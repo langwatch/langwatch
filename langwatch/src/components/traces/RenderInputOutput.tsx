@@ -101,6 +101,16 @@ export function RenderInputOutput(
   };
 
   const renderJson = (json: object) => {
+    let json_ = json;
+    if (!json_) {
+      json_ = parsePythonInsideJson(json);
+    }
+
+    let forceRaw = false;
+    if (typeof json_ !== "object") {
+      forceRaw = true;
+    }
+
     return (
       <>
         <HStack
@@ -110,25 +120,27 @@ export function RenderInputOutput(
           zIndex={1}
           spacing="-1px"
         >
-          <Tooltip label="View Raw">
-            <Box>
-              <TinyButton
-                onClick={() => setRaw(!raw)}
-                background={raw ? "gray.200" : "gray.100"}
-              >
-                {"{}"}
-              </TinyButton>
-            </Box>
-          </Tooltip>
+          {!forceRaw && (
+            <Tooltip label="View Raw">
+              <Box>
+                <TinyButton
+                  onClick={() => setRaw(!raw)}
+                  background={raw ? "gray.200" : "gray.100"}
+                >
+                  {"{}"}
+                </TinyButton>
+              </Box>
+            </Tooltip>
+          )}
           {renderCopyButton()}
         </HStack>
-        {raw ? (
+        {raw || forceRaw ? (
           <Text fontFamily="mono" fontSize="14px">
             {JSON.stringify(json, null, 2)}
           </Text>
         ) : (
           <ReactJson
-            src={json ? parsePythonInsideJson(json) : {}}
+            src={json_}
             name={false}
             displayDataTypes={false}
             displayObjectSize={false}

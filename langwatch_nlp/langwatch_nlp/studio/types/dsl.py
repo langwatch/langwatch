@@ -20,6 +20,7 @@ class FieldType(str, Enum):
     llm = "llm"
     prompting_technique = "prompting_technique"
     dataset = "dataset"
+    code = "code"
 
 
 class Field(BaseModel):
@@ -44,7 +45,7 @@ class ComponentType(str, Enum):
     entry = "entry"
     end = "end"
     signature = "signature"
-    module = "module"
+    code = "code"
     retriever = "retriever"
     prompting_technique = "prompting_technique"
     evaluator = "evaluator"
@@ -137,9 +138,8 @@ class NodeRef(BaseModel):
     ref: str
 
 
-class Module(BaseComponent):
-    components: Optional[List["Node"]] = None
-    forward_pass: Optional[Union[List[Edge], Dict[str, str]]] = None
+class Code(BaseComponent):
+    pass
 
 
 class Custom(BaseComponent):
@@ -161,7 +161,7 @@ class Evaluator(BaseComponent):
 
 
 Component = Union[
-    BaseComponent, Entry, Signature, PromptingTechnique, Module, Evaluator, End
+    BaseComponent, Entry, Signature, PromptingTechnique, Code, Evaluator, End
 ]
 
 
@@ -185,9 +185,9 @@ class PromptingTechniqueNode(BaseNode):
     data: PromptingTechnique
 
 
-class ModuleNode(BaseNode):
-    type: Literal["module"] = "module"
-    data: Module
+class CodeNode(BaseNode):
+    type: Literal["code"] = "code"
+    data: Code
 
 
 class EntryNode(BaseNode):
@@ -213,7 +213,7 @@ class EndNode(BaseNode):
 Node = Union[
     SignatureNode,
     PromptingTechniqueNode,
-    ModuleNode,
+    CodeNode,
     CustomNode,
     EntryNode,
     RetrieverNode,
