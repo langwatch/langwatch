@@ -165,6 +165,8 @@ const ALLOWED_EVALUATORS = [
   "ragas/answer_correctness",
   "ragas/answer_relevancy",
   "ragas/faithfulness",
+  "ragas/context_relevancy",
+  "ragas/context_utilization",
   "langevals/basic",
   "langevals/llm_boolean",
   "langevals/llm_score",
