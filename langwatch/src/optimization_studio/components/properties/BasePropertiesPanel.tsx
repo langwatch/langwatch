@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  Center,
   FormControl,
   FormErrorMessage,
   HStack,
@@ -9,11 +10,20 @@ import {
   Spacer,
   Text,
   Tooltip,
+  useDisclosure,
   VStack,
 } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
-import React, { useEffect, useState } from "react";
-import { ChevronDown, Columns, Info, Plus, Trash2, X } from "react-feather";
+import React, { useEffect, useSEdit2, tate, useState } from "react";
+import {
+  ChevronDown,
+  Columns,
+  Edit2,
+  Info,
+  Plus,
+  Trash2,
+  X,
+} from "react-feather";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
@@ -38,6 +48,8 @@ import {
 } from "../nodes/Nodes";
 
 import { LLMConfigField } from "./modals/LLMConfigModal";
+import { RenderCode } from "../../../components/code/RenderCode";
+import { CodeEditorModal } from "../code/CodeEditorModal";
 
 export function PropertyField({
   title,
@@ -107,6 +119,7 @@ export function FieldsDefinition({
     setTimeout(() => {
       updateNodeInternals(node.id);
     }, 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node.data.behave_as]);
 
   const watchedFields = watch("fields");
@@ -270,12 +283,15 @@ export function FieldsForm({
   title: string;
   field: "parameters" | "inputs" | "outputs";
 }) {
-  const { default_llm, setNode } = useWorkflowStore(
-    useShallow((state) => ({
-      setNode: state.setNode,
-      default_llm: state.default_llm,
-    }))
-  );
+  const { default_llm, setNode, parameters, setNodeParameter } =
+    useWorkflowStore(
+      useShallow((state) => ({
+        parameters: state.nodes.find((n) => n.id === node.id)?.data.parameters,
+        setNode: state.setNode,
+        default_llm: state.default_llm,
+        setNodeParameter: state.setNodeParameter,
+      }))
+    );
 
   const {
     control,
@@ -300,6 +316,8 @@ export function FieldsForm({
     });
     updateNodeInternals(node.id);
   };
+
+  const codeEditorModal = useDisclosure();
 
   return (
     <VStack
@@ -332,6 +350,73 @@ export function FieldsForm({
                 updateNodeInternals(node.id);
               }}
             />
+          );
+        }
+
+        if (field.type === "code") {
+          const stateField = parameters?.find(
+            (p) => p.identifier === field.identifier
+          );
+          return (
+            <Box position="relative" width="full" key={field.id}>
+              <Center
+                role="button"
+                aria-label="Edit code"
+                onClick={codeEditorModal.onOpen}
+                position="absolute"
+                top={0}
+                left={0}
+                width="100%"
+                height="100%"
+                background="rgba(0, 0, 0, 0.2)"
+                zIndex={10}
+                opacity={0}
+                cursor="pointer"
+                transition="opacity 0.2s ease-in-out"
+                _hover={{
+                  opacity: 1,
+                }}
+              >
+                <HStack
+                  spacing={2}
+                  fontSize={18}
+                  fontWeight="bold"
+                  color="white"
+                  background="rgba(0, 0, 0, .5)"
+                  paddingY={2}
+                  paddingX={4}
+                  borderRadius="6px"
+                >
+                  <Edit2 size={20} />
+                  <Text>Edit</Text>
+                </HStack>
+              </Center>
+              <RenderCode
+                code={stateField?.value as string}
+                language="python"
+                style={{
+                  width: "100%",
+                  fontSize: "12px",
+                  padding: "12px",
+                  borderRadius: "8px",
+                  backgroundColor: "rgb(39, 40, 34)",
+                  maxHeight: "200px",
+                  overflowY: "hidden",
+                }}
+              />
+              <CodeEditorModal
+                code={stateField?.value as string}
+                setCode={(code) => {
+                  setNodeParameter(node.id, {
+                    identifier: field.identifier,
+                    type: "code",
+                    value: code,
+                  });
+                }}
+                isOpen={codeEditorModal.isOpen}
+                onClose={codeEditorModal.onClose}
+              />
+            </Box>
           );
         }
 

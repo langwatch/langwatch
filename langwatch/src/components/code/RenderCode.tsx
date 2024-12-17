@@ -8,9 +8,11 @@ require("prismjs/components/prism-python");
 export const RenderCode = ({
   code,
   language,
+  style: propsStyle = {},
 }: {
   code: string;
   language: string;
+  style?: React.CSSProperties;
 }) => {
   return (
     <Highlight
@@ -20,7 +22,7 @@ export const RenderCode = ({
       language={language}
     >
       {({ style, tokens, getLineProps, getTokenProps }) => (
-        <pre style={{ ...style, whiteSpace: "pre-wrap" }}>
+        <pre style={{ ...style, whiteSpace: "pre-wrap", ...propsStyle }}>
           {tokens.map((line, i) => (
             <div key={i} {...getLineProps({ line })}>
               {line.map((token, key) => (

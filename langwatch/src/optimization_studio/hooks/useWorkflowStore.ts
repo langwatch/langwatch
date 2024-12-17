@@ -20,6 +20,7 @@ import type {
   Workflow,
 } from "../types/dsl";
 import { findLowestAvailableName } from "../utils/nodeUtils";
+import { snakeCaseToPascalCase } from "../../utils/stringCasing";
 
 export type SocketStatus =
   | "disconnected"
@@ -206,7 +207,36 @@ const store = (
             ? {
                 ...n,
                 ...node,
-                data: { ...n.data, ...node.data },
+                data: {
+                  ...n.data,
+                  ...node.data,
+                  ...(newId && n.type === "code"
+                    ? {
+                        parameters: updateCodeClassName(
+                          (node.data?.parameters as Field[]) ??
+                            n.data?.parameters ??
+                            [],
+                          n.id,
+                          newId
+                        ),
+                      }
+                    : {}),
+                  ...((node.data?.inputs || node.data?.outputs) &&
+                  n.type === "code"
+                    ? {
+                        parameters: updateOutputFields(
+                          updateInputFields(
+                            (node.data?.parameters as Field[]) ??
+                              n.data?.parameters ??
+                              [],
+                            (node.data?.inputs ?? []) as Field[]
+                          ),
+                          n.data.outputs ?? [],
+                          (node.data?.outputs ?? []) as Field[]
+                        ),
+                      }
+                    : {}),
+                },
                 id: newId ? newId : n.id,
               }
             : n
@@ -527,5 +557,96 @@ export const removeInvalidDecorations = (nodes: Node[]) => {
       };
     }
     return node;
+  });
+};
+
+export const updateCodeClassName = (
+  parameters: Field[],
+  _oldId: string,
+  newId: string
+): Field[] => {
+  return parameters.map((p) =>
+    p.identifier === "code"
+      ? {
+          ...p,
+          value: (p.value as string).replace(
+            /class .*?\(dspy\.Module\):/,
+            `class ${snakeCaseToPascalCase(newId)}(dspy.Module):`
+          ),
+        }
+      : p
+  );
+};
+
+const typesMap: Record<Field["type"], string> = {
+  str: "str",
+  int: "int",
+  float: "float",
+  bool: "bool",
+  image: "dspy.Image",
+  "list[str]": "list[str]",
+  "list[float]": "list[float]",
+  "list[int]": "list[int]",
+  "list[bool]": "list[bool]",
+  dict: "dict[str, Any]",
+  signature: "dspy.Signature",
+  llm: "Any",
+  prompting_technique: "Any",
+  dataset: "Any",
+  code: "str",
+};
+
+export const updateInputFields = (parameters: Field[], inputs: Field[]) => {
+  if (inputs.length === 0) {
+    return parameters;
+  }
+
+  return parameters.map((p) => {
+    if (p.identifier === "code") {
+      let code = (p.value as string).replace(
+        /def forward\([\s\S]*?\):/,
+        `def forward(self, ${inputs
+          .map((i) => `${i.identifier}: ${typesMap[i.type]}`)
+          .join(", ")}):`
+      );
+      if (code.includes(": Any") && !code.includes("from typing import Any")) {
+        code = `from typing import Any\n${code}`;
+      }
+      return {
+        ...p,
+        value: code,
+      };
+    }
+    return p;
+  });
+};
+
+export const updateOutputFields = (
+  parameters: Field[],
+  previousOutputs: Field[],
+  outputs: Field[]
+) => {
+  if (previousOutputs.length !== outputs.length) {
+    return parameters;
+  }
+
+  return parameters.map((p) => {
+    if (p.identifier === "code") {
+      let code = p.value as string;
+      for (const [index, output] of outputs.entries()) {
+        code = code.replace(
+          new RegExp(
+            `(return[\\s\\n\\t]+?\\{[^\\}]*?)"${previousOutputs[index]?.identifier}"`
+          ),
+          `$1"${output.identifier}"`
+        );
+      }
+
+      return {
+        ...p,
+        value: code,
+      };
+    }
+    return p;
   });
 };

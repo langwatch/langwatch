@@ -17,7 +17,8 @@ export type Field = {
     | "signature"
     | "llm"
     | "prompting_technique"
-    | "dataset";
+    | "dataset"
+    | "code";
   optional?: boolean;
   value?: unknown;
   desc?: string;
@@ -36,7 +37,7 @@ export type ComponentType =
   | "entry"
   | "end"
   | "signature"
-  | "module"
+  | "code"
   | "retriever"
   | "prompting_technique"
   | "custom"
@@ -78,17 +79,14 @@ export type LLMConfig = {
 
 export type Signature = BaseComponent;
 
+export type Code = BaseComponent;
+
 export type Custom = BaseComponent & {
   isCustom?: boolean;
   workflow_id?: string;
   publishedId?: string;
   version_id?: string;
   versions?: Record<string, any>;
-};
-
-export type Module = BaseComponent & {
-  components?: Flow["nodes"];
-  forward_pass?: Flow["edges"] | { code: string };
 };
 
 export type Retriever = BaseComponent;
@@ -130,7 +128,8 @@ export type Component =
   | Entry
   // eslint-disable-next-line
   | Signature
-  | Module
+  // eslint-disable-next-line
+  | Code
   | Evaluator
   | End
   | Custom;

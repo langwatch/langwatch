@@ -21,7 +21,10 @@ import { useDrag, useDragDropManager, useDragLayer } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
 import { BookOpen, Box as BoxIcon, ChevronsLeft, GitHub } from "react-feather";
 import { HoverableBigText } from "../../components/HoverableBigText";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import {
+  updateCodeClassName,
+  useWorkflowStore,
+} from "../hooks/useWorkflowStore";
 import { MODULES } from "../registry";
 import {
   type Component,
@@ -30,7 +33,11 @@ import {
   type Custom,
   type Field,
 } from "../types/dsl";
-import { findLowestAvailableName, getInputsOutputs } from "../utils/nodeUtils";
+import {
+  findLowestAvailableName,
+  getInputsOutputs,
+  nameToId,
+} from "../utils/nodeUtils";
 import { ComponentIcon } from "./ColorfulBlockIcons";
 import { NodeComponents } from "./nodes";
 import { PromptingTechniqueDraggingNode } from "./nodes/PromptingTechniqueNode";
@@ -143,15 +150,10 @@ export const NodeSelectionPanel = ({
           <Text fontWeight="500" padding={1}>
             Components
           </Text>
-          {MODULES.signatures.map((signature) => {
-            return (
-              <NodeDraggable
-                key={signature.name}
-                component={signature}
-                type="signature"
-              />
-            );
-          })}
+
+          <NodeDraggable component={MODULES.signature} type="signature" />
+
+          <NodeDraggable component={MODULES.code} type="code" />
 
           {components &&
             components.length > 0 &&
@@ -320,11 +322,20 @@ export const NodeDraggable = (props: {
         ...props.component,
         name: newName,
         behave_as: props.behave_as,
+        ...(props.type === "code"
+          ? {
+              parameters: updateCodeClassName(
+                props.component.parameters ?? [],
+                nameToId(props.component.name ?? ""),
+                newId
+              ),
+            }
+          : {}),
       },
     };
 
     return { newName, newId, newNode };
-  }, [props.component, props.type, nodes]);
+  }, [nodes, props.component, props.type, props.behave_as]);
 
   const { screenToFlowPosition } = useReactFlow();
 

@@ -45,3 +45,15 @@ export const camelCaseToSnakeCase = (input: string): string => {
     .replace(/(([a-z])(?=[A-Z][a-zA-Z])|([A-Z])(?=[A-Z][a-z]))/g, "$1_")
     .toLowerCase();
 };
+
+export const snakeCaseToCamelCase = (input: string): string => {
+  return input.replace(/_([a-z0-9])/g, (_, char) => char.toUpperCase());
+};
+
+export const camelCaseToPascalCase = (input: string): string => {
+  return input.replace(/^([a-z0-9])/, (_, char) => char.toUpperCase());
+};
+
+export const snakeCaseToPascalCase = (input: string): string => {
+  return camelCaseToPascalCase(snakeCaseToCamelCase(input));
+};

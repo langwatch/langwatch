@@ -6,6 +6,7 @@ import {
   Shield,
   Box as BoxIcon,
   BookOpen,
+  Code,
 } from "react-feather";
 import { EqualsIcon } from "../../components/icons/EqualsIcon";
 import { LLMIcon } from "../../components/icons/LLMIcon";
@@ -96,7 +97,7 @@ export const ComponentIcon = ({
   const componentIconMap: Record<ComponentType, React.ReactNode> = {
     signature: <LLMIcon />,
     entry: <Home />,
-    module: <BoxIcon />,
+    code: <Code />,
     retriever: <RetrieverIcon cls={cls} />,
     prompting_technique: <BoxIcon />,
     evaluator: <EvaluatorIcon cls={cls} />,
@@ -107,7 +108,7 @@ export const ComponentIcon = ({
   const componentColorMap: Record<ComponentType, string> = {
     signature: "green.400",
     entry: "blue.400",
-    module: "gray.400",
+    code: "#3E5A60",
     retriever: "purple.400",
     prompting_technique: "teal.400",
     evaluator: "#5FD15D",
