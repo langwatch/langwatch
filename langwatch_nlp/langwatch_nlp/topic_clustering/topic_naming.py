@@ -186,6 +186,9 @@ def improve_similar_names(
 
     embeddings = []
     for name in topic_names:
+        if "dimensions" in embeddings_litellm_params:
+            # TODO: target_dim is throwing errors for text-embedding-3-small because litellm drop_params is also not working for some reason
+            del embeddings_litellm_params["dimensions"]
         response = litellm.embedding(
             **embeddings_litellm_params,  # type: ignore
             input=name if name else "",

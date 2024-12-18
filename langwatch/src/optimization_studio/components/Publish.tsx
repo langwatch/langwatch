@@ -20,6 +20,7 @@ import {
   ModalOverlay,
   Skeleton,
   Spacer,
+  Spinner,
   Text,
   Tooltip,
   useDisclosure,
@@ -261,7 +262,7 @@ function PublishMenu({
         >
           <MenuItem
             {...props}
-            icon={<Lock size={16} />}
+            icon={usage.data ? <Lock size={16} /> : <Spinner size="sm" />}
             isDisabled={false}
             color="gray.400"
             onClick={() => {
@@ -269,7 +270,7 @@ function PublishMenu({
                 projectId: project?.id,
                 hook: "studio_click_subscribe_to_publish",
               });
-              router.push("/settings/subscription");
+              void router.push("/settings/subscription");
             }}
           />
         </Tooltip>
@@ -559,6 +560,7 @@ function PublishModalContent({
         <VStack align="start" width="full" spacing={3}>
           {hasProvidersWithoutCustomKeys && (
             <AddModelProviderKey
+              runWhat="publish"
               nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
             />
           )}

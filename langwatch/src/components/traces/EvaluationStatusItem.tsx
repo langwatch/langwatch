@@ -9,6 +9,22 @@ import {
   evaluationStatusColor,
 } from "../checks/EvaluationStatus";
 
+export function formatEvaluationSingleValue(evaluation: {
+  score?: number | null;
+  passed?: boolean | null;
+  label?: string | null;
+}) {
+  return evaluation.label !== undefined && evaluation.label !== null
+    ? evaluation.label
+    : evaluation.score !== undefined && evaluation.score !== null
+    ? formatEvaluationScore(evaluation.score)
+    : evaluation.passed !== undefined && evaluation.passed !== null
+    ? evaluation.passed
+      ? "Pass"
+      : "Fail"
+    : "N/A";
+}
+
 export function formatEvaluationScore(score: number | null | undefined) {
   if (score === null || score === undefined) {
     return "N/A";

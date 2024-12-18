@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any, Dict, List, Optional, Union, cast
 from langwatch_nlp.studio.modules.evaluators.evaluator_wrapper import EvaluatorWrapper
 from langwatch_nlp.studio.dspy.llm_node import LLMNode
@@ -19,13 +20,13 @@ from langwatch_nlp.studio.types.dsl import (
     Node,
     NodeDataset,
     NodeRef,
-    ModuleNode,
+    CodeNode,
     PromptingTechnique,
     PromptingTechniqueNode,
     Retriever,
     Signature,
     Workflow,
-    Module,
+    Code,
     Custom,
 )
 import dspy
@@ -44,6 +45,8 @@ def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
     match node.type:
         case "signature":
             return parse_signature(node.id, node.data, workflow)
+        case "code":
+            return parse_code(node.id, node.data, workflow)
         case "prompting_technique":
             raise NotImplementedError("Prompting techniques cannot be parsed directly")
         case "retriever":
@@ -158,6 +161,36 @@ def parse_signature(
     )
 
 
+def parse_code(node_id: str, component: Code, workflow: Workflow) -> dspy.Module:
+    code = next(
+        (
+            param.value
+            for param in (component.parameters or [])
+            if param.identifier == "code"
+        ),
+        None,
+    )
+    if not code:
+        raise ValueError(f"Could not find code for component {component.name}")
+
+    namespace = {}
+    try:
+        exec(code, None, namespace)
+    except Exception as e:
+        raise ValueError(f"Error parsing code for component {component.name}: {e}")
+
+    pattern = r"class (.*?)\(dspy\.Module\):"
+    match = re.search(pattern, code)
+    if not match:
+        raise ValueError(
+            f"Could not find a class that inherits from dspy.Module for component {component.name}"
+        )
+    class_name = match.group(1)
+
+    module = namespace[class_name]
+    return module()
+
+
 def parse_prompting_technique(
     component: PromptingTechnique,
 ) -> PromptingTechniqueTypes:
@@ -221,7 +254,7 @@ def autoparse_field_value(field: Field, value: Optional[Any]) -> Optional[Any]:
             value = json.loads(value)
         except ValueError:
             pass
-    if value is None:
+    if value is None or value == "null" or value == "None":
         return None
 
     if field.type == FieldType.int:

@@ -1,6 +1,24 @@
-import { Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  Icon,
+  IconButton,
+  Switch,
+  Text,
+  Tooltip,
+  useToast,
+  type ButtonProps,
+} from "@chakra-ui/react";
 import type { ReactJsonViewProps } from "@microlink/react-json-view";
 import dynamic from "next/dynamic";
+import { useState } from "react";
+import { Copy, File } from "react-feather";
+import { CopyIcon } from "../icons/Copy";
+import {
+  isPythonRepr,
+  parsePythonInsideJson,
+} from "../../utils/parsePythonInsideJson";
 
 export function RenderInputOutput(
   props: Partial<ReactJsonViewProps> & { value: string | undefined }
@@ -29,25 +47,157 @@ export function RenderInputOutput(
   const propsWithoutValue = { ...props };
   delete propsWithoutValue.value;
 
-  return typeof document !== "undefined" && json ? (
-    <ReactJson
-      src={json}
-      name={false}
-      displayDataTypes={false}
-      displayObjectSize={false}
-      enableClipboard={false}
-      collapseStringsAfterLength={500}
-      //@ts-ignore
-      displayArrayKey={false}
-      {...propsWithoutValue}
+  const [raw, setRaw] = useState(false);
+
+  const toast = useToast();
+
+  const renderCopyButton = () => {
+    return (
+      <Tooltip label="Copy">
+        <Box>
+          <TinyButton
+            position="relative"
+            onClick={() => {
+              void (async () => {
+                try {
+                  await navigator.clipboard.writeText(
+                    json
+                      ? JSON.stringify(json, null, 2)
+                      : value
+                      ? typeof value === "string"
+                        ? value
+                        : (value as any).toString()
+                      : `${value}`
+                  );
+                  toast({
+                    title: "Copied to clipboard",
+                    status: "success",
+                  });
+                } catch (e) {
+                  if (
+                    window.location.protocol === "http:" &&
+                    window.location.hostname !== "localhost" &&
+                    window.location.hostname !== "127.0.0.1"
+                  ) {
+                    toast({
+                      title: "Cannot copy to clipboard on HTTP",
+                      status: "error",
+                    });
+                    return;
+                  }
+                  toast({
+                    title: "Failed to copy to clipboard",
+                    status: "error",
+                  });
+                }
+              })();
+            }}
+          >
+            <CopyIcon width={12} height={12} />
+          </TinyButton>
+        </Box>
+      </Tooltip>
+    );
+  };
+
+  const renderJson = (json: object) => {
+    let json_ = json;
+    if (!json_) {
+      json_ = parsePythonInsideJson(json);
+    }
+
+    let forceRaw = false;
+    if (typeof json_ !== "object") {
+      forceRaw = true;
+    }
+
+    return (
+      <>
+        <HStack
+          position="absolute"
+          top={-2}
+          right={-2}
+          zIndex={1}
+          spacing="-1px"
+        >
+          {!forceRaw && (
+            <Tooltip label="View Raw">
+              <Box>
+                <TinyButton
+                  onClick={() => setRaw(!raw)}
+                  background={raw ? "gray.200" : "gray.100"}
+                >
+                  {"{}"}
+                </TinyButton>
+              </Box>
+            </Tooltip>
+          )}
+          {renderCopyButton()}
+        </HStack>
+        {raw || forceRaw ? (
+          <Text fontFamily="mono" fontSize="14px">
+            {JSON.stringify(json, null, 2)}
+          </Text>
+        ) : (
+          <ReactJson
+            src={json_}
+            name={false}
+            displayDataTypes={false}
+            displayObjectSize={false}
+            enableClipboard={false}
+            collapseStringsAfterLength={1000}
+            //@ts-ignore
+            displayArrayKey={false}
+            {...propsWithoutValue}
+          />
+        )}
+      </>
+    );
+  };
+
+  return (
+    <Box position="relative" width="full">
+      {typeof document !== "undefined" &&
+      (json ?? isPythonRepr(value ?? "")) ? (
+        renderJson(json ?? (value as any))
+      ) : (
+        <>
+          <HStack
+            position="absolute"
+            top={-2}
+            right={-2}
+            zIndex={1}
+            spacing="-1px"
+          >
+            {renderCopyButton()}
+          </HStack>
+          <Text fontFamily="mono" fontSize="14px">
+            {value
+              ? typeof value === "string"
+                ? value
+                : (value as any).toString()
+              : `${value}`}
+          </Text>
+        </>
+      )}
+    </Box>
+  );
+}
+
+function TinyButton(props: ButtonProps) {
+  return (
+    <Button
+      size="xs"
+      fontSize="10px"
+      fontFamily="mono"
+      padding={1}
+      height="auto"
+      width="auto"
+      minWidth="0"
+      borderRadius="0"
+      border="1px solid"
+      borderColor="gray.300"
+      {...props}
     />
-  ) : (
-    <Text fontFamily="mono" fontSize="14px">
-      {value
-        ? typeof value === "string"
-          ? value
-          : (value as any).toString()
-        : `${value}`}
-    </Text>
   );
 }

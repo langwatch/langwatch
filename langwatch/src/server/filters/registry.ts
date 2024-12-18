@@ -743,7 +743,10 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                 count: bucket.doc_count,
               };
             })
-            .filter((option: any) => option?.label !== undefined) ?? []
+            .filter(
+              (option: any) =>
+                option?.label !== undefined && option?.label !== null
+            ) ?? []
         );
       },
     },

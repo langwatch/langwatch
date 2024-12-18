@@ -34,6 +34,7 @@ export const addEnvs = async (
   }
 
   const onlyCustomKeys =
+    event.payload.workflow.nodes.some((node) => node.type === "code") ||
     event.type === "execute_optimization" ||
     event.type === "execute_evaluation";
 

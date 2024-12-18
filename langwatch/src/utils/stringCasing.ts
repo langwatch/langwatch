@@ -16,7 +16,7 @@ export const camelCaseToTitleCase = (input: string): string => {
 
 // Special cases (acronyms etc.)
 const accronyms =
-  /(\b(llm|rag|id|ip|iban|vat|pii|url|nrp|us|uk|es|it|pl|sg|au|in|fi|itin|ssn|nhs|nif|nie|nric|uen|abn|acn|tfn)\b)/gi;
+  /(\b(llm|rag|id|ip|iban|vat|pii|url|nrp|us|uk|es|it|pl|sg|au|in|fi|itin|ssn|nhs|nif|nie|nric|uen|abn|acn|tfn|ai)\b)/gi;
 
 export const titleCase = (input: string): string => {
   return input
@@ -44,4 +44,16 @@ export const camelCaseToSnakeCase = (input: string): string => {
   return input
     .replace(/(([a-z])(?=[A-Z][a-zA-Z])|([A-Z])(?=[A-Z][a-z]))/g, "$1_")
     .toLowerCase();
+};
+
+export const snakeCaseToCamelCase = (input: string): string => {
+  return input.replace(/_([a-z0-9])/g, (_, char) => char.toUpperCase());
+};
+
+export const camelCaseToPascalCase = (input: string): string => {
+  return input.replace(/^([a-z0-9])/, (_, char) => char.toUpperCase());
+};
+
+export const snakeCaseToPascalCase = (input: string): string => {
+  return camelCaseToPascalCase(snakeCaseToCamelCase(input));
 };

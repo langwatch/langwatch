@@ -1,5 +1,7 @@
 import { AVAILABLE_EVALUATORS } from "../server/evaluations/evaluators.generated";
 import {
+  type BaseComponent,
+  type Code,
   type Evaluator,
   type Field,
   type PromptingTechnique,
@@ -8,45 +10,73 @@ import {
 } from "./types/dsl";
 import { convertEvaluators } from "./utils/registryUtils";
 
-const signatures: Signature[] = [
-  {
-    name: "LLM Signature",
-    parameters: [
-      {
-        identifier: "llm",
-        type: "llm",
-        value: undefined,
-      },
-      {
-        identifier: "prompting_technique",
-        type: "prompting_technique",
-        value: undefined,
-      },
-      {
-        identifier: "instructions",
-        type: "str",
-        value: undefined,
-      },
-      {
-        identifier: "demonstrations",
-        type: "dataset",
-        value: undefined,
-      },
-    ],
-    inputs: [
-      {
-        identifier: "question",
-        type: "str",
-      },
-    ],
-    outputs: [
-      {
-        identifier: "answer",
-        type: "str",
-      },
-    ],
-  },
-];
+const signature: Signature = {
+  name: "LLM Signature",
+  parameters: [
+    {
+      identifier: "llm",
+      type: "llm",
+      value: undefined,
+    },
+    {
+      identifier: "prompting_technique",
+      type: "prompting_technique",
+      value: undefined,
+    },
+    {
+      identifier: "instructions",
+      type: "str",
+      value: undefined,
+    },
+    {
+      identifier: "demonstrations",
+      type: "dataset",
+      value: undefined,
+    },
+  ],
+  inputs: [
+    {
+      identifier: "question",
+      type: "str",
+    },
+  ],
+  outputs: [
+    {
+      identifier: "answer",
+      type: "str",
+    },
+  ],
+};
+
+const code: Code = {
+  name: "Code",
+  parameters: [
+    {
+      identifier: "code",
+      type: "code",
+      value: `import dspy
+
+class Code(dspy.Module):
+    def forward(self, question: str):
+        # Your code goes here
+
+        return {"answer": "Hello world!"}
+`,
+    },
+  ],
+  inputs: [
+    {
+      identifier: "question",
+      type: "str",
+    },
+  ],
+  outputs: [
+    {
+      identifier: "answer",
+      type: "str",
+    },
+  ],
+};
 
 const promptingTechniques: PromptingTechnique[] = [
   {
@@ -135,6 +165,8 @@ const ALLOWED_EVALUATORS = [
   "ragas/answer_correctness",
   "ragas/answer_relevancy",
   "ragas/faithfulness",
+  "ragas/context_relevancy",
+  "ragas/context_utilization",
   "langevals/basic",
   "langevals/llm_boolean",
   "langevals/llm_score",
@@ -181,7 +213,8 @@ const evaluators: Evaluator[] = [
 ];
 
 export const MODULES = {
-  signatures,
+  signature,
+  code,
   promptingTechniques,
   evaluators,
   retrievers,

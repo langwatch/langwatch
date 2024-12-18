@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
 
   const xAuthToken = req.headers.get("x-auth-token");
   const authHeader = req.headers.get("authorization");
+  const contentType = req.headers.get("content-type");
 
   const authToken =
     xAuthToken ??
@@ -55,7 +56,11 @@ export async function POST(req: NextRequest) {
 
   let traceRequest: IExportTraceServiceRequest;
   try {
-    traceRequest = traceRequestType.decode(new Uint8Array(body));
+    if (contentType === "application/json") {
+      traceRequest = JSON.parse(Buffer.from(body).toString("utf-8"));
+    } else {
+      traceRequest = traceRequestType.decode(new Uint8Array(body));
+    }
   } catch (error) {
     try {
       const json = JSON.parse(Buffer.from(body).toString("utf-8"));

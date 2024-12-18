@@ -62,6 +62,7 @@ import { api } from "~/utils/api";
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { titleCase } from "../../utils/stringCasing";
 
 type OrganizationFormData = {
   organizationName: string;
@@ -76,14 +77,19 @@ type OrganizationFormData = {
   otherCompanyType: string;
   otherProjectType: string;
   otherHowDidYouHearAboutUs: string;
+  utmCampaign: string | null;
 };
 
 export default function OrganizationOnboarding() {
   const { data: session } = useRequiredSession();
-  const { getRootProps, getRadioProps } = useRadioGroup({
+  const { getRootProps } = useRadioGroup({
     name: "usage",
     defaultValue: "company",
   });
+  const utmCampaign =
+    typeof window !== "undefined"
+      ? window.sessionStorage.getItem("utm_campaign")
+      : null;
 
   const {
     register,
@@ -95,6 +101,9 @@ export default function OrganizationOnboarding() {
     reset: resetForm,
   } = useForm<OrganizationFormData>({
     mode: "onChange",
+    defaultValues: {
+      utmCampaign,
+    },
   });
   const router = useRouter();
   const toast = useToast();
@@ -373,7 +382,6 @@ export default function OrganizationOnboarding() {
                   </FormErrorMessage>
                 </FormControl>
               )}
-
               <FormControl marginTop={4} isInvalid={!!errors?.terms}>
                 <Checkbox {...register("terms", { required: true })}>
                   <Text fontSize={14}>
@@ -392,6 +400,15 @@ export default function OrganizationOnboarding() {
                 </Checkbox>
                 <FormErrorMessage>Please agree to terms</FormErrorMessage>
               </FormControl>
+
+              {utmCampaign && (
+                <FormControl>
+                  <Text fontSize={14}>
+                    You are signing up via the{" "}
+                    <b>{titleCase(utmCampaign.replaceAll("-", " "))}</b> campaign
+                  </Text>
+                </FormControl>
+              )}
 
               <Divider />
               <HStack width="full">

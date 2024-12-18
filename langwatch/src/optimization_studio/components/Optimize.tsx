@@ -473,6 +473,7 @@ export function OptimizeModalContent({
         <VStack align="start" width="full" spacing={3}>
           {hasProvidersWithoutCustomKeys ? (
             <AddModelProviderKey
+              runWhat="run optimizations"
               nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
             />
           ) : !hasEvaluator ? (

@@ -14,7 +14,6 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import type { ElasticSearchSpan } from "../../server/tracer/types";
 import { api } from "../../utils/api";
-import { isNotFound } from "../../utils/trpcError";
 import {
   getEvaluationResult,
   SpanDetails,
@@ -26,7 +25,10 @@ import {
   CheckStatusIcon,
 } from "../checks/EvaluationStatus";
 import { IconWrapper } from "../IconWrapper";
-import { formatEvaluationScore } from "./EvaluationStatusItem";
+import {
+  formatEvaluationScore,
+  formatEvaluationSingleValue,
+} from "./EvaluationStatusItem";
 import { HoverableBigText } from "../HoverableBigText";
 
 type SpanWithChildren = ElasticSearchSpan & { children: SpanWithChildren[] };
@@ -196,33 +198,35 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
                   </Text>
                 </>
               )}
-            {(evaluationResult?.score !== undefined ||
-              evaluationResult?.passed !== undefined) && (
+            {((evaluationResult?.score !== undefined &&
+              evaluationResult?.score !== null) ||
+              (evaluationResult?.passed !== undefined &&
+                evaluationResult?.passed !== null)) && (
               <>
                 <Text>·</Text>
                 <Text
                   fontSize={13}
                   color={evaluationStatusColor(evaluationResult)}
                 >
-                  {evaluationResult.score !== undefined
-                    ? formatEvaluationScore(evaluationResult.score)
-                    : evaluationResult.passed
-                    ? "Pass"
-                    : "Fail"}
+                  {formatEvaluationSingleValue({
+                    ...evaluationResult,
+                    label: undefined,
+                  })}
                 </Text>
               </>
             )}
-            {evaluationResult?.label !== undefined && (
-              <>
-                <Text>·</Text>
-                <Text
-                  fontSize={13}
-                  color={evaluationStatusColor(evaluationResult)}
-                >
-                  {evaluationResult.label}
-                </Text>
-              </>
-            )}
+            {evaluationResult?.label !== undefined &&
+              evaluationResult?.label !== null && (
+                <>
+                  <Text>·</Text>
+                  <Text
+                    fontSize={13}
+                    color={evaluationStatusColor(evaluationResult)}
+                  >
+                    {evaluationResult.label}
+                  </Text>
+                </>
+              )}
           </HStack>
         </VStack>
       </HStack>

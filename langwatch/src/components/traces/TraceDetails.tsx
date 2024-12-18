@@ -41,6 +41,7 @@ import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { evaluationPassed } from "../checks/EvaluationStatus";
 import { Conversation } from "../../pages/[project]/messages/[trace]/index";
 import { useRouter } from "next/router";
+
 interface TraceEval {
   project?: Project;
   traceId: string;

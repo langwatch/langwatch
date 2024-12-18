@@ -40,7 +40,7 @@ export function PropertiesPanel() {
     entry: EntryPointPropertiesPanel as React.FC<{ node: Node<Component> }>,
     end: EndPropertiesPanel as React.FC<{ node: Node<Component> }>,
     signature: SignaturePropertiesPanel,
-    module: BasePropertiesPanel,
+    code: BasePropertiesPanel,
     custom: CustomPropertiesPanel,
     retriever: RetrievePropertiesPanel,
     prompting_technique: PromptingTechniquePropertiesPanel,

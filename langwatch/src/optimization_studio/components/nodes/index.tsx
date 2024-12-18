@@ -20,7 +20,7 @@ export const NodeComponents: Record<
   signature: SignatureNode,
   evaluator: EvaluatorNode,
   end: EndNode,
-  module: ComponentNode,
+  code: ComponentNode,
   retriever: ComponentNode,
   prompting_technique: PromptingTechniqueNode,
   custom: CustomNode,

@@ -41,7 +41,18 @@ export const spansRouter = createTRPCRouter({
       const spans = result.hits.hits
         .map((hit) => hit._source!)
         .filter((x) => x)
-        .flatMap((hit) => hit.spans ?? []);
+        .flatMap((hit) => hit.spans ?? [])
+        .sort((a, b) => {
+          const startDiff =
+            (a.timestamps?.started_at ?? 0) - (b.timestamps?.started_at ?? 0);
+          if (startDiff === 0) {
+            return (
+              (b.timestamps?.finished_at ?? 0) -
+              (a.timestamps?.finished_at ?? 0)
+            );
+          }
+          return startDiff;
+        });
 
       return spans;
     }),
