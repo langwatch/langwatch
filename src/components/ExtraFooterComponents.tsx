@@ -45,15 +45,25 @@ export function SignedInExtraFooterComponents() {
       });
     }
 
-    gtag("event", "open_dashboard", {
-      organization_id: organization.id,
-      organization_name: organization.name,
-      project_id: project.id,
-      project_name: project.name,
-      environment: process.env.NODE_ENV,
-      user_name: session.data.user.name,
-      user_id: session.data.user.id,
-    });
+    if (!(session.data.user as any).impersonator) {
+      gtag("set", "user_properties", {
+        organization_id: organization.id,
+        organization_name: organization.name,
+        project_id: project.id,
+        project_name: project.name,
+        environment: process.env.NODE_ENV,
+        user_id: session.data.user.id,
+      });
+
+      gtag("event", "open_dashboard", {
+        organization_id: organization.id,
+        organization_name: organization.name,
+        project_id: project.id,
+        project_name: project.name,
+        environment: process.env.NODE_ENV,
+        user_id: session.data.user.id,
+      });
+    }
   }, [organization?.id, project?.id]);
 
   if (!session.data || !organization || !project) {

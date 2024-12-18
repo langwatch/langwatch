@@ -1,5 +1,5 @@
 FROM node:20-alpine
-RUN apk --no-cache add curl python3 make gcc g++ socat
+RUN apk --no-cache add curl python3 make gcc g++ socat openssl
 WORKDIR /app
 RUN mkdir langwatch docs
 COPY package.json package-lock.json .
@@ -18,8 +18,7 @@ RUN npm run build
 ENV NODE_ENV=production
 
 EXPOSE 3000
-# EXPOSE 5432
-# EXPOSE 6379
+EXPOSE 5432
+EXPOSE 6379
 
-# CMD ["/app/scripts/start-with-proxy.sh"]
-CMD ["npm", "start"]
+CMD /app/scripts/start-proxy.sh & npm start
