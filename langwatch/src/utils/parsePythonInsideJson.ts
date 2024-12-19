@@ -2,14 +2,14 @@ import * as ohm from "ohm-js";
 
 const grammar = ohm.grammar(`
   PyRepr {
-    Expression = ObjectExpr | Array | String | Number | Boolean | null
+    Expression = ObjectExpr | Array | String | UUID | Number | Boolean | null
 
     ObjectExpr = ClassExpr | DictExpr
 
     ClassExpr = identifier "(" ListOf<KeyValue, ","> ")"
     DictExpr = "{" ListOf<DictPair, ","> "}"
 
-    KeyValue = identifier "=" Expression
+    KeyValue = identifier ("=" | ":") Expression
     DictPair = (String | identifier) ":" Expression
 
     Array = "[" ListOf<Expression, ","> "]"
@@ -23,6 +23,10 @@ const grammar = ohm.grammar(`
     Boolean = "True" | "False"
 
     null = "None"
+
+    UUID = letter alnum alnum+
+        | digit+ letter+ alnum+
+        | alnum+ "-" alnum+
 
     identifier = letter (alnum | "_")*
   }
@@ -48,6 +52,7 @@ const semantics = grammar.createSemantics().addOperation("toJSON", {
   },
   Boolean: (b) => b.sourceString === "True",
   null: (_) => null,
+  UUID: (uuid, b, c) => uuid.sourceString + b.sourceString + c.sourceString,
   identifier: (first, rest) => first.sourceString + rest.sourceString,
 
   // Add these handlers for ListOf
