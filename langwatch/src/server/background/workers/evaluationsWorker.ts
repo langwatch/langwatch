@@ -267,6 +267,7 @@ export const runEvaluation = async ({
 
     const requestBody: Record<string, any> = {
       trace_id: trace?.trace_id,
+      do_not_trace: true,
     };
 
     const switchMapping = (mapping: Mappings) => {
