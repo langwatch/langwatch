@@ -12,6 +12,7 @@ export const getFirstInputAsText = (spans: Span[]): string => {
     organizeSpansIntoTree(spans),
     "outside-in"
   );
+
   const topmostInputs = topmostSpans.filter(
     (span) =>
       span.input &&
@@ -21,7 +22,20 @@ export const getFirstInputAsText = (spans: Span[]): string => {
       (span.input.type !== "json" || !isEmptyJson(span.input.value))
   );
 
-  const input = topmostInputs[0]?.input;
+  let input = topmostInputs[0]?.input;
+  // Haystack
+  if (
+    topmostSpans[0]?.type === "chain" &&
+    topmostSpans[0]?.params?.scope?.name?.includes("haystack") &&
+    typeof (topmostSpans[0]?.input?.value as any)?.data === "object"
+  ) {
+    input = {
+      type: "json",
+      value: Object.values(
+        (topmostSpans[0]?.input?.value as any)?.data
+      )[0] as any,
+    };
+  }
   if (!input) {
     const topmostSpan = topmostSpans.filter((span) => !span.parent_id)[0];
     if (
@@ -163,6 +177,9 @@ export const typedValueToText = (
       if (json.user_query !== undefined) {
         return stringified(json.user_query);
       }
+      if (json.query !== undefined) {
+        return stringified(json.user_query);
+      }
       // Langflow
       if (json.input_value !== undefined) {
         return stringified(json.input_value);
@@ -224,6 +241,9 @@ export const typedValueToText = (
       }
       if (typeof json.outputs === "object" && json.outputs.text !== undefined) {
         return stringified(json.outputs.text);
+      }
+      if (Array.isArray(json.llm?.replies)) {
+        return stringified(json.llm.replies[0]);
       }
 
       return undefined;

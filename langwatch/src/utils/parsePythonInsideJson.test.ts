@@ -8,13 +8,13 @@ describe("parsePythonInsideJson", () => {
   });
 
   it("should return the parsed python code if it is found", () => {
-    const obj = { contexts: ["Document(text='Hello, world!', weight=0.5)"] };
+    const obj = { contexts: ["Document(text='Hello, world!', weight=1020.5)"] };
     expect(parsePythonInsideJson(obj)).toEqual({
       contexts: [
         {
           Document: {
             text: "Hello, world!",
-            weight: 0.5,
+            weight: 1020.5,
           },
         },
       ],
@@ -53,6 +53,21 @@ describe("parsePythonInsideJson", () => {
             },
             { HumanMessage: { content: "hello" } },
           ],
+        },
+      },
+    });
+  });
+
+  it("should parse unquoted uuids, and mix of = and : too", () => {
+    const obj = {
+      a: "Document(id=6c90b78ad94e4e634e2a067b5fe2d26d4ce95405ec222cbaefaeb09ab4dce81e, content: 'My name is Jean and I live in Paris.', score: 1.2934543208277889)",
+    };
+    expect(parsePythonInsideJson(obj)).toEqual({
+      a: {
+        Document: {
+          id: "6c90b78ad94e4e634e2a067b5fe2d26d4ce95405ec222cbaefaeb09ab4dce81e",
+          content: "My name is Jean and I live in Paris.",
+          score: 1.2934543208277889,
         },
       },
     });

@@ -20,6 +20,7 @@ from opentelemetry.sdk import trace as trace_sdk
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
 
 from openinference.instrumentation.haystack import HaystackInstrumentor
+from openinference.instrumentation import using_attributes
 
 # Set up OpenTelemetry trace provider with LangWatch as the endpoint
 tracer_provider = trace_sdk.TracerProvider()
@@ -80,12 +81,18 @@ async def main(message: cl.Message):
         content="",
     )
 
-    results = rag_pipeline.run(
-        {
-            "retriever": {"query": message.content},
-            "prompt_builder": {"question": message.content},
-        }
-    )
+    with using_attributes(
+        session_id=message.thread_id,
+        user_id="my-test-user",
+        tags=["User relevant question", "Second tag example"],
+        metadata={"foo": "bar"},
+    ):
+        results = rag_pipeline.run(
+            {
+                "retriever": {"query": message.content},
+                "prompt_builder": {"question": message.content},
+            }
+        )
 
     msg.content = results["llm"]["replies"][0]
     await msg.send()

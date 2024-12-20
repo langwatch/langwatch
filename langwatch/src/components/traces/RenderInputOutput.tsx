@@ -101,10 +101,7 @@ export function RenderInputOutput(
   };
 
   const renderJson = (json: object) => {
-    let json_ = json;
-    if (!json_) {
-      json_ = parsePythonInsideJson(json);
-    }
+    const json_ = parsePythonInsideJson(json);
 
     let forceRaw = false;
     if (typeof json_ !== "object") {

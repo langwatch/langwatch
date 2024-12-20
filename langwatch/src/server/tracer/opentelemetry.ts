@@ -14,6 +14,7 @@ import type {
   BaseSpan,
   ChatMessage,
   LLMSpan,
+  RAGChunk,
   Span,
   SpanTypes,
   TypedValueChatMessages,
@@ -24,6 +25,7 @@ import {
   spanTypesSchema,
   typedValueChatMessagesSchema,
 } from "./types.generated";
+import { parsePythonInsideJson } from "../../utils/parsePythonInsideJson";
 
 export type TraceForCollection = Pick<
   CollectorJob,
@@ -658,6 +660,24 @@ const addOpenTelemetrySpanAsSpan = (
     name = attributesMap.ai.toolCall.name;
   }
 
+  // haystack RAG
+  const contexts: RAGChunk[] = [];
+  if (output?.type === "json" && (output?.value as any)?.documents) {
+    const documents = parsePythonInsideJson((output?.value as any).documents);
+    if (Array.isArray(documents)) {
+      type = "rag";
+      for (const document of documents) {
+        const document_ = document["Document"];
+        if (document_ && document_.content) {
+          contexts.push({
+            ...(document_.id ? { document_id: document_.id } : {}),
+            content: document_.content,
+          });
+        }
+      }
+    }
+  }
+
   const span: BaseSpan & {
     model: LLMSpan["model"];
     metrics?: LLMSpan["metrics"];
@@ -674,6 +694,7 @@ const addOpenTelemetrySpanAsSpan = (
     output,
     ...(error ? { error } : {}),
     ...(metrics ? { metrics } : {}),
+    ...(contexts && contexts.length > 0 ? { contexts } : {}),
     params,
     timestamps: {
       ...(started_at ? { started_at } : {}),
