@@ -41,7 +41,7 @@ import {
 } from "../../metrics";
 import type { Trace } from "~/server/tracer/types";
 
-import { executeWorkflowEvaluation } from "../../../utils/executeEvalWorkflow";
+import { executeWorkflowEvaluation } from "../../optimization/executeEvalWorkflow";
 
 const debug = getDebugger("langwatch:workers:traceChecksWorker");
 
@@ -118,7 +118,7 @@ export const runEvaluationForTrace = async ({
       return ragInfo.contexts[0];
     }
     if (mapping === "metadata.expected_output") {
-      return trace.expected_output?.value;
+      return trace.expected_output?.value ?? trace.metadata.expected_output;
     }
     // Use typescript to ensure all cases are handled
     const _: never = mapping;
@@ -240,81 +240,15 @@ export const runEvaluation = async ({
   }
 
   if (evaluatorType.startsWith("custom/")) {
-    const workflowId = evaluatorType.split("/")[1];
-
-    const project = await prisma.project.findUnique({
-      where: {
-        id: projectId,
-      },
-    });
-
-    if (!project) {
-      throw new Error("Project not found");
-    }
-
-    const check = await prisma.check.findFirst({
-      where: {
-        checkType: evaluatorType,
-        projectId: projectId,
-      },
-    });
-
-    if (!check) {
-      throw new Error("Check not found");
-    }
-
-    const mappings = check.mappings as Record<Mappings, string>;
-
-    const requestBody: Record<string, any> = {
-      trace_id: trace?.trace_id,
-      do_not_trace: true,
-    };
-
-    const switchMapping = (mapping: Mappings) => {
-      if (mapping === "trace.input") {
-        return input;
-      }
-      if (mapping === "trace.output") {
-        return output;
-      }
-      if (mapping === "trace.first_rag_context") {
-        return contexts;
-      }
-      if (mapping === "metadata.expected_output") {
-        return expected_output;
-      }
-      // Use typescript to ensure all cases are handled
-      const _: never = mapping;
-      throw new Error(`Unknown mapping: ${String(mapping)}`);
-    };
-
-    Object.entries(mappings).forEach(([key, mapping]) => {
-      requestBody[key] = switchMapping(mapping as Mappings);
-    });
-
-    if (!workflowId) {
-      throw new Error("Workflow ID is required");
-    }
-
-    const response = await executeWorkflowEvaluation(
-      workflowId,
-      project.id,
-      requestBody
+    return customEvaluation(
+      projectId,
+      evaluatorType,
+      input,
+      output,
+      contexts,
+      expected_output,
+      trace
     );
-
-    const { result, status } = response;
-
-    if (status != "success") {
-      return {
-        status: "error",
-        ...result,
-      };
-    }
-
-    return {
-      status: "processed",
-      ...result,
-    };
   }
 
   const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
@@ -587,4 +521,90 @@ export const startEvaluationsWorker = (
 
   debug("Trace checks worker registered");
   return traceChecksWorker;
+};
+
+const customEvaluation = async (
+  projectId: string,
+  evaluatorType: EvaluatorTypes,
+  input?: string,
+  output?: string,
+  contexts?: string[] | string | undefined,
+  expected_output?: string,
+  trace?: Trace
+) => {
+  const workflowId = evaluatorType.split("/")[1];
+
+  const project = await prisma.project.findUnique({
+    where: {
+      id: projectId,
+    },
+  });
+
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  const check = await prisma.check.findFirst({
+    where: {
+      checkType: evaluatorType,
+      projectId: projectId,
+    },
+  });
+
+  if (!check) {
+    throw new Error("Check not found");
+  }
+
+  const mappings = check.mappings as Record<Mappings, string>;
+
+  const requestBody: Record<string, any> = {
+    trace_id: trace?.trace_id,
+    do_not_trace: true,
+  };
+
+  const switchMapping = (mapping: Mappings) => {
+    if (mapping === "trace.input") {
+      return input;
+    }
+    if (mapping === "trace.output") {
+      return output;
+    }
+    if (mapping === "trace.first_rag_context") {
+      return contexts;
+    }
+    if (mapping === "metadata.expected_output") {
+      return expected_output;
+    }
+    // Use typescript to ensure all cases are handled
+    const _: never = mapping;
+    throw new Error(`Unknown mapping: ${String(mapping)}`);
+  };
+
+  Object.entries(mappings).forEach(([key, mapping]) => {
+    requestBody[key] = switchMapping(mapping as Mappings);
+  });
+
+  if (!workflowId) {
+    throw new Error("Workflow ID is required");
+  }
+
+  const response = await executeWorkflowEvaluation(
+    workflowId,
+    project.id,
+    requestBody
+  );
+
+  const { result, status } = response;
+
+  if (status != "success") {
+    return {
+      status: "error",
+      ...result,
+    };
+  }
+
+  return {
+    status: "processed",
+    ...result,
+  };
 };

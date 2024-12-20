@@ -1,5 +1,6 @@
 import time
 from typing import Dict, Set, cast
+from contextlib import contextmanager
 
 import langwatch
 import sentry_sdk
@@ -29,6 +30,22 @@ from langwatch_nlp.studio.utils import (
 from dspy.utils.asyncify import asyncify
 
 
+@contextmanager
+def optional_langwatch_trace(
+    do_not_trace=False, trace_id=None, api_key=None, skip_root_span=False, metadata=None
+):
+    if do_not_trace:
+        yield None
+    else:
+        with langwatch.trace(
+            trace_id=trace_id,
+            api_key=api_key,
+            skip_root_span=skip_root_span,
+            metadata=metadata,
+        ) as trace:
+            yield trace
+
+
 async def execute_flow(
     event: ExecuteFlowPayload,
     queue: "ServerEventQueue",
@@ -51,7 +68,19 @@ async def execute_flow(
     yield start_workflow_event(workflow, trace_id)
 
     try:
-        if do_not_trace:
+        with optional_langwatch_trace(
+            do_not_trace=do_not_trace,
+            trace_id=event.trace_id,
+            api_key=event.workflow.api_key,
+            skip_root_span=True,
+            metadata={
+                "platform": "optimization_studio",
+                "environment": "development" if manual_execution_mode else "production",
+            },
+        ) as trace:
+            if not do_not_trace and trace:
+                trace.autotrack_dspy()
+
             module = WorkflowModule(
                 workflow,
                 manual_execution_mode=manual_execution_mode,
@@ -59,26 +88,6 @@ async def execute_flow(
                 inputs=inputs[0] if inputs else None,
             )
             module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
-        else:
-            with langwatch.trace(
-                trace_id=event.trace_id,
-                api_key=event.workflow.api_key,
-                skip_root_span=True,
-                metadata={
-                    "platform": "optimization_studio",
-                    "environment": (
-                        "development" if manual_execution_mode else "production"
-                    ),
-                },
-            ) as trace:
-                trace.autotrack_dspy()
-                module = WorkflowModule(
-                    workflow,
-                    manual_execution_mode=manual_execution_mode,
-                    until_node_id=until_node_id,
-                    inputs=inputs[0] if inputs else None,
-                )
-                module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
 
             entry_node = cast(
                 EntryNode,
@@ -125,9 +134,8 @@ async def execute_flow(
 
         yield end_workflow_event(workflow, trace_id, result)
     finally:
-        if do_not_trace:
-            return
-        await asyncify(trace.send_spans)()
+        if not do_not_trace and trace:
+            await asyncify(trace.send_spans)()
 
 
 def start_workflow_event(workflow: Workflow, trace_id: str):

@@ -28,20 +28,21 @@ export const findLowestAvailableName = (nodes: Node[], prefix: string) => {
   return { name, id };
 };
 
-export const getInputsOutputs = (edges: Edge[], nodes: Node[]) => {
+export const getEntryInputs = (edges: Edge[], nodes: Node[]) => {
   const entryEdges = edges.filter((edge: Edge) => edge.source === "entry");
-
   const evaluators = nodes.filter(checkIsEvaluator);
 
-  const entryInputs = entryEdges.reduce((acc: Edge[], edge: Edge) => {
-    if (
+  const entryInputs = entryEdges.filter(
+    (edge: Edge, index, self) =>
       !evaluators?.some((evaluator: Node) => evaluator.id === edge.target) &&
-      !acc.some((e) => e.sourceHandle === edge.sourceHandle)
-    ) {
-      acc.push(edge);
-    }
-    return acc;
-  }, [] as Edge[]);
+      self.findIndex((e) => e.sourceHandle === edge.sourceHandle) === index
+  );
+
+  return entryInputs;
+};
+
+export const getInputsOutputs = (edges: Edge[], nodes: Node[]) => {
+  const entryInputs = getEntryInputs(edges, nodes);
 
   const inputs = entryInputs.map((edge: Edge) => {
     return {

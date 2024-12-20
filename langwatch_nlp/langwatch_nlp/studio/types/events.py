@@ -51,7 +51,7 @@ class ExecuteFlowPayload(BaseModel):
     until_node_id: Optional[str] = None
     inputs: Optional[List[Dict[str, Any]]] = None
     manual_execution_mode: Optional[bool] = None
-    do_not_trace: Optional[bool] = None
+    do_not_trace: bool = False
 
 
 class ExecuteFlow(BaseModel):

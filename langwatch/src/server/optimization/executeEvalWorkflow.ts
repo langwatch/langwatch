@@ -1,13 +1,16 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
-import { prisma } from "../server/db";
-import { getProjectModelProviders } from "../server/api/routers/modelProviders";
-import { type Workflow } from "../optimization_studio/types/dsl";
+import { prisma } from "../db";
+import { getProjectModelProviders } from "../api/routers/modelProviders";
+import { type Workflow } from "../../optimization_studio/types/dsl";
 import { nanoid } from "nanoid";
-import type { StudioClientEvent } from "../optimization_studio/types/events";
+import type { StudioClientEvent } from "../../optimization_studio/types/events";
 import { type Edge, type Node } from "@xyflow/react";
-import { type MaybeStoredModelProvider } from "../server/modelProviders/registry";
-import { addEnvs } from "../optimization_studio/server/addEnvs";
-import { checkIsEvaluator } from "../optimization_studio/utils/nodeUtils";
+import { type MaybeStoredModelProvider } from "../modelProviders/registry";
+import { addEnvs } from "../../optimization_studio/server/addEnvs";
+import {
+  checkIsEvaluator,
+  getEntryInputs,
+} from "../../optimization_studio/utils/nodeUtils";
 
 const getWorkFlow = (state: Workflow) => {
   return {
@@ -30,14 +33,9 @@ const checkForRequiredInputs = (
 ) => {
   const bodyInputs = Object.keys(body);
 
-  const entryEdges = publishedWorkflowVersion?.edges.filter(
-    (edge: Edge) => edge.source === "entry"
-  );
-  const evaluators = publishedWorkflowVersion?.nodes.filter(checkIsEvaluator);
-
-  const entryInputs = entryEdges.filter(
-    (edge: Edge) =>
-      !evaluators?.some((evaluator: Node) => evaluator.id === edge.target)
+  const entryInputs = getEntryInputs(
+    publishedWorkflowVersion?.edges,
+    publishedWorkflowVersion?.nodes
   );
 
   const requiredInputs: string[] = [];
