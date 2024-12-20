@@ -536,7 +536,8 @@ const MappingsFields = ({
                     </option>
                   ))}
                 </Select>
-                <ArrowRight />x<Text>{field} (required)</Text>
+                <ArrowRight />
+                <Text>{field} (required)</Text>
               </HStack>
             ))}
           </>
