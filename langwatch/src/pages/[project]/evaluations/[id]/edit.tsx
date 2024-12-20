@@ -104,6 +104,7 @@ export default function EditTraceCheck() {
         preconditions: check.data
           .preconditions as CheckConfigFormData["preconditions"],
         settings: check.data.parameters as CheckConfigFormData["settings"],
+        mappings: check.data.mappings as CheckConfigFormData["mappings"],
       }
     : undefined;
 

@@ -1,5 +1,6 @@
 import time
 from typing import Dict, Set, cast
+from contextlib import contextmanager
 
 import langwatch
 import sentry_sdk
@@ -29,6 +30,22 @@ from langwatch_nlp.studio.utils import (
 from dspy.utils.asyncify import asyncify
 
 
+@contextmanager
+def optional_langwatch_trace(
+    do_not_trace=False, trace_id=None, api_key=None, skip_root_span=False, metadata=None
+):
+    if do_not_trace:
+        yield None
+    else:
+        with langwatch.trace(
+            trace_id=trace_id,
+            api_key=api_key,
+            skip_root_span=skip_root_span,
+            metadata=metadata,
+        ) as trace:
+            yield trace
+
+
 async def execute_flow(
     event: ExecuteFlowPayload,
     queue: "ServerEventQueue",
@@ -43,13 +60,16 @@ async def execute_flow(
         True if event.manual_execution_mode is None else event.manual_execution_mode
     )
 
+    do_not_trace = event.do_not_trace
+
     disable_dsp_caching()
 
     # TODO: handle workflow errors here throwing an special event showing the error was during the execution of the workflow?
     yield start_workflow_event(workflow, trace_id)
 
     try:
-        with langwatch.trace(
+        with optional_langwatch_trace(
+            do_not_trace=do_not_trace,
             trace_id=event.trace_id,
             api_key=event.workflow.api_key,
             skip_root_span=True,
@@ -58,7 +78,8 @@ async def execute_flow(
                 "environment": "development" if manual_execution_mode else "production",
             },
         ) as trace:
-            trace.autotrack_dspy()
+            if not do_not_trace and trace:
+                trace.autotrack_dspy()
 
             module = WorkflowModule(
                 workflow,
@@ -98,10 +119,13 @@ async def execute_flow(
 
                 traceback.print_exc()
                 yield error_workflow_event(trace_id, str(e))
-                sentry_sdk.capture_exception(e, extras={
-                    "trace_id": trace_id,
-                    "workflow_id": workflow.workflow_id,
-                })
+                sentry_sdk.capture_exception(
+                    e,
+                    extras={
+                        "trace_id": trace_id,
+                        "workflow_id": workflow.workflow_id,
+                    },
+                )
                 return
 
         # cost = result.get_cost() if hasattr(result, "get_cost") else None
@@ -110,7 +134,8 @@ async def execute_flow(
 
         yield end_workflow_event(workflow, trace_id, result)
     finally:
-        await asyncify(trace.send_spans)()
+        if not do_not_trace and trace:
+            await asyncify(trace.send_spans)()
 
 
 def start_workflow_event(workflow: Workflow, trace_id: str):

@@ -2,7 +2,7 @@ import { CostReferenceType, CostType } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { Worker, type Job } from "bullmq";
 import { nanoid } from "nanoid";
-import type { TraceCheckJob } from "~/server/background/types";
+import type { Mappings, TraceCheckJob } from "~/server/background/types";
 import { env } from "../../../env.mjs";
 import {
   AVAILABLE_EVALUATORS,
@@ -39,6 +39,9 @@ import {
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
+import type { Trace } from "~/server/tracer/types";
+
+import { executeWorkflowEvaluation } from "../../optimization/executeEvalWorkflow";
 
 const debug = getDebugger("langwatch:workers:traceChecksWorker");
 
@@ -60,6 +63,7 @@ export const runEvaluationJob = async (
     traceId: job.data.trace.trace_id,
     evaluatorType: job.data.check.type,
     settings: check.parameters,
+    mappings: check.mappings as Record<Mappings, string>,
   });
 };
 
@@ -68,11 +72,13 @@ export const runEvaluationForTrace = async ({
   traceId,
   evaluatorType,
   settings,
+  mappings,
 }: {
   projectId: string;
   traceId: string;
   evaluatorType: EvaluatorTypes;
   settings: Record<string, any> | string | number | boolean | null;
+  mappings: Record<string, string>;
 }): Promise<SingleEvaluationResult> => {
   const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
 
@@ -95,14 +101,64 @@ export const runEvaluationForTrace = async ({
     };
   }
 
-  const input = trace.input?.value;
-  const output = trace.output?.value;
-  const expected_output = trace.expected_output?.value;
+  const inputMapping = (mappings ?? {})?.input;
+  const outputMapping = (mappings ?? {})?.output;
+  const ragContextMapping = (mappings ?? {})?.context;
+  const expectedOutputMapping = (mappings ?? {})?.expected_output;
+
+  const switchMapping = (mapping: Mappings) => {
+    if (mapping === "trace.input") {
+      return trace.input?.value;
+    }
+    if (mapping === "trace.output") {
+      return trace.output?.value;
+    }
+    if (mapping === "trace.first_rag_context") {
+      const ragInfo = getRAGInfo(spans);
+      return ragInfo.contexts[0];
+    }
+    if (mapping === "metadata.expected_output") {
+      return trace.expected_output?.value ?? trace.metadata.expected_output;
+    }
+    // Use typescript to ensure all cases are handled
+    const _: never = mapping;
+    throw new Error(`Unknown mapping: ${String(mapping)}`);
+  };
+
+  let input;
+  let output;
+  let expected_output;
+
+  if (inputMapping) {
+    input = switchMapping(inputMapping as Mappings);
+  } else {
+    input = trace.input?.value;
+  }
+
+  if (outputMapping) {
+    output = switchMapping(outputMapping as Mappings);
+  } else {
+    output = trace.output?.value;
+  }
+
+  if (expectedOutputMapping) {
+    expected_output = switchMapping(expectedOutputMapping as Mappings);
+  } else {
+    expected_output = trace.expected_output?.value;
+  }
 
   let contexts = undefined;
-  if (evaluator.requiredFields.includes("contexts")) {
+
+  if (
+    evaluator?.requiredFields?.includes("contexts") &&
+    !evaluatorType.startsWith("custom/")
+  ) {
     const ragInfo = getRAGInfo(spans);
-    contexts = ragInfo.contexts;
+    if (ragContextMapping) {
+      contexts = switchMapping(ragContextMapping as Mappings);
+    } else {
+      contexts = ragInfo.contexts;
+    }
   }
 
   const threadId = trace.metadata.thread_id;
@@ -136,6 +192,7 @@ export const runEvaluationForTrace = async ({
     expected_output,
     conversation,
     settings: settings && typeof settings === "object" ? settings : undefined,
+    trace,
   });
 
   return result;
@@ -150,16 +207,18 @@ export const runEvaluation = async ({
   expected_output,
   settings,
   conversation,
+  trace,
   retries = 1,
 }: {
   projectId: string;
   evaluatorType: EvaluatorTypes;
   input?: string;
   output?: string;
-  contexts?: string[];
+  contexts?: string[] | string | undefined;
   expected_output?: string;
   conversation?: Conversation;
   settings?: Record<string, unknown>;
+  trace?: Trace;
   retries?: number;
 }): Promise<SingleEvaluationResult> => {
   const project = await prisma.project.findUnique({
@@ -178,6 +237,18 @@ export const runEvaluation = async ({
       status: "skipped",
       details: "Monthly usage limit exceeded",
     };
+  }
+
+  if (evaluatorType.startsWith("custom/")) {
+    return customEvaluation(
+      projectId,
+      evaluatorType,
+      input,
+      output,
+      contexts,
+      expected_output,
+      trace
+    );
   }
 
   const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
@@ -331,7 +402,7 @@ export const startEvaluationsWorker = (
       const start = Date.now();
 
       try {
-        debug(`Processing job ${job.id} with data:`, job.data);
+        debug(`Processing job ${job.id} with data::`, job.data);
 
         let processed = false;
         const timeout = new Promise((resolve, reject) => {
@@ -401,7 +472,7 @@ export const startEvaluationsWorker = (
           status: "error",
           error: error,
         });
-        debug("Failed to process job:", job.id, error);
+        debug("Failed to process job::", job.id, error);
 
         if (
           typeof error === "object" &&
@@ -450,4 +521,90 @@ export const startEvaluationsWorker = (
 
   debug("Trace checks worker registered");
   return traceChecksWorker;
+};
+
+const customEvaluation = async (
+  projectId: string,
+  evaluatorType: EvaluatorTypes,
+  input?: string,
+  output?: string,
+  contexts?: string[] | string | undefined,
+  expected_output?: string,
+  trace?: Trace
+) => {
+  const workflowId = evaluatorType.split("/")[1];
+
+  const project = await prisma.project.findUnique({
+    where: {
+      id: projectId,
+    },
+  });
+
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  const check = await prisma.check.findFirst({
+    where: {
+      checkType: evaluatorType,
+      projectId: projectId,
+    },
+  });
+
+  if (!check) {
+    throw new Error("Check not found");
+  }
+
+  const mappings = check.mappings as Record<Mappings, string>;
+
+  const requestBody: Record<string, any> = {
+    trace_id: trace?.trace_id,
+    do_not_trace: true,
+  };
+
+  const switchMapping = (mapping: Mappings) => {
+    if (mapping === "trace.input") {
+      return input;
+    }
+    if (mapping === "trace.output") {
+      return output;
+    }
+    if (mapping === "trace.first_rag_context") {
+      return contexts;
+    }
+    if (mapping === "metadata.expected_output") {
+      return expected_output;
+    }
+    // Use typescript to ensure all cases are handled
+    const _: never = mapping;
+    throw new Error(`Unknown mapping: ${String(mapping)}`);
+  };
+
+  Object.entries(mappings).forEach(([key, mapping]) => {
+    requestBody[key] = switchMapping(mapping as Mappings);
+  });
+
+  if (!workflowId) {
+    throw new Error("Workflow ID is required");
+  }
+
+  const response = await executeWorkflowEvaluation(
+    workflowId,
+    project.id,
+    requestBody
+  );
+
+  const { result, status } = response;
+
+  if (status != "success") {
+    return {
+      status: "error",
+      ...result,
+    };
+  }
+
+  return {
+    status: "processed",
+    ...result,
+  };
 };

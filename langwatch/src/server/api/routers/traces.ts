@@ -305,7 +305,9 @@ export const tracesRouter = createTRPCRouter({
       tracesFilterInput.extend({
         query: z.string().optional(),
         sortBy: z.string().optional(),
-        evaluatorType: evaluatorsSchema.keyof(),
+        evaluatorType: evaluatorsSchema
+          .keyof()
+          .or(z.string().startsWith("custom/")),
         preconditions: z.array(checkPreconditionSchema),
         expectedResults: z.number(),
       })

@@ -58,6 +58,7 @@ import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
 import { checkIsEvaluator } from "../utils/nodeUtils";
 import NextLink from "next/link";
 import { trackEvent } from "../../utils/tracking";
+import { getEntryInputs } from "../utils/nodeUtils";
 
 export function Publish({ isDisabled }: { isDisabled: boolean }) {
   const publishModal = useDisclosure();
@@ -650,17 +651,9 @@ export const ApiModalContent = () => {
     return;
   }
 
-  const entryEdges =
-    (publishedWorkflow.data?.dsl as unknown as Workflow)?.edges?.filter(
-      (edge: Edge) => edge.source === "entry"
-    ) ?? [];
-  const evaluators = (
-    publishedWorkflow.data?.dsl as unknown as Workflow
-  )?.nodes?.filter(checkIsEvaluator);
-
-  const entryInputs = entryEdges.filter(
-    (edge: Edge) =>
-      !evaluators?.some((evaluator: Node) => evaluator.id === edge.target)
+  const entryInputs = getEntryInputs(
+    (publishedWorkflow.data?.dsl as unknown as Workflow)?.edges,
+    (publishedWorkflow.data?.dsl as unknown as Workflow)?.nodes
   );
 
   const message = JSON.stringify(

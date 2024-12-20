@@ -4,6 +4,7 @@ import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
 import { AVAILABLE_EVALUATORS } from "../../evaluations/evaluators.generated";
+import { prisma } from "~/server/db";
 
 export const evaluationsRouter = createTRPCRouter({
   availableEvaluators: protectedProcedure
@@ -11,17 +12,41 @@ export const evaluationsRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
     .query(async () => {
       return Object.fromEntries(
-        Object.entries(AVAILABLE_EVALUATORS)
-          .map(([key, evaluator]) => [
-            key,
-            {
-              ...evaluator,
-              missingEnvVars: evaluator.envVars.filter(
-                (envVar) => !process.env[envVar]
-              ),
-            },
-          ])
+        Object.entries(AVAILABLE_EVALUATORS).map(([key, evaluator]) => [
+          key,
+          {
+            ...evaluator,
+            missingEnvVars: evaluator.envVars.filter(
+              (envVar) => !process.env[envVar]
+            ),
+          },
+        ])
       );
+    }),
+
+  availableCustomEvaluators: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
+    .query(async ({ input }) => {
+      const customEvaluators = await prisma.workflow
+        .findMany({
+          where: {
+            projectId: input.projectId,
+            isEvaluator: true,
+          },
+          include: {
+            versions: true, // Include all versions initially
+          },
+        })
+        .then((workflows) =>
+          workflows.map((workflow) => ({
+            ...workflow,
+            versions: workflow.versions.filter(
+              (version) => version.id === workflow.publishedId
+            ), // Filter manually
+          }))
+        );
+      return customEvaluators;
     }),
   runEvaluation: protectedProcedure
     .input(
@@ -39,6 +64,7 @@ export const evaluationsRouter = createTRPCRouter({
         traceId: input.traceId,
         evaluatorType: input.evaluatorType,
         settings: input.settings,
+        mappings: {},
       });
 
       return result;

@@ -228,6 +228,7 @@ model Check {
     enabled       Boolean                 @default(true)
     preconditions Json
     parameters    Json
+    mappings      Json?
     sample        Float                   @default(1.0)
     createdAt     DateTime                @default(now())
     updatedAt     DateTime                @default(now()) @updatedAt

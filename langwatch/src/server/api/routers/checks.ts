@@ -101,6 +101,7 @@ export const checksRouter = createTRPCRouter({
         checkType: z.string(),
         preconditions: checkPreconditionsSchema,
         settings: z.object({}).passthrough(),
+        mappings: z.object({}).passthrough(),
         sample: z.number().min(0).max(1),
         enabled: z.boolean().optional(),
         executionMode: z.enum([
@@ -122,6 +123,7 @@ export const checksRouter = createTRPCRouter({
         sample,
         enabled,
         executionMode,
+        mappings,
       } = input;
       const prisma = ctx.prisma;
       const slug = slugify(name, { lower: true, strict: true });
@@ -139,6 +141,7 @@ export const checksRouter = createTRPCRouter({
           sample,
           ...(enabled !== undefined && { enabled }),
           executionMode,
+          mappings,
         },
       });
 
@@ -199,25 +202,29 @@ export const checksRouter = createTRPCRouter({
 });
 
 const validateCheckSettings = (checkType: string, parameters: any) => {
-  if (AVAILABLE_EVALUATORS[checkType as EvaluatorTypes] === undefined) {
+  if (
+    AVAILABLE_EVALUATORS[checkType as EvaluatorTypes] === undefined &&
+    !checkType.startsWith("custom/")
+  ) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "Invalid checkType",
     });
   }
 
-  const checkType_ = checkType as EvaluatorTypes;
-
-  try {
-    evaluatorsSchema.shape[checkType_].shape.settings.parse(parameters);
-  } catch (error) {
-    if (error instanceof ZodError) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: `Invalid settings: ${error as any}`,
-      });
-    } else {
-      throw error;
+  if (!checkType.startsWith("custom/")) {
+    const checkType_ = checkType as EvaluatorTypes;
+    try {
+      evaluatorsSchema.shape[checkType_].shape.settings.parse(parameters);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Invalid settings: ${error as any}`,
+        });
+      } else {
+        throw error;
+      }
     }
   }
 };
