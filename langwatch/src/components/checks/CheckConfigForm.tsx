@@ -161,8 +161,6 @@ export default function CheckConfigForm({
   const storeSettingsOnCode = watch("storeSettingsOnCode");
   const mappings = watch("mappings");
 
-  console.log(mappings);
-
   const {
     fields: fieldsPrecondition,
     append: appendPrecondition,

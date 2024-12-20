@@ -202,7 +202,6 @@ export const checksRouter = createTRPCRouter({
 });
 
 const validateCheckSettings = (checkType: string, parameters: any) => {
-  console.log("checkType", checkType);
   if (
     AVAILABLE_EVALUATORS[checkType as EvaluatorTypes] === undefined &&
     !checkType.startsWith("custom/")

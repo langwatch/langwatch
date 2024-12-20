@@ -61,7 +61,6 @@ export function EvaluatorSelection({
       { projectId: project?.id ?? "" },
       { enabled: !!project }
     );
-  console.log("availableCustomEvaluators", availableCustomEvaluators.data);
 
   const availableEvaluators = [
     ...Object.entries(availableEvaluators_.data ?? AVAILABLE_EVALUATORS).filter(

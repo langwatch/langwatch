@@ -41,8 +41,6 @@ export function EvaluationManualIntegration({
   const storeSettingsOnCode = form.watch("storeSettingsOnCode");
   const checkSlug = storeSettingsOnCode ? checkType : slug;
 
-  console.log("evaluatorDefinition", evaluatorDefinition);
-
   const { project } = useOrganizationTeamProject();
   const isOutputMandatory =
     evaluatorDefinition.requiredFields.includes("output");

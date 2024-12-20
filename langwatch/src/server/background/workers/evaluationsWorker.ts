@@ -41,6 +41,8 @@ import {
 } from "../../metrics";
 import type { Trace } from "~/server/tracer/types";
 
+import { executeWorkflowEvaluation } from "../../../utils/executeEvalWorkflow";
+
 const debug = getDebugger("langwatch:workers:traceChecksWorker");
 
 export const runEvaluationJob = async (
@@ -55,8 +57,6 @@ export const runEvaluationJob = async (
   if (!check) {
     throw `check config ${job.data.check.evaluator_id} not found`;
   }
-
-  console.log("check....this", check);
 
   return await runEvaluationForTrace({
     projectId: job.data.trace.project_id,
@@ -240,7 +240,6 @@ export const runEvaluation = async ({
   }
 
   if (evaluatorType.startsWith("custom/")) {
-    console.log("custom evaluatorType....", evaluatorType);
     const workflowId = evaluatorType.split("/")[1];
 
     const project = await prisma.project.findUnique({
@@ -292,37 +291,23 @@ export const runEvaluation = async ({
       requestBody[key] = switchMapping(mapping as Mappings);
     });
 
-    console.log("rerequestBody..", requestBody);
-
-    const response = await fetch(
-      `${process.env.BASE_HOST}/api/optimization/${workflowId}`,
-      {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": project.apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          requestBody,
-        }),
-      }
-    );
-    //const test = await response.json();
-    if (!response.ok) {
-      console.error("Response not OK:", response.status, response.statusText);
-      const { message } = await response.json();
-      console.error("Error response:", message);
-
-      return {
-        status: "error",
-        ...message,
-      };
+    if (!workflowId) {
+      throw new Error("Workflow ID is required");
     }
 
-    const { result } = await response.json();
+    const response = await executeWorkflowEvaluation(
+      workflowId,
+      project.id,
+      requestBody
+    );
 
-    if (!result) {
-      throw new Error("Empty response from custom evaluator");
+    const { result, status } = response;
+
+    if (status != "success") {
+      return {
+        status: "error",
+        ...result,
+      };
     }
 
     return {
@@ -455,7 +440,6 @@ export const runEvaluation = async ({
 
   getEvaluationStatusCounter(evaluatorType, result.status).inc();
 
-  console.log("result...Normal", result);
   return result;
 };
 
