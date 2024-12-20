@@ -47,7 +47,7 @@ async def on_chat_start():
     # )
 
     tools = [retriever_tool]
-    model = ChatOpenAI(streaming=True)
+    model = ChatOpenAI(model="gpt-4o-mini", streaming=True)
     prompt = ChatPromptTemplate.from_messages(
         [
             (
