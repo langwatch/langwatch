@@ -51,6 +51,7 @@ import { FilterToggle } from "../filters/FilterToggle";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 import { evaluationStatusColor } from "./EvaluationStatus";
 import { elasticSearchSpanToSpan } from "../../server/tracer/utils";
+import { type ElasticSearchSpan } from "../../server/tracer/types";
 
 export function TryItOut({
   form,
@@ -113,7 +114,9 @@ export function TryItOut({
         evaluatePreconditions(
           evaluatorType,
           trace,
-          trace.spans?.map(elasticSearchSpanToSpan) ?? [],
+          (trace.spans ?? []).map((span) =>
+            elasticSearchSpanToSpan(span as ElasticSearchSpan)
+          ),
           preconditions
         )
     ) ?? [];
