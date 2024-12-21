@@ -422,9 +422,8 @@ model Annotation {
     projectId    String
     project      Project  @relation(fields: [projectId], references: [id])
     traceId      String
-    comment      String
-    // TODO: make this optional
-    isThumbsUp   Boolean
+    comment      String?
+    isThumbsUp   Boolean?
     userId       String?
     user         User?    @relation(fields: [userId], references: [id])
     createdAt    DateTime @default(now())
