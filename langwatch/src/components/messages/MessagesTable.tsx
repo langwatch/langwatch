@@ -72,6 +72,7 @@ import { formatEvaluationSingleValue } from "../traces/EvaluationStatusItem";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import type { TraceWithGuardrail } from "./MessageCard";
 import { HoverableBigText } from "../HoverableBigText";
+import { getColorForString } from "../../utils/rotatingColors";
 
 export function MessagesTable() {
   const router = useRouter();
@@ -439,6 +440,29 @@ export function MessagesTable() {
           </Td>
         ),
       value: (trace: Trace) => trace.output?.value ?? "",
+    },
+    "metadata.labels": {
+      name: "Labels",
+      sortable: true,
+      render: (trace, index) => (
+        <Td key={index}>
+          <HStack spacing={1}>
+            {(trace.metadata.labels ?? []).map((label) => (
+              <Tag
+                key={label}
+                size="sm"
+                paddingX={2}
+                background={getColorForString("colors", label).background}
+                color={getColorForString("colors", label).color}
+                fontSize={12}
+              >
+                {label}
+              </Tag>
+            ))}
+          </HStack>
+        </Td>
+      ),
+      value: (trace: Trace) => trace.metadata?.labels?.join(", ") ?? "",
     },
     "metrics.first_token_ms": {
       name: "First Token",
