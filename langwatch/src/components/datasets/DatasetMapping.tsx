@@ -12,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, ChevronDown } from "react-feather";
+import { ArrowRight } from "react-feather";
 import { z } from "zod";
 import type {
   DatasetColumns,
@@ -29,10 +29,12 @@ import { getRAGChunks, getRAGInfo } from "../../server/tracer/utils";
 import { useLocalStorage } from "usehooks-ts";
 import { api } from "../../utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { Annotation, User } from "@prisma/client";
+import type { Annotation, AnnotationScore, User } from "@prisma/client";
 
 type TraceWithSpansAndAnnotations = TraceWithSpans & {
-  annotations?: (Annotation & { user?: User | null })[];
+  annotations?: (Annotation & {
+    user?: User | null;
+  })[];
 };
 
 const TRACE_MAPPINGS = {
@@ -127,7 +129,11 @@ const TRACE_MAPPINGS = {
         })
       );
     },
-    subkeys: (traces: TraceWithSpansAndAnnotations[], key: string) => {
+    subkeys: (
+      traces: TraceWithSpansAndAnnotations[],
+      key: string,
+      _data: { annotationScoreOptions?: AnnotationScore[] }
+    ) => {
       const evaluation = traces
         .flatMap((trace) => trace.evaluations ?? [])
         .find((evaluation) => evaluation.evaluator_id === key);
@@ -160,22 +166,74 @@ const TRACE_MAPPINGS = {
     },
   },
   annotations: {
-    keys: (traces: TraceWithSpansAndAnnotations[]) => {
-      // TODO: add score
-      return ["comment", "is_thumbs_up", "author"].map((key) => ({
+    keys: (_traces: TraceWithSpansAndAnnotations[]) => {
+      return ["comment", "is_thumbs_up", "author", "score"].map((key) => ({
         key,
         label: key,
       }));
     },
-    mapping: (trace: TraceWithSpansAndAnnotations, key: string) => {
+    subkeys: (
+      traces: TraceWithSpansAndAnnotations[],
+      key: string,
+      data: { annotationScoreOptions?: AnnotationScore[] }
+    ) => {
+      if (key !== "score") {
+        return [];
+      }
+
+      return Object.entries(
+        Object.fromEntries(
+          traces.flatMap(
+            (trace) =>
+              trace.annotations?.flatMap((annotation) =>
+                Object.entries(annotation.scoreOptions ?? {})
+                  .filter(([_key, score]) => score.value !== null)
+                  .map(([key]) => [
+                    key,
+                    data.annotationScoreOptions?.find(
+                      (score) => score.id === key
+                    )?.name,
+                  ])
+                  .filter(([_key, label]) => !!label)
+              ) ?? []
+          )
+        )
+      ).map(([key, label]) => ({
+        key: key,
+        label: (label as string) ?? "",
+      }));
+    },
+    mapping: (
+      trace: TraceWithSpansAndAnnotations,
+      key: string,
+      subkey: string,
+      data: { annotationScoreOptions?: AnnotationScore[] }
+    ) => {
       if (!key) {
         return trace.annotations;
       }
       return trace.annotations?.map((annotation) => {
+        if (
+          key === "score" &&
+          subkey &&
+          typeof annotation.scoreOptions === "object"
+        ) {
+          return (annotation.scoreOptions as any)[subkey]?.value;
+        }
         const keyMap = {
           comment: () => annotation.comment,
           is_thumbs_up: () => annotation.isThumbsUp,
           author: () => annotation.user?.name ?? annotation.email ?? "",
+          score: () =>
+            Object.fromEntries(
+              Object.entries(annotation.scoreOptions ?? {})
+                .map(([key, score]) => [
+                  data.annotationScoreOptions?.find((score) => score.id === key)
+                    ?.name ?? key,
+                  score,
+                ])
+                .filter(([_key, score]) => score.value !== null)
+            ),
         };
         return keyMap[key as keyof typeof keyMap]();
       });
@@ -190,7 +248,8 @@ const TRACE_MAPPINGS = {
     ) => { key: string; label: string }[];
     subkeys?: (
       traces: TraceWithSpansAndAnnotations[],
-      key: string
+      key: string,
+      data: { annotationScoreOptions?: AnnotationScore[] }
     ) => {
       key: string;
       label: string;
@@ -207,6 +266,12 @@ const TRACE_MAPPINGS = {
           trace: TraceWithSpansAndAnnotations,
           key: string,
           subkey: string
+        ) => string | number | object | undefined)
+      | ((
+          trace: TraceWithSpansAndAnnotations,
+          key: string,
+          subkey: string,
+          data: { annotationScoreOptions?: AnnotationScore[] }
         ) => string | number | object | undefined);
     expandable_by?: keyof typeof TRACE_EXPANSIONS;
   }
@@ -375,7 +440,9 @@ export const TracesMapping = ({
         Object.entries(mapping).map(([column, { source, key, subkey }]) => {
           const source_ = source ? TRACE_MAPPINGS[source] : undefined;
 
-          let value = source_?.mapping(trace, key!, subkey!);
+          let value = source_?.mapping(trace, key!, subkey!, {
+            annotationScoreOptions: getAnnotationScoreOptions.data,
+          });
           if (
             source_ &&
             "expandable_by" in source_ &&
@@ -404,6 +471,7 @@ export const TracesMapping = ({
     setDatasetEntries(entries);
   }, [
     expansions,
+    getAnnotationScoreOptions.data,
     mapping,
     now,
     setDatasetEntries,
@@ -416,6 +484,13 @@ export const TracesMapping = ({
       {Object.entries(mapping).map(
         ([column, { source, key, subkey }], index) => {
           const mapping = source ? TRACE_MAPPINGS[source] : undefined;
+
+          const subkeys =
+            mapping && "subkeys" in mapping
+              ? mapping.subkeys(traces_, key!, {
+                  annotationScoreOptions: getAnnotationScoreOptions.data,
+                })
+              : undefined;
 
           return (
             <HStack key={index}>
@@ -434,11 +509,13 @@ export const TracesMapping = ({
                         subkey: undefined,
                       },
                     }));
-                    const newMapping =
-                      TRACE_MAPPINGS[
-                        e.target.value as keyof typeof TRACE_MAPPINGS
-                      ];
+                    const newMapping = e.target.value
+                      ? TRACE_MAPPINGS[
+                          e.target.value as keyof typeof TRACE_MAPPINGS
+                        ]
+                      : undefined;
                     if (
+                      newMapping &&
                       "expandable_by" in newMapping &&
                       newMapping.expandable_by &&
                       !availableExpansions.has(newMapping.expandable_by)
@@ -484,7 +561,7 @@ export const TracesMapping = ({
                       value={key}
                     >
                       <option value=""></option>
-                      {mapping.keys(traces).map(({ key, label }) => (
+                      {mapping.keys(traces_).map(({ key, label }) => (
                         <option key={key} value={key}>
                           {label}
                         </option>
@@ -492,7 +569,7 @@ export const TracesMapping = ({
                     </Select>
                   </HStack>
                 )}
-                {mapping && "subkeys" in mapping && (
+                {subkeys && subkeys.length > 0 && (
                   <HStack width="200px" flexShrink={0} align="start">
                     <Box
                       width="16px"
@@ -519,7 +596,7 @@ export const TracesMapping = ({
                       value={subkey}
                     >
                       <option value=""></option>
-                      {mapping.subkeys(traces, key!).map(({ key, label }) => (
+                      {subkeys.map(({ key, label }) => (
                         <option key={key} value={key}>
                           {label}
                         </option>
