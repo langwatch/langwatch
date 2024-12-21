@@ -15,6 +15,7 @@ import {
   FormLabel,
   HStack,
   Select,
+  Spacer,
   Text,
   useDisclosure,
   useToast,
@@ -52,6 +53,7 @@ import {
   type DatasetColumnDef,
 } from "./datasets/DatasetGrid";
 import { TracesMapping } from "./datasets/DatasetMapping";
+import { Edit2 } from "react-feather";
 
 type FormValues = {
   datasetId: string;
@@ -67,7 +69,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const createDatasetRecord = api.datasetRecord.create.useMutation();
   const toast = useToast();
-  const { onOpen, onClose, isOpen } = useDisclosure();
+  const editDataset = useDisclosure();
   const { closeDrawer } = useDrawer();
 
   const [localStorageDatasetId, setLocalStorageDatasetId] =
@@ -168,7 +170,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   }, [datasetId, datasets.data, setValue]);
 
   const onCreateDatasetSuccess = ({ datasetId }: { datasetId: string }) => {
-    onClose();
+    editDataset.onClose();
     void datasets.refetch().then(() => {
       setTimeout(() => {
         setValue("datasetId", datasetId);
@@ -396,7 +398,8 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
               <Button
                 colorScheme="blue"
                 onClick={() => {
-                  onOpen();
+                  setValue("datasetId", "");
+                  editDataset.onOpen();
                 }}
                 minWidth="fit-content"
                 variant="link"
@@ -424,11 +427,27 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                     />
                   </VStack>
                   <VStack align="start" width="full" height="full">
-                    <FormLabel margin={0}>Preview</FormLabel>
-                    <FormHelperText margin={0} fontSize={13}>
-                      Those are the rows that are going to be added, double
-                      click on the cell to edit them
-                    </FormHelperText>
+                    <HStack width="full" align="end">
+                      <VStack align="start">
+                        <FormLabel margin={0}>Preview</FormLabel>
+                        <FormHelperText margin={0} fontSize={13}>
+                          Those are the rows that are going to be added, double
+                          click on the cell to edit them
+                        </FormHelperText>
+                      </VStack>
+                      <Spacer />
+                      <Button
+                        size="sm"
+                        colorScheme="blue"
+                        variant="outline"
+                        leftIcon={<Edit2 height={16} />}
+                        onClick={() => {
+                          editDataset.onOpen();
+                        }}
+                      >
+                        Edit Columns
+                      </Button>
+                    </HStack>
                     <Box width="full" display="block" paddingTop={2}>
                       <DatasetGrid
                         columnDefs={columnDefs}
@@ -477,11 +496,21 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
         </DrawerBody>
       </DrawerContent>
       <AddOrEditDatasetDrawer
-        isOpen={isOpen}
-        onClose={onClose}
+        datasetToSave={
+          selectedDataset
+            ? {
+                datasetId,
+                name: selectedDataset?.name ?? "",
+                datasetRecords: undefined,
+                columnTypes:
+                  (selectedDataset?.columnTypes as DatasetColumns) ?? [],
+              }
+            : undefined
+        }
+        isOpen={editDataset.isOpen}
+        onClose={editDataset.onClose}
         onSuccess={onCreateDatasetSuccess}
       />
     </Drawer>
   );
 }
-

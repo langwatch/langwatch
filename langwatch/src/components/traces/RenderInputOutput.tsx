@@ -5,7 +5,7 @@ import {
   Text,
   Tooltip,
   useToast,
-  type ButtonProps
+  type ButtonProps,
 } from "@chakra-ui/react";
 import type { ReactJsonViewProps } from "@microlink/react-json-view";
 import dynamic from "next/dynamic";
@@ -19,7 +19,7 @@ import { CopyIcon } from "../icons/Copy";
 export function RenderInputOutput(
   props: Partial<ReactJsonViewProps> & {
     value: string | undefined;
-    showTools?: boolean;
+    showTools?: boolean | "copy-only";
   }
 ) {
   let { value } = props;
@@ -117,7 +117,7 @@ export function RenderInputOutput(
             zIndex={1}
             spacing="-1px"
           >
-            {!forceRaw && (
+            {!forceRaw && props.showTools !== "copy-only" && (
               <Tooltip label="View Raw">
                 <Box>
                   <TinyButton

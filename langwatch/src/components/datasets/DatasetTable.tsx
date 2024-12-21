@@ -469,7 +469,7 @@ export function DatasetTable({
               minWidth="fit-content"
               leftIcon={<Edit2 height={16} />}
             >
-              Edit Dataset
+              Edit Columns
             </Button>
             {datasetId && !isEmbedded && (
               <Button

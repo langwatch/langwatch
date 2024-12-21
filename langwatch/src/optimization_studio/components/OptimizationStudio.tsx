@@ -376,7 +376,6 @@ export default function OptimizationStudio() {
         </DndProvider>
       </ReactFlowProvider>
       <CurrentDrawer />
-      <ExpandedTextModal />
     </div>
   );
 }

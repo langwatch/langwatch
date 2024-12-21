@@ -11,26 +11,27 @@ import {
   Switch,
   HStack,
   Text,
+  VStack,
 } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
-import { useWorkflowStore } from "../optimization_studio/hooks/useWorkflowStore";
 import remarkGfm from "remark-gfm";
 import Markdown from "react-markdown";
+import { isJson } from "../utils/isJson";
+import { RenderInputOutput } from "./traces/RenderInputOutput";
 
-export function ExpandedTextModal() {
-  const { textExpanded, setTextExpanded } = useWorkflowStore((state) => ({
-    textExpanded: state.textExpanded,
-    setTextExpanded: state.setTextExpanded,
-  }));
-
+export function ExpandedTextModal({
+  isOpen,
+  onClose,
+  textExpanded,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  textExpanded: string | undefined;
+}) {
   const [isFormatted, setIsFormatted] = useState(true);
 
   return (
-    <Modal
-      isOpen={!!textExpanded}
-      onClose={() => setTextExpanded(undefined)}
-      size="4xl"
-    >
+    <Modal isOpen={isOpen} onClose={onClose} size="4xl">
       <ModalOverlay />
       <ModalContent>
         <ModalHeader
@@ -50,10 +51,16 @@ export function ExpandedTextModal() {
         </ModalHeader>
         <ModalCloseButton />
         <ModalBody paddingY={6} paddingX={8}>
-          {textExpanded && isFormatted ? (
-            <Markdown remarkPlugins={[remarkGfm]} className="markdown">
-              {textExpanded}
-            </Markdown>
+          {isOpen && textExpanded && isFormatted ? (
+            isJson(textExpanded) ? (
+              <RenderInputOutput value={textExpanded} showTools={"copy-only"} />
+            ) : (
+              <Markdown remarkPlugins={[remarkGfm]} className="markdown">
+                {typeof textExpanded === "string"
+                  ? textExpanded
+                  : JSON.stringify(textExpanded, null, 2)}
+              </Markdown>
+            )
           ) : textExpanded ? (
             <Box whiteSpace="pre-wrap" fontFamily="mono">
               {textExpanded}
@@ -65,12 +72,17 @@ export function ExpandedTextModal() {
   );
 }
 
-export function HoverableBigText({ children, ...props }: BoxProps) {
+export function HoverableBigText({
+  children,
+  expandedVersion,
+  ...props
+}: BoxProps & { expandedVersion?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [isOverflown, setIsOverflown] = useState(false);
-  const { setTextExpanded } = useWorkflowStore((state) => ({
-    setTextExpanded: state.setTextExpanded,
-  }));
+  const [textExpanded, setTextExpanded] = useState<string | undefined>(
+    undefined
+  );
+  const expandedVersion_ = expandedVersion ?? children;
 
   useEffect(() => {
     const element = ref.current!;
@@ -93,30 +105,52 @@ export function HoverableBigText({ children, ...props }: BoxProps) {
   }, []);
 
   return (
-    <Tooltip
-      isDisabled={!isOverflown}
-      label={
-        <Box whiteSpace="pre-wrap">
-          [click anywhere to enlarge]{"\n"}
-          {typeof children === "string"
-            ? children.slice(0, 2000) + (children.length > 2000 ? "..." : "")
-            : children}
-        </Box>
-      }
-    >
-      <Box
-        ref={ref}
-        width="full"
-        height="full"
-        whiteSpace="normal"
-        noOfLines={7}
-        {...props}
-        {...(isOverflown && {
-          onClick: () => setTextExpanded(children as string),
-        })}
+    <>
+      <Tooltip
+        isDisabled={!isOverflown}
+        label={
+          <VStack padding={0} spacing={0} width="full" display="block">
+            <Text
+              textAlign="center"
+              background="black"
+              width="calc(100% + 16px)"
+              marginLeft="-8px"
+              marginTop="-4px"
+            >
+              click anywhere to enlarge
+            </Text>
+            <Box whiteSpace="pre-wrap">
+              <center></center>
+              {typeof expandedVersion_ === "string"
+                ? expandedVersion_.slice(0, 2000) +
+                  (expandedVersion_.length > 2000 ? "..." : "")
+                : expandedVersion_}
+            </Box>
+          </VStack>
+        }
       >
-        {children}
-      </Box>
-    </Tooltip>
+        <Box
+          ref={ref}
+          width="full"
+          height="full"
+          whiteSpace="normal"
+          noOfLines={7}
+          {...props}
+          {...(isOverflown && {
+            onClick: (e) => {
+              e.stopPropagation();
+              setTextExpanded(expandedVersion_ as string);
+            },
+          })}
+        >
+          {children}
+        </Box>
+      </Tooltip>
+      <ExpandedTextModal
+        isOpen={!!textExpanded}
+        onClose={() => setTextExpanded(undefined)}
+        textExpanded={textExpanded}
+      />
+    </>
   );
 }

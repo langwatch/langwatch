@@ -42,7 +42,6 @@ type State = Workflow & {
     | "closed"
     | undefined;
   playgroundOpen: boolean;
-  textExpanded?: string;
 };
 
 type WorkflowStore = State & {
@@ -93,7 +92,6 @@ type WorkflowStore = State & {
     request: "evaluations" | "optimizations" | "closed" | undefined
   ) => void;
   setPlaygroundOpen: (open: boolean) => void;
-  setTextExpanded: (text: string | undefined) => void;
 };
 
 const DEFAULT_LLM_CONFIG: LLMConfig = {
@@ -122,7 +120,6 @@ const initialState: State = {
   previousWorkflow: undefined,
   openResultsPanelRequest: undefined,
   playgroundOpen: false,
-  textExpanded: undefined,
 };
 
 const store = (
@@ -458,9 +455,6 @@ const store = (
   },
   setPlaygroundOpen: (open: boolean) => {
     set({ playgroundOpen: open });
-  },
-  setTextExpanded: (text: string | undefined) => {
-    set({ textExpanded: text });
   },
 });
 

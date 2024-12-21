@@ -71,6 +71,7 @@ import { FilterToggle } from "../filters/FilterToggle";
 import { formatEvaluationSingleValue } from "../traces/EvaluationStatusItem";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import type { TraceWithGuardrail } from "./MessageCard";
+import { HoverableBigText } from "../HoverableBigText";
 
 export function MessagesTable() {
   const router = useRouter();
@@ -140,6 +141,9 @@ export function MessagesTable() {
       ])
     )
   );
+
+  const [scrollXPosition, setScrollXPosition] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const annotationCount = (traceId: string) => {
     if (getAnnotations.isLoading) {
@@ -281,9 +285,20 @@ export function MessagesTable() {
       sortable: false,
       render: (trace, index) => {
         return (
-          <Td key={index} textAlign="right">
+          <Td
+            key={index}
+            textAlign="right"
+            position="sticky"
+            left={0}
+            background="white"
+            transition="box-shadow 0.3s ease-in-out"
+            boxShadow={
+              scrollXPosition > 0
+                ? "0 2px 5px rgba(0, 0, 0, 0.1)"
+                : "0 0 0 rgba(0, 0, 0, 0)"
+            }
+          >
             <HStack position="relative" align="right">
-              <Spacer />
               {annotationCount(trace.trace_id)}
               <Checkbox
                 colorScheme="blue"
@@ -307,8 +322,13 @@ export function MessagesTable() {
               traceId: trace.trace_id,
             })
           }
+          maxWidth="150px"
         >
-          {trace.trace_id}
+          <Tooltip label={trace.trace_id ?? ""}>
+            <Text noOfLines={1} display="block">
+              {trace.trace_id}
+            </Text>
+          </Tooltip>
         </Td>
       ),
       value: (trace: Trace) => trace.trace_id,
@@ -533,19 +553,19 @@ export function MessagesTable() {
       render: (trace, index) => (
         <Td
           key={index}
+          minWidth="300px"
+          maxWidth="300px"
           onClick={() =>
             openDrawer("traceDetails", {
               traceId: trace.trace_id,
             })
           }
         >
-          <Tooltip label={JSON.stringify(trace.metadata)}>
-            <Text noOfLines={1} display="block" maxWidth="300px">
-              {JSON.stringify(trace.metadata) === "{}"
-                ? ""
-                : JSON.stringify(trace.metadata)}
-            </Text>
-          </Tooltip>
+          <HoverableBigText noOfLines={1}>
+            {trace.contexts
+              ? JSON.stringify(trace.metadata, null, 2)
+              : JSON.stringify(trace.metadata)}
+          </HoverableBigText>
         </Td>
       ),
       value: (trace: Trace) => JSON.stringify(trace.metadata),
@@ -556,19 +576,22 @@ export function MessagesTable() {
       render: (trace, index) => (
         <Td
           key={index}
+          minWidth="300px"
+          maxWidth="300px"
           onClick={() =>
             openDrawer("traceDetails", {
               traceId: trace.trace_id,
             })
           }
         >
-          <Tooltip label={JSON.stringify(trace.contexts)}>
-            <Text noOfLines={1} display="block" maxWidth="300px">
-              {JSON.stringify(trace.contexts) === "[]"
-                ? ""
-                : JSON.stringify(trace.contexts)}
-            </Text>
-          </Tooltip>
+          <HoverableBigText
+            noOfLines={1}
+            expandedVersion={JSON.stringify(trace.contexts, null, 2)}
+          >
+            {trace.contexts
+              ? JSON.stringify(trace.contexts.map((c) => c.content))
+              : ""}
+          </HoverableBigText>
         </Td>
       ),
       value: (trace: Trace) => JSON.stringify(trace.contexts),
@@ -621,6 +644,12 @@ export function MessagesTable() {
       value: (trace: Trace) =>
         topics.data?.find((topic) => topic.id === trace.metadata.subtopic_id)
           ?.name ?? "",
+    },
+    events: {
+      name: "Events",
+      sortable: true,
+      render: (trace, index) => <Td key={index}>{trace.events?.length}</Td>,
+      value: (trace: Trace) => trace.events?.length ?? 0,
     },
 
     ...Object.fromEntries(
@@ -902,17 +931,21 @@ export function MessagesTable() {
     link.remove();
   };
 
-  const selectAllTraces = () => {
-    setSelectedTraceIds(
-      traceGroups.data?.groups.flatMap((traceGroup) =>
-        traceGroup.map((trace) => trace.trace_id)
-      ) ?? []
-    );
+  const toggleAllTraces = () => {
+    if (selectedTraceIds.length === traceGroups.data?.groups.length) {
+      setSelectedTraceIds([]);
+    } else {
+      setSelectedTraceIds(
+        traceGroups.data?.groups.flatMap((traceGroup) =>
+          traceGroup.map((trace) => trace.trace_id)
+        ) ?? []
+      );
+    }
   };
 
   return (
     <>
-      <Container maxW={"calc(100vw - 200px)"} padding={6}>
+      <Container maxW={"calc(100vw - 50px)"} padding={6}>
         <HStack width="full" align="top" paddingBottom={6}>
           <HStack align="center" spacing={6}>
             <Heading as={"h1"} size="lg" paddingTop={1}>
@@ -942,16 +975,6 @@ export function MessagesTable() {
             </Tooltip>
           </HStack>
           <Spacer />
-          <Button
-            colorScheme="black"
-            minWidth="fit-content"
-            variant={"ghost"}
-            padding={0}
-            onClick={() => selectAllTraces()}
-            rightIcon={<CheckSquare size={17} />}
-          >
-            Select all
-          </Button>
           <Tooltip label={totalHits >= 10_000 ? "Up to 10.000 items" : ""}>
             <Button
               colorScheme="black"
@@ -1036,25 +1059,59 @@ export function MessagesTable() {
         <HStack align={"top"} gap={8}>
           <Card>
             <Progress colorScheme="orange" value={downloadProgress} size="xs" />
-            <CardBody>
+            <CardBody padding={0}>
               {checkedHeaderColumnsEntries.length === 0 && (
                 <Text>No columns selected</Text>
               )}
-              <TableContainer>
-                <Table variant="simple">
+              <TableContainer
+                ref={scrollRef}
+                onScroll={() => {
+                  if (scrollRef.current) {
+                    setScrollXPosition(scrollRef.current.scrollLeft);
+                  }
+                }}
+              >
+                <Table size="sm" height="fit-content">
                   <Thead>
                     <Tr>
                       {checkedHeaderColumnsEntries
                         .filter(([_, { enabled }]) => enabled)
                         .map(([columnKey, { name }], index) => (
-                          <Th key={index}>
-                            <HStack spacing={1}>
-                              <Text width={headerColumns[columnKey]?.width}>
-                                {name}
-                              </Text>
-                              {headerColumns[columnKey]?.sortable &&
-                                sortButton(columnKey)}
-                            </HStack>
+                          <Th
+                            key={index}
+                            paddingY={4}
+                            {...(columnKey === "checked"
+                              ? {
+                                  position: "sticky",
+                                  left: 0,
+                                  background: "white",
+                                  transition: "box-shadow 0.3s ease-in-out",
+                                  boxShadow:
+                                    scrollXPosition > 0
+                                      ? "0 2px 5px rgba(0, 0, 0, 0.1)"
+                                      : "0 0 0 rgba(0, 0, 0, 0)",
+                                }
+                              : {})}
+                          >
+                            {columnKey === "checked" ? (
+                              <HStack width="full" justifyContent="end">
+                                <Checkbox
+                                  isChecked={
+                                    selectedTraceIds.length ===
+                                    traceGroups.data?.groups.length
+                                  }
+                                  onChange={() => toggleAllTraces()}
+                                />
+                              </HStack>
+                            ) : (
+                              <HStack spacing={1}>
+                                <Text width={headerColumns[columnKey]?.width}>
+                                  {name}
+                                </Text>
+                                {headerColumns[columnKey]?.sortable &&
+                                  sortButton(columnKey)}
+                              </HStack>
+                            )}
                           </Th>
                         ))}
                     </Tr>
@@ -1165,7 +1222,7 @@ export function MessagesTable() {
           borderRadius={"md"}
         >
           <HStack gap={3}>
-            <Text>
+            <Text whiteSpace="nowrap">
               {selectedTraceIds.length}{" "}
               {selectedTraceIds.length === 1 ? "trace" : "traces"} selected
             </Text>
