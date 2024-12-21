@@ -97,9 +97,12 @@ export function EvaluatorSelection({
 
   for (const category of categories) {
     availableEvaluatorsPerCategory[category] = availableEvaluators.filter(
-      ([_, evaluator]) =>
-        evaluator.category === category ||
-        (evaluator.category === "rag" && category === "quality") // Merge RAG into quality for now
+      (entry): entry is [string, EvaluatorDefinition<any>] =>
+        Array.isArray(entry) &&
+        typeof entry[1] === "object" &&
+        "category" in entry[1] &&
+        (entry[1].category === category ||
+          (entry[1].category === "rag" && category === "quality"))
     );
   }
 
