@@ -108,17 +108,19 @@ export const runEvaluationForTrace = async ({
 
   const switchMapping = (mapping: Mappings) => {
     if (mapping === "trace.input") {
-      return trace.input?.value;
+      return trace.input?.value?.toString();
     }
     if (mapping === "trace.output") {
-      return trace.output?.value;
+      return trace.output?.value?.toString();
     }
     if (mapping === "trace.first_rag_context") {
       const ragInfo = getRAGInfo(spans);
-      return ragInfo.contexts[0];
+      return ragInfo.contexts[0]?.toString();
     }
     if (mapping === "metadata.expected_output") {
-      return trace.expected_output?.value ?? trace.metadata.expected_output;
+      return (
+        trace.expected_output?.value ?? trace.metadata.expected_output
+      )?.toString();
     }
     // Use typescript to ensure all cases are handled
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
