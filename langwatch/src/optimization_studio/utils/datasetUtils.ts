@@ -4,7 +4,7 @@ import type {
   DatasetColumnType,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
-import type { Entry, Field, NodeDataset } from "../types/dsl";
+import type { Field, NodeDataset } from "../types/dsl";
 import type { InMemoryDataset } from "../../components/datasets/DatasetTable";
 import type { Dataset, DatasetRecord } from "@prisma/client";
 
@@ -44,10 +44,11 @@ const fieldToColumnTypeMap: Record<Field["type"], DatasetColumnType> = {
   float: "number",
   int: "number",
   bool: "boolean",
-  "list[str]": "json",
-  "list[float]": "json",
-  "list[int]": "json",
-  "list[bool]": "json",
+  list: "list",
+  "list[str]": "list",
+  "list[float]": "list",
+  "list[int]": "list",
+  "list[bool]": "list",
   dict: "json",
   signature: "string",
   llm: "string",
@@ -62,6 +63,7 @@ const columnTypeToFieldTypeMap: Record<DatasetColumnType, Field["type"]> = {
   number: "float",
   date: "str",
   json: "dict",
+  list: "list",
   spans: "dict",
   rag_contexts: "dict",
   chat_messages: "dict",

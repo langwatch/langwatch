@@ -26,7 +26,6 @@ import { api } from "../../utils/api";
 
 import { nanoid } from "nanoid";
 import { tryToConvertRowsToAppropriateType } from "../AddOrEditDatasetDrawer";
-import { CustomSelect } from "./DatasetMapping";
 import { CSVReaderComponent } from "./UploadCSVModal";
 
 export function AddRowsFromCSVModal({

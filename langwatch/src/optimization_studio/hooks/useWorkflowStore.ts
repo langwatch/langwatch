@@ -578,6 +578,7 @@ const typesMap: Record<Field["type"], string> = {
   float: "float",
   bool: "bool",
   image: "dspy.Image",
+  list: "list",
   "list[str]": "list[str]",
   "list[float]": "list[float]",
   "list[int]": "list[int]",

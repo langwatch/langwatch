@@ -11,6 +11,7 @@ class FieldType(str, Enum):
     float = "float"
     int = "int"
     bool = "bool"
+    list = "list"
     list_str = "list[str]"
     list_float = "list[float]"
     list_int = "list[int]"

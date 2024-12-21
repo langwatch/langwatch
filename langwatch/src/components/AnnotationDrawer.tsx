@@ -24,7 +24,6 @@ import { useDrawer } from "~/components/CurrentDrawer";
 import { MetadataTag } from "~/components/MetadataTag";
 import { SmallLabel } from "~/components/SmallLabel";
 
-import { DeleteIcon } from "@chakra-ui/icons";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -39,9 +38,9 @@ import {
 } from "react-hook-form";
 
 type Annotation = {
-  isThumbsUp: string;
-  comment: string;
-  scoreOptions: Record<string, { value: string; reason: string }> | undefined;
+  isThumbsUp?: string | null;
+  comment?: string | null;
+  scoreOptions?: Record<string, { value: string; reason: string }>;
 };
 
 export function AnnotationDrawer({
@@ -88,7 +87,7 @@ export function AnnotationDrawer({
     scoreOptions: {},
   };
 
-  const { register, handleSubmit, watch, setValue, reset } = useForm({
+  const { register, handleSubmit, watch, setValue, reset } = useForm<Annotation>({
     defaultValues: {
       isThumbsUp: "thumbsUp",
       comment: comment,
@@ -272,7 +271,7 @@ export function AnnotationDrawer({
             /* eslint-disable-next-line @typescript-eslint/no-misused-promises */
             <form onSubmit={handleSubmit(onSubmit)}>
               <VStack align="start" spacing={3}>
-                <RadioGroup value={thumbsUpValue}>
+                <RadioGroup value={thumbsUpValue ?? undefined}>
                   <HStack spacing={4}>
                     <VStack align="start">
                       <Radio

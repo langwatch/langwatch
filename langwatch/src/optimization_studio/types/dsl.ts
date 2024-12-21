@@ -9,6 +9,7 @@ export type Field = {
     | "float"
     | "int"
     | "bool"
+    | "list"
     | "list[str]"
     | "list[float]"
     | "list[int]"
