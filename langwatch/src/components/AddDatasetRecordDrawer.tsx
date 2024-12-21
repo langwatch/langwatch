@@ -22,7 +22,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { nanoid } from "nanoid";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { useLocalStorage } from "usehooks-ts";
 import { z } from "zod";
@@ -348,15 +348,29 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     return headers;
   }, [selectedDataset]);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [atBottom, setAtBottom] = useState(false);
+
   return (
     <Drawer
       isOpen={true}
       placement="right"
       size="xl"
       onClose={handleOnClose}
-      blockScrollOnMount={false}
+      blockScrollOnMount={true}
     >
-      <DrawerContent maxWidth="1400px">
+      <DrawerContent
+        maxWidth="1400px"
+        overflow="scroll"
+        ref={scrollRef}
+        onScroll={() =>
+          setAtBottom(
+            (scrollRef.current?.scrollTop ?? 0) >=
+              (scrollRef.current?.scrollHeight ?? 0) -
+                (scrollRef.current?.clientHeight ?? 0)
+          )
+        }
+      >
         <DrawerHeader>
           <HStack>
             <DrawerCloseButton />
@@ -367,110 +381,126 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             </Text>
           </HStack>
         </DrawerHeader>
-        <DrawerBody overflow="scroll">
+        <DrawerBody overflow="visible" paddingX={0}>
           {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
           <form onSubmit={handleSubmit(onSubmit)}>
-            <HorizontalFormControl
-              label="Dataset"
-              helper="Add to an existing dataset or create a new one"
-              isInvalid={!!errors.datasetId}
-            >
-              {/* TODO: keep last selection on localstorage */}
-              <Select
-                {...register("datasetId", { required: "Dataset is required" })}
+            <VStack paddingX={6}>
+              <HorizontalFormControl
+                label="Dataset"
+                helper="Add to an existing dataset or create a new one"
+                isInvalid={!!errors.datasetId}
               >
-                <option value={""}>Select Dataset</option>
-                {datasets.data
-                  ? datasets.data?.map((dataset, index) => (
-                      <option
-                        key={index}
-                        value={dataset.id}
-                        selected={dataset.id === localStorageDatasetId}
-                      >
-                        {dataset.name}
-                      </option>
-                    ))
-                  : null}
-              </Select>
-              {errors.datasetId && (
-                <FormErrorMessage>{errors.datasetId.message}</FormErrorMessage>
-              )}
-              <Button
-                colorScheme="blue"
-                onClick={() => {
-                  setValue("datasetId", "");
-                  editDataset.onOpen();
-                }}
-                minWidth="fit-content"
-                variant="link"
-                marginTop={2}
-                fontWeight={"normal"}
-              >
-                + Create New
-              </Button>
-            </HorizontalFormControl>
-            {selectedDataset && (
-              <FormControl width="full" paddingY={4}>
-                <HStack width="full" spacing="64px" align="start">
-                  <VStack align="start" maxWidth="50%">
-                    <FormLabel margin={0}>Mapping</FormLabel>
-                    <FormHelperText margin={0} fontSize={13} marginBottom={2}>
-                      Map the trace data to the dataset columns
-                    </FormHelperText>
+                {/* TODO: keep last selection on localstorage */}
+                <Select
+                  {...register("datasetId", {
+                    required: "Dataset is required",
+                  })}
+                >
+                  <option value={""}>Select Dataset</option>
+                  {datasets.data
+                    ? datasets.data?.map((dataset, index) => (
+                        <option
+                          key={index}
+                          value={dataset.id}
+                          selected={dataset.id === localStorageDatasetId}
+                        >
+                          {dataset.name}
+                        </option>
+                      ))
+                    : null}
+                </Select>
+                {errors.datasetId && (
+                  <FormErrorMessage>
+                    {errors.datasetId.message}
+                  </FormErrorMessage>
+                )}
+                <Button
+                  colorScheme="blue"
+                  onClick={() => {
+                    setValue("datasetId", "");
+                    editDataset.onOpen();
+                  }}
+                  minWidth="fit-content"
+                  variant="link"
+                  marginTop={2}
+                  fontWeight={"normal"}
+                >
+                  + Create New
+                </Button>
+              </HorizontalFormControl>
+              {selectedDataset && (
+                <FormControl width="full" paddingY={4}>
+                  <HStack width="full" spacing="64px" align="start">
+                    <VStack align="start" maxWidth="50%">
+                      <FormLabel margin={0}>Mapping</FormLabel>
+                      <FormHelperText margin={0} fontSize={13} marginBottom={2}>
+                        Map the trace data to the dataset columns
+                      </FormHelperText>
 
-                    <TracesMapping
-                      traces={tracesWithSpans.data ?? []}
-                      columnTypes={
-                        selectedDataset?.columnTypes as DatasetColumns
-                      }
-                      setDatasetEntries={setRowDataFromDataset}
-                    />
-                  </VStack>
-                  <VStack align="start" width="full" height="full">
-                    <HStack width="full" align="end">
-                      <VStack align="start">
-                        <FormLabel margin={0}>Preview</FormLabel>
-                        <FormHelperText margin={0} fontSize={13}>
-                          Those are the rows that are going to be added, double
-                          click on the cell to edit them
-                        </FormHelperText>
-                      </VStack>
-                      <Spacer />
-                      <Button
-                        size="sm"
-                        colorScheme="blue"
-                        variant="outline"
-                        leftIcon={<Edit2 height={16} />}
-                        onClick={() => {
-                          editDataset.onOpen();
-                        }}
-                      >
-                        Edit Columns
-                      </Button>
-                    </HStack>
-                    <Box width="full" display="block" paddingTop={2}>
-                      <DatasetGrid
-                        columnDefs={columnDefs}
-                        rowData={rowDataFromDataset}
-                        onCellValueChanged={({
-                          data,
-                        }: {
-                          data: DatasetRecordEntry;
-                        }) => {
-                          setEditableRowData((rowData) =>
-                            rowData.map((row) =>
-                              row.id === data.id ? data : row
-                            )
-                          );
-                        }}
+                      <TracesMapping
+                        traces={tracesWithSpans.data ?? []}
+                        columnTypes={
+                          selectedDataset?.columnTypes as DatasetColumns
+                        }
+                        setDatasetEntries={setRowDataFromDataset}
                       />
-                    </Box>
-                  </VStack>
-                </HStack>
-              </FormControl>
-            )}
+                    </VStack>
+                    <VStack align="start" width="full" height="full">
+                      <HStack width="full" align="end">
+                        <VStack align="start">
+                          <FormLabel margin={0}>Preview</FormLabel>
+                          <FormHelperText margin={0} fontSize={13}>
+                            Those are the rows that are going to be added,
+                            double click on the cell to edit them
+                          </FormHelperText>
+                        </VStack>
+                        <Spacer />
+                        <Button
+                          size="sm"
+                          colorScheme="blue"
+                          variant="outline"
+                          leftIcon={<Edit2 height={16} />}
+                          onClick={() => {
+                            editDataset.onOpen();
+                          }}
+                        >
+                          Edit Columns
+                        </Button>
+                      </HStack>
+                      <Box width="full" display="block" paddingTop={2}>
+                        <DatasetGrid
+                          columnDefs={columnDefs}
+                          rowData={rowDataFromDataset}
+                          onCellValueChanged={({
+                            data,
+                          }: {
+                            data: DatasetRecordEntry;
+                          }) => {
+                            setEditableRowData((rowData) =>
+                              rowData.map((row) =>
+                                row.id === data.id ? data : row
+                              )
+                            );
+                          }}
+                        />
+                      </Box>
+                    </VStack>
+                  </HStack>
+                </FormControl>
+              )}
+            </VStack>
 
-            <HStack width="full" justifyContent="flex-end">
+            <HStack
+              width="full"
+              justifyContent="flex-end"
+              position="sticky"
+              bottom={0}
+              paddingBottom={4}
+              background="white"
+              transition="box-shadow 0.3s ease-in-out"
+              boxShadow={atBottom ? "none" : "0 -2px 5px rgba(0, 0, 0, 0.1)"}
+              paddingX={6}
+            >
               <Button
                 type="submit"
                 colorScheme="blue"

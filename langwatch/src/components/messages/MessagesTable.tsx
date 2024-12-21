@@ -156,7 +156,11 @@ export function MessagesTable() {
       return null;
     }
     return (
-      <Tooltip label={`${annotations?.length} annotations`}>
+      <Tooltip
+        label={`${annotations?.length} ${
+          annotations?.length === 1 ? "annotation" : "annotations"
+        }`}
+      >
         <HStack
           marginRight={1}
           onClick={() =>
@@ -298,13 +302,15 @@ export function MessagesTable() {
                 : "0 0 0 rgba(0, 0, 0, 0)"
             }
           >
-            <HStack position="relative" align="right">
-              {annotationCount(trace.trace_id)}
+            <HStack>
               <Checkbox
                 colorScheme="blue"
                 isChecked={selectedTraceIds.includes(trace.trace_id)}
                 onChange={() => traceSelection(trace.trace_id)}
               />
+              <Box position="relative" paddingLeft={2}>
+                {annotationCount(trace.trace_id)}
+              </Box>
             </HStack>
           </Td>
         );
@@ -1094,7 +1100,7 @@ export function MessagesTable() {
                               : {})}
                           >
                             {columnKey === "checked" ? (
-                              <HStack width="full" justifyContent="end">
+                              <HStack width="full">
                                 <Checkbox
                                   isChecked={
                                     selectedTraceIds.length ===
