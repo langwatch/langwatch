@@ -322,6 +322,11 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       type_: type,
       cellClass: "v-align",
       sortable: false,
+      minWidth: ["trace_id", "total_cost"].includes(name)
+        ? 120
+        : ["timestamp"].includes(name)
+        ? 160
+        : 200,
     }));
 
     // Add row number column
@@ -350,6 +355,16 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(false);
+
+  useEffect(() => {
+    if (!scrollRef.current) return;
+
+    setAtBottom(
+      (scrollRef.current.scrollTop ?? 0) >=
+        (scrollRef.current.scrollHeight ?? 0) -
+          (scrollRef.current.clientHeight ?? 0)
+    );
+  }, [rowDataFromDataset]);
 
   return (
     <Drawer

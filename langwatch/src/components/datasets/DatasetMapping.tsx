@@ -1,4 +1,15 @@
-import { Box, HStack, Select, Spacer, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  FormControl,
+  FormHelperText,
+  FormLabel,
+  HStack,
+  Select,
+  Spacer,
+  Switch,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, ChevronDown } from "react-feather";
@@ -85,14 +96,14 @@ const TRACE_MAPPINGS = {
       trace.spans
         ?.filter((span) => span.type === "llm")
         ?.map((span) => span.input?.value) ?? [],
-    expandable_by: "spans.span_id",
+    expandable_by: "spans.llm.span_id",
   },
   "spans.llm.output": {
     mapping: (trace: TraceWithSpansAndAnnotations) =>
       trace.spans
         ?.filter((span) => span.type === "llm")
         ?.map((span) => span.output?.value) ?? [],
-    expandable_by: "spans.span_id",
+    expandable_by: "spans.llm.span_id",
   },
   metadata: {
     keys: (traces: TraceWithSpansAndAnnotations[]) =>
@@ -197,7 +208,38 @@ const TRACE_MAPPINGS = {
           key: string,
           subkey: string
         ) => string | number | object | undefined);
-    expandable_by?: "spans.span_id" | "annotations.id";
+    expandable_by?: keyof typeof TRACE_EXPANSIONS;
+  }
+>;
+
+const TRACE_EXPANSIONS = {
+  "spans.llm.span_id": {
+    label: "LLM span",
+    expansion: (trace: TraceWithSpansAndAnnotations) => {
+      const spans = trace.spans?.filter((span) => span.type === "llm") ?? [];
+      return spans.map((span) => ({
+        ...trace,
+        spans: [span],
+      }));
+    },
+  },
+  "annotations.id": {
+    label: "annotation",
+    expansion: (trace: TraceWithSpansAndAnnotations) => {
+      const annotations = trace.annotations ?? [];
+      return annotations.map((annotation) => ({
+        ...trace,
+        annotations: [annotation],
+      }));
+    },
+  },
+} satisfies Record<
+  string,
+  {
+    label: string;
+    expansion: (
+      trace: TraceWithSpansAndAnnotations
+    ) => TraceWithSpansAndAnnotations[];
   }
 >;
 
@@ -248,16 +290,49 @@ export const TracesMapping = ({
       refetchOnWindowFocus: false,
     }
   );
-  const traces_ = traces.map((trace) => ({
-    ...trace,
-    annotations: annotationScores.data?.filter(
-      (annotation) => annotation.traceId === trace.trace_id
-    ),
-  }));
+  const traces_ = useMemo(
+    () =>
+      traces.map((trace) => ({
+        ...trace,
+        annotations: annotationScores.data?.filter(
+          (annotation) => annotation.traceId === trace.trace_id
+        ),
+      })),
+    [traces, annotationScores.data]
+  );
 
   const [mapping, setMapping] = useState<Mapping>({});
-  const [localStorageMapping, setLocalStorageMapping] =
-    useLocalStorage<Mapping>("datasetMapping", {});
+  const [localStorageMapping, setLocalStorageMapping] = useLocalStorage<{
+    mapping: Mapping;
+    expansions: string[];
+  }>("datasetMapping", { mapping: {}, expansions: [] });
+
+  const [expansions_, setExpansions] = useState<
+    Set<keyof typeof TRACE_EXPANSIONS>
+  >(new Set());
+  const availableExpansions = useMemo(
+    () =>
+      new Set(
+        Object.values(mapping)
+          .map((mapping) => {
+            const source = mapping.source && TRACE_MAPPINGS[mapping.source];
+            if (source && "expandable_by" in source && source.expandable_by) {
+              return source.expandable_by;
+            }
+            return;
+          })
+          .filter(Boolean)
+          .map((x) => x!)
+      ),
+    [mapping]
+  );
+  const expansions = useMemo(
+    () =>
+      new Set(
+        Array.from(expansions_).filter((x) => availableExpansions.has(x))
+      ),
+    [expansions_, availableExpansions]
+  );
 
   const now = useMemo(() => new Date().getTime(), []);
 
@@ -266,46 +341,81 @@ export const TracesMapping = ({
       Object.fromEntries(
         columnTypes?.map(({ name }) => [
           name,
-          localStorageMapping[name] ?? {
+          localStorageMapping.mapping[name] ?? {
             source: DATASET_INFERRED_MAPPINGS_BY_NAME[name] ?? "",
           },
         ]) ?? []
       )
     );
+    setExpansions(
+      new Set(
+        localStorageMapping.expansions as (keyof typeof TRACE_EXPANSIONS)[]
+      )
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columnTypes]);
 
   useEffect(() => {
-    setLocalStorageMapping(mapping);
-    setDatasetEntries(
-      traces_.map((trace, index) => {
-        return {
-          id: `${now}-${index}`,
-          selected: true,
-          ...Object.fromEntries(
-            Object.entries(mapping).map(([column, { source, key, subkey }]) => {
-              const value = TRACE_MAPPINGS[
-                source as keyof typeof TRACE_MAPPINGS
-              ]?.mapping(trace, key!, subkey!);
-              return [
-                column,
-                typeof value !== "string" && typeof value !== "number"
-                  ? JSON.stringify(value)
-                  : value,
-              ];
-            })
-          ),
-        };
-      })
-    );
-  }, [mapping, now, setDatasetEntries, traces]);
+    setLocalStorageMapping({
+      mapping: mapping,
+      expansions: Array.from(expansions),
+    });
+
+    let index = 0;
+    const entries: DatasetRecordEntry[] = [];
+    let expandedTraces: TraceWithSpansAndAnnotations[] = traces_;
+    for (const expansion of expansions) {
+      expandedTraces = expandedTraces.flatMap((trace) =>
+        TRACE_EXPANSIONS[expansion].expansion(trace)
+      );
+    }
+
+    for (const trace of expandedTraces) {
+      const entry = Object.fromEntries(
+        Object.entries(mapping).map(([column, { source, key, subkey }]) => {
+          const source_ = source ? TRACE_MAPPINGS[source] : undefined;
+
+          let value = source_?.mapping(trace, key!, subkey!);
+          if (
+            source_ &&
+            "expandable_by" in source_ &&
+            source_?.expandable_by &&
+            expansions.has(source_?.expandable_by)
+          ) {
+            value = value?.[0];
+          }
+
+          return [
+            column,
+            typeof value !== "string" && typeof value !== "number"
+              ? JSON.stringify(value)
+              : value,
+          ];
+        })
+      );
+
+      entries.push({
+        id: `${now}-${index}`,
+        selected: true,
+        ...entry,
+      });
+      index++;
+    }
+    setDatasetEntries(entries);
+  }, [
+    expansions,
+    mapping,
+    now,
+    setDatasetEntries,
+    setLocalStorageMapping,
+    traces_,
+  ]);
 
   return (
     <VStack align="start" width="full" spacing={2}>
       {Object.entries(mapping).map(
         ([column, { source, key, subkey }], index) => {
-          const mapping = source
-            ? TRACE_MAPPINGS[source as keyof typeof TRACE_MAPPINGS]
-            : undefined;
+          const mapping = source ? TRACE_MAPPINGS[source] : undefined;
 
           return (
             <HStack key={index}>
@@ -324,6 +434,19 @@ export const TracesMapping = ({
                         subkey: undefined,
                       },
                     }));
+                    const newMapping =
+                      TRACE_MAPPINGS[
+                        e.target.value as keyof typeof TRACE_MAPPINGS
+                      ];
+                    if (
+                      "expandable_by" in newMapping &&
+                      newMapping.expandable_by &&
+                      !availableExpansions.has(newMapping.expandable_by)
+                    ) {
+                      setExpansions(
+                        (prev) => new Set([...prev, newMapping.expandable_by])
+                      );
+                    }
                   }}
                   value={source}
                 >
@@ -414,6 +537,42 @@ export const TracesMapping = ({
             </HStack>
           );
         }
+      )}
+
+      {availableExpansions.size > 0 && (
+        <FormControl width="full" paddingY={4} marginTop={2}>
+          <VStack align="start">
+            <FormLabel margin={0}>Expansions</FormLabel>
+            <FormHelperText
+              margin={0}
+              fontSize={13}
+              marginBottom={2}
+              maxWidth="600px"
+            >
+              Normalize the dataset to duplicate the rows and have one entry per
+              line instead of an array for the following columns:
+            </FormHelperText>
+          </VStack>
+          <VStack align="start" paddingTop={2} spacing={2}>
+            {Array.from(availableExpansions).map((expansion) => (
+              <HStack key={expansion}>
+                <Switch
+                  isChecked={expansions.has(expansion)}
+                  onChange={(e) => {
+                    setExpansions((prev) =>
+                      e.target.checked
+                        ? new Set([...prev, expansion])
+                        : new Set(
+                            Array.from(prev).filter((x) => x !== expansion)
+                          )
+                    );
+                  }}
+                />
+                <Text>One row per {TRACE_EXPANSIONS[expansion].label}</Text>
+              </HStack>
+            ))}
+          </VStack>
+        </FormControl>
       )}
     </VStack>
   );
