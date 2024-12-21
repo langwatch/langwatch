@@ -146,6 +146,7 @@ export function SpanDetails({
                 (!!span.input || !!span.output) &&
                 JSON.stringify(span.params).length > 100
               }
+              showTools
             />
           </Box>
         </VStack>
@@ -169,7 +170,7 @@ export function SpanDetails({
             width="full"
             whiteSpace="pre-wrap"
           >
-            <RenderInputOutput value={span.input?.value} />
+            <RenderInputOutput value={span.input?.value} showTools />
           </Box>
         </VStack>
       )}
@@ -208,6 +209,7 @@ export function SpanDetails({
                   return context;
                 })
               )}
+              showTools
             />
           </Box>
         </VStack>
@@ -263,7 +265,7 @@ export function SpanDetails({
                 width="full"
                 whiteSpace="pre-wrap"
               >
-                <RenderInputOutput value={span.output.value} />
+                <RenderInputOutput value={span.output.value} showTools />
               </Box>
             )}
           </VStack>

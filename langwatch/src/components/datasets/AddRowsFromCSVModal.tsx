@@ -14,13 +14,7 @@ import {
   Text,
   useToast,
 } from "@chakra-ui/react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ChangeEvent,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import {
@@ -31,8 +25,9 @@ import {
 import { api } from "../../utils/api";
 
 import { nanoid } from "nanoid";
-import { CSVReaderComponent } from "./UploadCSVModal";
 import { tryToConvertRowsToAppropriateType } from "../AddOrEditDatasetDrawer";
+import { CustomSelect } from "./DatasetMapping";
+import { CSVReaderComponent } from "./UploadCSVModal";
 
 export function AddRowsFromCSVModal({
   isOpen,
@@ -104,8 +99,8 @@ export function AddRowsFromCSVModal({
     setCanUpload(isMappingsComplete());
   }, [isMappingsComplete, mapping]);
 
-  const onSelectChange = (value: string) => {
-    const [map, column] = value.split("-");
+  const onSelectChange = (map: string) => (value: string) => {
+    const column = value;
 
     if (!map || !column) return;
     mapping[map] = column;
@@ -188,11 +183,20 @@ export function AddRowsFromCSVModal({
       return (
         <HStack key={index} marginY={2}>
           <Box width={200}>
-            <CustomSelect
-              selectOptions={CSVHeaders}
-              mapping={option.value}
-              onSelectChange={onSelectChange}
-            />
+            <Select
+              placeholder="Select column"
+              onChange={(e) => {
+                onSelectChange(option.value)(e.target.value);
+              }}
+              value={mapping[option.value]}
+            >
+              {CSVHeaders.map((column) => (
+                <option key={column} value={column}>
+                  {column}
+                </option>
+              ))}
+              <option value="">Set empty</option>
+            </Select>
           </Box>
 
           <ArrowRight />
@@ -251,35 +255,3 @@ export function AddRowsFromCSVModal({
     </Modal>
   );
 }
-
-interface CustomSelectProps {
-  selectOptions: string[];
-  mapping: string;
-  onSelectChange: (value: string) => void;
-}
-const CustomSelect = ({
-  selectOptions,
-  onSelectChange,
-  mapping,
-}: CustomSelectProps) => {
-  const [selectedValue, setSelectedValue] = useState("");
-  const handleSelectChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    setSelectedValue(event.target.value);
-    onSelectChange(event.target.value);
-  };
-
-  return (
-    <Select
-      placeholder="Select column"
-      onChange={handleSelectChange}
-      value={selectedValue}
-    >
-      {selectOptions.map((column, i) => (
-        <option key={i} value={`${mapping}-${column}`}>
-          {column}
-        </option>
-      ))}
-      <option value={`${mapping}-empty`}>Set empty</option>
-    </Select>
-  );
-};

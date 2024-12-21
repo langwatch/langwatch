@@ -8,6 +8,7 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
+  Spacer,
   Text,
   useDisclosure,
   VStack,
@@ -28,10 +29,12 @@ export function UploadCSVModal({
   isOpen,
   onClose,
   onSuccess,
+  onCreateFromScratch,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: Parameters<typeof AddOrEditDatasetDrawer>[0]["onSuccess"];
+  onCreateFromScratch?: () => void;
 }) {
   const addDatasetDrawer = useDisclosure();
   const [localIsOpen, setLocalIsOpen] = useState(isOpen);
@@ -69,10 +72,11 @@ export function UploadCSVModal({
                     type: "string",
                   })
                 );
+                const now = new Date().getTime();
                 const records: DatasetRecordEntry[] = data
                   .slice(1)
-                  .map((row: string[]) => ({
-                    id: nanoid(),
+                  .map((row: string[], index: number) => ({
+                    id: `${now}-${index}`,
                     ...Object.fromEntries(
                       row.map((col, i) => [columns[i]?.name, col])
                     ),
@@ -99,9 +103,18 @@ export function UploadCSVModal({
           </ModalBody>
 
           <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={onClose}>
-              Close
-            </Button>
+            {onCreateFromScratch && (
+              <Button
+                variant="link"
+                colorScheme="gray"
+                fontWeight="normal"
+                color="blue.700"
+                onClick={onCreateFromScratch}
+              >
+                Skip, create empty dataset
+              </Button>
+            )}
+            <Spacer />
             <Button
               colorScheme="blue"
               isDisabled={
@@ -252,7 +265,7 @@ function CSVReaderBox({
           </Box>
         </>
       ) : (
-        "Drop CSV file here or click to upload"
+        <Text>Drop CSV file or click here to upload</Text>
       )}
     </Box>
   );

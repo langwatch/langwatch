@@ -1,6 +1,7 @@
 import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import { Link } from "@chakra-ui/next-js";
 import {
+  Box,
   Button,
   Checkbox,
   Drawer,
@@ -8,12 +9,16 @@ import {
   DrawerCloseButton,
   DrawerContent,
   DrawerHeader,
+  FormControl,
   FormErrorMessage,
+  FormHelperText,
+  FormLabel,
   HStack,
   Select,
   Text,
   useDisclosure,
   useToast,
+  VStack,
 } from "@chakra-ui/react";
 import { nanoid } from "nanoid";
 import { useEffect, useMemo, useState } from "react";
@@ -35,6 +40,7 @@ import type {
 } from "../server/tracer/types";
 import {
   elasticSearchEvaluationsToEvaluations,
+  elasticSearchSpanToSpan,
   getRAGInfo,
 } from "../server/tracer/utils";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
@@ -45,6 +51,7 @@ import {
   HeaderCheckboxComponent,
   type DatasetColumnDef,
 } from "./datasets/DatasetGrid";
+import { TracesMapping } from "./datasets/DatasetMapping";
 
 type FormValues = {
   datasetId: string;
@@ -290,96 +297,9 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       });
   };
 
-  const rowDataFromDataset = useMemo(() => {
-    if (!selectedDataset || !tracesWithSpans.data) {
-      return;
-    }
-
-    const rows: DatasetRecordEntry[] = [];
-
-    for (const trace of tracesWithSpans.data) {
-      const row: DatasetRecordEntry = {
-        id: nanoid(),
-        selected: true,
-      };
-      for (const {
-        name,
-        type,
-      } of (selectedDataset.columnTypes as DatasetColumns) ?? []) {
-        if (name === "input" && type === "string") {
-          row[name] = trace.input?.value ?? "";
-        } else if (name === "expected_output" && type === "string") {
-          row[name] = trace.output?.value ?? "";
-        } else if (type === "rag_contexts") {
-          try {
-            row[name] = JSON.stringify(
-              getRAGInfo(trace.spans ?? []).contexts ?? []
-            );
-          } catch (e) {
-            row[name] = JSON.stringify([]);
-          }
-        } else if (type === "spans") {
-          row[name] = JSON.stringify(
-            esSpansToDatasetSpans(trace.spans ?? []),
-            null,
-            2
-          );
-        } else if (name === "annotation_scores") {
-          const annotationScoresArray = annotationScores.data
-            ? getAnnotationScoresArray(
-                annotationScores.data as z.infer<
-                  typeof annotationScoreSchema
-                >[],
-                idNameMap ?? {},
-                trace.trace_id
-              )
-            : [];
-          row[name] = JSON.stringify(annotationScoresArray);
-        } else if (type === "evaluations") {
-          row[name] = JSON.stringify(
-            getEvaluationArray(evaluations, trace.trace_id)
-          );
-        } else {
-          row[name] = "";
-        }
-      }
-
-      // One row per LLM entry
-      if (
-        ((selectedDataset.columnTypes as DatasetColumns) ?? []).some(
-          ({ type }) => type === "chat_messages"
-        )
-      ) {
-        const llmEntries = trace.spans?.filter((span) => span.type === "llm");
-        // TODO: disable the row if the llm entry has no chat_message as input/output type
-        for (const llmEntry of llmEntries ?? []) {
-          const row_: DatasetRecordEntry = { ...row, id: nanoid() };
-
-          for (const {
-            name,
-            type,
-          } of (selectedDataset.columnTypes as DatasetColumns) ?? []) {
-            if (name === "expected_llm_output" && type === "chat_messages") {
-              row_[name] = llmEntry.output?.value ? llmEntry.output.value : "";
-            } else if (type === "chat_messages") {
-              row_[name] = llmEntry.input?.value ? llmEntry.input.value : "";
-            }
-          }
-          rows.push(row_);
-        }
-      } else {
-        rows.push(row);
-      }
-    }
-
-    return rows;
-  }, [
-    selectedDataset,
-    tracesWithSpans.data,
-    annotationScores.data,
-    idNameMap,
-    evaluations,
-  ]);
+  const [rowDataFromDataset, setRowDataFromDataset] = useState<
+    DatasetRecordEntry[]
+  >([]);
 
   useEffect(() => {
     if (!rowDataFromDataset) return;
@@ -486,43 +406,73 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                 + Create New
               </Button>
             </HorizontalFormControl>
-
             {selectedDataset && (
-              <DatasetGrid
-                columnDefs={columnDefs}
-                rowData={rowDataFromDataset}
-                onCellValueChanged={({
-                  data,
-                }: {
-                  data: DatasetRecordEntry;
-                }) => {
-                  setEditableRowData((rowData) =>
-                    rowData.map((row) => (row.id === data.id ? data : row))
-                  );
-                }}
-              />
+              <FormControl width="full" paddingY={4}>
+                <HStack width="full" spacing="64px" align="start">
+                  <VStack align="start" maxWidth="50%">
+                    <FormLabel margin={0}>Mapping</FormLabel>
+                    <FormHelperText margin={0} fontSize={13} marginBottom={2}>
+                      Map the trace data to the dataset columns
+                    </FormHelperText>
+
+                    <TracesMapping
+                      traces={tracesWithSpans.data ?? []}
+                      columnTypes={
+                        selectedDataset?.columnTypes as DatasetColumns
+                      }
+                      setDatasetEntries={setRowDataFromDataset}
+                    />
+                  </VStack>
+                  <VStack align="start" width="full" height="full">
+                    <FormLabel margin={0}>Preview</FormLabel>
+                    <FormHelperText margin={0} fontSize={13}>
+                      Those are the rows that are going to be added, double
+                      click on the cell to edit them
+                    </FormHelperText>
+                    <Box width="full" display="block" paddingTop={2}>
+                      <DatasetGrid
+                        columnDefs={columnDefs}
+                        rowData={rowDataFromDataset}
+                        onCellValueChanged={({
+                          data,
+                        }: {
+                          data: DatasetRecordEntry;
+                        }) => {
+                          setEditableRowData((rowData) =>
+                            rowData.map((row) =>
+                              row.id === data.id ? data : row
+                            )
+                          );
+                        }}
+                      />
+                    </Box>
+                  </VStack>
+                </HStack>
+              </FormControl>
             )}
 
-            <Button
-              type="submit"
-              colorScheme="blue"
-              marginTop={6}
-              marginBottom={4}
-              isLoading={createDatasetRecord.isLoading}
-              isDisabled={
-                !selectedDataset ||
-                !tracesWithSpans.data ||
-                rowsToAdd.length === 0
-              }
-            >
-              Add{" "}
-              {selectedDataset && tracesWithSpans.data
-                ? `${rowsToAdd.length} ${
-                    rowsToAdd.length == 1 ? "row" : "rows"
-                  }`
-                : ""}{" "}
-              to dataset
-            </Button>
+            <HStack width="full" justifyContent="flex-end">
+              <Button
+                type="submit"
+                colorScheme="blue"
+                marginTop={6}
+                marginBottom={4}
+                isLoading={createDatasetRecord.isLoading}
+                isDisabled={
+                  !selectedDataset ||
+                  !tracesWithSpans.data ||
+                  rowsToAdd.length === 0
+                }
+              >
+                Add{" "}
+                {selectedDataset && tracesWithSpans.data
+                  ? `${rowsToAdd.length} ${
+                      rowsToAdd.length == 1 ? "row" : "rows"
+                    }`
+                  : ""}{" "}
+                to dataset
+              </Button>
+            </HStack>
           </form>
         </DrawerBody>
       </DrawerContent>
@@ -535,25 +485,3 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   );
 }
 
-const esSpansToDatasetSpans = (spans: ElasticSearchSpan[]): DatasetSpan[] => {
-  const newArray = JSON.parse(JSON.stringify(spans));
-  for (let i = 0; i < spans.length; i++) {
-    if (newArray[i].output?.value) {
-      const outputObj = JSON.parse(newArray[i].output.value);
-      newArray[i].output.value = outputObj;
-    } else {
-      newArray[i].output = { value: "", type: "json" };
-    }
-    if (newArray[i].input?.value) {
-      const inputObj = JSON.parse(newArray[i].input.value);
-      newArray[i].input.value = inputObj;
-    } else {
-      newArray[i].input = { value: "", type: "json" };
-    }
-  }
-  try {
-    return z.array(datasetSpanSchema).parse(newArray);
-  } catch (e) {
-    return newArray;
-  }
-};

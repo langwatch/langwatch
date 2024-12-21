@@ -1161,11 +1161,14 @@ export function MessagesTable() {
           padding="8px"
           paddingX="16px"
           border="1px solid #ccc"
-          boxShadow="base"
+          boxShadow="0 0 15px rgba(0, 0, 0, 0.2)"
           borderRadius={"md"}
         >
           <HStack gap={3}>
-            <Text>{selectedTraceIds.length} Traces selected</Text>
+            <Text>
+              {selectedTraceIds.length}{" "}
+              {selectedTraceIds.length === 1 ? "trace" : "traces"} selected
+            </Text>
             <Button
               colorScheme="black"
               minWidth="fit-content"

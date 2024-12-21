@@ -140,12 +140,6 @@ export default function Datasets() {
           </Heading>
           <Spacer />
           <Button
-            onClick={() => uploadCSVModal.onOpen()}
-            rightIcon={<Upload height={17} width={17} strokeWidth={2.5} />}
-          >
-            Upload CSV
-          </Button>
-          <Button
             colorScheme="blue"
             onClick={() => {
               openDrawer("batchEvaluation", {
@@ -159,12 +153,11 @@ export default function Datasets() {
           </Button>
           <Button
             colorScheme="blue"
-            onClick={() => {
-              addEditDatasetDrawer.onOpen();
-            }}
+            onClick={() => uploadCSVModal.onOpen()}
             minWidth="fit-content"
+            leftIcon={<Upload height={17} width={17} strokeWidth={2.5} />}
           >
-            + Create New Dataset
+            Upload or Create Dataset
           </Button>
         </HStack>
         <Card>
@@ -287,6 +280,10 @@ export default function Datasets() {
         onSuccess={() => {
           void datasets.refetch();
           addEditDatasetDrawer.onClose();
+        }}
+        onCreateFromScratch={() => {
+          uploadCSVModal.onClose();
+          addEditDatasetDrawer.onOpen();
         }}
       />
     </DashboardLayout>

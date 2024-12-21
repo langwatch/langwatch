@@ -341,7 +341,7 @@ export const tracesRouter = createTRPCRouter({
           evaluatePreconditions(
             evaluatorType,
             trace,
-            trace.spans?.map(elasticSearchSpanToSpan) ?? [],
+            trace.spans ?? [],
             preconditions
           )
       );
@@ -699,7 +699,7 @@ export const getTracesWithSpans = async (
       const spans = trace.spans ?? [];
       return {
         ...elasticSearchTraceToTrace(trace),
-        spans,
+        spans: spans.map(elasticSearchSpanToSpan),
       };
     });
 

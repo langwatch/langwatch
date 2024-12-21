@@ -121,6 +121,7 @@ export const runEvaluationForTrace = async ({
       return trace.expected_output?.value ?? trace.metadata.expected_output;
     }
     // Use typescript to ensure all cases are handled
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const _: never = mapping;
     throw new Error(`Unknown mapping: ${String(mapping)}`);
   };
@@ -576,6 +577,7 @@ const customEvaluation = async (
       return expected_output;
     }
     // Use typescript to ensure all cases are handled
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const _: never = mapping;
     throw new Error(`Unknown mapping: ${String(mapping)}`);
   };

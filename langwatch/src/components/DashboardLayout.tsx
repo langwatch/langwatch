@@ -41,6 +41,7 @@ import {
   ChevronRight,
   Edit,
   Lock,
+  MessageCircle,
   MessageSquare,
   Play,
   Plus,
@@ -70,6 +71,7 @@ import { useTableView } from "./messages/HeaderButtons";
 import { IconWrapper } from "./IconWrapper";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { DiscordOutlineIcon } from "./icons/DiscordOutline";
+import { ChatBalloonIcon } from "./icons/ChatBalloon";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -532,6 +534,45 @@ export const DashboardLayout = ({
                   </Link>
                 </Tooltip>
               </>
+            )}
+            {(window as any)?.$crisp && (
+              <Tooltip hasArrow placement="right" gutter={16} label="Live Help">
+                <Button
+                  position="relative"
+                  color="white"
+                  variant="link"
+                  size="xs"
+                  padding={2}
+                  marginX={-2}
+                  borderRadius="full"
+                  minWidth={0}
+                  minHeight={0}
+                  onClick={() => {
+                    (window as any)?.$crisp.push(["do", "chat:show"]);
+                    (window as any)?.$crisp.push(["do", "chat:toggle"]);
+                  }}
+                  backgroundColor="blue.500"
+                  _hover={{
+                    transform: "scale(1.2)",
+                  }}
+                  _active={{
+                    color: "white",
+                  }}
+                >
+                  <ChatBalloonIcon width={20} height={20} />
+                  <Box
+                    position="absolute"
+                    bottom="0px"
+                    right="0px"
+                    width="10px"
+                    height="10px"
+                    borderRadius="full"
+                    backgroundColor="green.500"
+                    border="1px solid"
+                    borderColor="white"
+                  />
+                </Button>
+              </Tooltip>
             )}
           </VStack>
         </VStack>

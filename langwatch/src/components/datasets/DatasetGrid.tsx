@@ -203,6 +203,39 @@ export const DatasetGrid = React.memo(
               return false;
             },
           }}
+          dataTypeDefinitions={{
+            dateString: {
+              baseDataType: "dateString",
+              extendsDataType: "dateString",
+              dateParser: (value: string | undefined) =>
+                value ? new Date(value) : undefined,
+              // @ts-ignore
+              valueFormatter: (params: { value?: string }) =>
+                params.value &&
+                typeof params.value === "string" &&
+                // @ts-ignore
+                new Date(params.value) != "Invalid Date"
+                  ? params.value
+                      .replace("T", " ")
+                      .split(".")[0]
+                      ?.replace(" 00:00:00", "")
+                  : "Invalid Date",
+              dateFormatter: (value: Date | undefined) =>
+                value && typeof value === "object"
+                  ? new Date(
+                      Date.UTC(
+                        value.getFullYear(),
+                        value.getMonth(),
+                        value.getDate(),
+                        0,
+                        0,
+                        0,
+                        0
+                      )
+                    ).toISOString()
+                  : undefined,
+            },
+          }}
           {...props}
           columnDefs={columnDefs_}
         />

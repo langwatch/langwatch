@@ -203,7 +203,7 @@ const OutputBox = ({ value, ...props }: { value: any } & BoxProps) => {
       whiteSpace="pre-wrap"
       {...props}
     >
-      <RenderInputOutput value={value} />
+      <RenderInputOutput value={value} showTools />
     </Box>
   );
 };

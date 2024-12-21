@@ -2,26 +2,25 @@ import {
   Box,
   Button,
   HStack,
-  Icon,
-  IconButton,
-  Switch,
   Text,
   Tooltip,
   useToast,
-  type ButtonProps,
+  type ButtonProps
 } from "@chakra-ui/react";
 import type { ReactJsonViewProps } from "@microlink/react-json-view";
 import dynamic from "next/dynamic";
 import { useState } from "react";
-import { Copy, File } from "react-feather";
-import { CopyIcon } from "../icons/Copy";
 import {
   isPythonRepr,
   parsePythonInsideJson,
 } from "../../utils/parsePythonInsideJson";
+import { CopyIcon } from "../icons/Copy";
 
 export function RenderInputOutput(
-  props: Partial<ReactJsonViewProps> & { value: string | undefined }
+  props: Partial<ReactJsonViewProps> & {
+    value: string | undefined;
+    showTools?: boolean;
+  }
 ) {
   let { value } = props;
   const ReactJson = dynamic(() => import("@microlink/react-json-view"), {
@@ -110,27 +109,29 @@ export function RenderInputOutput(
 
     return (
       <>
-        <HStack
-          position="absolute"
-          top={-2}
-          right={-2}
-          zIndex={1}
-          spacing="-1px"
-        >
-          {!forceRaw && (
-            <Tooltip label="View Raw">
-              <Box>
-                <TinyButton
-                  onClick={() => setRaw(!raw)}
-                  background={raw ? "gray.200" : "gray.100"}
-                >
-                  {"{}"}
-                </TinyButton>
-              </Box>
-            </Tooltip>
-          )}
-          {renderCopyButton()}
-        </HStack>
+        {props.showTools && (
+          <HStack
+            position="absolute"
+            top={-2}
+            right={-2}
+            zIndex={1}
+            spacing="-1px"
+          >
+            {!forceRaw && (
+              <Tooltip label="View Raw">
+                <Box>
+                  <TinyButton
+                    onClick={() => setRaw(!raw)}
+                    background={raw ? "gray.200" : "gray.100"}
+                  >
+                    {"{}"}
+                  </TinyButton>
+                </Box>
+              </Tooltip>
+            )}
+            {renderCopyButton()}
+          </HStack>
+        )}
         {raw || forceRaw ? (
           <Text fontFamily="mono" fontSize="14px">
             {JSON.stringify(json, null, 2)}
@@ -159,15 +160,17 @@ export function RenderInputOutput(
         renderJson(json ?? (value as any))
       ) : (
         <>
-          <HStack
-            position="absolute"
-            top={-2}
-            right={-2}
-            zIndex={1}
-            spacing="-1px"
-          >
-            {renderCopyButton()}
-          </HStack>
+          {props.showTools && (
+            <HStack
+              position="absolute"
+              top={-2}
+              right={-2}
+              zIndex={1}
+              spacing="-1px"
+            >
+              {renderCopyButton()}
+            </HStack>
+          )}
           <Text fontFamily="mono" fontSize="14px">
             {value
               ? typeof value === "string"

@@ -12,6 +12,7 @@ export type DatasetColumnType =
   | "boolean"
   | "number"
   | "date"
+  | "list"
   | "json"
   | "spans"
   | "rag_contexts"
@@ -60,6 +61,7 @@ export const datasetColumnTypeMapping: {
   boolean: z.boolean().optional().nullable(),
   number: z.number().optional().nullable(),
   date: z.date().optional().nullable(),
+  list: z.array(jsonSchema.optional().nullable()).optional().nullable(),
   json: jsonSchema.optional().nullable(),
   spans: z.array(datasetSpanSchema).optional().nullable(),
   rag_contexts: z

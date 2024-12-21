@@ -17,11 +17,29 @@ import {
   type Trace,
   type ElasticSearchEvaluation,
   type Evaluation,
+  type RAGChunk,
 } from "./types";
 import { reservedTraceMetadataSchema } from "./types.generated";
 
+export const getRAGChunks = (
+  spans: (ElasticSearchSpan | Span)[]
+): RAGChunk[] => {
+  const sortedSpans = flattenSpanTree(
+    organizeSpansIntoTree(spans as Span[]),
+    "inside-out"
+  ).reverse();
+  const lastRagSpan = sortedSpans.find((span) => span.type === "rag") as
+    | ElasticSearchSpan
+    | undefined;
+  if (!lastRagSpan) {
+    return [];
+  }
+
+  return lastRagSpan.contexts ?? [];
+};
+
 export const getRAGInfo = (
-  spans: ElasticSearchSpan[]
+  spans: (ElasticSearchSpan | Span)[]
 ): { input: string; output: string; contexts: string[] } => {
   const sortedSpans = flattenSpanTree(
     organizeSpansIntoTree(spans as Span[]),

@@ -305,6 +305,9 @@ export type Trace = {
   // TODO: add spans here too
 };
 
+// TODO: kill this after previous todo is done
+export type TraceWithSpans = Trace & { spans: Span[] };
+
 export type ElasticSearchTrace = Omit<
   Trace,
   "metadata" | "timestamps" | "events"
