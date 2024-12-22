@@ -7,6 +7,9 @@ import { AnnotationDrawer } from "./AnnotationDrawer";
 import { AddAnnotationScoreDrawer } from "./AddAnnotationScoreDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
+import { UploadCSVModal } from "./datasets/UploadCSVModal";
+import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
+import { ErrorBoundary } from "react-error-boundary";
 
 type DrawerProps = {
   open: string;
@@ -20,7 +23,12 @@ const drawers = {
   addAnnotationScore: AddAnnotationScoreDrawer,
   addDatasetRecord: AddDatasetRecordDrawerV2,
   llmModelCost: LLMModelCostDrawer,
+  uploadCSV: UploadCSVModal,
+  addOrEditDataset: AddOrEditDatasetDrawer,
 } satisfies Record<string, React.FC<any>>;
+
+// workaround to pass complexProps to drawers
+let complexProps = {} as Record<string, (...args: any[]) => void>;
 
 export function CurrentDrawer() {
   const router = useRouter();
@@ -37,7 +45,27 @@ export function CurrentDrawer() {
     ? (drawers[queryDrawer.open as keyof typeof drawers] as React.FC<any>)
     : undefined;
 
-  return CurrentDrawer ? <CurrentDrawer {...queryDrawer} /> : null;
+  return CurrentDrawer ? (
+    <ErrorBoundary
+      fallback={null}
+      onError={() => {
+        void router.push(
+          "?" +
+            qs.stringify(
+              Object.fromEntries(
+                Object.entries(router.query).filter(
+                  ([key]) => !key.startsWith("drawer.")
+                )
+              )
+            ),
+          undefined,
+          { shallow: true }
+        );
+      }}
+    >
+      <CurrentDrawer {...queryDrawer} {...complexProps} />
+    </ErrorBoundary>
+  ) : null;
 }
 
 export function useDrawer() {
@@ -47,13 +75,23 @@ export function useDrawer() {
     drawer: T,
     props: Parameters<(typeof drawers)[T]>[0]
   ) => {
+    complexProps = Object.fromEntries(
+      Object.entries(props ?? {}).filter(
+        ([_key, value]) =>
+          typeof value === "function" || typeof value === "object"
+      )
+    );
+
     void router.push(
       "?" +
         qs.stringify(
           {
             ...Object.fromEntries(
               Object.entries(router.query).filter(
-                ([key]) => !key.startsWith("drawer.")
+                ([key, value]) =>
+                  !key.startsWith("drawer.") &&
+                  typeof value !== "function" &&
+                  typeof value !== "object"
               )
             ),
             drawer: {

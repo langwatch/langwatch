@@ -25,6 +25,7 @@ import type { AppRouter } from "../../../server/api/root";
 import { api } from "../../../utils/api";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import type { Component, Entry } from "../../types/dsl";
+import { useDrawer } from "../../../components/CurrentDrawer";
 
 export function DatasetSelection({
   node,
@@ -40,6 +41,8 @@ export function DatasetSelection({
     { enabled: !!project }
   );
 
+  const { openDrawer } = useDrawer();
+
   return (
     <VStack align="start" spacing={12}>
       <VStack align="start" spacing={4}>
@@ -49,27 +52,22 @@ export function DatasetSelection({
             size="sm"
             variant="outline"
             onClick={() => {
-              if (!(node.data as Entry).dataset?.id) {
-                if (
-                  !confirm(
-                    "This will discard the current draft dataset. Are you sure?"
-                  )
-                ) {
-                  return;
-                }
-              }
-              setIsEditing({
-                name: "",
-                inline: {
-                  records: {
-                    input: ["Hello, world!"],
-                  },
-                  columnTypes: [
-                    {
-                      name: "input",
-                      type: "string",
+              openDrawer("uploadCSV", {
+                onSuccess: ({ datasetId, name }) => {
+                  setIsEditing({
+                    id: datasetId,
+                    name,
+                  });
+                },
+                onCreateFromScratch: () => {
+                  openDrawer("addOrEditDataset", {
+                    onSuccess: ({ datasetId, name }) => {
+                      setIsEditing({
+                        id: datasetId,
+                        name,
+                      });
                     },
-                  ],
+                  });
                 },
               });
             }}

@@ -37,14 +37,15 @@ import { api } from "../utils/api";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 import type { InMemoryDataset } from "./datasets/DatasetTable";
 import { DatasetPreview } from "./datasets/DatasetPreview";
+import { useDrawer } from "./CurrentDrawer";
 
 interface AddDatasetDrawerProps {
   datasetToSave?: Omit<InMemoryDataset, "datasetRecords"> & {
     datasetId?: string;
     datasetRecords?: InMemoryDataset["datasetRecords"];
   };
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
   onSuccess: (dataset: {
     datasetId: string;
     name: string;
@@ -66,6 +67,9 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
   const { project } = useOrganizationTeamProject();
   const toast = useToast();
   const upsertDataset = api.dataset.upsert.useMutation();
+  const { closeDrawer } = useDrawer();
+  const onClose = props.onClose ?? closeDrawer;
+  const isOpen = props.isOpen ?? true;
 
   const initialColumns: ColumnType[] = [
     { name: "trace_id", type: "string" },
@@ -191,6 +195,7 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
             position: "top-right",
           });
           reset();
+          onClose();
         },
         onError: (error) => {
           toast({
@@ -227,12 +232,7 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
   );
 
   return (
-    <Drawer
-      isOpen={props.isOpen}
-      placement="right"
-      size={"xl"}
-      onClose={props.onClose}
-    >
+    <Drawer isOpen={isOpen} placement="right" size={"xl"} onClose={onClose}>
       <DrawerContent>
         <DrawerHeader>
           <HStack>

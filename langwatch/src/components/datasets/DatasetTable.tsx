@@ -6,14 +6,18 @@ import {
   CardBody,
   Heading,
   HStack,
+  MenuItem,
+  MenuList,
+  MenuButton,
   Spacer,
   Text,
   useDisclosure,
   useToast,
+  Menu,
 } from "@chakra-ui/react";
 import Parse from "papaparse";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Edit2, Play, Plus, Upload } from "react-feather";
+import { ChevronDown, Edit2, Play, Plus, Upload } from "react-feather";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useDrawer } from "../CurrentDrawer";
@@ -44,7 +48,7 @@ export type InMemoryDataset = {
 export const DEFAULT_DATASET_NAME = "Draft Dataset";
 
 export function DatasetTable({
-  datasetId,
+  datasetId: datasetId_,
   inMemoryDataset,
   onUpdateDataset,
   isEmbedded = false,
@@ -69,6 +73,10 @@ export function DatasetTable({
   const editDataset = useDisclosure();
   const [savingStatus, setSavingStatus] = useState<"saving" | "saved" | "">("");
 
+  const [datasetId, setDatasetId] = useState<string | undefined>(datasetId_);
+  useEffect(() => {
+    setDatasetId(datasetId_);
+  }, [datasetId_]);
   const databaseDataset = api.datasetRecord.getAll.useQuery(
     { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
     {
@@ -450,12 +458,31 @@ export function DatasetTable({
         <Spacer />
         {!hideButtons && (
           <>
-            <Button
-              onClick={() => addRowsFromCSVModal.onOpen()}
-              rightIcon={<Upload height={17} width={17} strokeWidth={2.5} />}
-            >
-              Add from CSV
-            </Button>
+            {isEmbedded && (
+              <Button
+                colorScheme="gray"
+                minWidth="fit-content"
+                onClick={() =>
+                  openDrawer("uploadCSV", {
+                    onSuccess: ({ datasetId: datasetId_ }) => {
+                      setDatasetId(datasetId_);
+                      void databaseDataset.refetch();
+                    },
+                    onCreateFromScratch: () => {
+                      openDrawer("addOrEditDataset", {
+                        onSuccess: ({ datasetId: datasetId_ }) => {
+                          setDatasetId(datasetId_);
+                          void databaseDataset.refetch();
+                        },
+                      });
+                    },
+                  })
+                }
+                leftIcon={<Upload height={17} width={17} strokeWidth={2.5} />}
+              >
+                Upload or Create Dataset
+              </Button>
+            )}
             <Button
               colorScheme="gray"
               minWidth="fit-content"
@@ -504,24 +531,41 @@ export function DatasetTable({
           </Box>
         </CardBody>
       </Card>
-      <Button
-        position="sticky"
-        left="0"
-        bottom={isEmbedded ? "32px" : 6}
-        marginTop={6}
-        marginLeft={6}
-        backgroundColor="#ffffff"
-        padding="8px"
-        paddingX="16px"
-        border="1px solid #ccc"
-        boxShadow="base"
-        borderRadius={"md"}
-        onClick={onAddNewRow}
-        zIndex="100"
-      >
-        <Plus />
-        <Text>Add new record</Text>
-      </Button>
+      <Menu autoSelect={false}>
+        <MenuButton
+          as={Button}
+          leftIcon={<Plus />}
+          rightIcon={<ChevronDown width={16} height={16} />}
+          position="sticky"
+          left="0"
+          bottom={isEmbedded ? "32px" : 6}
+          marginTop={6}
+          marginLeft={6}
+          backgroundColor="#ffffff"
+          padding="8px"
+          paddingX="16px"
+          border="1px solid #ccc"
+          boxShadow="base"
+          borderRadius={"md"}
+          zIndex="100"
+        >
+          Add new record
+        </MenuButton>
+        <MenuList>
+          <MenuItem
+            icon={<Upload height={16} width={16} />}
+            onClick={() => addRowsFromCSVModal.onOpen()}
+          >
+            Import from CSV
+          </MenuItem>
+          <MenuItem
+            icon={<Plus height={16} width={16} />}
+            onClick={onAddNewRow}
+          >
+            Add new line
+          </MenuItem>
+        </MenuList>
+      </Menu>
       <AddRowsFromCSVModal
         isOpen={addRowsFromCSVModal.isOpen}
         onClose={addRowsFromCSVModal.onClose}

@@ -17,19 +17,23 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "react-feather";
+import { useDrawer } from "../../components/CurrentDrawer";
 import type { DatasetColumns } from "../../server/datasets/types";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Component, Entry } from "../types/dsl";
-import { datasetColumnsToFields } from "../utils/datasetUtils";
+import {
+  datasetColumnsToFields,
+  transposeColumnsFirstToRowsFirstWithId,
+} from "../utils/datasetUtils";
 import { DatasetSelection } from "./datasets/DatasetSelection";
 import { DatasetUpload } from "./datasets/DatasetUpload";
 import { EditDataset } from "./datasets/EditDataset";
 
 export function DatasetModal({
   isOpen,
-  onClose,
+  onClose: onClose_,
   node,
   editingDataset: editingDataset_ = undefined,
 }: {
@@ -53,19 +57,67 @@ export function DatasetModal({
 
   const updateNodeInternals = useUpdateNodeInternals();
 
+  const { openDrawer } = useDrawer();
+
+  const initialDataset = useMemo(
+    () => (node.data as Entry).dataset,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [(node.data as Entry).dataset?.id]
+  );
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const checkForUnsavedChanges = (
+    newDataset: Entry["dataset"],
+    columnTypes: DatasetColumns
+  ) => {
+    if (
+      initialDataset &&
+      newDataset &&
+      !initialDataset?.id &&
+      JSON.stringify(initialDataset.inline) !==
+        JSON.stringify(newDataset.inline) &&
+      confirm("Want to save this draft dataset?")
+    ) {
+      openDrawer("addOrEditDataset", {
+        datasetToSave: {
+          name: newDataset.name,
+          columnTypes: columnTypes ?? [],
+          datasetRecords: transposeColumnsFirstToRowsFirstWithId(
+            newDataset.inline?.records ?? {}
+          ),
+        },
+        onSuccess: (dataset_) => {
+          setEditingDataset({ id: dataset_.datasetId, name: dataset_.name });
+          setSelectedDataset(
+            { id: dataset_.datasetId, name: dataset_.name },
+            dataset_.columnTypes,
+            false
+          );
+          onClose_();
+        },
+      });
+      return true;
+    }
+
+    return false;
+  };
+
+  const onClose = useCallback(() => {
+    if (
+      editingDataset?.inline &&
+      checkForUnsavedChanges(editingDataset, editingDataset.inline.columnTypes)
+    ) {
+      return;
+    }
+    onClose_();
+  }, [checkForUnsavedChanges, editingDataset, onClose_]);
+
   const setSelectedDataset = useCallback(
     (
       dataset: Required<Entry>["dataset"],
       columnTypes: DatasetColumns,
       close: boolean
     ) => {
-      if (close && dataset.id && !(node.data as Entry).dataset?.id) {
-        if (
-          !confirm("The current draft dataset will be discarded. Are you sure?")
-        ) {
-          return;
-        }
-      }
       setNode({
         id: node.id,
         data: {
@@ -79,7 +131,7 @@ export function DatasetModal({
         onClose();
       }
     },
-    [node.data, node.id, setNode, onClose]
+    [setNode, node.id, node.data, updateNodeInternals, onClose]
   );
 
   return (

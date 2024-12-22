@@ -279,7 +279,6 @@ export default function Datasets() {
         onClose={uploadCSVModal.onClose}
         onSuccess={() => {
           void datasets.refetch();
-          addEditDatasetDrawer.onClose();
         }}
         onCreateFromScratch={() => {
           uploadCSVModal.onClose();

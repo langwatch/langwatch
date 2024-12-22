@@ -18,24 +18,28 @@ import {
   type DatasetColumns,
   type DatasetRecordEntry,
 } from "../../server/datasets/types";
-import { nanoid } from "nanoid";
 import { formatFileSize, useCSVReader } from "react-papaparse";
 import type { InMemoryDataset } from "./DatasetTable";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
+import { useDrawer } from "../CurrentDrawer";
 
 export const MAX_ROWS_LIMIT = 10_000;
 
 export function UploadCSVModal({
-  isOpen,
-  onClose,
+  isOpen: isOpen_,
+  onClose: onClose_,
   onSuccess,
   onCreateFromScratch,
 }: {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
   onSuccess: Parameters<typeof AddOrEditDatasetDrawer>[0]["onSuccess"];
   onCreateFromScratch?: () => void;
 }) {
+  const { closeDrawer } = useDrawer();
+  const onClose = onClose_ ?? closeDrawer;
+  const isOpen = isOpen_ ?? true;
+
   const addDatasetDrawer = useDisclosure();
   const [localIsOpen, setLocalIsOpen] = useState(isOpen);
   const [uploadedDataset, setUploadedDataset] = useState<

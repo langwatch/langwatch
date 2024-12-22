@@ -62,11 +62,11 @@ export function EditDataset({
 
       setColumnTypes(dataset.columnTypes);
       setEditingDataset(nodeDataset);
-      if (nodeDataset && !editingDataset.id) {
+      if (nodeDataset) {
         setSelectedDataset(nodeDataset, dataset.columnTypes, false);
       }
     },
-    [editingDataset.id, setEditingDataset, setSelectedDataset]
+    [setEditingDataset, setSelectedDataset]
   );
 
   useEffect(() => {
@@ -98,7 +98,7 @@ export function EditDataset({
           setSelectedDataset(editingDataset, columnTypes, true);
         }}
       >
-        {cta ?? "Select Dataset"}
+        {cta ?? "Done"}
       </Button>
     </Box>
   );
