@@ -240,6 +240,67 @@ const TRACE_MAPPINGS = {
     },
     expandable_by: "annotations.id",
   },
+  events: {
+    keys: (traces: TraceWithSpansAndAnnotations[]) => {
+      return Array.from(
+        new Set(
+          traces.flatMap(
+            (trace) => trace.events?.flatMap((event) => event.event_type) ?? []
+          )
+        )
+      ).map((key) => ({
+        key,
+        label: key,
+      }));
+    },
+    subkeys: (traces: TraceWithSpansAndAnnotations[], key: string) => {
+      const events = traces
+        .flatMap((trace) => trace.events ?? [])
+        .filter((event) => event.event_type === key);
+
+      const eventMetrics = events.flatMap((event) =>
+        Object.keys(event.metrics).map((key) => `metrics.${key}`)
+      );
+
+      const eventDetails = events.flatMap((event) =>
+        Object.keys(event.event_details).map((key) => `event_details.${key}`)
+      );
+
+      return Array.from(new Set([...eventMetrics, ...eventDetails])).map(
+        (event) => ({
+          key: event,
+          label: event,
+        })
+      );
+    },
+    mapping: (
+      trace: TraceWithSpansAndAnnotations,
+      key: string,
+      subkey: string
+    ) => {
+      if (!key) {
+        return trace.events;
+      }
+      if (!subkey) {
+        return trace.events?.filter((event) => event.event_type === key);
+      }
+
+      if (subkey.startsWith("metrics.")) {
+        return trace.events
+          ?.filter((event) => event.event_type === key)
+          ?.map((event) => event.metrics[subkey.replace("metrics.", "")]);
+      }
+
+      if (subkey.startsWith("event_details.")) {
+        return trace.events
+          ?.filter((event) => event.event_type === key)
+          ?.map(
+            (event) => event.event_details[subkey.replace("event_details.", "")]
+          );
+      }
+    },
+    expandable_by: "events.event_id",
+  },
 } satisfies Record<
   string,
   {
@@ -295,6 +356,16 @@ const TRACE_EXPANSIONS = {
       return annotations.map((annotation) => ({
         ...trace,
         annotations: [annotation],
+      }));
+    },
+  },
+  "events.event_id": {
+    label: "event",
+    expansion: (trace: TraceWithSpansAndAnnotations) => {
+      const events = trace.events ?? [];
+      return events.map((event) => ({
+        ...trace,
+        events: [event],
       }));
     },
   },
@@ -627,7 +698,7 @@ export const TracesMapping = ({
               maxWidth="600px"
             >
               Normalize the dataset to duplicate the rows and have one entry per
-              line instead of an array for the following columns:
+              line instead of an array for the following mappings:
             </FormHelperText>
           </VStack>
           <VStack align="start" paddingTop={2} spacing={2}>
