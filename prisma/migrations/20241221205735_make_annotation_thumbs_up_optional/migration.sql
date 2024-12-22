@@ -1,0 +1,1 @@
+../../../langwatch/langwatch/prisma/migrations/20241221205735_make_annotation_thumbs_up_optional/migration.sql

@@ -98,7 +98,7 @@ export function SignedInExtraFooterComponents() {
           </Script>
           {window.location.pathname.includes("/studio") ? null : (
             <Script id="crisp">
-              {`window.$crisp=[];window.CRISP_WEBSITE_ID="cca9eacd-c4d6-4258-a7fc-9606be6fd012";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();`}
+              {`window.$crisp=[];window.$crisp.push(["do", "chat:hide"]);window.$crisp.push(["on", "chat:closed", () => { window.$crisp.push(["do", "chat:hide"]); }]);window.CRISP_WEBSITE_ID="cca9eacd-c4d6-4258-a7fc-9606be6fd012";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();`}
             </Script>
           )}
         </>
