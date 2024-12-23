@@ -26,7 +26,6 @@ import {
 } from "../checks/EvaluationStatus";
 import { IconWrapper } from "../IconWrapper";
 import {
-  formatEvaluationScore,
   formatEvaluationSingleValue,
 } from "./EvaluationStatusItem";
 import { HoverableBigText } from "../HoverableBigText";
@@ -163,6 +162,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
               color={!span.name && !span.model ? "gray.400" : undefined}
               maxWidth="180px"
               noOfLines={1}
+              expandable={false}
             >
               {span.name ?? span.model ?? "(unnamed)"}
             </HoverableBigText>

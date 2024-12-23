@@ -130,8 +130,6 @@ async def execute_flow(
 
         # cost = result.get_cost() if hasattr(result, "get_cost") else None
 
-        print("result", result)
-
         yield end_workflow_event(workflow, trace_id, result)
     finally:
         if not do_not_trace and trace:

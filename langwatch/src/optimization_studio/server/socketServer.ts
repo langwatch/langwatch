@@ -165,6 +165,11 @@ const callPython = async (
               return;
             }
           } catch (error) {
+            console.error(
+              "Failed to parse event:",
+              error,
+              JSON.stringify(event, undefined, 2)
+            );
             throw new Error(`Failed to parse event: ${event}`);
           }
         }

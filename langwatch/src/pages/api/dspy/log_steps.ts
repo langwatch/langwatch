@@ -172,10 +172,20 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
       inserted_at: new Date().getTime(),
       updated_at: new Date().getTime(),
     },
-    examples: param.examples.map((example) => ({
-      ...example,
-      hash: generateHash(example),
-    })),
+    examples: param.examples.map((example) => {
+      return {
+        ...{
+          ...example,
+          trace: example.trace?.map((t) => {
+            if (t.input?.contexts && typeof t.input.contexts !== "string") {
+              t.input.contexts = JSON.stringify(t.input.contexts);
+            }
+            return t;
+          }),
+        },
+        hash: generateHash(example),
+      };
+    }),
     llm_calls: param.llm_calls
       .map((call) => ({
         ...call,
