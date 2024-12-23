@@ -23,13 +23,36 @@ class ContextsRetriever(dspy.Module):
 
 class WeaviateRMWithConnection(WeaviateRM):
     def __init__(
-        self, weaviate_url: str, weaviate_api_key: Optional[str] = None, **kwargs
+        self,
+        weaviate_url: str,
+        weaviate_collection_name: str,
+        weaviate_collection_text_key: Optional[str] = "content",
+        weaviate_api_key: Optional[str] = None,
+        embedding_header_key: Optional[str] = None,
+        embedding_header_value: Optional[str] = None,
+        k: int = 3,
     ):
         client = weaviate.connect_to_weaviate_cloud(
             cluster_url=weaviate_url,
-            auth_credentials=weaviate.Auth.api_key(weaviate_api_key),
+            auth_credentials=(
+                weaviate.classes.init.Auth.api_key(weaviate_api_key)
+                if weaviate_api_key
+                else None
+            ),
+            headers=(
+                {
+                    embedding_header_key: embedding_header_value,
+                }
+                if embedding_header_key and embedding_header_value
+                else None
+            ),
         )
-        super().__init__(weaviate_client=client, **kwargs)
+        super().__init__(
+            weaviate_client=client,
+            weaviate_collection_name=weaviate_collection_name,
+            weaviate_collection_text_key=weaviate_collection_text_key,
+            k=k,
+        )
 
 
 class ColBERTv2RM(dspy.Retrieve):

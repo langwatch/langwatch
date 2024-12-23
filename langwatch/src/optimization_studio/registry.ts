@@ -156,6 +156,18 @@ const retrievers: Retriever[] = [
         type: "str",
         value: "content",
       },
+      {
+        identifier: "embedding_header_key",
+        desc: "Name of the header key in the Weaviate for the embeddings model api key",
+        type: "str",
+        value: "X-Cohere-Api-Key",
+      },
+      {
+        identifier: "embedding_header_value",
+        desc: "API key for the embeddings model",
+        type: "str",
+        value: "xxx",
+      },
     ],
     ...retrieverInputsAndOutputs,
   },

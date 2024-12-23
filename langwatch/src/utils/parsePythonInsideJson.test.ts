@@ -72,4 +72,16 @@ describe("parsePythonInsideJson", () => {
       },
     });
   });
+
+  it("should parse unnamed properties", () => {
+    const obj = {
+      a: `WeaviateQueryError('Query call with protocol GRPC search failed with message <AioRpcError of RPC that terminated with:\\n\\tstatus = StatusCode.UNKNOWN\\n\\tdetails = "remote client vectorize: Cohere API Key: no api key found neither in request header: X-Cohere-Api-Key nor in environment variable under COHERE_APIKEY"\\n\\tdebug_error_string = "UNKNOWN:Error received from peer  {grpc_message:"remote client vectorize: Cohere API Key: no api key found neither in request header: X-Cohere-Api-Key nor in environment variable under COHERE_APIKEY", grpc_status:2, created_time:"2024-12-23T14:24:08.438868+01:00"}"\\n>.')`,
+    };
+    expect(parsePythonInsideJson(obj)).toEqual({
+      a: {
+        WeaviateQueryError:
+          'Query call with protocol GRPC search failed with message <AioRpcError of RPC that terminated with:\\n\\tstatus = StatusCode.UNKNOWN\\n\\tdetails = "remote client vectorize: Cohere API Key: no api key found neither in request header: X-Cohere-Api-Key nor in environment variable under COHERE_APIKEY"\\n\\tdebug_error_string = "UNKNOWN:Error received from peer  {grpc_message:"remote client vectorize: Cohere API Key: no api key found neither in request header: X-Cohere-Api-Key nor in environment variable under COHERE_APIKEY", grpc_status:2, created_time:"2024-12-23T14:24:08.438868+01:00"}"\\n>.',
+      },
+    });
+  });
 });

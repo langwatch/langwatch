@@ -27,7 +27,7 @@ dependencies = [
     "tenacity>=8.5.0,<9",
     "uvicorn>=0.22.0,<0.23",
     "watchdog>=5.0.3",
-    "weaviate-client>=4.8.1,<5",
+    "weaviate-client>=4.10.2,<5",
 ]
 
 [project.optional-dependencies]
