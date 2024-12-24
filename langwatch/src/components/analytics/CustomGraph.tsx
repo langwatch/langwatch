@@ -236,6 +236,7 @@ const CustomGraph_ = React.memo(
         ? uppercaseFirstLetter(groupName)
             .replace("Evaluation passed passed", "Evaluation Passed")
             .replace("Evaluation passed failed", "Evaluation Failed")
+            .replace("Contains error", "Messages")
         : series?.name ?? aggKey;
     };
 
@@ -256,6 +257,8 @@ const CustomGraph_ = React.memo(
           skipped: neutral,
           processed: positive,
           passed: positive,
+          "with error": negative,
+          "without error": positive,
         };
 
         return getColor(colorSet, colorMap[groupKey] ?? neutral);

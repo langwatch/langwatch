@@ -705,7 +705,9 @@ function SeriesFieldItem({
     if (seriesLength === 1 && groupBy) {
       form.setValue(
         `series.${index}.colorSet`,
-        groupBy.startsWith("sentiment") || groupBy.startsWith("evaluations")
+        groupBy.startsWith("sentiment") ||
+          groupBy.startsWith("evaluations") ||
+          groupBy.includes("has_error")
           ? "positiveNegativeNeutral"
           : "colors"
       );

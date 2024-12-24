@@ -1024,6 +1024,27 @@ export const analyticsGroups = {
       quickwitSupport: false,
     },
   },
+  error: {
+    has_error: {
+      label: "Contains Error",
+      aggregation: (aggToGroup) => ({
+        error_group: {
+          terms: {
+            script: {
+              source:
+                "doc['error.has_error'].size() == 0 ? 'without error' : (doc['error.has_error'].value ? 'with error' : 'without error')",
+              lang: "painless",
+            },
+            size: 50,
+            missing: "without error",
+          },
+          aggs: aggToGroup,
+        },
+      }),
+      extractionPath: () => "error_group>buckets",
+      quickwitSupport: false,
+    },
+  },
 } satisfies Record<string, Record<string, AnalyticsGroup>>;
 
 export type AnalyticsGroupsGroupsEnum = keyof typeof analyticsGroups;
