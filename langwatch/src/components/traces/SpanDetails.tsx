@@ -95,6 +95,18 @@ export function SpanDetails({
               " prompt + " +
               (span.metrics?.completion_tokens ?? 0) +
               " completion"}
+            {span.metrics.completion_tokens &&
+              span.metrics.completion_tokens > 0 &&
+              (() => {
+                const durationFromFirstToken =
+                  span.timestamps.finished_at -
+                  (span.timestamps.first_token_at ??
+                    span.timestamps.started_at);
+                return ` (${Math.round(
+                  span.metrics.completion_tokens /
+                    (durationFromFirstToken / 1000)
+                )} tokens/s)`;
+              })()}
             {span.metrics?.tokens_estimated && estimatedCost}
           </Text>
         )}
