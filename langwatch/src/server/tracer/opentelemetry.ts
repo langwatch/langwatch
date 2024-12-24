@@ -662,18 +662,15 @@ const addOpenTelemetrySpanAsSpan = (
 
   // haystack RAG
   const contexts: RAGChunk[] = [];
-  if (output?.type === "json" && (output?.value as any)?.documents) {
-    const documents = parsePythonInsideJson((output?.value as any).documents);
-    if (Array.isArray(documents)) {
-      type = "rag";
-      for (const document of documents) {
-        const document_ = document["Document"];
-        if (document_ && document_.content) {
-          contexts.push({
-            ...(document_.id ? { document_id: document_.id } : {}),
-            content: document_.content,
-          });
-        }
+  if (Array.isArray((attributesMap.retrieval as any)?.documents)) {
+    type = "rag";
+    for (const document of (attributesMap.retrieval as any).documents) {
+      const document_ = document.document;
+      if (document_?.content) {
+        contexts.push({
+          ...(document_.id ? { document_id: document_.id } : {}),
+          content: document_.content,
+        });
       }
     }
   }
