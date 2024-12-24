@@ -38,13 +38,13 @@ class ReportingModule(dspy.Module):
             else None
         )
 
-        def wrapper(**kwargs):
+        def wrapper(*args, **kwargs):
             if self.context and node:
                 self.context.queue.put_nowait(
                     start_component_event(node, self.context.trace_id, kwargs)
                 )
             try:
-                result = module(**kwargs)
+                result = module(*args, **kwargs)
             except Exception as e:
                 if self.context and node:
                     self.context.queue.put_nowait(

@@ -334,7 +334,7 @@ const store = (
                 ...(current_execution_state ?? {}),
                 ...executionState,
                 ...(executionState?.error
-                  ? { error: executionState.error.slice(0, 140) }
+                  ? { error: executionState.error.slice(0, 2048) }
                   : {}),
                 timestamps: {
                   ...(timestamps ?? {}),

@@ -1,5 +1,5 @@
 from typing import Type, Union
-from langwatch_nlp.studio.dspy.retrieve import ColBERTv2RM
+from langwatch_nlp.studio.dspy.retrieve import ColBERTv2RM, WeaviateRMWithConnection
 from langwatch_nlp.studio.modules.evaluators.answer_correctness import (
     AnswerCorrectnessEvaluator,
 )
@@ -12,7 +12,6 @@ from dspy.teleprompt import (
 )
 
 import dspy
-from dspy.retrieve.weaviate_rm import WeaviateRM
 
 EVALUATORS: dict[str, Type[dspy.Module]] = {
     "ExactMatchEvaluator": ExactMatchEvaluator,
@@ -29,7 +28,7 @@ PROMPTING_TECHNIQUES: dict[str, PromptingTechniqueTypes] = {
 
 RETRIEVERS: dict[str, Type[dspy.Retrieve]] = {
     "ColBERTv2": ColBERTv2RM,
-    "WeaviateRM": WeaviateRM,
+    "WeaviateRM": WeaviateRMWithConnection,
 }
 
 OPTIMIZERS: dict[

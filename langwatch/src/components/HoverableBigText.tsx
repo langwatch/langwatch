@@ -75,8 +75,9 @@ export function ExpandedTextModal({
 export function HoverableBigText({
   children,
   expandedVersion,
+  expandable = true,
   ...props
-}: BoxProps & { expandedVersion?: string }) {
+}: BoxProps & { expandedVersion?: string; expandable?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [isOverflown, setIsOverflown] = useState(false);
   const [textExpanded, setTextExpanded] = useState<string | undefined>(
@@ -110,15 +111,17 @@ export function HoverableBigText({
         isDisabled={!isOverflown}
         label={
           <VStack padding={0} spacing={0} width="full" display="block">
-            <Text
-              textAlign="center"
-              background="black"
-              width="calc(100% + 16px)"
-              marginLeft="-8px"
-              marginTop="-4px"
-            >
-              click anywhere to enlarge
-            </Text>
+            {expandable && (
+              <Text
+                textAlign="center"
+                background="black"
+                width="calc(100% + 16px)"
+                marginLeft="-8px"
+                marginTop="-4px"
+              >
+                click anywhere to enlarge
+              </Text>
+            )}
             <Box whiteSpace="pre-wrap">
               <center></center>
               {typeof expandedVersion_ === "string"
@@ -136,12 +139,13 @@ export function HoverableBigText({
           whiteSpace="normal"
           noOfLines={7}
           {...props}
-          {...(isOverflown && {
-            onClick: (e) => {
-              e.stopPropagation();
-              setTextExpanded(expandedVersion_ as string);
-            },
-          })}
+          {...(isOverflown &&
+            expandable && {
+              onClick: (e) => {
+                e.stopPropagation();
+                setTextExpanded(expandedVersion_ as string);
+              },
+            })}
         >
           {children}
         </Box>
