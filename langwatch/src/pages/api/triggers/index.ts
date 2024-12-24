@@ -11,6 +11,16 @@ import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
 import { prisma } from "../../../server/db";
 
 import { type Trace } from "~/server/tracer/types";
+import { tr } from "date-fns/locale";
+import type {
+  DatasetColumns,
+  DatasetRecordEntry,
+} from "~/server/datasets/types";
+
+import { TRACE_MAPPINGS } from "~/components/datasets/DatasetMapping";
+import { useMemo } from "react";
+
+import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord";
 
 interface TraceGroups {
   groups: Trace[][];
@@ -20,6 +30,8 @@ interface ActionParams {
   members?: string[] | null;
   dataset?: string | null;
   slackWebhook?: string | null;
+  datasetMapping: DatasetColumns;
+  datasetId: string;
 }
 
 interface TriggerData {
@@ -27,6 +39,7 @@ interface TriggerData {
   output: string;
   traceId: string;
   projectId: string;
+  fullTrace: Trace;
 }
 
 export default async function handler(
@@ -120,6 +133,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
         output: trace.output?.value ?? "",
         traceId: trace.trace_id,
         projectId: input.projectId,
+        fullTrace: trace,
       }))
     );
 
@@ -166,6 +180,78 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
       } else {
         throw new Error("Project not found for triggerId: " + triggerId);
       }
+    } else if (action === TriggerAction.ADD_TO_DATASET) {
+      const trigger = await prisma.trigger.findUnique({
+        where: { id: triggerId, projectId: input.projectId },
+      });
+
+      const { datasetId, datasetMapping } =
+        trigger?.actionParams as ActionParams;
+
+      const dataset = await prisma.dataset.findUnique({
+        where: { id: datasetId, projectId: input.projectId },
+      });
+
+      const columnTypes = dataset?.columnTypes as DatasetColumns;
+
+      const rowsToAdd = triggerData.map((trace) => trace.fullTrace);
+      let index = 0;
+      const now = Date.now();
+
+      const { mapping, expansions } = datasetMapping;
+
+      console.log("mapping", mapping);
+      console.log("expansions", expansions);
+
+      const entries = rowsToAdd.map((trace) => {
+        const entry = Object.fromEntries(
+          Object.entries(mapping).map(([column, { source, key, subkey }]) => {
+            const source_ = source ? TRACE_MAPPINGS[source] : undefined;
+            let value = source_?.mapping(trace, key!, subkey!);
+
+            if (
+              source_ &&
+              "expandable_by" in source_ &&
+              source_.expandable_by &&
+              expansions.has(source_.expandable_by)
+            ) {
+              value = value?.[0];
+            }
+
+            return [
+              column,
+              typeof value !== "string" && typeof value !== "number"
+                ? JSON.stringify(value)
+                : value,
+            ];
+          })
+        );
+
+        return {
+          id: `${now}-${index++}`,
+          selected: true,
+          ...entry,
+        };
+      });
+
+      const createManyDatasetRecordsResult = await createManyDatasetRecords({
+        datasetId: datasetId,
+        projectId: input.projectId,
+        datasetRecords: entries,
+      });
+
+      console.log(
+        "createManyDatasetRecordsResult",
+        createManyDatasetRecordsResult
+      );
+
+      console.log("entries", entries);
+
+      triggerInfo = {
+        triggerData,
+        triggerName: name,
+        projectSlug: project!.slug,
+      };
     }
 
     return {

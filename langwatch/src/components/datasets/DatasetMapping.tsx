@@ -37,7 +37,7 @@ type TraceWithSpansAndAnnotations = TraceWithSpans & {
   })[];
 };
 
-const TRACE_MAPPINGS = {
+export const TRACE_MAPPINGS = {
   trace_id: {
     mapping: (trace: TraceWithSpansAndAnnotations) => trace.trace_id,
   },
@@ -338,7 +338,7 @@ const TRACE_MAPPINGS = {
   }
 >;
 
-const TRACE_EXPANSIONS = {
+export const TRACE_EXPANSIONS = {
   "spans.llm.span_id": {
     label: "LLM span",
     expansion: (trace: TraceWithSpansAndAnnotations) => {
@@ -393,7 +393,7 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   spans: "spans",
 };
 
-type Mapping = Record<
+export type Mapping = Record<
   string,
   {
     source: keyof typeof TRACE_MAPPINGS | "";
@@ -505,6 +505,9 @@ export const TracesMapping = ({
         TRACE_EXPANSIONS[expansion].expansion(trace)
       );
     }
+
+    console.log("expandedTraces", expandedTraces);
+    console.log("mapping", mapping);
 
     for (const trace of expandedTraces) {
       const entry = Object.fromEntries(

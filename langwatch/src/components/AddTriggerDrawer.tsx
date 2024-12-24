@@ -35,6 +35,21 @@ import { useForm } from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { usePublicEnv } from "../hooks/usePublicEnv";
+import { DatasetSelector } from "./datasets/DatasetSelector";
+import { useLocalStorage } from "usehooks-ts";
+import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
+import type {
+  DatasetColumns,
+  DatasetRecordEntry,
+} from "~/server/datasets/types";
+import { useEffect, useMemo, useState } from "react";
+import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
+import {
+  HeaderCheckboxComponent,
+  type DatasetColumnDef,
+} from "./datasets/DatasetGrid";
+import type { CustomCellRendererProps } from "@ag-grid-community/react";
+import type { Mapping } from "./datasets/DatasetMapping";
 
 export function TriggerDrawer() {
   const { project, organization, team } = useOrganizationTeamProject();
@@ -46,6 +61,10 @@ export function TriggerDrawer() {
   const toast = useToast();
   const createTrigger = api.trigger.create.useMutation();
   const teamSlug = team?.slug;
+  const datasets = api.dataset.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project, refetchOnWindowFocus: false }
+  );
 
   const teamWithMembers = api.team.getTeamWithMembers.useQuery(
     {
@@ -59,12 +78,16 @@ export function TriggerDrawer() {
 
   const { filterParams } = useFilterParams();
 
+  const [localStorageDatasetId, setLocalStorageDatasetId] =
+    useLocalStorage<string>("selectedDatasetId", "");
+
   const {
     register,
     handleSubmit,
     watch,
     formState: { errors },
     reset,
+    setValue,
   } = useForm({
     defaultValues: {
       name: "",
@@ -72,10 +95,99 @@ export function TriggerDrawer() {
       email: "",
       members: [],
       slackWebhook: "",
+      datasetId: localStorageDatasetId,
     },
   });
 
+  const datasetId = watch("datasetId");
+
+  const selectedDataset = datasets.data?.find(
+    (dataset) => dataset.id === datasetId
+  );
+
+  const tracesWithSpans = api.traces.getSampleTracesDataset.useQuery(
+    {
+      ...filterParams,
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const columnDefs = useMemo(() => {
+    if (!selectedDataset) {
+      return [];
+    }
+
+    const headers: DatasetColumnDef[] = (
+      (selectedDataset.columnTypes as DatasetColumns) ?? []
+    ).map(({ name, type }) => ({
+      headerName: name,
+      field: name,
+      type_: type,
+      cellClass: "v-align",
+      sortable: false,
+      minWidth: ["trace_id", "total_cost"].includes(name)
+        ? 120
+        : ["timestamp"].includes(name)
+        ? 160
+        : 200,
+    }));
+
+    // Add row number column
+    headers.unshift({
+      headerName: " ",
+      field: "selected",
+      type_: "boolean",
+      width: 46,
+      pinned: "left",
+      sortable: false,
+      filter: false,
+      enableCellChangeFlash: false,
+      headerComponent: HeaderCheckboxComponent,
+      cellRenderer: (props: CustomCellRendererProps) => (
+        <Checkbox
+          marginLeft="3px"
+          {...props}
+          isChecked={props.value}
+          onChange={(e) => props.setValue?.(e.target.checked)}
+        />
+      ),
+    });
+
+    return headers;
+  }, [selectedDataset]);
+
+  useEffect(() => {
+    if (datasetId) {
+      setLocalStorageDatasetId(datasetId);
+    }
+  }, [datasetId, setLocalStorageDatasetId]);
+
   const currentAction: TriggerAction = watch("action");
+
+  const onCreateDatasetSuccess = ({ datasetId }: { datasetId: string }) => {
+    editDataset.onClose();
+    void datasets.refetch().then(() => {
+      setTimeout(() => {
+        setValue("datasetId", datasetId);
+      }, 100);
+    });
+  };
+
+  const [rowDataFromDataset, setRowDataFromDataset] = useState<
+    DatasetRecordEntry[]
+  >([]);
+
+  const [datasetMapping] = useLocalStorage<{
+    mapping: Mapping;
+    expansions: string[];
+  }>("datasetMapping", {
+    mapping: {},
+    expansions: [],
+  });
 
   type Trigger = {
     name: string;
@@ -88,12 +200,19 @@ export function TriggerDrawer() {
   type ActionParams = {
     members?: string[];
     slackWebhook?: string;
+    datasetId?: string;
+    datasetMapping?: {
+      mapping: Mapping;
+      expansions: string[];
+    };
   };
 
   const onSubmit = (data: Trigger) => {
     let actionParams: ActionParams = {
       members: [],
       slackWebhook: "",
+      datasetId: datasetId,
+      datasetMapping: datasetMapping,
     };
     if (data.action === TriggerAction.SEND_EMAIL) {
       actionParams = {
@@ -102,6 +221,11 @@ export function TriggerDrawer() {
     } else if (data.action === TriggerAction.SEND_SLACK_MESSAGE) {
       actionParams = {
         slackWebhook: data.slackWebhook ?? "",
+      };
+    } else if (data.action === TriggerAction.ADD_TO_DATASET) {
+      actionParams = {
+        datasetId: datasetId,
+        datasetMapping: datasetMapping,
       };
     }
 
@@ -191,6 +315,8 @@ export function TriggerDrawer() {
     );
   };
 
+  const editDataset = useDisclosure();
+
   return (
     <Drawer
       isOpen={true}
@@ -199,7 +325,7 @@ export function TriggerDrawer() {
       onClose={closeDrawer}
       onOverlayClick={closeDrawer}
     >
-      <DrawerContent>
+      <DrawerContent maxWidth="1200px">
         <DrawerHeader>
           <HStack>
             <DrawerCloseButton />
@@ -298,7 +424,6 @@ export function TriggerDrawer() {
                       alignItems="start"
                       spacing={3}
                       paddingTop={2}
-                      isDisabled={true}
                       {...register("action")}
                     >
                       <VStack align="start" marginTop={-1}>
@@ -313,17 +438,60 @@ export function TriggerDrawer() {
                 </Stack>
               </RadioGroup>
             </HorizontalFormControl>
-            <Button
-              colorScheme="blue"
-              type="submit"
-              minWidth="fit-content"
-              isLoading={createTrigger.isLoading}
-            >
-              Add Trigger
-            </Button>
+            {(currentAction as TriggerAction) ===
+              TriggerAction.ADD_TO_DATASET && (
+              <>
+                <DatasetSelector
+                  datasets={datasets.data}
+                  localStorageDatasetId={localStorageDatasetId}
+                  register={register}
+                  errors={errors}
+                  setValue={setValue}
+                  onCreateNew={editDataset.onOpen}
+                />
+                {selectedDataset && (
+                  <DatasetMappingPreview
+                    traces={tracesWithSpans.data ?? []}
+                    columnTypes={selectedDataset.columnTypes as DatasetColumns}
+                    columnDefs={columnDefs}
+                    rowData={rowDataFromDataset}
+                    onEditColumns={editDataset.onOpen}
+                    onRowDataChange={setRowDataFromDataset}
+                    paragraph="This is a sample of the data will look when added to the dataset."
+                  />
+                )}
+              </>
+            )}
+
+            <HStack justifyContent="flex-end">
+              <Button
+                colorScheme="blue"
+                type="submit"
+                minWidth="fit-content"
+                isLoading={createTrigger.isLoading}
+              >
+                Add Trigger
+              </Button>
+            </HStack>
           </form>
         </DrawerBody>
       </DrawerContent>
+      <AddOrEditDatasetDrawer
+        datasetToSave={
+          selectedDataset
+            ? {
+                datasetId,
+                name: selectedDataset?.name ?? "",
+                datasetRecords: undefined,
+                columnTypes:
+                  (selectedDataset?.columnTypes as DatasetColumns) ?? [],
+              }
+            : undefined
+        }
+        isOpen={editDataset.isOpen}
+        onClose={editDataset.onClose}
+        onSuccess={onCreateDatasetSuccess}
+      />
     </Drawer>
   );
 }
