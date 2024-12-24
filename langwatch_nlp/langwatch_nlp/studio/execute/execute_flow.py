@@ -60,7 +60,11 @@ async def execute_flow(
         True if event.manual_execution_mode is None else event.manual_execution_mode
     )
 
-    do_not_trace = event.do_not_trace
+    do_not_trace = (
+        inputs[0].get("do_not_trace", event.do_not_trace)
+        if inputs
+        else event.do_not_trace
+    )
 
     disable_dsp_caching()
 
