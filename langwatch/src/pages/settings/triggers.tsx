@@ -128,6 +128,8 @@ export default function Members() {
         return "Slack";
       case "SEND_EMAIL":
         return "Email";
+      case "ADD_TO_DATASET":
+        return "Add to dataset";
     }
   };
 
@@ -137,6 +139,8 @@ export default function Members() {
   }
 
   const actionItems = (action: TriggerAction, actionParams: ActionParams) => {
+    console.log("actionParams", actionParams);
+    console.log("action", action);
     switch (action) {
       case "SEND_SLACK_MESSAGE":
         return (
@@ -150,6 +154,8 @@ export default function Members() {
         );
       case "SEND_EMAIL":
         return (actionParams as { members: string[] }).members?.join(", ");
+      case "ADD_TO_DATASET":
+        return;
     }
   };
 
@@ -207,6 +213,8 @@ export default function Members() {
                   triggers.data?.map((trigger) => {
                     const lastRunAt = new Date(trigger.lastRunAt);
                     const lastRunAtFormatted = lastRunAt.toLocaleString();
+
+                    console.log("trigger", trigger);
 
                     return (
                       <Tr key={trigger.id}>

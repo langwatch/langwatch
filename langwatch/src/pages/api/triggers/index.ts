@@ -1,6 +1,7 @@
 import {
-  type AlertType,
   TriggerAction,
+  type AlertType,
+  type AnnotationScore,
   type Project,
   type Trigger,
 } from "@prisma/client";
@@ -11,14 +12,13 @@ import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
 import { prisma } from "../../../server/db";
 
 import { type Trace } from "~/server/tracer/types";
-import { tr } from "date-fns/locale";
-import type {
-  DatasetColumns,
-  DatasetRecordEntry,
-} from "~/server/datasets/types";
 
-import { TRACE_MAPPINGS } from "~/components/datasets/DatasetMapping";
-import { useMemo } from "react";
+import {
+  mapTraceToDatasetEntry,
+  TRACE_EXPANSIONS,
+  TRACE_MAPPINGS,
+  type Mapping,
+} from "~/components/datasets/DatasetMapping";
 
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord";
 
@@ -30,7 +30,10 @@ interface ActionParams {
   members?: string[] | null;
   dataset?: string | null;
   slackWebhook?: string | null;
-  datasetMapping: DatasetColumns;
+  datasetMapping: {
+    mapping: Record<string, { source: string; key: string; subkey: string }>;
+    expansions: Set<keyof typeof TRACE_EXPANSIONS>;
+  };
   datasetId: string;
 }
 
@@ -144,7 +147,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
 
     if (action === TriggerAction.SEND_EMAIL) {
       triggerInfo = {
-        triggerEmails: (actionParams as ActionParams)?.members ?? [],
+        triggerEmails: (actionParams as unknown as ActionParams)?.members ?? [],
         triggerData,
         triggerName: name,
         projectSlug: project!.slug,
@@ -163,7 +166,8 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
       }
     } else if (action === TriggerAction.SEND_SLACK_MESSAGE) {
       triggerInfo = {
-        triggerWebhook: (actionParams as ActionParams)?.slackWebhook ?? "",
+        triggerWebhook:
+          (actionParams as unknown as ActionParams)?.slackWebhook ?? "",
         triggerData,
         triggerName: name,
         projectSlug: project!.slug,
@@ -186,13 +190,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
       });
 
       const { datasetId, datasetMapping } =
-        trigger?.actionParams as ActionParams;
-
-      const dataset = await prisma.dataset.findUnique({
-        where: { id: datasetId, projectId: input.projectId },
-      });
-
-      const columnTypes = dataset?.columnTypes as DatasetColumns;
+        trigger?.actionParams as unknown as ActionParams;
 
       const rowsToAdd = triggerData.map((trace) => trace.fullTrace);
       let index = 0;
@@ -200,31 +198,12 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
 
       const { mapping, expansions } = datasetMapping;
 
-      console.log("mapping", mapping);
-      console.log("expansions", expansions);
-
       const entries = rowsToAdd.map((trace) => {
-        const entry = Object.fromEntries(
-          Object.entries(mapping).map(([column, { source, key, subkey }]) => {
-            const source_ = source ? TRACE_MAPPINGS[source] : undefined;
-            let value = source_?.mapping(trace, key!, subkey!);
-
-            if (
-              source_ &&
-              "expandable_by" in source_ &&
-              source_.expandable_by &&
-              expansions.has(source_.expandable_by)
-            ) {
-              value = value?.[0];
-            }
-
-            return [
-              column,
-              typeof value !== "string" && typeof value !== "number"
-                ? JSON.stringify(value)
-                : value,
-            ];
-          })
+        const entry = mapTraceToDatasetEntry(
+          trace,
+          mapping as Mapping,
+          expansions,
+          undefined
         );
 
         return {
@@ -240,18 +219,13 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
         datasetRecords: entries,
       });
 
-      console.log(
-        "createManyDatasetRecordsResult",
-        createManyDatasetRecordsResult
-      );
-
-      console.log("entries", entries);
-
       triggerInfo = {
         triggerData,
         triggerName: name,
         projectSlug: project!.slug,
       };
+
+      await addTriggersSent(triggerId, triggerData);
     }
 
     return {

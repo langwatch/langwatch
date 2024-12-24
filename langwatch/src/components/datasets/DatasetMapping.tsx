@@ -22,6 +22,7 @@ import type {
   DatasetSpan,
   Evaluation,
   Span,
+  Trace,
   TraceWithSpans,
 } from "../../server/tracer/types";
 import { datasetSpanSchema } from "../../server/tracer/types.generated";
@@ -506,33 +507,12 @@ export const TracesMapping = ({
       );
     }
 
-    console.log("expandedTraces", expandedTraces);
-    console.log("mapping", mapping);
-
     for (const trace of expandedTraces) {
-      const entry = Object.fromEntries(
-        Object.entries(mapping).map(([column, { source, key, subkey }]) => {
-          const source_ = source ? TRACE_MAPPINGS[source] : undefined;
-
-          let value = source_?.mapping(trace, key!, subkey!, {
-            annotationScoreOptions: getAnnotationScoreOptions.data,
-          });
-          if (
-            source_ &&
-            "expandable_by" in source_ &&
-            source_?.expandable_by &&
-            expansions.has(source_?.expandable_by)
-          ) {
-            value = value?.[0];
-          }
-
-          return [
-            column,
-            typeof value !== "string" && typeof value !== "number"
-              ? JSON.stringify(value)
-              : value,
-          ];
-        })
+      const entry = mapTraceToDatasetEntry(
+        trace,
+        mapping,
+        expansions,
+        getAnnotationScoreOptions.data
       );
 
       entries.push({
@@ -735,4 +715,41 @@ const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
   } catch (e) {
     return spans as any;
   }
+};
+
+export const mapTraceToDatasetEntry = (
+  trace: TraceWithSpansAndAnnotations | Trace,
+  mapping: Mapping,
+  expansions: Set<keyof typeof TRACE_EXPANSIONS>,
+  annotationScoreOptions?: AnnotationScore[]
+) => {
+  return Object.fromEntries(
+    Object.entries(mapping).map(([column, { source, key, subkey }]) => {
+      const source_ = source ? TRACE_MAPPINGS[source] : undefined;
+
+      let value = source_?.mapping(
+        trace as TraceWithSpansAndAnnotations,
+        key!,
+        subkey!,
+        {
+          annotationScoreOptions,
+        }
+      );
+      if (
+        source_ &&
+        "expandable_by" in source_ &&
+        source_?.expandable_by &&
+        expansions.has(source_?.expandable_by)
+      ) {
+        value = value?.[0];
+      }
+
+      return [
+        column,
+        typeof value !== "string" && typeof value !== "number"
+          ? JSON.stringify(value)
+          : value,
+      ];
+    })
+  );
 };
