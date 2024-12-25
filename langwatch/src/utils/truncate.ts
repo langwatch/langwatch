@@ -59,6 +59,7 @@ const truncateWithSizeLimit = (
     for (let i = 0; i < entries.length; i++) {
       const tempResult = {
         ...result,
+        // @ts-ignore
         [entries[i][0]]: truncateRecursive(entries[i][1], {
           maxStringLength: 2 * 1024,
           maxTotalLength,
