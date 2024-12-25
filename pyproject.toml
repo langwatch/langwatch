@@ -1,0 +1,40 @@
+[project]
+name = "langwatch-server"
+version = "0.1.34"
+description = "LangWatch Server - Observability for LLM Applications"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+langwatch-server = "bin.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+include = ["build_hooks.py", "bin/**/*.py", "langwatch/**/*", "langwatch_nlp/**/*"]
+exclude = [
+  "langwatch/node_modules/**/*",
+  "langwatch/.next/cache",
+  "langwatch/.next-saas",
+  "python-sdk/**/*",
+  "typescript-sdk/**/*",
+  "langwatch_nlp/.venv/**/*",
+  "langwatch_nlp/notebooks/**/*",
+  ".venv/**/*",
+  ".env",
+  ".ipynb_checkpoints/**/*",
+  ".pytest_cache/**/*",
+  "**/*.pyc",
+  "**/__pycache__",
+  "**/.DS_Store",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["bin"]
+artifacts = ["langwatch"]
+
+[tool.hatch.build.hooks.custom]
+path = "build_hooks.py"

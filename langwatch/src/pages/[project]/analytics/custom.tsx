@@ -212,7 +212,7 @@ const chartOptions: Required<CustomGraphFormData>["graphType"][] = [
     icon: <PieChart />,
   },
   {
-    label: "Donnut Chart",
+    label: "Donut Chart",
     value: "donnut",
     icon: <PieChart />,
   },

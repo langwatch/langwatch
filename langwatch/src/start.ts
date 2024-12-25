@@ -152,7 +152,7 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
     process.exit(1);
   });
 
-  server.listen(port, () => {
+  server.listen(port, async () => {
     console.log(
       `\n🎉 LangWatch is ready on http://${
         process.env.NODE_ENV === "production" ? hostname : "localhost"
