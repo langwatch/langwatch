@@ -11,6 +11,11 @@ import { getDebugger } from "../../../utils/logger";
 import { flattenObjectKeys } from "../../api/utils";
 import { prisma } from "../../db";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
+import {
+  collectorIndexDelayHistogram,
+  getJobProcessingCounter,
+  getJobProcessingDurationHistogram,
+} from "../../metrics";
 import { connection } from "../../redis";
 import {
   type ElasticSearchInputOutput,
@@ -18,15 +23,10 @@ import {
   type ElasticSearchTrace,
   type ErrorCapture,
   type Evaluation,
-  type Event,
   type Span,
   type SpanInputOutput,
 } from "../../tracer/types";
-import {
-  elasticSearchEvaluationsToEvaluations,
-  elasticSearchEventToEvent,
-  elasticSearchSpanToSpan,
-} from "../../tracer/utils";
+import { elasticSearchSpanToSpan } from "../../tracer/utils";
 import { COLLECTOR_QUEUE, collectorQueue } from "../queues/collectorQueue";
 import { mapEvaluations, scheduleEvaluations } from "./collector/evaluations";
 import {
@@ -38,11 +38,7 @@ import { cleanupPIIs } from "./collector/piiCheck";
 import { addInputAndOutputForRAGs } from "./collector/rag";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 import { getTraceInput, getTraceOutput } from "./collector/trace";
-import {
-  collectorIndexDelayHistogram,
-  getJobProcessingCounter,
-  getJobProcessingDurationHistogram,
-} from "../../metrics";
+import { safeTruncate } from "../../../utils/truncate";
 
 const debug = getDebugger("langwatch:workers:collectorWorker");
 
@@ -172,7 +168,7 @@ const processCollectorJob_ = async (
     };
     if (esSpan.params && typeof span.params === "object") {
       esSpan.params = {
-        ...esSpan.params,
+        ...safeTruncate(esSpan.params),
         _keys: flattenObjectKeys(esSpan.params),
       };
     } else {
@@ -234,7 +230,7 @@ const processCollectorJob_ = async (
       ...(Object.keys(customMetadata).length > 0
         ? {
             ...customExistingMetadata,
-            custom: customMetadata,
+            custom: safeTruncate(customMetadata),
           }
         : {}),
       all_keys: Array.from(

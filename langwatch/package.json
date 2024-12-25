@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "npm run start:prepare:files && npm run build:websocket && BUILD_TIME=1 next build --no-lint",
+    "build": "npm run start:prepare:files && npm run build:websocket && BUILD_TIME=1 next build --no-lint && rm -rf .next/cache",
     "build:websocket": "esbuild src/optimization_studio/server/socketServer.ts --bundle --platform=node --outfile=build-websocket/socketServer.js --packages=external --alias:@injected-dependencies.server=src/injection/injection.server.ts",
     "lint": "next lint",
     "dev": "npm run start:prepare:files && npm run start:prepare:db && npm run build:websocket && NODE_ENV=development DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true concurrently --restart-tries -1 'npm run build:websocket -- --watch' 'npm run start' 'npm run start:workers'",
