@@ -105,13 +105,13 @@ export default function Members() {
     if (actionParams.datasetId) {
       return (
         <Link href={`/${project?.slug}/datasets/${actionParams.datasetId}`}>
-          View "
+          View &quot;
           {
             getDatasets.data?.find(
               (dataset) => dataset.id === actionParams.datasetId
             )?.name
           }
-          "
+          &quot;
         </Link>
       );
     }
@@ -159,6 +159,7 @@ export default function Members() {
   interface ActionParams {
     slackWebhook?: string;
     members?: string[];
+    datasetId?: string;
   }
 
   const actionItems = (action: TriggerAction, actionParams: ActionParams) => {

@@ -1,7 +1,6 @@
 import {
   TriggerAction,
   type AlertType,
-  type AnnotationScore,
   type Project,
   type Trigger,
 } from "@prisma/client";
@@ -15,12 +14,13 @@ import { type Trace } from "~/server/tracer/types";
 
 import {
   mapTraceToDatasetEntry,
-  TRACE_EXPANSIONS,
-  TRACE_MAPPINGS,
+  type TRACE_EXPANSIONS,
   type Mapping,
 } from "~/components/datasets/DatasetMapping";
 
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord";
+
+import type { DatasetRecordEntry } from "~/server/datasets/types";
 
 interface TraceGroups {
   groups: Trace[][];
@@ -193,25 +193,29 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
         trigger?.actionParams as unknown as ActionParams;
 
       const rowsToAdd = triggerData.map((trace) => trace.fullTrace);
-      let index = 0;
       const now = Date.now();
 
       const { mapping, expansions } = datasetMapping;
+      let index = 0;
+      const entries: DatasetRecordEntry[] = [];
 
-      const entries = rowsToAdd.map((trace) => {
-        const entry = mapTraceToDatasetEntry(
+      for (const trace of rowsToAdd) {
+        const mappedEntries = mapTraceToDatasetEntry(
           trace,
           mapping as Mapping,
           expansions,
           undefined
         );
 
-        return {
-          id: `${now}-${index++}`,
-          selected: true,
-          ...entry,
-        };
-      });
+        for (const entry of mappedEntries) {
+          entries.push({
+            id: `${now}-${index}`,
+            selected: true,
+            ...entry,
+          });
+          index++;
+        }
+      }
 
       const createManyDatasetRecordsResult = await createManyDatasetRecords({
         datasetId: datasetId,

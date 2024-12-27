@@ -409,7 +409,6 @@ export function TriggerDrawer() {
                   <DatasetMappingPreview
                     traces={tracesWithSpans.data ?? []}
                     columnTypes={selectedDataset.columnTypes as DatasetColumns}
-                    //  columnDefs={columnDefs}
                     selectedDataset={selectedDataset}
                     rowData={rowDataFromDataset}
                     onEditColumns={editDataset.onOpen}

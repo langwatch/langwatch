@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  Checkbox,
   FormControl,
   FormHelperText,
   FormLabel,
@@ -21,8 +22,9 @@ import {
 } from "./DatasetGrid";
 
 import { api } from "~/utils/api";
-import type { Dataset } from "~/server/datasets/types";
 import { useMemo } from "react";
+import type { CustomCellRendererProps } from "@ag-grid-community/react";
+import type { Dataset } from "@prisma/client";
 
 interface DatasetMappingPreviewProps {
   traces: any[]; // Replace 'any' with your trace type

@@ -500,28 +500,26 @@ export const TracesMapping = ({
 
     let index = 0;
     const entries: DatasetRecordEntry[] = [];
-    let expandedTraces: TraceWithSpansAndAnnotations[] = traces_;
-    for (const expansion of expansions) {
-      expandedTraces = expandedTraces.flatMap((trace) =>
-        TRACE_EXPANSIONS[expansion].expansion(trace)
-      );
-    }
 
-    for (const trace of expandedTraces) {
-      const entry = mapTraceToDatasetEntry(
+    for (const trace of traces_) {
+      const mappedEntries = mapTraceToDatasetEntry(
         trace,
         mapping,
         expansions,
         getAnnotationScoreOptions.data
       );
 
-      entries.push({
-        id: `${now}-${index}`,
-        selected: true,
-        ...entry,
-      });
-      index++;
+      // Add each expanded entry to the final results
+      for (const entry of mappedEntries) {
+        entries.push({
+          id: `${now}-${index}`,
+          selected: true,
+          ...entry,
+        });
+        index++;
+      }
     }
+
     setDatasetEntries(entries);
   }, [
     expansions,
@@ -723,33 +721,40 @@ export const mapTraceToDatasetEntry = (
   expansions: Set<keyof typeof TRACE_EXPANSIONS>,
   annotationScoreOptions?: AnnotationScore[]
 ) => {
-  return Object.fromEntries(
-    Object.entries(mapping).map(([column, { source, key, subkey }]) => {
-      const source_ = source ? TRACE_MAPPINGS[source] : undefined;
+  let expandedTraces: TraceWithSpansAndAnnotations[] = [
+    trace as TraceWithSpansAndAnnotations,
+  ];
+  for (const expansion of expansions) {
+    expandedTraces = expandedTraces.flatMap((trace) =>
+      TRACE_EXPANSIONS[expansion].expansion(trace)
+    );
+  }
 
-      let value = source_?.mapping(
-        trace as TraceWithSpansAndAnnotations,
-        key!,
-        subkey!,
-        {
+  return expandedTraces.map((trace) =>
+    Object.fromEntries(
+      Object.entries(mapping).map(([column, { source, key, subkey }]) => {
+        const source_ = source ? TRACE_MAPPINGS[source] : undefined;
+
+        let value = source_?.mapping(trace, key!, subkey!, {
           annotationScoreOptions,
-        }
-      );
-      if (
-        source_ &&
-        "expandable_by" in source_ &&
-        source_?.expandable_by &&
-        expansions.has(source_?.expandable_by)
-      ) {
-        value = value?.[0];
-      }
+        });
 
-      return [
-        column,
-        typeof value !== "string" && typeof value !== "number"
-          ? JSON.stringify(value)
-          : value,
-      ];
-    })
+        if (
+          source_ &&
+          "expandable_by" in source_ &&
+          source_?.expandable_by &&
+          expansions.has(source_?.expandable_by)
+        ) {
+          value = value?.[0];
+        }
+
+        return [
+          column,
+          typeof value !== "string" && typeof value !== "number"
+            ? JSON.stringify(value)
+            : value,
+        ];
+      })
+    )
   );
 };
