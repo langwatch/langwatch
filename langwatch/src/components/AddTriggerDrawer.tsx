@@ -116,50 +116,6 @@ export function TriggerDrawer() {
     }
   );
 
-  const columnDefs = useMemo(() => {
-    if (!selectedDataset) {
-      return [];
-    }
-
-    const headers: DatasetColumnDef[] = (
-      (selectedDataset.columnTypes as DatasetColumns) ?? []
-    ).map(({ name, type }) => ({
-      headerName: name,
-      field: name,
-      type_: type,
-      cellClass: "v-align",
-      sortable: false,
-      minWidth: ["trace_id", "total_cost"].includes(name)
-        ? 120
-        : ["timestamp"].includes(name)
-        ? 160
-        : 200,
-    }));
-
-    // Add row number column
-    headers.unshift({
-      headerName: " ",
-      field: "selected",
-      type_: "boolean",
-      width: 46,
-      pinned: "left",
-      sortable: false,
-      filter: false,
-      enableCellChangeFlash: false,
-      headerComponent: HeaderCheckboxComponent,
-      cellRenderer: (props: CustomCellRendererProps) => (
-        <Checkbox
-          marginLeft="3px"
-          {...props}
-          isChecked={props.value}
-          onChange={(e) => props.setValue?.(e.target.checked)}
-        />
-      ),
-    });
-
-    return headers;
-  }, [selectedDataset]);
-
   useEffect(() => {
     if (datasetId) {
       setLocalStorageDatasetId(datasetId);
@@ -453,7 +409,8 @@ export function TriggerDrawer() {
                   <DatasetMappingPreview
                     traces={tracesWithSpans.data ?? []}
                     columnTypes={selectedDataset.columnTypes as DatasetColumns}
-                    columnDefs={columnDefs}
+                    //  columnDefs={columnDefs}
+                    selectedDataset={selectedDataset}
                     rowData={rowDataFromDataset}
                     onEditColumns={editDataset.onOpen}
                     onRowDataChange={setRowDataFromDataset}

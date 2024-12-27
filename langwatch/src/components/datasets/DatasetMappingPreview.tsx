@@ -14,14 +14,21 @@ import type {
   DatasetRecordEntry,
 } from "../../server/datasets/types";
 import { TracesMapping } from "./DatasetMapping";
-import { DatasetGrid } from "./DatasetGrid";
-import type { DatasetColumnDef } from "./DatasetGrid";
+import {
+  DatasetGrid,
+  HeaderCheckboxComponent,
+  type DatasetColumnDef,
+} from "./DatasetGrid";
+
+import { api } from "~/utils/api";
+import type { Dataset } from "~/server/datasets/types";
+import { useMemo } from "react";
 
 interface DatasetMappingPreviewProps {
   traces: any[]; // Replace 'any' with your trace type
   columnTypes: DatasetColumns;
-  columnDefs: DatasetColumnDef[];
   rowData: DatasetRecordEntry[];
+  selectedDataset: Dataset;
   onEditColumns: () => void;
   onRowDataChange: (entries: DatasetRecordEntry[]) => void;
   paragraph?: string;
@@ -30,13 +37,56 @@ interface DatasetMappingPreviewProps {
 export function DatasetMappingPreview({
   traces,
   columnTypes,
-  columnDefs,
   rowData,
   onEditColumns,
   onRowDataChange,
   paragraph,
+  selectedDataset,
 }: DatasetMappingPreviewProps) {
-  console.log("rowData", rowData);
+  const columnDefs = useMemo(() => {
+    if (!selectedDataset) {
+      return [];
+    }
+
+    const headers: DatasetColumnDef[] = (
+      (selectedDataset.columnTypes as DatasetColumns) ?? []
+    ).map(({ name, type }) => ({
+      headerName: name,
+      field: name,
+      type_: type,
+      cellClass: "v-align",
+      sortable: false,
+      minWidth: ["trace_id", "total_cost"].includes(name)
+        ? 120
+        : ["timestamp"].includes(name)
+        ? 160
+        : 200,
+    }));
+
+    // Add row number column
+    headers.unshift({
+      headerName: " ",
+      field: "selected",
+      type_: "boolean",
+      width: 46,
+      pinned: "left",
+      sortable: false,
+      filter: false,
+      enableCellChangeFlash: false,
+      headerComponent: HeaderCheckboxComponent,
+      cellRenderer: (props: CustomCellRendererProps) => (
+        <Checkbox
+          marginLeft="3px"
+          {...props}
+          isChecked={props.value}
+          onChange={(e) => props.setValue?.(e.target.checked)}
+        />
+      ),
+    });
+
+    return headers;
+  }, [selectedDataset]);
+
   return (
     <FormControl width="full" paddingY={4}>
       <HStack width="full" spacing="64px" align="start">
