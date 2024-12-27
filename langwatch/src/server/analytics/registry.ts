@@ -20,7 +20,10 @@ import { formatMoney } from "../../utils/formatMoney";
 
 const simpleFieldAnalytics = (
   field: string
-): Omit<AnalyticsMetric, "label" | "colorSet" | "allowedAggregations" | "quickwitSupport"> => ({
+): Omit<
+  AnalyticsMetric,
+  "label" | "colorSet" | "allowedAggregations" | "quickwitSupport"
+> => ({
   format: "0.[0]",
   increaseIs: "good",
   aggregation: (aggregation: AggregationTypes) => ({
@@ -301,6 +304,77 @@ export const analyticsMetrics = {
                 },
               },
         };
+      },
+      quickwitSupport: false,
+    },
+    tokens_per_second: {
+      ...numericFieldAnalyticsWithPercentiles("tokens_per_second"),
+      label: "Tokens per Second",
+      colorSet: "cyanTones",
+      increaseIs: "good",
+      aggregation: (aggregation: AggregationTypes) => {
+        const tokensPerSecondScript = `
+          long completionTokens = 0;
+          long duration = 0;
+
+          try {
+              duration = doc['spans.timestamps.finished_at'].value.getMillis() -
+                 (doc['spans.timestamps.first_token_at'].size() > 0 ?
+                     doc['spans.timestamps.first_token_at'].value.getMillis() :
+                     doc['spans.timestamps.started_at'].value.getMillis());
+          } catch (Exception e) {
+              return 17;
+          }
+
+          try {
+              completionTokens = doc['spans.metrics.completion_tokens'].size() > 0 ?
+                  doc['spans.metrics.completion_tokens'].value : 0;
+          } catch (Exception e) {
+              return null;
+          }
+
+          if (duration == 0 || completionTokens == 0) {
+              return null;
+          }
+
+          return completionTokens / (duration / 1000.0);
+        `;
+        return {
+          [`tokens_per_second_${aggregation}`]: {
+            nested: {
+              path: "spans",
+            },
+            aggs: {
+              child: percentileAggregationTypes.includes(aggregation as any)
+                ? {
+                    percentiles: {
+                      script: {
+                        source: tokensPerSecondScript,
+                      },
+                      percents: [
+                        percentileToPercent[
+                          aggregation as PercentileAggregationTypes
+                        ],
+                      ],
+                    },
+                  }
+                : {
+                    [aggregation]: {
+                      script: {
+                        source: tokensPerSecondScript,
+                      },
+                    },
+                  },
+            },
+          },
+        };
+      },
+      extractionPath: (aggregation: AggregationTypes) => {
+        return percentileAggregationTypes.includes(aggregation as any)
+          ? `tokens_per_second_${aggregation}>child>values>${
+              percentileToPercent[aggregation as PercentileAggregationTypes]
+            }.0`
+          : `tokens_per_second_${aggregation}>child`;
       },
       quickwitSupport: false,
     },

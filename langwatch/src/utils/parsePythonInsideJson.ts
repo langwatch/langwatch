@@ -39,7 +39,7 @@ const semantics = grammar.createSemantics().addOperation("toJSON", {
   ObjectExpr: (e) => e.toJSON(),
   ClassExpr: (id, _1, args, _2) => {
     let argIndex = 0;
-    const processedArgs = args.toJSON().map((arg) => {
+    const processedArgs = args.toJSON().map((arg: any) => {
       if (Array.isArray(arg)) {
         // Named argument
         return arg;
