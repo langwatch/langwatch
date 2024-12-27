@@ -7,3 +7,5 @@ node_modules
 
 llm-model-costs.json
 quickwit-*
+__pycache__
+dist/

@@ -6,5 +6,6 @@ RUN npm --prefix=langwatch ci
 COPY models.json .
 COPY langwatch ./langwatch
 RUN npm --prefix=langwatch run build
-CMD npm --prefix=langwatch run start:docker
 EXPOSE 3000
+
+CMD npm --prefix=langwatch start
