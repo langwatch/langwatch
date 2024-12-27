@@ -235,8 +235,6 @@ export default function Members() {
                     const lastRunAt = new Date(trigger.lastRunAt);
                     const lastRunAtFormatted = lastRunAt.toLocaleString();
 
-                    console.log("trigger", trigger);
-
                     return (
                       <Tr key={trigger.id}>
                         <Td>{trigger.name}</Td>

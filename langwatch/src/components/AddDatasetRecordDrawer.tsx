@@ -198,8 +198,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   const onSubmit: SubmitHandler<FormValues> = (_data) => {
     if (!selectedDataset || !project) return;
 
-    console.log("dasdsa", rowsToAdd);
-
     const entries: DatasetRecordEntry[] = rowsToAdd.map(
       (row) =>
         Object.fromEntries(
@@ -218,8 +216,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             })
         ) as DatasetRecordEntry
     );
-
-    console.log("entries", entries);
 
     createDatasetRecord.mutate(
       {
