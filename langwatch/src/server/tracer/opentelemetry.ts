@@ -465,19 +465,19 @@ const addOpenTelemetrySpanAsSpan = (
         role: "assistant",
         content: attributesMap.ai.response.text,
       });
-      delete attributesMap.ai.response.text;
     }
     if (attributesMap.ai.response.toolCalls) {
       messages_.push({
         tool_calls: attributesMap.ai.response.toolCalls as any,
       });
-      delete attributesMap.ai.response.toolCalls;
     }
 
-    output = {
-      type: "chat_messages",
-      value: messages_,
-    };
+    if (messages_.length > 0) {
+      output = {
+        type: "chat_messages",
+        value: messages_,
+      };
+    }
   }
   if (!output && attributesMap.ai?.response?.object) {
     output = {

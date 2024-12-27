@@ -1,8 +1,6 @@
 import {
   Box,
   Button,
-  Checkbox,
-  CheckboxGroup,
   Drawer,
   DrawerBody,
   DrawerCloseButton,
@@ -13,8 +11,6 @@ import {
   HStack,
   Heading,
   Input,
-  Radio,
-  RadioGroup,
   Select,
   Text,
   VStack,
@@ -34,10 +30,10 @@ import type {
 } from "../server/datasets/types";
 import { datasetRecordFormSchema } from "../server/datasets/types.generated";
 import { api } from "../utils/api";
-import { HorizontalFormControl } from "./HorizontalFormControl";
-import type { InMemoryDataset } from "./datasets/DatasetTable";
-import { DatasetPreview } from "./datasets/DatasetPreview";
 import { useDrawer } from "./CurrentDrawer";
+import { HorizontalFormControl } from "./HorizontalFormControl";
+import { DatasetPreview } from "./datasets/DatasetPreview";
+import type { InMemoryDataset } from "./datasets/DatasetTable";
 
 interface AddDatasetDrawerProps {
   datasetToSave?: Omit<InMemoryDataset, "datasetRecords"> & {
@@ -63,7 +59,7 @@ type FormValues = {
   columnTypes: ColumnType[];
 };
 
-export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
+export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const toast = useToast();
   const upsertDataset = api.dataset.upsert.useMutation();
@@ -338,7 +334,7 @@ export const AddOrEditDatasetDrawer = (props: AddDatasetDrawerProps) => {
       </DrawerContent>
     </Drawer>
   );
-};
+}
 
 export const tryToConvertRowsToAppropriateType = (
   datasetRecords: DatasetRecordEntry[],
