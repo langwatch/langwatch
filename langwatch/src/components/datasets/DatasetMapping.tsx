@@ -22,6 +22,7 @@ import type {
   DatasetSpan,
   Evaluation,
   Span,
+  Trace,
   TraceWithSpans,
 } from "../../server/tracer/types";
 import { datasetSpanSchema } from "../../server/tracer/types.generated";
@@ -37,7 +38,7 @@ type TraceWithSpansAndAnnotations = TraceWithSpans & {
   })[];
 };
 
-const TRACE_MAPPINGS = {
+export const TRACE_MAPPINGS = {
   trace_id: {
     mapping: (trace: TraceWithSpansAndAnnotations) => trace.trace_id,
   },
@@ -338,7 +339,7 @@ const TRACE_MAPPINGS = {
   }
 >;
 
-const TRACE_EXPANSIONS = {
+export const TRACE_EXPANSIONS = {
   "spans.llm.span_id": {
     label: "LLM span",
     expansion: (trace: TraceWithSpansAndAnnotations) => {
@@ -393,7 +394,7 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   spans: "spans",
 };
 
-type Mapping = Record<
+export type Mapping = Record<
   string,
   {
     source: keyof typeof TRACE_MAPPINGS | "";
@@ -499,46 +500,26 @@ export const TracesMapping = ({
 
     let index = 0;
     const entries: DatasetRecordEntry[] = [];
-    let expandedTraces: TraceWithSpansAndAnnotations[] = traces_;
-    for (const expansion of expansions) {
-      expandedTraces = expandedTraces.flatMap((trace) =>
-        TRACE_EXPANSIONS[expansion].expansion(trace)
-      );
-    }
 
-    for (const trace of expandedTraces) {
-      const entry = Object.fromEntries(
-        Object.entries(mapping).map(([column, { source, key, subkey }]) => {
-          const source_ = source ? TRACE_MAPPINGS[source] : undefined;
-
-          let value = source_?.mapping(trace, key!, subkey!, {
-            annotationScoreOptions: getAnnotationScoreOptions.data,
-          });
-          if (
-            source_ &&
-            "expandable_by" in source_ &&
-            source_?.expandable_by &&
-            expansions.has(source_?.expandable_by)
-          ) {
-            value = value?.[0];
-          }
-
-          return [
-            column,
-            typeof value !== "string" && typeof value !== "number"
-              ? JSON.stringify(value)
-              : value,
-          ];
-        })
+    for (const trace of traces_) {
+      const mappedEntries = mapTraceToDatasetEntry(
+        trace,
+        mapping,
+        expansions,
+        getAnnotationScoreOptions.data
       );
 
-      entries.push({
-        id: `${now}-${index}`,
-        selected: true,
-        ...entry,
-      });
-      index++;
+      // Add each expanded entry to the final results
+      for (const entry of mappedEntries) {
+        entries.push({
+          id: `${now}-${index}`,
+          selected: true,
+          ...entry,
+        });
+        index++;
+      }
     }
+
     setDatasetEntries(entries);
   }, [
     expansions,
@@ -732,4 +713,51 @@ const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
   } catch (e) {
     return spans as any;
   }
+};
+
+export const mapTraceToDatasetEntry = (
+  trace: TraceWithSpansAndAnnotations | Trace,
+  mapping: Mapping,
+  expansions: Set<keyof typeof TRACE_EXPANSIONS>,
+  annotationScoreOptions?: AnnotationScore[]
+) => {
+  let expandedTraces: TraceWithSpansAndAnnotations[] = [
+    trace as TraceWithSpansAndAnnotations,
+  ];
+
+  for (const expansion of expansions) {
+    const expanded = expandedTraces.flatMap((trace) =>
+      TRACE_EXPANSIONS[expansion].expansion(trace)
+    );
+    // Only use expanded traces if we found some, otherwise keep original
+    expandedTraces = expanded.length > 0 ? expanded : expandedTraces;
+  }
+
+  return expandedTraces.map((trace) =>
+    Object.fromEntries(
+      Object.entries(mapping).map(([column, { source, key, subkey }]) => {
+        const source_ = source ? TRACE_MAPPINGS[source] : undefined;
+
+        let value = source_?.mapping(trace, key!, subkey!, {
+          annotationScoreOptions,
+        });
+
+        if (
+          source_ &&
+          "expandable_by" in source_ &&
+          source_?.expandable_by &&
+          expansions.has(source_?.expandable_by)
+        ) {
+          value = value?.[0];
+        }
+
+        return [
+          column,
+          typeof value !== "string" && typeof value !== "number"
+            ? JSON.stringify(value)
+            : value,
+        ];
+      })
+    )
+  );
 };

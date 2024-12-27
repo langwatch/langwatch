@@ -1,6 +1,6 @@
 import {
-  type AlertType,
   TriggerAction,
+  type AlertType,
   type Project,
   type Trigger,
 } from "@prisma/client";
@@ -12,6 +12,16 @@ import { prisma } from "../../../server/db";
 
 import { type Trace } from "~/server/tracer/types";
 
+import {
+  mapTraceToDatasetEntry,
+  type TRACE_EXPANSIONS,
+  type Mapping,
+} from "~/components/datasets/DatasetMapping";
+
+import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord";
+
+import type { DatasetRecordEntry } from "~/server/datasets/types";
+
 interface TraceGroups {
   groups: Trace[][];
 }
@@ -20,6 +30,11 @@ interface ActionParams {
   members?: string[] | null;
   dataset?: string | null;
   slackWebhook?: string | null;
+  datasetMapping: {
+    mapping: Record<string, { source: string; key: string; subkey: string }>;
+    expansions: Set<keyof typeof TRACE_EXPANSIONS>;
+  };
+  datasetId: string;
 }
 
 interface TriggerData {
@@ -27,6 +42,7 @@ interface TriggerData {
   output: string;
   traceId: string;
   projectId: string;
+  fullTrace: Trace;
 }
 
 export default async function handler(
@@ -120,6 +136,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
         output: trace.output?.value ?? "",
         traceId: trace.trace_id,
         projectId: input.projectId,
+        fullTrace: trace,
       }))
     );
 
@@ -130,7 +147,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
 
     if (action === TriggerAction.SEND_EMAIL) {
       triggerInfo = {
-        triggerEmails: (actionParams as ActionParams)?.members ?? [],
+        triggerEmails: (actionParams as unknown as ActionParams)?.members ?? [],
         triggerData,
         triggerName: name,
         projectSlug: project!.slug,
@@ -149,7 +166,8 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
       }
     } else if (action === TriggerAction.SEND_SLACK_MESSAGE) {
       triggerInfo = {
-        triggerWebhook: (actionParams as ActionParams)?.slackWebhook ?? "",
+        triggerWebhook:
+          (actionParams as unknown as ActionParams)?.slackWebhook ?? "",
         triggerData,
         triggerName: name,
         projectSlug: project!.slug,
@@ -166,6 +184,52 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
       } else {
         throw new Error("Project not found for triggerId: " + triggerId);
       }
+    } else if (action === TriggerAction.ADD_TO_DATASET) {
+      const trigger = await prisma.trigger.findUnique({
+        where: { id: triggerId, projectId: input.projectId },
+      });
+
+      const { datasetId, datasetMapping } =
+        trigger?.actionParams as unknown as ActionParams;
+
+      const rowsToAdd = triggerData.map((trace) => trace.fullTrace);
+      const now = Date.now();
+
+      const { mapping, expansions } = datasetMapping;
+      let index = 0;
+      const entries: DatasetRecordEntry[] = [];
+
+      for (const trace of rowsToAdd) {
+        const mappedEntries = mapTraceToDatasetEntry(
+          trace,
+          mapping as Mapping,
+          expansions,
+          undefined
+        );
+
+        for (const entry of mappedEntries) {
+          entries.push({
+            id: `${now}-${index}`,
+            selected: true,
+            ...entry,
+          });
+          index++;
+        }
+      }
+
+      const createManyDatasetRecordsResult = await createManyDatasetRecords({
+        datasetId: datasetId,
+        projectId: input.projectId,
+        datasetRecords: entries,
+      });
+
+      triggerInfo = {
+        triggerData,
+        triggerName: name,
+        projectSlug: project!.slug,
+      };
+
+      await addTriggersSent(triggerId, triggerData);
     }
 
     return {

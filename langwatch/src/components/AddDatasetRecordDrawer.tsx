@@ -54,6 +54,8 @@ import {
 } from "./datasets/DatasetGrid";
 import { TracesMapping } from "./datasets/DatasetMapping";
 import { Edit2 } from "react-feather";
+import { DatasetSelector } from "./datasets/DatasetSelector";
+import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 
 type FormValues = {
   datasetId: string;
@@ -309,50 +311,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     setEditableRowData(rowDataFromDataset);
   }, [rowDataFromDataset]);
 
-  const columnDefs = useMemo(() => {
-    if (!selectedDataset) {
-      return [];
-    }
-
-    const headers: DatasetColumnDef[] = (
-      (selectedDataset.columnTypes as DatasetColumns) ?? []
-    ).map(({ name, type }) => ({
-      headerName: name,
-      field: name,
-      type_: type,
-      cellClass: "v-align",
-      sortable: false,
-      minWidth: ["trace_id", "total_cost"].includes(name)
-        ? 120
-        : ["timestamp"].includes(name)
-        ? 160
-        : 200,
-    }));
-
-    // Add row number column
-    headers.unshift({
-      headerName: " ",
-      field: "selected",
-      type_: "boolean",
-      width: 46,
-      pinned: "left",
-      sortable: false,
-      filter: false,
-      enableCellChangeFlash: false,
-      headerComponent: HeaderCheckboxComponent,
-      cellRenderer: (props: CustomCellRendererProps) => (
-        <Checkbox
-          marginLeft="3px"
-          {...props}
-          isChecked={props.value}
-          onChange={(e) => props.setValue?.(e.target.checked)}
-        />
-      ),
-    });
-
-    return headers;
-  }, [selectedDataset]);
-
   const scrollRef = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(false);
 
@@ -400,108 +358,23 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
           <form onSubmit={handleSubmit(onSubmit)}>
             <VStack paddingX={6}>
-              <HorizontalFormControl
-                label="Dataset"
-                helper="Add to an existing dataset or create a new one"
-                isInvalid={!!errors.datasetId}
-              >
-                {/* TODO: keep last selection on localstorage */}
-                <Select
-                  {...register("datasetId", {
-                    required: "Dataset is required",
-                  })}
-                >
-                  <option value={""}>Select Dataset</option>
-                  {datasets.data
-                    ? datasets.data?.map((dataset, index) => (
-                        <option
-                          key={index}
-                          value={dataset.id}
-                          selected={dataset.id === localStorageDatasetId}
-                        >
-                          {dataset.name}
-                        </option>
-                      ))
-                    : null}
-                </Select>
-                {errors.datasetId && (
-                  <FormErrorMessage>
-                    {errors.datasetId.message}
-                  </FormErrorMessage>
-                )}
-                <Button
-                  colorScheme="blue"
-                  onClick={() => {
-                    setValue("datasetId", "");
-                    editDataset.onOpen();
-                  }}
-                  minWidth="fit-content"
-                  variant="link"
-                  marginTop={2}
-                  fontWeight={"normal"}
-                >
-                  + Create New
-                </Button>
-              </HorizontalFormControl>
+              <DatasetSelector
+                datasets={datasets.data}
+                localStorageDatasetId={localStorageDatasetId}
+                register={register}
+                errors={errors}
+                setValue={setValue}
+                onCreateNew={editDataset.onOpen}
+              />
               {selectedDataset && (
-                <FormControl width="full" paddingY={4}>
-                  <HStack width="full" spacing="64px" align="start">
-                    <VStack align="start" maxWidth="50%">
-                      <FormLabel margin={0}>Mapping</FormLabel>
-                      <FormHelperText margin={0} fontSize={13} marginBottom={2}>
-                        Map the trace data to the dataset columns
-                      </FormHelperText>
-
-                      <TracesMapping
-                        traces={tracesWithSpans.data ?? []}
-                        columnTypes={
-                          selectedDataset?.columnTypes as DatasetColumns
-                        }
-                        setDatasetEntries={setRowDataFromDataset}
-                      />
-                    </VStack>
-                    <VStack align="start" width="full" height="full">
-                      <HStack width="full" align="end">
-                        <VStack align="start">
-                          <FormLabel margin={0}>Preview</FormLabel>
-                          <FormHelperText margin={0} fontSize={13}>
-                            Those are the rows that are going to be added,
-                            double click on the cell to edit them
-                          </FormHelperText>
-                        </VStack>
-                        <Spacer />
-                        <Button
-                          size="sm"
-                          colorScheme="blue"
-                          variant="outline"
-                          leftIcon={<Edit2 height={16} />}
-                          onClick={() => {
-                            editDataset.onOpen();
-                          }}
-                        >
-                          Edit Columns
-                        </Button>
-                      </HStack>
-                      <Box width="full" display="block" paddingTop={2}>
-                        <DatasetGrid
-                          columnDefs={columnDefs}
-                          rowData={rowDataFromDataset}
-                          onCellValueChanged={({
-                            data,
-                          }: {
-                            data: DatasetRecordEntry;
-                          }) => {
-                            setEditableRowData((rowData) =>
-                              rowData.map((row) =>
-                                row.id === data.id ? data : row
-                              )
-                            );
-                          }}
-                        />
-                      </Box>
-                    </VStack>
-                  </HStack>
-                </FormControl>
+                <DatasetMappingPreview
+                  traces={tracesWithSpans.data ?? []}
+                  columnTypes={selectedDataset.columnTypes as DatasetColumns}
+                  rowData={rowDataFromDataset}
+                  selectedDataset={selectedDataset}
+                  onEditColumns={editDataset.onOpen}
+                  onRowDataChange={setRowDataFromDataset}
+                />
               )}
             </VStack>
 

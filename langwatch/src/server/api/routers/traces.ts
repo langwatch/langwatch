@@ -300,6 +300,38 @@ export const tracesRouter = createTRPCRouter({
       return getTracesWithSpans(projectId, traceIds);
     }),
 
+  getSampleTracesDataset: protectedProcedure
+    .input(
+      tracesFilterInput.extend({
+        projectId: z.string(),
+        query: z.string().optional(),
+        sortBy: z.string().optional(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+    .query(async ({ ctx, input }) => {
+      const { groups } = await getAllTracesForProject({
+        input: {
+          ...input,
+          groupBy: "none",
+          pageSize: 10,
+        },
+        ctx,
+      });
+      const traceIds = groups.flatMap((group) =>
+        group.map((trace) => trace.trace_id)
+      );
+
+      if (traceIds.length === 0) {
+        return [];
+      }
+
+      const { projectId } = input;
+      const traceWithSpans = await getTracesWithSpans(projectId, traceIds);
+
+      return traceWithSpans;
+    }),
+
   getSampleTraces: protectedProcedure
     .input(
       tracesFilterInput.extend({
