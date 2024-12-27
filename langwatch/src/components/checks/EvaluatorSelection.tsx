@@ -28,6 +28,7 @@ import { titleCase } from "../../utils/stringCasing";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 import { api } from "../../utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { Plus } from "react-feather";
 
 type Category = EvaluatorDefinition<any>["category"];
 
@@ -276,6 +277,33 @@ export function EvaluatorSelection({
                     </GridItem>
                   );
                 })}
+
+                {category === "custom" && (
+                  <GridItem
+                    as={Link}
+                    href={`/${project?.slug}/workflows`}
+                    border="dashed"
+                    borderColor="gray.300"
+                    borderWidth={3}
+                    borderRadius={6}
+                    padding={6}
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    minHeight="200px"
+                    _hover={{
+                      background: "gray.50",
+                      textDecoration: "none",
+                    }}
+                  >
+                    <VStack spacing={3}>
+                      <Box p={3} borderRadius="full" bg="gray.100">
+                        <Plus size={24} color="gray" />
+                      </Box>
+                      <Text color="gray.600">Create Custom Evaluator</Text>
+                    </VStack>
+                  </GridItem>
+                )}
               </Grid>
             </TabPanel>
           )
