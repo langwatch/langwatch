@@ -30,6 +30,7 @@ import {
   Textarea,
   Select,
   Input,
+  Link,
 } from "@chakra-ui/react";
 import type { TriggerAction } from "@prisma/client";
 import { MoreVertical } from "react-feather";
@@ -54,6 +55,7 @@ export default function Members() {
   const { project, organizations } = useOrganizationTeamProject();
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
+
   const triggers = api.trigger.getTriggers.useQuery(
     {
       projectId: project?.id ?? "",
@@ -62,6 +64,10 @@ export default function Members() {
       enabled: !!project?.id,
     }
   );
+
+  const getDatasets = api.dataset.getAll.useQuery({
+    projectId: project?.id ?? "",
+  });
 
   const { setValue, ...formMethods } = useForm({
     defaultValues: {
@@ -93,6 +99,23 @@ export default function Members() {
         },
       }
     );
+  };
+
+  const getDatasetName = (actionParams: ActionParams) => {
+    if (actionParams.datasetId) {
+      return (
+        <Link href={`/${project?.slug}/datasets/${actionParams.datasetId}`}>
+          View "
+          {
+            getDatasets.data?.find(
+              (dataset) => dataset.id === actionParams.datasetId
+            )?.name
+          }
+          "
+        </Link>
+      );
+    }
+    return "";
   };
 
   const deleteTrigger = (triggerId: string) => {
@@ -139,8 +162,6 @@ export default function Members() {
   }
 
   const actionItems = (action: TriggerAction, actionParams: ActionParams) => {
-    console.log("actionParams", actionParams);
-    console.log("action", action);
     switch (action) {
       case "SEND_SLACK_MESSAGE":
         return (
@@ -155,7 +176,7 @@ export default function Members() {
       case "SEND_EMAIL":
         return (actionParams as { members: string[] }).members?.join(", ");
       case "ADD_TO_DATASET":
-        return;
+        return getDatasetName(actionParams) ?? "";
     }
   };
 
