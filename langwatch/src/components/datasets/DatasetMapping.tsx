@@ -724,10 +724,13 @@ export const mapTraceToDatasetEntry = (
   let expandedTraces: TraceWithSpansAndAnnotations[] = [
     trace as TraceWithSpansAndAnnotations,
   ];
+
   for (const expansion of expansions) {
-    expandedTraces = expandedTraces.flatMap((trace) =>
+    const expanded = expandedTraces.flatMap((trace) =>
       TRACE_EXPANSIONS[expansion].expansion(trace)
     );
+    // Only use expanded traces if we found some, otherwise keep original
+    expandedTraces = expanded.length > 0 ? expanded : expandedTraces;
   }
 
   return expandedTraces.map((trace) =>
