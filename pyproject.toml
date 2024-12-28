@@ -7,14 +7,20 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.scripts]
-langwatch-server = "bin.cli:main"
+langwatch-server = "langwatch_server.bin.cli:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build]
-include = ["build_hooks.py", "bin/**/*.py", "langwatch/**/*", "langwatch_nlp/**/*"]
+include = [
+  "langwatch_server",
+  "bin/**/*",
+  "langwatch/**/*",
+  "langwatch_nlp/**/*",
+  "build_hooks.py",
+]
 exclude = [
   "langwatch/node_modules/**/*",
   "langwatch/.next/cache",
@@ -23,18 +29,18 @@ exclude = [
   "typescript-sdk/**/*",
   "langwatch_nlp/.venv/**/*",
   "langwatch_nlp/notebooks/**/*",
-  ".venv/**/*",
-  ".env",
-  ".ipynb_checkpoints/**/*",
-  ".pytest_cache/**/*",
+  "**/.venv/**/*",
+  "**/.env",
+  "**/.ipynb_checkpoints/**/*",
+  "**/.pytest_cache/**/*",
   "**/*.pyc",
   "**/__pycache__",
   "**/.DS_Store",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["bin"]
-artifacts = ["langwatch"]
+packages = ["langwatch_server"]
+artifacts = ["langwatch_server"]
 
 [tool.hatch.build.hooks.custom]
 path = "build_hooks.py"

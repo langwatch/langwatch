@@ -1,7 +1,6 @@
 .env
 .env.*
 !.env.example
-*.generated.ts
 traceDir
 node_modules
 
@@ -9,3 +8,5 @@ llm-model-costs.json
 quickwit-*
 __pycache__
 dist/
+
+langwatch_server/

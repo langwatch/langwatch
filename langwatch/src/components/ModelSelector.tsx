@@ -1,13 +1,10 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import React from "react";
-import models from "../../../models.json";
+import models from "../../models.json";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { api } from "../utils/api";
-import {
-  vendorIcons,
-  modelProviderIcons,
-} from "../server/modelProviders/iconsMap";
+import { modelProviderIcons } from "../server/modelProviders/iconsMap";
 
 export type ModelOption = {
   label: string;

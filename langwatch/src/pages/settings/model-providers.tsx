@@ -42,7 +42,7 @@ import {
 import { allowedTopicClusteringModels } from "../../server/topicClustering/types";
 import { api } from "../../utils/api";
 
-import models from "../../../../models.json";
+import models from "../../../models.json";
 
 import CreatableSelect from "react-select/creatable";
 import {

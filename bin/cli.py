@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -16,6 +17,8 @@ def get_webapp_dir():
 
 def npm_install():
     webapp_dir = get_webapp_dir()
+    if not (webapp_dir / ".env").exists():
+        shutil.copy(webapp_dir / ".env.example", webapp_dir / ".env")
     if not (webapp_dir / "node_modules").exists():
         print(
             "Setting up LangWatch for first time use, this is a one-time only operation..."
