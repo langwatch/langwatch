@@ -83,6 +83,12 @@ async function submitUserMessage(content: string) {
       },
       ...aiState.get().messages
     ],
+    experimental_telemetry: {
+      isEnabled: true,
+      metadata: {
+        threadId: aiState.get().chatId
+      }
+    },
     tools: {
       listStocks: tool({
         description: 'List three imaginary stocks that are trending.',
@@ -361,12 +367,6 @@ async function submitUserMessage(content: string) {
           )
         }
       })
-    },
-    experimental_telemetry: {
-      isEnabled: true,
-      metadata: {
-        threadId: aiState.get().chatId
-      }
     }
   })
 

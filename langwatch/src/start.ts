@@ -68,7 +68,7 @@ const isMetricsAuthorized = (req: IncomingMessage): boolean => {
 module.exports.startApp = async (dir = path.dirname(__dirname)) => {
   const dev = process.env.NODE_ENV !== "production";
   const hostname = "0.0.0.0";
-  const port = parseInt(process.env.PORT ?? "3000");
+  const port = parseInt(process.env.PORT ?? "5560");
   // when using middleware `hostname` and `port` must be provided below
   const app = next({ dev, hostname, port, dir });
   const handle = app.getRequestHandler();
@@ -154,9 +154,10 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
 
   server.listen(port, async () => {
     console.log(
-      `\n🎉 LangWatch is ready on http://${
-        process.env.NODE_ENV === "production" ? hostname : "localhost"
-      }:${port}\n`
+      `\n🎉 LangWatch is ready on http://${hostname.replace(
+        "0.0.0.0",
+        "localhost"
+      )}:${port}\n`
     );
   });
 };

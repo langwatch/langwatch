@@ -6,6 +6,6 @@ RUN npm --prefix=langwatch ci
 COPY models.json .
 COPY langwatch ./langwatch
 RUN npm --prefix=langwatch run build
-EXPOSE 3000
+EXPOSE 5560
 
 CMD npm --prefix=langwatch start

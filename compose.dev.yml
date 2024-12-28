@@ -16,7 +16,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     ports:
-      - "3000:3000"
+      - "5560:5560"
     depends_on:
       postgres:
         condition: service_healthy
@@ -34,7 +34,7 @@ services:
       - "8080:8080"
     restart: always
     environment:
-      - LANGWATCH_ENDPOINT=http://app:3000
+      - LANGWATCH_ENDPOINT=http://app:5560
 
   langevals:
     image: langwatch/langevals:latest

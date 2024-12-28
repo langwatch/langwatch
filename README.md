@@ -55,7 +55,7 @@ cp langwatch/.env.example langwatch/.env
 docker compose up --build
 ```
 
-Then, open LangWatch at http://localhost:3000
+Then, open LangWatch at http://localhost:5560
 
 ## Development
 

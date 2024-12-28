@@ -6,7 +6,7 @@ import { getTestProject } from "../../utils/testUtils";
 import { mean, median, standardDeviation } from "simple-statistics";
 
 const LANGWATCH_ENDPOINT =
-  process.env.LANGWATCH_ENDPOINT ?? "http://localhost:3000";
+  process.env.LANGWATCH_ENDPOINT ?? "http://localhost:5560";
 
 const LANGWATCH_API_KEY = process.env.LANGWATCH_API_KEY;
 

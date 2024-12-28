@@ -198,7 +198,7 @@ describe("opentelemetry traces receiver", () => {
     const blob = new Blob([uint8Array], { type: "application/x-protobuf" });
 
     const response = await POST(
-      new NextRequest("http://localhost:3000/api/otel/v1/trace", {
+      new NextRequest("http://localhost:5560/api/otel/v1/trace", {
         method: "POST",
         body: blob,
         headers: {
@@ -325,7 +325,7 @@ describe("opentelemetry traces receiver", () => {
 
   it("receives a json trace too", async () => {
     const response = await POST(
-      new NextRequest("http://localhost:3000/api/otel/v1/trace", {
+      new NextRequest("http://localhost:5560/api/otel/v1/trace", {
         method: "POST",
         body: JSON.stringify(request),
         headers: {
