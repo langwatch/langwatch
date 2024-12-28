@@ -86,7 +86,7 @@ resource "kubernetes_deployment" "langwatch" {
           image_pull_policy = "Always"
 
           port {
-            container_port = 3000
+            container_port = 5560
           }
 
           env {
@@ -131,7 +131,7 @@ resource "kubernetes_deployment" "langwatch" {
           liveness_probe {
             http_get {
               path = "/"
-              port = 3000
+              port = 5560
             }
             initial_delay_seconds = 30
             period_seconds        = 30
@@ -142,7 +142,7 @@ resource "kubernetes_deployment" "langwatch" {
           readiness_probe {
             http_get {
               path = "/"
-              port = 3000
+              port = 5560
             }
             initial_delay_seconds = 30
             period_seconds        = 30
@@ -185,7 +185,7 @@ resource "kubernetes_service" "langwatch" {
     port {
       name        = "https"
       port        = 443
-      target_port = 3000
+      target_port = 5560
     }
 
     type = "LoadBalancer"
@@ -211,7 +211,7 @@ resource "kubernetes_service" "langwatch_internal" {
 
     port {
       port        = 80
-      target_port = 3000
+      target_port = 5560
     }
 
     type = "ClusterIP" # Internal only

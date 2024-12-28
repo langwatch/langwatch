@@ -17,8 +17,9 @@ RUN rm .env &>/dev/null || true
 RUN npm run build
 ENV NODE_ENV=production
 
-EXPOSE 3000
+EXPOSE 5560
 EXPOSE 5432
 EXPOSE 6379
 
 CMD /app/scripts/start-proxy.sh & npm start
+

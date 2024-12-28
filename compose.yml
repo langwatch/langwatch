@@ -8,7 +8,7 @@ services:
     build:
       context: .
     ports:
-      - "3000:3000"
+      - "5560:5560"
     environment:
       REDIS_URL: redis://redis:6379
     depends_on:
