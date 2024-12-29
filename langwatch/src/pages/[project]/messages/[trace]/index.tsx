@@ -150,7 +150,10 @@ export function Conversation({
     }
   );
 
-  const modalTraceId = router.query["drawer.traceId"];
+  const modalTraceId =
+    threadTraces.data?.length && threadTraces.data?.length > 1
+      ? router.query["drawer.traceId"]
+      : undefined;
 
   useEffect(() => {
     if (threadTraces.data && threadTraces.data?.length > 0) {
@@ -204,7 +207,6 @@ export function Conversation({
               </Container>
             )
           ) : null}
-          {!threadId && <Box height="56px" />}
           {trace.data && !threadTraces.data && (
             <TraceMessages trace={trace.data} highlighted={!!modalTraceId} />
           )}
@@ -510,7 +512,7 @@ function Message({
   paddingTop?: string;
 }>) {
   const { project } = useOrganizationTeamProject();
-  const { openDrawer } = useDrawer();
+  const { openDrawer, isDrawerOpen } = useDrawer();
 
   // show time ago if less than a day old
   const timestampDate = timestamp ? new Date(timestamp) : undefined;
@@ -528,9 +530,20 @@ function Message({
       role="button"
       onClick={() => {
         if (!trace) return;
-        openDrawer("traceDetails", {
-          traceId: trace.trace_id,
-        });
+        if (isDrawerOpen("traceDetails")) {
+          openDrawer(
+            "traceDetails",
+            {
+              traceId: trace.trace_id,
+              selectedTab: "traceDetails",
+            },
+            { replace: true }
+          );
+        } else {
+          openDrawer("traceDetails", {
+            traceId: trace.trace_id,
+          });
+        }
       }}
     >
       {avatar}

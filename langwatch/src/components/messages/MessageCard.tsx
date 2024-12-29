@@ -130,7 +130,7 @@ export function MessageCard({
           onClick={() =>
             openDrawer("traceDetails", {
               traceId: trace.trace_id,
-              annotationTab: true,
+              selectedTab: "annotations",
             })
           }
         >

@@ -146,7 +146,7 @@ export function AnnotationDrawer({
             if (listTableView === "list" || listTableView === "table") {
               openDrawer("traceDetails", {
                 traceId: traceId,
-                annotationTab: true,
+                selectedTab: "annotations",
               });
             }
           },
@@ -190,7 +190,7 @@ export function AnnotationDrawer({
             if (listTableView === "list" || listTableView === "table") {
               openDrawer("traceDetails", {
                 traceId: traceId,
-                annotationTab: true,
+                selectedTab: "annotations",
               });
             }
           },
@@ -257,7 +257,7 @@ export function AnnotationDrawer({
                 width={16}
                 cursor="pointer"
                 onClick={() =>
-                  openDrawer("traceDetails", { traceId, annotationTab: true })
+                  openDrawer("traceDetails", { traceId, selectedTab: "annotations" })
                 }
               />
             </HStack>

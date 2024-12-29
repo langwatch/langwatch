@@ -17,7 +17,6 @@ import "~/styles/globals.scss";
 import "~/styles/markdown.scss";
 
 import { extendTheme } from "@chakra-ui/react";
-import debounce from "lodash.debounce";
 import { Inter } from "next/font/google";
 import Head from "next/head";
 import { useRouter } from "next/router";
@@ -157,7 +156,7 @@ export const theme = extendTheme({
   },
 });
 
-const handleChangeStart = debounce(() => NProgress.start(), 200);
+let handleChangeStartTimeout: NodeJS.Timeout | null = null;
 
 const LangWatch: AppType<{
   session: Session | null;
@@ -202,12 +201,15 @@ const LangWatch: AppType<{
     NProgress.configure({ showSpinner: false });
     const handleChangeDone = () => {
       keepSameFeatureFlags();
-      handleChangeStart.cancel();
+      if (handleChangeStartTimeout) {
+        clearTimeout(handleChangeStartTimeout);
+        handleChangeStartTimeout = null;
+      }
       NProgress.done();
       setTimeout(() => NProgress.done(), 200);
     };
     const handleChangeStart_ = () => {
-      handleChangeStart();
+      handleChangeStartTimeout = setTimeout(() => NProgress.start(), 300);
     };
 
     router.events.on("routeChangeStart", handleChangeStart_);

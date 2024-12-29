@@ -12,6 +12,7 @@ import {
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import { ArrowDown, ArrowUp, HelpCircle } from "react-feather";
+import { Delayed } from "../Delayed";
 
 export function SummaryMetric({
   label,
@@ -104,9 +105,11 @@ export function SummaryMetricValue({
             numeral(current).format(format ?? "0a")
           )
         ) : (
-          <Box paddingY="0.25em">
-            <Skeleton height="1em" width="78px" />
-          </Box>
+          <Delayed takeSpace>
+            <Box paddingY="0.25em" height="2.35em">
+              <Skeleton height="1em" width="78px" />
+            </Box>
+          </Delayed>
         )}
       </Box>
       <MetricChange

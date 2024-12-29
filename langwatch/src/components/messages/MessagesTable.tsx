@@ -73,6 +73,7 @@ import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import type { TraceWithGuardrail } from "./MessageCard";
 import { HoverableBigText } from "../HoverableBigText";
 import { getColorForString } from "../../utils/rotatingColors";
+import { Delayed } from "../Delayed";
 
 export function MessagesTable() {
   const router = useRouter();
@@ -157,39 +158,42 @@ export function MessagesTable() {
       return null;
     }
     return (
-      <Tooltip
-        label={`${annotations?.length} ${
-          annotations?.length === 1 ? "annotation" : "annotations"
-        }`}
-      >
-        <HStack
-          marginRight={1}
-          onClick={() =>
-            openDrawer("traceDetails", {
-              traceId: traceId,
-              annotationTab: true,
-            })
-          }
+      <Box position="relative">
+        <Tooltip
+          label={`${annotations?.length} ${
+            annotations?.length === 1 ? "annotation" : "annotations"
+          }`}
         >
-          <Edit size="18px" />
-          <Box
-            width="13px"
-            height="13px"
-            borderRadius="12px"
-            background="green.500"
-            position="absolute"
-            top="10px"
-            left="0px"
-            paddingTop="1px"
-            fontSize="9px"
-            color="white"
-            lineHeight="12px"
-            textAlign="center"
+          <HStack
+            paddingLeft={2}
+            marginRight={1}
+            onClick={() =>
+              openDrawer("traceDetails", {
+                traceId: traceId,
+                selectedTab: "annotations",
+              })
+            }
           >
-            {annotations?.length}
-          </Box>
-        </HStack>
-      </Tooltip>
+            <Edit size="18px" />
+            <Box
+              width="13px"
+              height="13px"
+              borderRadius="12px"
+              background="green.500"
+              position="absolute"
+              top="10px"
+              left="0px"
+              paddingTop="1px"
+              fontSize="9px"
+              color="white"
+              lineHeight="12px"
+              textAlign="center"
+            >
+              {annotations?.length}
+            </Box>
+          </HStack>
+        </Tooltip>
+      </Box>
     );
   };
 
@@ -309,9 +313,7 @@ export function MessagesTable() {
                 isChecked={selectedTraceIds.includes(trace.trace_id)}
                 onChange={() => traceSelection(trace.trace_id)}
               />
-              <Box position="relative" paddingLeft={2}>
-                {annotationCount(trace.trace_id)}
-              </Box>
+              {annotationCount(trace.trace_id)}
             </HStack>
           </Td>
         );
@@ -321,6 +323,7 @@ export function MessagesTable() {
     trace_id: {
       name: "ID",
       sortable: true,
+      width: 100,
       render: (trace: Trace, index: number) => (
         <Td
           key={index}
@@ -343,6 +346,7 @@ export function MessagesTable() {
     "timestamps.started_at": {
       name: "Timestamp",
       sortable: true,
+      width: 160,
       render: (trace: Trace, index: number) => (
         <Td
           key={index}
@@ -1135,7 +1139,10 @@ export function MessagesTable() {
                               </HStack>
                             ) : (
                               <HStack spacing={1}>
-                                <Text width={headerColumns[columnKey]?.width}>
+                                <Text
+                                  minWidth={headerColumns[columnKey]?.width}
+                                  width="full"
+                                >
                                   {name}
                                 </Text>
                                 {headerColumns[columnKey]?.sortable &&
@@ -1162,13 +1169,15 @@ export function MessagesTable() {
                       ))
                     )}
                     {traceGroups.isLoading &&
-                      Array.from({ length: 3 }).map((_, i) => (
+                      Array.from({ length: 2 }).map((_, i) => (
                         <Tr key={i}>
                           {Array.from({
                             length: checkedHeaderColumnsEntries.length,
                           }).map((_, i) => (
                             <Td key={i}>
-                              <Skeleton height="20px" />
+                              <Delayed key={1} takeSpace>
+                                <Skeleton height="16px" />
+                              </Delayed>
                             </Td>
                           ))}
                         </Tr>

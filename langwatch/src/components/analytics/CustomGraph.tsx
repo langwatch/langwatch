@@ -51,6 +51,7 @@ import { SummaryMetric } from "./SummaryMetric";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { QuickwitNote } from "./QuickwitNote";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { Delayed } from "../Delayed";
 
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
@@ -321,7 +322,9 @@ const CustomGraph_ = React.memo(
       return (
         <Box width="full" height="full" position="relative">
           {input.graphType !== "summary" && timeseries.isFetching && (
-            <Spinner position="absolute" right={4} top={4} />
+            <Delayed>
+              <Spinner position="absolute" right={4} top={4} />
+            </Delayed>
           )}
           {timeseries.error && (
             <Alert

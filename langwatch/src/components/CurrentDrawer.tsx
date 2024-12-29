@@ -73,7 +73,8 @@ export function useDrawer() {
 
   const openDrawer = <T extends keyof typeof drawers>(
     drawer: T,
-    props: Parameters<(typeof drawers)[T]>[0]
+    props: Parameters<(typeof drawers)[T]>[0],
+    { replace }: { replace?: boolean } = {}
   ) => {
     complexProps = Object.fromEntries(
       Object.entries(props ?? {}).filter(
@@ -82,7 +83,7 @@ export function useDrawer() {
       )
     );
 
-    void router.push(
+    void router[replace ? "replace" : "push"](
       "?" +
         qs.stringify(
           {

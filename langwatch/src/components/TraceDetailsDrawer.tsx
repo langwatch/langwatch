@@ -12,7 +12,7 @@ import { TraceDetails } from "./traces/TraceDetails";
 
 interface TraceDetailsDrawerProps {
   traceId: string;
-  annotationTab?: boolean;
+  selectedTab?: string;
 }
 
 export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
@@ -36,22 +36,16 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
     >
       <DrawerContent paddingX={0}>
         <DrawerBody
+          paddingTop={0}
           paddingX={0}
           overflowY="auto"
           id="conversation-scroll-container"
         >
-          <HStack paddingTop={2} paddingLeft={6}>
-            {traceView === "span" ? (
-              <Maximize2 onClick={toggleView} cursor={"pointer"} />
-            ) : (
-              <Minimize2 onClick={toggleView} cursor={"pointer"} />
-            )}
-
-            <DrawerCloseButton zIndex={1} />
-          </HStack>
           <TraceDetails
             traceId={props.traceId}
-            annotationTab={props.annotationTab}
+            selectedTab={props.selectedTab}
+            traceView={traceView}
+            onToggleView={toggleView}
           />
         </DrawerBody>
       </DrawerContent>

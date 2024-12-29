@@ -287,6 +287,7 @@ export const tracesRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input }) => {
       const { projectId, threadId } = input;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       return getTracesByThreadId({ projectId, threadId });
     }),

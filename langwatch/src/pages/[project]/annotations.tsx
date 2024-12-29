@@ -148,7 +148,7 @@ export default function Annotations() {
   const openTraceDrawer = (traceId: string) => {
     openDrawer("traceDetails", {
       traceId: traceId,
-      annotationTab: true,
+      selectedTab: "annotations",
     });
   };
 

@@ -14,6 +14,7 @@ import { HelpCircle } from "react-feather";
 import { api } from "../../utils/api";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { OverflownTextWithTooltip } from "../OverflownText";
+import { Delayed } from "../Delayed";
 
 export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   const router = useRouter();
@@ -138,11 +139,11 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
       )}
       <VStack width="full" spacing={4} align="start">
         {topicCountsQuery.isLoading ? (
-          <>
+          <Delayed>
             <Skeleton width="full" height="20px" />
             <Skeleton width="full" height="20px" />
             <Skeleton width="full" height="20px" />
-          </>
+          </Delayed>
         ) : topicCountsQuery.data ? (
           topicCountsQuery.data.topicCounts.length > 0 ? (
             topicCountsQuery.data.topicCounts

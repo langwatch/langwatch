@@ -2,6 +2,7 @@ import { Link } from "@chakra-ui/next-js";
 import {
   Box,
   Button,
+  DrawerCloseButton,
   Heading,
   HStack,
   Spacer,
@@ -35,12 +36,15 @@ import { useDrawer } from "../CurrentDrawer";
 import { ShareButton } from "./ShareButton";
 import { SpanTree } from "./SpanTree";
 import { TraceSummary } from "./Summary";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { evaluationPassed } from "../checks/EvaluationStatus";
 import { Conversation } from "../../pages/[project]/messages/[trace]/index";
+import { Maximize2 } from "react-feather";
+import { Minimize2 } from "react-feather";
 import { useRouter } from "next/router";
+import qs from "qs";
 
 interface TraceEval {
   project?: Project;
@@ -50,15 +54,16 @@ interface TraceEval {
 
 export function TraceDetails(props: {
   traceId: string;
-  annotationTab?: boolean;
+  selectedTab?: string;
   publicShare?: PublicShare;
+  traceView?: "span" | "full";
+  onToggleView?: () => void;
 }) {
   const { project, hasTeamPermission } = useOrganizationTeamProject();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const router = useRouter();
 
-  const canViewMessages =
-    router.query.view == "table" || router.query["drawer.annotationTab"];
+  const canViewMessages = router.query.view == "table";
 
   const { openDrawer } = useDrawer();
 
@@ -103,8 +108,55 @@ export function TraceDetails(props: {
 
   const anyGuardrails = !!evaluations.data?.some((x) => x.is_guardrail);
 
-  const annotationTabIndex =
-    props.annotationTab && anyGuardrails ? 4 : props.annotationTab ? 3 : 0;
+  const indexes = Object.fromEntries(
+    [
+      ...(canViewMessages ? ["messages"] : []),
+      "traceDetails",
+      ...(anyGuardrails ? ["guardrails"] : []),
+      "evaluations",
+      "annotations",
+      "events",
+    ].map((tab, index) => [tab, index])
+  );
+  const tabByIndex = Object.keys(indexes);
+
+  const defaultTabIndex = props.selectedTab ? indexes[props.selectedTab] : 0;
+
+  const [tabIndex, setTabIndex_] = useState(defaultTabIndex);
+
+  const setTabIndex = useCallback(
+    (tabIndex: number) => {
+      setTabIndex_(tabIndex);
+      if (router.query["drawer.selectedTab"] == tabByIndex[tabIndex]) {
+        return;
+      }
+      void router.replace(
+        "?" +
+          qs.stringify(
+            {
+              ...Object.fromEntries(
+                Object.entries(router.query).filter(
+                  ([key]) => !key.startsWith("drawer.selectedTab")
+                )
+              ),
+              drawer: {
+                selectedTab: tabByIndex[tabIndex],
+              },
+            },
+            { allowDots: true }
+          )
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tabIndex]
+  );
+
+  useEffect(() => {
+    if (props.selectedTab) {
+      setTabIndex_((tabIndex) => indexes[props.selectedTab!] ?? tabIndex);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.selectedTab]);
 
   const { trace } = useTraceDetailsState(props.traceId);
 
@@ -115,130 +167,162 @@ export function TraceDetails(props: {
   }, [trace.data?.metadata.thread_id]);
 
   return (
-    <>
+    <VStack
+      align="start"
+      width="full"
+      height="full"
+      background="white"
+      spacing={0}
+    >
       <VStack
-        align="start"
         width="full"
-        height="full"
+        spacing={0}
+        position="sticky"
+        top={0}
+        zIndex={2}
         background="white"
-        gap={6}
       >
-        <VStack align="start" width="full">
-          <HStack width="full" marginTop={4} paddingX={6}>
-            <Text paddingTop={2} fontSize="2xl" fontWeight="600">
-              Message Details
-            </Text>
-            <Spacer />
-            <HStack>
-              {hasTeamPermission(TeamRoleGroup.ANNOTATIONS_MANAGE) && (
-                <Button
-                  colorScheme="black"
-                  variant="outline"
-                  onClick={() =>
-                    openDrawer("annotation", {
-                      traceId: props.traceId,
-                      action: "new",
-                    })
-                  }
-                >
-                  Annotate
-                </Button>
+        {props.onToggleView && (
+          <>
+            <HStack width="full" paddingTop={4} paddingLeft={6}>
+              {props.traceView === "span" ? (
+                <Maximize2 onClick={props.onToggleView} cursor={"pointer"} />
+              ) : (
+                <Minimize2 onClick={props.onToggleView} cursor={"pointer"} />
               )}
-              {hasTeamPermission(TeamRoleGroup.DATASETS_MANAGE) && (
-                <Button
-                  colorScheme="black"
-                  type="submit"
-                  variant="outline"
-                  minWidth="fit-content"
-                  onClick={() => {
-                    openDrawer("addDatasetRecord", {
-                      traceId: props.traceId,
-                    });
-                  }}
-                >
-                  Add to Dataset
-                </Button>
-              )}
-              {project && (
-                <ShareButton project={project} traceId={props.traceId} />
-              )}
+
+              <DrawerCloseButton zIndex={1} />
             </HStack>
+          </>
+        )}
+        <HStack width="full" paddingTop={4} paddingX={6} paddingBottom={6}>
+          <Text paddingTop={2} fontSize="2xl" fontWeight="600">
+            Message Details
+          </Text>
+          <Spacer />
+          <HStack>
+            {hasTeamPermission(TeamRoleGroup.ANNOTATIONS_MANAGE) && (
+              <Button
+                colorScheme="black"
+                variant="outline"
+                onClick={() =>
+                  openDrawer("annotation", {
+                    traceId: props.traceId,
+                    action: "new",
+                  })
+                }
+              >
+                Annotate
+              </Button>
+            )}
+            {hasTeamPermission(TeamRoleGroup.DATASETS_MANAGE) && (
+              <Button
+                colorScheme="black"
+                type="submit"
+                variant="outline"
+                minWidth="fit-content"
+                onClick={() => {
+                  openDrawer("addDatasetRecord", {
+                    traceId: props.traceId,
+                  });
+                }}
+              >
+                Add to Dataset
+              </Button>
+            )}
+            {project && (
+              <ShareButton project={project} traceId={props.traceId} />
+            )}
           </HStack>
-        </VStack>
-        <VStack align="start" width="full">
-          <Tabs width="full" defaultIndex={annotationTabIndex}>
-            <TabList paddingX={6}>
-              {canViewMessages && <Tab>Messages</Tab>}
-              <Tab>Trace Details</Tab>
-              {anyGuardrails && (
-                <Tab>
-                  Guardrails{" "}
-                  <Blocked
-                    project={project}
-                    traceId={props.traceId}
-                    evaluations={evaluations.data}
-                  />
-                </Tab>
-              )}
+        </HStack>
+        <Tabs width="full" index={tabIndex} onChange={setTabIndex}>
+          <TabList paddingX={6}>
+            {canViewMessages && <Tab>Messages</Tab>}
+            <Tab>Trace Details</Tab>
+            {anyGuardrails && (
               <Tab>
-                Evaluations{" "}
-                <EvaluationsCount
+                Guardrails{" "}
+                <Blocked
                   project={project}
                   traceId={props.traceId}
                   evaluations={evaluations.data}
                 />
               </Tab>
-              <Tab>
-                Annotations{" "}
-                {annotationsQuery.data && (
-                  <AnnotationMsgs annotations={annotationsQuery.data} />
-                )}
-              </Tab>
-              <Tab>
-                Events{" "}
-                {trace.data?.events && trace.data.events.length > 0 && (
-                  <Text
-                    marginLeft={3}
-                    borderRadius={"md"}
-                    paddingX={2}
-                    backgroundColor={"green.500"}
-                    color={"white"}
-                    fontSize={"sm"}
-                  >
-                    {trace.data.events.length}
-                  </Text>
-                )}
-              </Tab>
-            </TabList>
-
-            <TabPanels>
-              {canViewMessages && (
-                <TabPanel paddingX={0} padding={0}>
-                  <Conversation threadId={threadId} traceId={props.traceId} />
-                </TabPanel>
+            )}
+            <Tab>
+              Evaluations{" "}
+              <EvaluationsCount
+                project={project}
+                traceId={props.traceId}
+                evaluations={evaluations.data}
+              />
+            </Tab>
+            <Tab>
+              Annotations{" "}
+              {annotationsQuery.data && (
+                <AnnotationMsgs annotations={annotationsQuery.data} />
               )}
-              <TabPanel paddingX={6} paddingY={0}>
+            </Tab>
+            <Tab>
+              Events{" "}
+              {trace.data?.events && trace.data.events.length > 0 && (
+                <Text
+                  marginLeft={3}
+                  borderRadius={"md"}
+                  paddingX={2}
+                  backgroundColor={"green.500"}
+                  color={"white"}
+                  fontSize={"sm"}
+                >
+                  {trace.data.events.length}
+                </Text>
+              )}
+            </Tab>
+          </TabList>
+        </Tabs>
+      </VStack>
+
+      <Tabs width="full" index={tabIndex} onChange={setTabIndex}>
+        <TabPanels>
+          {canViewMessages && (
+            <TabPanel paddingX={0} padding={0} paddingTop={2}>
+              {tabIndex === indexes.messages && (
+                <Conversation threadId={threadId} traceId={props.traceId} />
+              )}
+            </TabPanel>
+          )}
+          <TabPanel paddingX={6} paddingY={0}>
+            {tabIndex === indexes.traceDetails && (
+              <>
                 <TraceSummary traceId={props.traceId} />
                 <SpanTree traceId={props.traceId} />
-              </TabPanel>
-              {anyGuardrails && (
-                <TabPanel paddingX={6} paddingY={4}>
-                  <Guardrails
-                    project={project}
-                    traceId={props.traceId ?? ""}
-                    evaluations={evaluations.data}
-                  />
-                </TabPanel>
-              )}
-              <TabPanel paddingX={6} paddingY={4}>
-                <Evaluations
+              </>
+            )}
+          </TabPanel>
+          {anyGuardrails && (
+            <TabPanel paddingX={6} paddingY={4}>
+              {tabIndex === indexes.guardrails && (
+                <Guardrails
                   project={project}
                   traceId={props.traceId ?? ""}
                   evaluations={evaluations.data}
-                  anyGuardrails={anyGuardrails}
                 />
-              </TabPanel>
-              <TabPanel paddingX={6} paddingY={4}>
+              )}
+            </TabPanel>
+          )}
+          <TabPanel paddingX={6} paddingY={4}>
+            {tabIndex === indexes.evaluations && (
+              <Evaluations
+                project={project}
+                traceId={props.traceId ?? ""}
+                evaluations={evaluations.data}
+                anyGuardrails={anyGuardrails}
+              />
+            )}
+          </TabPanel>
+          <TabPanel paddingX={6} paddingY={4}>
+            {tabIndex === indexes.annotations && (
+              <>
                 {annotationsQuery.isLoading ? (
                   <Text>Loading...</Text>
                 ) : annotationsQuery.data &&
@@ -257,15 +341,15 @@ export function TraceDetails(props: {
                     .
                   </Text>
                 )}
-              </TabPanel>
-              <TabPanel paddingX={6} paddingY={4}>
-                <Events traceId={props.traceId} />
-              </TabPanel>
-            </TabPanels>
-          </Tabs>
-        </VStack>
-      </VStack>
-    </>
+              </>
+            )}
+          </TabPanel>
+          <TabPanel paddingX={6} paddingY={4}>
+            {tabIndex === indexes.events && <Events traceId={props.traceId} />}
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
+    </VStack>
   );
 }
 

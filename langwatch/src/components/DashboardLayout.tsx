@@ -41,7 +41,6 @@ import {
   ChevronRight,
   Edit,
   Lock,
-  MessageCircle,
   MessageSquare,
   Play,
   Plus,
@@ -655,31 +654,35 @@ export const DashboardLayout = ({
           zIndex={3}
           width="full"
           padding={4}
-          gap={6}
           background="white"
           borderBottomWidth="1px"
           borderBottomColor="gray.300"
+          justifyContent="space-between"
         >
-          {organizations && project && (
-            <ProjectSelector organizations={organizations} project={project} />
-          )}
-          {!project && (
-            <Text paddingLeft={2}>
-              <Link href="/auth/signin" color="orange.600" fontWeight="600">
-                Sign in
-              </Link>{" "}
-              to LangWatch to monitor your projects
-            </Text>
-          )}
-          <Hide below="lg">
-            <Breadcrumbs currentRoute={currentRoute} />
-          </Hide>
-          <Spacer />
+          <HStack gap={6} flex={1.5}>
+            {organizations && project && (
+              <ProjectSelector
+                organizations={organizations}
+                project={project}
+              />
+            )}
+            {!project && (
+              <Text paddingLeft={2}>
+                <Link href="/auth/signin" color="orange.600" fontWeight="600">
+                  Sign in
+                </Link>{" "}
+                to LangWatch to monitor your projects
+              </Text>
+            )}
+            <Hide below="lg">
+              <Breadcrumbs currentRoute={currentRoute} />
+            </Hide>
+          </HStack>
           {project && (
             <form
               action={`${project.slug}/messages`}
               method="GET"
-              style={{ width: "100%", maxWidth: "600px" }}
+              style={{ flex: 2, maxWidth: "600px" }}
               onSubmit={(e) => {
                 e.preventDefault();
                 if (
@@ -714,69 +717,75 @@ export const DashboardLayout = ({
               </InputGroup>
             </form>
           )}
-          <Spacer />
-          <HStack spacing={4}>
-            {integrationsLeft ? (
-              <Popover placement="bottom-end">
-                <PopoverTrigger>
-                  <Button position="relative" variant="ghost">
-                    <ChecklistIcon />
-                    <Badge
-                      position="absolute"
-                      bottom="2px"
-                      right="2px"
-                      size="sm"
-                      color="white"
-                      backgroundColor="green.500"
-                      borderRadius="full"
-                    >
-                      {integrationsLeft}
-                    </Badge>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent>
-                  <PopoverBody padding={4}>
-                    <IntegrationChecks />
-                  </PopoverBody>
-                </PopoverContent>
-              </Popover>
-            ) : (
-              <Box width={["auto", "auto", "auto", "55px"]} />
-            )}
-            <Menu>
-              <MenuButton
-                as={Button}
-                variant="unstyled"
-                {...(publicPage ? { onClick: () => void signIn("auth0") } : {})}
-              >
-                <Avatar
-                  name={user?.name ?? undefined}
-                  backgroundColor={"orange.400"}
-                  color="white"
-                  size="sm"
-                />
-              </MenuButton>
-              {session && (
-                <Portal>
-                  <MenuList zIndex="popover">
-                    {dependencies.ExtraMenuItems && (
-                      <dependencies.ExtraMenuItems />
-                    )}
-                    <MenuGroup
-                      title={`${session.user.name} (${session.user.email})`}
-                    >
-                      <MenuItem
-                        onClick={() =>
-                          void signOut({ callbackUrl: window.location.origin })
-                        }
+          <HStack gap={6} flex={1}>
+            <Spacer />
+            <HStack spacing={4}>
+              {integrationsLeft ? (
+                <Popover placement="bottom-end">
+                  <PopoverTrigger>
+                    <Button position="relative" variant="ghost">
+                      <ChecklistIcon />
+                      <Badge
+                        position="absolute"
+                        bottom="2px"
+                        right="2px"
+                        size="sm"
+                        color="white"
+                        backgroundColor="green.500"
+                        borderRadius="full"
                       >
-                        Logout
-                      </MenuItem>
-                    </MenuGroup>
-                  </MenuList>
-                </Portal>
+                        {integrationsLeft}
+                      </Badge>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent>
+                    <PopoverBody padding={4}>
+                      <IntegrationChecks />
+                    </PopoverBody>
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <Box width={["auto", "auto", "auto", "55px"]} />
               )}
-            </Menu>
+              <Menu>
+                <MenuButton
+                  as={Button}
+                  variant="unstyled"
+                  {...(publicPage
+                    ? { onClick: () => void signIn("auth0") }
+                    : {})}
+                >
+                  <Avatar
+                    name={user?.name ?? undefined}
+                    backgroundColor={"orange.400"}
+                    color="white"
+                    size="sm"
+                  />
+                </MenuButton>
+                {session && (
+                  <Portal>
+                    <MenuList zIndex="popover">
+                      {dependencies.ExtraMenuItems && (
+                        <dependencies.ExtraMenuItems />
+                      )}
+                      <MenuGroup
+                        title={`${session.user.name} (${session.user.email})`}
+                      >
+                        <MenuItem
+                          onClick={() =>
+                            void signOut({
+                              callbackUrl: window.location.origin,
+                            })
+                          }
+                        >
+                          Logout
+                        </MenuItem>
+                      </MenuGroup>
+                    </MenuList>
+                  </Portal>
+                )}
+              </Menu>
+            </HStack>
           </HStack>
         </HStack>
         {publicEnv.data?.DEMO_PROJECT_SLUG &&
