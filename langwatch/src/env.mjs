@@ -32,7 +32,7 @@ export const env = createEnv({
     API_TOKEN_JWT_SECRET: optionalIfBuildTime(z.string().min(1)),
     ELASTICSEARCH_NODE_URL: optionalIfBuildTime(z.string().min(1)),
     ELASTICSEARCH_API_KEY: z.string().optional(),
-    REDIS_URL: optionalIfBuildTime(z.string().min(1)),
+    REDIS_URL: z.string().optional(),
     GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
     AZURE_OPENAI_ENDPOINT: z.string().optional(),
     AZURE_OPENAI_KEY: z.string().optional(),

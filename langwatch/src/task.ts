@@ -40,8 +40,10 @@ const runAsync = async () => {
     debug(`SCRIPT RUNNER: failed to execute ${taskName}`);
     throw e;
   } finally {
-    redis.disconnect();
+    redis?.disconnect();
   }
+
+  process.exit(0);
 };
 
 (async () => {

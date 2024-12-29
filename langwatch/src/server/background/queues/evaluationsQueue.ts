@@ -1,45 +1,48 @@
-import { Queue } from "bullmq";
-import type { TraceCheckJob } from "~/server/background/types";
+import type { EvaluationJob } from "~/server/background/types";
 import { traceCheckIndexId } from "~/server/elasticsearch";
 import { captureError } from "../../../utils/captureError";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
 import { getDebugger } from "../../../utils/logger";
+import { QueueWithFallback } from "./queueWithFallback";
+import { runEvaluationJob } from "../workers/evaluationsWorker";
 
-export const TRACE_CHECKS_QUEUE_NAME = "evaluations";
+export const EVALUATIONS_QUEUE_NAME = "evaluations";
 
 const debug = getDebugger("langwatch:evaluations:queue");
 
-export const traceChecksQueue =
-  connection &&
-  new Queue<TraceCheckJob, any, string>(TRACE_CHECKS_QUEUE_NAME, {
-    connection,
-    defaultJobOptions: {
-      backoff: {
-        type: "exponential",
-        delay: 1000,
-      },
-      attempts: 3,
-      removeOnComplete: {
-        age: 60 * 60, // Remove in 1 hour to prevent accidental reruns
-      },
-      removeOnFail: {
-        age: 60 * 60 * 24 * 3, // 3 days
-      },
+export const evaluationsQueue = new QueueWithFallback<
+  EvaluationJob,
+  any,
+  string
+>(EVALUATIONS_QUEUE_NAME, runEvaluationJob, {
+  connection,
+  defaultJobOptions: {
+    backoff: {
+      type: "exponential",
+      delay: 1000,
     },
-  });
+    attempts: 3,
+    removeOnComplete: {
+      age: 60 * 60, // Remove in 1 hour to prevent accidental reruns
+    },
+    removeOnFail: {
+      age: 60 * 60 * 24 * 3, // 3 days
+    },
+  },
+});
 
-export const scheduleTraceCheck = async ({
+export const scheduleEvaluation = async ({
   check,
   trace,
   delay,
 }: {
-  check: TraceCheckJob["check"];
-  trace: TraceCheckJob["trace"];
+  check: EvaluationJob["check"];
+  trace: EvaluationJob["trace"];
   delay?: number;
 }) => {
-  await updateCheckStatusInES({
+  await updateEvaluationStatusInES({
     check,
     trace: trace,
     status: "scheduled",
@@ -50,7 +53,7 @@ export const scheduleTraceCheck = async ({
     checkId: check.evaluator_id,
     projectId: trace.project_id,
   });
-  const currentJob = await traceChecksQueue?.getJob(jobId);
+  const currentJob = await evaluationsQueue.getJob(jobId);
   if (currentJob) {
     const state = await currentJob.getState();
     if (state == "failed" || state == "completed") {
@@ -63,7 +66,7 @@ export const scheduleTraceCheck = async ({
     debug(
       `scheduling ${check.type} (checkId: ${check.evaluator_id}) for trace ${trace.trace_id}`
     );
-    await traceChecksQueue?.add(
+    await evaluationsQueue.add(
       check.type,
       {
         // Recreating the check object to avoid passing the whole check object and making the queue heavy, we pass only the keys we need
@@ -92,7 +95,7 @@ export const scheduleTraceCheck = async ({
   }
 };
 
-export const updateCheckStatusInES = async ({
+export const updateEvaluationStatusInES = async ({
   check,
   trace,
   status,
@@ -104,8 +107,8 @@ export const updateCheckStatusInES = async ({
   retries,
   is_guardrail,
 }: {
-  check: TraceCheckJob["check"];
-  trace: TraceCheckJob["trace"];
+  check: EvaluationJob["check"];
+  trace: EvaluationJob["trace"];
   status: ElasticSearchEvaluation["status"];
   error?: any;
   score?: number;

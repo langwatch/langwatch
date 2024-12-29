@@ -12,12 +12,12 @@ import {
 import { TRACE_CHECKS_INDEX, esClient } from "../../elasticsearch";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
 import {
-  scheduleTraceCheck,
-  updateCheckStatusInES,
-} from "../queues/traceChecksQueue";
+  scheduleEvaluation,
+  updateEvaluationStatusInES,
+} from "../queues/evaluationsQueue";
 import { traceCheckIndexId } from "~/server/elasticsearch";
 import * as traceChecksWorker from "../worker";
-import type { TraceCheckJob } from "~/server/background/types";
+import type { EvaluationJob } from "~/server/background/types";
 import type {
   EvaluatorTypes,
   SingleEvaluationResult,
@@ -47,12 +47,12 @@ const getTraceCheck = async (
 };
 
 describe("Check Queue Integration Tests", () => {
-  let worker: Worker<TraceCheckJob, any, EvaluatorTypes> | undefined;
+  let worker: Worker<EvaluationJob, any, EvaluatorTypes> | undefined;
   const trace_id = `test-trace-id-${nanoid()}`;
   const trace_id_success = `test-trace-id-success-${nanoid()}`;
   const trace_id_failed = `test-trace-id-failure-${nanoid()}`;
   const trace_id_error = `test-trace-id-error-${nanoid()}`;
-  const check: TraceCheckJob["check"] = {
+  const check: EvaluationJob["check"] = {
     id: "check_123",
     type: "langevals/basic",
     name: "My Custom Check",
@@ -101,7 +101,7 @@ describe("Check Queue Integration Tests", () => {
       labels: ["test_label_123"],
     };
 
-    await scheduleTraceCheck({ check, trace, delay: 0 });
+    await scheduleEvaluation({ check, trace, delay: 0 });
 
     // Wait for a bit to allow the job to be scheduled
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -145,7 +145,7 @@ describe("Check Queue Integration Tests", () => {
       project_id: "test-project-id",
     };
 
-    await scheduleTraceCheck({ check, trace, delay: 0 });
+    await scheduleEvaluation({ check, trace, delay: 0 });
 
     // Wait for the job to be completed
     await new Promise<void>(
@@ -182,7 +182,7 @@ describe("Check Queue Integration Tests", () => {
       project_id: "test-project-id",
     };
 
-    await scheduleTraceCheck({ check, trace, delay: 0 });
+    await scheduleEvaluation({ check, trace, delay: 0 });
 
     // Wait for the job to be completed
     await new Promise<void>(
@@ -215,7 +215,7 @@ describe("Check Queue Integration Tests", () => {
       project_id: "test-project-id",
     };
 
-    await scheduleTraceCheck({ check, trace });
+    await scheduleEvaluation({ check, trace });
 
     // Wait for the worker to attempt to process the job
     await new Promise((resolve) => worker?.on("failed", resolve));
@@ -245,7 +245,7 @@ describe("Check Queue Integration Tests", () => {
       project_id: "test-project-id",
     };
 
-    await scheduleTraceCheck({ check, trace, delay: 0 });
+    await scheduleEvaluation({ check, trace, delay: 0 });
 
     // Wait for the job to be completed
     await new Promise<void>(
@@ -268,7 +268,7 @@ describe("Check Queue Integration Tests", () => {
     expect(mocks.runEvaluation).toHaveBeenCalled();
 
     // Process the job again
-    await scheduleTraceCheck({ check, trace, delay: 0 });
+    await scheduleEvaluation({ check, trace, delay: 0 });
 
     // Query ES to verify the status is "scheduled"
     response = await esClient.search<ElasticSearchEvaluation>({
@@ -305,7 +305,7 @@ describe("Check Queue Integration Tests", () => {
 describe("updateCheckStatusInES", () => {
   const traceId = `test-trace-id-${nanoid()}`;
   const projectId = "test-project-id";
-  const check: TraceCheckJob["check"] = {
+  const check: EvaluationJob["check"] = {
     id: "check_123",
     type: "langevals/basic",
     name: "My Custom Check",
@@ -326,7 +326,7 @@ describe("updateCheckStatusInES", () => {
   });
 
   it("should insert a new trace check if none exists", async () => {
-    await updateCheckStatusInES({
+    await updateEvaluationStatusInES({
       check,
       trace: {
         trace_id: traceId,
@@ -351,7 +351,7 @@ describe("updateCheckStatusInES", () => {
 
   it("should update an existing trace check", async () => {
     // Insert the initial document
-    await updateCheckStatusInES({
+    await updateEvaluationStatusInES({
       check,
       trace: {
         trace_id: traceId,
@@ -361,7 +361,7 @@ describe("updateCheckStatusInES", () => {
     });
 
     // Update the document
-    await updateCheckStatusInES({
+    await updateEvaluationStatusInES({
       check,
       trace: {
         trace_id: traceId,

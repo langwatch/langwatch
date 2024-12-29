@@ -2,7 +2,7 @@ import { CostReferenceType, CostType } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { Worker, type Job } from "bullmq";
 import { nanoid } from "nanoid";
-import type { Mappings, TraceCheckJob } from "~/server/background/types";
+import type { Mappings, EvaluationJob } from "~/server/background/types";
 import { env } from "../../../env.mjs";
 import {
   AVAILABLE_EVALUATORS,
@@ -29,9 +29,9 @@ import { prisma } from "../../db";
 import { connection } from "../../redis";
 import { getRAGInfo } from "../../tracer/utils";
 import {
-  TRACE_CHECKS_QUEUE_NAME,
-  updateCheckStatusInES,
-} from "../queues/traceChecksQueue";
+  EVALUATIONS_QUEUE_NAME,
+  updateEvaluationStatusInES,
+} from "../queues/evaluationsQueue";
 import type { Conversation } from "../../../server/evaluations/types";
 import {
   evaluationDurationHistogram,
@@ -43,11 +43,11 @@ import type { Trace } from "~/server/tracer/types";
 
 import { executeWorkflowEvaluation } from "../../optimization/executeEvalWorkflow";
 
-const debug = getDebugger("langwatch:workers:traceChecksWorker");
+const debug = getDebugger("langwatch:workers:evaluationsWorker");
 
-export const runEvaluationJob = async (
-  job: Job<TraceCheckJob, any, EvaluatorTypes>
-): Promise<SingleEvaluationResult> => {
+export async function runEvaluationJob(
+  job: Job<EvaluationJob, any, string>
+): Promise<SingleEvaluationResult> {
   const check = await prisma.check.findUnique({
     where: {
       id: job.data.check.evaluator_id,
@@ -65,7 +65,7 @@ export const runEvaluationJob = async (
     settings: check.parameters,
     mappings: check.mappings as Record<Mappings, string>,
   });
-};
+}
 
 export const runEvaluationForTrace = async ({
   projectId,
@@ -383,7 +383,7 @@ export const runEvaluation = async ({
 
 export const startEvaluationsWorker = (
   processFn: (
-    job: Job<TraceCheckJob, any, EvaluatorTypes>
+    job: Job<EvaluationJob, any, EvaluatorTypes>
   ) => Promise<SingleEvaluationResult>
 ) => {
   if (!connection) {
@@ -391,8 +391,8 @@ export const startEvaluationsWorker = (
     return;
   }
 
-  const traceChecksWorker = new Worker<TraceCheckJob, any, EvaluatorTypes>(
-    TRACE_CHECKS_QUEUE_NAME,
+  const traceChecksWorker = new Worker<EvaluationJob, any, EvaluatorTypes>(
+    EVALUATIONS_QUEUE_NAME,
     async (job) => {
       if (
         env.NODE_ENV !== "test" &&
@@ -442,7 +442,7 @@ export const startEvaluationsWorker = (
           });
         }
 
-        await updateCheckStatusInES({
+        await updateEvaluationStatusInES({
           check: job.data.check,
           trace: job.data.trace,
           status: result.status,
@@ -469,7 +469,7 @@ export const startEvaluationsWorker = (
         getJobProcessingDurationHistogram("evaluation").observe(duration);
         getJobProcessingCounter("evaluation", "completed").inc();
       } catch (error) {
-        await updateCheckStatusInES({
+        await updateEvaluationStatusInES({
           check: job.data.check,
           trace: job.data.trace,
           status: "error",

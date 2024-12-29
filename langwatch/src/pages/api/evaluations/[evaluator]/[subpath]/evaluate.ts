@@ -12,7 +12,7 @@ import {
 import * as Sentry from "@sentry/nextjs";
 import { nanoid } from "nanoid";
 import { type z } from "zod";
-import { updateCheckStatusInES } from "../../../../../server/background/queues/traceChecksQueue";
+import { updateEvaluationStatusInES } from "../../../../../server/background/queues/evaluationsQueue";
 import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluations";
 import { extractChunkTextualContent } from "../../../../../server/background/workers/collector/rag";
 import { runEvaluation } from "../../../../../server/background/workers/evaluationsWorker";
@@ -274,7 +274,7 @@ export async function handleEvaluatorCall(
         };
 
   if (params.trace_id) {
-    await updateCheckStatusInES({
+    await updateEvaluationStatusInES({
       check: {
         evaluation_id:
           storedEvaluator?.id ?? params.evaluation_id ?? `eval_${nanoid()}`,

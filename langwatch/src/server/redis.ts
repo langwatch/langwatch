@@ -6,12 +6,16 @@ import { PHASE_PRODUCTION_BUILD } from "next/constants";
 const debug = getDebugger("langwatch:redis");
 
 export const connection =
-  process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD || process.env.BUILD_TIME
+  process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD ||
+  !!process.env.BUILD_TIME ||
+  !env.REDIS_URL
     ? undefined
-    : new IORedis(env.REDIS_URL, {
+    : new IORedis(env.REDIS_URL ?? "", {
         maxRetriesPerRequest: null,
         enableOfflineQueue: false,
-        tls: env.REDIS_URL.includes("tls.rejectUnauthorized=false") ? { rejectUnauthorized: false } : env.REDIS_URL.includes("rediss://"),
+        tls: env.REDIS_URL?.includes("tls.rejectUnauthorized=false")
+          ? { rejectUnauthorized: false }
+          : (env.REDIS_URL?.includes("rediss://") as any),
       });
 
 connection?.on("connect", () => {

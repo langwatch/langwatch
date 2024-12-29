@@ -1,7 +1,6 @@
 import type { EvaluatorTypes } from "../../server/evaluations/evaluators.generated";
 import type {
   CustomMetadata,
-  ElasticSearchSpan,
   ElasticSearchTrace,
   ReservedTraceMetadata,
   RESTEvaluation,
@@ -15,7 +14,7 @@ export type Mappings =
   | "trace.first_rag_context"
   | "metadata.expected_output";
 
-export type TraceCheckJob = {
+export type EvaluationJob = {
   check: {
     evaluation_id: string;
     evaluator_id: string;

@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
-import { Worker } from "bullmq";
+import { type Job, Worker } from "bullmq";
 import type { TrackEventJob } from "~/server/background/types";
 import {
   type ElasticSearchEvent,
@@ -17,55 +17,48 @@ import {
 
 const debug = getDebugger("langwatch:workers:trackEventWorker");
 
-export const startTrackEventsWorker = () => {
-  if (!connection) {
-    debug("No redis connection, skipping track events worker");
-    return;
-  }
-
-  const trackEventsWorker = new Worker<TrackEventJob, void, string>(
-    TRACK_EVENTS_QUEUE_NAME,
-    async (job) => {
-      debug(`Processing job ${job.id} with data:`, job.data);
-      getJobProcessingCounter("track_event", "processing").inc();
-      const start = Date.now();
-      let event: ElasticSearchEvent = {
-        ...job.data.event,
-        project_id: job.data.project_id,
-        metrics: Object.entries(job.data.event.metrics).map(([key, value]) => ({
+export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
+  debug(`Processing job ${job.id} with data:`, job.data);
+  getJobProcessingCounter("track_event", "processing").inc();
+  const start = Date.now();
+  let event: ElasticSearchEvent = {
+    ...job.data.event,
+    project_id: job.data.project_id,
+    metrics: Object.entries(job.data.event.metrics).map(([key, value]) => ({
+      key,
+      value,
+    })),
+    event_details: job.data.event.event_details
+      ? Object.entries(job.data.event.event_details).map(([key, value]) => ({
           key,
           value,
-        })),
-        event_details: job.data.event.event_details
-          ? Object.entries(job.data.event.event_details).map(
-              ([key, value]) => ({ key, value })
-            )
-          : [],
-        timestamps: {
-          started_at: job.data.event.timestamp,
-          inserted_at: Date.now(),
-          updated_at: Date.now(),
-        },
-      };
-      // use zod to remove any other keys that may be present but not allowed
-      event = elasticSearchEventSchema.parse(event);
+        }))
+      : [],
+    timestamps: {
+      started_at: job.data.event.timestamp,
+      inserted_at: Date.now(),
+      updated_at: Date.now(),
+    },
+  };
+  // use zod to remove any other keys that may be present but not allowed
+  event = elasticSearchEventSchema.parse(event);
 
-      const trace: Partial<ElasticSearchTrace> = {
-        trace_id: event.trace_id,
-        project_id: event.project_id,
-        events: [event],
-      };
+  const trace: Partial<ElasticSearchTrace> = {
+    trace_id: event.trace_id,
+    project_id: event.project_id,
+    events: [event],
+  };
 
-      await esClient.update({
-        index: TRACE_INDEX.alias,
-        id: traceIndexId({
-          traceId: event.trace_id,
-          projectId: event.project_id,
-        }),
-        retry_on_conflict: 10,
-        body: {
-          script: {
-            source: `
+  await esClient.update({
+    index: TRACE_INDEX.alias,
+    id: traceIndexId({
+      traceId: event.trace_id,
+      projectId: event.project_id,
+    }),
+    retry_on_conflict: 10,
+    body: {
+      script: {
+        source: `
               if (ctx._source.events == null) {
                 ctx._source.events = [];
               }
@@ -86,28 +79,38 @@ export const startTrackEventsWorker = () => {
                 ctx._source.events.add(newEvent);
               }
             `,
-            lang: "painless",
-            params: {
-              newEvent: event,
-            },
-          },
-          upsert: {
-            trace_id: trace.trace_id,
-            project_id: trace.project_id,
-            timestamps: {
-              inserted_at: Date.now(),
-              started_at: Date.now(),
-              updated_at: Date.now(),
-            },
-            events: [event],
-          },
+        lang: "painless",
+        params: {
+          newEvent: event,
         },
-        refresh: true,
-      });
-      getJobProcessingCounter("track_event", "completed").inc();
-      const duration = Date.now() - start;
-      getJobProcessingDurationHistogram("track_event").observe(duration);
+      },
+      upsert: {
+        trace_id: trace.trace_id,
+        project_id: trace.project_id,
+        timestamps: {
+          inserted_at: Date.now(),
+          started_at: Date.now(),
+          updated_at: Date.now(),
+        },
+        events: [event],
+      },
     },
+    refresh: true,
+  });
+  getJobProcessingCounter("track_event", "completed").inc();
+  const duration = Date.now() - start;
+  getJobProcessingDurationHistogram("track_event").observe(duration);
+}
+
+export const startTrackEventsWorker = () => {
+  if (!connection) {
+    debug("No redis connection, skipping track events worker");
+    return;
+  }
+
+  const trackEventsWorker = new Worker<TrackEventJob, void, string>(
+    TRACK_EVENTS_QUEUE_NAME,
+    runTrackEventJob,
     {
       connection,
       concurrency: 3,

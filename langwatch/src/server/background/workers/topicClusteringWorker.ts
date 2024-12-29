@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
-import { Worker } from "bullmq";
+import { type Job, Worker } from "bullmq";
 import type { TopicClusteringJob } from "~/server/background/types";
 import { getDebugger } from "../../../utils/logger";
 import { connection } from "../../redis";
@@ -12,6 +12,19 @@ import {
 
 const debug = getDebugger("langwatch:workers:topicClusteringWorker");
 
+export async function runTopicClusteringJob(
+  job: Job<TopicClusteringJob, void, string>
+) {
+  getJobProcessingCounter("topic_clustering", "processing").inc();
+  const start = Date.now();
+  debug(`Processing job ${job.id} with data:`, job.data);
+
+  await clusterTopicsForProject(job.data.project_id, job.data.search_after);
+  getJobProcessingCounter("topic_clustering", "completed").inc();
+  const duration = Date.now() - start;
+  getJobProcessingDurationHistogram("topic_clustering").observe(duration);
+}
+
 export const startTopicClusteringWorker = () => {
   if (!connection) {
     debug("No redis connection, skipping collector worker");
@@ -20,16 +33,7 @@ export const startTopicClusteringWorker = () => {
 
   const topicClusteringWorker = new Worker<TopicClusteringJob, void, string>(
     TOPIC_CLUSTERING_QUEUE_NAME,
-    async (job) => {
-      getJobProcessingCounter("topic_clustering", "processing").inc();
-      const start = Date.now();
-      debug(`Processing job ${job.id} with data:`, job.data);
-
-      await clusterTopicsForProject(job.data.project_id, job.data.search_after);
-      getJobProcessingCounter("topic_clustering", "completed").inc();
-      const duration = Date.now() - start;
-      getJobProcessingDurationHistogram("topic_clustering").observe(duration);
-    },
+    runTopicClusteringJob,
     {
       connection,
       concurrency: 3,

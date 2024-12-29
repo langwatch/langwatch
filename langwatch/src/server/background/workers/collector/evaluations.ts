@@ -12,8 +12,8 @@ import { prisma } from "../../../db";
 import type { ElasticSearchEvaluation } from "../../../tracer/types";
 import { type ElasticSearchTrace, type Span } from "../../../tracer/types";
 import { elasticSearchEvaluationSchema } from "../../../tracer/types.generated";
-import { scheduleTraceCheck } from "../../queues/traceChecksQueue";
-import type { CollectorJob, TraceCheckJob } from "../../types";
+import { scheduleEvaluation } from "../../queues/evaluationsQueue";
+import type { CollectorJob, EvaluationJob } from "../../types";
 
 export const evaluationNameAutoslug = (name: string) => {
   const autoslug = slugify(name || "unnamed", {
@@ -66,7 +66,7 @@ export const mapEvaluations = (
 };
 
 export const scheduleEvaluations = async (
-  trace: TraceCheckJob["trace"] & PreconditionTrace,
+  trace: EvaluationJob["trace"] & PreconditionTrace,
   spans: Span[]
 ) => {
   const isOutputEmpty = !trace.output?.value;
@@ -99,7 +99,7 @@ export const scheduleEvaluations = async (
       );
       if (preconditionsMet) {
         traceChecksSchedulings.push(
-          scheduleTraceCheck({
+          scheduleEvaluation({
             check: {
               evaluation_id: check.id, // Keep the same as evaluator id so multiple jobs for this trace will update the same evaluation state
               evaluator_id: check.id,

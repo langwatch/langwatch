@@ -2,7 +2,7 @@ import { type Job, type Worker } from "bullmq";
 import type {
   CollectorJob,
   TopicClusteringJob,
-  TraceCheckJob,
+  EvaluationJob,
   TrackEventJob,
 } from "~/server/background/types";
 import type {
@@ -39,7 +39,7 @@ if (process.env.SENTRY_DSN) {
     beforeSend(event, hint) {
       if (
         hint.originalException instanceof WorkersRestart ||
-        `${hint.originalException}`.includes("Max runtime reached")
+        `${hint.originalException as any}`.includes("Max runtime reached")
       ) {
         return null;
       }
@@ -52,7 +52,7 @@ const debug = getDebugger("langwatch:workers");
 
 type Workers = {
   collectorWorker: Worker<CollectorJob, void, string> | undefined;
-  evaluationsWorker: Worker<TraceCheckJob, any, EvaluatorTypes> | undefined;
+  evaluationsWorker: Worker<EvaluationJob, any, EvaluatorTypes> | undefined;
   topicClusteringWorker: Worker<TopicClusteringJob, void, string> | undefined;
   trackEventsWorker: Worker<TrackEventJob, void, string> | undefined;
 };
@@ -60,7 +60,7 @@ type Workers = {
 export const start = (
   runEvaluationMock:
     | ((
-        job: Job<TraceCheckJob, any, EvaluatorTypes>
+        job: Job<EvaluationJob, any, EvaluatorTypes>
       ) => Promise<SingleEvaluationResult>)
     | undefined = undefined,
   maxRuntimeMs: number | undefined = undefined

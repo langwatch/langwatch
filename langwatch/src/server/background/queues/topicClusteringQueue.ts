@@ -1,30 +1,32 @@
-import { Queue } from "bullmq";
 import { connection } from "../../redis";
 import type { TopicClusteringJob } from "~/server/background/types";
 import crypto from "crypto";
 import { prisma } from "../../db";
+import { QueueWithFallback } from "./queueWithFallback";
+import { runTopicClusteringJob } from "../workers/topicClusteringWorker";
 
 export const TOPIC_CLUSTERING_QUEUE_NAME = "topic_clustering";
 
-const topicClusteringQueue = connection && new Queue<TopicClusteringJob, void, string>(
-  TOPIC_CLUSTERING_QUEUE_NAME,
-  {
-    connection,
-    defaultJobOptions: {
-      backoff: {
-        type: "exponential",
-        delay: 5000,
-      },
-      attempts: 3,
-      removeOnComplete: {
-        age: 0, // immediately remove completed jobs
-      },
-      removeOnFail: {
-        age: 60 * 60 * 24 * 3, // 3 days
-      },
+const topicClusteringQueue = new QueueWithFallback<
+  TopicClusteringJob,
+  void,
+  string
+>(TOPIC_CLUSTERING_QUEUE_NAME, runTopicClusteringJob, {
+  connection,
+  defaultJobOptions: {
+    backoff: {
+      type: "exponential",
+      delay: 5000,
     },
-  }
-);
+    attempts: 3,
+    removeOnComplete: {
+      age: 0, // immediately remove completed jobs
+    },
+    removeOnFail: {
+      age: 60 * 60 * 24 * 3, // 3 days
+    },
+  },
+});
 
 export const scheduleTopicClustering = async () => {
   const projects = await prisma.project.findMany({
@@ -52,7 +54,7 @@ export const scheduleTopicClustering = async () => {
     };
   });
 
-  await topicClusteringQueue?.addBulk(jobs);
+  await topicClusteringQueue.addBulk(jobs);
 };
 
 export const scheduleTopicClusteringNextPage = async (
@@ -61,7 +63,7 @@ export const scheduleTopicClusteringNextPage = async (
 ) => {
   const yyyymmdd = new Date().toISOString().split("T")[0];
 
-  await topicClusteringQueue?.add(
+  await topicClusteringQueue.add(
     "topic_clustering",
     { project_id: projectId, search_after: searchAfter },
     {

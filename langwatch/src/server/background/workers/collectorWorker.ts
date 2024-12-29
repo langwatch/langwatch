@@ -92,10 +92,10 @@ export const scheduleTraceCollectionWithFallback = async (
   }
 };
 
-export const processCollectorJob = async (
+export async function processCollectorJob(
   id: string | undefined,
   data: CollectorJob | CollectorCheckAndAdjustJob
-) => {
+) {
   if ("spans" in data && data.spans?.length > 200) {
     console.log("Too many spans, maximum of 200 per trace, dropping job");
     return;
@@ -118,7 +118,7 @@ export const processCollectorJob = async (
   const duration = Date.now() - start;
   getJobProcessingDurationHistogram("collector").observe(duration);
   return result;
-};
+}
 
 const processCollectorJob_ = async (
   id: string | undefined,
@@ -285,7 +285,7 @@ const processCollectorJob_ = async (
   }
 
   const checkAndAdjust = async (postfix = "") => {
-    return collectorQueue!.add(
+    return collectorQueue.add(
       "collector",
       {
         action: "check_and_adjust",
