@@ -7,6 +7,7 @@ import type { ElasticSearchEvaluation } from "../../tracer/types";
 import { getDebugger } from "../../../utils/logger";
 import { QueueWithFallback } from "./queueWithFallback";
 import { runEvaluationJob } from "../workers/evaluationsWorker";
+import type { ConnectionOptions } from "bullmq";
 
 export const EVALUATIONS_QUEUE_NAME = "evaluations";
 
@@ -17,7 +18,7 @@ export const evaluationsQueue = new QueueWithFallback<
   any,
   string
 >(EVALUATIONS_QUEUE_NAME, runEvaluationJob, {
-  connection: connection as any,
+  connection: connection as ConnectionOptions,
   defaultJobOptions: {
     backoff: {
       type: "exponential",

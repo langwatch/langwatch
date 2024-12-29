@@ -2,6 +2,7 @@ import type { TrackEventJob } from "~/server/background/types";
 import { connection } from "../../redis";
 import { QueueWithFallback } from "./queueWithFallback";
 import { runTrackEventJob } from "../workers/trackEventsWorker";
+import type { ConnectionOptions } from "bullmq";
 
 export const TRACK_EVENTS_QUEUE_NAME = "track_events";
 
@@ -10,7 +11,7 @@ export const trackEventsQueue = new QueueWithFallback<
   void,
   string
 >(TRACK_EVENTS_QUEUE_NAME, runTrackEventJob, {
-  connection: connection as any,
+  connection: connection as ConnectionOptions,
   defaultJobOptions: {
     backoff: {
       type: "exponential",

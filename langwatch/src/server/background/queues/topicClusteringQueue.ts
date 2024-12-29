@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { prisma } from "../../db";
 import { QueueWithFallback } from "./queueWithFallback";
 import { runTopicClusteringJob } from "../workers/topicClusteringWorker";
+import type { ConnectionOptions } from "bullmq";
 
 export const TOPIC_CLUSTERING_QUEUE_NAME = "topic_clustering";
 
@@ -12,7 +13,7 @@ const topicClusteringQueue = new QueueWithFallback<
   void,
   string
 >(TOPIC_CLUSTERING_QUEUE_NAME, runTopicClusteringJob, {
-  connection: connection as any,
+  connection: connection as ConnectionOptions,
   defaultJobOptions: {
     backoff: {
       type: "exponential",
