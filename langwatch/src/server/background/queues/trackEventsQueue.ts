@@ -10,7 +10,7 @@ export const trackEventsQueue = new QueueWithFallback<
   void,
   string
 >(TRACK_EVENTS_QUEUE_NAME, runTrackEventJob, {
-  connection,
+  connection: connection as any,
   defaultJobOptions: {
     backoff: {
       type: "exponential",

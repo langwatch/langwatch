@@ -12,7 +12,7 @@ const topicClusteringQueue = new QueueWithFallback<
   void,
   string
 >(TOPIC_CLUSTERING_QUEUE_NAME, runTopicClusteringJob, {
-  connection,
+  connection: connection as any,
   defaultJobOptions: {
     backoff: {
       type: "exponential",

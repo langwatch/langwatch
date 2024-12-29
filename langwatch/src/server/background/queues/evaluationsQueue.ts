@@ -17,7 +17,7 @@ export const evaluationsQueue = new QueueWithFallback<
   any,
   string
 >(EVALUATIONS_QUEUE_NAME, runEvaluationJob, {
-  connection,
+  connection: connection as any,
   defaultJobOptions: {
     backoff: {
       type: "exponential",

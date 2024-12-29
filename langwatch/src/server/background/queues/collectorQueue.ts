@@ -13,7 +13,7 @@ export const collectorQueue = new QueueWithFallback<
   void,
   string
 >(COLLECTOR_QUEUE, (job) => processCollectorJob(job.id, job.data), {
-  connection,
+  connection: connection as any,
   defaultJobOptions: {
     delay: 0,
     attempts: 18, // with exponential backoff the very last attempt will happen in 3 days
