@@ -390,7 +390,7 @@ export function MessagesTable() {
       sortable: false,
       width: 300,
       render: (trace, index) =>
-        trace.error ? (
+        trace.error && !trace.output?.value ? (
           <Td
             key={index}
             onClick={() =>
