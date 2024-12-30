@@ -1169,7 +1169,7 @@ export function MessagesTable() {
                       ))
                     )}
                     {traceGroups.isLoading &&
-                      Array.from({ length: 2 }).map((_, i) => (
+                      Array.from({ length: 3 }).map((_, i) => (
                         <Tr key={i}>
                           {Array.from({
                             length: checkedHeaderColumnsEntries.length,

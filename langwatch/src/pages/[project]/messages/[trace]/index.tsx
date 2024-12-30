@@ -265,7 +265,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
   ref
 ) {
   const { project } = useOrganizationTeamProject();
-  const { openDrawer } = useDrawer();
+  const { openDrawer, isDrawerOpen } = useDrawer();
   const toast = useToast();
 
   const translateAPI = api.translate.translate.useMutation();
@@ -314,20 +314,29 @@ const TraceMessages = React.forwardRef(function TraceMessages(
 
   const AnnotationHover = () => {
     return (
-      <VStack>
+      <VStack
+        position="absolute"
+        top={"50%"}
+        right={-5}
+        transform="translateY(-50%)"
+      >
         <Tooltip label="Translate message to English" hasArrow placement="top">
           <Box
-            position="absolute"
-            right={-5}
+            width="38px"
+            height="38px"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
             paddingY={2}
             paddingX={2}
-            top={"50%"}
-            marginTop={"-70px"}
             borderRadius={"50%"}
             border="1px solid"
             borderColor="gray.200"
             backgroundColor="white"
-            onClick={() => translate()}
+            onClick={(e) => {
+              e.stopPropagation();
+              translate();
+            }}
             cursor="pointer"
           >
             <VStack>
@@ -351,27 +360,27 @@ const TraceMessages = React.forwardRef(function TraceMessages(
         </Tooltip>
         <Tooltip label="Annotate" hasArrow placement="top">
           <Box
-            position="absolute"
-            right={-5}
-            paddingY={3}
+            width="38px"
+            height="38px"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            paddingY={2}
             paddingX={2}
-            top={"50%"}
-            marginTop={"-28px"}
             borderRadius={"3xl"}
             border="1px solid"
             borderColor="gray.200"
             backgroundColor="white"
-            onClick={() =>
+            onClick={(e) => {
+              e.stopPropagation();
               openDrawer("annotation", {
                 traceId: trace.trace_id,
                 action: "new",
-              })
-            }
+              });
+            }}
             cursor="pointer"
           >
             <VStack>
-              <ThumbsUp size={"20px"} />
-              <ThumbsDown size={"20px"} />
               <Edit size={"20px"} />
             </VStack>
           </Box>
@@ -392,6 +401,25 @@ const TraceMessages = React.forwardRef(function TraceMessages(
         onMouseEnter={() => setShowAnnotationHover(true)}
         onMouseLeave={() => setShowAnnotationHover(false)}
         position="relative"
+        cursor="pointer"
+        role="button"
+        onClick={() => {
+          if (!trace) return;
+          if (isDrawerOpen("traceDetails")) {
+            openDrawer(
+              "traceDetails",
+              {
+                traceId: trace.trace_id,
+                selectedTab: "traceDetails",
+              },
+              { replace: true }
+            );
+          } else {
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+            });
+          }
+        }}
       >
         <Container maxWidth="1200px">
           <Grid templateColumns="repeat(4, 1fr)">
@@ -512,7 +540,6 @@ function Message({
   paddingTop?: string;
 }>) {
   const { project } = useOrganizationTeamProject();
-  const { openDrawer, isDrawerOpen } = useDrawer();
 
   // show time ago if less than a day old
   const timestampDate = timestamp ? new Date(timestamp) : undefined;
@@ -521,31 +548,7 @@ function Message({
   if (!project) return null;
 
   return (
-    <HStack
-      width="full"
-      paddingTop={paddingTop}
-      align="start"
-      spacing={3}
-      cursor="pointer"
-      role="button"
-      onClick={() => {
-        if (!trace) return;
-        if (isDrawerOpen("traceDetails")) {
-          openDrawer(
-            "traceDetails",
-            {
-              traceId: trace.trace_id,
-              selectedTab: "traceDetails",
-            },
-            { replace: true }
-          );
-        } else {
-          openDrawer("traceDetails", {
-            traceId: trace.trace_id,
-          });
-        }
-      }}
-    >
+    <HStack width="full" paddingTop={paddingTop} align="start" spacing={3}>
       {avatar}
       <VStack
         align="start"

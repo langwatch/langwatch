@@ -34,7 +34,7 @@ export const annotationRouter = createTRPCRouter({
           id: nanoid(),
           projectId: input.projectId,
           comment: input.comment ?? "",
-          isThumbsUp: input.isThumbsUp ?? false,
+          isThumbsUp: input.isThumbsUp ?? null,
           traceId: input.traceId,
           userId: ctx.session.user.id,
           scoreOptions: input.scoreOptions ?? {},

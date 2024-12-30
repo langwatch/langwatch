@@ -286,11 +286,11 @@ export default function Annotations() {
                             </Td>
                             <Td>{annotation.traceId}</Td>
                             <Td>
-                              {annotation.isThumbsUp ? (
+                              {annotation.isThumbsUp === true ? (
                                 <ThumbsUp />
-                              ) : (
+                              ) : annotation.isThumbsUp === false ? (
                                 <ThumbsDown />
-                              )}
+                              ) : null}
                             </Td>
                             {scoreOptions.data &&
                               scoreOptions.data.length > 0 &&

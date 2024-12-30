@@ -91,11 +91,11 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
               </HStack>
               <Text>{annotation.comment}</Text>
               <VStack align="start" spacing={1}>
-                {annotation.isThumbsUp ? (
+                {annotation.isThumbsUp === true ? (
                   <ThumbsUp size={"20px"} />
-                ) : (
+                ) : annotation.isThumbsUp === false ? (
                   <ThumbsDown size={"20px"} />
-                )}
+                ) : null}
                 {annotation.scoreOptions &&
                   typeof annotation.scoreOptions === "object" &&
                   Object.entries(annotation.scoreOptions).map(

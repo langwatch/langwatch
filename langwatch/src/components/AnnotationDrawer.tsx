@@ -82,26 +82,32 @@ export function AnnotationDrawer({
   const updateAnnotation = api.annotation.updateByTraceId.useMutation();
 
   const { isThumbsUp, comment, id, scoreOptions } = getAnnotation.data ?? {
-    isThumbsUp: "thumbsUp",
+    isThumbsUp: undefined,
     comment: "",
     scoreOptions: {},
   };
 
-  const { register, handleSubmit, watch, setValue, reset } = useForm<Annotation>({
-    defaultValues: {
-      isThumbsUp: "thumbsUp",
-      comment: comment,
-      scoreOptions: getAnnotation.data?.scoreOptions as
-        | Record<string, { value: string; reason: string }>
-        | undefined,
-    },
-  });
+  const { register, handleSubmit, watch, setValue, reset } =
+    useForm<Annotation>({
+      defaultValues: {
+        isThumbsUp: undefined,
+        comment: comment,
+        scoreOptions: getAnnotation.data?.scoreOptions as
+          | Record<string, { value: string; reason: string }>
+          | undefined,
+      },
+    });
 
   const thumbsUpValue = watch("isThumbsUp");
 
   useEffect(() => {
     if (action === "edit") {
-      const thumbValue = isThumbsUp === true ? "thumbsUp" : "thumbsDown";
+      const thumbValue =
+        isThumbsUp === true
+          ? "thumbsUp"
+          : isThumbsUp === false
+          ? "thumbsDown"
+          : undefined;
       setValue("isThumbsUp", thumbValue);
       setValue("comment", comment);
 
@@ -115,7 +121,12 @@ export function AnnotationDrawer({
   }, [scoreOptions, setValue, action, isThumbsUp, comment]);
 
   const onSubmit = (data: Annotation) => {
-    const isThumbsUp = data.isThumbsUp === "thumbsUp";
+    const isThumbsUp =
+      data.isThumbsUp === "thumbsUp"
+        ? true
+        : data.isThumbsUp === "thumbsDown"
+        ? false
+        : undefined;
 
     if (action === "edit") {
       updateAnnotation.mutate(
@@ -257,7 +268,10 @@ export function AnnotationDrawer({
                 width={16}
                 cursor="pointer"
                 onClick={() =>
-                  openDrawer("traceDetails", { traceId, selectedTab: "annotations" })
+                  openDrawer("traceDetails", {
+                    traceId,
+                    selectedTab: "annotations",
+                  })
                 }
               />
             </HStack>
