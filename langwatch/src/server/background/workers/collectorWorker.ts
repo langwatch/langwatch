@@ -52,6 +52,13 @@ export const scheduleTraceCollectionWithFallback = async (
     return;
   }
 
+  if (
+    collectorJob.traceId === "1" &&
+    collectorJob.projectId === "project_QCQ98bmqExaZZneLwoi08"
+  ) {
+    return;
+  }
+
   try {
     const timeoutState = { state: "waiting" };
     const timeoutPromise = new Promise((resolve, reject) => {
