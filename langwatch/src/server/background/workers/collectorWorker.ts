@@ -52,13 +52,6 @@ export const scheduleTraceCollectionWithFallback = async (
     return;
   }
 
-  if (
-    collectorJob.traceId === "1" &&
-    collectorJob.projectId === "project_QCQ98bmqExaZZneLwoi08"
-  ) {
-    return;
-  }
-
   try {
     const timeoutState = { state: "waiting" };
     const timeoutPromise = new Promise((resolve, reject) => {
@@ -656,11 +649,13 @@ export const fetchExistingMD5s = async (
       indexing_md5s: ElasticSearchTrace["indexing_md5s"];
       inserted_at: number | undefined;
       existing_metadata: ElasticSearchTrace["metadata"];
+      version: number | undefined;
     }
   | undefined
 > => {
   const existingTraceResponse = await esClient.search<ElasticSearchTrace>({
     index: TRACE_INDEX.alias,
+    version: true,
     body: {
       size: 1,
       query: {
@@ -676,6 +671,7 @@ export const fetchExistingMD5s = async (
   });
 
   const existingTrace = existingTraceResponse.hits.hits[0]?._source;
+  const version = existingTraceResponse.hits.hits[0]?._version;
   if (!existingTrace) {
     return undefined;
   }
@@ -684,5 +680,6 @@ export const fetchExistingMD5s = async (
     indexing_md5s: existingTrace.indexing_md5s,
     inserted_at: existingTrace.timestamps?.inserted_at,
     existing_metadata: existingTrace.metadata,
+    version,
   };
 };
