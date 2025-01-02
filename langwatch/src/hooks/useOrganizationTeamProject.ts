@@ -178,14 +178,14 @@ export const useOrganizationTeamProject = (
       ? `?return_to=${currentPath}`
       : "";
 
-    if (!organization || !team) {
+    const teamsWithProjectsOnAnyOrg = organizations.data.flatMap((org) =>
+      org.teams.filter((team) => team.projects.length > 0)
+    );
+    if (!organization || !teamsWithProjectsOnAnyOrg.length) {
       void router.push(`/onboarding/organization${returnTo}`);
       return;
     }
 
-    const teamsWithProjectsOnAnyOrg = organizations.data.flatMap((org) =>
-      org.teams.filter((team) => team.projects.length > 0)
-    );
     const hasTeamsWithProjectsOnCurrentOrg = organization.teams.some(
       (team) => team.projects.length > 0
     );
