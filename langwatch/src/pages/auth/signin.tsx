@@ -8,11 +8,11 @@ import {
   HStack,
   Heading,
   Input,
-  Link,
   Spacer,
   VStack,
   useToast,
 } from "@chakra-ui/react";
+import { Link } from "@chakra-ui/next-js";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type GetServerSidePropsContext } from "next";
 import { type Session } from "next-auth";

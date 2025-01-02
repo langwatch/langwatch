@@ -114,43 +114,30 @@ export default function ProjectOnboarding() {
   }, [form, team.data]);
 
   const createProject = api.project.create.useMutation();
-  const apiContext = api.useContext();
 
   const onSubmit: SubmitHandler<ProjectFormData> = (data: ProjectFormData) => {
     if (!team.data) return;
 
-    createProject.mutate({
-      organizationId: organization?.id ?? "",
-      name: data.name,
-      teamId: data.teamId == "NEW" ? undefined : data.teamId,
-      newTeamName: data.newTeamName,
-      language: data.language,
-      framework: data.framework,
-    });
-  };
-
-  useEffect(() => {
-    if (createProject.isSuccess) {
-      void (async () => {
-        await apiContext.organization.getAll.refetch();
-        // For some reason even though we await for the refetch it's not done yet when we move pages
-        setTimeout(() => {
+    createProject.mutate(
+      {
+        organizationId: organization?.id ?? "",
+        name: data.name,
+        teamId: data.teamId == "NEW" ? undefined : data.teamId,
+        newTeamName: data.newTeamName,
+        language: data.language,
+        framework: data.framework,
+      },
+      {
+        onSuccess: (data) => {
           if (returnTo) {
-            void router.push(returnTo);
+            window.location.href = returnTo;
           } else {
-            void router.push(`/${createProject.data.projectSlug}/messages`);
+            window.location.href = `/${data.projectSlug}/messages`;
           }
-        }, 1000);
-      })();
-    }
-  }, [
-    apiContext.organization,
-    apiContext.organization.getAll,
-    createProject.data?.projectSlug,
-    createProject.isSuccess,
-    returnTo,
-    router,
-  ]);
+        },
+      }
+    );
+  };
 
   if (team.isFetched && !team.data) {
     return <ErrorPage statusCode={404} />;

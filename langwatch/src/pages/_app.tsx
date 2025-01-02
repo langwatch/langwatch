@@ -157,6 +157,10 @@ export const theme = extendTheme({
 });
 
 let handleChangeStartTimeout: NodeJS.Timeout | null = null;
+let nProgressEnabled = false;
+setTimeout(() => {
+  nProgressEnabled = true;
+}, 1000);
 
 const LangWatch: AppType<{
   session: Session | null;
@@ -209,7 +213,9 @@ const LangWatch: AppType<{
       setTimeout(() => NProgress.done(), 200);
     };
     const handleChangeStart_ = () => {
-      handleChangeStartTimeout = setTimeout(() => NProgress.start(), 300);
+      if (nProgressEnabled) {
+        handleChangeStartTimeout = setTimeout(() => NProgress.start(), 300);
+      }
     };
 
     router.events.on("routeChangeStart", handleChangeStart_);

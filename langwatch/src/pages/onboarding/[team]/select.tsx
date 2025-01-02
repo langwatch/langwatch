@@ -1,11 +1,9 @@
 import {
   Box,
-  Button,
   Card,
   CardBody,
   CardHeader,
   FormControl,
-  FormErrorMessage,
   HStack,
   Heading,
   Image,
@@ -18,29 +16,15 @@ import {
 } from "@chakra-ui/react";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
-import { useEffect } from "react";
 import { TrendingUp } from "react-feather";
-import {
-  useForm,
-  type SubmitHandler,
-  type UseFormRegister,
-} from "react-hook-form";
 import { PuzzleIcon } from "~/components/icons/PuzzleIcon";
 import { SetupLayout } from "~/components/SetupLayout";
-import { type ProjectFormData } from "~/components/TechStack";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import { api } from "../../../utils/api";
 
 export default function ProjectOnboardingSelect() {
   useRequiredSession();
-
-  const form = useForm<ProjectFormData>({
-    defaultValues: {
-      projectType: "",
-    },
-  });
-  const { watch, register, setValue } = form;
 
   const router = useRouter();
   const { organization, project } = useOrganizationTeamProject({
@@ -60,52 +44,33 @@ export default function ProjectOnboardingSelect() {
     { enabled: !!organization }
   );
 
-  useEffect(() => {
-    if (team.data) {
-      form.setValue("teamId", team.data.id);
-    }
-  }, [form, team.data]);
-
   const createProject = api.project.create.useMutation();
-  const apiContext = api.useContext();
 
-  const selectedValueProjectType = watch("projectType");
-
-  const onSubmit: SubmitHandler<ProjectFormData> = () => {
+  const onSubmit = (projectType: string) => {
     if (!team.data) return;
     if (createProject.isLoading) return;
 
-    createProject.mutate({
-      organizationId: organization?.id ?? "",
-      teamId: team.data.id,
-      name: team.data.name,
-      language: "other",
-      framework: "other",
-    });
+    createProject.mutate(
+      {
+        organizationId: organization?.id ?? "",
+        teamId: team.data.id,
+        name: team.data.name,
+        language: "other",
+        framework: "other",
+      },
+      {
+        onSuccess: (data) => {
+          void (async () => {
+            if (projectType === "optimization") {
+              window.location.href = `/${data.projectSlug}/workflows`;
+            } else {
+              window.location.href = `/${data.projectSlug}/messages`;
+            }
+          })();
+        },
+      }
+    );
   };
-
-  useEffect(() => {
-    if (createProject.isSuccess) {
-      void (async () => {
-        await apiContext.organization.getAll.refetch();
-        // For some reason even though we await for the refetch it's not done yet when we move pages
-        setTimeout(() => {
-          if (selectedValueProjectType === "optimization") {
-            void router.push(`/${createProject.data.projectSlug}/workflows`);
-          } else {
-            void router.push(`/${createProject.data.projectSlug}/messages`);
-          }
-        }, 1000);
-      })();
-    }
-  }, [
-    apiContext.organization,
-    apiContext.organization.getAll,
-    createProject.data?.projectSlug,
-    createProject.isSuccess,
-    router,
-    selectedValueProjectType,
-  ]);
 
   if (team.isFetched && !team.data) {
     return <ErrorPage statusCode={404} />;
@@ -174,11 +139,8 @@ export default function ProjectOnboardingSelect() {
             <br />
           </Text>
 
-          <FormControl isInvalid={!!form.formState.errors.projectType}>
-            <RadioGroup
-              value={selectedValueProjectType ?? ""}
-              onChange={(value) => setValue("projectType", value)}
-            >
+          <FormControl>
+            <RadioGroup value={""}>
               <Box>
                 <HStack width="full" height="100%" alignItems="start">
                   {Object.entries(projectTypes).map(([value, details]) => {
@@ -188,8 +150,7 @@ export default function ProjectOnboardingSelect() {
                         onClick={(e) => {
                           e.preventDefault();
                           if (createProject.isLoading) return;
-                          setValue("projectType", value);
-                          void form.handleSubmit(onSubmit)();
+                          void onSubmit(value);
                         }}
                         width="full"
                         height="100%"
@@ -203,10 +164,6 @@ export default function ProjectOnboardingSelect() {
                           text={details.text}
                           image={details.image}
                           icon={details.icon}
-                          registerProps={register("projectType", {
-                            required: "Please select a project type",
-                          })}
-                          selectedValue={selectedValueProjectType ?? ""}
                           isDisabled={createProject.isLoading}
                         />
                       </Box>
@@ -215,16 +172,9 @@ export default function ProjectOnboardingSelect() {
                 </HStack>
               </Box>
             </RadioGroup>
-            <FormErrorMessage>
-              {form.formState.errors.projectType?.message}
-            </FormErrorMessage>
           </FormControl>
 
           {createProject.error && <p>Something went wrong!</p>}
-
-          <HStack width="full">
-            <Text hidden={!createProject.isLoading}>Loading...</Text>
-          </HStack>
         </VStack>
       </form>
     </SetupLayout>
@@ -233,8 +183,6 @@ export default function ProjectOnboardingSelect() {
 
 const CustomRadio = ({
   value,
-  registerProps,
-  selectedValue,
   heading,
   text,
   image,
@@ -242,8 +190,6 @@ const CustomRadio = ({
   isDisabled,
 }: {
   value: string;
-  registerProps: ReturnType<UseFormRegister<ProjectFormData>>;
-  selectedValue: string;
   heading: string;
   text: React.ReactNode;
   image: string;
@@ -255,9 +201,7 @@ const CustomRadio = ({
       <input
         type="radio"
         value={value}
-        {...registerProps}
-        checked={selectedValue === value} // Add checked prop
-        style={{ display: "none" }} // Hide default radio button
+        style={{ display: "none" }}
         disabled={isDisabled}
       />
       <Card
@@ -268,7 +212,7 @@ const CustomRadio = ({
           borderColor: "orange.500",
           cursor: "pointer",
         }}
-        borderColor={selectedValue === value ? "orange.500" : "gray.300"}
+        borderColor="gray.300"
         _checked={{
           borderColor: "orange.500",
         }}

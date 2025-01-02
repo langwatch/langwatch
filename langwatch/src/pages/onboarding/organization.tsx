@@ -13,7 +13,6 @@ import {
   RadioGroup,
   Text,
   VStack,
-  useRadio,
   useRadioGroup,
   useSteps,
   useToast,
@@ -63,6 +62,7 @@ import { LoadingScreen } from "../../components/LoadingScreen";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { titleCase } from "../../utils/stringCasing";
+import React from "react";
 
 type OrganizationFormData = {
   organizationName: string;
@@ -133,6 +133,19 @@ export default function OrganizationOnboarding() {
         signUpData: data,
       },
       {
+        onSuccess: (data) => {
+          void (async () => {
+            await apiContext.organization.getAll.refetch();
+            // For some reason even though we await for the refetch it's not done yet when we move pages
+            setTimeout(() => {
+              void router.push(
+                `/onboarding/${data.teamSlug}/select${
+                  returnTo ? `?return_to=${returnTo}` : ""
+                }`
+              );
+            });
+          })();
+        },
         onError: () => {
           toast({
             title: "Failed to create organization",
@@ -147,28 +160,6 @@ export default function OrganizationOnboarding() {
       }
     );
   };
-
-  useEffect(() => {
-    if (createOrganization.isSuccess) {
-      void (async () => {
-        await apiContext.organization.getAll.refetch();
-        // For some reason even though we await for the refetch it's not done yet when we move pages
-        setTimeout(() => {
-          void router.push(
-            `/onboarding/${createOrganization.data.teamSlug}/select${
-              returnTo ? `?return_to=${returnTo}` : ""
-            }`
-          );
-        });
-      })();
-    }
-  }, [
-    apiContext.organization.getAll,
-    createOrganization.data?.teamSlug,
-    createOrganization.isSuccess,
-    returnTo,
-    router,
-  ]);
 
   if (!session) {
     return <LoadingScreen />;
@@ -405,7 +396,8 @@ export default function OrganizationOnboarding() {
                 <FormControl>
                   <Text fontSize={14}>
                     You are signing up via the{" "}
-                    <b>{titleCase(utmCampaign.replaceAll("-", " "))}</b> campaign
+                    <b>{titleCase(utmCampaign.replaceAll("-", " "))}</b>{" "}
+                    campaign
                   </Text>
                 </FormControl>
               )}
@@ -446,9 +438,8 @@ export default function OrganizationOnboarding() {
                     <HStack width="full" wrap="wrap">
                       {Object.entries(companyType).map(([value, icon]) => {
                         return (
-                          <>
+                          <React.Fragment key={value}>
                             <CustomRadio
-                              key={value}
                               value={value}
                               registerProps={register("companyType", {
                                 required: "Please select a company type",
@@ -464,7 +455,7 @@ export default function OrganizationOnboarding() {
                                   placeholder="Please specify"
                                 />
                               )}
-                          </>
+                          </React.Fragment>
                         );
                       })}
                     </HStack>
@@ -545,9 +536,8 @@ export default function OrganizationOnboarding() {
                     <HStack width="full" wrap="wrap">
                       {Object.entries(projectType).map(([value, icon]) => {
                         return (
-                          <>
+                          <React.Fragment key={value}>
                             <CustomRadio
-                              key={value}
                               value={value}
                               registerProps={register("projectType", {
                                 required: "Please select a project type",
@@ -563,7 +553,7 @@ export default function OrganizationOnboarding() {
                                   placeholder="Please specify"
                                 />
                               )}
-                          </>
+                          </React.Fragment>
                         );
                       })}
                     </HStack>
@@ -584,9 +574,8 @@ export default function OrganizationOnboarding() {
                       {Object.entries(howDidYouHearAboutUs).map(
                         ([value, icon]) => {
                           return (
-                            <>
+                            <React.Fragment key={value}>
                               <CustomRadio
-                                key={value}
                                 value={value}
                                 registerProps={register(
                                   "howDidYouHearAboutUs",
@@ -609,7 +598,7 @@ export default function OrganizationOnboarding() {
                                     placeholder="Please specify"
                                   />
                                 )}
-                            </>
+                            </React.Fragment>
                           );
                         }
                       )}

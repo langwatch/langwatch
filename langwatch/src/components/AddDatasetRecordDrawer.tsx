@@ -1,61 +1,34 @@
-import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import { Link } from "@chakra-ui/next-js";
 import {
-  Box,
   Button,
-  Checkbox,
   Drawer,
   DrawerBody,
   DrawerCloseButton,
   DrawerContent,
   DrawerHeader,
-  FormControl,
-  FormErrorMessage,
-  FormHelperText,
-  FormLabel,
   HStack,
-  Select,
-  Spacer,
   Text,
   useDisclosure,
   useToast,
   VStack,
 } from "@chakra-ui/react";
-import { nanoid } from "nanoid";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { useLocalStorage } from "usehooks-ts";
-import { z } from "zod";
+import { type z } from "zod";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { datasetSpanSchema } from "~/server/tracer/types.generated";
 import { api } from "~/utils/api";
 import type {
   annotationScoreSchema,
   DatasetColumns,
   DatasetRecordEntry,
 } from "../server/datasets/types";
-import type {
-  DatasetSpan,
-  ElasticSearchEvaluation,
-  ElasticSearchSpan,
-} from "../server/tracer/types";
-import {
-  elasticSearchEvaluationsToEvaluations,
-  elasticSearchSpanToSpan,
-  getRAGInfo,
-} from "../server/tracer/utils";
+import type { ElasticSearchEvaluation } from "../server/tracer/types";
+import { elasticSearchEvaluationsToEvaluations } from "../server/tracer/utils";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { useDrawer } from "./CurrentDrawer";
-import { HorizontalFormControl } from "./HorizontalFormControl";
-import {
-  DatasetGrid,
-  HeaderCheckboxComponent,
-  type DatasetColumnDef,
-} from "./datasets/DatasetGrid";
-import { TracesMapping } from "./datasets/DatasetMapping";
-import { Edit2 } from "react-feather";
-import { DatasetSelector } from "./datasets/DatasetSelector";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
+import { DatasetSelector } from "./datasets/DatasetSelector";
 
 type FormValues = {
   datasetId: string;

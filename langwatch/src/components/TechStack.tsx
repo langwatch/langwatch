@@ -167,6 +167,7 @@ export function TechStackSelector<
         display="flex"
         alignItems="center"
         justifyContent="center"
+        overflow="hidden"
       >
         {children}
       </Box>
