@@ -43,9 +43,13 @@ export default function ProjectOnboardingSelect() {
   const { watch, register, setValue } = form;
 
   const router = useRouter();
-  const { organization } = useOrganizationTeamProject({
+  const { organization, project } = useOrganizationTeamProject({
     redirectToProjectOnboarding: false,
   });
+
+  if (project) {
+    void router.push(`/${project.slug}`);
+  }
 
   const { team: teamSlug } = router.query;
   const team = api.team.getBySlug.useQuery(
