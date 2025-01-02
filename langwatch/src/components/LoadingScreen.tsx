@@ -2,12 +2,17 @@ import { Box, Fade } from "@chakra-ui/react";
 import { FullLogo } from "./icons/FullLogo";
 import { useEffect, useState } from "react";
 
+let logoVisibleOnce = false;
+
 export const LoadingScreen = () => {
-  const [showLogo, setShowLogo] = useState(false);
+  const [showLogo, setShowLogo] = useState(logoVisibleOnce);
 
   useEffect(() => {
     setTimeout(() => {
       setShowLogo(true);
+      setTimeout(() => {
+        logoVisibleOnce = true;
+      }, 500);
     }, 50);
   }, []);
 
@@ -22,9 +27,13 @@ export const LoadingScreen = () => {
       alignItems="center"
       justifyContent="center"
     >
-      <Fade in={showLogo}>
+      {!logoVisibleOnce ? (
+        <Fade in={showLogo}>
+          <FullLogo />
+        </Fade>
+      ) : (
         <FullLogo />
-      </Fade>
+      )}
     </Box>
   );
 };
