@@ -16,15 +16,7 @@ export default function Index() {
 
   useEffect(() => {
     if (project) {
-      void router.push(`/${project.slug}`);
-    }
-
-    if (team && !project) {
-      if (team.projects[0]) {
-        void router.push(`/${team.projects[0].slug}`);
-      } else {
-        void router.push(`/onboarding/${team.slug}/project`);
-      }
+      void router.replace(`/${project.slug}`);
     }
   }, [project, router, team]);
 

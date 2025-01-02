@@ -68,7 +68,6 @@ export function RadioCard(props: UseRadioProps & PropsWithChildren) {
 export default function ProjectOnboarding() {
   useRequiredSession();
 
-  const { project } = useOrganizationTeamProject();
   const form = useForm<ProjectFormData>({
     defaultValues: {
       language: "python",
@@ -79,7 +78,7 @@ export default function ProjectOnboarding() {
   const teamId = watch("teamId");
 
   const router = useRouter();
-  const { organization } = useOrganizationTeamProject({
+  const { organization, project } = useOrganizationTeamProject({
     redirectToProjectOnboarding: false,
   });
 
