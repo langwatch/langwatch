@@ -101,7 +101,7 @@ export default function CheckConfigForm({
   const DEFAULT_MAPPINGS: CheckConfigFormData["mappings"] = {
     input: "trace.input",
     output: "trace.output",
-    context: "trace.first_rag_context",
+    contexts: "trace.first_rag_context",
     expected_output: "metadata.expected_output",
   };
 

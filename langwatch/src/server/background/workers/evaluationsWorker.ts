@@ -103,10 +103,10 @@ export const runEvaluationForTrace = async ({
 
   const inputMapping = (mappings ?? {})?.input;
   const outputMapping = (mappings ?? {})?.output;
-  const ragContextMapping = (mappings ?? {})?.context;
+  const ragContextMapping = (mappings ?? {})?.contexts;
   const expectedOutputMapping = (mappings ?? {})?.expected_output;
 
-  const switchMapping = (mapping: Mappings) => {
+  const switchMapping = (mapping: Mappings): string | string[] | undefined => {
     if (mapping === "trace.input") {
       return trace.input?.value?.toString();
     }
@@ -115,7 +115,7 @@ export const runEvaluationForTrace = async ({
     }
     if (mapping === "trace.first_rag_context") {
       const ragInfo = getRAGInfo(spans);
-      return ragInfo.contexts[0]?.toString();
+      return ragInfo.contexts;
     }
     if (mapping === "metadata.expected_output") {
       return (
@@ -189,10 +189,11 @@ export const runEvaluationForTrace = async ({
   const result = await runEvaluation({
     projectId,
     evaluatorType: evaluatorType,
-    input,
-    output,
-    contexts,
-    expected_output,
+    // TODO: move this to a registry/extractor type-safe constructor
+    input: input as string | undefined,
+    output: output as string | undefined,
+    contexts: Array.isArray(contexts) ? contexts : contexts ? [contexts] : [],
+    expected_output: expected_output as string | undefined,
     conversation,
     settings: settings && typeof settings === "object" ? settings : undefined,
     trace,
@@ -217,7 +218,7 @@ export const runEvaluation = async ({
   evaluatorType: EvaluatorTypes;
   input?: string;
   output?: string;
-  contexts?: string[] | string | undefined;
+  contexts?: string[];
   expected_output?: string;
   conversation?: Conversation;
   settings?: Record<string, unknown>;
