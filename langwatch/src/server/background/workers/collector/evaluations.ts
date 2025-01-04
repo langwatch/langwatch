@@ -7,10 +7,9 @@ import {
   type PreconditionTrace,
 } from "../../../../server/evaluations/preconditions";
 import type { CheckPreconditions } from "../../../../server/evaluations/types";
-import { getDebugger } from "../../../../utils/logger";
 import { prisma } from "../../../db";
 import type { ElasticSearchEvaluation } from "../../../tracer/types";
-import { type ElasticSearchTrace, type Span } from "../../../tracer/types";
+import { type Span } from "../../../tracer/types";
 import { elasticSearchEvaluationSchema } from "../../../tracer/types.generated";
 import { scheduleEvaluation } from "../../queues/evaluationsQueue";
 import type { CollectorJob, EvaluationJob } from "../../types";

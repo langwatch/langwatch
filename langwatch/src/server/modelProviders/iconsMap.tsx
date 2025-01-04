@@ -1,15 +1,13 @@
 import { Anthropic } from "../../components/icons/Anthropic";
+import { AWS } from "../../components/icons/AWS";
 import { Azure } from "../../components/icons/Azure";
 import { Cloudflare } from "../../components/icons/Cloudflare";
-import { Google } from "../../components/icons/Google";
-import { Groq } from "../../components/icons/Groq";
-import { Meta } from "../../components/icons/Meta";
-import { Mistral } from "../../components/icons/Mistral";
-import { OpenAI } from "../../components/icons/OpenAI";
 import { Custom } from "../../components/icons/Custom";
-import { type modelProviders } from "./registry";
 import { Gemini } from "../../components/icons/Gemini";
 import { GoogleCloud } from "../../components/icons/GoogleCloud";
+import { Groq } from "../../components/icons/Groq";
+import { OpenAI } from "../../components/icons/OpenAI";
+import { type modelProviders } from "./registry";
 
 export const modelProviderIcons: Record<
   keyof typeof modelProviders,
@@ -22,15 +20,6 @@ export const modelProviderIcons: Record<
   vertex_ai: <GoogleCloud />,
   gemini: <Gemini />,
   cloudflare: <Cloudflare />,
+  bedrock: <AWS />,
   custom: <Custom />,
-};
-
-export const vendorIcons: Record<string, React.ReactNode> = {
-  azure: <Azure />,
-  openai: <OpenAI />,
-  meta: <Meta />,
-  mistral: <Mistral />,
-  anthropic: <Anthropic />,
-  google: <Google />,
-  cloudflare: <Cloudflare />,
 };

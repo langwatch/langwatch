@@ -6,6 +6,7 @@ import {
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAzure } from "@ai-sdk/azure";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock";
 import { embed } from "ai";
 import {
   OPENAI_EMBEDDING_DIMENSION,
@@ -46,10 +47,11 @@ export const getEmbeddings = async (
   if (
     !model.startsWith("openai/") &&
     !model.startsWith("azure/") &&
-    !model.startsWith("gemini/")
+    !model.startsWith("gemini/") &&
+    !model.startsWith("bedrock/")
   ) {
     throw new Error(
-      "Only OpenAI or Azure models are supported for embeddings for now"
+      "Only OpenAI, Azure, Gemini or Bedrock models are supported for embeddings for now"
     );
   }
 
@@ -136,6 +138,12 @@ const getVercelAIModel = (
           ? OPENAI_EMBEDDING_DIMENSION
           : undefined,
       })
+    : provider === "bedrock"
+    ? createAmazonBedrock({
+        accessKeyId: params.aws_access_key_id,
+        secretAccessKey: params.aws_secret_access_key,
+        region: params.aws_region_name,
+      }).textEmbeddingModel(modelName)
     : undefined;
 };
 

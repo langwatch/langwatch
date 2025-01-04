@@ -250,6 +250,8 @@ export const prepareLitellmParams = (
 ) => {
   const params: Record<string, string> = {};
 
+  params.model = model.replace("custom/", "openai/");
+
   const apiKey = getModelOrDefaultApiKey(modelProvider);
   if (apiKey && modelProvider.provider !== "vertex_ai") {
     params.api_key = apiKey;
@@ -267,7 +269,15 @@ export const prepareLitellmParams = (
       getModelOrDefaultEnvKey(modelProvider, "VERTEXAI_LOCATION") ?? "invalid";
   }
 
-  params.model = model.replace("custom/", "openai/");
+  if (modelProvider.provider === "bedrock") {
+    params.aws_access_key_id =
+      getModelOrDefaultEnvKey(modelProvider, "AWS_ACCESS_KEY_ID") ?? "invalid";
+    params.aws_secret_access_key =
+      getModelOrDefaultEnvKey(modelProvider, "AWS_SECRET_ACCESS_KEY") ??
+      "invalid";
+    params.aws_region_name =
+      getModelOrDefaultEnvKey(modelProvider, "AWS_REGION_NAME") ?? "invalid";
+  }
 
   // TODO: add azure deployment as params.model as azure/<deployment-name>
 

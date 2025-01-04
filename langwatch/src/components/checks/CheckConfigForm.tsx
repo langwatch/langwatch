@@ -1,4 +1,10 @@
 import {
+  Accordion,
+  AccordionButton,
+  AccordionIcon,
+  AccordionItem,
+  AccordionPanel,
+  Box,
   Button,
   Card,
   CardBody,
@@ -9,17 +15,14 @@ import {
   Text,
   Tooltip,
   VStack,
-  Accordion,
-  AccordionItem,
-  AccordionButton,
-  AccordionPanel,
-  AccordionIcon,
-  Box,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { EvaluationExecutionMode } from "@prisma/client";
+import type { JsonArray } from "@prisma/client/runtime/library";
+import type { Edge, Node } from "@xyflow/react";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { HelpCircle, ArrowRight } from "react-feather";
+import { ArrowRight, HelpCircle } from "react-feather";
 import {
   Controller,
   FormProvider,
@@ -30,9 +33,9 @@ import {
 import slugify from "slugify";
 import { z } from "zod";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { getInputsOutputs } from "../../optimization_studio/utils/nodeUtils";
 import {
   AVAILABLE_EVALUATORS,
-  type EvaluatorDefinition,
   type Evaluators,
   type EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
@@ -49,14 +52,10 @@ import { checkPreconditionsSchema } from "../../server/evaluations/types.generat
 import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import DynamicZodForm from "./DynamicZodForm";
-import { EvaluatorSelection, evaluatorTempNameMap } from "./EvaluatorSelection";
 import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
+import { EvaluatorSelection, evaluatorTempNameMap } from "./EvaluatorSelection";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
-import { EvaluationExecutionMode } from "@prisma/client";
-import { getInputsOutputs } from "../../optimization_studio/utils/nodeUtils";
-import type { JsonArray } from "@prisma/client/runtime/library";
-import type { Edge, Node } from "@xyflow/react";
 
 export interface CheckConfigFormData {
   name: string;

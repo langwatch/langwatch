@@ -469,7 +469,8 @@ function ModelProviderForm({
                   </Box>
                   {(provider.provider === "openai" ||
                     provider.provider === "azure" ||
-                    provider.provider === "gemini") && (
+                    provider.provider === "gemini" ||
+                    provider.provider === "bedrock") && (
                     <>
                       <Box width="full">
                         <SmallLabel>Embeddings Models</SmallLabel>

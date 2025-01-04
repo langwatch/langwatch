@@ -102,6 +102,17 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
+  bedrock: {
+    name: "Bedrock",
+    apiKey: "AWS_ACCESS_KEY_ID",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      AWS_ACCESS_KEY_ID: z.string().min(1),
+      AWS_SECRET_ACCESS_KEY: z.string().min(1),
+      AWS_REGION_NAME: z.string().min(1),
+    }),
+    enabledSince: new Date("2023-01-01"),
+  },
   custom: {
     name: "Custom",
     apiKey: "CUSTOM_API_KEY",
