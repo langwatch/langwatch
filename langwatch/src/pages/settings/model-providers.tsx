@@ -431,6 +431,7 @@ function ModelProviderForm({
                         <GridItem>
                           <Input
                             {...register(`customKeys.${key}`)}
+                            autoComplete="off"
                             placeholder={
                               (providerKeys as any)[key]._def.typeName ===
                               "ZodOptional"
