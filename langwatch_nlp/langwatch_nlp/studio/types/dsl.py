@@ -77,6 +77,7 @@ class DecoratedBy(BaseModel):
 class BaseComponent(BaseModel):
     _library_ref: Optional[str] = None
     name: Optional[str] = None
+    description: Optional[str] = None
     cls: Optional[str] = None
     parameters: Optional[List[Field]] = None
     inputs: Optional[List[Field]] = None

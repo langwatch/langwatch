@@ -264,7 +264,7 @@ export function TryItOut({
         <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
         <FilterToggle />
       </HStack>
-      {evaluatorType === "google_cloud/dlp_pii_detection" && (
+      {evaluatorType === "presidio/pii_detection" && (
         <Alert status="info">
           <AlertIcon />
           <Text>

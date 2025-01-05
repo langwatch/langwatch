@@ -48,6 +48,7 @@ export type BaseComponent = {
   _library_ref?: string;
   id?: string;
   name?: string;
+  description?: string;
   cls?: string;
   parameters?: Field[];
   inputs?: Field[];

@@ -180,9 +180,18 @@ export async function handleEvaluatorCall(
     }
   }
 
-  const { input, output, contexts, expected_output, conversation } =
+  const { input, output, contexts, expected_output, expected_contexts, conversation } =
     params.data;
   const contextList = contexts
+    ?.map((context) => {
+      if (typeof context === "string") {
+        return context;
+      } else {
+        return extractChunkTextualContent(context.content);
+      }
+    })
+    .filter((x) => x);
+  const expectedContextList = expected_contexts
     ?.map((context) => {
       if (typeof context === "string") {
         return context;
@@ -202,6 +211,7 @@ export async function handleEvaluatorCall(
       output: output ? output : undefined,
       contexts: contextList,
       expected_output: expected_output ? expected_output : undefined,
+      expected_contexts: expectedContextList,
       conversation:
         conversation?.map((message) => ({
           input: message.input ?? undefined,

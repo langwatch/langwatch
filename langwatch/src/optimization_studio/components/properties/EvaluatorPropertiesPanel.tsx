@@ -18,14 +18,15 @@ import { useDebouncedCallback } from "use-debounce";
 export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
   const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
 
+  const settingsFromParameters = Object.fromEntries(
+    (node.data.parameters ?? []).map(({ identifier, value }) => [
+      identifier,
+      value,
+    ])
+  );
   const form = useForm({
     defaultValues: {
-      settings: Object.fromEntries(
-        (node.data.parameters ?? []).map(({ identifier, value }) => [
-          identifier,
-          value,
-        ])
-      ),
+      settings: settingsFromParameters,
     },
   });
 
@@ -93,35 +94,38 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
     void form.handleSubmit(onSubmit)();
   }, [form, onSubmit]);
 
-  const handleSubmitDebounced = useDebouncedCallback(handleSubmit_, 1000);
+  const handleSubmitDebounced = useDebouncedCallback(handleSubmit_, 100);
   useEffect(() => {
     form.watch(() => {
       handleSubmitDebounced();
     });
   }, [form, handleSubmitDebounced]);
 
+  const hasEvaluatorFields =
+    evaluator &&
+    schema instanceof z.ZodObject &&
+    Object.keys(schema.shape).length > 0;
+
   return (
     <BasePropertiesPanel
       node={node}
       hideInputs
       hideOutputs
-      hideParameters={(node.data.parameters ?? []).length == 0}
+      hideParameters={!!hasEvaluatorFields}
     >
-      {evaluator &&
-        schema instanceof z.ZodObject &&
-        Object.keys(schema.shape).length > 0 && (
-          <FormProvider {...form}>
-            <VStack width="full" spacing={3}>
-              <DynamicZodForm
-                schema={schema}
-                evaluatorType={evaluator as keyof Evaluators}
-                prefix="settings"
-                errors={form.formState.errors.settings}
-                variant="studio"
-              />
-            </VStack>
-          </FormProvider>
-        )}
+      {hasEvaluatorFields && (
+        <FormProvider {...form}>
+          <VStack width="full" spacing={3}>
+            <DynamicZodForm
+              schema={schema}
+              evaluatorType={evaluator as keyof Evaluators}
+              prefix="settings"
+              errors={form.formState.errors.settings}
+              variant="studio"
+            />
+          </VStack>
+        </FormProvider>
+      )}
     </BasePropertiesPanel>
   );
 }

@@ -24,7 +24,7 @@ export const convertEvaluators = (
       definition.requiredFields.forEach((field) => {
         inputs.push({
           identifier: field,
-          type: field === "contexts" ? "list[str]" : "str",
+          type: field === "contexts" || field === "expected_contexts" ? "list[str]" : "str",
         });
       });
 
@@ -32,7 +32,7 @@ export const convertEvaluators = (
       definition.optionalFields.forEach((field) => {
         inputs.push({
           identifier: field,
-          type: field === "contexts" ? "list[str]" : "str",
+          type: field === "contexts" || field === "expected_contexts" ? "list[str]" : "str",
           optional: true,
         });
       });
@@ -43,6 +43,7 @@ export const convertEvaluators = (
         "contexts",
         "output",
         "expected_output",
+        "expected_contexts",
       ];
       inputs = inputs.sort(
         (a, b) =>
@@ -66,6 +67,7 @@ export const convertEvaluators = (
         name: (evaluatorTempNameMap[definition.name] ?? definition.name)
           .replace("Evaluator", "")
           .trim(),
+        description: definition.description,
         inputs,
         outputs,
       } satisfies Evaluator;

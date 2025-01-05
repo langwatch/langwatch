@@ -216,6 +216,7 @@ export const runEvaluation = async ({
   output,
   contexts,
   expected_output,
+  expected_contexts,
   settings,
   conversation,
   trace,
@@ -227,6 +228,7 @@ export const runEvaluation = async ({
   output?: string;
   contexts?: string[];
   expected_output?: string;
+  expected_contexts?: string[];
   conversation?: Conversation;
   settings?: Record<string, unknown>;
   trace?: Trace;
@@ -258,6 +260,7 @@ export const runEvaluation = async ({
       output,
       contexts,
       expected_output,
+      expected_contexts,
       trace
     );
   }
@@ -541,6 +544,7 @@ const customEvaluation = async (
   output?: string,
   contexts?: string[] | string | undefined,
   expected_output?: string,
+  expected_contexts?: string[],
   trace?: Trace
 ) => {
   const workflowId = evaluatorType.split("/")[1];
@@ -585,6 +589,9 @@ const customEvaluation = async (
     }
     if (mapping === "metadata.expected_output") {
       return expected_output;
+    }
+    if (mapping === "metadata.expected_contexts") {
+      return expected_contexts;
     }
     // Use typescript to ensure all cases are handled
     // eslint-disable-next-line @typescript-eslint/no-unused-vars

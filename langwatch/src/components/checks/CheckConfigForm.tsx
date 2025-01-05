@@ -168,7 +168,6 @@ export default function CheckConfigForm({
   const sample = watch("sample");
   const executionMode = watch("executionMode");
   const storeSettingsOnCode = watch("storeSettingsOnCode");
-  const mappings = watch("mappings");
 
   const {
     fields: fieldsPrecondition,

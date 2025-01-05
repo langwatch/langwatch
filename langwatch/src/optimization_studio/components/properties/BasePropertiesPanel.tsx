@@ -119,7 +119,7 @@ export function FieldsDefinition({
     setTimeout(() => {
       updateNodeInternals(node.id);
     }, 0);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node.data.behave_as]);
 
   const watchedFields = watch("fields");
@@ -541,119 +541,131 @@ export function BasePropertiesPanel({
       height="full"
       overflowY="auto"
     >
-      <HStack
-        paddingY={1}
-        paddingLeft={2}
-        width="full"
-        justify="space-between"
-        spacing={0}
-        alignItems="flex-start"
-      >
-        <HStack spacing={2}>
-          {header ? (
-            header
-          ) : !isWorkflow(node) ? (
-            <>
-              <ComponentIcon
-                type={node.type as ComponentType}
-                cls={node.data.cls}
-                size="lg"
-              />
-              {isEditingName ? (
-                <Input
-                  fontSize={15}
-                  marginLeft={1}
-                  fontWeight={500}
-                  variant="outline"
-                  background="transparent"
-                  value={name ?? getNodeDisplayName(node)}
-                  borderRadius={5}
-                  paddingLeft={1}
-                  margin={0}
-                  size="sm"
-                  onBlur={() => {
-                    setIsEditingName(false);
-                    if (name) {
-                      handleNameChange(name, node.id);
-                    }
-                  }}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+      <VStack spacing={2} width="full" align="start">
+        <HStack
+          paddingY={1}
+          paddingLeft={2}
+          width="full"
+          justify="space-between"
+          spacing={0}
+          alignItems="flex-start"
+        >
+          <HStack spacing={2}>
+            {header ? (
+              header
+            ) : !isWorkflow(node) ? (
+              <>
+                <ComponentIcon
+                  type={node.type as ComponentType}
+                  cls={node.data.cls}
+                  size="lg"
+                />
+                {isEditingName ? (
+                  <Input
+                    fontSize={15}
+                    marginLeft={1}
+                    fontWeight={500}
+                    variant="outline"
+                    background="transparent"
+                    value={name ?? getNodeDisplayName(node)}
+                    borderRadius={5}
+                    paddingLeft={1}
+                    margin={0}
+                    size="sm"
+                    onBlur={() => {
                       setIsEditingName(false);
                       if (name) {
                         handleNameChange(name, node.id);
                       }
+                    }}
+                    onChange={(e) => {
+                      setName(e.target.value);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setIsEditingName(false);
+                        if (name) {
+                          handleNameChange(name, node.id);
+                        }
+                      }
+                    }}
+                  />
+                ) : (
+                  <HoverableBigText
+                    noOfLines={2}
+                    fontSize={15}
+                    fontWeight={500}
+                    onClick={() => {
+                      if (node.type !== "prompting_technique") {
+                        setIsEditingName(true);
+                      }
+                    }}
+                    cursor={
+                      node.type === "prompting_technique"
+                        ? undefined
+                        : "pointer"
                     }
-                  }}
-                />
-              ) : (
-                <HoverableBigText
-                  noOfLines={2}
-                  fontSize={15}
-                  fontWeight={500}
+                    overflow="hidden"
+                    textOverflow="ellipsis"
+                  >
+                    {getNodeDisplayName(node)}
+                  </HoverableBigText>
+                )}
+              </>
+            ) : null}
+          </HStack>
+          <HStack spacing={0} marginRight="-4px" hidden={isEditingName}>
+            {!isWorkflow(node) && isExecutableComponent(node) && (
+              <>
+                <HStack
+                  spacing={2}
                   onClick={() => {
-                    if (node.type !== "prompting_technique") {
-                      setIsEditingName(true);
+                    if (!propertiesExpanded) {
+                      setPropertiesExpanded(true);
                     }
                   }}
-                  cursor={
-                    node.type === "prompting_technique" ? undefined : "pointer"
-                  }
-                  overflow="hidden"
-                  textOverflow="ellipsis"
                 >
-                  {getNodeDisplayName(node)}
-                </HoverableBigText>
-              )}
-            </>
-          ) : null}
-        </HStack>
-        <HStack spacing={0} marginRight="-4px" hidden={isEditingName}>
-          {!isWorkflow(node) && isExecutableComponent(node) && (
-            <>
-              <HStack
-                spacing={2}
-                onClick={() => {
-                  if (!propertiesExpanded) {
-                    setPropertiesExpanded(true);
-                  }
-                }}
-              >
-                <ComponentExecutionButton node={node} size="sm" iconSize={16} />
-              </HStack>
+                  <ComponentExecutionButton
+                    node={node}
+                    size="sm"
+                    iconSize={16}
+                  />
+                </HStack>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                color="gray.500"
-                onClick={() => {
-                  setPropertiesExpanded(!propertiesExpanded);
-                }}
-              >
-                <Columns size={16} />
-              </Button>
-            </>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            color="gray.500"
-            onClick={() => {
-              if (propertiesExpanded) {
-                setPropertiesExpanded(false);
-              } else {
-                deselectAllNodes();
-              }
-            }}
-          >
-            <X size={16} />
-          </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  color="gray.500"
+                  onClick={() => {
+                    setPropertiesExpanded(!propertiesExpanded);
+                  }}
+                >
+                  <Columns size={16} />
+                </Button>
+              </>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              color="gray.500"
+              onClick={() => {
+                if (propertiesExpanded) {
+                  setPropertiesExpanded(false);
+                } else {
+                  deselectAllNodes();
+                }
+              }}
+            >
+              <X size={16} />
+            </Button>
+          </HStack>
         </HStack>
-      </HStack>
-
+        {node.data?.description && (
+          <Text fontSize={12} color="gray.500" paddingX={2}>
+            {node.data?.description}
+          </Text>
+        )}
+      </VStack>
       {children}
       {!isWorkflow(node) && (
         <>

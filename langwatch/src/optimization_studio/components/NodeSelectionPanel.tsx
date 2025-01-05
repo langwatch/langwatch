@@ -409,10 +409,13 @@ export const NodeDraggable = (props: {
   return (
     <>
       <Tooltip
+        hasArrow
+        gutter={16}
+        placement="right"
         label={
           props.disableDrag
             ? "You cannot add the same component as your workflow"
-            : ""
+            : props.component.description ?? ""
         }
       >
         <Box
@@ -431,7 +434,7 @@ export const NodeDraggable = (props: {
               behave_as={props.behave_as}
               size="md"
             />
-            <HoverableBigText noOfLines={1}>
+            <HoverableBigText noOfLines={1} expandable={false}>
               {props.component.name}
             </HoverableBigText>
             <Spacer />

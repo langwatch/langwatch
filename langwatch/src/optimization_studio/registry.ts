@@ -12,6 +12,7 @@ import { convertEvaluators } from "./utils/registryUtils";
 
 const signature: Signature = {
   name: "LLM Signature",
+  description: "LLM calling node",
   parameters: [
     {
       identifier: "llm",
@@ -50,6 +51,7 @@ const signature: Signature = {
 
 const code: Code = {
   name: "Code",
+  description: "Python code block",
   parameters: [
     {
       identifier: "code",
@@ -82,6 +84,8 @@ const promptingTechniques: PromptingTechnique[] = [
   {
     cls: "ChainOfThought",
     name: "ChainOfThought",
+    description:
+      "Drag and drop to an LLM signature to add a chain of thought prompting technique, adding a reasoning step to the LLM.",
     parameters: [],
   },
 ];
@@ -108,6 +112,7 @@ const retrievers: Retriever[] = [
   {
     cls: "ColBERTv2",
     name: "ColBERTv2",
+    description: "Retriever for a ColBERTv2 vector database",
     parameters: [
       {
         identifier: "k",
@@ -127,6 +132,7 @@ const retrievers: Retriever[] = [
   {
     cls: "WeaviateRM",
     name: "Weaviate",
+    description: "Retriever for a Weaviate vector database",
     parameters: [
       {
         identifier: "k",
@@ -174,23 +180,36 @@ const retrievers: Retriever[] = [
 ];
 
 const ALLOWED_EVALUATORS = [
-  "ragas/answer_correctness",
-  "ragas/answer_relevancy",
-  "ragas/faithfulness",
-  "ragas/context_relevancy",
-  "ragas/context_utilization",
-  "langevals/basic",
+  "ragas/factual_correctness",
+  "lingua/language_detection",
   "langevals/llm_boolean",
   "langevals/llm_score",
-  "lingua/language_detection",
+  "langevals/llm_category",
+  "ragas/faithfulness",
+  "ragas/context_precision",
+  "ragas/context_recall",
+  "ragas/context_f1",
+  "ragas/response_relevancy",
+  "ragas/response_context_precision",
+  "ragas/response_context_recall",
+  "ragas/summarization_score",
+  "langevals/basic",
   "azure/prompt_injection",
   "openai/moderation",
+  "presidio/pii_detection",
+  "langevals/valid_format",
+  "ragas/rubrics_based_scoring",
+  "ragas/sql_query_equivalence",
+  "ragas/bleu_score",
+  "ragas/rouge_score",
 ];
 
 const evaluators: Evaluator[] = [
   {
     cls: "ExactMatchEvaluator",
     name: "Exact Match",
+    description:
+      "Check if the generated output exactly matches the expected output (==)",
     inputs: [
       { identifier: "output", type: "str" },
       { identifier: "expected_output", type: "str" },
@@ -202,7 +221,9 @@ const evaluators: Evaluator[] = [
   },
   {
     cls: "AnswerCorrectnessEvaluator",
-    name: "Answer Correctness",
+    name: "LLM Answer Match",
+    description:
+      "Uses an LLM to judge to check if the generated output and the expected output are the same",
     parameters: [{ identifier: "llm", type: "llm" }],
     inputs: [
       { identifier: "input", type: "str" },

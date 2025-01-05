@@ -68,6 +68,10 @@ export const evaluationInputSchema = z.object({
       .optional()
       .nullable(),
     expected_output: z.string().optional().nullable(),
+    expected_contexts: z
+      .union([z.array(rAGChunkSchema), z.array(z.string())])
+      .optional()
+      .nullable(),
     conversation: z
       .array(
         z.object({
