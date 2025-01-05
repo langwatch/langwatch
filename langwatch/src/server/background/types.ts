@@ -12,7 +12,8 @@ export type Mappings =
   | "trace.input"
   | "trace.output"
   | "trace.first_rag_context"
-  | "metadata.expected_output";
+  | "metadata.expected_output"
+  | "metadata.expected_contexts";
 
 export type EvaluationJob = {
   check: {

@@ -4,10 +4,15 @@ import {
   AccordionIcon,
   AccordionItem,
   AccordionPanel,
+  Alert,
+  AlertIcon,
   Box,
   Button,
   Card,
   CardBody,
+  FormControl,
+  FormHelperText,
+  FormLabel,
   HStack,
   Input,
   Select,
@@ -102,6 +107,7 @@ export default function CheckConfigForm({
     output: "trace.output",
     contexts: "trace.first_rag_context",
     expected_output: "metadata.expected_output",
+    expected_contexts: "metadata.expected_contexts",
   };
 
   const MAPPING_OPTIONS = [
@@ -109,6 +115,10 @@ export default function CheckConfigForm({
     { value: "trace.output", label: "trace.output" },
     { value: "trace.first_rag_context", label: "trace.first_rag_context" },
     { value: "metadata.expected_output", label: "metadata.expected_output" },
+    {
+      value: "metadata.expected_contexts",
+      label: "metadata.expected_contexts",
+    },
   ];
 
   if (defaultValues) {
@@ -294,28 +304,47 @@ export default function CheckConfigForm({
           <VStack spacing={6} align="start" width="full">
             <Card width="full">
               <CardBody>
-                <VStack spacing={4}>
+                <VStack spacing={0}>
                   <HorizontalFormControl
                     label="Evaluation Type"
                     helper="Select the evaluation to run"
                     isInvalid={!!errors.checkType}
                   >
-                    {evaluatorTempNameMap[
-                      availableEvaluators[checkType].name
-                    ] ?? availableEvaluators[checkType].name}{" "}
-                    <Button
-                      variant="link"
-                      onClick={() => {
-                        void router.push({
-                          pathname: router.pathname + "/choose",
-                          query: router.query,
-                        });
-                      }}
-                      marginLeft={4}
-                      fontWeight="normal"
-                    >
-                      (change)
-                    </Button>
+                    <VStack align="start" width="full">
+                      <HStack spacing={0}>
+                        <Text>
+                          {evaluatorTempNameMap[
+                            availableEvaluators[checkType].name
+                          ] ?? availableEvaluators[checkType].name}
+                        </Text>
+                        <Button
+                          variant="link"
+                          onClick={() => {
+                            void router.push({
+                              pathname: router.pathname + "/choose",
+                              query: router.query,
+                            });
+                          }}
+                          marginLeft={4}
+                          fontWeight="normal"
+                        >
+                          (change)
+                        </Button>
+                      </HStack>
+                      <Text fontSize={12} color="gray.500">
+                        {availableEvaluators[checkType].description}
+                      </Text>
+                      {checkType.startsWith("legacy/") && (
+                        <Alert status="warning" alignItems="start">
+                          <AlertIcon />
+                          <Text fontSize={13}>
+                            You are using a legacy evaluator version, please
+                            click the <b>change</b> button above to select a
+                            newer version or a replacement for this evaluator.
+                          </Text>
+                        </Alert>
+                      )}
+                    </VStack>
                   </HorizontalFormControl>
                   <HorizontalFormControl
                     label="Name"
@@ -349,14 +378,22 @@ export default function CheckConfigForm({
                       evaluatorType={checkType}
                       prefix="settings"
                       errors={errors.settings}
+                      skipFields={["max_tokens"]}
                     />
                   )}
+                </VStack>
+              </CardBody>
+            </Card>
 
+            <Card width="full" padding={0}>
+              <CardBody padding={0}>
+                <VStack paddingX={4} spacing={0}>
                   <HorizontalFormControl
                     label="Execution Mode"
                     helper="Configure when this evaluation is executed"
                     isInvalid={!!errors.executionMode}
                     align="start"
+                    _last={{ borderBottomWidth: "1px" }}
                   >
                     <Select {...register("executionMode")} required>
                       <option value={EvaluationExecutionMode.ON_MESSAGE}>
@@ -372,64 +409,6 @@ export default function CheckConfigForm({
                       </option>
                     </Select>
                   </HorizontalFormControl>
-
-                  {executionMode === EvaluationExecutionMode.ON_MESSAGE && (
-                    <>
-                      <PreconditionsField
-                        runOn={
-                          preconditions?.length === 0 &&
-                          !evaluatorDefinition?.requiredFields.includes(
-                            "contexts"
-                          ) ? (
-                            sample == 1 ? (
-                              runOn
-                            ) : (
-                              <Text color="gray.500" fontStyle="italic">
-                                No preconditions defined
-                              </Text>
-                            )
-                          ) : null
-                        }
-                        append={appendPrecondition}
-                        remove={removePrecondition}
-                        fields={fieldsPrecondition}
-                      />
-                      <HorizontalFormControl
-                        label="Sampling"
-                        helper="Run this check only on a sample of messages (min 0.01, max 1.0)"
-                        isInvalid={!!errors.sample}
-                        align="start"
-                      >
-                        <Controller
-                          control={control}
-                          name="sample"
-                          render={({ field }) => (
-                            <VStack align="start">
-                              <HStack>
-                                <Input
-                                  width="110px"
-                                  type="number"
-                                  min="0"
-                                  max="1"
-                                  step="0.1"
-                                  placeholder="0.0"
-                                  {...field}
-                                  onChange={(e) =>
-                                    field.onChange(+e.target.value)
-                                  }
-                                />
-                                <Tooltip label="You can use this to save costs on expensive checks if you have too many messages incomming. From 0.01 to run on 1% of the messages to 1.0 to run on 100% of the messages">
-                                  <HelpCircle width="14px" />
-                                </Tooltip>
-                              </HStack>
-                              {runOn}
-                            </VStack>
-                          )}
-                        />
-                      </HorizontalFormControl>
-                    </>
-                  )}
-
                   {executionMode !== EvaluationExecutionMode.ON_MESSAGE && (
                     <EvaluationManualIntegration
                       slug={slug}
@@ -438,44 +417,119 @@ export default function CheckConfigForm({
                     />
                   )}
                 </VStack>
-              </CardBody>
-            </Card>
 
-            <Card width="full" padding={0}>
-              <CardBody padding={0}>
-                <Accordion
-                  defaultIndex={accordionIndex}
-                  allowToggle
-                  padding={0}
-                >
-                  <AccordionItem border="none">
-                    <h2>
+                {executionMode === EvaluationExecutionMode.ON_MESSAGE && (
+                  <Accordion
+                    defaultIndex={accordionIndex}
+                    allowToggle
+                    padding={0}
+                  >
+                    <AccordionItem border="none">
                       <AccordionButton paddingY={6}>
                         <Box as="span" flex="1" textAlign="left">
-                          <Text fontWeight="500">Mappings</Text>
+                          <FormControl>
+                            <VStack align="start" spacing={1}>
+                              <FormLabel margin={0}>
+                                Execution Settings
+                              </FormLabel>
+                              <FormHelperText margin={0} fontSize={13}>
+                                Configure how and when this evaluation is
+                                executed when a new message arrives
+                              </FormHelperText>
+                            </VStack>
+                          </FormControl>
                         </Box>
                         <AccordionIcon />
                       </AccordionButton>
-                    </h2>
-                    <AccordionPanel paddingTop={0}>
-                      <MappingsFields
-                        register={register}
-                        mappingOptions={MAPPING_OPTIONS}
-                        defaultValues={
-                          defaultValues?.mappings ?? DEFAULT_MAPPINGS
-                        }
-                        optionalFields={
-                          availableEvaluators[checkType].optionalFields
-                        }
-                        requiredFields={
-                          availableEvaluators[checkType].requiredFields
-                        }
-                      />
-                    </AccordionPanel>
-                  </AccordionItem>
-                </Accordion>
+                      <AccordionPanel paddingTop={2}>
+                        <HorizontalFormControl
+                          label="Mappings"
+                          helper="Map which fields from the trace will be used to run the evaluation"
+                        >
+                          <MappingsFields
+                            register={register}
+                            mappingOptions={MAPPING_OPTIONS}
+                            defaultValues={
+                              defaultValues?.mappings ?? DEFAULT_MAPPINGS
+                            }
+                            optionalFields={
+                              availableEvaluators[checkType].optionalFields
+                            }
+                            requiredFields={
+                              availableEvaluators[checkType].requiredFields
+                            }
+                          />
+                        </HorizontalFormControl>
+                        <PreconditionsField
+                          runOn={
+                            preconditions?.length === 0 &&
+                            !evaluatorDefinition?.requiredFields.includes(
+                              "contexts"
+                            ) ? (
+                              sample == 1 ? (
+                                runOn
+                              ) : (
+                                <Text color="gray.500" fontStyle="italic">
+                                  No preconditions defined
+                                </Text>
+                              )
+                            ) : null
+                          }
+                          append={appendPrecondition}
+                          remove={removePrecondition}
+                          fields={fieldsPrecondition}
+                        />
+                        {checkType && evaluatorsSchema.shape[checkType] && (
+                          <DynamicZodForm
+                            schema={
+                              evaluatorsSchema.shape[checkType].shape.settings
+                            }
+                            evaluatorType={checkType}
+                            prefix="settings"
+                            errors={errors.settings}
+                            onlyFields={["max_tokens"]}
+                          />
+                        )}
+                        <HorizontalFormControl
+                          label="Sampling"
+                          helper="Run this check only on a sample of messages (min 0.01, max 1.0)"
+                          isInvalid={!!errors.sample}
+                          align="start"
+                        >
+                          <Controller
+                            control={control}
+                            name="sample"
+                            render={({ field }) => (
+                              <VStack align="start">
+                                <HStack>
+                                  <Input
+                                    width="110px"
+                                    type="number"
+                                    min="0"
+                                    max="1"
+                                    step="0.1"
+                                    placeholder="0.0"
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(+e.target.value)
+                                    }
+                                  />
+                                  <Tooltip label="You can use this to save costs on expensive checks if you have too many messages incomming. From 0.01 to run on 1% of the messages to 1.0 to run on 100% of the messages">
+                                    <HelpCircle width="14px" />
+                                  </Tooltip>
+                                </HStack>
+                                {runOn}
+                              </VStack>
+                            )}
+                          />
+                        </HorizontalFormControl>
+                      </AccordionPanel>
+                    </AccordionItem>
+                  </Accordion>
+                )}
               </CardBody>
             </Card>
+
             <HStack width="full">
               <Spacer />
               <Tooltip
@@ -550,12 +604,12 @@ const MappingsFields = ({
                   defaultValue={defaultValues[field]}
                   {...register(`mappings.${field}`)}
                 >
+                  <option value="">(empty)</option>
                   {mappingOptions.map(({ value, label }) => (
                     <option key={value} value={value}>
                       {label}
                     </option>
                   ))}
-                  <option value="">None</option>
                 </Select>
                 <ArrowRight />
                 <Text>{field} (optional)</Text>

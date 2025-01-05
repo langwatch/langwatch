@@ -42,6 +42,20 @@ export const evaluatorTempNameMap: Record<string, string> = {
   "Azure Prompt Shield": "Prompt Injection Detection",
 };
 
+const sortingOrder = [
+  // rag,
+  "ragas/faithfulness",
+  "ragas/response_context_precision",
+  "ragas/response_context_recall",
+
+  // quality,
+  "ragas/response_relevancy",
+  "ragas/summarization_score",
+  "lingua/language_detection",
+  "langevals/valid_format",
+  "ragas/factual_correctness",
+];
+
 export function EvaluatorSelection({
   form,
 }: {
@@ -64,12 +78,18 @@ export function EvaluatorSelection({
     );
 
   const availableEvaluators = [
-    ...Object.entries(availableEvaluators_.data ?? AVAILABLE_EVALUATORS).filter(
-      ([key, _evaluator]) =>
-        !key.startsWith("example/") &&
-        key !== "aws/comprehend_pii_detection" &&
-        key !== "google_cloud/dlp_pii_detection"
-    ),
+    ...Object.entries(availableEvaluators_.data ?? AVAILABLE_EVALUATORS)
+      .filter(
+        ([key, _evaluator]) =>
+          !key.startsWith("example/") && !key.startsWith("legacy/")
+      )
+      .sort(([key, _evaluator], [key2, _evaluator2]) => {
+        const index = sortingOrder.indexOf(key);
+        const index2 = sortingOrder.indexOf(key2);
+        if (index === -1) return 999;
+        if (index2 === -1) return -999;
+        return index - index2;
+      }),
     ...(availableCustomEvaluators.data ?? []).map((evaluator) => [
       `custom/${evaluator.id}`,
       {
@@ -81,7 +101,13 @@ export function EvaluatorSelection({
     ]),
   ];
 
-  const categories: Category[] = ["safety", "policy", "quality", "custom"];
+  const categories: Category[] = [
+    "safety",
+    "policy",
+    "rag",
+    "quality",
+    "custom",
+  ];
 
   const availableEvaluatorsPerCategory: Record<
     string,
@@ -102,8 +128,7 @@ export function EvaluatorSelection({
         Array.isArray(entry) &&
         typeof entry[1] === "object" &&
         "category" in entry[1] &&
-        (entry[1].category === category ||
-          (entry[1].category === "rag" && category === "quality"))
+        entry[1].category === category
     );
   }
 
@@ -249,7 +274,7 @@ export function EvaluatorSelection({
                             >
                               <Tooltip label="Only messages with contexts can run this evaluation, click for more info">
                                 <Tag colorScheme="orange" whiteSpace="nowrap">
-                                  Requires RAG
+                                  Requires Contexts
                                 </Tag>
                               </Tooltip>
                             </Link>
@@ -271,6 +296,19 @@ export function EvaluatorSelection({
                                 </Tag>
                               </Tooltip>
                             </Link>
+                          )}
+                          {evaluator.requiredFields.includes(
+                            "expected_contexts"
+                          ) && (
+                            <Tooltip label="Only messages with expected contexts can run this evaluation, click for more info">
+                              <Tag
+                                backgroundColor="purple.50"
+                                color="purple.700"
+                                whiteSpace="nowrap"
+                              >
+                                Requires Expected Contexts
+                              </Tag>
+                            </Tooltip>
                           )}
                         </HStack>
                       </VStack>

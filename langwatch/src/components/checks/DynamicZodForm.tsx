@@ -40,12 +40,16 @@ const DynamicZodForm = ({
   prefix,
   errors,
   variant = "default",
+  onlyFields,
+  skipFields,
 }: {
   schema: ZodType;
   evaluatorType: EvaluatorTypes;
   prefix: string;
   errors: FieldErrors<CheckConfigFormData>["settings"];
   variant?: "default" | "studio";
+  onlyFields?: string[];
+  skipFields?: string[];
 }) => {
   const { control, register } = useFormContext();
 
@@ -320,62 +324,71 @@ const DynamicZodForm = ({
         evaluatorType
       ) as EvaluatorDefinition<T>;
 
-      return Object.keys(schema.shape).map((key) => {
-        const field = schema.shape[key];
-        const isOptional = field instanceof z.ZodOptional;
-        const helperText =
-          evaluatorDefinition?.settings?.[
-            key as keyof Evaluators[T]["settings"]
-          ].description ?? "";
-        const isInvalid = errors && key in errors && !!(errors as any)[key];
+      return Object.keys(schema.shape)
+        .filter((key) => !skipFields?.includes(key))
+        .filter((key) => (onlyFields ? onlyFields.includes(key) : true))
+        .map((key) => {
+          const field = schema.shape[key];
+          const isOptional = field instanceof z.ZodOptional;
+          const helperText =
+            evaluatorDefinition?.settings?.[
+              key as keyof Evaluators[T]["settings"]
+            ].description ?? "";
+          const isInvalid = errors && key in errors && !!(errors as any)[key];
 
-        if (variant === "studio") {
+          if (variant === "studio") {
+            return (
+              <VStack
+                key={key}
+                as="form"
+                align="start"
+                spacing={3}
+                width="full"
+              >
+                <HStack width="full">
+                  <PropertySectionTitle>
+                    {camelCaseToTitleCase(key)}
+                  </PropertySectionTitle>
+                  {isOptional && (
+                    <Text color="gray.500" fontSize={12}>
+                      (optional)
+                    </Text>
+                  )}
+                  {helperText && (
+                    <Tooltip label={helperText}>
+                      <Info size={14} />
+                    </Tooltip>
+                  )}
+                </HStack>
+                <FormControl isInvalid={isInvalid}>
+                  {renderField(
+                    field,
+                    basePath ? `${basePath}.${key}` : key,
+                    evaluatorDefinition
+                  )}
+                </FormControl>
+              </VStack>
+            );
+          }
+
           return (
-            <VStack key={key} as="form" align="start" spacing={3} width="full">
-              <HStack width="full">
-                <PropertySectionTitle>
-                  {camelCaseToTitleCase(key)}
-                </PropertySectionTitle>
-                {isOptional && (
-                  <Text color="gray.500" fontSize={12}>
-                    (optional)
-                  </Text>
-                )}
-                {helperText && (
-                  <Tooltip label={helperText}>
-                    <Info size={14} />
-                  </Tooltip>
-                )}
-              </HStack>
-              <FormControl isInvalid={isInvalid}>
+            <React.Fragment key={key}>
+              <HorizontalFormControl
+                label={
+                  camelCaseToTitleCase(key) + (isOptional ? " (Optional)" : "")
+                }
+                helper={helperText}
+                isInvalid={isInvalid}
+              >
                 {renderField(
                   field,
                   basePath ? `${basePath}.${key}` : key,
                   evaluatorDefinition
                 )}
-              </FormControl>
-            </VStack>
+              </HorizontalFormControl>
+            </React.Fragment>
           );
-        }
-
-        return (
-          <React.Fragment key={key}>
-            <HorizontalFormControl
-              label={
-                camelCaseToTitleCase(key) + (isOptional ? " (Optional)" : "")
-              }
-              helper={helperText}
-              isInvalid={isInvalid}
-            >
-              {renderField(
-                field,
-                basePath ? `${basePath}.${key}` : key,
-                evaluatorDefinition
-              )}
-            </HorizontalFormControl>
-          </React.Fragment>
-        );
-      });
+        });
     }
     return null;
   };

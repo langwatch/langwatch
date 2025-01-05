@@ -122,6 +122,13 @@ export const runEvaluationForTrace = async ({
         trace.expected_output?.value ?? trace.metadata.expected_output
       )?.toString();
     }
+    if (mapping === "metadata.expected_contexts") {
+      return trace.metadata.expected_contexts
+        ? Array.isArray(trace.metadata.expected_contexts)
+          ? (trace.metadata.expected_contexts as string[])
+          : [trace.metadata.expected_contexts as string]
+        : undefined;
+    }
     // Use typescript to ensure all cases are handled
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const _: never = mapping;

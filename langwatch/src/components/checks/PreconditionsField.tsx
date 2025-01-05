@@ -79,10 +79,9 @@ export const PreconditionsField = ({
               align="start"
               position="relative"
             >
-              <Text>Requires a RAG</Text>
+              <Text>Requires RAG Contexts</Text>
               <Text color="gray.500" fontStyle="italic">
-                This precondition is necessary to run this evaluation and cannot
-                be removed
+                This evaluator will only run if the RAG contexts are provided
               </Text>
             </VStack>
           </Box>
@@ -98,8 +97,24 @@ export const PreconditionsField = ({
             >
               <Text>Requires an Expected Output</Text>
               <Text color="gray.500" fontStyle="italic">
-                This precondition is necessary to run this evaluation and cannot
-                be removed
+                This evaluator will only run if the expected output is provided
+              </Text>
+            </VStack>
+          </Box>
+        )}
+        {evaluator?.requiredFields.includes("expected_contexts") && (
+          <Box borderLeft="4px solid" borderLeftColor="blue.400" width="full">
+            <VStack
+              borderLeftColor="reset"
+              padding={3}
+              width="full"
+              align="start"
+              position="relative"
+            >
+              <Text>Requires Expected Contexts</Text>
+              <Text color="gray.500" fontStyle="italic">
+                This evaluator will only run if the expected contexts are
+                provided
               </Text>
             </VStack>
           </Box>

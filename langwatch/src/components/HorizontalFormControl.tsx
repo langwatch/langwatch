@@ -18,6 +18,7 @@ export function HorizontalFormControl({
   align,
   minWidth,
   inputWidth,
+  ...props
 }: PropsWithChildren<{
   label: string | ReactNode;
   helper: string;
@@ -28,9 +29,10 @@ export function HorizontalFormControl({
   return (
     <FormControl
       borderBottomWidth="1px"
-      paddingY={4}
+      paddingY={5}
       isInvalid={isInvalid}
       _last={{ border: "none" }}
+      {...props}
     >
       <HStack
         width="full"
