@@ -1091,160 +1091,172 @@ export function MessagesTable() {
         </HStack>
 
         <HStack align={"top"} gap={8}>
-          <Card>
-            <Progress colorScheme="orange" value={downloadProgress} size="xs" />
-            <CardBody padding={0}>
-              {checkedHeaderColumnsEntries.length === 0 && (
-                <Text>No columns selected</Text>
-              )}
-              <TableContainer
-                ref={scrollRef}
-                onScroll={() => {
-                  if (scrollRef.current) {
-                    setScrollXPosition(scrollRef.current.scrollLeft);
-                  }
-                }}
-              >
-                <Table size="sm" height="fit-content">
-                  <Thead>
-                    <Tr>
-                      {checkedHeaderColumnsEntries
-                        .filter(([_, { enabled }]) => enabled)
-                        .map(([columnKey, { name }], index) => (
-                          <Th
-                            key={index}
-                            paddingY={4}
-                            {...(columnKey === "checked"
-                              ? {
-                                  position: "sticky",
-                                  left: 0,
-                                  background: "white",
-                                  transition: "box-shadow 0.3s ease-in-out",
-                                  boxShadow:
-                                    scrollXPosition > 0
-                                      ? "0 2px 5px rgba(0, 0, 0, 0.1)"
-                                      : "0 0 0 rgba(0, 0, 0, 0)",
-                                }
-                              : {})}
-                          >
-                            {columnKey === "checked" ? (
-                              <HStack width="full">
-                                <Checkbox
-                                  isChecked={
-                                    selectedTraceIds.length ===
-                                    traceGroups.data?.groups.length
-                                  }
-                                  onChange={() => toggleAllTraces()}
-                                />
-                              </HStack>
-                            ) : (
-                              <HStack spacing={1}>
-                                <Text
-                                  minWidth={headerColumns[columnKey]?.width}
-                                  width="full"
-                                >
-                                  {name}
-                                </Text>
-                                {headerColumns[columnKey]?.sortable &&
-                                  sortButton(columnKey)}
-                              </HStack>
-                            )}
-                          </Th>
-                        ))}
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {traceGroups.data?.groups.flatMap((traceGroup) =>
-                      traceGroup.map((trace) => (
-                        <Tr key={trace.trace_id} role="button" cursor="pointer">
-                          {checkedHeaderColumnsEntries.map(
-                            ([column, { name }], index) =>
-                              headerColumns[column]?.render(trace, index) ??
-                              headerColumnForEvaluation({
-                                columnKey: column,
-                                checkName: name,
-                              })?.render(trace, index)
-                          )}
-                        </Tr>
-                      ))
-                    )}
-                    {traceGroups.isLoading &&
-                      Array.from({ length: 3 }).map((_, i) => (
-                        <Tr key={i}>
-                          {Array.from({
-                            length: checkedHeaderColumnsEntries.length,
-                          }).map((_, i) => (
-                            <Td key={i}>
-                              <Delayed key={1} takeSpace>
-                                <Skeleton height="16px" />
-                              </Delayed>
-                            </Td>
-                          ))}
-                        </Tr>
-                      ))}
-                    {traceGroups.isFetched &&
-                      traceGroups.data?.groups.length === 0 && (
+          <Box flex="1" minWidth="0">
+            <VStack spacing={1} align="start">
+              <Card height="fit-content" width="100%">
+                <Progress
+                  colorScheme="orange"
+                  value={downloadProgress}
+                  size="xs"
+                />
+                <CardBody padding={0}>
+                  {checkedHeaderColumnsEntries.length === 0 && (
+                    <Text>No columns selected</Text>
+                  )}
+                  <TableContainer
+                    ref={scrollRef}
+                    onScroll={() => {
+                      if (scrollRef.current) {
+                        setScrollXPosition(scrollRef.current.scrollLeft);
+                      }
+                    }}
+                  >
+                    <Table size="sm" height="fit-content">
+                      <Thead>
                         <Tr>
-                          <Td />
-                          <Td colSpan={checkedHeaderColumnsEntries.length}>
-                            No messages found, try selecting different filters
-                            and dates
-                          </Td>
+                          {checkedHeaderColumnsEntries
+                            .filter(([_, { enabled }]) => enabled)
+                            .map(([columnKey, { name }], index) => (
+                              <Th
+                                key={index}
+                                paddingY={4}
+                                {...(columnKey === "checked"
+                                  ? {
+                                      position: "sticky",
+                                      left: 0,
+                                      background: "white",
+                                      transition: "box-shadow 0.3s ease-in-out",
+                                      boxShadow:
+                                        scrollXPosition > 0
+                                          ? "0 2px 5px rgba(0, 0, 0, 0.1)"
+                                          : "0 0 0 rgba(0, 0, 0, 0)",
+                                    }
+                                  : {})}
+                              >
+                                {columnKey === "checked" ? (
+                                  <HStack width="full">
+                                    <Checkbox
+                                      isChecked={
+                                        selectedTraceIds.length ===
+                                        traceGroups.data?.groups.length
+                                      }
+                                      onChange={() => toggleAllTraces()}
+                                    />
+                                  </HStack>
+                                ) : (
+                                  <HStack spacing={1}>
+                                    <Text
+                                      minWidth={headerColumns[columnKey]?.width}
+                                      width="full"
+                                    >
+                                      {name}
+                                    </Text>
+                                    {headerColumns[columnKey]?.sortable &&
+                                      sortButton(columnKey)}
+                                  </HStack>
+                                )}
+                              </Th>
+                            ))}
                         </Tr>
-                      )}
-                  </Tbody>
-                </Table>
-              </TableContainer>
-            </CardBody>
-          </Card>
+                      </Thead>
+                      <Tbody>
+                        {traceGroups.data?.groups.flatMap((traceGroup) =>
+                          traceGroup.map((trace) => (
+                            <Tr
+                              key={trace.trace_id}
+                              role="button"
+                              cursor="pointer"
+                            >
+                              {checkedHeaderColumnsEntries.map(
+                                ([column, { name }], index) =>
+                                  headerColumns[column]?.render(trace, index) ??
+                                  headerColumnForEvaluation({
+                                    columnKey: column,
+                                    checkName: name,
+                                  })?.render(trace, index)
+                              )}
+                            </Tr>
+                          ))
+                        )}
+                        {traceGroups.isLoading &&
+                          Array.from({ length: 3 }).map((_, i) => (
+                            <Tr key={i}>
+                              {Array.from({
+                                length: checkedHeaderColumnsEntries.length,
+                              }).map((_, i) => (
+                                <Td key={i}>
+                                  <Delayed key={1} takeSpace>
+                                    <Skeleton height="16px" />
+                                  </Delayed>
+                                </Td>
+                              ))}
+                            </Tr>
+                          ))}
+                        {traceGroups.isFetched &&
+                          traceGroups.data?.groups.length === 0 && (
+                            <Tr>
+                              <Td />
+                              <Td colSpan={checkedHeaderColumnsEntries.length}>
+                                No messages found, try selecting different
+                                filters and dates
+                              </Td>
+                            </Tr>
+                          )}
+                      </Tbody>
+                    </Table>
+                  </TableContainer>
+                </CardBody>
+              </Card>
+              <HStack padding={6}>
+                <Text>Items per page </Text>
+
+                <Select
+                  defaultValue={"25"}
+                  placeholder=""
+                  maxW="70px"
+                  size="sm"
+                  onChange={(e) => changePageSize(parseInt(e.target.value))}
+                  borderColor={"black"}
+                  borderRadius={"lg"}
+                >
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="250">250</option>
+                </Select>
+
+                <Text marginLeft={"20px"}>
+                  {" "}
+                  {`${pageOffset + 1}`} -{" "}
+                  {`${
+                    pageOffset + pageSize > totalHits
+                      ? totalHits
+                      : pageOffset + pageSize
+                  }`}{" "}
+                  of {`${totalHits}`} items
+                </Text>
+                <Button
+                  width={10}
+                  padding={0}
+                  onClick={prevPage}
+                  isDisabled={pageOffset === 0}
+                >
+                  <ChevronLeft />
+                </Button>
+                <Button
+                  width={10}
+                  padding={0}
+                  isDisabled={pageOffset + pageSize >= totalHits}
+                  onClick={nextPage}
+                >
+                  <ChevronRight />
+                </Button>
+              </HStack>
+            </VStack>
+          </Box>
+
           <FilterSidebar />
-        </HStack>
-
-        <HStack padding={6}>
-          <Text>Items per page </Text>
-
-          <Select
-            defaultValue={"25"}
-            placeholder=""
-            maxW="70px"
-            size="sm"
-            onChange={(e) => changePageSize(parseInt(e.target.value))}
-            borderColor={"black"}
-            borderRadius={"lg"}
-          >
-            <option value="10">10</option>
-            <option value="25">25</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-            <option value="250">250</option>
-          </Select>
-
-          <Text marginLeft={"20px"}>
-            {" "}
-            {`${pageOffset + 1}`} -{" "}
-            {`${
-              pageOffset + pageSize > totalHits
-                ? totalHits
-                : pageOffset + pageSize
-            }`}{" "}
-            of {`${totalHits}`} items
-          </Text>
-          <Button
-            width={10}
-            padding={0}
-            onClick={prevPage}
-            isDisabled={pageOffset === 0}
-          >
-            <ChevronLeft />
-          </Button>
-          <Button
-            width={10}
-            padding={0}
-            isDisabled={pageOffset + pageSize >= totalHits}
-            onClick={nextPage}
-          >
-            <ChevronRight />
-          </Button>
         </HStack>
       </Container>
       {selectedTraceIds.length > 0 && (
