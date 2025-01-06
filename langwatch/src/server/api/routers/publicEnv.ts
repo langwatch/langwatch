@@ -17,6 +17,7 @@ export const publicEnvRouter = publicProcedure
       IS_QUICKWIT: env.IS_QUICKWIT,
       HAS_EMAIL_PROVIDER_KEY:
         !!env.SENDGRID_API_KEY || !!(env.USE_AWS_SES && env.AWS_REGION),
+      IS_SAAS: env.IS_SAAS,
     };
 
     return publicEnvVars;
