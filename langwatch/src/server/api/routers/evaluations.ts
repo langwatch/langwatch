@@ -26,7 +26,7 @@ export const evaluationsRouter = createTRPCRouter({
 
   availableCustomEvaluators: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_VIEW))
     .query(async ({ input }) => {
       const customEvaluators = await prisma.workflow
         .findMany({
