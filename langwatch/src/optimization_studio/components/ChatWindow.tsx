@@ -97,7 +97,7 @@ export const ChatWindow = ({
   return (
     <Modal onClose={onClose} size={"5xl"} isOpen={isOpen}>
       <ModalOverlay />
-      <ModalContent height={"60vh"}>
+      <ModalContent height={"65vh"} overflowY="auto">
         <ModalHeader>Test Message</ModalHeader>
         <ModalCloseButton />
         <ModalBody>
