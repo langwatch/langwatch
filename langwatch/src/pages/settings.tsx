@@ -206,8 +206,8 @@ function ProjectSettingsForm({ project }: { project: Project }) {
       description:
         "Redacts only essential PII data like email addresses, phone numbers, credit card numbers and IP addresses",
     },
-    ...(organization?.signedDPA ||
-    publicEnv.data?.IS_ONPREM ||
+    ...(!!organization?.signedDPA ||
+    !publicEnv.data?.IS_SAAS ||
     publicEnv.data?.NODE_ENV === "development"
       ? [
           {

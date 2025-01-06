@@ -503,37 +503,36 @@ export const DashboardLayout = ({
                 </IconWrapper>
               </Link>
             </Tooltip>
-            {!publicEnv.data?.IS_ONPREM && (
-              <>
-                <Tooltip
-                  hasArrow
-                  placement="right"
-                  gutter={16}
-                  label="Star us on GitHub"
+
+            <>
+              <Tooltip
+                hasArrow
+                placement="right"
+                gutter={16}
+                label="Star us on GitHub"
+              >
+                <Link
+                  href="https://github.com/langwatch/langwatch"
+                  target="_blank"
                 >
-                  <Link
-                    href="https://github.com/langwatch/langwatch"
-                    target="_blank"
-                  >
-                    <IconWrapper width="20px" height="20px">
-                      <GitHub />
-                    </IconWrapper>
-                  </Link>
-                </Tooltip>
-                <Tooltip
-                  hasArrow
-                  placement="right"
-                  gutter={16}
-                  label="Join our community"
-                >
-                  <Link href="https://discord.gg/kT4PhDS2gH" target="_blank">
-                    <IconWrapper width="20px" height="20px">
-                      <DiscordOutlineIcon />
-                    </IconWrapper>
-                  </Link>
-                </Tooltip>
-              </>
-            )}
+                  <IconWrapper width="20px" height="20px">
+                    <GitHub />
+                  </IconWrapper>
+                </Link>
+              </Tooltip>
+              <Tooltip
+                hasArrow
+                placement="right"
+                gutter={16}
+                label="Join our community"
+              >
+                <Link href="https://discord.gg/kT4PhDS2gH" target="_blank">
+                  <IconWrapper width="20px" height="20px">
+                    <DiscordOutlineIcon />
+                  </IconWrapper>
+                </Link>
+              </Tooltip>
+            </>
             {(window as any)?.$crisp && (
               <Tooltip hasArrow placement="right" gutter={16} label="Live Help">
                 <Button
