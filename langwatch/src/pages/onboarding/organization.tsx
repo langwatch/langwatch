@@ -113,7 +113,7 @@ export default function OrganizationOnboarding() {
       : undefined;
 
   const publicEnv = usePublicEnv();
-  const isOnPrem = publicEnv.data?.IS_ONPREM;
+  const isSaaS = publicEnv.data?.IS_SAAS;
 
   const createOrganization = api.organization.createAndAssign.useMutation();
   const apiContext = api.useContext();
@@ -320,7 +320,7 @@ export default function OrganizationOnboarding() {
                 />
               </FormControl>
 
-              {!isOnPrem && (
+              {isSaaS && (
                 <FormControl isInvalid={!!errors.usage}>
                   <FormLabel>How will you be using LangWatch?</FormLabel>
 
@@ -345,7 +345,7 @@ export default function OrganizationOnboarding() {
                   <FormErrorMessage>{errors.usage?.message}</FormErrorMessage>
                 </FormControl>
               )}
-              {!isOnPrem && (
+              {isSaaS && (
                 <FormControl isInvalid={!!errors.solution}>
                   <FormLabel>What solution are you interested in?</FormLabel>
                   <RadioGroup
@@ -409,7 +409,7 @@ export default function OrganizationOnboarding() {
                   type="submit"
                   disabled={createOrganization.isLoading}
                   onClick={() => {
-                    if (!isOnPrem) {
+                    if (isSaaS) {
                       checkFirstStep();
                     }
                   }}

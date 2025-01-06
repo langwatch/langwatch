@@ -190,7 +190,7 @@ export const projectRouter = createTRPCRouter({
           teamId: teamId,
           apiKey: generateApiKey(),
           piiRedactionLevel:
-            env.NODE_ENV === "development" || env.IS_ONPREM
+            env.NODE_ENV === "development" || !env.IS_SAAS
               ? "DISABLED"
               : "ESSENTIAL",
         },
@@ -249,7 +249,7 @@ export const projectRouter = createTRPCRouter({
         input.piiRedactionLevel === "DISABLED" &&
         !(
           env.NODE_ENV === "development" ||
-          !!env.IS_ONPREM ||
+          !env.IS_SAAS ||
           project.team.organization.signedDPA
         )
       ) {

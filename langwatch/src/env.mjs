@@ -52,6 +52,7 @@ export const env = createEnv({
     IS_ONPREM: z.string().optional(),
     EMAIL_DEFAULT_FROM: z.string().optional(),
     S3_KEY_SALT: z.string().optional(),
+    IS_SAAS: z.boolean().optional(),
   },
 
   /**
@@ -108,6 +109,9 @@ export const env = createEnv({
     IS_ONPREM: process.env.IS_ONPREM,
     EMAIL_DEFAULT_FROM: process.env.EMAIL_DEFAULT_FROM,
     S3_KEY_SALT: process.env.S3_KEY_SALT,
+    IS_SAAS:
+      process.env.IS_SAAS === "1" ||
+      process.env.IS_SAAS?.toLowerCase() === "true",
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

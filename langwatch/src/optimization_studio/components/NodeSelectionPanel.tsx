@@ -249,27 +249,20 @@ export const NodeSelectionPanel = ({
           spacing={4}
           background="white"
         >
-          {!publicEnv.data?.IS_ONPREM && (
-            <>
-              <Tooltip hasArrow gutter={16} label="Star us on GitHub">
-                <Link
-                  href="https://github.com/langwatch/langwatch"
-                  target="_blank"
-                >
-                  <IconWrapper width="20px" height="20px">
-                    <GitHub />
-                  </IconWrapper>
-                </Link>
-              </Tooltip>
-              <Tooltip hasArrow gutter={16} label="Join our community">
-                <Link href="https://discord.gg/kT4PhDS2gH" target="_blank">
-                  <IconWrapper width="20px" height="20px">
-                    <DiscordOutlineIcon />
-                  </IconWrapper>
-                </Link>
-              </Tooltip>
-            </>
-          )}
+          <Tooltip hasArrow gutter={16} label="Star us on GitHub">
+            <Link href="https://github.com/langwatch/langwatch" target="_blank">
+              <IconWrapper width="20px" height="20px">
+                <GitHub />
+              </IconWrapper>
+            </Link>
+          </Tooltip>
+          <Tooltip hasArrow gutter={16} label="Join our community">
+            <Link href="https://discord.gg/kT4PhDS2gH" target="_blank">
+              <IconWrapper width="20px" height="20px">
+                <DiscordOutlineIcon />
+              </IconWrapper>
+            </Link>
+          </Tooltip>
           <Tooltip hasArrow gutter={16} label="Documentation">
             <Link
               href="https://docs.langwatch.ai/optimization-studio/llm-nodes"
