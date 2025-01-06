@@ -166,7 +166,9 @@ export function MessageCard({
               }}
             >
               <Text noOfLines={1} wordBreak="break-all">
-                {getExtractedInput(trace)}
+                <Markdown remarkPlugins={[remarkGfm]} className="markdown markdown-without-margin">
+                  {getExtractedInput(trace)}
+                </Markdown>
               </Text>
             </LinkOverlay>
           </Box>

@@ -441,14 +441,15 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                   timestamp={trace.timestamps.started_at}
                   paddingTop="20px"
                 >
-                  <Text
-                    paddingY="6px"
-                    marginBottom="38px"
-                    whiteSpace="pre-wrap"
-                  >
-                    {translatedTextInput && translationActive
-                      ? translatedTextInput
-                      : getExtractedInput(trace)}
+                  <Text paddingY="6px" marginBottom="38px">
+                    <Markdown
+                      remarkPlugins={[remarkGfm]}
+                      className="markdown markdown-conversation-history"
+                    >
+                      {translatedTextInput && translationActive
+                        ? translatedTextInput
+                        : getExtractedInput(trace)}
+                    </Markdown>
                   </Text>
                 </Message>
                 <Message

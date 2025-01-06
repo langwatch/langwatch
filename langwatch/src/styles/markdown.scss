@@ -99,3 +99,9 @@
     background-color: transparent;
   }
 }
+
+.markdown.markdown-without-margin {
+  p {
+    margin-bottom: 0;
+  }
+}
