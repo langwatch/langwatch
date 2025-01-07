@@ -37,9 +37,6 @@ class LangWatchEvaluator(Evaluator):
         if "contexts" in kwargs and type(kwargs["contexts"]) != list:
             kwargs["contexts"] = [kwargs["contexts"]]
 
-        if "expected_contexts" in kwargs and type(kwargs["expected_contexts"]) != list:
-            kwargs["expected_contexts"] = [kwargs["expected_contexts"]]
-
         result = _cached_langwatch_evaluate(
             self.evaluator,
             name=self.name,
