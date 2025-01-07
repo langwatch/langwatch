@@ -11,7 +11,6 @@ from langevals_core.base_evaluator import (
 )
 import langwatch
 
-
 from langwatch_nlp.studio.dspy.evaluation import Evaluator
 from langwatch.evaluations import EvaluationResultModel
 from dsp.modules.cache_utils import CacheMemory
