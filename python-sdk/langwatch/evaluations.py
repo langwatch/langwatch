@@ -37,6 +37,7 @@ def evaluate(
     output: Optional[str] = None,
     expected_output: Optional[str] = None,
     contexts: Union[List[RAGChunk], List[str]] = [],
+    expected_contexts: Union[List[RAGChunk], List[str]] = [],
     conversation: Conversation = [],
     settings: Optional[dict] = None,
     as_guardrail: bool = False,
@@ -57,6 +58,7 @@ def evaluate(
             output=output,
             expected_output=expected_output,
             contexts=contexts,
+            expected_contexts=expected_contexts,
             conversation=conversation,
             settings=settings,
             trace_id=span.trace.trace_id if span and span.trace else None,
@@ -82,6 +84,7 @@ async def async_evaluate(
     output: Optional[str] = None,
     expected_output: Optional[str] = None,
     contexts: Union[List[RAGChunk], List[str]] = [],
+    expected_contexts: Union[List[RAGChunk], List[str]] = [],
     conversation: Conversation = [],
     settings: Optional[dict] = None,
     as_guardrail: bool = False,
@@ -102,6 +105,7 @@ async def async_evaluate(
             output=output,
             expected_output=expected_output,
             contexts=contexts,
+            expected_contexts=expected_contexts,
             conversation=conversation,
             settings=settings,
             trace_id=span.trace.trace_id if span and span.trace else None,
@@ -152,6 +156,7 @@ def prepare_data(
     output: Optional[str],
     expected_output: Optional[str],
     contexts: Union[List[RAGChunk], List[str]] = [],
+    expected_contexts: Union[List[RAGChunk], List[str]] = [],
     conversation: Conversation = [],
     settings: Optional[dict] = None,
     trace_id: Optional[Union[str, UUID]] = None,
@@ -169,6 +174,8 @@ def prepare_data(
         data["expected_output"] = expected_output
     if contexts and len(contexts) > 0:
         data["contexts"] = contexts
+    if expected_contexts and len(expected_contexts) > 0:
+        data["expected_contexts"] = expected_contexts
     if conversation and len(conversation) > 0:
         data["conversation"] = conversation
     if span:
