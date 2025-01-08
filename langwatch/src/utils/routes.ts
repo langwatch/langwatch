@@ -5,7 +5,7 @@ export const projectRoutes = {
   },
   workflows: {
     path: "/[project]/workflows",
-    title: "Workflows",
+    title: "Optimization Studio Workflows",
   },
   messages: {
     path: "/[project]/messages",
