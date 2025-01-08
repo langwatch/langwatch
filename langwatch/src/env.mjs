@@ -49,7 +49,6 @@ export const env = createEnv({
     USE_AWS_SES: z.string().optional(),
     AWS_REGION: z.string().optional(),
     SENTRY_DSN: z.string().optional(),
-    IS_ONPREM: z.string().optional(),
     EMAIL_DEFAULT_FROM: z.string().optional(),
     S3_KEY_SALT: z.string().optional(),
     IS_SAAS: z.boolean().optional(),
@@ -106,7 +105,6 @@ export const env = createEnv({
     USE_AWS_SES: process.env.USE_AWS_SES,
     AWS_REGION: process.env.AWS_REGION,
     SENTRY_DSN: process.env.SENTRY_DSN,
-    IS_ONPREM: process.env.IS_ONPREM,
     EMAIL_DEFAULT_FROM: process.env.EMAIL_DEFAULT_FROM,
     S3_KEY_SALT: process.env.S3_KEY_SALT,
     IS_SAAS:

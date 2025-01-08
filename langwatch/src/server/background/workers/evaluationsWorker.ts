@@ -338,6 +338,7 @@ export const runEvaluation = async ({
               input: input ?? "",
               output: output ?? "",
               contexts: contexts ?? [],
+              expected_contexts: expected_contexts ?? [],
               expected_output: expected_output ?? "",
               conversation: conversation ?? [],
             },
