@@ -1,4 +1,11 @@
-import { Queue, Job, type JobsOptions, type QueueOptions } from "bullmq";
+import {
+  Job,
+  Queue,
+  type JobsOptions,
+  type QueueOptions,
+  type RedisClient,
+} from "bullmq";
+import { EventEmitter } from "events";
 import { connection } from "../../redis";
 
 // Queue that falls back to calling the worker directly if the queue is not available
@@ -21,7 +28,7 @@ export class QueueWithFallback<
     worker: (job: Job<DataType, ResultType, NameType>) => Promise<any>,
     opts?: QueueOptions
   ) {
-    super(name, opts);
+    super(name, opts, connection ? undefined : (NoOpConnection as any));
     this.worker = worker;
   }
 
@@ -56,5 +63,26 @@ export class QueueWithFallback<
       return undefined;
     }
     return await super.getJob(id);
+  }
+}
+
+class NoOpConnection extends EventEmitter {
+  constructor() {
+    super();
+  }
+  async reconnect(): Promise<void> {
+    return void 0;
+  }
+  async disconnect(): Promise<void> {
+    return void 0;
+  }
+  async waitUntilReady(): Promise<void> {
+    return void 0;
+  }
+  async close(): Promise<void> {
+    return void 0;
+  }
+  get client(): Promise<RedisClient> {
+    return Promise.resolve(null as any);
   }
 }
