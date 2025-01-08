@@ -17,4 +17,4 @@ ensure-uv:
 start: install
 	@echo "Starting the server..."
 	@uv run watchmedo auto-restart -p 'none' --signal SIGTERM -- \
-		uvicorn -- langwatch_nlp.main:app --host 0.0.0.0 --port 8080 --timeout-keep-alive 70 --reload $(filter-out $@,$(MAKECMDGOALS))
+		uvicorn -- langwatch_nlp.main:app --host 0.0.0.0 --port 5561 --timeout-keep-alive 70 --reload $(filter-out $@,$(MAKECMDGOALS))

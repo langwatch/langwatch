@@ -8,8 +8,8 @@ services:
       DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
       ELASTICSEARCH_NODE_URL: http://opensearch:9200
       REDIS_URL: redis://redis:6379
-      LANGWATCH_NLP_SERVICE: http://langwatch_nlp:8080
-      LANGEVALS_ENDPOINT: http://langevals:8000
+      LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
+      LANGEVALS_ENDPOINT: http://langevals:5562
     env_file:
       - langwatch/.env
     build:
@@ -31,7 +31,7 @@ services:
     env_file:
       - langwatch/.env
     ports:
-      - "8080:8080"
+      - "5561:5561"
     restart: always
     environment:
       - LANGWATCH_ENDPOINT=http://app:5560
@@ -39,7 +39,7 @@ services:
   langevals:
     image: langwatch/langevals:latest
     ports:
-      - "8000:8000"
+      - "5562:5562"
     restart: always
     pull_policy: always
     environment:
