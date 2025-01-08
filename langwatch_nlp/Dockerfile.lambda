@@ -15,6 +15,6 @@ RUN PYTHONPATH=. uv run python langwatch_nlp/main.py
 
 ENV RUNNING_IN_DOCKER=true
 
-EXPOSE 5561
+EXPOSE 8080
 
-CMD uv --no-cache run uvicorn langwatch_nlp.main:app --host 0.0.0.0 --port 5561 --timeout-keep-alive 4500
+CMD uv --no-cache run uvicorn langwatch_nlp.main:app --host 0.0.0.0 --port 8080 --timeout-keep-alive 4500
