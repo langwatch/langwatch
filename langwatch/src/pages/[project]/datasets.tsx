@@ -5,6 +5,7 @@ import {
   Container,
   HStack,
   Heading,
+  Link,
   Menu,
   MenuButton,
   MenuItem,
@@ -26,7 +27,13 @@ import {
 
 import { DeleteIcon, EditIcon } from "@chakra-ui/icons";
 import { useRouter } from "next/router";
-import { MoreVertical, Play, Upload } from "react-feather";
+import {
+  FileText,
+  MoreVertical,
+  Play,
+  Upload,
+  Table as TableIcon,
+} from "react-feather";
 import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
 import { useDrawer } from "../../components/CurrentDrawer";
 import { DashboardLayout } from "../../components/DashboardLayout";
@@ -35,6 +42,7 @@ import { api } from "../../utils/api";
 import type { DatasetColumns } from "../../server/datasets/types";
 import { UploadCSVModal } from "../../components/datasets/UploadCSVModal";
 import { useState } from "react";
+import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 
 export default function Datasets() {
   const addEditDatasetDrawer = useDisclosure();
@@ -163,7 +171,24 @@ export default function Datasets() {
         <Card>
           <CardBody>
             {datasets.data && datasets.data.length == 0 ? (
-              <Text>No datasets found</Text>
+              <NoDataInfoBlock
+                title="No datasets yet"
+                description="Upload or create datasets on your messages to do further analysis or to train your own models."
+                docsInfo={
+                  <Text>
+                    To learn more about datasets, please visit our{" "}
+                    <Link
+                      color="orange.400"
+                      href="https://docs.langwatch.ai/features/datasets"
+                      target="_blank"
+                    >
+                      documentation
+                    </Link>
+                    .
+                  </Text>
+                }
+                icon={<TableIcon />}
+              />
             ) : (
               <TableContainer>
                 <Table variant="simple">

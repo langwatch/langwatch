@@ -23,7 +23,7 @@ import {
 import Parse from "papaparse";
 
 import { useEffect } from "react";
-import { HelpCircle, ThumbsDown, ThumbsUp } from "react-feather";
+import { Edit, HelpCircle, ThumbsDown, ThumbsUp } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -38,6 +38,7 @@ import type { AppRouter } from "../../server/api/root";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { TRPCClientErrorLike } from "@trpc/client";
+import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 
 export default function Annotations() {
   const { project } = useOrganizationTeamProject();
@@ -211,24 +212,31 @@ export default function Annotations() {
           />
           <FilterToggle />
         </HStack>
-        <HStack align="start" spacing={6}>
-          <Card>
+        <HStack width="full" align="start" spacing={6}>
+          <Card flex={1}>
             <CardBody>
               {annotations.data &&
               annotations.data.length == 0 &&
               scoreOptions.data &&
               scoreOptions.data.length == 0 ? (
-                <Text>
-                  No annotations found.{" "}
-                  <Link
-                    href="https://docs.langwatch.ai/features/annotations"
-                    target="_blank"
-                    textDecoration="underline"
-                  >
-                    Get started with annotations
-                  </Link>
-                  .
-                </Text>
+                <NoDataInfoBlock
+                  title="No annotations yet"
+                  description="Annotate your messages to add more context and improve your analysis."
+                  docsInfo={
+                    <Text>
+                      To get started with annotations, please visit our{" "}
+                      <Link
+                        href="https://docs.langwatch.ai/features/annotations"
+                        target="_blank"
+                        color="orange.400"
+                      >
+                        documentation
+                      </Link>
+                      .
+                    </Text>
+                  }
+                  icon={<Edit />}
+                />
               ) : (
                 <TableContainer>
                   <Table variant="simple">

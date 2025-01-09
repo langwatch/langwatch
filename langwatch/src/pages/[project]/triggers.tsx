@@ -31,15 +31,20 @@ import {
   Select,
   Input,
   Link,
+  TableContainer,
+  Container,
 } from "@chakra-ui/react";
 import type { TriggerAction } from "@prisma/client";
-import { MoreVertical } from "react-feather";
+import { Bell, MoreVertical } from "react-feather";
 import SettingsLayout from "../../components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { DeleteIcon, EditIcon } from "@chakra-ui/icons";
 import { Switch } from "@chakra-ui/react";
-import { ProjectSelector } from "../../components/DashboardLayout";
+import {
+  DashboardLayout,
+  ProjectSelector,
+} from "../../components/DashboardLayout";
 import { type AlertType } from "@prisma/client";
 import {
   useForm,
@@ -50,6 +55,7 @@ import {
 } from "react-hook-form";
 import { z } from "zod";
 import { SmallLabel } from "~/components/SmallLabel";
+import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 
 export default function Members() {
   const { project, organizations } = useOrganizationTeamProject();
@@ -187,16 +193,9 @@ export default function Members() {
   };
 
   return (
-    <SettingsLayout>
-      <VStack
-        paddingX={4}
-        paddingY={6}
-        spacing={6}
-        width="full"
-        maxWidth="6xl"
-        align="start"
-      >
-        <HStack width="full" marginTop={2}>
+    <DashboardLayout>
+      <Container maxW={"calc(100vw - 200px)"} padding={6} marginTop={8}>
+        <HStack width="full" align="top" spacing={6} paddingBottom={6}>
           <Heading size="lg" as="h1">
             Triggers
           </Heading>
@@ -205,122 +204,141 @@ export default function Members() {
             <ProjectSelector organizations={organizations} project={project} />
           )}
         </HStack>
-        <Card width="full">
+        <Card width="full" padding={6}>
           <CardBody width="full" paddingY={0} paddingX={0}>
-            <Table variant="simple" width="full">
-              <Thead>
-                <Tr>
-                  <Th>Name</Th>
-                  <Th>Action</Th>
-                  <Th>Action Items</Th>
-                  <Th>Checks</Th>
-                  <Th>Last Triggered At</Th>
-                  <Th>Active</Th>
-                  <Th></Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {triggers.isLoading ? (
-                  <Tr>
-                    <Td colSpan={5}>Loading...</Td>
-                  </Tr>
-                ) : triggers.data?.length === 0 ? (
-                  <Tr>
-                    <Td colSpan={5}>
-                      No triggers, set one up by creating a filter on your
-                      messages.
-                    </Td>
-                  </Tr>
-                ) : (
-                  triggers.data?.map((trigger) => {
-                    const lastRunAt = new Date(trigger.lastRunAt);
-                    const lastRunAtFormatted = lastRunAt.toLocaleString();
-
-                    return (
-                      <Tr key={trigger.id}>
-                        <Td>{trigger.name}</Td>
-                        <Td>{triggerActionName(trigger.action)}</Td>
-                        <Td>
-                          {actionItems(
-                            trigger.action,
-                            trigger.actionParams as ActionParams
-                          )}
-                        </Td>
-                        <Td>
-                          <Tooltip
-                            label={trigger.checks
-                              .map((check) => check?.name)
-                              .join(", ")}
-                          >
-                            <Text noOfLines={1} display="block">
-                              {trigger.checks
-                                .map((check) => check?.name)
-                                .join(", ")}
-                            </Text>
-                          </Tooltip>
-                        </Td>
-                        <Td whiteSpace="nowrap">{lastRunAtFormatted}</Td>
-                        <Td textAlign="center">
-                          <Switch
-                            isChecked={trigger.active}
-                            onChange={() => {
-                              handleToggleTrigger(trigger.id, !trigger.active);
-                            }}
-                          />
-                        </Td>
-                        <Td>
-                          <Menu>
-                            <MenuButton
-                              as={Button}
-                              variant={"ghost"}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                              }}
-                            >
-                              <MoreVertical />
-                            </MenuButton>
-                            <MenuList>
-                              <MenuItem
-                                icon={<EditIcon />}
-                                onClick={() => {
-                                  setValue("triggerId", trigger.id);
-                                  setValue(
-                                    "customMessage",
-                                    trigger.message ?? ""
-                                  );
-                                  setValue(
-                                    "alertType",
-                                    trigger.alertType ?? ""
-                                  );
-                                  setValue("name", trigger.name ?? "");
-                                  onOpen();
-                                }}
-                              >
-                                Customize
-                              </MenuItem>
-                              <MenuItem
-                                color="red.600"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-
-                                  deleteTrigger(trigger.id);
-                                }}
-                                icon={<DeleteIcon />}
-                              >
-                                Delete
-                              </MenuItem>
-                            </MenuList>
-                          </Menu>
-                        </Td>
+            {triggers.data && triggers.data.length == 0 ? (
+              <NoDataInfoBlock
+                title="No triggers yet"
+                description="Set up triggers on your messages to get notified when certain conditions are met."
+                docsInfo={
+                  <Text>
+                    To learn more about triggers, please visit our{" "}
+                    <Link
+                      color="orange.400"
+                      href="https://docs.langwatch.ai/features/triggers"
+                      target="_blank"
+                    >
+                      documentation
+                    </Link>
+                    .
+                  </Text>
+                }
+                icon={<Bell />}
+              />
+            ) : (
+              <TableContainer>
+                <Table variant="simple" width="full">
+                  <Thead>
+                    <Tr>
+                      <Th>Name</Th>
+                      <Th>Action</Th>
+                      <Th>Action Items</Th>
+                      <Th>Checks</Th>
+                      <Th>Last Triggered At</Th>
+                      <Th>Active</Th>
+                      <Th></Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {triggers.isLoading ? (
+                      <Tr>
+                        <Td colSpan={5}>Loading...</Td>
                       </Tr>
-                    );
-                  })
-                )}
-              </Tbody>
-            </Table>
+                    ) : (
+                      triggers.data?.map((trigger) => {
+                        const lastRunAt = new Date(trigger.lastRunAt);
+                        const lastRunAtFormatted = lastRunAt.toLocaleString();
+
+                        return (
+                          <Tr key={trigger.id}>
+                            <Td>{trigger.name}</Td>
+                            <Td>{triggerActionName(trigger.action)}</Td>
+                            <Td>
+                              {actionItems(
+                                trigger.action,
+                                trigger.actionParams as ActionParams
+                              )}
+                            </Td>
+                            <Td>
+                              <Tooltip
+                                label={trigger.checks
+                                  .map((check) => check?.name)
+                                  .join(", ")}
+                              >
+                                <Text noOfLines={1} display="block">
+                                  {trigger.checks
+                                    .map((check) => check?.name)
+                                    .join(", ")}
+                                </Text>
+                              </Tooltip>
+                            </Td>
+                            <Td whiteSpace="nowrap">{lastRunAtFormatted}</Td>
+                            <Td textAlign="center">
+                              <Switch
+                                isChecked={trigger.active}
+                                onChange={() => {
+                                  handleToggleTrigger(
+                                    trigger.id,
+                                    !trigger.active
+                                  );
+                                }}
+                              />
+                            </Td>
+                            <Td>
+                              <Menu>
+                                <MenuButton
+                                  as={Button}
+                                  variant={"ghost"}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                  }}
+                                >
+                                  <MoreVertical />
+                                </MenuButton>
+                                <MenuList>
+                                  <MenuItem
+                                    icon={<EditIcon />}
+                                    onClick={() => {
+                                      setValue("triggerId", trigger.id);
+                                      setValue(
+                                        "customMessage",
+                                        trigger.message ?? ""
+                                      );
+                                      setValue(
+                                        "alertType",
+                                        trigger.alertType ?? ""
+                                      );
+                                      setValue("name", trigger.name ?? "");
+                                      onOpen();
+                                    }}
+                                  >
+                                    Customize
+                                  </MenuItem>
+                                  <MenuItem
+                                    color="red.600"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+
+                                      deleteTrigger(trigger.id);
+                                    }}
+                                    icon={<DeleteIcon />}
+                                  >
+                                    Delete
+                                  </MenuItem>
+                                </MenuList>
+                              </Menu>
+                            </Td>
+                          </Tr>
+                        );
+                      })
+                    )}
+                  </Tbody>
+                </Table>
+              </TableContainer>
+            )}
           </CardBody>
         </Card>
-      </VStack>
+      </Container>
       <Modal isOpen={isOpen} onClose={handleCloseModal} size="2xl">
         <ModalOverlay />
         <ModalContent>
@@ -341,7 +359,7 @@ export default function Members() {
           <ModalFooter></ModalFooter>
         </ModalContent>
       </Modal>
-    </SettingsLayout>
+    </DashboardLayout>
   );
 }
 

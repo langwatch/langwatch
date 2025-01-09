@@ -5,6 +5,7 @@ import {
   Container,
   HStack,
   Heading,
+  Link,
   Skeleton,
   Spacer,
   Table,
@@ -21,6 +22,7 @@ import router from "next/router";
 import { Play } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -59,7 +61,25 @@ export default function Experiments() {
         <Card>
           <CardBody>
             {experiments.data && experiments.data.length == 0 ? (
-              <Text>No records found</Text>
+              <NoDataInfoBlock
+                title="No experiments yet"
+                description="Run batch experiments on your messages to do further analysis"
+                docsInfo={
+                  <Text>
+                    To learn more about experiments and evaluations, please
+                    visit our{" "}
+                    <Link
+                      color="orange.400"
+                      href="https://docs.langwatch.ai/evaluations/overview"
+                      target="_blank"
+                    >
+                      documentation
+                    </Link>
+                    .
+                  </Text>
+                }
+                icon={<Play />}
+              />
             ) : (
               <TableContainer>
                 <Table variant="simple">

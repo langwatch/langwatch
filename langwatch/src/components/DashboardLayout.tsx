@@ -36,6 +36,7 @@ import { useRouter } from "next/router";
 import numeral from "numeral";
 import React, { useMemo, useState } from "react";
 import {
+  Bell,
   BookOpen,
   ChevronDown,
   ChevronRight,
@@ -405,7 +406,7 @@ export const DashboardLayout = ({
         <VStack
           paddingX={6}
           paddingY={8}
-          spacing={8}
+          spacing={6}
           position="sticky"
           top={0}
           height="100vh"
@@ -414,7 +415,7 @@ export const DashboardLayout = ({
             <LogoIcon width={25} height={34} />
           </Box>
 
-          <VStack height="full" spacing={8}>
+          <VStack height="full" spacing={7}>
             <SideMenuLink
               path={projectRoutes.workflows.path}
               icon={PuzzleIcon}
@@ -466,6 +467,12 @@ export const DashboardLayout = ({
               project={project}
             />
             <SideMenuLink
+              path={projectRoutes.triggers.path}
+              icon={Bell}
+              label={projectRoutes.triggers.title}
+              project={project}
+            />
+            <SideMenuLink
               path={projectRoutes.experiments.path}
               icon={Play}
               label={projectRoutes.experiments.title}
@@ -491,48 +498,50 @@ export const DashboardLayout = ({
             )}
 
             <Spacer />
-            <Tooltip
-              hasArrow
-              placement="right"
-              gutter={16}
-              label="Documentation"
-            >
-              <Link href="https://docs.langwatch.ai" target="_blank">
-                <IconWrapper width="20px" height="20px">
-                  <BookOpen />
-                </IconWrapper>
-              </Link>
-            </Tooltip>
+            <VStack spacing={6}>
+              <Tooltip
+                hasArrow
+                placement="right"
+                gutter={16}
+                label="Documentation"
+              >
+                <Link href="https://docs.langwatch.ai" target="_blank">
+                  <IconWrapper width="20px" height="20px">
+                    <BookOpen />
+                  </IconWrapper>
+                </Link>
+              </Tooltip>
 
-            <>
-              <Tooltip
-                hasArrow
-                placement="right"
-                gutter={16}
-                label="Star us on GitHub"
-              >
-                <Link
-                  href="https://github.com/langwatch/langwatch"
-                  target="_blank"
+              <>
+                <Tooltip
+                  hasArrow
+                  placement="right"
+                  gutter={16}
+                  label="Star us on GitHub"
                 >
-                  <IconWrapper width="20px" height="20px">
-                    <GitHub />
-                  </IconWrapper>
-                </Link>
-              </Tooltip>
-              <Tooltip
-                hasArrow
-                placement="right"
-                gutter={16}
-                label="Join our community"
-              >
-                <Link href="https://discord.gg/kT4PhDS2gH" target="_blank">
-                  <IconWrapper width="20px" height="20px">
-                    <DiscordOutlineIcon />
-                  </IconWrapper>
-                </Link>
-              </Tooltip>
-            </>
+                  <Link
+                    href="https://github.com/langwatch/langwatch"
+                    target="_blank"
+                  >
+                    <IconWrapper width="20px" height="20px">
+                      <GitHub />
+                    </IconWrapper>
+                  </Link>
+                </Tooltip>
+                <Tooltip
+                  hasArrow
+                  placement="right"
+                  gutter={16}
+                  label="Join our community"
+                >
+                  <Link href="https://discord.gg/kT4PhDS2gH" target="_blank">
+                    <IconWrapper width="20px" height="20px">
+                      <DiscordOutlineIcon />
+                    </IconWrapper>
+                  </Link>
+                </Tooltip>
+              </>
+            </VStack>
             {(window as any)?.$crisp && (
               <Tooltip hasArrow placement="right" gutter={16} label="Live Help">
                 <Button

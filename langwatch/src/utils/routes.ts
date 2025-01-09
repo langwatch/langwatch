@@ -88,6 +88,10 @@ export const projectRoutes = {
     path: "/[project]/annotations",
     title: "Annotations",
   },
+  triggers: {
+    path: "/[project]/triggers",
+    title: "Triggers",
+  },
 };
 
 export type Route = {
