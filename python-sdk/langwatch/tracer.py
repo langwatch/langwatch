@@ -2,6 +2,8 @@ import copy
 from importlib.metadata import version
 import os
 from concurrent.futures import Future, ThreadPoolExecutor
+from random import random
+
 import time
 from types import ModuleType
 from typing import (
@@ -641,6 +643,7 @@ class ContextTrace:
     span: Type[ContextSpan]
     root_span: Optional[ContextSpan] = None
     evaluations: List[Evaluation] = []
+    disable_sending: bool = False
 
     _capture_input: bool = True
     _capture_output: bool = True
@@ -655,6 +658,7 @@ class ContextTrace:
         metadata: Optional[TraceMetadata] = None,
         expected_output: Optional[str] = None,
         api_key: Optional[str] = None,
+        disable_sending: bool = False,
         # Span constructor parameters
         span_id: Optional[str] = None,
         capture_input: bool = True,
@@ -673,6 +677,7 @@ class ContextTrace:
         skip_root_span: bool = False,
     ):
         self.api_key = api_key or langwatch.api_key
+        self.disable_sending = disable_sending
         self.spans: Dict[str, Span] = {}
 
         self._capture_input = capture_input
@@ -726,6 +731,7 @@ class ContextTrace:
             "trace_id": None,
             "metadata": self.metadata,
             "api_key": self.api_key,
+            "disable_sending": self.disable_sending,
             # Span constructor parameters
             "capture_input": self._capture_input,
             "capture_output": self._capture_output,
@@ -822,6 +828,7 @@ class ContextTrace:
         trace_id: Optional[Union[str, UUID]] = None,
         metadata: Optional[TraceMetadata] = None,
         expected_output: Optional[str] = None,
+        disable_sending: Optional[bool] = None,
         # root span update
         span_id: Optional[Union[str, UUID]] = None,
         name: Optional[str] = None,
@@ -860,6 +867,9 @@ class ContextTrace:
                 params=params,
                 metrics=metrics,
             )
+
+        if disable_sending:
+            self.disable_sending = disable_sending
 
     def add_evaluation(
         self,
@@ -1048,6 +1058,7 @@ class ContextTrace:
             ),
             api_key=self.api_key,
             force_sync=self._force_sync,
+            disable_sending=self.disable_sending,
         )
 
     def append_span(self, span: Span):
@@ -1139,7 +1150,10 @@ class ContextTrace:
 
 @retry(tries=5, delay=0.5, backoff=3)
 def send_spans(
-    data: CollectorRESTParams, api_key: Optional[str] = None, force_sync=False
+    data: CollectorRESTParams,
+    api_key: Optional[str] = None,
+    force_sync=False,
+    disable_sending: Optional[bool] = False,
 ):
     import json
 
@@ -1164,7 +1178,7 @@ def send_spans(
 
     # TODO: replace this with httpx, don't forget the custom SerializableWithStringFallback encoder
 
-    if langwatch.enabled:
+    if langwatch.enabled and random() < langwatch.sampling_rate and not disable_sending:
         response = requests.post(
             f"{langwatch.endpoint}/api/collector{force_sync}",
             data=json.dumps(data, cls=SerializableWithStringFallback),

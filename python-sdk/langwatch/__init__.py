@@ -74,11 +74,13 @@ if langchain_available:
         )
 
 enabled: Optional[bool] = True
+sampling_rate: float = 1.0
 
 __all__ = (
     "endpoint",
     "api_key",
     "enabled",
+    "sampling_rate",
     "trace",
     "span",
     "get_current_trace",
