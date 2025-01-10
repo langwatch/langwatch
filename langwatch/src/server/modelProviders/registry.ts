@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ModelProvider } from "@prisma/client";
+import models from "../../../models.json";
 
 type ModelProviderDefinition = {
   name: string;
@@ -11,12 +12,30 @@ type ModelProviderDefinition = {
 
 export type MaybeStoredModelProvider = Omit<
   ModelProvider,
-  "id" | "projectId" | "createdAt" | "updatedAt"
+  | "id"
+  | "projectId"
+  | "createdAt"
+  | "updatedAt"
+  | "customModels"
+  | "customEmbeddingsModels"
 > & {
   id?: string;
-  customModels?: string[] | null;
-  customEmbeddingsModels?: string[] | null;
+  models?: string[] | null;
+  embeddingsModels?: string[] | null;
   disabledByDefault?: boolean;
+};
+
+export const getProviderModelOptions = (
+  provider: string,
+  mode: "chat" | "embedding"
+) => {
+  return Object.entries(models)
+    .filter(([key, _]) => key.split("/")[0] === provider)
+    .filter(([_, value]) => value.mode === mode)
+    .map(([key, _]) => ({
+      value: key.split("/").slice(1).join("/"),
+      label: key.split("/").slice(1).join("/"),
+    }));
 };
 
 export const modelProviders = {
