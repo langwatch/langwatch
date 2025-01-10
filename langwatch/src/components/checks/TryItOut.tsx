@@ -52,6 +52,7 @@ import type { CheckConfigFormData } from "./CheckConfigForm";
 import { evaluationStatusColor } from "./EvaluationStatus";
 import { elasticSearchSpanToSpan } from "../../server/tracer/utils";
 import { type ElasticSearchSpan } from "../../server/tracer/types";
+import { HoverableBigText } from "../HoverableBigText";
 
 export function TryItOut({
   form,
@@ -552,15 +553,9 @@ export function TryItOut({
                             <Td color={color} maxWidth="250px">
                               {runningResult &&
                                 (resultDetails ? (
-                                  <Tooltip label={resultDetails}>
-                                    <Text
-                                      noOfLines={2}
-                                      wordBreak="break-all"
-                                      display="block"
-                                    >
-                                      {resultDetails}
-                                    </Text>
-                                  </Tooltip>
+                                  <HoverableBigText noOfLines={3}>
+                                    {resultDetails}
+                                  </HoverableBigText>
                                 ) : runningResult.status === "loading" ? (
                                   ""
                                 ) : (

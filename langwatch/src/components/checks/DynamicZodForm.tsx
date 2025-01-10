@@ -299,7 +299,7 @@ const DynamicZodForm = ({
           {Object.keys(fieldSchema_.shape).map((key) => (
             <VStack key={key} align="start" width="full">
               {!(fieldSchema_.shape[key] instanceof z.ZodBoolean) && (
-                <SmallLabel>{titleCase(key)}</SmallLabel>
+                <SmallLabel>{fieldName.startsWith("rubrics.") ? `Level ${parseInt(fieldName.split(".")[1] ?? "0") + 1}` : titleCase(key)}</SmallLabel>
               )}
               {renderField(
                 fieldSchema_.shape[key],
