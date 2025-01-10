@@ -154,6 +154,12 @@ const SideMenuLink = ({
             : "/auth/signin"
         }
         aria-label={label}
+        onClick={() => {
+          trackEvent("side_menu_click", {
+            project_id: project?.id,
+            menu_item: label,
+          });
+        }}
       >
         <VStack>
           <IconElem size={24} color={isActive ? orange400 : undefined} />
