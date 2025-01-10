@@ -9,6 +9,8 @@ For LLM and library-specific tracing functions, check out the other files on thi
 
 import os
 from warnings import warn
+from typing import Optional
+
 
 from langwatch.tracer import (
     trace,
@@ -71,9 +73,12 @@ if langchain_available:
             "LangChain seems to be installed but we couldn't import langwatch.langchain, please check your langchain dependency installation."
         )
 
+enabled: Optional[bool] = True
+
 __all__ = (
     "endpoint",
     "api_key",
+    "enabled",
     "trace",
     "span",
     "get_current_trace",

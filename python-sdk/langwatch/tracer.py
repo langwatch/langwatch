@@ -1163,33 +1163,37 @@ def send_spans(
         data["spans"] = data["spans"][:256]
 
     # TODO: replace this with httpx, don't forget the custom SerializableWithStringFallback encoder
-    response = requests.post(
-        f"{langwatch.endpoint}/api/collector{force_sync}",
-        data=json.dumps(data, cls=SerializableWithStringFallback),
-        headers={
-            "X-Auth-Token": str(api_key),
-            "Content-Type": "application/json",
-        },
-    )
 
-    if response.status_code == 429:
-        json = response.json()
-        if "message" in json and "ERR_PLAN_LIMIT" in json["message"]:
-            warn(json["message"])
+    if langwatch.enabled:
+        response = requests.post(
+            f"{langwatch.endpoint}/api/collector{force_sync}",
+            data=json.dumps(data, cls=SerializableWithStringFallback),
+            headers={
+                "X-Auth-Token": str(api_key),
+                "Content-Type": "application/json",
+            },
+        )
+
+        if response.status_code == 429:
+            json = response.json()
+            if "message" in json and "ERR_PLAN_LIMIT" in json["message"]:
+                warn(json["message"])
+            else:
+                warn(
+                    "Rate limit exceeded, dropping message from being sent to LangWatch"
+                )
         else:
-            warn("Rate limit exceeded, dropping message from being sent to LangWatch")
-    else:
-        if response.status_code >= 300 and response.status_code < 500:
-            try:
-                json = response.json()
-                if "message" in json:
-                    message = json["message"]
-                    warn(f"LangWatch returned an error: {message}")
-                else:
+            if response.status_code >= 300 and response.status_code < 500:
+                try:
+                    json = response.json()
+                    if "message" in json:
+                        message = json["message"]
+                        warn(f"LangWatch returned an error: {message}")
+                    else:
+                        warn(f"LangWatch returned an error: {response.content}")
+                except:
                     warn(f"LangWatch returned an error: {response.content}")
-            except:
-                warn(f"LangWatch returned an error: {response.content}")
-        response.raise_for_status()
+            response.raise_for_status()
 
 
 trace = ContextTrace
