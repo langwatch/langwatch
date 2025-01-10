@@ -868,7 +868,7 @@ class ContextTrace:
                 metrics=metrics,
             )
 
-        if disable_sending:
+        if disable_sending is not None:
             self.disable_sending = disable_sending
 
     def add_evaluation(
