@@ -22,7 +22,7 @@ export const useChatWithSubscription = (
     api: "/api/playground",
     headers: {
       "X-Model": model ?? "",
-      "X-System-Prompt": systemPrompt ?? "",
+      "X-System-Prompt": encodeURIComponent(systemPrompt ?? ""),
       "X-Project-Id": project?.id ?? "",
     },
   });

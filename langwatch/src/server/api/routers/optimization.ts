@@ -51,6 +51,10 @@ export const optimizationRouter = createTRPCRouter({
         },
       });
 
+      if (!publishedWorkflow) {
+        return null;
+      }
+
       const isComponent = workflow?.isComponent;
       const isEvaluator = workflow?.isEvaluator;
 
@@ -75,7 +79,7 @@ export const optimizationRouter = createTRPCRouter({
       }
 
       try {
-        const result = await ctx.prisma.workflow.update({
+        await ctx.prisma.workflow.update({
           where: { id: workflowId, projectId: projectId },
           data: { isComponent, isEvaluator: isEvaluator },
         });
