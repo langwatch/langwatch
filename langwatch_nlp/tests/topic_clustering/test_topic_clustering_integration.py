@@ -39,7 +39,6 @@ class TestTopicClusteringIntegration:
                 Trace(
                     trace_id=row["trace_id"],
                     input=row["input"],
-                    embeddings=row["embeddings"],
                     topic_id=None,
                     subtopic_id=None,
                 )
@@ -48,8 +47,10 @@ class TestTopicClusteringIntegration:
         response = client.post(
             "/topics/batch_clustering",
             json={
-                "model": "azure/gpt-4-1106-preview",
-                "litellm_params": {"api_base": os.environ["AZURE_OPENAI_ENDPOINT"]},
+                "litellm_params": {
+                    "api_base": os.environ["AZURE_OPENAI_ENDPOINT"],
+                    "model": "azure/gpt-4o-mini",
+                },
                 "embeddings_litellm_params": {
                     "api_key": os.environ["OPENAI_API_KEY"],
                     "model": "openai/text-embedding-3-small",
@@ -69,8 +70,10 @@ class TestTopicClusteringIntegration:
         response = client.post(
             "/topics/incremental_clustering",
             json={
-                "model": "azure/gpt-4-1106-preview",
-                "litellm_params": {"api_base": os.environ["AZURE_OPENAI_ENDPOINT"]},
+                "litellm_params": {
+                    "api_base": os.environ["AZURE_OPENAI_ENDPOINT"],
+                    "model": "azure/gpt-4o-mini",
+                },
                 "embeddings_litellm_params": {
                     "api_key": os.environ["OPENAI_API_KEY"],
                     "model": "openai/text-embedding-3-small",

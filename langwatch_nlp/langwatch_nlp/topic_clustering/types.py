@@ -5,9 +5,12 @@ from typing_extensions import TypedDict
 class Trace(TypedDict):
     trace_id: str
     input: str
-    embeddings: list[float]
     topic_id: Optional[str]
     subtopic_id: Optional[str]
+
+
+class TraceWithEmbeddings(Trace):
+    embeddings: list[float]
 
 
 class Topic(TypedDict):

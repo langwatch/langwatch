@@ -21,15 +21,18 @@ from langwatch_nlp.topic_clustering.types import (
     TopicClusteringResponse,
     Trace,
     TraceTopicMap,
+    TraceWithEmbeddings,
 )
 from scipy.spatial.distance import cdist
 import numpy as np
+
+from langwatch_nlp.topic_clustering.utils import fill_embeddings
 
 
 U = TypeVar("U", Topic, Subtopic)
 
 
-def get_matching_topic(trace: Trace, topics: list[U]) -> Optional[U]:
+def get_matching_topic(trace: TraceWithEmbeddings, topics: list[U]) -> Optional[U]:
     trace_embeddings = np.array(trace["embeddings"])
     centroid_distances = cdist(
         [trace_embeddings],
@@ -47,7 +50,7 @@ def get_matching_topic(trace: Trace, topics: list[U]) -> Optional[U]:
 
 
 def assign_trace_to_topic(
-    trace: Trace, topics: list[Topic], subtopics: list[Subtopic]
+    trace: TraceWithEmbeddings, topics: list[Topic], subtopics: list[Subtopic]
 ) -> TraceTopicMap:
     topic_id = trace["topic_id"]
     subtopic_id = trace["subtopic_id"]
@@ -78,7 +81,7 @@ def maybe_create_new_topics(
     model: str,
     litellm_params: dict[str, str],
     embeddings_litellm_params: dict[str, str],
-    traces: list[Trace],
+    traces: list[TraceWithEmbeddings],
     topics: list[U],
     cophenetic_distances: int,
     with_subtopics=True,
@@ -127,7 +130,7 @@ def maybe_create_new_topics_and_subtopics_from_unassigned_traces(
     model: str,
     litellm_params: dict[str, str],
     embeddings_litellm_params: dict[str, str],
-    traces: list[Trace],
+    traces: list[TraceWithEmbeddings],
     topics: list[Topic],
     subtopics: list[Subtopic],
 ) -> tuple[list[Topic], list[Subtopic], list[TraceTopicMap], Money]:
@@ -153,7 +156,7 @@ def maybe_create_new_topics_and_subtopics_from_unassigned_traces(
         )
         cost["amount"] += cost_["amount"]
 
-    new_traces_to_assign_to_subtopics_map: dict[str, list[Trace]] = {}
+    new_traces_to_assign_to_subtopics_map: dict[str, list[TraceWithEmbeddings]] = {}
     for trace in traces:
         trace_topic_map = assign_trace_to_topic(trace, topics, subtopics)
         topic_id = trace_topic_map["topic_id"]
@@ -212,8 +215,12 @@ def setup_endpoints(app: FastAPI):
         if model.startswith("azure/") and params.deployment_name:
             model = f"azure/{params.deployment_name}"
 
+        traces_with_embeddings = fill_embeddings(
+            params.traces, params.embeddings_litellm_params
+        )
+
         traces_to_assign = []
-        for trace in params.traces:
+        for trace in traces_with_embeddings:
             trace_topic_map = assign_trace_to_topic(
                 trace, params.topics, params.subtopics
             )
@@ -225,7 +232,7 @@ def setup_endpoints(app: FastAPI):
                 model=params.litellm_params["model"],
                 litellm_params=params.litellm_params,
                 embeddings_litellm_params=params.embeddings_litellm_params,
-                traces=params.traces,
+                traces=traces_with_embeddings,
                 topics=params.topics,
                 subtopics=params.subtopics,
             )

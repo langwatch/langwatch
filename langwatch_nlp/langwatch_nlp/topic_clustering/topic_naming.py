@@ -4,18 +4,18 @@ from typing import Optional
 import litellm
 from litellm.cost_calculator import completion_cost
 import numpy as np
-from openai import AzureOpenAI, OpenAI
 import os
 import json
 from random import random
 from typing import Iterable, TypeVar, Optional
 
-from tenacity import retry, stop_after_attempt, wait_exponential, wait_none
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from langwatch_nlp.topic_clustering.types import Money, Trace
-from langchain_community.callbacks.openai_info import get_openai_token_cost_for_model
 
-from langwatch_nlp.topic_clustering.utils import normalize_embedding_dimensions
+from langwatch_nlp.topic_clustering.utils import (
+    generate_embeddings,
+)
 
 T = TypeVar("T")
 
@@ -85,8 +85,9 @@ def generate_topic_names(
             **litellm_params,  # type: ignore
         )
     except Exception as e:
-        print(f"Failed to generate topic names for {len(topic_examples)} topics: {e}")
-        raise e
+        raise ValueError(
+            f"Failed to generate topic names for {len(topic_examples)} topics: {e}\n\nExisting: {existing_str}\n\nTopic examples: {topic_examples_str}\n\n. Error: {e}"
+        )
 
     total_cost = completion_cost(response)
 
@@ -108,7 +109,6 @@ def get_subtopic_samples(samples: list[Trace], n=5):
 
 
 def generate_topic_names_split(
-    model: str,
     litellm_params: dict[str, str],
     topic_examples: list[list[str]],
     existing: Optional[list[str]] = None,
@@ -146,21 +146,19 @@ def generate_topic_names_split(
     return results, cost
 
 
+@retry(wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(2), reraise=True)
 def generate_topic_names_split_and_improve_similar_names(
-    model: str,
     litellm_params: dict[str, str],
     embeddings_litellm_params: dict[str, str],
     topic_examples: list[list[str]],
     existing: Optional[list[str]] = None,
 ) -> tuple[list[Optional[str]], Money]:
     topic_names, cost1 = generate_topic_names_split(
-        model,
         litellm_params,
         topic_examples=topic_examples,
         existing=existing,
     )
     topic_names, cost2 = improve_similar_names(
-        model,
         litellm_params,
         embeddings_litellm_params,
         topic_names=topic_names,
@@ -171,7 +169,6 @@ def generate_topic_names_split_and_improve_similar_names(
 
 
 def improve_similar_names(
-    model: str,
     litellm_params: dict[str, str],
     embeddings_litellm_params: dict[str, str],
     topic_names: list[Optional[str]],
@@ -184,30 +181,18 @@ def improve_similar_names(
     if len(topic_names) != len(topic_examples):
         raise ValueError("topic_names and topic_examples must have the same length.")
 
-    embeddings = []
-    for name in topic_names:
-        if "dimensions" in embeddings_litellm_params:
-            # TODO: target_dim is throwing errors for text-embedding-3-small because litellm drop_params is also not working for some reason
-            del embeddings_litellm_params["dimensions"]
-        response = litellm.embedding(
-            **embeddings_litellm_params,  # type: ignore
-            input=name if name else "",
-        )
-        if response.data:
-            embedding = response.data[0]["embedding"]
-            embeddings.append(
-                normalize_embedding_dimensions(
-                    embedding,
-                    target_dim=int(embeddings_litellm_params.get("dimensions", 1536)),
-                )
-            )
+    names = [name if name else "" for name in topic_names]
+    embeddings = generate_embeddings(names, embeddings_litellm_params)
 
     # find the two closest embeddings
     closest_distance = float("inf")
     closest_pair = None
     for i, embedding_a in enumerate(embeddings):
         for j, embedding_b in enumerate(embeddings):
-            if i == j or topic_names[i] is None or topic_names[j] is None:
+            if embedding_a is None or embedding_b is None:
+                continue
+
+            if i == j or not topic_names[i] or not topic_names[j]:
                 continue
             # calculate cosine distance
             distance = 1 - np.dot(embedding_a, embedding_b) / (
@@ -236,7 +221,6 @@ def improve_similar_names(
     )
 
     new_topic_a_name, new_topic_b_name, cost_ = improve_name_between_two_topics(
-        model,
         litellm_params,
         topic_a_name,
         topic_b_name,
@@ -253,7 +237,6 @@ def improve_similar_names(
     iteration_ = iteration + 1
     if iteration_ < max_iterations:
         return improve_similar_names(
-            model,
             litellm_params,
             embeddings_litellm_params,
             topic_names=topic_names_,
@@ -266,9 +249,7 @@ def improve_similar_names(
     return topic_names_, cost__
 
 
-@retry(wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(4), reraise=True)
 def improve_name_between_two_topics(
-    model: str,
     litellm_params: dict[str, str],
     topic_a_name: Optional[str],
     topic_b_name: Optional[str],
@@ -284,38 +265,43 @@ def improve_name_between_two_topics(
         + "\n".join(topic_b_examples)
     )
 
-    response = litellm.completion(
-        temperature=0.0,
-        messages=[
-            {
-                "role": "system",
-                "content": f"You are a highly knowledgeable assistant tasked with taxonomy for naming topics, \
+    try:
+        response = litellm.completion(
+            temperature=0.0,
+            messages=[
+                {
+                    "role": "system",
+                    "content": f"You are a highly knowledgeable assistant tasked with taxonomy for naming topics, \
                     right now we have two topics with very similar names, and we need to disambiguate between them, \
                     to have a better name that really contrasts what one topic is about versus the other. \
                     Please look at the topics A and B and come up with a new, concise but constrasting name for each, \
                     based on their examples.",
-            },
-            {"role": "user", "content": f"{topic_examples_str}"},
-        ],
-        tools=[
-            {
-                "type": "function",
-                "function": {
-                    "name": "topicNames",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "topic_a": {"type": "string"},
-                            "topic_b": {"type": "string"},
-                        },
-                    },
-                    "description": 'use this function to name the topics based on the examples provided, avoid using "and" or "&" in the name, try to name it with a single 2-3 words concept.',
                 },
-            }
-        ],
-        tool_choice={"type": "function", "function": {"name": "topicNames"}},
-        **litellm_params,  # type: ignore
-    )
+                {"role": "user", "content": f"{topic_examples_str}"},
+            ],
+            tools=[
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "topicNames",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "topic_a": {"type": "string"},
+                                "topic_b": {"type": "string"},
+                            },
+                        },
+                        "description": 'use this function to name the topics based on the examples provided, avoid using "and" or "&" in the name, try to name it with a single 2-3 words concept.',
+                    },
+                }
+            ],
+            tool_choice={"type": "function", "function": {"name": "topicNames"}},
+            **litellm_params,  # type: ignore
+        )
+    except Exception as e:
+        raise ValueError(
+            f"Failed to improve names between {topic_a_name} and {topic_b_name}: {e}\n\nTopic examples: {topic_examples_str}\n\n. Error: {e}"
+        )
 
     total_cost = completion_cost(response)
 
@@ -350,7 +336,6 @@ def generate_topic_and_subtopic_names(
         ]
 
         def noop_topic_names(
-            model: str,
             litellm_params: dict[str, str],
             embeddings_litellm_params: dict[str, str],
             topic_examples: list[list[str]],
@@ -364,7 +349,6 @@ def generate_topic_and_subtopic_names(
                 if skip_topic_names
                 else generate_topic_names_split_and_improve_similar_names
             ),
-            model,
             litellm_params,
             embeddings_litellm_params,
             topic_examples,
@@ -380,7 +364,6 @@ def generate_topic_and_subtopic_names(
             ]
             future = executor.submit(
                 generate_topic_names_split_and_improve_similar_names,
-                model,
                 litellm_params,
                 embeddings_litellm_params,
                 subtopic_samples,

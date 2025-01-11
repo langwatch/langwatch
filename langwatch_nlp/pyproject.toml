@@ -6,14 +6,14 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "boto3>=1.35.74,<2",
-    "dspy>=2.5.41,<2.6",
+    "dspy>=2.5.43,<2.6",
     "fastapi>=0.111.1,<1",
     "google-cloud-aiplatform>=1.70.0,<2",
     "httpx>=0.27.0,<0.28",
     "langchain-community>=0.0.28,<0.1",
     "langevals-core>=0.1.10,<0.2",
     "langwatch>=0.1.35,<0.2",
-    "litellm[proxy]>=1.51.0,<2",
+    "litellm[proxy]>=1.53.7,<2",
     "mangum>=0.17.0,<0.18",
     "nanoid>=2.0.0,<3",
     "numpy>=1.26.4,<2",
