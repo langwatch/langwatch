@@ -77,6 +77,6 @@ export default withSentryConfig(config, {
 
   widenClientFileUpload: true,
   tunnelRoute: "/monitoring",
-  hideSourceMaps: false,
+  hideSourceMaps: true,
   disableLogger: true,
 });

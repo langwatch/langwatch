@@ -40,7 +40,7 @@ export const PreconditionsField = ({
   remove: (index: number) => void;
   fields: Record<"id", string>[];
 }) => {
-  const { control, watch, setValue } = useFormContext();
+  const { control, watch } = useFormContext();
   const preconditions = watch("preconditions");
   const checkType = watch("checkType");
 
