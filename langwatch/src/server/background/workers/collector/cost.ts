@@ -8,6 +8,7 @@ import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
 } from "../../../modelProviders/llmModelCost";
+import * as Sentry from "@sentry/nextjs";
 
 const cachedModel: Record<
   string,
@@ -90,16 +91,21 @@ export async function tokenizeAndEstimateCost({
   outputTokens: number;
   cost: number | undefined;
 }> {
-  const inputTokens = (await countTokens(llmModelCost, input)) ?? 0;
-  const outputTokens = (await countTokens(llmModelCost, output)) ?? 0;
+  return await Sentry.startSpan(
+    { name: "tokenizeAndEstimateCost" },
+    async () => {
+      const inputTokens = (await countTokens(llmModelCost, input)) ?? 0;
+      const outputTokens = (await countTokens(llmModelCost, output)) ?? 0;
 
-  const cost = estimateCost({ llmModelCost, inputTokens, outputTokens });
+      const cost = estimateCost({ llmModelCost, inputTokens, outputTokens });
 
-  return {
-    inputTokens,
-    outputTokens,
-    cost,
-  };
+      return {
+        inputTokens,
+        outputTokens,
+        cost,
+      };
+    }
+  );
 }
 
 export function estimateCost({

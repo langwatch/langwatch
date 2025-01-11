@@ -19,12 +19,12 @@ import { startTrackEventsWorker } from "./workers/trackEventsWorker";
 import { startCollectorWorker } from "./workers/collectorWorker";
 
 import * as Sentry from "@sentry/node";
+import "../../instrumentation.node";
 import http from "http";
 import { register } from "prom-client";
 import path from "path";
 import fs from "fs";
 import { workerRestartsCounter } from "../metrics";
-import { connection } from "../redis";
 
 class WorkersRestart extends Error {
   constructor(message: string) {
