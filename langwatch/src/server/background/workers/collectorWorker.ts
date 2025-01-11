@@ -37,9 +37,9 @@ import {
 import { cleanupPIIs } from "./collector/piiCheck";
 import { addInputAndOutputForRAGs } from "./collector/rag";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
-import { getTraceInput, getTraceOutput } from "./collector/trace";
 import { safeTruncate } from "../../../utils/truncate";
 import { nanoid } from "nanoid";
+import { getFirstInputAsText, getLastOutputAsText } from "./collector/common";
 
 const debug = getDebugger("langwatch:workers:collectorWorker");
 
@@ -225,8 +225,8 @@ const processCollectorJob_ = async (
 
   const allSpans = existingSpans.concat(spans);
   const [input, output] = await Promise.all([
-    getTraceInput(allSpans, project.id, true),
-    getTraceOutput(allSpans, project.id, true),
+    { value: getFirstInputAsText(allSpans) },
+    { value: getLastOutputAsText(allSpans) },
   ]);
   const error = getLastOutputError(spans);
 
@@ -501,8 +501,8 @@ const processCollectorCheckAndAdjustJob = async (
 
   const spans = existingTrace.spans?.map(elasticSearchSpanToSpan) ?? [];
   const [input, output] = await Promise.all([
-    getTraceInput(spans, projectId),
-    getTraceOutput(spans, projectId),
+    { value: getFirstInputAsText(spans) },
+    { value: getLastOutputAsText(spans) },
   ]);
   const error = getLastOutputError(spans);
 

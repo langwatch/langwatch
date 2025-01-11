@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { scoreSatisfactionFromInput } from "./satisfaction";
-import { getEmbeddings } from "../../../embeddings";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../../elasticsearch";
 import type { Trace } from "../../../tracer/types";
 import { getTestProject } from "~/utils/testUtils";
@@ -26,12 +25,6 @@ describe("Satisfaction Scoring Integration Test", () => {
   beforeAll(async () => {
     project = await getTestProject("satisfaction-scoring-integration-test");
     testTraceData.project_id = project.id;
-    if (testTraceData.input) {
-      testTraceData.input.embeddings = await getEmbeddings(
-        testTraceData.input.value,
-        project.id
-      );
-    }
 
     // Create a trace entry in Elasticsearch for the test
     await esClient.index({

@@ -81,7 +81,6 @@
     "bcrypt": "^5.1.1",
     "bullmq": "^5.34.5",
     "chakra-react-select": "^4.7.6",
-    "compute-cosine-similarity": "^1.1.0",
     "concurrently": "^8.2.2",
     "cookie": "^0.6.0",
     "date-fns": "^2.30.0",

@@ -35,17 +35,6 @@ export type CheckPrecondition =
        * @maxLength 500
        */
       value: string;
-    }
-  | {
-      field: CheckPreconditionFields;
-      rule: "is_similar_to";
-      /**
-       * @minLength 1
-       * @maxLength 500
-       */
-      value: string;
-      embeddings?: { model: string; embeddings: number[] };
-      threshold: number;
     };
 
 export type CheckPreconditions = CheckPrecondition[];
