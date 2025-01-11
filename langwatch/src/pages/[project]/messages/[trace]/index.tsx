@@ -115,7 +115,7 @@ export default function TraceDetails() {
             position="sticky"
             top={0}
             id="conversation-scroll-container"
-            background={trace.data ? "gray.50" : "white"}
+            background="gray.50"
             paddingBottom="220px"
           >
             <Conversation threadId={threadId} traceId={traceId} />
@@ -168,88 +168,109 @@ export function Conversation({
 
   return (
     <Box width="full" minWidth="800px">
-      {!!threadId || trace.data ? (
-        <VStack
-          align="start"
-          width="full"
-          spacing={0}
-          background="white"
-          borderBottom="1px solid"
-          borderColor="gray.200"
-        >
-          {threadId ? (
-            threadTraces.data ? (
-              threadTraces.data.map((trace) => (
-                <TraceMessages
-                  key={trace.trace_id}
-                  trace={trace}
-                  ref={trace.trace_id == traceId ? currentTraceRef : undefined}
-                  highlighted={trace.trace_id == modalTraceId}
-                />
-              ))
-            ) : threadTraces.error ? (
-              <Container maxWidth="800px" paddingTop={8} paddingBottom={4}>
-                <Text color="red.500">
-                  Something went wrong trying to load previous messages
+      <VStack
+        align="start"
+        width="full"
+        spacing={0}
+        background="white"
+        borderBottom="1px solid"
+        borderColor="gray.200"
+      >
+        {!!threadId || trace.data ? (
+          <>
+            {threadId ? (
+              threadTraces.data ? (
+                threadTraces.data.map((trace) => (
+                  <TraceMessages
+                    key={trace.trace_id}
+                    trace={trace}
+                    ref={
+                      trace.trace_id == traceId ? currentTraceRef : undefined
+                    }
+                    highlighted={trace.trace_id == modalTraceId}
+                  />
+                ))
+              ) : threadTraces.error ? (
+                <Container maxWidth="800px" paddingTop={8} paddingBottom={4}>
+                  <Text color="red.500">
+                    Something went wrong trying to load previous messages
+                  </Text>
+                </Container>
+              ) : (
+                <Container
+                  maxWidth="800px"
+                  height="56px"
+                  paddingTop={4}
+                  paddingBottom={4}
+                >
+                  <HStack spacing={3}>
+                    <Spinner size="sm" />
+                    <Text>Loading messages...</Text>
+                  </HStack>
+                </Container>
+              )
+            ) : null}
+            {trace.data && !threadTraces.data && (
+              <TraceMessages trace={trace.data} highlighted={!!modalTraceId} />
+            )}
+            {trace.data && !trace.data.metadata.thread_id && (
+              <Container maxWidth="800px" padding={8}>
+                <Text fontStyle="italic" color="gray.500">
+                  Pass the thread_id on your integration to capture and
+                  visualize the whole conversation or associated actions. Read
+                  more on our docs.
                 </Text>
               </Container>
-            ) : (
-              <Container
-                maxWidth="800px"
-                height="56px"
-                paddingTop={4}
-                paddingBottom={4}
-              >
-                <HStack spacing={3}>
-                  <Spinner size="sm" />
-                  <Text>Loading messages...</Text>
-                </HStack>
-              </Container>
-            )
-          ) : null}
-          {trace.data && !threadTraces.data && (
-            <TraceMessages trace={trace.data} highlighted={!!modalTraceId} />
-          )}
-          {trace.data && !trace.data.metadata.thread_id && (
-            <Container maxWidth="800px" padding={8}>
-              <Text fontStyle="italic" color="gray.500">
-                Pass the thread_id on your integration to capture and visualize
-                the whole conversation or associated actions. Read more on our
-                docs.
-              </Text>
-            </Container>
-          )}
-        </VStack>
-      ) : trace.isLoading ? (
-        <Container
-          width="full"
-          maxWidth="800px"
-          background="white"
-          paddingTop="20px"
-          paddingBottom="30px"
-        >
-          <VStack gap="40px" width="full" align="start" paddingTop="56px">
-            <Message
-              author=""
-              avatar={<SkeletonCircle minWidth="32px" minHeight="32px" />}
-            >
-              <VStack gap={4} width="full" align="start">
-                <Skeleton width="600px" height="20px" />
-                <Skeleton width="600px" height="20px" />
-              </VStack>
-            </Message>
-            <Message
-              author=""
-              avatar={<SkeletonCircle minWidth="32px" minHeight="32px" />}
-            >
-              <VStack gap={4} width="full" align="start">
-                <Skeleton width="600px" height="20px" />
-                <Skeleton width="600px" height="20px" />
-              </VStack>
-            </Message>
-          </VStack>
-        </Container>
-      ) : null}
+            )}
+          </>
+        ) : trace.isLoading ? (
+          <Container
+            maxWidth="1200px"
+            width="full"
+            borderY="1px solid white"
+            paddingY={4}
+          >
+            <Grid templateColumns="repeat(4, 1fr)">
+              <GridItem colSpan={3}>
+                <Box
+                  minWidth="65%"
+                  position="relative"
+                  borderRight="1px solid"
+                  borderColor="gray.200"
+                  marginRight={10}
+                  paddingLeft={10}
+                  paddingRight={10}
+                >
+                  <Message
+                    author=""
+                    avatar={<SkeletonCircle minWidth="32px" minHeight="32px" />}
+                    paddingTop="20px"
+                  >
+                    <Box paddingY="6px" marginBottom="62px">
+                      <VStack gap={4} width="full" align="start">
+                        <Skeleton width="600px" maxWidth="100%" height="20px" />
+                        <Skeleton width="600px" maxWidth="100%" height="20px" />
+                      </VStack>
+                    </Box>
+                  </Message>
+                  <Message
+                    author=""
+                    avatar={<SkeletonCircle minWidth="32px" minHeight="32px" />}
+                  >
+                    <Box paddingY="6px" marginBottom="62px">
+                      <VStack gap={4} width="full" align="start">
+                        <Skeleton width="600px" maxWidth="100%" height="20px" />
+                        <Skeleton width="600px" maxWidth="100%" height="20px" />
+                      </VStack>
+                    </Box>
+                  </Message>
+                </Box>
+              </GridItem>
+              <GridItem minWidth="300px"></GridItem>
+            </Grid>
+          </Container>
+        ) : null}
+      </VStack>
     </Box>
   );
 }

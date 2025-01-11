@@ -248,13 +248,11 @@ export type ElasticSearchSpan = Omit<
 
 export type TraceInput = {
   value: string;
-  embeddings?: { model: string; embeddings: number[] };
   satisfaction_score?: number;
 };
 
 export type TraceOutput = {
   value: string;
-  embeddings?: { model: string; embeddings: number[] };
 };
 
 type PrimitiveType = string | number | boolean | null | undefined;

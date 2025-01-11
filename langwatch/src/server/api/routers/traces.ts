@@ -620,14 +620,6 @@ export const getAllTracesForProject = async ({
 
   const groups = groupTraces(input.groupBy, traces);
 
-  // Remove embeddings to reduce payload size
-  for (const group of groups) {
-    for (const trace of group) {
-      delete trace.input?.embeddings;
-      delete trace.output?.embeddings;
-    }
-  }
-
   totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
 
   const evaluations = Object.fromEntries(

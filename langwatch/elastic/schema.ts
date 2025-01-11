@@ -13,7 +13,6 @@ import {
   type ElasticSearchTrace,
   type ElasticSearchEvaluation,
 } from "../src/server/tracer/types";
-import { OPENAI_EMBEDDING_DIMENSION } from "../src/utils/constants";
 
 type NonNestedMappingProperty =
   | Omit<MappingProperty, "properties">
@@ -197,61 +196,11 @@ export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
     properties: {
       value: { type: "text" },
       satisfaction_score: { type: "float" },
-      embeddings: {
-        properties: {
-          model: { type: "keyword" },
-          embeddings: process.env.IS_OPENSEARCH
-            ? {
-                type: "knn_vector",
-                dimension: OPENAI_EMBEDDING_DIMENSION,
-                method: {
-                  name: "hnsw",
-                  space_type: "l2",
-                  engine: "nmslib",
-                  parameters: {
-                    ef_construction: 128,
-                    m: 24,
-                  },
-                },
-              }
-            : {
-                index: true,
-                type: "dense_vector",
-                dims: OPENAI_EMBEDDING_DIMENSION,
-                similarity: "cosine",
-              },
-        },
-      },
     },
   },
   output: {
     properties: {
       value: { type: "text" },
-      embeddings: {
-        properties: {
-          model: { type: "keyword" },
-          embeddings: process.env.IS_OPENSEARCH
-            ? {
-                type: "knn_vector",
-                dimension: OPENAI_EMBEDDING_DIMENSION,
-                method: {
-                  name: "hnsw",
-                  space_type: "l2",
-                  engine: "nmslib",
-                  parameters: {
-                    ef_construction: 128,
-                    m: 24,
-                  },
-                },
-              }
-            : {
-                index: true,
-                type: "dense_vector",
-                dims: OPENAI_EMBEDDING_DIMENSION,
-                similarity: "cosine",
-              },
-        },
-      },
     },
   },
   metrics: {

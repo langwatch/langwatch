@@ -123,7 +123,7 @@ export async function processCollectorJob(
   const result = await Sentry.startSpan(
     {
       name: "Process Collector Job",
-      op: "task",
+      op: "rootSpan",
       attributes: {
         traceId: data.traceId,
       },
