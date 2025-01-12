@@ -9,6 +9,7 @@ import {
   type MaybeStoredLLMModelCost,
 } from "../../../modelProviders/llmModelCost";
 import * as Sentry from "@sentry/nextjs";
+import NodeFetchCache, { FileSystemCache } from "node-fetch-cache";
 
 const cachedModel: Record<
   string,
@@ -46,9 +47,20 @@ const initTikToken = async (
 
   if (!cachedModel[tokenizer]) {
     loadingModel.add(tokenizer);
-    console.info(`Initializing ${tokenizer} tokenizer`);
+    const startTime = Date.now();
     const registryInfo = (registry as any)[tokenizer];
-    const model = await load(registryInfo);
+    const fetch = NodeFetchCache.create({
+      cache: new FileSystemCache({
+        cacheDirectory: "node_modules/.cache/tiktoken",
+        ttl: 1000 * 60 * 60 * 24 * 365, // 1 year
+      }),
+    });
+    const model = await load(registryInfo, (url) =>
+      fetch(url).then((r) => r.text())
+    );
+    console.info(
+      `Initialized ${tokenizer} tokenizer in ${Date.now() - startTime}ms`
+    );
     const encoder = new Tiktoken(
       model.bpe_ranks,
       model.special_tokens,
@@ -144,3 +156,7 @@ export const getMatchingLLMModelCost = async (
   const llmModelCosts = await getLLMModelCosts({ projectId });
   return matchingLLMModelCost(model, llmModelCosts);
 };
+
+// Pre-warm most used models
+initTikToken("gpt-4");
+initTikToken("gpt-4o");
