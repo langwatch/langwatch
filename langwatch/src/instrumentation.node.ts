@@ -29,6 +29,13 @@ Sentry.init({
     return 1.0;
   },
 
+  beforeSend(event, hint) {
+    if (`${hint.originalException as any}`.includes("Max runtime reached")) {
+      return null;
+    }
+    return event;
+  },
+
   integrations: [SentryNode.prismaIntegration(), nodeProfilingIntegration()],
 
   profilesSampleRate: 1.0,

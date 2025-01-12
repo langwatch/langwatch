@@ -18,7 +18,6 @@ import {
 import { startTrackEventsWorker } from "./workers/trackEventsWorker";
 import { startCollectorWorker } from "./workers/collectorWorker";
 
-import * as Sentry from "@sentry/node";
 import "../../instrumentation.node";
 import http from "http";
 import { register } from "prom-client";
@@ -31,22 +30,6 @@ class WorkersRestart extends Error {
     super(message);
     this.name = "WorkersRestart";
   }
-}
-
-if (process.env.SENTRY_DSN) {
-  Sentry.init({
-    dsn: process.env.SENTRY_DSN,
-    tracesSampleRate: 1.0,
-    beforeSend(event, hint) {
-      if (
-        hint.originalException instanceof WorkersRestart ||
-        `${hint.originalException as any}`.includes("Max runtime reached")
-      ) {
-        return null;
-      }
-      return event;
-    },
-  });
 }
 
 const debug = getDebugger("langwatch:workers");
