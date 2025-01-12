@@ -29,7 +29,7 @@ const loadingModel = new Set<string>();
 const initTikToken = async (
   modelName: string
 ): Promise<{ encoder: Tiktoken } | undefined> => {
-  const fallback = "gpt-4";
+  const fallback = "gpt-4o";
   const tokenizer =
     modelName in models
       ? (models as any)[modelName]
