@@ -1,63 +1,63 @@
+import { DeleteIcon, EditIcon } from "@chakra-ui/icons";
 import {
+  Box,
   Button,
   Card,
   CardBody,
+  Container,
   HStack,
   Heading,
+  Input,
+  Link,
   Menu,
   MenuButton,
   MenuItem,
   MenuList,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
+  Select,
   Spacer,
+  Switch,
   Table,
+  TableContainer,
   Tbody,
   Td,
   Text,
+  Textarea,
   Th,
   Thead,
   Tooltip,
   Tr,
   VStack,
-  useToast,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
   useDisclosure,
-  Textarea,
-  Select,
-  Input,
-  Link,
-  TableContainer,
-  Container,
-  Box,
+  useToast,
 } from "@chakra-ui/react";
 import type { Check, TriggerAction } from "@prisma/client";
-import { Bell, MoreVertical } from "react-feather";
-import SettingsLayout from "../../components/SettingsLayout";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
-import { DeleteIcon, EditIcon } from "@chakra-ui/icons";
-import { Switch } from "@chakra-ui/react";
+import { type AlertType } from "@prisma/client";
+import { Bell, Filter, MoreVertical } from "react-feather";
+import {
+  Controller,
+  useForm,
+  type Control,
+  type SubmitHandler,
+  type UseFormHandleSubmit,
+} from "react-hook-form";
+import { z } from "zod";
+import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { SmallLabel } from "~/components/SmallLabel";
 import {
   DashboardLayout,
   ProjectSelector,
 } from "../../components/DashboardLayout";
-import { type AlertType } from "@prisma/client";
-import {
-  useForm,
-  Controller,
-  type SubmitHandler,
-  type Control,
-  type UseFormHandleSubmit,
-} from "react-hook-form";
-import { object, z } from "zod";
-import { SmallLabel } from "~/components/SmallLabel";
-import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
-import { MetadataTag } from "~/components/MetadataTag";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
+import { formatTimeAgo } from "../../utils/formatTimeAgo";
+import { HoverableBigText } from "~/components/HoverableBigText";
 
 export default function Members() {
   const { project, organizations } = useOrganizationTeamProject();
@@ -201,12 +201,16 @@ export default function Members() {
   }) => (
     <HStack
       border="1px solid lightgray"
-      borderRadius="md"
+      borderRadius="4px"
       fontSize={fontSize}
-      marginBottom={2}
-      width="fit-content"
-      spacing={0}
+      width="100%"
+      spacing={2}
+      paddingX={2}
+      paddingY={1}
     >
+      <Box color="gray.500">
+        <Filter width={16} style={{ minWidth: 16 }} />
+      </Box>
       {children}
     </HStack>
   );
@@ -220,8 +224,13 @@ export default function Members() {
       .join(" ");
 
     return (
-      <Box padding={1} fontWeight="500">
-        {text}:
+      <Box
+        padding={1}
+        fontWeight="500"
+        textTransform="capitalize"
+        color="gray.500"
+      >
+        {text.replace("_", " ")}
       </Box>
     );
   };
@@ -229,7 +238,9 @@ export default function Members() {
   const FilterValue = ({ children }: { children: React.ReactNode }) => {
     return (
       <Box padding={1} borderRightRadius="md">
-        {children}
+        <HoverableBigText noOfLines={1} expandable={false}>
+          {children}
+        </HoverableBigText>
       </Box>
     );
   };
@@ -239,38 +250,33 @@ export default function Members() {
     const result = [];
 
     for (const [key, value] of Object.entries(obj)) {
-      if (key.startsWith("eval")) {
-        return null;
-      }
-
       if (Array.isArray(value)) {
-        result.push(
-          <FilterContainer key={key}>
-            <FilterLabel>{key}</FilterLabel>
-            <FilterValue>{value.join(", ")}</FilterValue>
-          </FilterContainer>
-        );
+        if (!key.startsWith("eval")) {
+          result.push(
+            <FilterContainer key={key}>
+              <FilterLabel>{key}</FilterLabel>
+              <FilterValue>{value.join(", ")}</FilterValue>
+            </FilterContainer>
+          );
+        }
       } else if (typeof value === "object" && value !== null) {
-        // Handle nested object values
         const nestedResult = [];
         for (const [nestedKey, nestedValue] of Object.entries(value)) {
-          if (key.startsWith("eval")) {
-            return null;
-          }
           if (Array.isArray(nestedValue)) {
             nestedResult.push(`${nestedKey}:${nestedValue.join("-")}`);
           } else {
             nestedResult.push(`${nestedKey}:${nestedValue}`);
           }
         }
-        result.push(
-          <FilterContainer key={key}>
-            <FilterLabel>{key}</FilterLabel>
-            <FilterValue>{nestedResult}</FilterValue>
-          </FilterContainer>
-        );
+        if (!key.startsWith("eval")) {
+          result.push(
+            <FilterContainer key={key}>
+              <FilterLabel>{key}</FilterLabel>
+              <FilterValue>{nestedResult}</FilterValue>
+            </FilterContainer>
+          );
+        }
       } else {
-        // Handle single values
         result.push(
           <FilterContainer key={key} fontSize="xs">
             <FilterLabel>{key}</FilterLabel>
@@ -284,21 +290,16 @@ export default function Members() {
   };
 
   const applyChecks = (checks: Check[]) => {
-    if (checks.length === 0) {
+    if (!checks || checks.length === 0) {
       return null;
     }
 
     return (
       <FilterContainer fontSize="sm">
-        <FilterLabel>evaluations</FilterLabel>
-        <HStack wrap="wrap" spacing={0}>
-          {checks.map((check, index) => (
-            <Text key={check?.id}>
-              {check?.name}
-              {index < checks.length - 1 && ","} &nbsp;
-            </Text>
-          ))}
-        </HStack>
+        <FilterLabel>Evaluations</FilterLabel>
+        <FilterValue>
+          {checks.map((check, index) => check?.name).join(", ")}
+        </FilterValue>
       </FilterContainer>
     );
   };
@@ -372,16 +373,22 @@ export default function Members() {
                             </Td>
 
                             <Td maxWidth="500px">
-                              <HStack spacing={1} wrap="wrap">
-                                {applyChecks(trigger.checks)}
+                              <VStack spacing={2}>
+                                {applyChecks(
+                                  trigger.checks?.filter(
+                                    (check): check is Check => !!check
+                                  ) ?? []
+                                )}
 
                                 {trigger.filters &&
                                 typeof trigger.filters === "string"
                                   ? applyFilters(trigger.filters)
                                   : null}
-                              </HStack>
+                              </VStack>
                             </Td>
-                            <Td whiteSpace="nowrap">{lastRunAtFormatted}</Td>
+                            <Td whiteSpace="nowrap">
+                              {formatTimeAgo(trigger.lastRunAt)}
+                            </Td>
                             <Td textAlign="center">
                               <Switch
                                 isChecked={trigger.active}
@@ -534,8 +541,8 @@ const TriggerForm = ({
     <form onSubmit={handleSubmit(onSubmit)}>
       <VStack spacing={4} align="start" width="full">
         <Text>
-          Create a customized message for this trigger. This will override the
-          default message for this trigger.
+          Customize the notification message that will be sent when this trigger
+          activates. This will replace the default message.
         </Text>
         <VStack width="full" align="start">
           <SmallLabel>Title</SmallLabel>
