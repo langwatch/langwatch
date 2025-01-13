@@ -28,6 +28,7 @@ class EvaluationResultModel(BaseModel):
     details: Optional[str] = None
     label: Optional[str] = None
     cost: Optional[Money] = None
+    error_type: Optional[str] = None
 
 
 def evaluate(
@@ -204,8 +205,6 @@ def handle_response(
     as_guardrail: bool = False,
 ):
     result = EvaluationResultModel.model_validate(response)
-    if result.status == "error":
-        result.details = response.get("message", "")
     if span:
         span.update(
             output=(
@@ -240,7 +239,7 @@ def handle_exception(
 ):
     response: dict = {
         "status": "error",
-        "message": repr(e),
+        "details": repr(e),
     }
     if as_guardrail:
         response["passed"] = True
