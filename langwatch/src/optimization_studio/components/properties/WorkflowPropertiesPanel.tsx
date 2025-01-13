@@ -2,6 +2,8 @@ import {
   Box,
   HStack,
   Input,
+  Select,
+  Spacer,
   Switch,
   Text,
   Textarea,
@@ -188,6 +190,21 @@ export function WorkflowPropertiesPanel() {
         </>
       }
     >
+      <PropertyField
+        title="Workflow Type"
+        tooltip="Select Evaluator if you want to publish this workflow as an evaluator to be used for other workflows and on monitoring messages, this will change the End node for expected properties of an evaluator."
+      >
+        <Select
+          size="sm"
+          value={isEvaluator ? "evaluator" : "workflow"}
+          onChange={(e) => {
+            setAsEvaluator();
+          }}
+        >
+          <option value="workflow">Workflow</option>
+          <option value="evaluator">Evaluator</option>
+        </Select>
+      </PropertyField>
       <PropertyField title="Default LLM">
         <LLMConfigField
           llmConfig={workflow.default_llm}
@@ -196,10 +213,20 @@ export function WorkflowPropertiesPanel() {
           }}
         />
       </PropertyField>
-      <HStack paddingLeft={2}>
-        <Text>Use as Evaluator</Text>
-        <Switch isChecked={isEvaluator} onChange={() => setAsEvaluator()} />
-      </HStack>
+      <PropertyField title="Enable Tracing">
+        <HStack paddingX={2} width="full">
+          <Text fontSize={14}>
+            Store execution traces when running this workflow
+          </Text>
+          <Spacer />
+          <Switch
+            isChecked={workflow.enable_tracing}
+            onChange={() => {
+              setWorkflow({ enable_tracing: !workflow.enable_tracing });
+            }}
+          />
+        </HStack>
+      </PropertyField>
     </BasePropertiesPanel>
   );
 }

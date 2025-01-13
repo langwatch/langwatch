@@ -2,7 +2,7 @@ import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
 import type { End, Entry, Evaluator, Retriever, Workflow } from "../types/dsl";
 
 export const simpleRagTemplate: Workflow = {
-  spec_version: "1.2",
+  spec_version: "1.3",
   name: "Simple RAG",
   icon: "🧩",
   description:
@@ -13,6 +13,7 @@ export const simpleRagTemplate: Workflow = {
     temperature: 0,
     max_tokens: 2048,
   },
+  enable_tracing: true,
   nodes: [
     {
       id: "entry",

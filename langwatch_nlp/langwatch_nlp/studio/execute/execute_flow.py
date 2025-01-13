@@ -24,26 +24,11 @@ from langwatch_nlp.studio.types.events import (
 from langwatch_nlp.studio.utils import (
     ClientReadableValueError,
     disable_dsp_caching,
+    optional_langwatch_trace,
     transpose_inline_dataset_to_object_list,
 )
 
 from dspy.utils.asyncify import asyncify
-
-
-@contextmanager
-def optional_langwatch_trace(
-    do_not_trace=False, trace_id=None, api_key=None, skip_root_span=False, metadata=None
-):
-    if do_not_trace:
-        yield None
-    else:
-        with langwatch.trace(
-            trace_id=trace_id,
-            api_key=api_key,
-            skip_root_span=skip_root_span,
-            metadata=metadata,
-        ) as trace:
-            yield trace
 
 
 async def execute_flow(
@@ -60,7 +45,7 @@ async def execute_flow(
         True if event.manual_execution_mode is None else event.manual_execution_mode
     )
 
-    do_not_trace = (
+    do_not_trace = not workflow.enable_tracing or (
         inputs[0].get("do_not_trace", event.do_not_trace)
         if inputs
         else event.do_not_trace
@@ -136,7 +121,7 @@ async def execute_flow(
 
         yield end_workflow_event(workflow, trace_id, result)
     finally:
-        if not do_not_trace and trace:
+        if trace:
             await asyncify(trace.send_spans)()
 
 

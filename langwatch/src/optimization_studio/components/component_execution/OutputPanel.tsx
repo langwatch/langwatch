@@ -15,6 +15,8 @@ import { RenderInputOutput } from "../../../components/traces/RenderInputOutput"
 import { SpanDuration } from "../../../components/traces/SpanDetails";
 import type { Component } from "../../types/dsl";
 import { useDrawer } from "../../../components/CurrentDrawer";
+import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import { useShallow } from "zustand/react/shallow";
 
 export const OutputPanel = ({ node }: { node: Node<Component> }) => {
   const [isWaitingLong] = useDebounceValue(
@@ -23,6 +25,12 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
   );
 
   const { openDrawer } = useDrawer();
+
+  const { enableTracing } = useWorkflowStore(
+    useShallow((state) => ({
+      enableTracing: state.enable_tracing,
+    }))
+  );
 
   return (
     <Box
@@ -84,17 +92,22 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
                     />
                   </>
                 ) : null}
-                <Text color="gray.400">·</Text>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    openDrawer("traceDetails", {
-                      traceId: node.data.execution_state?.trace_id ?? "",
-                    });
-                  }}
-                >
-                  Full Trace
-                </Button>
+
+                {enableTracing && (
+                  <>
+                    <Text color="gray.400">·</Text>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        openDrawer("traceDetails", {
+                          traceId: node.data.execution_state?.trace_id ?? "",
+                        });
+                      }}
+                    >
+                      Full Trace
+                    </Button>
+                  </>
+                )}
               </HStack>
             )}
         </HStack>

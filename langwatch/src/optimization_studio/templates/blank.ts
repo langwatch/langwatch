@@ -2,7 +2,7 @@ import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
 import type { End, Entry, Signature, Workflow } from "../types/dsl";
 
 export const blankTemplate: Workflow = {
-  spec_version: "1.2",
+  spec_version: "1.3",
   name: "Blank Template",
   icon: "🧩",
   description: "Start a new workflow from scratch",
@@ -12,6 +12,7 @@ export const blankTemplate: Workflow = {
     temperature: 0,
     max_tokens: 2048,
   },
+  enable_tracing: true,
   nodes: [
     {
       id: "entry",

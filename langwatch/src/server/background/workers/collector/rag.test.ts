@@ -16,13 +16,15 @@ describe("RAG", () => {
         },
       },
       { document_id: "4", content: ["qwe", "qwert"] },
+      { document_id: "2", content: { title: null, content: "baz", score: 0.87 } },
     ];
 
     expect(extractRAGTextualContext(contexts)).toEqual([
       "foo",
-      "bar\nbaz",
-      "wut\nqux",
+      "{\"title\":\"bar\",\"content\":\"baz\",\"score\":0.87}",
+      JSON.stringify(contexts[2]?.content),
       "qwe\nqwert",
+      "{\"title\":null,\"content\":\"baz\",\"score\":0.87}",
     ]);
   });
 

@@ -7,6 +7,7 @@ class DatasetColumnType(str, Enum):
     boolean = "boolean"
     number = "number"
     date = "date"
+    list = "list"
     json = "json"
     spans = "spans"
     rag_contexts = "rag_contexts"

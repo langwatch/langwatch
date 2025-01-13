@@ -142,7 +142,7 @@ type Flow = {
 };
 
 export type Workflow = {
-  spec_version: "1.2";
+  spec_version: "1.3";
   workflow_id?: string;
   name: string;
   icon: string;
@@ -152,6 +152,7 @@ export type Workflow = {
   nodes: Node<Component>[];
   edges: Edge[];
   data?: Record<string, any>;
+  enable_tracing: boolean;
 
   state: {
     execution?: {

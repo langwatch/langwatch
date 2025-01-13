@@ -78,11 +78,7 @@ export const extractChunkTextualContent = (object: any): string => {
       .trim();
   }
   if (typeof content === "object") {
-    return Object.values(content)
-      .map(extractChunkTextualContent)
-      .filter((x) => x)
-      .join("\n")
-      .trim();
+    return JSON.stringify(content);
   }
 
   return "";

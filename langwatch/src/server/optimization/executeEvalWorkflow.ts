@@ -21,6 +21,7 @@ const getWorkFlow = (state: Workflow) => {
     description: state.description,
     version: state.version,
     default_llm: state.default_llm,
+    enable_tracing: state.enable_tracing,
     nodes: state.nodes,
     edges: state.edges,
     state: state.state,

@@ -102,7 +102,7 @@ const DEFAULT_LLM_CONFIG: LLMConfig = {
 
 const initialState: State = {
   workflow_id: undefined,
-  spec_version: "1.2",
+  spec_version: "1.3",
   name: "Loading...",
   icon: "🧩",
   description: "",
@@ -110,6 +110,7 @@ const initialState: State = {
   nodes: [],
   edges: [],
   default_llm: DEFAULT_LLM_CONFIG,
+  enable_tracing: true,
   state: {},
 
   hoveredNodeId: undefined,
@@ -148,6 +149,7 @@ const store = (
       description: state.description,
       version: state.version,
       default_llm: state.default_llm,
+      enable_tracing: state.enable_tracing,
       nodes: state.nodes,
       edges: state.edges,
       state: state.state,

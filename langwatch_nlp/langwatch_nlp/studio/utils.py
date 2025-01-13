@@ -1,5 +1,6 @@
 import ast
 import builtins
+from contextlib import contextmanager
 import inspect
 import keyword
 import os
@@ -9,6 +10,7 @@ import threading
 from typing import Any, Dict, List, cast
 
 from joblib.memory import MemorizedFunc, AsyncMemorizedFunc
+import langwatch
 import litellm
 
 from langwatch_nlp.studio.types.dsl import (
@@ -184,3 +186,19 @@ def shutdown_handler(sig, frame):
 def forceful_exit(self):
     print("Forceful exit triggered", file=sys.stderr)
     os._exit(1)
+
+
+@contextmanager
+def optional_langwatch_trace(
+    do_not_trace=False, trace_id=None, api_key=None, skip_root_span=False, metadata=None
+):
+    if do_not_trace:
+        yield None
+    else:
+        with langwatch.trace(
+            trace_id=trace_id,
+            api_key=api_key,
+            skip_root_span=skip_root_span,
+            metadata=metadata,
+        ) as trace:
+            yield trace

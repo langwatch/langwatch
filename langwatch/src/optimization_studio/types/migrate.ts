@@ -22,6 +22,7 @@ export const migrateDSLVersion = (dsl_: Workflow) => {
 
   // @ts-expect-error
   if (dsl.spec_version === "1.1") {
+    // @ts-expect-error
     dsl.spec_version = "1.2";
     dsl.nodes.forEach((node) => {
       if (node.data.parameters) {
@@ -68,6 +69,12 @@ export const migrateDSLVersion = (dsl_: Workflow) => {
         delete node.data.demonstrations;
       }
     });
+  }
+
+  // @ts-expect-error
+  if (dsl.spec_version === "1.2") {
+    dsl.spec_version = "1.3";
+    dsl.enable_tracing = true;
   }
 
   return dsl;

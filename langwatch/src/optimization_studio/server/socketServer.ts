@@ -10,6 +10,7 @@ import { prisma } from "../../server/db";
 import type { StudioClientEvent, StudioServerEvent } from "../types/events";
 import { addEnvs, getS3CacheKey } from "./addEnvs";
 import { loadDatasets } from "./loadDatasets";
+import * as Sentry from "@sentry/node";
 
 const wss = new WebSocketServer({ noServer: true });
 
@@ -120,9 +121,19 @@ const callPython = async (
       try {
         body = JSON.stringify(body, null, 2);
       } catch {}
-      throw new Error(
-        `Failed to call Python: ${response.statusText}\n\n${body}`
-      );
+      if (response.status === 422) {
+        console.error(
+          "Optimization Studio validation failed, some components might be outdated",
+          "\n\n",
+          JSON.stringify(event, null, 2)
+        );
+        const error = new Error(
+          `Optimization Studio validation failed, some components might be outdated`
+        );
+        Sentry.captureException(error, { extra: { event } });
+        throw error;
+      }
+      throw new Error(`Failed run workflow: ${response.statusText}\n\n${body}`);
     }
   } catch (error) {
     if (

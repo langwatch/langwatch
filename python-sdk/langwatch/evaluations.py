@@ -37,9 +37,9 @@ def evaluate(
     input: Optional[str] = None,
     output: Optional[str] = None,
     expected_output: Optional[str] = None,
-    contexts: Union[List[RAGChunk], List[str]] = [],
-    expected_contexts: Union[List[RAGChunk], List[str]] = [],
-    conversation: Conversation = [],
+    contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
+    expected_contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
+    conversation: Optional[Conversation] = None,
     settings: Optional[dict] = None,
     as_guardrail: bool = False,
     trace: Optional[ContextTrace] = None,
@@ -69,7 +69,7 @@ def evaluate(
             api_key=api_key,
         )
         try:
-            with httpx.Client(timeout=30) as client:
+            with httpx.Client(timeout=120) as client:
                 response = client.post(**request_params)
                 response.raise_for_status()
         except Exception as e:
@@ -84,9 +84,9 @@ async def async_evaluate(
     input: Optional[str] = None,
     output: Optional[str] = None,
     expected_output: Optional[str] = None,
-    contexts: Union[List[RAGChunk], List[str]] = [],
-    expected_contexts: Union[List[RAGChunk], List[str]] = [],
-    conversation: Conversation = [],
+    contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
+    expected_contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
+    conversation: Optional[Conversation] = None,
     settings: Optional[dict] = None,
     as_guardrail: bool = False,
     trace: Optional[ContextTrace] = None,
@@ -116,7 +116,7 @@ async def async_evaluate(
             api_key=api_key,
         )
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
+            async with httpx.AsyncClient(timeout=120) as client:
                 response = await client.post(**request_params)
                 response.raise_for_status()
         except Exception as e:

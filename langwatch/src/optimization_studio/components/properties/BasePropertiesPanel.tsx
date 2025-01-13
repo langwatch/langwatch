@@ -54,13 +54,15 @@ import { CodeEditorModal } from "../code/CodeEditorModal";
 export function PropertyField({
   title,
   children,
+  tooltip,
 }: {
   title: string;
   children: React.ReactNode;
+  tooltip?: React.ReactNode;
 }) {
   return (
     <VStack align="start" spacing={3} width="full">
-      <PropertySectionTitle>{title}</PropertySectionTitle>
+      <PropertySectionTitle tooltip={tooltip}>{title}</PropertySectionTitle>
       {children}
     </VStack>
   );
@@ -470,13 +472,22 @@ export function FieldsForm({
 
 export function PropertySectionTitle({
   children,
+  tooltip,
 }: {
   children: React.ReactNode;
+  tooltip?: React.ReactNode;
 }) {
   return (
-    <Box paddingLeft={2}>
+    <HStack paddingLeft={2}>
       <NodeSectionTitle fontSize={12}>{children}</NodeSectionTitle>
-    </Box>
+      {tooltip && (
+        <Tooltip label={tooltip}>
+          <Box marginBottom="-2px">
+            <Info size={14} />
+          </Box>
+        </Tooltip>
+      )}
+    </HStack>
   );
 }
 

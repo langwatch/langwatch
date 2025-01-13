@@ -1,5 +1,5 @@
 from typing import Any, List, Dict, Union, Optional, Literal
-from pydantic import BaseModel, Field as PydanticField
+from pydantic import BaseModel
 from enum import Enum
 
 from langwatch_nlp.studio.types.dataset import DatasetColumns
@@ -276,3 +276,4 @@ class Workflow(BaseModel):
     nodes: List[Node]
     edges: List[Edge]
     state: WorkflowState
+    enable_tracing: Optional[bool] = True
