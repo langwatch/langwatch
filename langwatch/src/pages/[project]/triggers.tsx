@@ -1,61 +1,63 @@
+import { DeleteIcon, EditIcon } from "@chakra-ui/icons";
 import {
+  Box,
   Button,
   Card,
   CardBody,
+  Container,
   HStack,
   Heading,
+  Input,
+  Link,
   Menu,
   MenuButton,
   MenuItem,
   MenuList,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
+  Select,
   Spacer,
+  Switch,
   Table,
+  TableContainer,
   Tbody,
   Td,
   Text,
+  Textarea,
   Th,
   Thead,
   Tooltip,
   Tr,
   VStack,
-  useToast,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
   useDisclosure,
-  Textarea,
-  Select,
-  Input,
-  Link,
-  TableContainer,
-  Container,
+  useToast,
 } from "@chakra-ui/react";
-import type { TriggerAction } from "@prisma/client";
-import { Bell, MoreVertical } from "react-feather";
-import SettingsLayout from "../../components/SettingsLayout";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
-import { DeleteIcon, EditIcon } from "@chakra-ui/icons";
-import { Switch } from "@chakra-ui/react";
+import type { Check, TriggerAction } from "@prisma/client";
+import { type AlertType } from "@prisma/client";
+import { Bell, Filter, MoreVertical } from "react-feather";
+import {
+  Controller,
+  useForm,
+  type Control,
+  type SubmitHandler,
+  type UseFormHandleSubmit,
+} from "react-hook-form";
+import { z } from "zod";
+import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { SmallLabel } from "~/components/SmallLabel";
 import {
   DashboardLayout,
   ProjectSelector,
 } from "../../components/DashboardLayout";
-import { type AlertType } from "@prisma/client";
-import {
-  useForm,
-  Controller,
-  type SubmitHandler,
-  type Control,
-  type UseFormHandleSubmit,
-} from "react-hook-form";
-import { z } from "zod";
-import { SmallLabel } from "~/components/SmallLabel";
-import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
+import { formatTimeAgo } from "../../utils/formatTimeAgo";
+import { HoverableBigText } from "~/components/HoverableBigText";
 
 export default function Members() {
   const { project, organizations } = useOrganizationTeamProject();
@@ -111,13 +113,11 @@ export default function Members() {
     if (actionParams.datasetId) {
       return (
         <Link href={`/${project?.slug}/datasets/${actionParams.datasetId}`}>
-          View &quot;
           {
             getDatasets.data?.find(
               (dataset) => dataset.id === actionParams.datasetId
             )?.name
           }
-          &quot;
         </Link>
       );
     }
@@ -192,6 +192,118 @@ export default function Members() {
     void triggers.refetch();
   };
 
+  const FilterContainer = ({
+    children,
+    fontSize = "sm",
+  }: {
+    children: React.ReactNode;
+    fontSize?: string;
+  }) => (
+    <HStack
+      border="1px solid lightgray"
+      borderRadius="4px"
+      fontSize={fontSize}
+      width="100%"
+      spacing={2}
+      paddingX={2}
+      paddingY={1}
+    >
+      <Box color="gray.500">
+        <Filter width={16} style={{ minWidth: 16 }} />
+      </Box>
+      {children}
+    </HStack>
+  );
+
+  const FilterLabel = ({ children }: { children: React.ReactNode }) => {
+    const text = String(children)
+      .split(".")
+      .filter(
+        (word, index) => index !== 0 || word.toLowerCase() === "evaluations"
+      )
+      .join(" ");
+
+    return (
+      <Box
+        padding={1}
+        fontWeight="500"
+        textTransform="capitalize"
+        color="gray.500"
+      >
+        {text.replace("_", " ")}
+      </Box>
+    );
+  };
+
+  const FilterValue = ({ children }: { children: React.ReactNode }) => {
+    return (
+      <Box padding={1} borderRightRadius="md">
+        <HoverableBigText noOfLines={1} expandable={false}>
+          {children}
+        </HoverableBigText>
+      </Box>
+    );
+  };
+
+  const applyFilters = (filters: string) => {
+    const obj = JSON.parse(filters);
+    const result = [];
+
+    for (const [key, value] of Object.entries(obj)) {
+      if (Array.isArray(value)) {
+        if (!key.startsWith("eval")) {
+          result.push(
+            <FilterContainer key={key}>
+              <FilterLabel>{key}</FilterLabel>
+              <FilterValue>{value.join(", ")}</FilterValue>
+            </FilterContainer>
+          );
+        }
+      } else if (typeof value === "object" && value !== null) {
+        const nestedResult = [];
+        for (const [nestedKey, nestedValue] of Object.entries(value)) {
+          if (Array.isArray(nestedValue)) {
+            nestedResult.push(`${nestedKey}:${nestedValue.join("-")}`);
+          } else {
+            nestedResult.push(`${nestedKey}:${nestedValue}`);
+          }
+        }
+        if (!key.startsWith("eval")) {
+          result.push(
+            <FilterContainer key={key}>
+              <FilterLabel>{key}</FilterLabel>
+              <FilterValue>{nestedResult}</FilterValue>
+            </FilterContainer>
+          );
+        }
+      } else {
+        result.push(
+          <FilterContainer key={key} fontSize="xs">
+            <FilterLabel>{key}</FilterLabel>
+            <FilterValue>{String(value)}</FilterValue>
+          </FilterContainer>
+        );
+      }
+    }
+
+    return result;
+  };
+
+  const applyChecks = (checks: Check[]) => {
+    if (!checks || checks.length === 0) {
+      return null;
+    }
+
+    return (
+      <FilterContainer fontSize="sm">
+        <FilterLabel>Evaluations</FilterLabel>
+        <FilterValue>
+          {checks.map((check, index) => check?.name).join(", ")}
+        </FilterValue>
+      </FilterContainer>
+    );
+  };
+
   return (
     <DashboardLayout>
       <Container maxW={"calc(100vw - 200px)"} padding={6} marginTop={8}>
@@ -232,11 +344,11 @@ export default function Members() {
                     <Tr>
                       <Th>Name</Th>
                       <Th>Action</Th>
-                      <Th>Action Items</Th>
-                      <Th>Checks</Th>
+                      <Th>Destination</Th>
+                      <Th>Filters</Th>
                       <Th>Last Triggered At</Th>
                       <Th>Active</Th>
-                      <Th></Th>
+                      <Th>Actions</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
@@ -259,20 +371,24 @@ export default function Members() {
                                 trigger.actionParams as ActionParams
                               )}
                             </Td>
-                            <Td>
-                              <Tooltip
-                                label={trigger.checks
-                                  .map((check) => check?.name)
-                                  .join(", ")}
-                              >
-                                <Text noOfLines={1} display="block">
-                                  {trigger.checks
-                                    .map((check) => check?.name)
-                                    .join(", ")}
-                                </Text>
-                              </Tooltip>
+
+                            <Td maxWidth="500px">
+                              <VStack spacing={2}>
+                                {applyChecks(
+                                  trigger.checks?.filter(
+                                    (check): check is Check => !!check
+                                  ) ?? []
+                                )}
+
+                                {trigger.filters &&
+                                typeof trigger.filters === "string"
+                                  ? applyFilters(trigger.filters)
+                                  : null}
+                              </VStack>
                             </Td>
-                            <Td whiteSpace="nowrap">{lastRunAtFormatted}</Td>
+                            <Td whiteSpace="nowrap">
+                              {formatTimeAgo(trigger.lastRunAt)}
+                            </Td>
                             <Td textAlign="center">
                               <Switch
                                 isChecked={trigger.active}
@@ -296,24 +412,26 @@ export default function Members() {
                                   <MoreVertical />
                                 </MenuButton>
                                 <MenuList>
-                                  <MenuItem
-                                    icon={<EditIcon />}
-                                    onClick={() => {
-                                      setValue("triggerId", trigger.id);
-                                      setValue(
-                                        "customMessage",
-                                        trigger.message ?? ""
-                                      );
-                                      setValue(
-                                        "alertType",
-                                        trigger.alertType ?? ""
-                                      );
-                                      setValue("name", trigger.name ?? "");
-                                      onOpen();
-                                    }}
-                                  >
-                                    Customize
-                                  </MenuItem>
+                                  {trigger.action != "ADD_TO_DATASET" && (
+                                    <MenuItem
+                                      icon={<EditIcon />}
+                                      onClick={() => {
+                                        setValue("triggerId", trigger.id);
+                                        setValue(
+                                          "customMessage",
+                                          trigger.message ?? ""
+                                        );
+                                        setValue(
+                                          "alertType",
+                                          trigger.alertType ?? ""
+                                        );
+                                        setValue("name", trigger.name ?? "");
+                                        onOpen();
+                                      }}
+                                    >
+                                      Customize Message
+                                    </MenuItem>
+                                  )}
                                   <MenuItem
                                     color="red.600"
                                     onClick={(event) => {
@@ -342,7 +460,7 @@ export default function Members() {
       <Modal isOpen={isOpen} onClose={handleCloseModal} size="2xl">
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>Customize Your Trigger</ModalHeader>
+          <ModalHeader>Trigger Message</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <TriggerForm
@@ -423,8 +541,8 @@ const TriggerForm = ({
     <form onSubmit={handleSubmit(onSubmit)}>
       <VStack spacing={4} align="start" width="full">
         <Text>
-          Create a customized message for this trigger. This will override the
-          default message for this trigger.
+          Customize the notification message that will be sent when this trigger
+          activates. This will replace the default message.
         </Text>
         <VStack width="full" align="start">
           <SmallLabel>Title</SmallLabel>

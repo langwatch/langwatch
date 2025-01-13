@@ -142,6 +142,8 @@ export const triggerRouter = createTRPCRouter({
         }
       });
 
+      console.log(allCheckIds);
+
       const allChecks = await ctx.prisma.check.findMany({
         where: {
           id: {
