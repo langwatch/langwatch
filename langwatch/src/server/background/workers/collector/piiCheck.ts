@@ -14,6 +14,7 @@ import {
   getEvaluationStatusCounter,
   getPiiChecksCounter,
 } from "../../../metrics";
+import * as Sentry from "@sentry/nextjs";
 
 const debug = getDebugger("langwatch:trace_checks:piiCheck");
 
@@ -308,61 +309,63 @@ export const cleanupPIIs = async (
   spans: ElasticSearchSpan[],
   options: PIICheckOptions
 ): Promise<void> => {
-  const { enforced, mainMethod } = options;
+  return await Sentry.startSpan({ name: "cleanupPIIs" }, async () => {
+    const { enforced, mainMethod } = options;
 
-  if (!credentials && mainMethod === "google_dlp") {
-    if (enforced) {
-      throw new Error(
-        "GOOGLE_APPLICATION_CREDENTIALS is not set, PII check cannot be performed"
+    if (!credentials && mainMethod === "google_dlp") {
+      if (enforced) {
+        throw new Error(
+          "GOOGLE_APPLICATION_CREDENTIALS is not set, PII check cannot be performed"
+        );
+      }
+      console.warn(
+        "⚠️  WARNING: GOOGLE_APPLICATION_CREDENTIALS is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default"
       );
+      return;
     }
-    console.warn(
-      "⚠️  WARNING: GOOGLE_APPLICATION_CREDENTIALS is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default"
-    );
-    return;
-  }
-  if (mainMethod === "presidio" && !process.env.LANGEVALS_ENDPOINT) {
-    if (enforced) {
-      throw new Error(
-        "LANGEVALS_ENDPOINT is not set, PII check cannot be performed"
+    if (mainMethod === "presidio" && !process.env.LANGEVALS_ENDPOINT) {
+      if (enforced) {
+        throw new Error(
+          "LANGEVALS_ENDPOINT is not set, PII check cannot be performed"
+        );
+      }
+      console.warn(
+        "⚠️  WARNING: LANGEVALS_ENDPOINT is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default"
       );
-    }
-    console.warn(
-      "⚠️  WARNING: LANGEVALS_ENDPOINT is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default"
-    );
-    return;
-  }
-
-  debug("Checking PII for trace", trace.trace_id);
-
-  const clearPIIPromises = [
-    clearPII(trace, ["input", "value"], options),
-    clearPII(trace, ["output", "value"], options),
-    clearPII(trace, ["error", "message"], options),
-  ];
-
-  for (const span of spans) {
-    clearPIIPromises.push(clearPII(span, ["input", "value"], options));
-    clearPIIPromises.push(clearPII(span, ["error", "message"], options));
-
-    if (span.output) {
-      clearPIIPromises.push(clearPII(span.output, ["value"], options));
+      return;
     }
 
-    for (const context of span.contexts ?? []) {
-      if (Array.isArray(context.content)) {
-        for (let i = 0; i < context.content.length; i++) {
-          clearPIIPromises.push(clearPII(context.content, [i], options));
+    debug("Checking PII for trace", trace.trace_id);
+
+    const clearPIIPromises = [
+      clearPII(trace, ["input", "value"], options),
+      clearPII(trace, ["output", "value"], options),
+      clearPII(trace, ["error", "message"], options),
+    ];
+
+    for (const span of spans) {
+      clearPIIPromises.push(clearPII(span, ["input", "value"], options));
+      clearPIIPromises.push(clearPII(span, ["error", "message"], options));
+
+      if (span.output) {
+        clearPIIPromises.push(clearPII(span.output, ["value"], options));
+      }
+
+      for (const context of span.contexts ?? []) {
+        if (Array.isArray(context.content)) {
+          for (let i = 0; i < context.content.length; i++) {
+            clearPIIPromises.push(clearPII(context.content, [i], options));
+          }
+        } else if (typeof context.content === "object") {
+          for (const key in context.content) {
+            clearPIIPromises.push(clearPII(context.content, [key], options));
+          }
+        } else {
+          clearPIIPromises.push(clearPII(context, ["content"], options));
         }
-      } else if (typeof context.content === "object") {
-        for (const key in context.content) {
-          clearPIIPromises.push(clearPII(context.content, [key], options));
-        }
-      } else {
-        clearPIIPromises.push(clearPII(context, ["content"], options));
       }
     }
-  }
 
-  await Promise.all(clearPIIPromises);
+    await Promise.all(clearPIIPromises);
+  });
 };

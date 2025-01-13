@@ -210,11 +210,13 @@ const LangWatch: AppType<{
         handleChangeStartTimeout = null;
       }
       NProgress.done();
-      setTimeout(() => NProgress.done(), 200);
     };
     const handleChangeStart_ = () => {
-      if (nProgressEnabled) {
-        handleChangeStartTimeout = setTimeout(() => NProgress.start(), 300);
+      if (nProgressEnabled && !handleChangeStartTimeout) {
+        handleChangeStartTimeout = setTimeout(() => {
+          NProgress.start();
+          handleChangeStartTimeout = null;
+        }, 100);
       }
     };
 

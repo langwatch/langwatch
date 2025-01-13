@@ -5,19 +5,26 @@ from langwatch_nlp.topic_clustering.build_response import build_response
 from langwatch_nlp.topic_clustering.topic_naming import (
     generate_topic_and_subtopic_names,
 )
-from langwatch_nlp.topic_clustering.utils import calculate_centroid_and_distance
+from langwatch_nlp.topic_clustering.utils import (
+    calculate_centroid_and_distance,
+    fill_embeddings,
+)
 from langwatch_nlp.topic_clustering.constants import (
     COPHENETIC_DISTANCES_FOR_SUBTOPICS,
     COPHENETIC_DISTANCES_FOR_TOPICS,
     MINIMUM_SUBTOPICS_PER_TOPIC,
     MINIMUM_TRACES_PER_TOPIC,
 )
-from langwatch_nlp.topic_clustering.types import TopicClusteringResponse, Trace
+from langwatch_nlp.topic_clustering.types import (
+    TopicClusteringResponse,
+    Trace,
+    TraceWithEmbeddings,
+)
 from scipy.cluster.hierarchy import linkage, fcluster
 
 
 def build_hierarchy(
-    traces: list[Trace],
+    traces: list[TraceWithEmbeddings],
     cophenetic_distance: int,
     with_embeddings=True,
     maximum_p95_distance: float = 1,
@@ -89,7 +96,13 @@ def setup_endpoints(app: FastAPI):
         if model.startswith("azure/") and params.deployment_name:
             model = f"azure/{params.deployment_name}"
 
-        hierarchy = build_hierarchy(params.traces, COPHENETIC_DISTANCES_FOR_TOPICS)
+        traces_with_embeddings = fill_embeddings(
+            params.traces, params.embeddings_litellm_params
+        )
+
+        hierarchy = build_hierarchy(
+            traces_with_embeddings, COPHENETIC_DISTANCES_FOR_TOPICS
+        )
         topic_names, subtopic_names, cost = generate_topic_and_subtopic_names(
             model=model,
             litellm_params=params.litellm_params,

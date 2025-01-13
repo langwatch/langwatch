@@ -26,9 +26,9 @@ export const scoreSatisfactionFromInput = async ({
     throw new Error("LANGWATCH_NLP_SERVICE not set");
   }
 
-  if (!input?.embeddings) {
+  if (!input?.value) {
     console.warn(
-      `Trace ID ${traceId} input does not have embeddings, skipping satisfaction score`
+      `Trace ID ${traceId} input is empty, skipping satisfaction score`
     );
     return;
   }
@@ -40,7 +40,7 @@ export const scoreSatisfactionFromInput = async ({
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      vector: input.embeddings.embeddings,
+      text: input.value,
       embeddings_litellm_params: {
         ...prepareLitellmParams(
           embeddingsModel.model,

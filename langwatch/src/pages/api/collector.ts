@@ -282,6 +282,11 @@ export default async function handler(
     return res.status(400).json({ message: "Trace ID not defined" });
   }
 
+  Sentry.getCurrentScope()?.setPropagationContext({
+    traceId,
+    spanId: traceId,
+  });
+
   const traceIds = Array.from(
     new Set(spans.filter((span) => span.trace_id).map((span) => span.trace_id))
   );

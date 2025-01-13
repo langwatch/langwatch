@@ -3,7 +3,6 @@ import {
   clusterTopicsForProject,
   fetchTopicsBatchClustering,
 } from "./topicClustering";
-import { DEFAULT_EMBEDDINGS_MODEL, getEmbeddings } from "../embeddings";
 import { TRACE_INDEX, esClient, traceIndexId } from "../elasticsearch";
 import type { Trace } from "../tracer/types";
 import { CostType } from "@prisma/client";
@@ -99,14 +98,7 @@ describe("Topic Clustering Integration Test", () => {
   beforeAll(async () => {
     const project = await getTestProject("clustering");
     testProjectId = project.id;
-    const allEmbeddings = await Promise.all(
-      traces.map((trace) => getEmbeddings(trace.input!, project.id))
-    );
     traces.forEach((trace, i) => {
-      const embeddings = allEmbeddings[i];
-      if (embeddings) {
-        trace.embeddings = embeddings.embeddings;
-      }
       trace.topic_id = null;
       trace.subtopic_id = null;
     });
@@ -127,10 +119,6 @@ describe("Topic Clustering Integration Test", () => {
           project_id: testProjectId,
           input: {
             value: trace.input,
-            embeddings: {
-              model: DEFAULT_EMBEDDINGS_MODEL,
-              embeddings: trace.embeddings,
-            },
           },
           timestamps: {
             started_at: Date.now(),
@@ -160,8 +148,10 @@ describe("Topic Clustering Integration Test", () => {
 
   it("cluster tracers into topics", async () => {
     const result = await fetchTopicsBatchClustering("project_id", {
-      model: "openai/gpt-4o",
-      litellm_params: {},
+      litellm_params: {
+        model: "openai/gpt-4o-mini",
+        api_key: process.env.OPENAI_API_KEY!,
+      },
       embeddings_litellm_params: {
         model: "openai/text-embedding-3-small",
         api_key: process.env.OPENAI_API_KEY!,

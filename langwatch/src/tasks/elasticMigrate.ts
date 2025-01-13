@@ -17,7 +17,6 @@ import {
 import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
 import { env } from "../env.mjs";
 import { execSync } from "child_process";
-import { stderr } from "process";
 
 const files = fs
   .readdirSync(path.join(__dirname, "..", "..", "elastic", "migrations"))

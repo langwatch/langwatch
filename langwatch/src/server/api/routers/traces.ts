@@ -8,7 +8,6 @@ import type {
 } from "@elastic/elasticsearch/lib/api/types";
 import { PublicShareResourceTypes, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import similarity from "compute-cosine-similarity";
 import shuffle from "lodash/shuffle";
 import type { Session } from "next-auth";
 import {
@@ -472,12 +471,10 @@ export const getAllTracesForProject = async ({
       _source: {
         excludes: [
           // TODO: do we really need to exclude both keys and nested keys for embeddings?
-          ...(input.groupBy !== "input"
-            ? ["input.embeddings", "input.embeddings.embeddings"]
-            : []),
-          ...(input.groupBy !== "output"
-            ? ["output.embeddings", "input.embeddings.embeddings"]
-            : []),
+          "input.embeddings",
+          "input.embeddings.embeddings",
+          "output.embeddings",
+          "output.embeddings.embeddings",
           ...(canSeeCosts ? [] : ["metrics.total_cost"]),
           ...(downloadMode ? ["spans"] : ["spans.input.value", "spans.error"]),
         ],
@@ -623,14 +620,6 @@ export const getAllTracesForProject = async ({
 
   const groups = groupTraces(input.groupBy, traces);
 
-  // Remove embeddings to reduce payload size
-  for (const group of groups) {
-    for (const trace of group) {
-      delete trace.input?.embeddings;
-      delete trace.output?.embeddings;
-    }
-  }
-
   totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
 
   const evaluations = Object.fromEntries(
@@ -746,12 +735,6 @@ const groupTraces = <T extends Trace>(
   const groups: T[][] = [];
 
   const groupingKeyPresent = (trace: T) => {
-    if (groupBy === "input") {
-      return !!trace.input?.embeddings?.embeddings;
-    }
-    if (groupBy === "output") {
-      return !!trace.output?.embeddings?.embeddings;
-    }
     if (groupBy === "user_id") {
       return !!trace.metadata.user_id;
     }
@@ -763,31 +746,6 @@ const groupTraces = <T extends Trace>(
   };
 
   const matchesGroup = (trace: T, member: T) => {
-    if (groupBy === "input") {
-      const similarityThreshold = 0.85;
-      if (
-        !trace.input?.embeddings?.embeddings ||
-        !member.input?.embeddings?.embeddings
-      ) {
-        return false;
-      }
-
-      return (
-        (similarity(
-          trace.input.embeddings.embeddings,
-          member.input.embeddings.embeddings
-        ) ?? 0) > similarityThreshold
-      );
-    }
-    if (groupBy === "output") {
-      const similarityThreshold = 0.9;
-      return (
-        (similarity(
-          trace.output!.embeddings!.embeddings,
-          member.output!.embeddings!.embeddings
-        ) ?? 0) > similarityThreshold
-      );
-    }
     if (groupBy === "user_id") {
       return trace.metadata.user_id === member.metadata.user_id;
     }

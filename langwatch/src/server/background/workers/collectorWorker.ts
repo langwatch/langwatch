@@ -37,8 +37,9 @@ import {
 import { cleanupPIIs } from "./collector/piiCheck";
 import { addInputAndOutputForRAGs } from "./collector/rag";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
-import { getTraceInput, getTraceOutput } from "./collector/trace";
 import { safeTruncate } from "../../../utils/truncate";
+import { nanoid } from "nanoid";
+import { getFirstInputAsText, getLastOutputAsText } from "./collector/common";
 
 const debug = getDebugger("langwatch:workers:collectorWorker");
 
@@ -113,7 +114,25 @@ export async function processCollectorJob(
     return result;
   }
   getJobProcessingCounter("collector", "processing").inc();
-  const result = await processCollectorJob_(id, data as CollectorJob);
+
+  Sentry.getCurrentScope().setPropagationContext({
+    traceId: data.traceId,
+    spanId: nanoid(),
+  });
+
+  const result = await Sentry.startSpan(
+    {
+      name: "Process Collector Job",
+      op: "rootSpan",
+      attributes: {
+        traceId: data.traceId,
+      },
+    },
+    async () => {
+      return await processCollectorJob_(id, data as CollectorJob);
+    }
+  );
+
   getJobProcessingCounter("collector", "completed").inc();
   const duration = Date.now() - start;
   getJobProcessingDurationHistogram("collector").observe(duration);
@@ -206,8 +225,8 @@ const processCollectorJob_ = async (
 
   const allSpans = existingSpans.concat(spans);
   const [input, output] = await Promise.all([
-    getTraceInput(allSpans, project.id, true),
-    getTraceOutput(allSpans, project.id, true),
+    { value: getFirstInputAsText(allSpans) },
+    { value: getLastOutputAsText(allSpans) },
   ]);
   const error = getLastOutputError(spans);
 
@@ -270,7 +289,9 @@ const processCollectorJob_ = async (
     });
   }
 
-  await updateTrace(trace, esSpans, evaluations);
+  await Sentry.startSpan({ name: "updateTrace" }, async () => {
+    await updateTrace(trace, esSpans, evaluations);
+  });
 
   if (!existingTrace?.inserted_at) {
     const delay = Date.now() - data.collectedAt;
@@ -480,8 +501,8 @@ const processCollectorCheckAndAdjustJob = async (
 
   const spans = existingTrace.spans?.map(elasticSearchSpanToSpan) ?? [];
   const [input, output] = await Promise.all([
-    getTraceInput(spans, projectId),
-    getTraceOutput(spans, projectId),
+    { value: getFirstInputAsText(spans) },
+    { value: getLastOutputAsText(spans) },
   ]);
   const error = getLastOutputError(spans);
 

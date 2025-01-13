@@ -49,21 +49,27 @@ export function useLoadChatMessagesEffect({
       const outputMessages = spanObj?.output
         ? JSON.parse(spanObj.output.value)
         : [];
-      const inputMessagesArr = Array.isArray(inputMessages)
-        ? inputMessages
-        : [inputMessages];
-      const outputMessagesArr = Array.isArray(outputMessages)
-        ? outputMessages
-        : [outputMessages];
-
-      const messages = [...inputMessagesArr, ...outputMessagesArr];
+      const inputMessagesArr = (
+        Array.isArray(inputMessages) ? inputMessages : [inputMessages]
+      ).map((message) =>
+        message.role ? message : { role: "user", content: message.toString() }
+      );
+      const outputMessagesArr = (
+        Array.isArray(outputMessages) ? outputMessages : [outputMessages]
+      ).map((message) =>
+        message.role
+          ? message
+          : { role: "assistant", content: message.toString() }
+      );
 
       // Generate message id placeholders in case they are missing
       // because the MessageBlock component uses the id to determine
       // keys in lists.
-      messages.forEach((message, ix) => {
-        message.id = message.id || `${spanObj?.span_id}_${ix}`;
-      });
+      const messages = [...inputMessagesArr, ...outputMessagesArr].map(
+        (message, ix) => {
+          return { ...message, id: message.id || `${spanObj?.span_id}_${ix}` };
+        }
+      );
 
       const systemMessage = messages.find((m) => m.role === "system");
       const nonSystemMessages = messages.filter((m) => m.role !== "system");

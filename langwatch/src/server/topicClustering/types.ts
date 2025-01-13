@@ -22,7 +22,6 @@ export const allowedTopicClusteringModels = modelSelectorOptions
 export type TopicClusteringTrace = {
   trace_id: string;
   input: string;
-  embeddings: number[];
   topic_id: string | null;
   subtopic_id: string | null;
 };

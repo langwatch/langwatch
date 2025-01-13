@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import {
+  getProviderModelOptions,
   modelProviders,
   type MaybeStoredModelProvider,
 } from "../../modelProviders/registry";
@@ -137,13 +138,19 @@ export const getProjectModelProviders = async (projectId: string) => {
             modelProvider.enabledSince < project.createdAt &&
             !!process.env[modelProvider.apiKey] &&
             (providerKey !== "vertex_ai" || !!process.env.VERTEXAI_PROJECT);
+
           const modelProvider_: MaybeStoredModelProvider = {
             provider: providerKey,
             enabled,
             disabledByDefault: !enabled,
             customKeys: null,
-            customModels: null,
-            customEmbeddingsModels: null,
+            models: getProviderModelOptions(providerKey, "chat").map(
+              (m) => m.value
+            ),
+            embeddingsModels: getProviderModelOptions(
+              providerKey,
+              "embedding"
+            ).map((m) => m.value),
             deploymentMapping: null,
           };
           return [providerKey, modelProvider_];
@@ -154,26 +161,30 @@ export const getProjectModelProviders = async (projectId: string) => {
     await prisma.modelProvider.findMany({
       where: { projectId },
     })
-  ).reduce(
-    (acc, modelProvider) => {
-      return {
-        ...acc,
-        [modelProvider.provider]: {
+  )
+    .filter((modelProvider) => modelProvider.customKeys)
+    .reduce(
+      (acc, modelProvider) => {
+        const modelProvider_: MaybeStoredModelProvider = {
           provider: modelProvider.provider,
           enabled: modelProvider.enabled,
           customKeys: modelProvider.customKeys,
-          customModels: modelProvider.customModels as string[] | null,
-          customEmbeddingsModels: modelProvider.customEmbeddingsModels as
+          models: modelProvider.customModels as string[] | null,
+          embeddingsModels: modelProvider.customEmbeddingsModels as
             | string[]
             | null,
           deploymentMapping: modelProvider.deploymentMapping,
           disabledByDefault:
             defaultModelProviders[modelProvider.provider]?.disabledByDefault,
-        },
-      };
-    },
-    {} as Record<string, MaybeStoredModelProvider>
-  );
+        };
+
+        return {
+          ...acc,
+          [modelProvider.provider]: modelProvider_,
+        };
+      },
+      {} as Record<string, MaybeStoredModelProvider>
+    );
 
   return {
     ...defaultModelProviders,

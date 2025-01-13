@@ -8,6 +8,8 @@ import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
 } from "../../../modelProviders/llmModelCost";
+import * as Sentry from "@sentry/nextjs";
+import NodeFetchCache, { FileSystemCache } from "node-fetch-cache";
 
 const cachedModel: Record<
   string,
@@ -27,7 +29,7 @@ const loadingModel = new Set<string>();
 const initTikToken = async (
   modelName: string
 ): Promise<{ encoder: Tiktoken } | undefined> => {
-  const fallback = "gpt-4";
+  const fallback = "gpt-4o";
   const tokenizer =
     modelName in models
       ? (models as any)[modelName]
@@ -45,9 +47,20 @@ const initTikToken = async (
 
   if (!cachedModel[tokenizer]) {
     loadingModel.add(tokenizer);
-    console.info(`Initializing ${tokenizer} tokenizer`);
+    const startTime = Date.now();
     const registryInfo = (registry as any)[tokenizer];
-    const model = await load(registryInfo);
+    const fetch = NodeFetchCache.create({
+      cache: new FileSystemCache({
+        cacheDirectory: "node_modules/.cache/tiktoken",
+        ttl: 1000 * 60 * 60 * 24 * 365, // 1 year
+      }),
+    });
+    const model = await load(registryInfo, (url) =>
+      fetch(url).then((r) => r.text())
+    );
+    console.info(
+      `Initialized ${tokenizer} tokenizer in ${Date.now() - startTime}ms`
+    );
     const encoder = new Tiktoken(
       model.bpe_ranks,
       model.special_tokens,
@@ -90,16 +103,21 @@ export async function tokenizeAndEstimateCost({
   outputTokens: number;
   cost: number | undefined;
 }> {
-  const inputTokens = (await countTokens(llmModelCost, input)) ?? 0;
-  const outputTokens = (await countTokens(llmModelCost, output)) ?? 0;
+  return await Sentry.startSpan(
+    { name: "tokenizeAndEstimateCost" },
+    async () => {
+      const inputTokens = (await countTokens(llmModelCost, input)) ?? 0;
+      const outputTokens = (await countTokens(llmModelCost, output)) ?? 0;
 
-  const cost = estimateCost({ llmModelCost, inputTokens, outputTokens });
+      const cost = estimateCost({ llmModelCost, inputTokens, outputTokens });
 
-  return {
-    inputTokens,
-    outputTokens,
-    cost,
-  };
+      return {
+        inputTokens,
+        outputTokens,
+        cost,
+      };
+    }
+  );
 }
 
 export function estimateCost({
@@ -138,3 +156,7 @@ export const getMatchingLLMModelCost = async (
   const llmModelCosts = await getLLMModelCosts({ projectId });
   return matchingLLMModelCost(model, llmModelCosts);
 };
+
+// Pre-warm most used models
+initTikToken("gpt-4");
+initTikToken("gpt-4o");

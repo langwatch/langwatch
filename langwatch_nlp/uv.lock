@@ -369,6 +369,15 @@ wheels = [
 ]
 
 [[package]]
+name = "cloudpickle"
+version = "3.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/97/c7/f746cadd08c4c08129215cf1b984b632f9e579fc781301e63da9e85c76c1/cloudpickle-3.1.0.tar.gz", hash = "sha256:81a929b6e3c7335c863c771d673d105f02efdb89dfaba0c90495d1c64796601b", size = 66155 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/48/41/e1d85ca3cab0b674e277c8c4f678cf66a91cd2cecf93df94353a606fe0db/cloudpickle-3.1.0-py3-none-any.whl", hash = "sha256:fe11acda67f61aaaec473e3afe030feb131d78a43461b718185363384f1ba12e", size = 22021 },
+]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -571,18 +580,21 @@ wheels = [
 
 [[package]]
 name = "dspy"
-version = "2.5.41"
+version = "2.5.43"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
     { name = "asyncer" },
     { name = "backoff" },
+    { name = "cachetools" },
+    { name = "cloudpickle" },
     { name = "datasets" },
     { name = "diskcache" },
     { name = "httpx" },
+    { name = "jinja2" },
     { name = "joblib" },
     { name = "json-repair" },
-    { name = "litellm" },
+    { name = "litellm", extra = ["proxy"] },
     { name = "magicattr" },
     { name = "openai" },
     { name = "optuna" },
@@ -594,9 +606,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "ujson" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/dc/44/4ff003b2b0efb01cc0e8de59f6c079ae8cc7e8511cb30bb8df1dae2a195e/dspy-2.5.41.tar.gz", hash = "sha256:d94b74d39f5c57346ff4090b99688660c9e5fd385cf29d139e4e0ed104c8477b", size = 258727 }
+sdist = { url = "https://files.pythonhosted.org/packages/6b/2f/61bd4a6116f38f57e7a0bd0c90a833c2257006d1c8ac2f67b0c306bba9e5/dspy-2.5.43.tar.gz", hash = "sha256:cdae20d2b2e6cba46c9cdc2220dc6315ef1a375baa4fcaf61e5ca2943a9205be", size = 263024 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/72/82/a86a37f654da2789dbb910e4061749a4865f3fa2087f13d32263b09037b5/dspy-2.5.41-py3-none-any.whl", hash = "sha256:28732210ddc2a47dd3d887d444fd8edf38bdc535c420357fd5d9fbe88d1df286", size = 340372 },
+    { url = "https://files.pythonhosted.org/packages/82/de/2ca5421f490af3767d7993ff71da995eb97f8036a57005be22e1590c24dc/dspy-2.5.43-py3-none-any.whl", hash = "sha256:fe04b7188b5185db20d4b75e646b8d831fa8a50a0f8693b1d6317d33b0e02508", size = 345202 },
 ]
 
 [[package]]
@@ -1550,7 +1562,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "boto3", specifier = ">=1.35.74,<2" },
-    { name = "dspy", specifier = ">=2.5.41,<2.6" },
+    { name = "dspy", specifier = ">=2.5.43,<2.6" },
     { name = "fastapi", specifier = ">=0.111.1,<1" },
     { name = "google-cloud-aiplatform", specifier = ">=1.70.0,<2" },
     { name = "httpx", specifier = ">=0.27.0,<0.28" },
@@ -1558,7 +1570,7 @@ requires-dist = [
     { name = "langchain-community", specifier = ">=0.0.28,<0.1" },
     { name = "langevals-core", specifier = ">=0.1.10,<0.2" },
     { name = "langwatch", specifier = ">=0.1.35,<0.2" },
-    { name = "litellm", extras = ["proxy"], specifier = ">=1.51.0,<2" },
+    { name = "litellm", extras = ["proxy"], specifier = ">=1.53.7,<2" },
     { name = "mangum", specifier = ">=0.17.0,<0.18" },
     { name = "nanoid", specifier = ">=2.0.0,<3" },
     { name = "numpy", specifier = ">=1.26.4,<2" },
@@ -1582,11 +1594,12 @@ requires-dist = [
 
 [[package]]
 name = "litellm"
-version = "1.51.0"
+version = "1.53.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "click" },
+    { name = "httpx" },
     { name = "importlib-metadata" },
     { name = "jinja2" },
     { name = "jsonschema" },
@@ -1597,9 +1610,9 @@ dependencies = [
     { name = "tiktoken" },
     { name = "tokenizers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ae/f4/48b9cb08cf815c67ea7b7609b80364de6214dd8542ed3d529464c249ab23/litellm-1.51.0.tar.gz", hash = "sha256:8bf648677ee145a8fe5054a2e3f3a34895b9ab65a6015e4b94efca7ef406f466", size = 6101223 }
+sdist = { url = "https://files.pythonhosted.org/packages/64/c0/78b3b23f39edb11045c88f459096ab1c5e3afc710881de52b2ab837eb8c9/litellm-1.53.7.tar.gz", hash = "sha256:1b00bb3b7f8f35b0843abc1ced98e7bb0580430ca027f6710128dc1346fb1073", size = 6186780 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b2/a5/475033a2f15f6e30e879e87d50cbada588e2af4ea36eec1fd66f3bd996c3/litellm-1.51.0-py3-none-any.whl", hash = "sha256:0b2c20d116834166c8440e5698d7d927dbcc78fcaa08ce0c5cbea2d0de55ec6c", size = 6329724 },
+    { url = "https://files.pythonhosted.org/packages/19/dd/a7870198fb4391977864619c5d2fec3c306961da447d54cfc7ed5252701d/litellm-1.53.7-py3-none-any.whl", hash = "sha256:f6d58a6bebe8cb530d6e3d45ae6f2f648546687d5fd3eb2e064ac8292b50b9c1", size = 6441792 },
 ]
 
 [package.optional-dependencies]
@@ -1876,7 +1889,7 @@ wheels = [
 
 [[package]]
 name = "openai"
-version = "1.55.0"
+version = "1.59.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -1888,9 +1901,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f8/7b/b1a3b6fa17dc523c603121dd23615bcd895a9fc3ab23be92307b9347bc50/openai-1.55.0.tar.gz", hash = "sha256:6c0975ac8540fe639d12b4ff5a8e0bf1424c844c4a4251148f59f06c4b2bd5db", size = 313963 }
+sdist = { url = "https://files.pythonhosted.org/packages/2e/7a/07fbe7bdabffd0a5be1bfe5903a02c4fff232e9acbae894014752a8e4def/openai-1.59.6.tar.gz", hash = "sha256:c7670727c2f1e4473f62fea6fa51475c8bc098c9ffb47bfb9eef5be23c747934", size = 344915 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/b2/9d8939c9ef73e6a2d5cb3366ef3fabd728a8de4729210d9af785c0edc6ec/openai-1.55.0-py3-none-any.whl", hash = "sha256:446e08918f8dd70d8723274be860404c8c7cc46b91b93bbc0ef051f57eb503c1", size = 389528 },
+    { url = "https://files.pythonhosted.org/packages/70/45/6de8e5fd670c804b29c777e4716f1916741c71604d5c7d952eee8432f7d3/openai-1.59.6-py3-none-any.whl", hash = "sha256:b28ed44eee3d5ebe1a3ea045ee1b4b50fea36ecd50741aaa5ce5a5559c900cb6", size = 454817 },
 ]
 
 [[package]]

@@ -1,4 +1,3 @@
-import similarity from "compute-cosine-similarity";
 import {
   type ElasticSearchTrace,
   type RAGSpan,
@@ -85,32 +84,6 @@ export function evaluatePreconditions(
           console.error(
             `Invalid regex in preconditions: ${precondition.value}`
           );
-          return false;
-        }
-        break;
-      case "is_similar_to":
-        const embeddingsMap = {
-          input: trace.input?.embeddings?.embeddings ?? [],
-          output: trace.output?.embeddings?.embeddings ?? [],
-          "metadata.labels": null,
-        };
-        const embeddings = embeddingsMap[precondition.field];
-        if (!embeddings) {
-          console.error(
-            `${precondition.field} is not available for embeddings match`
-          );
-          return false;
-        }
-
-        const preconditionEmbeddings = precondition.embeddings?.embeddings;
-        if (!preconditionEmbeddings || preconditionEmbeddings.length === 0) {
-          console.error(
-            `No embeddings provided for is_similar_to precondition on ${precondition.field} field.`
-          );
-          return false;
-        }
-        const similarityScore = similarity(preconditionEmbeddings, embeddings);
-        if ((similarityScore ?? 0) < precondition.threshold) {
           return false;
         }
         break;

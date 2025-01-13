@@ -36,32 +36,18 @@ import { SmallLabel } from "../../components/SmallLabel";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import {
+  getProviderModelOptions,
   modelProviders as modelProvidersRegistry,
   type MaybeStoredModelProvider,
 } from "../../server/modelProviders/registry";
 import { allowedTopicClusteringModels } from "../../server/topicClustering/types";
 import { api } from "../../utils/api";
 
-import models from "../../../models.json";
-
 import CreatableSelect from "react-select/creatable";
 import {
   DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
 } from "../../utils/constants";
-
-export const getProviderModelOptions = (
-  provider: string,
-  mode: "chat" | "embedding"
-) => {
-  return Object.entries(models)
-    .filter(([key, _]) => key.split("/")[0] === provider)
-    .filter(([_, value]) => value.mode === mode)
-    .map(([key, _]) => ({
-      value: key.split("/").slice(1).join("/"),
-      label: key.split("/").slice(1).join("/"),
-    }));
-};
 
 export default function ModelsPage() {
   const { project, organizations } = useOrganizationTeamProject();
@@ -187,12 +173,12 @@ function ModelProviderForm({
         useCustomKeys: !!provider.customKeys,
         customKeys: provider.customKeys as object | null,
         customModels: getStoredModelOptions(
-          provider.customModels ?? [],
+          provider.models ?? [],
           provider.provider,
           "chat"
         ),
         customEmbeddingsModels: getStoredModelOptions(
-          provider.customEmbeddingsModels ?? [],
+          provider.embeddingsModels ?? [],
           provider.provider,
           "embedding"
         ),
@@ -279,8 +265,8 @@ function ModelProviderForm({
         provider: provider.provider,
         enabled: e.target.checked,
         customKeys: provider.customKeys as any,
-        customModels: provider.customModels ?? [],
-        customEmbeddingsModels: provider.customEmbeddingsModels ?? [],
+        customModels: provider.models ?? [],
+        customEmbeddingsModels: provider.embeddingsModels ?? [],
       });
 
       if (e.target.checked && provider.disabledByDefault) {
@@ -295,8 +281,8 @@ function ModelProviderForm({
       provider.id,
       provider.provider,
       provider.customKeys,
-      provider.customModels,
-      provider.customEmbeddingsModels,
+      provider.models,
+      provider.embeddingsModels,
       provider.disabledByDefault,
       project?.id,
       refetch,
@@ -327,7 +313,7 @@ function ModelProviderForm({
       setValue(
         "customModels",
         getStoredModelOptions(
-          provider.customModels ?? [],
+          provider.models ?? [],
           provider.provider,
           "chat"
         )
@@ -335,7 +321,7 @@ function ModelProviderForm({
       setValue(
         "customEmbeddingsModels",
         getStoredModelOptions(
-          provider.customEmbeddingsModels ?? [],
+          provider.embeddingsModels ?? [],
           provider.provider,
           "embedding"
         )

@@ -478,10 +478,8 @@ function MessageSkeleton() {
 }
 
 const groups = {
-  input: "Input",
-  output: "Output",
-  user_id: "User ID",
   thread_id: "Thread ID",
+  user_id: "User ID",
   none: "None",
 };
 
@@ -489,7 +487,7 @@ const useGroupBy = () => {
   const router = useRouter();
 
   const groupBy =
-    (router.query.group_by as keyof typeof groups | undefined) ?? "input";
+    (router.query.group_by as keyof typeof groups | undefined) ?? "thread_id";
 
   const setGroupBy = (group: keyof typeof groups) => {
     void router.push(

@@ -281,8 +281,12 @@ export const runEvaluation = async ({
     if (!modelProvider.enabled) {
       throw `Provider ${provider} is not enabled`;
     }
-    if (modelProvider.customModels && !modelProvider.customModels.includes(model)) {
-      throw `Model ${model} is not in the models list, please select another model for running this evaluation`;
+    const model_ = model.split("/").slice(1).join("/");
+    const modelList = embeddings
+      ? modelProvider.embeddingsModels
+      : modelProvider.models;
+    if (modelList && !modelList.includes(model_)) {
+      throw `Model ${model_} is not in the ${embeddings ? "embedding models" : "models"} list for ${provider}, please select another model for running this evaluation`;
     }
     const params = prepareLitellmParams(model, modelProvider);
 

@@ -197,21 +197,12 @@ export const clusterTopicsForProject = async (
     },
   });
 
-  const embeddingsModel = await getProjectEmbeddingsModel(projectId);
-
   const traces: TopicClusteringTrace[] = result.hits.hits
     .map((hit) => hit._source!)
-    .filter(
-      (trace) =>
-        !!trace?.input?.value &&
-        !!trace?.input?.embeddings?.embeddings &&
-        trace?.input?.embeddings?.model.replace("openai/", "") ===
-          embeddingsModel.model.replace("openai/", "")
-    )
+    .filter((trace) => !!trace?.input?.value)
     .map((trace) => ({
       trace_id: trace.trace_id,
-      input: trace.input?.value ?? "",
-      embeddings: trace.input?.embeddings?.embeddings ?? [],
+      input: trace.input?.value.slice(0, 8192) ?? "",
       topic_id:
         trace.metadata?.topic_id && topicIds.includes(trace.metadata.topic_id)
           ? trace.metadata.topic_id

@@ -25,7 +25,6 @@ import {
   spanTypesSchema,
   typedValueChatMessagesSchema,
 } from "./types.generated";
-import { parsePythonInsideJson } from "../../utils/parsePythonInsideJson";
 
 export type TraceForCollection = Pick<
   CollectorJob,

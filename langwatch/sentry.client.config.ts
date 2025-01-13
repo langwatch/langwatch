@@ -17,15 +17,16 @@ Sentry.init({
 
   replaysOnErrorSampleRate: 1.0,
 
-  // This sets the sample rate to be 10%. You may want this to be 100% while
+  // This sets the sample rate to be 0% for non-errors. You may want this to be 100% while
   // in development and sample at a lower rate in production
-  replaysSessionSampleRate: 0.1,
+  replaysSessionSampleRate: 0.0,
 
   // You can remove this option if you're not planning to use the Sentry Session Replay feature:
   integrations: [
-    new Sentry.Replay({
+    Sentry.replayIntegration({
       // Additional Replay configuration goes in here, for example:
-      maskAllText: true,
+      maskAllText: false,
+      maskAllInputs: false,
       blockAllMedia: true,
     }),
   ],
