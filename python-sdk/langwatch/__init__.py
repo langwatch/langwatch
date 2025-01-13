@@ -71,9 +71,14 @@ if langchain_available:
             "LangChain seems to be installed but we couldn't import langwatch.langchain, please check your langchain dependency installation."
         )
 
+enabled: bool = True
+sampling_rate: float = 1.0
+
 __all__ = (
     "endpoint",
     "api_key",
+    "enabled",
+    "sampling_rate",
     "trace",
     "span",
     "get_current_trace",
