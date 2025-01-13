@@ -155,9 +155,9 @@ def prepare_data(
     input: Optional[str],
     output: Optional[str],
     expected_output: Optional[str],
-    contexts: Union[List[RAGChunk], List[str]] = [],
-    expected_contexts: Union[List[RAGChunk], List[str]] = [],
-    conversation: Conversation = [],
+    contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
+    expected_contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
+    conversation: Optional[Conversation] = None,
     settings: Optional[dict] = None,
     trace_id: Optional[Union[str, UUID]] = None,
     span_id: Optional[Union[str, UUID]] = None,
@@ -166,17 +166,17 @@ def prepare_data(
     api_key: Optional[str] = None,
 ):
     data = {}
-    if input:
+    if input is not None:
         data["input"] = input
-    if output:
+    if output is not None:
         data["output"] = output
-    if expected_output:
+    if expected_output is not None:
         data["expected_output"] = expected_output
-    if contexts and len(contexts) > 0:
+    if contexts is not None:
         data["contexts"] = contexts
-    if expected_contexts and len(expected_contexts) > 0:
+    if expected_contexts is not None:
         data["expected_contexts"] = expected_contexts
-    if conversation and len(conversation) > 0:
+    if conversation is not None:
         data["conversation"] = conversation
     if span:
         span.update(
