@@ -34,6 +34,7 @@ import { api } from "~/utils/api";
 import GraphsLayout from "~/components/GraphsLayout";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
+import { useRouter } from "next/router";
 
 export default function Reports() {
   const { project } = useOrganizationTeamProject();
@@ -42,6 +43,8 @@ export default function Reports() {
   const graphs = api.graphs.getAll.useQuery({ projectId: project?.id ?? "" });
   const deleteGraphs = api.graphs.delete.useMutation();
   const toast = useToast();
+
+  const router = useRouter();
 
   const deleteGraph = (id: string) => () => {
     deleteGraphs.mutate(
@@ -117,6 +120,15 @@ export default function Reports() {
                           <MoreVertical />
                         </MenuButton>
                         <MenuList>
+                          <MenuItem
+                            onClick={() => {
+                              void router.push(
+                                `/${project?.slug}/analytics/custom/${graph.id}`
+                              );
+                            }}
+                          >
+                            Edit Graph
+                          </MenuItem>
                           <MenuItem
                             color="red.600"
                             onClick={deleteGraph(graph.id)}

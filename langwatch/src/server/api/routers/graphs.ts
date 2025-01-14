@@ -51,8 +51,44 @@ export const graphsRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Graph not found" });
       }
 
-      await prisma.customGraph.delete({ where: { id, projectId: input.projectId } });
+      await prisma.customGraph.delete({
+        where: { id, projectId: input.projectId },
+      });
 
       return graph;
+    }),
+  getById: protectedProcedure
+    .input(z.object({ projectId: z.string(), id: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
+    .query(async ({ ctx, input }) => {
+      const { id } = input;
+      const prisma = ctx.prisma;
+
+      const graph = await prisma.customGraph.findUnique({
+        where: { id, projectId: input.projectId },
+      });
+
+      return graph;
+    }),
+  updateById: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        name: z.string(),
+        graph: z.string(),
+        graphId: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      const prisma = ctx.prisma;
+
+      return prisma.customGraph.update({
+        where: { id: input.graphId, projectId: input.projectId },
+        data: {
+          name: input.name,
+          graph: JSON.parse(input.graph),
+        },
+      });
     }),
 });

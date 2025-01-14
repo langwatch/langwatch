@@ -67,22 +67,22 @@ import {
   type UseFieldArrayReturn,
 } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
-import { DashboardLayout } from "../../../components/DashboardLayout";
+import { DashboardLayout } from "../../../../components/DashboardLayout";
 import {
   FilterToggle,
   useFilterToggle,
-} from "../../../components/filters/FilterToggle";
-import { FilterSidebar } from "../../../components/filters/FilterSidebar";
+} from "../../../../components/filters/FilterToggle";
+import { FilterSidebar } from "../../../../components/filters/FilterSidebar";
 import {
   PeriodSelector,
   usePeriodSelector,
-} from "../../../components/PeriodSelector";
+} from "../../../../components/PeriodSelector";
 import {
   CustomGraph,
   summaryGraphTypes,
   type CustomGraphInput,
-} from "../../../components/analytics/CustomGraph";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+} from "../../../../components/analytics/CustomGraph";
+import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import {
   analyticsGroups,
   analyticsMetrics,
@@ -93,7 +93,7 @@ import {
   pipelineAggregations,
   type FlattenAnalyticsGroupsEnum,
   type FlattenAnalyticsMetricsEnum,
-} from "../../../server/analytics/registry";
+} from "../../../../server/analytics/registry";
 import type {
   AggregationTypes,
   AnalyticsGroup,
@@ -101,17 +101,17 @@ import type {
   PipelineAggregationTypes,
   PipelineFields,
   SharedFiltersInput,
-} from "../../../server/analytics/types";
-import type { FilterField } from "../../../server/filters/types";
-import { api } from "../../../utils/api";
+} from "../../../../server/analytics/types";
+import type { FilterField } from "../../../../server/filters/types";
+import { api } from "../../../../utils/api";
 import {
   rotatingColors,
   type RotatingColorSet,
-} from "../../../utils/rotatingColors";
+} from "../../../../utils/rotatingColors";
 import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,
-} from "../../../utils/stringCasing";
+} from "../../../../utils/stringCasing";
 import { useRouter } from "next/router";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { RenderCode } from "~/components/code/RenderCode";
@@ -238,13 +238,34 @@ const defaultValues: CustomGraphFormData = {
   includePrevious: true,
 };
 
-export default function AnalyticsCustomGraph() {
+export default function AnalyticsCustomGraph({
+  customId,
+  graph,
+  name,
+}: {
+  customId?: string;
+  graph?: CustomGraphInput;
+  name?: string;
+}) {
   const jsonModal = useDisclosure();
   const apiModal = useDisclosure();
   const { filterParams } = useFilterParams();
+
+  let initialFormData: CustomGraphFormData | undefined;
+  if (customId && graph) {
+    initialFormData = customGraphInputToFormData(graph);
+  }
+
   const form = useForm<CustomGraphFormData>({
-    defaultValues,
+    defaultValues: customId ? initialFormData : defaultValues,
   });
+
+  useEffect(() => {
+    if (name) {
+      form.setValue("title", name);
+    }
+  }, [name, form]);
+
   const seriesFields = useFieldArray({
     control: form.control,
     name: "series",
@@ -299,7 +320,11 @@ export default function AnalyticsCustomGraph() {
           <HStack width="full" align="start" minHeight="500px" spacing={8}>
             <Card minWidth="480px" minHeight="560px">
               <CardBody>
-                <CustomGraphForm form={form} seriesFields={seriesFields} />
+                <CustomGraphForm
+                  form={form}
+                  seriesFields={seriesFields}
+                  customId={customId}
+                />
               </CardBody>
             </Card>
             <Card width="full">
@@ -381,6 +406,39 @@ EOF`}
     </DashboardLayout>
   );
 }
+
+const customGraphInputToFormData = (
+  graphInput: CustomGraphInput
+): CustomGraphFormData => {
+  return {
+    title: graphInput.graphId === "custom" ? undefined : graphInput.graphId,
+    graphType: chartOptions.find(
+      (option) => option.value === graphInput.graphType
+    )!,
+    series: graphInput.series.map((series) => ({
+      name: series.name,
+      colorSet: series.colorSet,
+      metric: series.metric,
+      key: series.key,
+      subkey: series.subkey,
+      aggregation: series.aggregation,
+      pipeline:
+        "pipeline" in series && series.pipeline
+          ? {
+              field: series.pipeline.field,
+              aggregation: series.pipeline.aggregation,
+            }
+          : {
+              field: "",
+              aggregation: "avg",
+            },
+    })),
+    groupBy: graphInput.groupBy ?? "",
+    includePrevious: graphInput.includePrevious ?? true,
+    timeScale: graphInput.timeScale ?? 1,
+    connected: graphInput.connected,
+  };
+};
 
 const customGraphFormToCustomGraphInput = (
   formData: CustomGraphFormData
@@ -468,9 +526,11 @@ const customAPIinput = (
 function CustomGraphForm({
   form,
   seriesFields,
+  customId,
 }: {
   form: ReturnType<typeof useForm<CustomGraphFormData>>;
   seriesFields: UseFieldArrayReturn<CustomGraphFormData, "series", "id">;
+  customId?: string;
 }) {
   const [expandedSeries, setExpandedSeries] = useState<number | number[]>([0]);
   const groupByField = form.control.register("groupBy");
@@ -499,6 +559,7 @@ function CustomGraphForm({
   }, [form, groupBy, joinedSeriesNames]);
 
   const addNewGraph = api.graphs.create.useMutation();
+  const updateGraphById = api.graphs.updateById.useMutation();
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
 
@@ -513,6 +574,24 @@ function CustomGraphForm({
       {
         projectId: project?.id ?? "",
         name: graphName ?? "",
+        graph: JSON.stringify(graphJson),
+      },
+      {
+        onSuccess: () => {
+          void router.push(`/${project?.slug}/analytics/reports`);
+        },
+      }
+    );
+  };
+
+  const updateGraph = () => {
+    const graphName = form.getValues("title");
+    const graphJson = customGraphFormToCustomGraphInput(form.getValues());
+    updateGraphById.mutate(
+      {
+        projectId: project?.id ?? "",
+        name: graphName ?? "",
+        graphId: customId ?? "",
         graph: JSON.stringify(graphJson),
       },
       {
@@ -659,17 +738,30 @@ function CustomGraphForm({
       )}
       <HStack width="full" spacing={2}>
         <Spacer />
-        <Button
-          colorScheme="orange"
-          isLoading={addNewGraph.isLoading}
-          onClick={() => {
-            addGraph();
-          }}
-          marginX={2}
-          minWidth="fit-content"
-        >
-          Save
-        </Button>
+
+        {customId ? (
+          <Button
+            colorScheme="orange"
+            onClick={updateGraph}
+            isLoading={updateGraphById.isLoading}
+            marginX={2}
+            minWidth="fit-content"
+          >
+            Update
+          </Button>
+        ) : (
+          <Button
+            colorScheme="orange"
+            isLoading={addNewGraph.isLoading}
+            onClick={() => {
+              addGraph();
+            }}
+            marginX={2}
+            minWidth="fit-content"
+          >
+            Save
+          </Button>
+        )}
       </HStack>
     </VStack>
   );
