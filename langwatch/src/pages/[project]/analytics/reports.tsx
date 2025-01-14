@@ -1,4 +1,4 @@
-import { AddIcon, DeleteIcon } from "@chakra-ui/icons";
+import { AddIcon, DeleteIcon, EditIcon } from "@chakra-ui/icons";
 import { Link } from "@chakra-ui/next-js";
 import {
   Alert,
@@ -121,6 +121,7 @@ export default function Reports() {
                         </MenuButton>
                         <MenuList>
                           <MenuItem
+                            icon={<EditIcon />}
                             onClick={() => {
                               void router.push(
                                 `/${project?.slug}/analytics/custom/${graph.id}`
