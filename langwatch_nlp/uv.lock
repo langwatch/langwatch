@@ -1501,7 +1501,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.1.36"
+version = "0.1.37"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "coolname" },
@@ -1514,9 +1514,9 @@ dependencies = [
     { name = "retry" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/37/bb/ab3d519994b94405dec5ba69735fff4224fcf9b088b775492ee067e36399/langwatch-0.1.36.tar.gz", hash = "sha256:5c49706ffe8cbaa53cc20829649d98ac3c038cfdd4168af7c6cda0f4915967b5", size = 1027670 }
+sdist = { url = "https://files.pythonhosted.org/packages/c1/95/f10de84ecb8cf0c1f51734871ea8765c18148cce1929d442735fd8e80c1f/langwatch-0.1.37.tar.gz", hash = "sha256:792aa8684e8f3b54d36c64ddb709572b59759c0bf3afef3d5fc25540bca7c406", size = 1027662 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3e/23/063ddc57fcc7d2f83c589700080e9731f6b43c76561ddcf20ad0273cc258/langwatch-0.1.36-py3-none-any.whl", hash = "sha256:e949e4f001406b041e8f0f1b029146c7a0abf2361c7ff643dd12ae1bf2f19151", size = 35583 },
+    { url = "https://files.pythonhosted.org/packages/04/72/93517ccbb27c0a69a16b1c8a90a96f245a46dc82bd699cc54c0576a23825/langwatch-0.1.37-py3-none-any.whl", hash = "sha256:eb05fea9d83a1c83a2194e2afaffe527aa988761f19e9b596aa7d92742c51d3a", size = 35561 },
 ]
 
 [[package]]
@@ -1569,7 +1569,7 @@ requires-dist = [
     { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=6.29.5,<7" },
     { name = "langchain-community", specifier = ">=0.0.28,<0.1" },
     { name = "langevals-core", specifier = ">=0.1.10,<0.2" },
-    { name = "langwatch", specifier = ">=0.1.36,<0.2" },
+    { name = "langwatch", specifier = ">=0.1.37,<0.2" },
     { name = "litellm", extras = ["proxy"], specifier = ">=1.53.7,<2" },
     { name = "mangum", specifier = ">=0.17.0,<0.18" },
     { name = "nanoid", specifier = ">=2.0.0,<3" },
