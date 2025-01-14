@@ -182,26 +182,9 @@ export const TRACE_MAPPINGS = {
         return [];
       }
 
-      return Object.entries(
-        Object.fromEntries(
-          traces.flatMap(
-            (trace) =>
-              trace.annotations?.flatMap((annotation) =>
-                Object.entries(annotation.scoreOptions ?? {})
-                  .filter(([_key, score]) => score.value !== null)
-                  .map(([key]) => [
-                    key,
-                    data.annotationScoreOptions?.find(
-                      (score) => score.id === key
-                    )?.name,
-                  ])
-                  .filter(([_key, label]) => !!label)
-              ) ?? []
-          )
-        )
-      ).map(([key, label]) => ({
-        key: key,
-        label: (label as string) ?? "",
+      return (data.annotationScoreOptions ?? []).map((option) => ({
+        key: option.id,
+        label: option.name,
       }));
     },
     mapping: (
