@@ -454,6 +454,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
     size?: "sm" | "md";
   }) {
     const [keepRefetching, setKeepRefetching] = useState(true);
+    const [tabIndex, setTabIndex] = useState(0);
 
     const run = api.experiments.getExperimentBatchEvaluationRun.useQuery(
       {
@@ -496,6 +497,12 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
         return acc;
       },
       {} as Record<string, ESBatchEvaluation["evaluations"]>
+    );
+
+    resultsByEvaluator = Object.fromEntries(
+      Object.entries(resultsByEvaluator ?? {}).sort((a, b) =>
+        a[0].localeCompare(b[0])
+      )
     );
 
     if (
@@ -615,6 +622,8 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
         minHeight="0"
         overflowX="auto"
         position="relative"
+        onChange={(index) => setTabIndex(index)}
+        index={tabIndex}
       >
         <Box
           position="absolute"
@@ -633,26 +642,30 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
           ))}
         </TabList>
         <TabPanels minWidth="full" minHeight="0" overflowY="auto">
-          {Object.entries(resultsByEvaluator).map(([evaluator, results]) => {
-            return (
-              <TabPanel
-                key={evaluator}
-                padding={0}
-                minWidth="full"
-                width="fit-content"
-                minHeight="0"
-              >
-                <BatchEvaluationV2EvaluationResult
-                  results={results}
-                  datasetByIndex={datasetByIndex}
-                  datasetColumns={datasetColumns}
-                  isFinished={isFinished}
-                  size={size}
-                  hasScrolled={hasScrolled}
-                />
-              </TabPanel>
-            );
-          })}
+          {Object.entries(resultsByEvaluator).map(
+            ([evaluator, results], index) => {
+              return (
+                <TabPanel
+                  key={evaluator}
+                  padding={0}
+                  minWidth="full"
+                  width="fit-content"
+                  minHeight="0"
+                >
+                  {tabIndex === index ? (
+                    <BatchEvaluationV2EvaluationResult
+                      results={results}
+                      datasetByIndex={datasetByIndex}
+                      datasetColumns={datasetColumns}
+                      isFinished={isFinished}
+                      size={size}
+                      hasScrolled={hasScrolled}
+                    />
+                  ) : null}
+                </TabPanel>
+              );
+            }
+          )}
         </TabPanels>
       </Tabs>
     );
@@ -702,10 +715,6 @@ export function BatchEvaluationV2EvaluationResult({
       .filter(([_key, value]) => value)
       .map(([key]) => key)
   );
-  // If any evaluator succeeded, we don't need the details column, both "skipped" and "error" just shows in place of the column
-  if (evaluationResultsColumns.size > 1) {
-    evaluationResultsColumns.delete("details");
-  }
 
   const totalRows = Math.max(
     ...Object.values(datasetByIndex).map((d) => d.index + 1)
@@ -850,7 +859,7 @@ export function BatchEvaluationV2EvaluationResult({
                 </Td>
 
                 {Array.from(evaluationResultsColumns).map((column) => {
-                  if (evaluation?.status === "error") {
+                  if (column !== "details" && evaluation?.status === "error") {
                     return (
                       <Td
                         key={`evaluation-result-${column}`}
@@ -863,7 +872,10 @@ export function BatchEvaluationV2EvaluationResult({
                     );
                   }
 
-                  if (evaluation?.status === "skipped") {
+                  if (
+                    column !== "details" &&
+                    evaluation?.status === "skipped"
+                  ) {
                     return (
                       <Td
                         key={`evaluation-result-${column}`}
@@ -890,11 +902,21 @@ export function BatchEvaluationV2EvaluationResult({
                           : "none"
                       }
                     >
-                      {value === false
-                        ? "false"
-                        : value === true
-                        ? "true"
-                        : value ?? "-"}
+                      {column === "details" ? (
+                        <HoverableBigText
+                          noOfLines={3}
+                          maxWidth="300px"
+                          whiteSpace="pre-wrap"
+                        >
+                          {value}
+                        </HoverableBigText>
+                      ) : value === false ? (
+                        "false"
+                      ) : value === true ? (
+                        "true"
+                      ) : (
+                        value ?? "-"
+                      )}
                     </Td>
                   );
                 })}

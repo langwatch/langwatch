@@ -517,12 +517,7 @@ export const startEvaluationsWorker = (
           throw error;
         }
 
-        // Ragas evaluations are expensive
-        const isEvaluationRetriable = !job.data.check.type.includes("ragas/");
-
-        if (isEvaluationRetriable) {
-          throw error;
-        }
+        throw error;
       }
     },
     {

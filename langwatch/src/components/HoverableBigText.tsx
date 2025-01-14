@@ -58,6 +58,8 @@ export function ExpandedTextModal({
               <Markdown remarkPlugins={[remarkGfm]} className="markdown">
                 {typeof textExpanded === "string"
                   ? textExpanded
+                      .replace(/\n(?![\n\-])/g, "\\\n")
+                      .replace(/(\n+)\\(\n+)/g, "$1$2")
                   : JSON.stringify(textExpanded, null, 2)}
               </Markdown>
             )
