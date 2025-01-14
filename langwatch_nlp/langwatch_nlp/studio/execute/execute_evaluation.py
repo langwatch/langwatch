@@ -107,7 +107,7 @@ async def execute_evaluation(
             total=len(examples),
             queue=queue,
         )
-        results = await asyncify(evaluator)(
+        await asyncify(evaluator)(
             module, metric=reporting.evaluate_and_report
         )
         await reporting.wait_for_completion()

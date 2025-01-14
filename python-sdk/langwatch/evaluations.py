@@ -69,7 +69,7 @@ def evaluate(
             api_key=api_key,
         )
         try:
-            with httpx.Client(timeout=120) as client:
+            with httpx.Client(timeout=900) as client:
                 response = client.post(**request_params)
                 response.raise_for_status()
         except Exception as e:
@@ -116,7 +116,7 @@ async def async_evaluate(
             api_key=api_key,
         )
         try:
-            async with httpx.AsyncClient(timeout=120) as client:
+            async with httpx.AsyncClient(timeout=900) as client:
                 response = await client.post(**request_params)
                 response.raise_for_status()
         except Exception as e:

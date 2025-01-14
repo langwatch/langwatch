@@ -286,7 +286,9 @@ export const runEvaluation = async ({
       ? modelProvider.embeddingsModels
       : modelProvider.models;
     if (modelList && !modelList.includes(model_)) {
-      throw `Model ${model_} is not in the ${embeddings ? "embedding models" : "models"} list for ${provider}, please select another model for running this evaluation`;
+      throw `Model ${model_} is not in the ${
+        embeddings ? "embedding models" : "models"
+      } list for ${provider}, please select another model for running this evaluation`;
     }
     const params = prepareLitellmParams(model, modelProvider);
 
@@ -428,13 +430,16 @@ export const startEvaluationsWorker = (
 
         let processed = false;
         const timeout = new Promise((resolve, reject) => {
-          setTimeout(() => {
-            if (processed) {
-              resolve(undefined);
-            } else {
-              reject(new Error("Job timed out after 60s"));
-            }
-          }, 60_000);
+          setTimeout(
+            () => {
+              if (processed) {
+                resolve(undefined);
+              } else {
+                reject(new Error("Job timed out after 5 minutes"));
+              }
+            },
+            5 * 60 * 1000
+          );
         });
 
         const result = (await Promise.race([
@@ -523,7 +528,7 @@ export const startEvaluationsWorker = (
     {
       connection,
       concurrency: 3,
-      stalledInterval: 60_000, // 1 minute
+      stalledInterval: 10 * 60 * 1000, // 10 minutes
     }
   );
 
