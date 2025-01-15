@@ -21,6 +21,7 @@ import {
   esClient,
 } from "../../../../server/elasticsearch";
 import { getPayloadSizeHistogram } from "../../../../server/metrics";
+import { safeTruncate } from "../../../../utils/truncate";
 
 export const debug = getDebugger("langwatch:evaluations:batch:log_results");
 
@@ -164,7 +165,11 @@ const processBatchEvaluation = async (
     ...param,
     experiment_id: experiment.id,
     project_id: project.id,
-    dataset: param.dataset ?? [],
+    dataset:
+      param.dataset?.map((entry) => ({
+        ...entry,
+        ...(entry.entry ? { entry: safeTruncate(entry.entry, 8 * 1024) } : {}),
+      })) ?? [],
     evaluations: param.evaluations ?? [],
     timestamps: {
       ...param.timestamps,
