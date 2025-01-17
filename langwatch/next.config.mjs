@@ -1,11 +1,10 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import path from "path";
-import { fileURLToPath } from "url";
 
 process.env.SENTRY_IGNORE_API_RESOLUTION_ERROR = "1";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const aliasPath =
+  process.env.DEPENDENCY_INJECTION_DIR ?? path.join("src", "injection");
 
 /**
  * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially useful
@@ -31,13 +30,21 @@ const config = {
 
   experimental: {
     scrollRestoration: true,
+    turbo: {
+      resolveAlias: {
+        "@injected-dependencies.client": path.join(
+          aliasPath,
+          "injection.client.ts"
+        ),
+        "@injected-dependencies.server": path.join(
+          aliasPath,
+          "injection.server.ts"
+        ),
+      },
+    },
   },
 
   webpack: (config) => {
-    const aliasPath =
-      process.env.DEPENDENCY_INJECTION_DIR ??
-      path.join(__dirname, "src", "injection");
-
     config.resolve.alias["@injected-dependencies.client"] = path.join(
       aliasPath,
       "injection.client.ts"
