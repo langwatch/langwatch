@@ -328,7 +328,7 @@ export default function OrganizationOnboarding() {
                     value={selectedValueUsage || ""}
                     onChange={(value) => setValue("usage", value)}
                   >
-                    <HStack width="full">
+                    <HStack width="full" wrap="wrap">
                       {Object.entries(options).map(([value, icon]) => (
                         <CustomRadio
                           key={value}

@@ -142,7 +142,7 @@ export default function ProjectOnboardingSelect() {
           <FormControl>
             <RadioGroup value={""}>
               <Box>
-                <HStack width="full" height="100%" alignItems="start">
+                <HStack width="full" height="100%" alignItems="start" wrap="wrap" >
                   {Object.entries(projectTypes).map(([value, details]) => {
                     return (
                       <Box
