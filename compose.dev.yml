@@ -7,6 +7,7 @@ services:
       DISABLE_PII_REDACTION: true
       DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
       ELASTICSEARCH_NODE_URL: http://opensearch:9200
+      IS_OPENSEARCH: true
       REDIS_URL: redis://redis:6379
       LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
       LANGEVALS_ENDPOINT: http://langevals:5562
