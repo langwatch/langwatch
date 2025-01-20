@@ -25,6 +25,9 @@ import { extractChunkTextualContent } from "../../../server/background/workers/c
 import { getCustomEvaluators } from "../../../server/api/routers/evaluations";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
 
+import type { JsonArray } from "@prisma/client/runtime/library";
+import type { Edge, Node } from "@xyflow/react";
+
 export const debug = getDebugger("langwatch:guardrail:evaluate");
 
 const batchEvaluationInputSchema = z.object({
