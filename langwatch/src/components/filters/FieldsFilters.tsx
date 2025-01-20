@@ -357,7 +357,6 @@ function ListSelection({
     {
       ...filterParams,
       field: filterId,
-      query: query,
       key: keys?.[0],
       subkey: keys?.[1],
     },
@@ -404,6 +403,12 @@ function ListSelection({
     >
       {filterData.data?.options
         .sort((a, b) => (a.count > b.count ? -1 : 1))
+        .filter((option) => {
+          if (query) {
+            return option.label.toLowerCase().includes(query.toLowerCase());
+          }
+          return true;
+        })
         .map(({ field, label, count }) => {
           let details = "";
           const labelDetailsMatch = label.match(/^\[(.*)\] (.*)/);
