@@ -22,6 +22,8 @@ import {
   type SingleEvaluationResult,
 } from "../../../server/evaluations/evaluators.generated";
 import { extractChunkTextualContent } from "../../../server/background/workers/collector/rag";
+import { getCustomEvaluators } from "../../../server/api/routers/evaluations";
+import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
 
 export const debug = getDebugger("langwatch:guardrail:evaluate");
 
@@ -83,6 +85,7 @@ export default async function handler(
   }
 
   let params: BatchEvaluationRESTParams;
+  console.log("req.body", req.body);
   try {
     params = batchEvaluationInputSchema.parse(req.body);
   } catch (error) {
@@ -110,8 +113,9 @@ export default async function handler(
     });
   }
 
-  const { input, output, contexts, expected_output, conversation } =
-    params.data;
+  console.log("params.data", params.data);
+
+  let { input, output, contexts, expected_output, conversation } = params.data;
   const { datasetSlug } = params;
   const experimentSlug = params.experimentSlug ?? params.batchId ?? nanoid(); // backwards compatibility
   const evaluation = params.evaluation;
@@ -132,15 +136,49 @@ export default async function handler(
     checkType = evaluation;
   }
 
-  if (!AVAILABLE_EVALUATORS[checkType as keyof typeof AVAILABLE_EVALUATORS]) {
+  let evaluationRequiredFields: string[] = [];
+
+  const availableCustomEvaluators = await getCustomEvaluators({
+    projectId: project.id,
+  });
+
+  const availableEvaluators = {
+    ...AVAILABLE_EVALUATORS,
+    ...Object.fromEntries(
+      (availableCustomEvaluators ?? []).map((evaluator) => {
+        const { inputs } = getInputsOutputs(
+          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
+            ?.edges as Edge[],
+          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
+            ?.nodes as JsonArray as unknown[] as Node[]
+        );
+        const requiredFields = inputs.map((input) => input.identifier);
+
+        return [
+          `custom/${evaluator.id}`,
+          {
+            requiredFields: requiredFields,
+          },
+        ];
+      })
+    ),
+  };
+
+  const evaluator = availableEvaluators[checkType as EvaluatorTypes];
+  if (!evaluator) {
     return res.status(400).json({
       error: `Evaluator not found: ${checkType}`,
     });
   }
 
-  const evaluationRequiredFields =
-    AVAILABLE_EVALUATORS[checkType as keyof typeof AVAILABLE_EVALUATORS]
-      .requiredFields;
+  evaluationRequiredFields = evaluator.requiredFields;
+
+  if (checkType.startsWith("custom")) {
+    evaluationRequiredFields = evaluationRequiredFields.map((field) => {
+      const value = check.mappings[field];
+      return value.split(".").pop();
+    });
+  }
 
   if (
     !evaluationRequiredFields.every((field: string) => {
@@ -151,6 +189,30 @@ export default async function handler(
       error: `Missing required field for ${checkType}`,
       requiredFields: evaluationRequiredFields,
     });
+  }
+
+  if (checkType.startsWith("custom")) {
+    const mappings = check.mappings;
+    const transformedData: Record<string, any> = {};
+
+    // Process each mapping
+    for (const [targetField, sourcePath] of Object.entries(mappings)) {
+      const [category, field] = sourcePath.split(".");
+
+      // Map the data based on the category (trace or metadata)
+      if (category === "trace") {
+        transformedData[targetField] = params.data[field];
+      } else if (category === "metadata") {
+        // Handle metadata fields differently if needed
+        transformedData[targetField] = params.data[field];
+      }
+    }
+
+    input = transformedData.input ?? input;
+    output = transformedData.output ?? output;
+    expected_output = transformedData.expected_output ?? expected_output;
+    contexts = transformedData.contexts ?? contexts;
+    conversation = transformedData.conversation ?? conversation;
   }
 
   const contextList = contexts
@@ -198,6 +260,8 @@ export default async function handler(
       traceback: [],
     };
   }
+
+  console.log(result);
 
   const experiment = await prisma.experiment.findUnique({
     where: {

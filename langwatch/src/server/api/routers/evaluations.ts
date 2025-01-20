@@ -28,24 +28,9 @@ export const evaluationsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_VIEW))
     .query(async ({ input }) => {
-      const customEvaluators = await prisma.workflow
-        .findMany({
-          where: {
-            projectId: input.projectId,
-            isEvaluator: true,
-          },
-          include: {
-            versions: true, // Include all versions initially
-          },
-        })
-        .then((workflows) =>
-          workflows.map((workflow) => ({
-            ...workflow,
-            versions: workflow.versions.filter(
-              (version) => version.id === workflow.publishedId
-            ), // Filter manually
-          }))
-        );
+      const customEvaluators = await getCustomEvaluators({
+        projectId: input.projectId,
+      });
       return customEvaluators;
     }),
   runEvaluation: protectedProcedure
@@ -71,3 +56,26 @@ export const evaluationsRouter = createTRPCRouter({
       return result;
     }),
 });
+
+export const getCustomEvaluators = async ({
+  projectId,
+}: {
+  projectId: string;
+}) => {
+  const workflows = await prisma.workflow.findMany({
+    where: {
+      projectId,
+      isEvaluator: true,
+    },
+    include: {
+      versions: true,
+    },
+  });
+
+  return workflows.map((workflow) => ({
+    ...workflow,
+    versions: workflow.versions.filter(
+      (version) => version.id === workflow.publishedId
+    ),
+  }));
+};
