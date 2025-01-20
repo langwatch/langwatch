@@ -109,6 +109,7 @@ export const sharedFiltersInputSchema = z.object({
       ])
     )
     .default({}),
+  traceIds: z.array(z.string()).optional(),
 });
 
 export type SharedFiltersInput = z.infer<typeof sharedFiltersInputSchema>;

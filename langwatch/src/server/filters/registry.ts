@@ -1,6 +1,7 @@
 import type {
   QueryDslBoolQuery,
   QueryDslQueryContainer,
+  QueryDslMatchAllQuery,
 } from "@elastic/elasticsearch/lib/api/types";
 import {
   AVAILABLE_EVALUATORS,
@@ -1359,6 +1360,32 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             })
           ) ?? []
         );
+      },
+    },
+  },
+  "annotations.hasAnnotation": {
+    name: "Annotations",
+    urlKey: "annotations",
+    query: () => ({
+      match_all: {} as QueryDslMatchAllQuery,
+    }),
+    listMatch: {
+      aggregation: (_query) => ({
+        unique_values: {
+          terms: {
+            script: "1",
+            size: 1,
+          },
+        },
+      }),
+      extract: (_result: Record<string, any>) => {
+        return [
+          {
+            field: "true",
+            label: "Has Annotation",
+            count: _result.unique_values?.buckets?.[0]?.doc_count ?? 0,
+          },
+        ];
       },
     },
   },

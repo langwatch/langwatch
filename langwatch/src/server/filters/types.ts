@@ -26,6 +26,7 @@ export const filterFieldsEnum = z.enum([
   "events.metrics.key",
   "events.metrics.value",
   "events.event_details.key",
+  "annotations.hasAnnotation",
 ]);
 
 export type FilterField = z.infer<typeof filterFieldsEnum>;

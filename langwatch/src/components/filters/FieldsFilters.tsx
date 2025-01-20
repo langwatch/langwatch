@@ -62,6 +62,7 @@ export function FieldsFilters() {
     "metadata.value",
     "evaluations.state",
     "traces.error",
+    "annotations.hasAnnotation",
   ];
 
   const filters: [FilterField, FilterDefinition][] = filterKeys.map((id) => [
