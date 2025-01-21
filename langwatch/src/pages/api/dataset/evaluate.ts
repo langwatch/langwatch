@@ -177,8 +177,9 @@ export default async function handler(
 
   if (checkType.startsWith("custom")) {
     evaluationRequiredFields = evaluationRequiredFields.map((field) => {
-      const value = check.mappings[field];
-      return value.split(".").pop();
+      const value =
+        (check?.mappings as Record<string, string>)?.[field] ?? field;
+      return value.split(".").pop() ?? field;
     });
   }
 
