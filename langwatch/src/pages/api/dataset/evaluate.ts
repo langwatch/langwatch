@@ -22,6 +22,11 @@ import {
   type SingleEvaluationResult,
 } from "../../../server/evaluations/evaluators.generated";
 import { extractChunkTextualContent } from "../../../server/background/workers/collector/rag";
+import { getCustomEvaluators } from "../../../server/api/routers/evaluations";
+import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
+
+import type { JsonArray } from "@prisma/client/runtime/library";
+import type { Edge, Node } from "@xyflow/react";
 
 export const debug = getDebugger("langwatch:guardrail:evaluate");
 
@@ -83,6 +88,7 @@ export default async function handler(
   }
 
   let params: BatchEvaluationRESTParams;
+
   try {
     params = batchEvaluationInputSchema.parse(req.body);
   } catch (error) {
@@ -132,15 +138,49 @@ export default async function handler(
     checkType = evaluation;
   }
 
-  if (!AVAILABLE_EVALUATORS[checkType as keyof typeof AVAILABLE_EVALUATORS]) {
+  let evaluationRequiredFields: string[] = [];
+
+  const availableCustomEvaluators = await getCustomEvaluators({
+    projectId: project.id,
+  });
+
+  const availableEvaluators = {
+    ...AVAILABLE_EVALUATORS,
+    ...Object.fromEntries(
+      (availableCustomEvaluators ?? []).map((evaluator) => {
+        const { inputs } = getInputsOutputs(
+          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
+            ?.edges as Edge[],
+          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
+            ?.nodes as JsonArray as unknown[] as Node[]
+        );
+        const requiredFields = inputs.map((input) => input.identifier);
+
+        return [
+          `custom/${evaluator.id}`,
+          {
+            requiredFields: requiredFields,
+          },
+        ];
+      })
+    ),
+  };
+
+  const evaluator = availableEvaluators[checkType as EvaluatorTypes];
+  if (!evaluator) {
     return res.status(400).json({
       error: `Evaluator not found: ${checkType}`,
     });
   }
 
-  const evaluationRequiredFields =
-    AVAILABLE_EVALUATORS[checkType as keyof typeof AVAILABLE_EVALUATORS]
-      .requiredFields;
+  evaluationRequiredFields = evaluator.requiredFields;
+
+  if (checkType.startsWith("custom")) {
+    evaluationRequiredFields = evaluationRequiredFields.map((field) => {
+      const value = check.mappings[field];
+      return value.split(".").pop();
+    });
+  }
 
   if (
     !evaluationRequiredFields.every((field: string) => {
