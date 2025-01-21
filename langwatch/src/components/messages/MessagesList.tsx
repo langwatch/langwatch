@@ -382,6 +382,7 @@ const ExpandableMessages = React.memo(
           <VStack width="full" gap={6}>
             {traceGroup
               .slice(0, isExpanded ? traceGroup.length : 3)
+              //.reverse()
               .map((trace, traceIndex) => {
                 const expanded = isExpanded || traceGroup.length === 1;
                 const renderContent = isExpanded || traceIndex === 0;
