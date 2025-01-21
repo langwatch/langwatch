@@ -88,7 +88,7 @@ export default async function handler(
   }
 
   let params: BatchEvaluationRESTParams;
-  console.log("req.body", req.body);
+
   try {
     params = batchEvaluationInputSchema.parse(req.body);
   } catch (error) {
@@ -116,9 +116,8 @@ export default async function handler(
     });
   }
 
-  console.log("params.data", params.data);
-
-  let { input, output, contexts, expected_output, conversation } = params.data;
+  const { input, output, contexts, expected_output, conversation } =
+    params.data;
   const { datasetSlug } = params;
   const experimentSlug = params.experimentSlug ?? params.batchId ?? nanoid(); // backwards compatibility
   const evaluation = params.evaluation;
@@ -194,30 +193,6 @@ export default async function handler(
     });
   }
 
-  if (checkType.startsWith("custom")) {
-    const mappings = check.mappings;
-    const transformedData: Record<string, any> = {};
-
-    // Process each mapping
-    for (const [targetField, sourcePath] of Object.entries(mappings)) {
-      const [category, field] = sourcePath.split(".");
-
-      // Map the data based on the category (trace or metadata)
-      if (category === "trace") {
-        transformedData[targetField] = params.data[field];
-      } else if (category === "metadata") {
-        // Handle metadata fields differently if needed
-        transformedData[targetField] = params.data[field];
-      }
-    }
-
-    input = transformedData.input ?? input;
-    output = transformedData.output ?? output;
-    expected_output = transformedData.expected_output ?? expected_output;
-    contexts = transformedData.contexts ?? contexts;
-    conversation = transformedData.conversation ?? conversation;
-  }
-
   const contextList = contexts
     ?.map((context) => {
       if (typeof context === "string") {
@@ -263,8 +238,6 @@ export default async function handler(
       traceback: [],
     };
   }
-
-  console.log(result);
 
   const experiment = await prisma.experiment.findUnique({
     where: {
