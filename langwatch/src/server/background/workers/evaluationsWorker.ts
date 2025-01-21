@@ -557,8 +557,6 @@ const customEvaluation = async (
 ) => {
   const workflowId = evaluatorType.split("/")[1];
 
-  console.log(workflowId);
-
   const project = await prisma.project.findUnique({
     where: {
       id: projectId,
@@ -586,9 +584,6 @@ const customEvaluation = async (
     trace_id: trace?.trace_id,
     do_not_trace: true,
   };
-
-  console.log("mappings", mappings);
-  console.log("requestBody", requestBody);
 
   const switchMapping = (mapping: Mappings) => {
     if (mapping === "trace.input") {
@@ -625,8 +620,6 @@ const customEvaluation = async (
     project.id,
     requestBody
   );
-
-  console.log("adssa", response);
 
   const { result, status } = response;
 
