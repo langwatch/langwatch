@@ -14,17 +14,13 @@ def callback(entry: DatasetEntry):
     # print(response)
     # return {"output": response}
 
-    return {
-        "output": "Hello! How can I help you today?",
-    }
+    return {"output": "Hello! How can I help you today?"}
 
 
 # Instantiate the BatchEvaluation object
 evaluation = BatchEvaluation(
-    dataset="test-custim",
-    evaluations=[
-        "test-eval",
-    ],
+    dataset="",  # Provide the actual dataset name here
+    evaluations=[""],  # Provide the actual evaluations here
     callback=callback,
 )
 
