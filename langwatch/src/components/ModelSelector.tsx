@@ -203,10 +203,10 @@ const getCustomModels = (
   for (const provider in modelProviders) {
     if (
       modelProviders[provider].enabled &&
-      modelProviders[provider].customModels &&
+      modelProviders[provider].models &&
       mode === "chat"
     ) {
-      modelProviders[provider].customModels.forEach((model: string) => {
+      modelProviders[provider].models.forEach((model: string) => {
         models.push(`${provider}/${model}`);
         customProviders.push(provider);
       });
@@ -214,15 +214,13 @@ const getCustomModels = (
 
     if (
       modelProviders[provider].enabled &&
-      modelProviders[provider].customEmbeddingsModels &&
+      modelProviders[provider].embeddingsModels &&
       mode === "embedding"
     ) {
-      modelProviders[provider].customEmbeddingsModels?.forEach(
-        (model: string) => {
-          models.push(`${provider}/${model}`);
-          customProviders.push(provider);
-        }
-      );
+      modelProviders[provider].embeddingsModels?.forEach((model: string) => {
+        models.push(`${provider}/${model}`);
+        customProviders.push(provider);
+      });
     }
   }
 
