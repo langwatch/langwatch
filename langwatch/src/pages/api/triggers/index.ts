@@ -208,10 +208,16 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
         );
 
         for (const entry of mappedEntries) {
+          const sanitizedEntry = Object.fromEntries(
+            Object.entries(entry).map(([key, value]) => [
+              key,
+              typeof value === "string" ? value.replace(/\u0000/g, "") : value,
+            ])
+          );
           entries.push({
             id: `${now}-${index}`,
             selected: true,
-            ...entry,
+            ...sanitizedEntry,
           });
           index++;
         }
