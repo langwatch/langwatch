@@ -103,6 +103,7 @@ export default function CheckConfigForm({
   };
 
   const DEFAULT_MAPPINGS: CheckConfigFormData["mappings"] = {
+    spans: "spans",
     input: "trace.input",
     output: "trace.output",
     contexts: "trace.first_rag_context",
@@ -111,6 +112,7 @@ export default function CheckConfigForm({
   };
 
   const MAPPING_OPTIONS = [
+    { value: "spans", label: "spans" },
     { value: "trace.input", label: "trace.input" },
     { value: "trace.output", label: "trace.output" },
     { value: "trace.first_rag_context", label: "trace.first_rag_context" },

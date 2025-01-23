@@ -14,10 +14,11 @@ import { nanoid } from "nanoid";
 import { type z } from "zod";
 import { updateEvaluationStatusInES } from "../../../../../server/background/queues/evaluationsQueue";
 import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluations";
-import { extractChunkTextualContent } from "../../../../../server/background/workers/collector/rag";
-import { runEvaluation } from "../../../../../server/background/workers/evaluationsWorker";
 import {
-  AVAILABLE_EVALUATORS,
+  runEvaluation,
+  type DataForEvaluation,
+} from "../../../../../server/background/workers/evaluationsWorker";
+import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "../../../../../server/evaluations/evaluators.generated";
@@ -31,6 +32,10 @@ import {
   type EvaluationRESTParams,
   type EvaluationRESTResult,
 } from "../../../../../server/evaluations/types";
+import {
+  getEvaluatorDataForParams,
+  getEvaluatorIncludingCustom,
+} from "../../../dataset/evaluate";
 
 export const debug = getDebugger("langwatch:evaluations:evaluate");
 
@@ -90,7 +95,11 @@ export async function handleEvaluatorCall(
     checkType = evaluatorSlug;
   }
 
-  if (!AVAILABLE_EVALUATORS[checkType as keyof typeof AVAILABLE_EVALUATORS]) {
+  const evaluator = await getEvaluatorIncludingCustom(
+    project.id,
+    checkType as EvaluatorTypes
+  );
+  if (!evaluator) {
     return res.status(404).json({
       error: `Evaluator not found: ${checkType}`,
     });
@@ -169,10 +178,29 @@ export async function handleEvaluatorCall(
     });
   }
 
+  let data: DataForEvaluation;
+  try {
+    data = getEvaluatorDataForParams(
+      checkType,
+      params.data as Record<string, any>
+    );
+  } catch (error) {
+    debug(
+      "Invalid evaluation data received",
+      error,
+      JSON.stringify(req.body, null, "  "),
+      { projectId: project.id }
+    );
+    Sentry.captureException(error, { extra: { projectId: project.id } });
+
+    const validationError = fromZodError(error as ZodError);
+    return res.status(400).json({ error: validationError.message });
+  }
+
   for (const requiredField of evaluatorDefinition.requiredFields) {
     if (
-      params.data[requiredField] === undefined ||
-      params.data[requiredField] === null
+      data.data[requiredField] === undefined ||
+      data.data[requiredField] === null
     ) {
       return res.status(400).json({
         error: `${requiredField} is required for ${evaluatorDefinition.name} evaluator`,
@@ -180,43 +208,13 @@ export async function handleEvaluatorCall(
     }
   }
 
-  const { input, output, contexts, expected_output, expected_contexts, conversation } =
-    params.data;
-  const contextList = contexts
-    ?.map((context) => {
-      if (typeof context === "string") {
-        return context;
-      } else {
-        return extractChunkTextualContent(context.content);
-      }
-    })
-    .filter((x) => x);
-  const expectedContextList = expected_contexts
-    ?.map((context) => {
-      if (typeof context === "string") {
-        return context;
-      } else {
-        return extractChunkTextualContent(context.content);
-      }
-    })
-    .filter((x) => x);
-
   let result: SingleEvaluationResult;
 
   const runEval = () =>
     runEvaluation({
       projectId: project.id,
       evaluatorType: checkType as EvaluatorTypes,
-      input: input ? input : undefined,
-      output: output ? output : undefined,
-      contexts: contextList,
-      expected_output: expected_output ? expected_output : undefined,
-      expected_contexts: expectedContextList,
-      conversation:
-        conversation?.map((message) => ({
-          input: message.input ?? undefined,
-          output: message.output ?? undefined,
-        })) ?? [],
+      data,
       settings,
     });
 

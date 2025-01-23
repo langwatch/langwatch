@@ -13,11 +13,15 @@ import {
   getCurrentMonthCost,
   maxMonthlyUsageLimit,
 } from "../../../server/api/routers/limits";
-import { runEvaluation } from "../../../server/background/workers/evaluationsWorker";
+import {
+  runEvaluation,
+  type DataForEvaluation,
+} from "../../../server/background/workers/evaluationsWorker";
 import { rAGChunkSchema } from "../../../server/tracer/types.generated";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluationResult,
+  type EvaluatorDefinition,
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "../../../server/evaluations/evaluators.generated";
@@ -35,25 +39,31 @@ const batchEvaluationInputSchema = z.object({
   experimentSlug: z.string().optional(),
   batchId: z.string().optional(),
   datasetSlug: z.string(),
-  data: z.object({
-    input: z.string().optional().nullable(),
-    output: z.string().optional().nullable(),
-    contexts: z
-      .union([z.array(rAGChunkSchema), z.array(z.string())])
-      .optional()
-      .nullable(),
-    expected_output: z.string().optional().nullable(),
-    conversation: z
-      .array(
-        z.object({
-          input: z.string().optional().nullable(),
-          output: z.string().optional().nullable(),
-        })
-      )
-      .optional()
-      .nullable(),
-  }),
+  data: z.object({}).passthrough().optional().nullable(),
   settings: z.object({}).passthrough().optional().nullable(),
+});
+
+const defaultEvaluatorInputSchema = z.object({
+  input: z.string().optional().nullable(),
+  output: z.string().optional().nullable(),
+  contexts: z
+    .union([z.array(rAGChunkSchema), z.array(z.string())])
+    .optional()
+    .nullable(),
+  expected_output: z.string().optional().nullable(),
+  expected_contexts: z
+    .union([z.array(rAGChunkSchema), z.array(z.string())])
+    .optional()
+    .nullable(),
+  conversation: z
+    .array(
+      z.object({
+        input: z.string().optional().nullable(),
+        output: z.string().optional().nullable(),
+      })
+    )
+    .optional()
+    .nullable(),
 });
 
 type BatchEvaluationRESTParams = z.infer<typeof batchEvaluationInputSchema>;
@@ -93,7 +103,7 @@ export default async function handler(
     params = batchEvaluationInputSchema.parse(req.body);
   } catch (error) {
     debug(
-      "Invalid evaluation data received",
+      "Invalid evaluation params received",
       error,
       JSON.stringify(req.body, null, "  "),
       { projectId: project.id }
@@ -116,8 +126,6 @@ export default async function handler(
     });
   }
 
-  const { input, output, contexts, expected_output, conversation } =
-    params.data;
   const { datasetSlug } = params;
   const experimentSlug = params.experimentSlug ?? params.batchId ?? nanoid(); // backwards compatibility
   const evaluation = params.evaluation;
@@ -140,33 +148,10 @@ export default async function handler(
 
   let evaluationRequiredFields: string[] = [];
 
-  const availableCustomEvaluators = await getCustomEvaluators({
-    projectId: project.id,
-  });
-
-  const availableEvaluators = {
-    ...AVAILABLE_EVALUATORS,
-    ...Object.fromEntries(
-      (availableCustomEvaluators ?? []).map((evaluator) => {
-        const { inputs } = getInputsOutputs(
-          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-            ?.edges as Edge[],
-          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-            ?.nodes as JsonArray as unknown[] as Node[]
-        );
-        const requiredFields = inputs.map((input) => input.identifier);
-
-        return [
-          `custom/${evaluator.id}`,
-          {
-            requiredFields: requiredFields,
-          },
-        ];
-      })
-    ),
-  };
-
-  const evaluator = availableEvaluators[checkType as EvaluatorTypes];
+  const evaluator = await getEvaluatorIncludingCustom(
+    project.id,
+    checkType as EvaluatorTypes
+  );
   if (!evaluator) {
     return res.status(400).json({
       error: `Evaluator not found: ${checkType}`,
@@ -175,17 +160,9 @@ export default async function handler(
 
   evaluationRequiredFields = evaluator.requiredFields;
 
-  if (checkType.startsWith("custom")) {
-    evaluationRequiredFields = evaluationRequiredFields.map((field) => {
-      const value =
-        (check?.mappings as Record<string, string>)?.[field] ?? field;
-      return value.split(".").pop() ?? field;
-    });
-  }
-
   if (
     !evaluationRequiredFields.every((field: string) => {
-      return field in params.data;
+      return field in data.data;
     })
   ) {
     return res.status(400).json({
@@ -194,15 +171,24 @@ export default async function handler(
     });
   }
 
-  const contextList = contexts
-    ?.map((context) => {
-      if (typeof context === "string") {
-        return context;
-      } else {
-        return extractChunkTextualContent(context.content);
-      }
-    })
-    .filter((x) => x);
+  let data: DataForEvaluation;
+  try {
+    data = getEvaluatorDataForParams(
+      checkType,
+      params.data as Record<string, any>
+    );
+  } catch (error) {
+    debug(
+      "Invalid evaluation data received",
+      error,
+      JSON.stringify(req.body, null, "  "),
+      { projectId: project.id }
+    );
+    Sentry.captureException(error, { extra: { projectId: project.id } });
+
+    const validationError = fromZodError(error as ZodError);
+    return res.status(400).json({ error: validationError.message });
+  }
 
   const dataset = await prisma.dataset.findFirst({
     where: {
@@ -219,15 +205,7 @@ export default async function handler(
   try {
     result = await runEvaluation({
       projectId: project.id,
-      input: input ? input : undefined,
-      output: output ? output : undefined,
-      contexts: contextList,
-      expected_output: expected_output ? expected_output : undefined,
-      conversation:
-        conversation?.map((message) => ({
-          input: message.input ?? undefined,
-          output: message.output ?? undefined,
-        })) ?? [],
+      data,
       evaluatorType: checkType as EvaluatorTypes,
       settings: (settings as Record<string, unknown>) ?? {},
     });
@@ -276,7 +254,7 @@ export default async function handler(
       id: nanoid(),
       experimentId: experiment.id,
       projectId: project.id,
-      data: params.data,
+      data: data.data,
       status: status,
       score: score ?? 0,
       passed: passed ?? false,
@@ -291,3 +269,99 @@ export default async function handler(
 
   return res.status(200).json(result);
 }
+
+export const getEvaluatorDataForParams = (
+  checkType: string,
+  params: Record<string, any>
+) => {
+  let data: DataForEvaluation;
+  if (checkType.startsWith("custom/")) {
+    data = {
+      type: "custom",
+      data: params,
+    };
+  } else {
+    const data_ = defaultEvaluatorInputSchema.parse(params.data);
+    const {
+      input,
+      output,
+      contexts,
+      expected_output,
+      conversation,
+      expected_contexts,
+    } = data_;
+
+    const contextList = contexts
+      ?.map((context) => {
+        if (typeof context === "string") {
+          return context;
+        } else {
+          return extractChunkTextualContent(context.content);
+        }
+      })
+      .filter((x) => x);
+
+    const expectedContextList = expected_contexts
+      ?.map((context) => {
+        if (typeof context === "string") {
+          return context;
+        } else {
+          return extractChunkTextualContent(context.content);
+        }
+      })
+      .filter((x) => x);
+
+    data = {
+      type: "default",
+      data: {
+        input: input ? input : undefined,
+        output: output ? output : undefined,
+        contexts: contextList,
+        expected_output: expected_output ? expected_output : undefined,
+        expected_contexts: expectedContextList,
+        conversation:
+          conversation?.map((message) => ({
+            input: message.input ?? undefined,
+            output: message.output ?? undefined,
+          })) ?? [],
+      },
+    };
+  }
+
+  return data;
+};
+
+export const getEvaluatorIncludingCustom = async (
+  projectId: string,
+  checkType: EvaluatorTypes
+): Promise<
+  EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS> | undefined
+> => {
+  const availableCustomEvaluators = await getCustomEvaluators({
+    projectId: projectId,
+  });
+
+  const availableEvaluators = {
+    ...AVAILABLE_EVALUATORS,
+    ...Object.fromEntries(
+      (availableCustomEvaluators ?? []).map((evaluator) => {
+        const { inputs } = getInputsOutputs(
+          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
+            ?.edges as Edge[],
+          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
+            ?.nodes as JsonArray as unknown[] as Node[]
+        );
+        const requiredFields = inputs.map((input) => input.identifier);
+
+        return [
+          `custom/${evaluator.id}`,
+          {
+            requiredFields: requiredFields,
+          },
+        ];
+      })
+    ),
+  };
+
+  return availableEvaluators[checkType];
+};

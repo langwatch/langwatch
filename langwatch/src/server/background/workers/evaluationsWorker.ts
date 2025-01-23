@@ -39,7 +39,7 @@ import {
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
-import type { Trace } from "~/server/tracer/types";
+import type { ElasticSearchSpan, Trace } from "~/server/tracer/types";
 
 import { executeWorkflowEvaluation } from "../../optimization/executeEvalWorkflow";
 
@@ -67,6 +67,162 @@ export async function runEvaluationJob(
   });
 }
 
+const switchMapping = (
+  trace: Trace,
+  spans: ElasticSearchSpan[],
+  mapping: Mappings
+): string | string[] | ElasticSearchSpan[] | undefined => {
+  if (mapping === "trace.input") {
+    return trace.input?.value?.toString();
+  }
+  if (mapping === "trace.output") {
+    return trace.output?.value?.toString();
+  }
+  if (mapping === "trace.first_rag_context") {
+    const ragInfo = getRAGInfo(spans);
+    return ragInfo.contexts;
+  }
+  if (mapping === "metadata.expected_output") {
+    return (
+      trace.expected_output?.value ?? trace.metadata.expected_output
+    )?.toString();
+  }
+  if (mapping === "metadata.expected_contexts") {
+    return trace.metadata.expected_contexts
+      ? Array.isArray(trace.metadata.expected_contexts)
+        ? (trace.metadata.expected_contexts as string[])
+        : [trace.metadata.expected_contexts as string]
+      : undefined;
+  }
+  if (mapping === "spans") {
+    return spans;
+  }
+  // Use typescript to ensure all cases are handled
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _: never = mapping;
+  throw new Error(`Unknown mapping: ${String(mapping)}`);
+};
+
+export type DataForEvaluation =
+  | {
+      type: "default";
+      data: {
+        input?: string;
+        output?: string;
+        contexts?: string[];
+        expected_output?: string;
+        expected_contexts?: string[];
+        conversation?: Conversation;
+      };
+    }
+  | {
+      type: "custom";
+      data: Record<string, any>;
+    };
+
+const buildDataForEvaluation = async (
+  evaluatorType: EvaluatorTypes,
+  trace: Trace,
+  mappings: Record<string, string>
+): Promise<DataForEvaluation> => {
+  const spans = await esGetSpansByTraceId({
+    traceId: trace.trace_id,
+    projectId: trace.project_id,
+  });
+
+  const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
+  if (evaluatorType.startsWith("custom/")) {
+    return {
+      type: "custom",
+      data: Object.fromEntries(
+        Object.entries(mappings).map(([key, mapping]) => [
+          key,
+          switchMapping(trace, spans, mapping as Mappings),
+        ])
+      ),
+    };
+  } else {
+    const inputMapping = (mappings ?? {})?.input;
+    const outputMapping = (mappings ?? {})?.output;
+    const ragContextMapping = (mappings ?? {})?.contexts;
+    const expectedOutputMapping = (mappings ?? {})?.expected_output;
+
+    let input;
+    let output;
+    let expected_output;
+
+    if (inputMapping) {
+      input = switchMapping(trace, spans, inputMapping as Mappings);
+    } else {
+      input = trace.input?.value;
+    }
+
+    if (outputMapping) {
+      output = switchMapping(trace, spans, outputMapping as Mappings);
+    } else {
+      output = trace.output?.value;
+    }
+
+    if (expectedOutputMapping) {
+      expected_output = switchMapping(
+        trace,
+        spans,
+        expectedOutputMapping as Mappings
+      );
+    } else {
+      expected_output = trace.expected_output?.value;
+    }
+
+    let contexts = undefined;
+
+    if (evaluator?.requiredFields?.includes("contexts")) {
+      const ragInfo = getRAGInfo(spans);
+      if (ragContextMapping) {
+        contexts = switchMapping(trace, spans, ragContextMapping as Mappings);
+      } else {
+        contexts = ragInfo.contexts;
+      }
+    }
+
+    const threadId = trace.metadata.thread_id;
+    const fullThread = threadId
+      ? await getTracesByThreadId({
+          threadId: threadId,
+          projectId: trace.project_id,
+        })
+      : undefined;
+    const currentMessageIndex = fullThread?.findIndex(
+      (message) => message.trace_id === trace.trace_id
+    );
+    const conversation: Conversation = fullThread
+      ?.slice(0, currentMessageIndex)
+      .map((message) => ({
+        input: message.input?.value,
+        output: message.output?.value,
+      })) ?? [
+      {
+        input: trace.input?.value,
+        output: trace.output?.value,
+      },
+    ];
+
+    return {
+      type: "default",
+      data: {
+        input: input as string | undefined,
+        output: output as string | undefined,
+        contexts: Array.isArray(contexts)
+          ? contexts.map((context) => context.toString())
+          : contexts
+          ? [contexts]
+          : [],
+        expected_output: expected_output as string | undefined,
+        conversation,
+      },
+    };
+  }
+};
+
 export const runEvaluationForTrace = async ({
   projectId,
   traceId,
@@ -80,15 +236,9 @@ export const runEvaluationForTrace = async ({
   settings: Record<string, any> | string | number | boolean | null;
   mappings: Record<string, string>;
 }): Promise<SingleEvaluationResult> => {
-  const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
-
   const trace = await getTraceById({
     projectId,
     traceId,
-  });
-  const spans = await esGetSpansByTraceId({
-    traceId: traceId,
-    projectId: projectId,
   });
   if (!trace) {
     throw "trace not found";
@@ -101,107 +251,12 @@ export const runEvaluationForTrace = async ({
     };
   }
 
-  const inputMapping = (mappings ?? {})?.input;
-  const outputMapping = (mappings ?? {})?.output;
-  const ragContextMapping = (mappings ?? {})?.contexts;
-  const expectedOutputMapping = (mappings ?? {})?.expected_output;
-
-  const switchMapping = (mapping: Mappings): string | string[] | undefined => {
-    if (mapping === "trace.input") {
-      return trace.input?.value?.toString();
-    }
-    if (mapping === "trace.output") {
-      return trace.output?.value?.toString();
-    }
-    if (mapping === "trace.first_rag_context") {
-      const ragInfo = getRAGInfo(spans);
-      return ragInfo.contexts;
-    }
-    if (mapping === "metadata.expected_output") {
-      return (
-        trace.expected_output?.value ?? trace.metadata.expected_output
-      )?.toString();
-    }
-    if (mapping === "metadata.expected_contexts") {
-      return trace.metadata.expected_contexts
-        ? Array.isArray(trace.metadata.expected_contexts)
-          ? (trace.metadata.expected_contexts as string[])
-          : [trace.metadata.expected_contexts as string]
-        : undefined;
-    }
-    // Use typescript to ensure all cases are handled
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _: never = mapping;
-    throw new Error(`Unknown mapping: ${String(mapping)}`);
-  };
-
-  let input;
-  let output;
-  let expected_output;
-
-  if (inputMapping) {
-    input = switchMapping(inputMapping as Mappings);
-  } else {
-    input = trace.input?.value;
-  }
-
-  if (outputMapping) {
-    output = switchMapping(outputMapping as Mappings);
-  } else {
-    output = trace.output?.value;
-  }
-
-  if (expectedOutputMapping) {
-    expected_output = switchMapping(expectedOutputMapping as Mappings);
-  } else {
-    expected_output = trace.expected_output?.value;
-  }
-
-  let contexts = undefined;
-
-  if (
-    evaluator?.requiredFields?.includes("contexts") &&
-    !evaluatorType.startsWith("custom/")
-  ) {
-    const ragInfo = getRAGInfo(spans);
-    if (ragContextMapping) {
-      contexts = switchMapping(ragContextMapping as Mappings);
-    } else {
-      contexts = ragInfo.contexts;
-    }
-  }
-
-  const threadId = trace.metadata.thread_id;
-  const fullThread = threadId
-    ? await getTracesByThreadId({
-        threadId: threadId,
-        projectId: projectId,
-      })
-    : undefined;
-  const currentMessageIndex = fullThread?.findIndex(
-    (message) => message.trace_id === trace.trace_id
-  );
-  const conversation: Conversation = fullThread
-    ?.slice(0, currentMessageIndex)
-    .map((message) => ({
-      input: message.input?.value,
-      output: message.output?.value,
-    })) ?? [
-    {
-      input: trace.input?.value,
-      output: trace.output?.value,
-    },
-  ];
+  const data = await buildDataForEvaluation(evaluatorType, trace, mappings);
 
   const result = await runEvaluation({
     projectId,
     evaluatorType: evaluatorType,
-    // TODO: move this to a registry/extractor type-safe constructor
-    input: input as string | undefined,
-    output: output as string | undefined,
-    contexts: Array.isArray(contexts) ? contexts : contexts ? [contexts] : [],
-    expected_output: expected_output as string | undefined,
-    conversation,
+    data,
     settings: settings && typeof settings === "object" ? settings : undefined,
     trace,
   });
@@ -212,24 +267,14 @@ export const runEvaluationForTrace = async ({
 export const runEvaluation = async ({
   projectId,
   evaluatorType,
-  input,
-  output,
-  contexts,
-  expected_output,
-  expected_contexts,
+  data,
   settings,
-  conversation,
   trace,
   retries = 1,
 }: {
   projectId: string;
   evaluatorType: EvaluatorTypes;
-  input?: string;
-  output?: string;
-  contexts?: string[];
-  expected_output?: string;
-  expected_contexts?: string[];
-  conversation?: Conversation;
+  data: DataForEvaluation;
   settings?: Record<string, unknown>;
   trace?: Trace;
   retries?: number;
@@ -252,17 +297,8 @@ export const runEvaluation = async ({
     };
   }
 
-  if (evaluatorType.startsWith("custom/")) {
-    return customEvaluation(
-      projectId,
-      evaluatorType,
-      input,
-      output,
-      contexts,
-      expected_output,
-      expected_contexts,
-      trace
-    );
+  if (data.type === "custom") {
+    return customEvaluation(projectId, evaluatorType, data.data, trace);
   }
 
   const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
@@ -344,12 +380,12 @@ export const runEvaluation = async ({
         body: JSON.stringify({
           data: [
             {
-              input: input ?? "",
-              output: output ?? "",
-              contexts: contexts ?? [],
-              expected_contexts: expected_contexts ?? [],
-              expected_output: expected_output ?? "",
-              conversation: conversation ?? [],
+              input: data.data.input ?? "",
+              output: data.data.output ?? "",
+              contexts: data.data.contexts ?? [],
+              expected_contexts: data.data.expected_contexts ?? [],
+              expected_output: data.data.expected_output ?? "",
+              conversation: data.data.conversation ?? [],
             },
           ],
           settings: settings && typeof settings === "object" ? settings : {},
@@ -373,11 +409,7 @@ export const runEvaluation = async ({
       return runEvaluation({
         projectId,
         evaluatorType: evaluatorType,
-        input,
-        output,
-        contexts,
-        expected_output,
-        conversation,
+        data,
         settings,
         retries: retries - 1,
       });
@@ -548,11 +580,7 @@ export const startEvaluationsWorker = (
 const customEvaluation = async (
   projectId: string,
   evaluatorType: EvaluatorTypes,
-  input?: string,
-  output?: string,
-  contexts?: string[] | string | undefined,
-  expected_output?: string,
-  expected_contexts?: string[],
+  data: Record<string, any>,
   trace?: Trace
 ) => {
   const workflowId = evaluatorType.split("/")[1];
@@ -578,38 +606,11 @@ const customEvaluation = async (
     throw new Error("Check not found");
   }
 
-  const mappings = check.mappings as Record<Mappings, string>;
-
   const requestBody: Record<string, any> = {
     trace_id: trace?.trace_id,
     do_not_trace: true,
+    ...data,
   };
-
-  const switchMapping = (mapping: Mappings) => {
-    if (mapping === "trace.input") {
-      return input;
-    }
-    if (mapping === "trace.output") {
-      return output;
-    }
-    if (mapping === "trace.first_rag_context") {
-      return contexts;
-    }
-    if (mapping === "metadata.expected_output") {
-      return expected_output;
-    }
-    if (mapping === "metadata.expected_contexts") {
-      return expected_contexts;
-    }
-    // Use typescript to ensure all cases are handled
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _: never = mapping;
-    throw new Error(`Unknown mapping: ${String(mapping)}`);
-  };
-
-  Object.entries(mappings).forEach(([key, mapping]) => {
-    requestBody[key] = switchMapping(mapping as Mappings);
-  });
 
   if (!workflowId) {
     throw new Error("Workflow ID is required");
