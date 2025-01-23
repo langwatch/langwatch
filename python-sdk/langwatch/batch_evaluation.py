@@ -55,6 +55,8 @@ class ConversationMessage(TypedDict):
 
 
 class DatasetEntry(BaseModel):
+    model_config = {"extra": "allow", "populate_by_name": True}
+
     id: Optional[str] = None
     input: Optional[str] = None
     contexts: Optional[Union[list[RAGChunk], list[str]]] = None
@@ -306,7 +308,10 @@ def get_dataset(
                 entry = record["entry"]
                 if "contexts" in entry and type(entry["contexts"]) == str:
                     entry["contexts"] = json.loads(entry["contexts"])
-                if "expected_contexts" in entry and type(entry["expected_contexts"]) == str:
+                if (
+                    "expected_contexts" in entry
+                    and type(entry["expected_contexts"]) == str
+                ):
                     entry["expected_contexts"] = json.loads(entry["expected_contexts"])
                 if "conversation" in entry and type(entry["conversation"]) == str:
                     entry["conversation"] = json.loads(entry["conversation"])
