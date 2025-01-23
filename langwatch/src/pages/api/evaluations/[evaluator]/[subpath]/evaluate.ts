@@ -95,11 +95,11 @@ export async function handleEvaluatorCall(
     checkType = evaluatorSlug;
   }
 
-  const evaluator = await getEvaluatorIncludingCustom(
+  const evaluatorDefinition = await getEvaluatorIncludingCustom(
     project.id,
     checkType as EvaluatorTypes
   );
-  if (!evaluator) {
+  if (!evaluatorDefinition) {
     return res.status(404).json({
       error: `Evaluator not found: ${checkType}`,
     });
@@ -142,17 +142,19 @@ export async function handleEvaluatorCall(
     });
   }
 
-  const evaluatorDefinition = getEvaluatorDefinitions(checkType)!;
+  const evaluatorSettingSchema = checkType.startsWith("custom/")
+    ? undefined
+    : evaluatorsSchema.shape[checkType as EvaluatorTypes]?.shape.settings;
 
-  const evaluatorSettingSchema =
-    evaluatorsSchema.shape[checkType as EvaluatorTypes].shape.settings;
-
-  let settings: z.infer<typeof evaluatorSettingSchema> | undefined =
-    (storedEvaluator?.parameters as z.infer<typeof evaluatorSettingSchema>) ??
-    {};
+  let settings:
+    | z.infer<NonNullable<typeof evaluatorSettingSchema>>
+    | undefined =
+    (storedEvaluator?.parameters as z.infer<
+      NonNullable<typeof evaluatorSettingSchema>
+    >) ?? {};
 
   try {
-    settings = evaluatorSettingSchema.parse({
+    settings = evaluatorSettingSchema?.parse({
       ...getEvaluatorDefaultSettings(evaluatorDefinition),
       ...(storedEvaluator ? (storedEvaluator.parameters as object) : {}),
       ...(params.settings ? params.settings : {}),

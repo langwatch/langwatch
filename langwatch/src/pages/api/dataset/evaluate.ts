@@ -356,6 +356,7 @@ export const getEvaluatorIncludingCustom = async (
         return [
           `custom/${evaluator.id}`,
           {
+            name: evaluator.name,
             requiredFields: requiredFields,
           },
         ];
