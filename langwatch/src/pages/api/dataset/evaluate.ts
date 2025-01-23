@@ -160,23 +160,22 @@ export default async function handler(
 
   evaluationRequiredFields = evaluator.requiredFields;
 
-  if (
-    !evaluationRequiredFields.every((field: string) => {
-      return field in data.data;
-    })
-  ) {
-    return res.status(400).json({
-      error: `Missing required field for ${checkType}`,
-      requiredFields: evaluationRequiredFields,
-    });
-  }
-
   let data: DataForEvaluation;
   try {
     data = getEvaluatorDataForParams(
       checkType,
       params.data as Record<string, any>
     );
+    if (
+      !evaluationRequiredFields.every((field: string) => {
+        return field in data.data;
+      })
+    ) {
+      return res.status(400).json({
+        error: `Missing required field for ${checkType}`,
+        requiredFields: evaluationRequiredFields,
+      });
+    }
   } catch (error) {
     debug(
       "Invalid evaluation data received",
