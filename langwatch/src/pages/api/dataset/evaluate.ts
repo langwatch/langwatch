@@ -281,7 +281,7 @@ export const getEvaluatorDataForParams = (
       data: params,
     };
   } else {
-    const data_ = defaultEvaluatorInputSchema.parse(params.data);
+    const data_ = defaultEvaluatorInputSchema.parse(params);
     const {
       input,
       output,
