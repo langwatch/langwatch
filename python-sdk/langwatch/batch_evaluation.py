@@ -19,6 +19,7 @@ from tqdm import tqdm
 import pandas as pd
 
 from langwatch.types import Money, RAGChunk
+import json
 
 
 class EvaluationResult(BaseModel):
@@ -58,6 +59,7 @@ class DatasetEntry(BaseModel):
     input: Optional[str] = None
     contexts: Optional[Union[list[RAGChunk], list[str]]] = None
     expected_output: Optional[str] = None
+    expected_contexts: Optional[Union[list[RAGChunk], list[str]]] = None
     conversation: Optional[list[ConversationMessage]] = None
 
 
@@ -104,14 +106,15 @@ class BatchEvaluation:
             langwatch.login()
 
         experiment_slug = generate_slug(3)
-        response = httpx.post(
-            f"{langwatch.endpoint}/api/experiment/init",
-            headers={"X-Auth-Token": langwatch.api_key or ""},
-            json={
-                "experiment_slug": experiment_slug,
-                "experiment_type": "BATCH_EVALUATION",
-            },
-        )
+        with httpx.Client(timeout=300) as client:
+            response = client.post(
+                f"{langwatch.endpoint}/api/experiment/init",
+                headers={"X-Auth-Token": langwatch.api_key or ""},
+                json={
+                    "experiment_slug": experiment_slug,
+                    "experiment_type": "BATCH_EVALUATION",
+                },
+            )
         if response.status_code == 401:
             langwatch.api_key = None
             raise ValueError(
@@ -282,7 +285,7 @@ def get_dataset(
         "url": langwatch.endpoint + f"/api/dataset/{slug}",
         "headers": {"X-Auth-Token": str(langwatch.api_key)},
     }
-    with httpx.Client(timeout=30) as client:
+    with httpx.Client(timeout=300) as client:
         response = client.get(**request_params)
         response.raise_for_status()
 
@@ -297,4 +300,15 @@ def get_dataset(
         # If the response does not contain a status key or its value is not "error"
         res = result.get("data", None)
         # parse to pydantic
-        return [DatasetRecord.model_validate(record) for record in res]
+        records = []
+        for record in res:
+            if "entry" in record:
+                entry = record["entry"]
+                if "contexts" in entry and type(entry["contexts"]) == str:
+                    entry["contexts"] = json.loads(entry["contexts"])
+                if "expected_contexts" in entry and type(entry["expected_contexts"]) == str:
+                    entry["expected_contexts"] = json.loads(entry["expected_contexts"])
+                if "conversation" in entry and type(entry["conversation"]) == str:
+                    entry["conversation"] = json.loads(entry["conversation"])
+            records.append(DatasetRecord.model_validate(record))
+        return records
