@@ -87,6 +87,10 @@ export default async function handler(
     project.team.organizationId
   );
   if (currentMonthMessagesCount >= activePlan.maxMessagesPerMonth) {
+    console.log("[429] Reached plan limit", {
+      projectId: project.id,
+      currentMonthMessagesCount,
+    });
     return res.status(429).json({
       message: `ERR_PLAN_LIMIT: You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
     });
@@ -181,6 +185,10 @@ export default async function handler(
   traceSpanCountHistogram.observe(req.body.spans?.length ?? 0);
 
   if (req.body.spans?.length > 200) {
+    console.log("[429] Too many spans", {
+      projectId: project.id,
+      spansCount: req.body.spans?.length,
+    });
     return res.status(429).json({
       message: "Too many spans, maximum of 200 per trace",
     });

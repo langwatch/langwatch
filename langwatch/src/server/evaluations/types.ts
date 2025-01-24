@@ -49,28 +49,7 @@ export const evaluationInputSchema = z.object({
   evaluation_id: z.string().optional().nullable(),
   evaluator_id: z.string().optional().nullable(),
   name: z.string().optional().nullable(),
-  data: z.object({
-    input: z.string().optional().nullable(),
-    output: z.string().optional().nullable(),
-    contexts: z
-      .union([z.array(rAGChunkSchema), z.array(z.string())])
-      .optional()
-      .nullable(),
-    expected_output: z.string().optional().nullable(),
-    expected_contexts: z
-      .union([z.array(rAGChunkSchema), z.array(z.string())])
-      .optional()
-      .nullable(),
-    conversation: z
-      .array(
-        z.object({
-          input: z.string().optional().nullable(),
-          output: z.string().optional().nullable(),
-        })
-      )
-      .optional()
-      .nullable(),
-  }),
+  data: z.object({}).passthrough().optional().nullable(),
   settings: z.object({}).passthrough().optional().nullable(),
   as_guardrail: z.boolean().optional().nullable().default(false),
 });

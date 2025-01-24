@@ -8,6 +8,12 @@ import {
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { z } from "zod";
 
+export const config = {
+  api: {
+    responseLimit: false,
+  },
+}
+
 const paramsSchema = getAllForProjectInput
   .omit({
     projectId: true,
@@ -27,6 +33,7 @@ const paramsSchema = getAllForProjectInput
         message: "Invalid date format for endDate",
       }),
     ]),
+    scrollId: z.string().optional().nullable(),
   });
 
 export default async function handler(
@@ -76,17 +83,15 @@ export default async function handler(
       pageSize,
     },
     downloadMode: true,
+    scrollId: params.scrollId ?? undefined,
   });
   const traces = results.groups.flat();
 
   return res.status(200).json({
     traces,
     pagination: {
-      currentPageOffset: params.pageOffset ?? 0,
-      ...(traces.length >= pageSize
-        ? { nextPageOffset: (params.pageOffset ?? 0) + pageSize }
-        : {}),
       totalHits: results.totalHits,
+      scrollId: results.scrollId,
     },
   });
 }

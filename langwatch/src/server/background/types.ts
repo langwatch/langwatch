@@ -9,6 +9,7 @@ import type {
 } from "../tracer/types";
 
 export type Mappings =
+  | "spans"
   | "trace.input"
   | "trace.output"
   | "trace.first_rag_context"

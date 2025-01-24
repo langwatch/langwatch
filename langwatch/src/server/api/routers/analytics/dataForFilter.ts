@@ -8,6 +8,7 @@ import { availableFilters } from "../../../filters/registry";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
 import { generateTracesPivotQueryConditions } from "./common";
 import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/typesWithBodyKey";
+import { getAnnotatedTraceIds } from "~/server/filters/annotations";
 
 export const dataForFilter = protectedProcedure
   .input(
@@ -57,6 +58,24 @@ export const dataForFilter = protectedProcedure
         ) as Record<string, AggregationsAggregationContainer>,
       },
     });
+
+    if (field === "annotations.hasAnnotation") {
+      const annotatedTraceIds = await getAnnotatedTraceIds({
+        projectId: input.projectId,
+        startDate: new Date(input.startDate),
+        endDate: new Date(input.endDate),
+      });
+      response.aggregations = {
+        unique_values: {
+          buckets: [
+            {
+              key: "true",
+              doc_count: annotatedTraceIds.length,
+            },
+          ],
+        },
+      };
+    }
 
     const results = availableFilters[field].listMatch.extract(
       (response.aggregations ?? {}) as any

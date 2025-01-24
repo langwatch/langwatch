@@ -43,7 +43,6 @@ import { useRouter } from "next/router";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
 import {
-  CheckSquare,
   ChevronDown,
   ChevronLeft,
   ChevronRight,

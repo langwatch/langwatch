@@ -9,6 +9,7 @@ import {
   Image,
   ListItem,
   RadioGroup,
+  SimpleGrid,
   Spacer,
   Text,
   UnorderedList,
@@ -142,7 +143,7 @@ export default function ProjectOnboardingSelect() {
           <FormControl>
             <RadioGroup value={""}>
               <Box>
-                <HStack width="full" height="100%" alignItems="start">
+                <SimpleGrid columns={[1, null, 2]} spacing="20px">
                   {Object.entries(projectTypes).map(([value, details]) => {
                     return (
                       <Box
@@ -152,7 +153,6 @@ export default function ProjectOnboardingSelect() {
                           if (createProject.isLoading) return;
                           void onSubmit(value);
                         }}
-                        width="full"
                         height="100%"
                         padding={0}
                         margin={0}
@@ -169,7 +169,7 @@ export default function ProjectOnboardingSelect() {
                       </Box>
                     );
                   })}
-                </HStack>
+                </SimpleGrid>
               </Box>
             </RadioGroup>
           </FormControl>

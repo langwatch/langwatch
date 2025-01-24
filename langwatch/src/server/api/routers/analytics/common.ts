@@ -32,6 +32,7 @@ export const generateTracesPivotQueryConditions = ({
   endDate,
   filters,
   query,
+  traceIds,
 }: z.infer<typeof sharedFiltersInputSchema>): {
   pivotIndexConditions: QueryDslQueryContainer;
   isAnyFilterPresent: boolean;
@@ -57,9 +58,8 @@ export const generateTracesPivotQueryConditions = ({
     pivotIndexConditions: {
       bool: {
         must: [
-          {
-            term: { project_id: projectId },
-          },
+          { term: { project_id: projectId } },
+          ...(traceIds?.length ? [{ terms: { trace_id: traceIds } }] : []),
           ...(query ? [{ query_string: { query } }] : []),
           {
             range: {

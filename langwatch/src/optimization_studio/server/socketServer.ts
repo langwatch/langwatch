@@ -158,13 +158,8 @@ const callPython = async (
     }
 
     const decoder = new TextDecoder();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value, { stream: true });
+    const decodeChunk = (chunk: string) => {
       const events = chunk.split("\n\n").filter(Boolean);
-
       for (const event of events) {
         if (event.startsWith("data: ")) {
           try {
@@ -181,9 +176,29 @@ const callPython = async (
               error,
               JSON.stringify(event, undefined, 2)
             );
-            throw new Error(`Failed to parse event: ${event}`);
+            const error_ = new Error(
+              `Failed to parse server event, please contact support`
+            );
+            Sentry.captureException(error_, { extra: { event } });
+            throw error_;
           }
         }
+      }
+    };
+
+    let chunksBuffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      chunksBuffer += chunk;
+
+      if (chunksBuffer.includes("\n\n")) {
+        const chunks = chunksBuffer.split("\n\n");
+        const readyChunks = chunks.slice(0, -1).join("\n\n");
+        decodeChunk(readyChunks);
+        chunksBuffer = chunks[chunks.length - 1] ?? "";
       }
     }
   } catch (error) {

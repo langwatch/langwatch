@@ -40,6 +40,7 @@ import {
   checkUserPermissionForProject,
 } from "../permission";
 import { generateTracesPivotQueryConditions } from "./analytics/common";
+import { getAnnotatedTraceIds } from "~/server/filters/annotations";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
@@ -435,7 +436,23 @@ export const getAllTracesForProject = async ({
   includeContexts?: boolean;
   scrollId?: string;
 }) => {
-  const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
+  let traceIds: string[] = [];
+
+  if (
+    Array.isArray(input.filters["annotations.hasAnnotation"]) &&
+    input.filters["annotations.hasAnnotation"].includes("true")
+  ) {
+    traceIds = await getAnnotatedTraceIds({
+      projectId: input.projectId,
+      startDate: new Date(input.startDate),
+      endDate: new Date(input.endDate),
+    });
+  }
+
+  const { pivotIndexConditions } = generateTracesPivotQueryConditions({
+    ...input,
+    traceIds,
+  });
 
   let pageSize = input.pageSize ? input.pageSize : 25;
   const pageOffset = input.pageOffset ? input.pageOffset : 0;

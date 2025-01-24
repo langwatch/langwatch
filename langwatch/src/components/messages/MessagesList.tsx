@@ -21,6 +21,7 @@ import {
   Tooltip,
   VStack,
   Select,
+  Divider,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
@@ -362,7 +363,11 @@ const ExpandableMessages = React.memo(
               color="gray.500"
               cursor="default"
             >
-              User ID: {traceGroup[0]?.metadata.user_id ?? "null"}
+              <HStack spacing={1}>
+                <Text>User ID: </Text>
+                <Text>{traceGroup[0]?.metadata.user_id ?? "null"}</Text>
+                <Divider orientation="vertical" height="20px" />
+              </HStack>
             </Box>
           )}
           {isExpanded && groupBy === "thread_id" && (
@@ -376,12 +381,17 @@ const ExpandableMessages = React.memo(
               color="gray.500"
               cursor="default"
             >
-              Thread ID: {traceGroup[0]?.metadata.thread_id ?? "null"}
+              <HStack spacing={1}>
+                <Text>Thread ID: </Text>
+                <Text>{traceGroup[0]?.metadata.thread_id ?? "null"}</Text>
+                <Divider orientation="vertical" height="20px" />
+              </HStack>
             </Box>
           )}
           <VStack width="full" gap={6}>
             {traceGroup
               .slice(0, isExpanded ? traceGroup.length : 3)
+              .reverse()
               .map((trace, traceIndex) => {
                 const expanded = isExpanded || traceGroup.length === 1;
                 const renderContent = isExpanded || traceIndex === 0;
