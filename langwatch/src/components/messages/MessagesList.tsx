@@ -281,11 +281,6 @@ const ExpandableMessages = React.memo(
     const cardRefs = (traceGroups ?? []).map(() => createRef<Element>());
     const [groupBy] = useGroupBy();
     const [transitionsEnabled, setTransitionsEnabled] = useState(false);
-    const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-
-    const toggleSort = () => {
-      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
-    };
 
     useEffect(() => {
       const newHeights: Record<number, number> = {};
@@ -298,19 +293,6 @@ const ExpandableMessages = React.memo(
       setTimeout(() => setTransitionsEnabled(true), 100);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [traceGroups]);
-
-    const sortDirectionText = () => {
-      return (
-        <HStack spacing={1}>
-          {sortDirection === "asc" ? (
-            <ChevronUp size={14} />
-          ) : (
-            <ChevronDown size={14} />
-          )}
-          <Text>{sortDirection === "asc" ? "Oldest" : "Newest"}</Text>
-        </HStack>
-      );
-    };
 
     return traceGroups.map((traceGroup, groupIndex) => {
       const isExpanded = !!expandedGroups[groupIndex];
@@ -379,14 +361,12 @@ const ExpandableMessages = React.memo(
               fontSize={13}
               fontWeight={600}
               color="gray.500"
-              cursor="pointer"
-              onClick={toggleSort}
+              cursor="default"
             >
               <HStack spacing={1}>
                 <Text>User ID: </Text>
                 <Text>{traceGroup[0]?.metadata.user_id ?? "null"}</Text>
                 <Divider orientation="vertical" height="20px" />
-                {sortDirectionText()}
               </HStack>
             </Box>
           )}
@@ -399,25 +379,19 @@ const ExpandableMessages = React.memo(
               fontSize={13}
               fontWeight={600}
               color="gray.500"
-              cursor="pointer"
-              onClick={toggleSort}
+              cursor="default"
             >
               <HStack spacing={1}>
                 <Text>Thread ID: </Text>
                 <Text>{traceGroup[0]?.metadata.thread_id ?? "null"}</Text>
                 <Divider orientation="vertical" height="20px" />
-                {sortDirectionText()}
               </HStack>
             </Box>
           )}
           <VStack width="full" gap={6}>
             {traceGroup
               .slice(0, isExpanded ? traceGroup.length : 3)
-              .sort((a, b) => {
-                const comparison =
-                  b.timestamps.inserted_at - a.timestamps.inserted_at;
-                return sortDirection === "asc" ? -comparison : comparison;
-              })
+              .reverse()
               .map((trace, traceIndex) => {
                 const expanded = isExpanded || traceGroup.length === 1;
                 const renderContent = isExpanded || traceIndex === 0;
