@@ -258,6 +258,9 @@ export const organizationRouter = createTRPCRouter({
       z.object({
         organizationId: z.string(),
         name: z.string(),
+        s3Endpoint: z.string().optional(),
+        s3AccessKeyId: z.string().optional(),
+        s3SecretAccessKey: z.string().optional(),
       })
     )
     .use(
@@ -290,6 +293,9 @@ export const organizationRouter = createTRPCRouter({
         },
         data: {
           name: input.name,
+          s3Endpoint: input.s3Endpoint,
+          s3AccessKeyId: input.s3AccessKeyId,
+          s3SecretAccessKey: input.s3SecretAccessKey,
         },
       });
 

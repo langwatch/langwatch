@@ -227,6 +227,9 @@ export const projectRouter = createTRPCRouter({
         framework: z.string(),
         piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]),
         userLinkTemplate: z.string().optional(),
+        s3Endpoint: z.string().optional(),
+        s3AccessKeyId: z.string().optional(),
+        s3SecretAccessKey: z.string().optional(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
@@ -267,6 +270,9 @@ export const projectRouter = createTRPCRouter({
           framework: input.framework,
           piiRedactionLevel: input.piiRedactionLevel,
           userLinkTemplate: input.userLinkTemplate,
+          s3Endpoint: input.s3Endpoint,
+          s3AccessKeyId: input.s3AccessKeyId,
+          s3SecretAccessKey: input.s3SecretAccessKey,
         },
       });
 

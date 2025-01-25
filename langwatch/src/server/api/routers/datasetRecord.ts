@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
-import { PrismaClient, type DatasetRecord } from "@prisma/client";
+import {
+  PrismaClient,
+  type DatasetRecord,
+  type Organization,
+  type Project,
+} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import {
   newDatasetEntriesSchema,
@@ -9,6 +14,7 @@ import {
 } from "../../datasets/types";
 import { nanoid } from "nanoid";
 import { prisma } from "../../db";
+import { env } from "../../../env.mjs";
 
 import {
   S3Client,
@@ -16,8 +22,9 @@ import {
   ListObjectsV2Command,
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
-const USE_S3_STORAGE = true;
+const USE_S3_STORAGE = env.USE_S3_STORAGE;
 
 export const datasetRecordRouter = createTRPCRouter({
   create: protectedProcedure
@@ -46,10 +53,21 @@ export const datasetRecordRouter = createTRPCRouter({
         });
       }
 
-      return createManyDatasetRecordsS3({
+      if (dataset.useS3) {
+        console.log("using s3");
+        return createManyDatasetRecordsS3({
+          datasetId: input.datasetId,
+          projectId: input.projectId,
+          datasetRecords: input.entries,
+        });
+      }
+
+      console.log("using postgres");
+      return createManyDatasetRecords({
         datasetId: input.datasetId,
         projectId: input.projectId,
         datasetRecords: input.entries,
+        ctx: ctx,
       });
     }),
   update_3: protectedProcedure
@@ -118,6 +136,7 @@ export const datasetRecordRouter = createTRPCRouter({
         updatedRecord,
         datasetId: input.datasetId,
         projectId: input.projectId,
+        useS3: dataset.useS3,
       });
     }),
   getAll_3: protectedProcedure
@@ -184,37 +203,22 @@ export const datasetRecordRouter = createTRPCRouter({
         });
       }
 
-      const { count } = await ctx.prisma.datasetRecord.deleteMany({
-        where: {
-          id: { in: input.recordIds },
-          datasetId: input.datasetId,
-          projectId: input.projectId,
-        },
+      return deleteManyDatasetRecords({
+        recordIds: input.recordIds,
+        datasetId: input.datasetId,
+        projectId: input.projectId,
       });
-
-      if (count === 0) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "No matching records found to delete",
-        });
-      }
-
-      return { deletedCount: count };
     }),
 });
 
-const updateDatasetRecord = async ({
-  recordId,
-  updatedRecord,
+const deleteManyDatasetRecords = async ({
+  recordIds,
   datasetId,
   projectId,
-  prisma,
 }: {
-  recordId: string;
-  updatedRecord: any;
+  recordIds: string[];
   datasetId: string;
   projectId: string;
-  prisma: PrismaClient;
 }) => {
   if (USE_S3_STORAGE) {
     const s3Client = new S3Client({
@@ -226,12 +230,89 @@ const updateDatasetRecord = async ({
       forcePathStyle: true,
     });
 
+    // Get existing records
+    let records: any[] = [];
+    try {
+      const { Body } = await s3Client.send(
+        new GetObjectCommand({
+          Bucket: "test",
+          Key: `datasets/${projectId}/${datasetId}`,
+        })
+      );
+
+      const content = await Body?.transformToString();
+      records = JSON.parse(content ?? "[]");
+    } catch (error) {
+      if ((error as any).name === "NoSuchKey") {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No records found to delete",
+        });
+      }
+      throw error;
+    }
+
+    const initialLength = records.length;
+    records = records.filter((record) => !recordIds.includes(record.id));
+
+    if (records.length === initialLength) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "No matching records found to delete",
+      });
+    }
+
+    // Save back to S3
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: "test",
+        Key: `datasets/${projectId}/${datasetId}`,
+        Body: JSON.stringify(records),
+        ContentType: "application/json",
+      })
+    );
+
+    return { deletedCount: initialLength - records.length };
+  } else {
+    // Legacy Postgres code
+    const { count } = await prisma.datasetRecord.deleteMany({
+      where: {
+        id: { in: recordIds },
+        datasetId,
+        projectId,
+      },
+    });
+
+    if (count === 0) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "No matching records found to delete",
+      });
+    }
+
+    return { deletedCount: count };
+  }
+};
+
+const updateDatasetRecord = async ({
+  recordId,
+  updatedRecord,
+  datasetId,
+  projectId,
+  useS3,
+}: {
+  recordId: string;
+  updatedRecord: any;
+  datasetId: string;
+  projectId: string;
+  useS3: boolean;
+}) => {
+  if (useS3) {
     await updateRecordInS3({
       projectId,
       datasetId,
       recordId,
       updatedRecord,
-      s3Client,
     });
   } else {
     // Legacy Postgres code - to be removed after migration
@@ -252,14 +333,13 @@ const updateRecordInS3 = async ({
   datasetId,
   recordId,
   updatedRecord,
-  s3Client,
 }: {
   projectId: string;
   datasetId: string;
   recordId: string;
   updatedRecord: any;
-  s3Client: S3Client;
 }) => {
+  const s3Client = await createS3Client(projectId);
   // Get existing records
   let records: any[] = [];
   try {
@@ -307,6 +387,8 @@ const updateRecordInS3 = async ({
       ContentType: "application/json",
     })
   );
+
+  return { success: true };
 };
 
 const upsertDatasetRecord = async ({
@@ -349,7 +431,7 @@ const createDatasetRecord = (
   entry: DatasetRecordEntry,
   { datasetId, projectId }: { datasetId: string; projectId: string }
 ): DatasetRecord => {
-  const id = entry.id ?? nanoid();
+  const id = nanoid();
   const entryWithoutId: Omit<typeof entry, "id"> = { ...entry };
   // @ts-ignore
   delete entryWithoutId.id;
@@ -373,6 +455,14 @@ export const createManyDatasetRecords = async ({
   projectId: string;
   datasetRecords: DatasetRecordEntry[];
 }) => {
+  if (USE_S3_STORAGE) {
+    return createManyDatasetRecordsS3({
+      datasetId,
+      projectId,
+      datasetRecords,
+    });
+  }
+
   const recordData: DatasetRecord[] = datasetRecords.map((entry) =>
     createDatasetRecord(entry, { datasetId, projectId })
   );
@@ -391,15 +481,7 @@ export const createManyDatasetRecordsS3 = async ({
   projectId: string;
   datasetRecords: DatasetRecordEntry[];
 }) => {
-  const s3Client = new S3Client({
-    // region: process.env.AWS_REGION,
-    endpoint: "http://localhost:9000",
-    credentials: {
-      accessKeyId: "ktDZf3wZ82N0dPmIkkeq",
-      secretAccessKey: "QSNoQSfPBmvThY3zm80KrshAx1JydXfLGQAnB8ym",
-    },
-    forcePathStyle: true,
-  });
+  const s3Client = await createS3Client(projectId);
 
   const recordData: DatasetRecord[] = datasetRecords.map((entry) =>
     createDatasetRecord(entry, { datasetId, projectId })
@@ -463,14 +545,7 @@ export const getFullDatasetS3 = async ({
   projectId: string;
   entrySelection?: "first" | "last" | "random" | "all";
 }) => {
-  const s3Client = new S3Client({
-    endpoint: "http://localhost:9000",
-    credentials: {
-      accessKeyId: "ktDZf3wZ82N0dPmIkkeq",
-      secretAccessKey: "QSNoQSfPBmvThY3zm80KrshAx1JydXfLGQAnB8ym",
-    },
-    forcePathStyle: true,
-  });
+  const s3Client = await createS3Client(projectId);
 
   let records: any[] = [];
 
@@ -514,4 +589,52 @@ export const getFullDatasetS3 = async ({
       updatedAt: record.insertedAt,
     })),
   };
+};
+
+export const createS3Client = async (projectId: string) => {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+  });
+
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  const organization = await prisma.organization.findFirst({
+    where: {
+      teams: {
+        some: {
+          projects: {
+            some: { id: projectId },
+          },
+        },
+      },
+    },
+  });
+
+  if (!organization) {
+    throw new Error("Organization not found");
+  }
+
+  const s3Config = {
+    endpoint:
+      project.s3Endpoint ?? organization?.s3Endpoint ?? env.S3_ENDPOINT!,
+    accessKeyId:
+      project.s3AccessKeyId ??
+      organization?.s3AccessKeyId ??
+      env.S3_ACCESS_KEY_ID!,
+    secretAccessKey:
+      project.s3SecretAccessKey ??
+      organization?.s3SecretAccessKey ??
+      env.S3_SECRET_ACCESS_KEY!,
+  };
+
+  return new S3Client({
+    endpoint: s3Config.endpoint,
+    credentials: {
+      accessKeyId: s3Config.accessKeyId,
+      secretAccessKey: s3Config.secretAccessKey,
+    },
+    forcePathStyle: true,
+  });
 };

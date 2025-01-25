@@ -142,6 +142,9 @@ model Organization {
     usageSpendingMaxLimit Int?
     signupData            Json?
     signedDPA             Boolean              @default(false)
+    s3Endpoint            String?
+    s3AccessKeyId         String?
+    s3SecretAccessKey     String?
 
     promoCode String?
     features  OrganizationFeature[]
@@ -186,6 +189,9 @@ model Project {
     publicShares         PublicShare[]
     workflows            Workflow[]
     WorkflowVersion      WorkflowVersion[]
+    s3Endpoint           String?
+    s3AccessKeyId        String?
+    s3SecretAccessKey    String?
 
     @@index([teamId])
 }
@@ -303,6 +309,7 @@ model Dataset {
     archivedAt       DateTime?
     datasetRecords   DatasetRecord[]
     batchEvaluations BatchEvaluation[]
+    useS3            Boolean           @default(false)
 
     @@unique([projectId, slug])
 }
