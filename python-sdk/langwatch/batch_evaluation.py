@@ -68,6 +68,9 @@ class DatasetEntry(BaseModel):
     def __getitem__(self, item: str) -> Any:
         return getattr(self, item)
 
+    def __dict__(self):
+        return self.model_dump()
+
 
 class DatasetRecord(BaseModel):
     id: str
@@ -173,7 +176,7 @@ class BatchEvaluation:
     def _results_to_pandas(self, results: list[BatchEvaluationResultRecord]):
         results_df = []
         for result in results:
-            result_dict: dict[str, Any] = result.entry.__dict__
+            result_dict: dict[str, Any] = result.entry.model_dump()
             for evaluation_name, evaluation_result in result.results:
                 if evaluation_result.status == "processed":
                     result_dict[evaluation_name] = (
