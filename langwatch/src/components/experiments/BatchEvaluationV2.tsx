@@ -73,7 +73,14 @@ export function BatchEvaluationV2({
         selectedRunId={selectedRunId}
         setSelectedRunId={setSelectedRunId}
       />
-      <Box width="calc(100vw - 398px)" height="full" position="relative">
+      <VStack
+        width="calc(100vw - 398px)"
+        height="fit-content"
+        minHeight="100%"
+        position="relative"
+        spacing={0}
+        justify="space-between"
+      >
         <VStack
           align="start"
           width="full"
@@ -138,7 +145,7 @@ export function BatchEvaluationV2({
         {selectedRun && (
           <BatchEvaluationV2EvaluationSummary run={selectedRun} />
         )}
-      </Box>
+      </VStack>
     </HStack>
   );
 }
@@ -709,6 +716,13 @@ export function BatchEvaluationV2EvaluationResult({
     if (result.details !== undefined && result.details !== null) {
       evaluatorResultsColumnsMap.details = true;
     }
+  }
+  if (
+    !evaluatorResultsColumnsMap.passed &&
+    !evaluatorResultsColumnsMap.score &&
+    !evaluatorResultsColumnsMap.label
+  ) {
+    evaluatorResultsColumnsMap.score = true;
   }
   const evaluationResultsColumns = new Set(
     Object.entries(evaluatorResultsColumnsMap)

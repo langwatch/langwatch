@@ -72,6 +72,7 @@ import { IconWrapper } from "./IconWrapper";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { DiscordOutlineIcon } from "./icons/DiscordOutline";
 import { ChatBalloonIcon } from "./icons/ChatBalloon";
+import { HoverableBigText } from "./HoverableBigText";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -82,7 +83,7 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
         <Link href="/">Dashboard</Link>
         {currentRoute.parent && (
           <>
-            <ChevronRight width="12" />
+            <ChevronRight width="12" style={{ minWidth: "12px" }} />
             <Link
               href={projectRoutes[currentRoute.parent].path.replace(
                 "[project]",
@@ -93,8 +94,10 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
             </Link>
           </>
         )}
-        <ChevronRight width="12" />
-        <Text>{currentRoute.title}</Text>
+        <ChevronRight width="12" style={{ minWidth: "12px" }} />
+        <HoverableBigText noOfLines={1} expandable={false}>
+          {currentRoute.title}
+        </HoverableBigText>
       </HStack>
     )
   );
@@ -195,8 +198,14 @@ export const ProjectSelector = React.memo(function ProjectSelector({
     }))
   );
 
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
-    <Menu>
+    <Menu
+      isOpen={isOpen}
+      onOpen={() => setIsOpen(true)}
+      onClose={() => setIsOpen(false)}
+    >
       <MenuButton
         as={Button}
         variant="outline"
@@ -218,59 +227,62 @@ export const ProjectSelector = React.memo(function ProjectSelector({
       </MenuButton>
       <Portal>
         <Box zIndex="popover" padding={0}>
-          <MenuList zIndex="popover">
-            <>
-              {projectGroups
-                .filter((projectGroup) =>
-                  projectGroup.team.members.some(
-                    (member) => member.userId === session?.user.id
+          {isOpen && (
+            <MenuList zIndex="popover">
+              <>
+                {projectGroups
+                  .filter((projectGroup) =>
+                    projectGroup.team.members.some(
+                      (member) => member.userId === session?.user.id
+                    )
                   )
-                )
-                .map((projectGroup) => (
-                  <MenuGroup
-                    key={projectGroup.team.id}
-                    title={
-                      projectGroup.organization.name +
-                      (projectGroup.team.name !== projectGroup.organization.name
-                        ? " - " + projectGroup.team.name
-                        : "")
-                    }
-                  >
-                    {projectGroup.projects.map((project) => (
-                      <Link
-                        key={project.id}
-                        href={
-                          currentRoute?.path.includes("[project]")
-                            ? currentRoute.path
-                                .replace("[project]", project.slug)
-                                .replace(/\[.*?\]/g, "")
-                                .replace(/\/\/+/g, "/")
-                            : `/${project.slug}?return_to=${window.location.pathname}`
-                        }
-                        _hover={{
-                          textDecoration: "none",
-                        }}
-                      >
-                        <MenuItem
-                          icon={
-                            <HStack width="26px" justify="center">
-                              <ProjectTechStackIcon project={project} />
-                            </HStack>
+                  .map((projectGroup) => (
+                    <MenuGroup
+                      key={projectGroup.team.id}
+                      title={
+                        projectGroup.organization.name +
+                        (projectGroup.team.name !==
+                        projectGroup.organization.name
+                          ? " - " + projectGroup.team.name
+                          : "")
+                      }
+                    >
+                      {projectGroup.projects.map((project) => (
+                        <Link
+                          key={project.id}
+                          href={
+                            currentRoute?.path.includes("[project]")
+                              ? currentRoute.path
+                                  .replace("[project]", project.slug)
+                                  .replace(/\[.*?\]/g, "")
+                                  .replace(/\/\/+/g, "/")
+                              : `/${project.slug}?return_to=${window.location.pathname}`
                           }
-                          fontSize="14px"
+                          _hover={{
+                            textDecoration: "none",
+                          }}
                         >
-                          {project.name}
-                        </MenuItem>
-                      </Link>
-                    ))}
-                    <AddProjectButton
-                      team={projectGroup.team}
-                      organization={projectGroup.organization}
-                    />
-                  </MenuGroup>
-                ))}
-            </>
-          </MenuList>
+                          <MenuItem
+                            icon={
+                              <HStack width="26px" justify="center">
+                                <ProjectTechStackIcon project={project} />
+                              </HStack>
+                            }
+                            fontSize="14px"
+                          >
+                            {project.name}
+                          </MenuItem>
+                        </Link>
+                      ))}
+                      <AddProjectButton
+                        team={projectGroup.team}
+                        organization={projectGroup.organization}
+                      />
+                    </MenuGroup>
+                  ))}
+              </>
+            </MenuList>
+          )}
         </Box>
       </Portal>
     </Menu>
