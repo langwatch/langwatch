@@ -432,18 +432,35 @@ export const createManyDatasetRecords = async ({
       true
     );
 
+    let existingRecords: any[] = [];
+    try {
+      const { Body } = await s3Client.send(
+        new GetObjectCommand({
+          Bucket: "langwatch",
+          Key: `datasets/${projectId}/${datasetId}`,
+        })
+      );
+      const content = await Body?.transformToString();
+      existingRecords = JSON.parse(content ?? "[]");
+    } catch (error) {
+      if ((error as any).name !== "NoSuchKey") throw error;
+    }
+
+    // Combine existing and new records
+    const allRecords = [...existingRecords, ...recordData];
+
     await s3Client.send(
       new PutObjectCommand({
         Bucket: "langwatch",
-        Key: `datasets/${projectId}/${datasetId}`, // Single file for all records
-        Body: JSON.stringify(recordData), // Save the entire recordData array
+        Key: `datasets/${projectId}/${datasetId}`,
+        Body: JSON.stringify(allRecords),
         ContentType: "application/json",
       })
     );
 
     await prisma.dataset.update({
       where: { id: datasetId, projectId },
-      data: { s3RecordCount: recordData.length },
+      data: { s3RecordCount: allRecords.length },
     });
 
     return { success: true };
