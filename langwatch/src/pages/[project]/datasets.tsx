@@ -231,7 +231,11 @@ export default function Datasets() {
                                 ))}
                               </HStack>
                             </Td>
-                            <Td>{dataset._count.datasetRecords ?? 0}</Td>
+                            <Td>
+                              {dataset.useS3
+                                ? dataset.s3RecordCount ?? 0
+                                : dataset._count.datasetRecords ?? 0}
+                            </Td>
                             <Td>
                               {new Date(dataset.createdAt).toLocaleString()}
                             </Td>

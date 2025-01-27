@@ -67,7 +67,6 @@ export const datasetRecordRouter = createTRPCRouter({
         datasetId: input.datasetId,
         projectId: input.projectId,
         datasetRecords: input.entries,
-        ctx: ctx,
       });
     }),
   update_3: protectedProcedure
@@ -385,8 +384,17 @@ const updateRecordInS3 = async ({
       Key: `datasets/${projectId}/${datasetId}`,
       Body: JSON.stringify(records),
       ContentType: "application/json",
+      Metadata: {
+        recordCount: records.length.toString(),
+        lastUpdated: new Date().toISOString(),
+      },
     })
   );
+
+  // await prisma.dataset.update({
+  //   where: { id: datasetId, projectId },
+  //   data: { s3RecordCount: records.length },
+  // });
 
   return { success: true };
 };
@@ -429,8 +437,12 @@ const upsertDatasetRecord = async ({
 
 const createDatasetRecord = (
   entry: DatasetRecordEntry,
-  { datasetId, projectId }: { datasetId: string; projectId: string }
-): DatasetRecord => {
+  {
+    datasetId,
+    projectId,
+    index,
+  }: { datasetId: string; projectId: string; index: number }
+) => {
   const id = nanoid();
   const entryWithoutId: Omit<typeof entry, "id"> = { ...entry };
   // @ts-ignore
@@ -439,6 +451,7 @@ const createDatasetRecord = (
   return {
     id,
     entry: entryWithoutId,
+    index: (index + 1) * 1000,
     datasetId,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -455,16 +468,8 @@ export const createManyDatasetRecords = async ({
   projectId: string;
   datasetRecords: DatasetRecordEntry[];
 }) => {
-  if (USE_S3_STORAGE) {
-    return createManyDatasetRecordsS3({
-      datasetId,
-      projectId,
-      datasetRecords,
-    });
-  }
-
-  const recordData: DatasetRecord[] = datasetRecords.map((entry) =>
-    createDatasetRecord(entry, { datasetId, projectId })
+  const recordData: DatasetRecord[] = datasetRecords.map((entry, index) =>
+    createDatasetRecord(entry, { datasetId, projectId, index })
   );
 
   return prisma.datasetRecord.createMany({
@@ -483,8 +488,8 @@ export const createManyDatasetRecordsS3 = async ({
 }) => {
   const s3Client = await createS3Client(projectId);
 
-  const recordData: DatasetRecord[] = datasetRecords.map((entry) =>
-    createDatasetRecord(entry, { datasetId, projectId })
+  const recordData: DatasetRecord[] = datasetRecords.map((entry, index) =>
+    createDatasetRecord(entry, { datasetId, projectId, index })
   );
 
   await s3Client.send(
@@ -493,8 +498,17 @@ export const createManyDatasetRecordsS3 = async ({
       Key: `datasets/${projectId}/${datasetId}`, // Single file for all records
       Body: JSON.stringify(recordData), // Save the entire recordData array
       ContentType: "application/json",
+      Metadata: {
+        recordCount: recordData.length.toString(),
+        lastUpdated: new Date().toISOString(),
+      },
     })
   );
+
+  // await prisma.dataset.update({
+  //   where: { id: datasetId, projectId },
+  //   data: { s3RecordCount: recordData.length },
+  // });
 
   return { success: true };
 };
@@ -545,6 +559,17 @@ export const getFullDatasetS3 = async ({
   projectId: string;
   entrySelection?: "first" | "last" | "random" | "all";
 }) => {
+  const dataset = await prisma.dataset.findFirst({
+    where: { id: datasetId, projectId },
+  });
+
+  if (!dataset) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Dataset not found",
+    });
+  }
+
   const s3Client = await createS3Client(projectId);
 
   let records: any[] = [];
@@ -559,23 +584,27 @@ export const getFullDatasetS3 = async ({
 
     const content = await Body?.transformToString();
     records = JSON.parse(content ?? "[]");
+    if (entrySelection !== "all") {
+      const count = records.length;
+      records = records.filter((_, index) => {
+        switch (entrySelection) {
+          case "first":
+            return index === 0;
+          case "last":
+            return index === count - 1;
+          case "random":
+            return index === Math.floor(Math.random() * count);
+          default:
+            return true;
+        }
+      });
+    }
   } catch (error) {
     if ((error as any).name === "NoSuchKey") {
       records = [];
     } else {
       throw error;
     }
-  }
-
-  const dataset = await prisma.dataset.findFirst({
-    where: { id: datasetId, projectId },
-  });
-
-  if (!dataset) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Dataset not found",
-    });
   }
 
   return {

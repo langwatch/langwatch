@@ -310,6 +310,7 @@ model Dataset {
     datasetRecords   DatasetRecord[]
     batchEvaluations BatchEvaluation[]
     useS3            Boolean           @default(false)
+    s3RecordCount    Int?
 
     @@unique([projectId, slug])
 }
