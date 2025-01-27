@@ -68,8 +68,14 @@ class DatasetEntry(BaseModel):
     def __getitem__(self, item: str) -> Any:
         return getattr(self, item)
 
+    @property
     def __dict__(self):
-        return self.model_dump()
+        return {k: getattr(self, k) for k in self.__pydantic_fields_set__}
+
+    @__dict__.setter
+    def __dict__(self, value: dict):
+        for key, val in value.items():
+            setattr(self, key, val)
 
 
 class DatasetRecord(BaseModel):
@@ -209,15 +215,11 @@ class BatchEvaluation:
             or isinstance(callbackResponse, float)
         ):
             entry_with_output = DatasetEntry(
-                id=record.id,  # type: ignore
-                **entry.__dict__,
-                output=callbackResponse,  # type: ignore
+                **{**entry.model_dump(), "output": callbackResponse}
             )
         else:
             entry_with_output = DatasetEntry(
-                id=record.id,  # type: ignore
-                **entry.__dict__,
-                **(callbackResponse or {}),
+                **{**entry.model_dump(), **(callbackResponse or {})}
             )
 
         coroutines: list[Coroutine[Tuple[str, SingleEvaluationResult], Any, Any]] = []

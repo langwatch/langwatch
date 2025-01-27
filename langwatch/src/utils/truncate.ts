@@ -56,6 +56,7 @@ const truncateWithSizeLimit = (
     const entries = Object.entries(data);
     let result: Record<string, unknown> = {};
 
+    // eslint-disable-next-line @typescript-eslint/prefer-for-of
     for (let i = 0; i < entries.length; i++) {
       const tempResult = {
         ...result,

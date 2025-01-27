@@ -170,7 +170,16 @@ const processBatchEvaluation = async (
         ...entry,
         ...(entry.entry ? { entry: safeTruncate(entry.entry, 8 * 1024) } : {}),
       })) ?? [],
-    evaluations: param.evaluations ?? [],
+    evaluations:
+      param.evaluations?.map((evaluation) => ({
+        ...evaluation,
+        ...(evaluation.inputs
+          ? { inputs: safeTruncate(evaluation.inputs, 8 * 1024) }
+          : {}),
+        ...(evaluation.details
+          ? { details: safeTruncate(evaluation.details, 4 * 1024) }
+          : {}),
+      })) ?? [],
     timestamps: {
       ...param.timestamps,
       created_at: param.timestamps?.created_at ?? new Date().getTime(),
