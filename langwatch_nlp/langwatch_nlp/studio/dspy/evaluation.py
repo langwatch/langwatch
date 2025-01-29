@@ -221,6 +221,9 @@ class EvaluationReporting:
 
     def send_batch(self, finished: bool = False):
         with self.lock:
+            if len(self.batch["dataset"]) == 0 and len(self.batch["evaluations"]) == 0:
+                return
+
             body = {
                 "experiment_slug": self.workflow.workflow_id,
                 "name": f"{self.workflow.name} - Evaluations",

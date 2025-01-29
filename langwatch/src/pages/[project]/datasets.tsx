@@ -28,7 +28,6 @@ import {
 import { DeleteIcon, EditIcon } from "@chakra-ui/icons";
 import { useRouter } from "next/router";
 import {
-  FileText,
   MoreVertical,
   Play,
   Upload,

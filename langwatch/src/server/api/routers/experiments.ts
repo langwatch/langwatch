@@ -209,7 +209,7 @@ export const experimentsRouter = createTRPCRouter({
 
       type ESBatchEvaluationRunInfo = Pick<
         ESBatchEvaluation,
-        "run_id" | "workflow_version_id" | "timestamps" | "total"
+        "run_id" | "workflow_version_id" | "timestamps" | "progress" | "total"
       >;
 
       const batchEvaluationRuns =
@@ -224,6 +224,7 @@ export const experimentsRouter = createTRPCRouter({
               "timestamps.updated_at",
               "timestamps.finished_at",
               "timestamps.stopped_at",
+              "progress",
               "total",
             ],
             query: {
@@ -335,6 +336,7 @@ export const experimentsRouter = createTRPCRouter({
             ? versionsMap[source.workflow_version_id]
             : null,
           timestamps: source.timestamps,
+          progress: source.progress,
           total: source.total,
           summary: {
             cost:

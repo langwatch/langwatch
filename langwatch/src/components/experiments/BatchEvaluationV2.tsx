@@ -9,6 +9,7 @@ import {
   Divider,
   HStack,
   Heading,
+  Progress,
   Skeleton,
   Spacer,
   Spinner,
@@ -46,6 +47,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../server/api/root";
 import numeral from "numeral";
 import React from "react";
+import { formatMoney } from "../../utils/formatMoney";
 
 export function BatchEvaluationV2({
   project,
@@ -73,7 +75,15 @@ export function BatchEvaluationV2({
         selectedRunId={selectedRunId}
         setSelectedRunId={setSelectedRunId}
       />
-      <Box width="calc(100vw - 398px)" height="full" position="relative">
+      <VStack
+        width="full"
+        height="fit-content"
+        minHeight="100%"
+        position="relative"
+        spacing={0}
+        justify="space-between"
+        minWidth="0"
+      >
         <VStack
           align="start"
           width="full"
@@ -136,9 +146,9 @@ export function BatchEvaluationV2({
           )}
         </VStack>
         {selectedRun && (
-          <BatchEvaluationV2EvaluationSummary run={selectedRun} />
+          <BatchEvaluationV2EvaluationSummary run={selectedRun} showProgress />
         )}
-      </Box>
+      </VStack>
     </HStack>
   );
 }
@@ -327,8 +337,8 @@ export function BatchEvaluationV2RunList({
             return (
               <HStack
                 key={run?.run_id ?? "new"}
-                paddingX={size === "sm" ? 2 : 6}
-                paddingY={size === "sm" ? 2 : 4}
+                paddingX={size === "sm" ? 2 : 4}
+                paddingY={size === "sm" ? 2 : 3}
                 width="100%"
                 cursor="pointer"
                 role="button"
@@ -710,6 +720,13 @@ export function BatchEvaluationV2EvaluationResult({
       evaluatorResultsColumnsMap.details = true;
     }
   }
+  if (
+    !evaluatorResultsColumnsMap.passed &&
+    !evaluatorResultsColumnsMap.score &&
+    !evaluatorResultsColumnsMap.label
+  ) {
+    evaluatorResultsColumnsMap.score = true;
+  }
   const evaluationResultsColumns = new Set(
     Object.entries(evaluatorResultsColumnsMap)
       .filter(([_key, value]) => value)
@@ -842,15 +859,28 @@ export function BatchEvaluationV2EvaluationResult({
                     ))}
 
                 <Td>
-                  {datasetEntry?.cost ? (
-                    <FormatMoney
-                      amount={datasetEntry?.cost ?? 0}
-                      currency="USD"
-                      format="$0.00[00]"
-                    />
-                  ) : (
-                    "-"
-                  )}
+                  <Tooltip
+                    label={
+                      <VStack align="start" spacing={0}>
+                        <Text>
+                          Prediction cost: {datasetEntry?.cost ?? "-"}
+                        </Text>
+                        <Text>Evaluation cost: {evaluation?.cost ?? "-"}</Text>
+                      </VStack>
+                    }
+                  >
+                    {!!datasetEntry?.cost || !!evaluation?.cost
+                      ? formatMoney(
+                          {
+                            amount:
+                              (datasetEntry?.cost ?? 0) +
+                              (evaluation?.cost ?? 0),
+                            currency: "USD",
+                          },
+                          "$0.00[00]"
+                        )
+                      : "-"}
+                  </Tooltip>
                 </Td>
                 <Td>
                   {datasetEntry?.duration
@@ -914,6 +944,8 @@ export function BatchEvaluationV2EvaluationResult({
                         "false"
                       ) : value === true ? (
                         "true"
+                      ) : !isNaN(Number(value)) ? (
+                        numeral(Number(value)).format("0.[00]")
                       ) : (
                         value ?? "-"
                       )}
@@ -947,6 +979,7 @@ const getFinishedAt = (
 
 export function BatchEvaluationV2EvaluationSummary({
   run,
+  showProgress = false,
 }: {
   run: NonNullable<
     UseTRPCQueryResult<
@@ -954,6 +987,7 @@ export function BatchEvaluationV2EvaluationSummary({
       TRPCClientErrorLike<AppRouter>
     >["data"]
   >["runs"][number];
+  showProgress?: boolean;
 }) {
   const [currentTimestamp, setCurrentTimestamp] = useState(0);
   const finishedAt = useMemo(() => {
@@ -980,85 +1014,108 @@ export function BatchEvaluationV2EvaluationSummary({
   }, [!!finishedAt]);
 
   return (
-    <HStack
+    <VStack
+      width="full"
+      background="white"
+      spacing={0}
       position="sticky"
       left={0}
       bottom={0}
-      width="100%"
-      background="white"
       borderTop="1px solid"
       borderColor="gray.200"
-      paddingY={4}
-      paddingX={6}
-      spacing={5}
+      overflowX="auto"
     >
-      {Object.entries(run.summary.evaluations).map(([_, evaluation]) => {
-        return (
-          <>
-            <VStack align="start" spacing={1}>
-              <Text fontWeight="500">{evaluation.name}</Text>
-              <Text>{formatEvaluationSummary(evaluation)}</Text>
-            </VStack>
-            <Divider orientation="vertical" height="48px" />
-          </>
-        );
-      })}
-      <VStack align="start" spacing={1}>
-        <Text fontWeight="500" noOfLines={1}>
-          Mean Cost
-        </Text>
-        <Text noOfLines={1} whiteSpace="nowrap">
-          <FormatMoney
-            amount={run.summary.dataset_average_cost}
-            currency="USD"
-            format="$0.00[00]"
-          />
-        </Text>
-      </VStack>
-      <Divider orientation="vertical" height="48px" />
-      <VStack align="start" spacing={1}>
-        <Text fontWeight="500" noOfLines={1}>
-          Mean Duration
-        </Text>
-        <Text>{formatMilliseconds(run.summary.dataset_average_duration)}</Text>
-      </VStack>
-      <Divider orientation="vertical" height="48px" />
-      <VStack align="start" spacing={1}>
-        <Text fontWeight="500" noOfLines={1}>
-          Total Cost
-        </Text>
-        <Text noOfLines={1} whiteSpace="nowrap">
-          <FormatMoney
-            amount={run.summary.cost}
-            currency="USD"
-            format="$0.00[00]"
-          />
-        </Text>
-      </VStack>
-      <Divider orientation="vertical" height="48px" />
-      <VStack align="start" spacing={1}>
-        <Text fontWeight="500" noOfLines={1}>
-          Runtime
-        </Text>
-        <Text noOfLines={1} whiteSpace="nowrap">
-          {numeral(runtime / 1000).format("00:00:00")}
-        </Text>
-      </VStack>
-      {run.timestamps.stopped_at && (
-        <>
-          <Spacer />
-          <HStack>
-            <Box
-              width="12px"
-              height="12px"
-              background="red.500"
-              borderRadius="full"
+      <HStack width="100%" paddingY={4} paddingX={6} spacing={5}>
+        {Object.entries(run.summary.evaluations).map(([_, evaluation]) => {
+          return (
+            <>
+              <VStack align="start" spacing={1}>
+                <Text fontWeight="500">{evaluation.name}</Text>
+                <Text>{formatEvaluationSummary(evaluation)}</Text>
+              </VStack>
+              <Divider orientation="vertical" height="48px" />
+            </>
+          );
+        })}
+        <VStack align="start" spacing={1}>
+          <Text fontWeight="500" noOfLines={1}>
+            Mean Cost
+          </Text>
+          <Text noOfLines={1} whiteSpace="nowrap">
+            <FormatMoney
+              amount={run.summary.dataset_average_cost}
+              currency="USD"
+              format="$0.00[00]"
             />
-            <Text>Stopped</Text>
-          </HStack>
-        </>
+          </Text>
+        </VStack>
+        <Divider orientation="vertical" height="48px" />
+        <VStack align="start" spacing={1}>
+          <Text fontWeight="500" noOfLines={1}>
+            Mean Duration
+          </Text>
+          <Text>
+            {formatMilliseconds(run.summary.dataset_average_duration)}
+          </Text>
+        </VStack>
+        <Divider orientation="vertical" height="48px" />
+        <VStack align="start" spacing={1}>
+          <Text fontWeight="500" noOfLines={1}>
+            Total Cost
+          </Text>
+          <Text noOfLines={1} whiteSpace="nowrap">
+            <FormatMoney
+              amount={run.summary.cost}
+              currency="USD"
+              format="$0.00[00]"
+            />
+          </Text>
+        </VStack>
+        <Divider orientation="vertical" height="48px" />
+        <VStack align="start" spacing={1}>
+          <Text fontWeight="500" noOfLines={1}>
+            Runtime
+          </Text>
+          <Text noOfLines={1} whiteSpace="nowrap">
+            {numeral(runtime / 1000).format("00:00:00")}
+          </Text>
+        </VStack>
+        {run.timestamps.stopped_at && (
+          <>
+            <Spacer />
+            <HStack>
+              <Box
+                width="12px"
+                height="12px"
+                background="red.500"
+                borderRadius="full"
+              />
+              <Text>Stopped</Text>
+            </HStack>
+          </>
+        )}
+      </HStack>
+      {showProgress && !finishedAt && (
+        <HStack
+          width="full"
+          padding={3}
+          borderTop="1px solid"
+          borderColor="gray.200"
+          spacing={2}
+        >
+          <Text whiteSpace="nowrap" marginTop="-1px" paddingX={2}>
+            Running
+          </Text>
+          <EvaluationProgressBar
+            evaluationState={{
+              progress: run.progress,
+              total: run.total,
+            }}
+            size="lg"
+          />
+        </HStack>
       )}
-    </HStack>
+    </VStack>
   );
 }
 
@@ -1079,3 +1136,42 @@ const formatEvaluationSummary = (
             )} avg. score)`)
     : numeral(evaluation.average_score).format("0.[00]");
 };
+
+export function EvaluationProgressBar({
+  evaluationState,
+  size = "xs",
+}: {
+  evaluationState:
+    | { progress?: number | null; total?: number | null; status?: string }
+    | undefined;
+  size?: "xs" | "sm" | "md" | "lg";
+}) {
+  const progress = evaluationState?.progress ?? 0;
+  const total = evaluationState?.total ?? 100;
+  const isIndeterminate =
+    evaluationState?.status === "waiting" || !evaluationState?.total;
+
+  return (
+    <HStack width="full" spacing={4}>
+      {!isIndeterminate && size !== "xs" && (
+        <Text whiteSpace="nowrap">{Math.round((progress / total) * 100)}%</Text>
+      )}
+      <Progress
+        size={size}
+        width="full"
+        colorScheme="blue"
+        isIndeterminate={isIndeterminate}
+        isAnimated
+        borderRadius="sm"
+        value={progress}
+        max={total ? total : undefined}
+        hasStripe
+      />
+      {!isIndeterminate && size !== "xs" && (
+        <Text whiteSpace="nowrap">
+          {progress} / {total}
+        </Text>
+      )}
+    </HStack>
+  );
+}

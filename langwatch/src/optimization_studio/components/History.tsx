@@ -290,7 +290,7 @@ export const VersionBox = ({
       color="gray.600"
       whiteSpace="nowrap"
       textAlign="center"
-      minWidth="48px"
+      minWidth="0px"
       height="44px"
       {...props}
     >

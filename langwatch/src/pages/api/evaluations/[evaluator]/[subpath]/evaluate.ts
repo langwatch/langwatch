@@ -7,7 +7,6 @@ import { getDebugger } from "../../../../../utils/logger";
 import {
   CostReferenceType,
   CostType,
-  EvaluationExecutionMode,
 } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { nanoid } from "nanoid";
@@ -23,10 +22,7 @@ import {
   type SingleEvaluationResult,
 } from "../../../../../server/evaluations/evaluators.generated";
 import { evaluatorsSchema } from "../../../../../server/evaluations/evaluators.zod.generated";
-import {
-  getEvaluatorDefaultSettings,
-  getEvaluatorDefinitions,
-} from "../../../../../server/evaluations/getEvaluator";
+import { getEvaluatorDefaultSettings } from "../../../../../server/evaluations/getEvaluator";
 import {
   evaluationInputSchema,
   type EvaluationRESTParams,
@@ -129,15 +125,10 @@ export async function handleEvaluatorCall(
 
   const isGuardrail = as_guardrail || params.as_guardrail;
 
-  if (
-    storedEvaluator &&
-    (!storedEvaluator.enabled ||
-      (isGuardrail &&
-        storedEvaluator.executionMode !== EvaluationExecutionMode.AS_GUARDRAIL))
-  ) {
+  if (storedEvaluator && !storedEvaluator.enabled && !!isGuardrail) {
     return res.status(200).json({
       status: "skipped",
-      details: `${isGuardrail ? "Guardrail" : "Evaluator"} is not enabled`,
+      details: `Guardrail is not enabled`,
       ...(isGuardrail ? { passed: true } : {}),
     });
   }

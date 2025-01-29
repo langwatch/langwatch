@@ -1,4 +1,3 @@
-from multiprocessing import Queue
 import time
 from typing import Optional, cast
 import dspy
