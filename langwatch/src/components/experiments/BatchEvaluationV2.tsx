@@ -123,12 +123,12 @@ export function BatchEvaluationV2({
           ) : batchEvaluationRuns.data?.runs.length === 0 ? (
             <Text>Waiting for results...</Text>
           ) : (
-            selectedRun && (
+            (
               <>
                 <Card width="100%">
                   <CardHeader>
                     <Heading as="h2" size="md">
-                      {selectedRun.workflow_version?.commitMessage ??
+                      {selectedRun?.workflow_version?.commitMessage ??
                         "Evaluation Results"}
                     </Heading>
                   </CardHeader>
@@ -136,7 +136,7 @@ export function BatchEvaluationV2({
                     <BatchEvaluationV2EvaluationResults
                       project={project}
                       experiment={experiment}
-                      runId={selectedRun.run_id}
+                      runId={selectedRun?.run_id}
                       isFinished={isFinished}
                     />
                   </CardBody>
