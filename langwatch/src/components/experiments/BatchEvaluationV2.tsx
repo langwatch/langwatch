@@ -123,26 +123,24 @@ export function BatchEvaluationV2({
           ) : batchEvaluationRuns.data?.runs.length === 0 ? (
             <Text>Waiting for results...</Text>
           ) : (
-            (
-              <>
-                <Card width="100%">
-                  <CardHeader>
-                    <Heading as="h2" size="md">
-                      {selectedRun?.workflow_version?.commitMessage ??
-                        "Evaluation Results"}
-                    </Heading>
-                  </CardHeader>
-                  <CardBody paddingTop={0}>
-                    <BatchEvaluationV2EvaluationResults
-                      project={project}
-                      experiment={experiment}
-                      runId={selectedRun?.run_id}
-                      isFinished={isFinished}
-                    />
-                  </CardBody>
-                </Card>
-              </>
-            )
+            <>
+              <Card width="100%">
+                <CardHeader>
+                  <Heading as="h2" size="md">
+                    {selectedRun?.workflow_version?.commitMessage ??
+                      "Evaluation Results"}
+                  </Heading>
+                </CardHeader>
+                <CardBody paddingTop={0}>
+                  <BatchEvaluationV2EvaluationResults
+                    project={project}
+                    experiment={experiment}
+                    runId={selectedRun?.run_id}
+                    isFinished={isFinished}
+                  />
+                </CardBody>
+              </Card>
+            </>
           )}
         </VStack>
         {selectedRun && (
@@ -335,7 +333,9 @@ export function BatchEvaluationV2RunList({
             </HStack>
           )}
           {batchEvaluationRuns.data?.runs.map((run) => {
-            const runCost = run.summary.cost;
+            const runCost =
+              (run.summary.dataset_cost ?? 0) +
+              (run.summary.evaluations_cost ?? 0);
             const runName = run.workflow_version?.commitMessage ?? run.run_id;
 
             return (
@@ -1051,9 +1051,40 @@ export function BatchEvaluationV2EvaluationSummary({
           </Text>
           <Text noOfLines={1} whiteSpace="nowrap">
             <FormatMoney
-              amount={run.summary.dataset_average_cost}
+              amount={
+                (run.summary.dataset_average_cost ?? 0) +
+                (run.summary.evaluations_average_cost ?? 0)
+              }
               currency="USD"
               format="$0.00[00]"
+              tooltip={
+                <VStack align="start" spacing={0}>
+                  <Text>
+                    Prediction mean cost:{" "}
+                    {run.summary.dataset_average_cost
+                      ? formatMoney(
+                          {
+                            amount: run.summary.dataset_average_cost,
+                            currency: "USD",
+                          },
+                          "$0.00[00]"
+                        )
+                      : "-"}
+                  </Text>
+                  <Text>
+                    Evaluation mean cost:{" "}
+                    {run.summary.evaluations_average_cost
+                      ? formatMoney(
+                          {
+                            amount: run.summary.evaluations_average_cost,
+                            currency: "USD",
+                          },
+                          "$0.00[00]"
+                        )
+                      : "-"}
+                  </Text>
+                </VStack>
+              }
             />
           </Text>
         </VStack>
@@ -1062,9 +1093,33 @@ export function BatchEvaluationV2EvaluationSummary({
           <Text fontWeight="500" noOfLines={1}>
             Mean Duration
           </Text>
-          <Text>
-            {formatMilliseconds(run.summary.dataset_average_duration)}
-          </Text>
+          <Tooltip
+            label={
+              <VStack align="start" spacing={0}>
+                <Text>
+                  Prediction mean duration:{" "}
+                  {run.summary.dataset_average_duration
+                    ? formatMilliseconds(run.summary.dataset_average_duration)
+                    : "-"}
+                </Text>
+                <Text>
+                  Evaluation mean duration:{" "}
+                  {run.summary.evaluations_average_duration
+                    ? formatMilliseconds(
+                        run.summary.evaluations_average_duration
+                      )
+                    : "-"}
+                </Text>
+              </VStack>
+            }
+          >
+            <Text>
+              {formatMilliseconds(
+                (run.summary.dataset_average_duration ?? 0) +
+                  (run.summary.evaluations_average_duration ?? 0)
+              )}
+            </Text>
+          </Tooltip>
         </VStack>
         <Divider orientation="vertical" height="48px" />
         <VStack align="start" spacing={1}>
@@ -1073,9 +1128,40 @@ export function BatchEvaluationV2EvaluationSummary({
           </Text>
           <Text noOfLines={1} whiteSpace="nowrap">
             <FormatMoney
-              amount={run.summary.cost}
+              amount={
+                (run.summary.dataset_cost ?? 0) +
+                (run.summary.evaluations_cost ?? 0)
+              }
               currency="USD"
               format="$0.00[00]"
+              tooltip={
+                <VStack align="start" spacing={0}>
+                  <Text>
+                    Prediction cost:{" "}
+                    {run.summary.dataset_cost
+                      ? formatMoney(
+                          {
+                            amount: run.summary.dataset_cost,
+                            currency: "USD",
+                          },
+                          "$0.00[00]"
+                        )
+                      : "-"}
+                  </Text>
+                  <Text>
+                    Evaluation cost:{" "}
+                    {run.summary.evaluations_cost
+                      ? formatMoney(
+                          {
+                            amount: run.summary.evaluations_cost,
+                            currency: "USD",
+                          },
+                          "$0.00[00]"
+                        )
+                      : "-"}
+                  </Text>
+                </VStack>
+              }
             />
           </Text>
         </VStack>
