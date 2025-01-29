@@ -267,6 +267,10 @@ export function BatchEvaluationV2RunList({
   setSelectedRunId: (runId: string) => void;
   size?: "sm" | "md";
 }) {
+  const hasAnyVersion = batchEvaluationRuns.data?.runs.some(
+    (run) => run.workflow_version
+  );
+
   return (
     <VStack
       align="start"
@@ -309,8 +313,8 @@ export function BatchEvaluationV2RunList({
             (r) => r.run_id === selectedRunId
           ) && (
             <HStack
-              paddingX={size === "sm" ? 2 : 6}
-              paddingY={size === "sm" ? 2 : 4}
+              paddingX={size === "sm" ? 2 : 4}
+              paddingY={size === "sm" ? 2 : 3}
               width="100%"
               cursor="pointer"
               role="button"
@@ -320,7 +324,7 @@ export function BatchEvaluationV2RunList({
               }}
               spacing={3}
             >
-              <VersionBox />
+              <VersionBox minWidth={hasAnyVersion ? "48px" : "0"} />
               <VStack align="start" spacing={2} width="100%" paddingRight={2}>
                 <HStack width="100%">
                   <Skeleton width="100%" height="12px" />
@@ -358,9 +362,13 @@ export function BatchEvaluationV2RunList({
                 spacing={3}
               >
                 {run.workflow_version ? (
-                  <VersionBox version={run.workflow_version} />
+                  <VersionBox
+                    version={run.workflow_version}
+                    minWidth={hasAnyVersion ? "48px" : "0"}
+                  />
                 ) : (
                   <VersionBox
+                    minWidth={hasAnyVersion ? "48px" : "0"}
                     backgroundColor={
                       run.timestamps.stopped_at
                         ? "red.200"
