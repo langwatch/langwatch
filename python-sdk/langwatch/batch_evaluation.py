@@ -17,6 +17,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from typing_extensions import TypedDict
 from pydantic import BaseModel, Field
 from coolname import generate_slug
+import urllib.parse
 import langwatch
 import httpx
 from tqdm import tqdm
@@ -126,11 +127,13 @@ class BatchEvaluation:
         self.threads: List[threading.Thread] = []
 
     def run(self):
-        print("Starting batch evaluation...")
         if langwatch.api_key is None:
             print("API key was not detected, calling langwatch.login()...")
             langwatch.login()
 
+        dataset = get_dataset(self.dataset)
+
+        print("Starting batch evaluation...")
         with httpx.Client(timeout=300) as client:
             response = client.post(
                 f"{langwatch.endpoint}/api/experiment/init",
@@ -149,9 +152,9 @@ class BatchEvaluation:
         response.raise_for_status()
         experiment_path = response.json()["path"]
         self.experiment_slug = response.json()["slug"]
-        print(f"Follow the results at: {langwatch.endpoint}{experiment_path}")
 
-        dataset = get_dataset(self.dataset)
+        url_encoded_run_id = urllib.parse.quote(self.run_id)
+        print(f"Follow the results at: {langwatch.endpoint}{experiment_path}?runId={url_encoded_run_id}")
 
         if dataset is None:
             raise Exception(f"Dataset {self.dataset} not found.")
@@ -163,21 +166,36 @@ class BatchEvaluation:
 
         self.total = len(dataset)
 
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures: List[Future] = [
-                executor.submit(self.run_record, record) for record in dataset
-            ]
-            for future in tqdm(as_completed(futures), total=self.total):
-                results.append(future.result())
+        try:
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                futures: List[Future] = [
+                    executor.submit(self.run_record, record) for record in dataset
+                ]
+                for future in tqdm(as_completed(futures), total=self.total):
+                    results.append(future.result())
 
-            executor.submit(self.wait_for_completion).result()
+                executor.submit(self.wait_for_completion).result()
 
-        print(f"Batch evaluation done!")
+            print(f"Batch evaluation done!")
 
-        return BatchEvaluationRun(
-            list=results,
-            df=self._results_to_pandas(results),
-        )
+            return BatchEvaluationRun(
+                list=results,
+                df=self._results_to_pandas(results),
+            )
+
+        except Exception as e:
+            BatchEvaluation.post_results(
+                langwatch.api_key or "",
+                {
+                    "experiment_slug": self.experiment_slug,
+                    "run_id": self.run_id,
+                    "timestamps": {
+                        "finished_at": int(time.time() * 1000),
+                        "stopped_at": int(time.time() * 1000),
+                    },
+                },
+            )
+            raise e
 
     def _results_to_pandas(self, results: list[BatchEvaluationResultRecord]):
         results_df = []

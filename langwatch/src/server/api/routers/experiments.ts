@@ -255,6 +255,16 @@ export const experimentsRouter = createTRPCRouter({
                           field: "evaluations.cost",
                         },
                       },
+                      average_cost: {
+                        avg: {
+                          field: "evaluations.cost",
+                        },
+                      },
+                      average_duration: {
+                        avg: {
+                          field: "evaluations.duration",
+                        },
+                      },
                     },
                   },
                   dataset_average_cost: {
@@ -339,10 +349,20 @@ export const experimentsRouter = createTRPCRouter({
           progress: source.progress,
           total: source.total,
           summary: {
-            cost:
-              runAgg?.dataset_cost.value + runAgg?.evaluations_cost.cost.value,
-            dataset_average_cost: runAgg?.dataset_average_cost.value,
-            dataset_average_duration: runAgg?.dataset_average_duration.value,
+            dataset_cost: runAgg?.dataset_cost.value as number | undefined,
+            evaluations_cost: runAgg?.evaluations_cost.cost.value as
+              | number
+              | undefined,
+            dataset_average_cost: runAgg?.dataset_average_cost.value as
+              | number
+              | undefined,
+            dataset_average_duration: runAgg?.dataset_average_duration.value as
+              | number
+              | undefined,
+            evaluations_average_cost: runAgg?.evaluations_cost.average_cost
+              .value as number | undefined,
+            evaluations_average_duration: runAgg?.evaluations_cost
+              .average_duration.value as number | undefined,
             evaluations: Object.fromEntries(
               runAgg?.evaluations.child.buckets.map((bucket: any) => {
                 return [
