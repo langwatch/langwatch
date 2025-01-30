@@ -10,11 +10,20 @@ export const annotationScoreRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         name: z.string(),
-        dataType: z.enum(["BOOLEAN", "CATEGORICAL", "LIKERT"]),
+        dataType: z.enum([
+          "OPTION",
+          "CHECKBOX",
+          "BOOLEAN",
+          "LIKERT",
+          "CATEGORICAL",
+        ]),
         description: z.string().optional().nullable(),
         options: z.object({}).optional().nullable(),
         category: z.array(z.string()).optional().nullable(),
         categoryExplanation: z.array(z.string()).optional().nullable(),
+        radioCheckboxOptions: z.array(z.string()),
+        defaultRadioOption: z.string().optional().nullable(),
+        defaultCheckboxOption: z.array(z.string()).optional().nullable(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
@@ -22,39 +31,10 @@ export const annotationScoreRouter = createTRPCRouter({
       type OptionType = { label: string; value: string; reason?: string };
       const options: OptionType[] = [];
 
-      if (
-        input.dataType === "CATEGORICAL" &&
-        input.category &&
-        input.categoryExplanation
-      ) {
-        for (let i = 0; i < input.category.length; i++) {
-          if (input.category[i] !== "") {
-            options.push({
-              label: input.category[i]!,
-              value: input.category[i]!,
-              reason: input.categoryExplanation[i]!,
-            });
-          }
-        }
-      }
+      input.radioCheckboxOptions?.forEach((option) => {
+        options.push({ label: option, value: option });
+      });
 
-      if (input.dataType === "BOOLEAN") {
-        options.push(
-          { label: "true", value: "true" },
-          { label: "false", value: "false" }
-        );
-      }
-      if (input.dataType === "LIKERT") {
-        const likertScale = [
-          "strongly agree",
-          "agree",
-          "disagree",
-          "strongly disagree",
-        ];
-        likertScale.forEach((scale) => {
-          options.push({ label: scale, value: scale });
-        });
-      }
       return ctx.prisma.annotationScore.create({
         data: {
           id: nanoid(),
@@ -63,6 +43,10 @@ export const annotationScoreRouter = createTRPCRouter({
           dataType: input.dataType,
           description: input.description ?? "",
           options: options ?? {},
+          defaultValue: {
+            value: input.defaultRadioOption ?? null,
+            options: input.defaultCheckboxOption ?? null,
+          },
         },
       });
     }),
