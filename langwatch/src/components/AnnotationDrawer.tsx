@@ -37,7 +37,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 
-import { ReasonModal } from "./ReasonModal";
+import { ScoreReasonModal } from "./ScoreReasonModal";
 
 type Annotation = {
   isThumbsUp?: string | null;
@@ -244,14 +244,14 @@ export function AnnotationDrawer({
       }
     );
   };
-  const disclosure = useDisclosure();
+  const scoreReasonModal = useDisclosure();
   const [selectedScoreTypeId, setSelectedScoreTypeId] = useState<string | null>(
     null
   );
 
   const handleReasonClick = (scoreTypeId: string) => {
     setSelectedScoreTypeId(scoreTypeId);
-    disclosure.onOpen();
+    scoreReasonModal.onOpen();
   };
 
   const selectedReason = selectedScoreTypeId
@@ -407,18 +407,18 @@ export function AnnotationDrawer({
         </DrawerBody>
       </DrawerContent>
 
-      <ReasonModal
+      <ScoreReasonModal
         reason={selectedReason}
-        isOpen={disclosure.isOpen}
+        isOpen={scoreReasonModal.isOpen}
         onClose={() => {
-          disclosure.onClose();
+          scoreReasonModal.onClose();
           setSelectedScoreTypeId(null);
         }}
         onConfirm={(newReason) => {
           if (selectedScoreTypeId) {
             setValue(`scoreOptions.${selectedScoreTypeId}.reason`, newReason);
           }
-          disclosure.onClose();
+          scoreReasonModal.onClose();
           setSelectedScoreTypeId(null);
         }}
       />

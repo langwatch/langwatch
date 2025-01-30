@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 
-export function ReasonModal({
+export function ScoreReasonModal({
   reason: initialReason,
   isOpen,
   onClose,

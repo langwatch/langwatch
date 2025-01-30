@@ -199,7 +199,7 @@ export const AddAnnotationScoreDrawer = () => {
               >
                 <Select
                   {...register("dataType")}
-                  placeholder="Select form input type"
+                  placeholder="Select score type"
                   required
                 >
                   <option value={AnnotationScoreDataType.OPTION}>
