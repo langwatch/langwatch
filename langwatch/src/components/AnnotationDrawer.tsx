@@ -1,41 +1,43 @@
 import {
   Button,
+  Checkbox,
+  CheckboxGroup,
+  Divider,
   Drawer,
   DrawerBody,
   DrawerCloseButton,
   DrawerContent,
   DrawerHeader,
   HStack,
-  Input,
   Radio,
   RadioGroup,
-  Spacer,
   Spinner,
   Text,
   Textarea,
   VStack,
   useDisclosure,
   useToast,
-  Divider,
 } from "@chakra-ui/react";
 
-import { ExternalLink, ThumbsDown, ThumbsUp, Trash } from "react-feather";
+import { ExternalLink, ThumbsDown, ThumbsUp } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { MetadataTag } from "~/components/MetadataTag";
-import { SmallLabel } from "~/components/SmallLabel";
 
+import type { AnnotationScoreDataType } from "@prisma/client";
+import Link from "next/link";
 import { useRouter } from "next/router";
-import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useState } from "react";
+import {
+  useForm,
+  type UseFormRegister,
+  type UseFormSetValue,
+  type UseFormWatch,
+} from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { HorizontalFormControl } from "./HorizontalFormControl";
-import Link from "next/link";
-import {
-  type UseFormRegister,
-  type UseFormWatch,
-  type UseFormSetValue,
-} from "react-hook-form";
+
+import { ScoreReasonModal } from "./ScoreReasonModal";
 
 type Annotation = {
   isThumbsUp?: string | null;
@@ -242,6 +244,19 @@ export function AnnotationDrawer({
       }
     );
   };
+  const scoreReasonModal = useDisclosure();
+  const [selectedScoreTypeId, setSelectedScoreTypeId] = useState<string | null>(
+    null
+  );
+
+  const handleReasonClick = (scoreTypeId: string) => {
+    setSelectedScoreTypeId(scoreTypeId);
+    scoreReasonModal.onOpen();
+  };
+
+  const selectedReason = selectedScoreTypeId
+    ? watch(`scoreOptions.${selectedScoreTypeId}`)?.reason ?? ""
+    : "";
 
   return (
     <Drawer
@@ -323,12 +338,23 @@ export function AnnotationDrawer({
                   const options = Array.isArray(scoreType.options)
                     ? (scoreType.options as AnnotationScoreOption[])
                     : [];
-                  return ScoreBlock(
-                    { ...scoreType, options },
-                    watch,
-                    register,
-                    setValue
-                  );
+                  return scoreType.dataType
+                    ? ScoreBlock(
+                        {
+                          ...scoreType,
+                          options,
+                          dataType: scoreType.dataType,
+                          defaultValue: scoreType.defaultValue as {
+                            value: string;
+                            options: string[];
+                          } | null,
+                        },
+                        watch,
+                        register,
+                        setValue,
+                        () => handleReasonClick(scoreType.id)
+                      )
+                    : null;
                 })}
                 <VStack align="start" spacing={4} width="full">
                   <Text>Comments</Text>
@@ -380,6 +406,22 @@ export function AnnotationDrawer({
           )}
         </DrawerBody>
       </DrawerContent>
+
+      <ScoreReasonModal
+        reason={selectedReason}
+        isOpen={scoreReasonModal.isOpen}
+        onClose={() => {
+          scoreReasonModal.onClose();
+          setSelectedScoreTypeId(null);
+        }}
+        onConfirm={(newReason) => {
+          if (selectedScoreTypeId) {
+            setValue(`scoreOptions.${selectedScoreTypeId}.reason`, newReason);
+          }
+          scoreReasonModal.onClose();
+          setSelectedScoreTypeId(null);
+        }}
+      />
     </Drawer>
   );
 }
@@ -394,49 +436,96 @@ type AnnotationScore = {
   name: string;
   options: AnnotationScoreOption[];
   description: string | null;
+  dataType: AnnotationScoreDataType;
+  defaultValue: { value: string; options: string[] } | null;
 };
 
 const ScoreBlock = (
   scoreType: AnnotationScore,
   watch: UseFormWatch<Annotation>,
   register: UseFormRegister<Annotation>,
-  setValue: UseFormSetValue<Annotation>
+  setValue: UseFormSetValue<Annotation>,
+  onReasonClick: (scoreTypeId: string) => void
 ) => {
+  // Remove disclosure parameter and reason watching
   const scoreValue = watch(`scoreOptions.${scoreType.id}.value`);
+  const defaultRadioValue = scoreType.defaultValue?.value ?? "";
+  const defaultCheckboxSelection = scoreType.defaultValue?.options ?? [];
 
   return (
-    <HorizontalFormControl
-      label={scoreType.name}
-      helper={scoreType.description ?? ""}
-    >
-      <RadioGroup key={scoreType.id} value={scoreValue} padding={0}>
-        <VStack align="start" spacing={2}>
-          {scoreType.options.map((option) => {
-            return (
-              <Radio
-                value={option.value.toString()}
-                {...register(`scoreOptions.${scoreType.id}.value`)}
-                key={option.value}
-              >
-                {option.label}
-              </Radio>
-            );
-          })}
-          <Spacer />
-          <SmallLabel>Reasoning</SmallLabel>
-          <HStack>
-            <Input {...register(`scoreOptions.${scoreType.id}.reason`)} />
-            <Button
-              onClick={() => {
-                setValue(`scoreOptions.${scoreType.id}.reason`, "");
-                setValue(`scoreOptions.${scoreType.id}.value`, "");
-              }}
-            >
-              <Trash />
-            </Button>
-          </HStack>
-        </VStack>
-      </RadioGroup>
-    </HorizontalFormControl>
+    <>
+      <HorizontalFormControl
+        label={scoreType.name}
+        helper={scoreType.description ?? ""}
+      >
+        {scoreType?.dataType === "CHECKBOX" ? (
+          <CheckboxGroup
+            key={scoreType.id}
+            defaultValue={defaultCheckboxSelection}
+          >
+            <VStack align="start" spacing={2}>
+              {scoreType.options.map((option, index) => {
+                return (
+                  <Checkbox
+                    value={option.value.toString()}
+                    key={index}
+                    {...register(`scoreOptions.${scoreType.id}.value`)}
+                  >
+                    {option.label}
+                  </Checkbox>
+                );
+              })}
+              <HStack>
+                <Button size="xs" onClick={() => onReasonClick(scoreType.id)}>
+                  Give a reason
+                </Button>
+                <Button
+                  size="xs"
+                  onClick={() => {
+                    setValue(`scoreOptions.${scoreType.id}.value`, "");
+                  }}
+                >
+                  Clear
+                </Button>
+              </HStack>
+            </VStack>
+          </CheckboxGroup>
+        ) : (
+          <RadioGroup
+            key={scoreType.id}
+            value={scoreValue}
+            padding={0}
+            defaultValue={defaultRadioValue}
+          >
+            <VStack align="start" spacing={2}>
+              {scoreType.options.map((option) => {
+                return (
+                  <Radio
+                    value={option.value.toString()}
+                    {...register(`scoreOptions.${scoreType.id}.value`)}
+                    key={option.value}
+                  >
+                    {option.label}
+                  </Radio>
+                );
+              })}
+              <HStack>
+                <Button size="xs" onClick={() => onReasonClick(scoreType.id)}>
+                  Give a reason
+                </Button>
+                <Button
+                  size="xs"
+                  onClick={() => {
+                    setValue(`scoreOptions.${scoreType.id}.value`, "");
+                  }}
+                >
+                  Clear
+                </Button>
+              </HStack>
+            </VStack>
+          </RadioGroup>
+        )}
+      </HorizontalFormControl>
+    </>
   );
 };

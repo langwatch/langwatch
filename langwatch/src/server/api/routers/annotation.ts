@@ -1,16 +1,19 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
+import { PublicShareResourceTypes } from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   TeamRoleGroup,
   checkPermissionOrPubliclyShared,
   checkUserPermissionForProject,
 } from "../permission";
-import { PublicShareResourceTypes } from "@prisma/client";
 
 const scoreOptionSchema = z.object({
-  value: z.string().optional().nullable(),
+  value: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .nullable(),
   reason: z.string().optional().nullable(),
 });
 
