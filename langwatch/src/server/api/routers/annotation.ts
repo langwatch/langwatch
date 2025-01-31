@@ -65,7 +65,7 @@ export const annotationRouter = createTRPCRouter({
         },
         data: {
           comment: input.comment ?? "",
-          isThumbsUp: input.isThumbsUp ?? false,
+          isThumbsUp: input.isThumbsUp,
           scoreOptions: input.scoreOptions ?? {},
         },
       });

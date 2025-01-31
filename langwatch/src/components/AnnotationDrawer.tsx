@@ -42,7 +42,7 @@ import { ScoreReasonModal } from "./ScoreReasonModal";
 type Annotation = {
   isThumbsUp?: string | null;
   comment?: string | null;
-  scoreOptions?: Record<string, { value: string; reason: string }>;
+  scoreOptions?: Record<string, { value: string | string[]; reason: string }>;
 };
 
 export function AnnotationDrawer({
@@ -130,6 +130,16 @@ export function AnnotationDrawer({
         ? false
         : undefined;
 
+    const filteredScoreOptions = Object.fromEntries(
+      Object.entries(data.scoreOptions ?? {}).filter(
+        ([_, value]) =>
+          value.value !== "" &&
+          value.value !== null &&
+          (typeof value.value === "boolean" ? value.value : true) &&
+          (Array.isArray(value.value) ? value.value.length > 0 : true)
+      )
+    );
+
     if (action === "edit") {
       updateAnnotation.mutate(
         {
@@ -138,10 +148,7 @@ export function AnnotationDrawer({
           isThumbsUp: isThumbsUp,
           comment: data.comment,
           traceId: traceId,
-          scoreOptions: (data.scoreOptions ?? {}) as Record<
-            string,
-            { value: string; reason: string }
-          >,
+          scoreOptions: filteredScoreOptions,
         },
         {
           onSuccess: () => {
@@ -182,10 +189,7 @@ export function AnnotationDrawer({
           isThumbsUp: isThumbsUp,
           comment: data.comment,
           traceId: traceId,
-          scoreOptions: (data.scoreOptions ?? {}) as Record<
-            string,
-            { value: string; reason: string }
-          >,
+          scoreOptions: filteredScoreOptions,
         },
         {
           onSuccess: () => {
@@ -447,7 +451,6 @@ const ScoreBlock = (
   setValue: UseFormSetValue<Annotation>,
   onReasonClick: (scoreTypeId: string) => void
 ) => {
-  // Remove disclosure parameter and reason watching
   const scoreValue = watch(`scoreOptions.${scoreType.id}.value`);
   const defaultRadioValue = scoreType.defaultValue?.value ?? "";
   const defaultCheckboxSelection = scoreType.defaultValue?.options ?? [];
@@ -461,7 +464,12 @@ const ScoreBlock = (
         {scoreType?.dataType === "CHECKBOX" ? (
           <CheckboxGroup
             key={scoreType.id}
-            defaultValue={defaultCheckboxSelection}
+            value={[
+              ...(scoreValue ? [scoreValue].flat() : defaultCheckboxSelection),
+            ].map(String)}
+            onChange={(values) =>
+              setValue(`scoreOptions.${scoreType.id}.value`, values.map(String))
+            }
           >
             <VStack align="start" spacing={2}>
               {scoreType.options.map((option, index) => {
@@ -482,7 +490,7 @@ const ScoreBlock = (
                 <Button
                   size="xs"
                   onClick={() => {
-                    setValue(`scoreOptions.${scoreType.id}.value`, "");
+                    setValue(`scoreOptions.${scoreType.id}.value`, []);
                   }}
                 >
                   Clear
@@ -493,7 +501,7 @@ const ScoreBlock = (
         ) : (
           <RadioGroup
             key={scoreType.id}
-            value={scoreValue}
+            value={Array.isArray(scoreValue) ? scoreValue[0] : scoreValue}
             padding={0}
             defaultValue={defaultRadioValue}
           >

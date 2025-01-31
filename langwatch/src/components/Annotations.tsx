@@ -116,12 +116,17 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                       return (
                         name && (
                           <Text key={key} fontSize={"sm"}>
-                            <HStack spacing={1}>
+                            <HStack spacing={1} align="center">
                               <Text fontWeight="bold">{name}:</Text>
                               {typeof scoreOption === "object" &&
                                 "value" in scoreOption && (
-                                  <HStack spacing={1}>
-                                    <Text>{String(scoreOption.value)}</Text>
+                                  <HStack spacing={1} wrap="wrap">
+                                    <Text>
+                                      {[scoreOption.value ?? []]
+                                        .flat()
+                                        .map(String)
+                                        .join(", ")}
+                                    </Text>
                                     {scoreOption.reason && (
                                       <Text key={key}>
                                         (
