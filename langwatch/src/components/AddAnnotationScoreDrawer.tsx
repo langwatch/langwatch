@@ -63,6 +63,8 @@ export const AddAnnotationScoreDrawer = () => {
     dataType: string;
     options?: string[] | null;
     checkbox?: string[] | null;
+    defaultRadioOption?: string | null;
+    defaultCheckboxOption?: string[] | null;
   };
 
   const [radioCheckboxOptions, setRadioCheckboxOptions] = useState<string[]>([
