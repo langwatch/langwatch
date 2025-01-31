@@ -28,7 +28,7 @@ from langwatch.types import Money
 
 class EvaluationResult(BaseModel):
     status: Literal["processed"] = "processed"
-    score: float = Field(description="No description provided")
+    score: Optional[float] = Field(default=None, description="No description provided")
     passed: Optional[bool] = None
     details: Optional[str] = Field(
         default=None, description="Short human-readable description of the result"
@@ -154,7 +154,9 @@ class BatchEvaluation:
         self.experiment_slug = response.json()["slug"]
 
         url_encoded_run_id = urllib.parse.quote(self.run_id)
-        print(f"Follow the results at: {langwatch.endpoint}{experiment_path}?runId={url_encoded_run_id}")
+        print(
+            f"Follow the results at: {langwatch.endpoint}{experiment_path}?runId={url_encoded_run_id}"
+        )
 
         if dataset is None:
             raise Exception(f"Dataset {self.dataset} not found.")
