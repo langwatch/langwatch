@@ -38,6 +38,7 @@ export const authOptions = (
 ): NextAuthOptions => ({
   session: {
     strategy: env.NEXTAUTH_PROVIDER === "email" ? "jwt" : "database",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   callbacks: {
     session: async ({ session, user }) => {
