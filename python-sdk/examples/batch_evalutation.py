@@ -19,6 +19,7 @@ def callback(entry: DatasetEntry):
 
 # Instantiate the BatchEvaluation object
 evaluation = BatchEvaluation(
+    experiment="My Experiment",
     dataset="",  # Provide the actual dataset name here
     evaluations=[""],  # Provide the actual evaluations here
     callback=callback,

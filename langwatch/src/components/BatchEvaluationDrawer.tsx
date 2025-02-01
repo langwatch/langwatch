@@ -616,8 +616,9 @@ def callback(entry: DatasetEntry):
     return {}
 
 
-    # Instantiate the BatchEvaluation object
+# Instantiate the BatchEvaluation object
 evaluation = BatchEvaluation(
+    experiment="My Experiment",
     dataset="${dataset}",
     evaluations=${JSON.stringify(checks)},
     callback=callback,

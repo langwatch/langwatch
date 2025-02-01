@@ -15,7 +15,7 @@ import dynamic from "next/dynamic";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
-  loading: () => <div>Loading editor...</div>,
+  loading: () => <div style={{ padding: "0 16px" }}>Loading editor...</div>,
 });
 
 import monokaiTheme from "./Monokai.json";
