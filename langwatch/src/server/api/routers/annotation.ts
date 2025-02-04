@@ -172,4 +172,45 @@ export const annotationRouter = createTRPCRouter({
         },
       });
     }),
+  createQueue: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        name: z.string(),
+        description: z.string(),
+        userIds: z.array(z.string()),
+        scoreTypeIds: z.array(z.string()),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.annotationQueue.create({
+        data: {
+          projectId: input.projectId,
+          name: input.name,
+          description: input.description,
+          members: {
+            create: input.userIds.map((userId) => ({
+              userId,
+            })),
+          },
+          AnnotationQueueScores: {
+            create: input.scoreTypeIds.map((scoreTypeId) => ({
+              annotationScoreId: scoreTypeId,
+            })),
+          },
+        },
+      });
+    }),
+  getQueues: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.annotationQueue.findMany({
+        where: { projectId: input.projectId },
+        include: {
+          members: true,
+        },
+      });
+    }),
 });

@@ -5,6 +5,7 @@ import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
 import { TriggerDrawer } from "./AddTriggerDrawer";
 import { AnnotationDrawer } from "./AnnotationDrawer";
 import { AddAnnotationScoreDrawer } from "./AddAnnotationScoreDrawer";
+import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { UploadCSVModal } from "./datasets/UploadCSVModal";
@@ -21,6 +22,7 @@ const drawers = {
   trigger: TriggerDrawer,
   annotation: AnnotationDrawer,
   addAnnotationScore: AddAnnotationScoreDrawer,
+  addAnnotationQueue: AddAnnotationQueueDrawer,
   addDatasetRecord: AddDatasetRecordDrawerV2,
   llmModelCost: LLMModelCostDrawer,
   uploadCSV: UploadCSVModal,
@@ -73,7 +75,7 @@ export function useDrawer() {
 
   const openDrawer = <T extends keyof typeof drawers>(
     drawer: T,
-    props: Parameters<(typeof drawers)[T]>[0],
+    props?: Parameters<(typeof drawers)[T]>[0],
     { replace }: { replace?: boolean } = {}
   ) => {
     complexProps = Object.fromEntries(

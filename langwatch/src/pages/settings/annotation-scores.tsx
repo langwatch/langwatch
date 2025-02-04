@@ -86,7 +86,7 @@ const AnnotationScorePage = () => {
             size="sm"
             colorScheme="orange"
             leftIcon={<Plus size={20} />}
-            onClick={() => openDrawer("addAnnotationScore", undefined)}
+            onClick={() => openDrawer("addAnnotationScore")}
           >
             Add new score metric
           </Button>
