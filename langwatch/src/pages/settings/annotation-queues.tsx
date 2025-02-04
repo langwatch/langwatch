@@ -104,9 +104,9 @@ const AnnotationScorePage = () => {
                 <Thead>
                   <Tr>
                     <Th>Name</Th>
-                    <Th width="50%">Members</Th>
-                    <Th>Score Type</Th>
-                    <Th>Description</Th>
+                    <Th width="40%">Members</Th>
+                    <Th>Score Names</Th>
+                    <Th minWidth="20%">Description</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
@@ -153,7 +153,7 @@ const ParticipantTag = ({
   const users = projectUsers.filter((user) => userIds.includes(user.id));
 
   return (
-    <HStack>
+    <HStack flexWrap="wrap" gap={2}>
       {users?.map((user) => (
         <HStack
           key={user.id}
