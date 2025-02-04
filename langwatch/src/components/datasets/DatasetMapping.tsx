@@ -11,7 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 import { z } from "zod";
 import type {
@@ -30,7 +30,12 @@ import { getRAGChunks, getRAGInfo } from "../../server/tracer/utils";
 import { useLocalStorage } from "usehooks-ts";
 import { api } from "../../utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { Annotation, AnnotationScore, User } from "@prisma/client";
+import type {
+  Annotation,
+  AnnotationScore,
+  Dataset,
+  User,
+} from "@prisma/client";
 
 type TraceWithSpansAndAnnotations = TraceWithSpans & {
   annotations?: (Annotation & {
@@ -168,17 +173,19 @@ export const TRACE_MAPPINGS = {
   },
   annotations: {
     keys: (_traces: TraceWithSpansAndAnnotations[]) => {
-      return ["comment", "is_thumbs_up", "author", "score"].map((key) => ({
-        key,
-        label: key,
-      }));
+      return ["comment", "is_thumbs_up", "author", "score", "score.reason"].map(
+        (key) => ({
+          key,
+          label: key,
+        })
+      );
     },
     subkeys: (
       traces: TraceWithSpansAndAnnotations[],
       key: string,
       data: { annotationScoreOptions?: AnnotationScore[] }
     ) => {
-      if (key !== "score") {
+      if (key !== "score" && key !== "score.reason") {
         return [];
       }
 
@@ -197,27 +204,30 @@ export const TRACE_MAPPINGS = {
         return trace.annotations;
       }
       return trace.annotations?.map((annotation) => {
-        if (
-          key === "score" &&
-          subkey &&
-          typeof annotation.scoreOptions === "object"
-        ) {
-          return (annotation.scoreOptions as any)[subkey]?.value;
+        if (subkey && typeof annotation.scoreOptions === "object") {
+          if (key === "score") {
+            return (annotation.scoreOptions as any)[subkey]?.value;
+          }
+          if (key === "score.reason") {
+            return (annotation.scoreOptions as any)[subkey]?.reason;
+          }
         }
+        const scoreOptions = () =>
+          Object.fromEntries(
+            Object.entries(annotation.scoreOptions ?? {})
+              .map(([key, score]) => [
+                data.annotationScoreOptions?.find((score) => score.id === key)
+                  ?.name ?? key,
+                score,
+              ])
+              .filter(([_key, score]) => score.value !== null)
+          );
         const keyMap = {
           comment: () => annotation.comment,
           is_thumbs_up: () => annotation.isThumbsUp,
           author: () => annotation.user?.name ?? annotation.email ?? "",
-          score: () =>
-            Object.fromEntries(
-              Object.entries(annotation.scoreOptions ?? {})
-                .map(([key, score]) => [
-                  data.annotationScoreOptions?.find((score) => score.id === key)
-                    ?.name ?? key,
-                  score,
-                ])
-                .filter(([_key, score]) => score.value !== null)
-            ),
+          score: scoreOptions,
+          "score.reason": scoreOptions,
         };
         return keyMap[key as keyof typeof keyMap]();
       });
@@ -387,10 +397,12 @@ export type Mapping = Record<
 >;
 
 export const TracesMapping = ({
+  dataset,
   traces,
   columnTypes,
   setDatasetEntries,
 }: {
+  dataset: Dataset;
   traces: TraceWithSpans[];
   columnTypes?: DatasetColumns;
   setDatasetEntries: (entries: DatasetRecordEntry[]) => void;
@@ -421,15 +433,53 @@ export const TracesMapping = ({
     [traces, annotationScores.data]
   );
 
-  const [mapping, setMapping] = useState<Mapping>({});
-  const [localStorageMapping, setLocalStorageMapping] = useLocalStorage<{
+  const datasetMapping = (dataset.mapping as {
     mapping: Mapping;
-    expansions: string[];
-  }>("datasetMapping", { mapping: {}, expansions: [] });
+    expansions: (keyof typeof TRACE_EXPANSIONS)[];
+  }) ?? { mapping: {}, expansions: [] };
 
-  const [expansions_, setExpansions] = useState<
-    Set<keyof typeof TRACE_EXPANSIONS>
-  >(new Set());
+  type MappingState = {
+    mapping: Mapping;
+    expansions: Set<keyof typeof TRACE_EXPANSIONS>;
+  };
+
+  const trpc = api.useContext();
+  const updateStoredMapping_ = api.dataset.updateMapping.useMutation();
+  const updateStoredMapping = useCallback(
+    (mappingState: MappingState) => {
+      updateStoredMapping_.mutate(
+        {
+          projectId: project?.id ?? "",
+          datasetId: dataset.id,
+          mapping: {
+            mapping: mappingState.mapping,
+            expansions: Array.from(mappingState.expansions),
+          },
+        },
+        {
+          onSuccess: () => {
+            void trpc.dataset.getAll.invalidate();
+          },
+        }
+      );
+    },
+    [dataset.id, project?.id, trpc.dataset.getAll, updateStoredMapping_]
+  );
+
+  const [mappingState, setMappingState_] = useState<MappingState>({
+    mapping: {},
+    expansions: new Set(),
+  });
+  const setMappingState = useCallback(
+    (callback: (mappingState: MappingState) => MappingState) => {
+      const newMappingState = callback(mappingState);
+      setMappingState_(newMappingState);
+      updateStoredMapping(newMappingState);
+    },
+    [mappingState, updateStoredMapping]
+  );
+  const mapping = mappingState.mapping;
+
   const availableExpansions = useMemo(
     () =>
       new Set(
@@ -449,38 +499,31 @@ export const TracesMapping = ({
   const expansions = useMemo(
     () =>
       new Set(
-        Array.from(expansions_).filter((x) => availableExpansions.has(x))
+        Array.from(mappingState.expansions).filter((x) =>
+          availableExpansions.has(x)
+        )
       ),
-    [expansions_, availableExpansions]
+    [mappingState.expansions, availableExpansions]
   );
 
   const now = useMemo(() => new Date().getTime(), []);
 
   useEffect(() => {
-    setMapping(
-      Object.fromEntries(
+    setMappingState_({
+      mapping: Object.fromEntries(
         columnTypes?.map(({ name }) => [
           name,
-          localStorageMapping.mapping[name] ?? {
+          datasetMapping.mapping[name] ?? {
             source: DATASET_INFERRED_MAPPINGS_BY_NAME[name] ?? "",
           },
         ]) ?? []
-      )
-    );
-    setExpansions(
-      new Set(
-        localStorageMapping.expansions as (keyof typeof TRACE_EXPANSIONS)[]
-      )
-    );
+      ),
+      expansions: new Set(datasetMapping.expansions),
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columnTypes]);
 
   useEffect(() => {
-    setLocalStorageMapping({
-      mapping: mapping,
-      expansions: Array.from(expansions),
-    });
-
     let index = 0;
     const entries: DatasetRecordEntry[] = [];
 
@@ -508,10 +551,11 @@ export const TracesMapping = ({
     expansions,
     getAnnotationScoreOptions.data,
     mapping,
-    now,
     setDatasetEntries,
-    setLocalStorageMapping,
     traces_,
+    dataset.id,
+    project?.id,
+    now,
   ]);
 
   return (
@@ -534,31 +578,41 @@ export const TracesMapping = ({
                   width="200px"
                   flexShrink={0}
                   onChange={(e) => {
-                    setMapping((prev) => ({
-                      ...prev,
-                      [column]: {
-                        source: e.target.value as
-                          | keyof typeof TRACE_MAPPINGS
-                          | "",
-                        key: undefined,
-                        subkey: undefined,
-                      },
-                    }));
-                    const newMapping = e.target.value
-                      ? TRACE_MAPPINGS[
-                          e.target.value as keyof typeof TRACE_MAPPINGS
-                        ]
-                      : undefined;
-                    if (
-                      newMapping &&
-                      "expandable_by" in newMapping &&
-                      newMapping.expandable_by &&
-                      !availableExpansions.has(newMapping.expandable_by)
-                    ) {
-                      setExpansions(
-                        (prev) => new Set([...prev, newMapping.expandable_by])
-                      );
-                    }
+                    setMappingState((prev) => {
+                      const targetMapping = e.target.value
+                        ? TRACE_MAPPINGS[
+                            e.target.value as keyof typeof TRACE_MAPPINGS
+                          ]
+                        : undefined;
+
+                      let newExpansions = expansions;
+                      if (
+                        targetMapping &&
+                        "expandable_by" in targetMapping &&
+                        targetMapping.expandable_by &&
+                        !availableExpansions.has(targetMapping.expandable_by)
+                      ) {
+                        newExpansions = new Set([
+                          ...new Set(Array.from(newExpansions)),
+                          targetMapping.expandable_by,
+                        ]);
+                      }
+
+                      return {
+                        ...prev,
+                        mapping: {
+                          ...prev.mapping,
+                          [column]: {
+                            source: e.target.value as
+                              | keyof typeof TRACE_MAPPINGS
+                              | "",
+                            key: undefined,
+                            subkey: undefined,
+                          },
+                        },
+                        expansions: newExpansions,
+                      };
+                    });
                   }}
                   value={source}
                 >
@@ -585,11 +639,14 @@ export const TracesMapping = ({
                     <Select
                       width="full"
                       onChange={(e) => {
-                        setMapping((prev) => ({
+                        setMappingState((prev) => ({
                           ...prev,
-                          [column]: {
-                            ...(prev[column] as any),
-                            key: e.target.value,
+                          mapping: {
+                            ...prev.mapping,
+                            [column]: {
+                              ...(prev.mapping[column] as any),
+                              key: e.target.value,
+                            },
                           },
                         }));
                       }}
@@ -620,11 +677,14 @@ export const TracesMapping = ({
                     <Select
                       width="full"
                       onChange={(e) => {
-                        setMapping((prev) => ({
+                        setMappingState((prev) => ({
                           ...prev,
-                          [column]: {
-                            ...(prev[column] as any),
-                            subkey: e.target.value,
+                          mapping: {
+                            ...prev.mapping,
+                            [column]: {
+                              ...(prev.mapping[column] as any),
+                              subkey: e.target.value,
+                            },
                           },
                         }));
                       }}
@@ -671,13 +731,16 @@ export const TracesMapping = ({
                 <Switch
                   isChecked={expansions.has(expansion)}
                   onChange={(e) => {
-                    setExpansions((prev) =>
-                      e.target.checked
-                        ? new Set([...prev, expansion])
+                    setMappingState((prev) => ({
+                      ...prev,
+                      expansions: e.target.checked
+                        ? new Set([...prev.expansions, expansion])
                         : new Set(
-                            Array.from(prev).filter((x) => x !== expansion)
-                          )
-                    );
+                            Array.from(prev.expansions).filter(
+                              (x) => x !== expansion
+                            )
+                          ),
+                    }));
                   }}
                 />
                 <Text>One row per {TRACE_EXPANSIONS[expansion].label}</Text>

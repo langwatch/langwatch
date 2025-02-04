@@ -303,6 +303,7 @@ model Dataset {
     archivedAt       DateTime?
     datasetRecords   DatasetRecord[]
     batchEvaluations BatchEvaluation[]
+    mapping          Json?
 
     @@unique([projectId, slug])
 }
