@@ -14,6 +14,9 @@ import {
   useDisclosure,
   useToast,
   Menu,
+  AlertTitle,
+  AlertIcon,
+  Alert,
 } from "@chakra-ui/react";
 import Parse from "papaparse";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -94,6 +97,7 @@ export function DatasetTable({
     [databaseDataset.data]
   );
   const deleteDatasetRecord = api.datasetRecord.deleteMany.useMutation();
+  const downloadDataset = api.datasetRecord.download.useMutation();
 
   const gridRef = useRef<AgGridReact>(null);
 
@@ -198,9 +202,34 @@ export function DatasetTable({
 
   const toast = useToast();
 
-  const downloadCSV = (selectedOnly = false) => {
+  const downloadCSV = async (selectedOnly = false) => {
+    let data: InMemoryDataset | undefined;
+    if (databaseDataset.data && !selectedOnly) {
+      const dataset = await downloadDataset.mutateAsync({
+        projectId: project?.id ?? "",
+        datasetId: datasetId ?? "",
+      });
+
+      if (dataset?.datasetRecords) {
+        data = datasetDatabaseRecordsToInMemoryDataset(dataset);
+      }
+    } else {
+      data = dataset;
+    }
+
+    if (!data) {
+      toast({
+        title: "Error downloading dataset",
+        description: "Please try again",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+
     const csvData =
-      dataset?.datasetRecords
+      data.datasetRecords
         .filter((record) =>
           selectedOnly ? selectedEntryIds.has(record.id) : true
         )
@@ -446,7 +475,7 @@ export function DatasetTable({
           )}
         </Heading>
         <Text fontSize={"14px"} color="gray.400">
-          {parentRowData?.length} records
+          {databaseDataset.data?.count ?? parentRowData?.length} records
         </Text>
         <Text fontSize={"14px"} color="gray.400">
           {savingStatus === "saving"
@@ -487,8 +516,11 @@ export function DatasetTable({
               colorScheme="gray"
               minWidth="fit-content"
               onClick={() => dataset && downloadCSV()}
+              leftIcon={<DownloadIcon />}
+              isLoading={downloadDataset.isLoading}
+              loadingText="Downloading..."
             >
-              Export <DownloadIcon marginLeft={2} />
+              Export
             </Button>
             <Button
               colorScheme="gray"
@@ -518,6 +550,13 @@ export function DatasetTable({
       <Card>
         <CardBody padding={0} position="relative">
           <Box height={`calc(max(100vh - ${bottomSpace}, 500px))`}>
+            {databaseDataset.data?.truncated && (
+              <Alert status="warning" variant="subtle">
+                <AlertIcon />
+                This dataset is too large to display all records. Displaying the
+                first 5mb of data.
+              </Alert>
+            )}
             <DatasetGrid
               columnDefs={columnDefs}
               rowData={localRowData}

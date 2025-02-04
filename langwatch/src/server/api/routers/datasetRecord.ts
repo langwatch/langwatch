@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
-import { type DatasetRecord } from "@prisma/client";
+import { type Dataset, type DatasetRecord } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import {
   newDatasetEntriesSchema,
@@ -101,6 +101,16 @@ export const datasetRecordRouter = createTRPCRouter({
       return getFullDataset({
         datasetId: input.datasetId,
         projectId: input.projectId,
+      });
+    }),
+  download: protectedProcedure
+    .input(z.object({ projectId: z.string(), datasetId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
+    .mutation(async ({ input }) => {
+      return getFullDataset({
+        datasetId: input.datasetId,
+        projectId: input.projectId,
+        limitMb: null,
       });
     }),
   getHead: protectedProcedure
@@ -204,33 +214,86 @@ export const getFullDataset = async ({
   datasetId,
   projectId,
   entrySelection = "all",
+  limitMb = 5,
 }: {
   datasetId: string;
   projectId: string;
   entrySelection?: "first" | "last" | "random" | "all";
-}) => {
-  let count = 0;
-  if (entrySelection === "random" || entrySelection === "last") {
-    count = await prisma.datasetRecord.count({
-      where: { datasetId, projectId },
-    });
-  }
-
+  limitMb?: number | null;
+}): Promise<
+  | (Dataset & {
+      datasetRecords: DatasetRecord[];
+      truncated?: boolean;
+      count: number;
+    })
+  | null
+> => {
   const dataset = await prisma.dataset.findFirst({
     where: { id: datasetId, projectId },
-    include: {
-      datasetRecords: {
+  });
+
+  if (!dataset) {
+    return null;
+  }
+
+  const count = await prisma.datasetRecord.count({
+    where: { datasetId, projectId },
+  });
+
+  if (entrySelection === "random" || entrySelection === "last") {
+    return {
+      ...dataset,
+      count,
+      datasetRecords: await prisma.datasetRecord.findMany({
+        where: { datasetId, projectId },
         orderBy: { createdAt: "asc" },
-        take: entrySelection === "all" ? undefined : 1,
+        take: 1,
         skip:
           entrySelection === "last"
             ? Math.max(count - 1, 0)
             : entrySelection === "random"
             ? Math.floor(Math.random() * count)
             : 0,
-      },
-    },
-  });
+      }),
+    };
+  }
 
-  return dataset;
+  let truncatedDatasetRecords: DatasetRecord[] = [];
+  let truncated = false;
+  let totalSize = 0;
+  let currentPage = 0;
+  const BATCH_SIZE = 500;
+
+  // Fetch records in batches
+  while (!truncated) {
+    const records = await prisma.datasetRecord.findMany({
+      where: { datasetId, projectId },
+      orderBy: { createdAt: "asc" },
+      take: BATCH_SIZE,
+      skip: currentPage * BATCH_SIZE,
+    });
+
+    if (records.length === 0) break;
+
+    for (const record of records) {
+      const recordSize = JSON.stringify(record.entry).length;
+      if (!limitMb || totalSize + recordSize < limitMb * 1024 * 1024) {
+        truncatedDatasetRecords.push(record);
+        totalSize += recordSize;
+      } else {
+        truncated = true;
+        break;
+      }
+    }
+
+    if (truncated || records.length < BATCH_SIZE) break;
+    currentPage++;
+  }
+
+  return {
+    ...dataset,
+    datasetRecords: truncatedDatasetRecords,
+    truncated,
+    count,
+  };
 };
