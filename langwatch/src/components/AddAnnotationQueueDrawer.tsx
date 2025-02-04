@@ -37,9 +37,17 @@ export const AddAnnotationQueueDrawer = () => {
   const { project, organization } = useOrganizationTeamProject();
   const toast = useToast();
   const createAnnotationQueue = api.annotation.createQueue.useMutation();
-  const annotationScores = api.annotationScore.getAllActive.useQuery({
-    projectId: project?.id ?? "",
-  });
+
+  const queryClient = api.useContext();
+
+  const annotationScores = api.annotationScore.getAllActive.useQuery(
+    {
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project,
+    }
+  );
 
   const { closeDrawer } = useDrawer();
 
@@ -99,6 +107,8 @@ export const AddAnnotationQueueDrawer = () => {
       },
       {
         onSuccess: (data) => {
+          void queryClient.annotation.getQueues.invalidate();
+          void queryClient.annotation.getQueues.refetch();
           toast({
             title: "Annotation Queue Created",
             description: `Successfully created ${data.name} annotation queue`,

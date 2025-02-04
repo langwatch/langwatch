@@ -210,6 +210,11 @@ export const annotationRouter = createTRPCRouter({
         where: { projectId: input.projectId },
         include: {
           members: true,
+          AnnotationQueueScores: {
+            include: {
+              annotationScore: true,
+            },
+          },
         },
       });
     }),

@@ -1,4 +1,5 @@
 import {
+  Avatar,
   Button,
   Card,
   CardBody,
@@ -9,30 +10,31 @@ import {
   Table,
   Tbody,
   Td,
+  Text,
   Th,
   Thead,
   Tr,
   VStack,
   useToast,
-  Text,
-  Avatar,
+  Tag,
 } from "@chakra-ui/react";
-import { Bell, Plus, Tag, ThumbsUp } from "react-feather";
+import { Plus, ThumbsUp } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 
-import { Switch } from "@chakra-ui/react";
+import type {
+  User,
+  AnnotationScore,
+  AnnotationQueueScores,
+} from "@prisma/client";
+import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import SettingsLayout from "../../components/SettingsLayout";
 import { api } from "../../utils/api";
-import { useEffect } from "react";
-import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
-import type { User } from "@prisma/client";
 
 const AnnotationScorePage = () => {
   const { project, organization } = useOrganizationTeamProject();
-  const toast = useToast();
 
-  const { openDrawer, isDrawerOpen } = useDrawer();
+  const { openDrawer } = useDrawer();
 
   const getAllAnnotationQueues = api.annotation.getQueues.useQuery(
     {
@@ -48,12 +50,7 @@ const AnnotationScorePage = () => {
       },
       { enabled: !!organization }
     );
-
-  const isAnnotationDrawerOpen = isDrawerOpen("addAnnotationQueue");
-
-  useEffect(() => {
-    void getAllAnnotationQueues.refetch();
-  }, [isAnnotationDrawerOpen]);
+  console.log(getAllAnnotationQueues.data);
 
   return (
     <SettingsLayout>
@@ -108,6 +105,7 @@ const AnnotationScorePage = () => {
                   <Tr>
                     <Th>Name</Th>
                     <Th width="50%">Members</Th>
+                    <Th>Score Type</Th>
                     <Th>Description</Th>
                   </Tr>
                 </Thead>
@@ -123,6 +121,11 @@ const AnnotationScorePage = () => {
                             ) ?? []
                           }
                           userIds={queue.members.map((member) => member.userId)}
+                        />
+                      </Td>
+                      <Td>
+                        <ScoreTypeTag
+                          scoreTypes={queue.AnnotationQueueScores}
                         />
                       </Td>
                       <Td>{queue.description}</Td>
@@ -167,6 +170,22 @@ const ParticipantTag = ({
             {user.name}
           </Text>
         </HStack>
+      ))}
+    </HStack>
+  );
+};
+
+const ScoreTypeTag = ({
+  scoreTypes,
+}: {
+  scoreTypes: (AnnotationQueueScores & { annotationScore: AnnotationScore })[];
+}) => {
+  return (
+    <HStack flexWrap="wrap" gap={2}>
+      {scoreTypes.map((score) => (
+        <Tag whiteSpace="nowrap" key={score.annotationScore.id}>
+          {score.annotationScore.name}
+        </Tag>
       ))}
     </HStack>
   );
