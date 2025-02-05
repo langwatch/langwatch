@@ -18,7 +18,6 @@ import {
   VStack,
   useDisclosure,
   useToast,
-  type UseDisclosureReturn,
 } from "@chakra-ui/react";
 import { useForm } from "react-hook-form";
 
@@ -70,14 +69,12 @@ export const AddAnnotationQueueDrawer = () => {
     defaultValues: {
       name: "",
       description: "",
-      userIds: { value: [], label: [] },
     },
   });
 
   type FormData = {
     name: string;
     description?: string | null;
-    userIds: { value: string[]; label: string[] };
   };
 
   const [participants, setParticipants] = useState<
@@ -309,10 +306,43 @@ export const AddAnnotationQueueDrawer = () => {
                             </chakraComponents.MultiValueLabel>
                           ),
                           MenuList: (props) => (
-                            <CustomMenuList
+                            <chakraComponents.MenuList
                               {...props}
-                              scoreTypeDrawerOpen={scoreTypeDrawerOpen}
-                            />
+                              maxHeight={300}
+                            >
+                              <Box
+                                maxH="250px"
+                                overflowY="auto"
+                                css={{
+                                  "&::-webkit-scrollbar": {
+                                    display: "none",
+                                  },
+                                  msOverflowStyle: "none", // IE and Edge
+                                  scrollbarWidth: "none", // Firefox
+                                }}
+                              >
+                                {props.children}
+                              </Box>
+                              <Box
+                                p={2}
+                                position="sticky"
+                                bottom={0}
+                                bg="white"
+                                borderTop="1px solid"
+                                borderColor="gray.100"
+                              >
+                                <Button
+                                  width="100%"
+                                  colorScheme="blue"
+                                  onClick={scoreTypeDrawerOpen.onOpen}
+                                  leftIcon={<Plus />}
+                                  variant="outline"
+                                  size="sm"
+                                >
+                                  Add New
+                                </Button>
+                              </Box>
+                            </chakraComponents.MenuList>
                           ),
                         }}
                       />
@@ -347,49 +377,5 @@ export const AddAnnotationQueueDrawer = () => {
         />
       </Drawer>
     </>
-  );
-};
-
-const CustomMenuList = ({
-  scoreTypeDrawerOpen,
-  ...props
-}: {
-  scoreTypeDrawerOpen: UseDisclosureReturn;
-} & any) => {
-  return (
-    <chakraComponents.MenuList {...props} maxH="300px" position="relative">
-      <Box
-        maxH="250px"
-        overflowY="auto"
-        css={{
-          "&::-webkit-scrollbar": {
-            display: "none",
-          },
-          msOverflowStyle: "none", // IE and Edge
-          scrollbarWidth: "none", // Firefox
-        }}
-      >
-        {props.children}
-      </Box>
-      <Box
-        p={2}
-        position="sticky"
-        bottom={0}
-        bg="white"
-        borderTop="1px solid"
-        borderColor="gray.100"
-      >
-        <Button
-          width="100%"
-          colorScheme="blue"
-          onClick={scoreTypeDrawerOpen.onOpen}
-          leftIcon={<Plus />}
-          variant="outline"
-          size="sm"
-        >
-          Add New
-        </Button>
-      </Box>
-    </chakraComponents.MenuList>
   );
 };
