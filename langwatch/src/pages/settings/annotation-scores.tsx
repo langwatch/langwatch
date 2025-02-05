@@ -138,7 +138,7 @@ const AnnotationScorePage = () => {
                       <Td>{score.name}</Td>
                       <Td>{score.description}</Td>
                       <Td width="20%">
-                        <Text wrap="nowrap" noOfLines={1}>
+                        <Text noOfLines={1}>
                           {score.dataType === AnnotationScoreDataType.CHECKBOX
                             ? "Checkbox"
                             : "Multiple choice"}
@@ -192,9 +192,7 @@ const ScoreOptions = ({
         <HStack>
           <HStack flexWrap="wrap" gap={2} spacing={4}>
             {options.map((option) => (
-              <Tag key={option.value} value={option.value.toString()}>
-                {option.label}
-              </Tag>
+              <Tag key={option.value}>{option.label}</Tag>
             ))}
           </HStack>
         </HStack>
@@ -202,9 +200,7 @@ const ScoreOptions = ({
         <HStack>
           <HStack flexWrap="wrap" gap={2} spacing={4}>
             {options.map((option) => (
-              <Tag key={option.value} value={option.value.toString()}>
-                {option.label}
-              </Tag>
+              <Tag key={option.value}>{option.label}</Tag>
             ))}
           </HStack>
         </HStack>
