@@ -105,7 +105,7 @@ const AnnotationScorePage = () => {
                   <Tr>
                     <Th>Name</Th>
                     <Th width="40%">Members</Th>
-                    <Th>Score Names</Th>
+                    <Th>Score Types</Th>
                     <Th minWidth="20%">Description</Th>
                   </Tr>
                 </Thead>
@@ -157,7 +157,7 @@ const ParticipantTag = ({
       {users?.map((user) => (
         <HStack
           key={user.id}
-          spacing={2}
+          spacing={1}
           border="1px solid"
           borderColor="gray.200"
           borderRadius="50"
@@ -166,7 +166,7 @@ const ParticipantTag = ({
           paddingRight={2}
         >
           <Avatar name={user.name ?? ""} size="xs" />
-          <Text noOfLines={1} maxWidth="120px">
+          <Text noOfLines={1} maxWidth="120px" fontSize="xs">
             {user.name}
           </Text>
         </HStack>

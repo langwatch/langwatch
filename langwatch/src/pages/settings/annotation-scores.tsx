@@ -19,9 +19,12 @@ import {
   Radio,
   Checkbox,
   CheckboxGroup,
+  Tag,
 } from "@chakra-ui/react";
 import { Bell, Plus, ThumbsUp } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
+import { CheckIcon } from "@chakra-ui/icons";
+import { AnnotationScoreDataType } from "@prisma/client";
 
 import { Switch } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -124,6 +127,7 @@ const AnnotationScorePage = () => {
                   <Tr>
                     <Th>Name</Th>
                     <Th>Description</Th>
+                    <Th>Score Type</Th>
                     <Th>Score Options</Th>
                     <Th>Status</Th>
                   </Tr>
@@ -133,6 +137,13 @@ const AnnotationScorePage = () => {
                     <Tr key={score.id}>
                       <Td>{score.name}</Td>
                       <Td>{score.description}</Td>
+                      <Td width="20%">
+                        <Text wrap="nowrap" noOfLines={1}>
+                          {score.dataType === AnnotationScoreDataType.CHECKBOX
+                            ? "Checkbox"
+                            : "Multiple choice"}
+                        </Text>
+                      </Td>
                       <Td>
                         <ScoreOptions
                           options={
@@ -178,25 +189,25 @@ const ScoreOptions = ({
   return (
     <>
       {dataType === "CHECKBOX" ? (
-        <CheckboxGroup>
+        <HStack>
           <HStack flexWrap="wrap" gap={2} spacing={4}>
             {options.map((option) => (
-              <Checkbox key={option.value} value={option.value.toString()}>
+              <Tag key={option.value} value={option.value.toString()}>
                 {option.label}
-              </Checkbox>
+              </Tag>
             ))}
           </HStack>
-        </CheckboxGroup>
+        </HStack>
       ) : (
-        <RadioGroup>
+        <HStack>
           <HStack flexWrap="wrap" gap={2} spacing={4}>
             {options.map((option) => (
-              <Radio key={option.value} value={option.value.toString()}>
+              <Tag key={option.value} value={option.value.toString()}>
                 {option.label}
-              </Radio>
+              </Tag>
             ))}
           </HStack>
-        </RadioGroup>
+        </HStack>
       )}
     </>
   );
