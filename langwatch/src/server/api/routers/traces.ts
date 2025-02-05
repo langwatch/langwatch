@@ -1,10 +1,11 @@
 import { z } from "zod";
 
 import type {
+  AggregationsAggregate,
   QueryDslBoolQuery,
+  SearchResponse,
   SearchTotalHits,
   Sort,
-  SearchResponse,
 } from "@elastic/elasticsearch/lib/api/types";
 import { PublicShareResourceTypes, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
@@ -20,6 +21,7 @@ import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { evaluatePreconditions } from "../../evaluations/preconditions";
 import { checkPreconditionSchema } from "../../evaluations/types.generated";
 
+import { getAnnotatedTraceIds } from "~/server/filters/annotations";
 import { sharedFiltersInputSchema } from "../../analytics/types";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import {
@@ -40,7 +42,6 @@ import {
   checkUserPermissionForProject,
 } from "../permission";
 import { generateTracesPivotQueryConditions } from "./analytics/common";
-import { getAnnotatedTraceIds } from "~/server/filters/annotations";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
@@ -585,7 +586,35 @@ export const getAllTracesForProject = async ({
     ).map((guardrail) => [guardrail.slug, guardrail.name])
   );
 
-  const traces = tracesResult.hits.hits
+  let messagesFromThreadIds:
+    | SearchResponse<ElasticSearchTrace, Record<string, AggregationsAggregate>>
+    | undefined = undefined;
+  if (input.groupBy === "thread_id") {
+    const threadIds = tracesResult.hits.hits
+      .map((hit) => hit._source?.metadata.thread_id)
+      .filter((x) => x);
+    const existingTraceIds = new Set(
+      tracesResult.hits.hits
+        .map((hit) => hit._source?.trace_id)
+        .filter((x) => x)
+    );
+
+    messagesFromThreadIds = await esClient.search<ElasticSearchTrace>({
+      index: TRACE_INDEX.alias,
+      body: {
+        query: { terms: { "metadata.thread_id": threadIds } },
+      },
+      size: 100,
+    });
+    messagesFromThreadIds.hits.hits = messagesFromThreadIds.hits.hits.filter(
+      (hit) => !existingTraceIds.has(hit._source?.trace_id ?? "")
+    );
+  }
+
+  const traces = [
+    ...(messagesFromThreadIds?.hits.hits ?? []),
+    ...tracesResult.hits.hits,
+  ]
     .filter((x) => x._source)
     .map((hit) => {
       const trace = hit._source!;
