@@ -24,8 +24,11 @@ import { ZodError } from "zod";
 import type { UnsetMarker } from "@trpc/server/dist/core/internals/utils";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-import { type PermissionMiddleware } from "./permission";
 import { auditLog } from "../auditLog";
+import {
+  permissionGuardedString,
+  type PermissionMiddleware,
+} from "./permission";
 
 /**
  * 1. CONTEXT
@@ -241,12 +244,31 @@ interface PendingPermissionProcedureBuilder<TParams extends ProcedureParams> {
   ) => ReturnType<ProcedureBuilder<TParams>["use"]>;
 }
 
+const markProjectId = t.middleware(({ next, input }) => {
+  const input_ = input as any;
+  if (input_.projectId) {
+    input_.projectId = permissionGuardedString(input_.projectId, false);
+  }
+  if (input_.teamId) {
+    input_.teamId = permissionGuardedString(input_.teamId, false);
+  }
+  if (input_.organizationId) {
+    input_.organizationId = permissionGuardedString(
+      input_.organizationId,
+      false
+    );
+  }
+  return next();
+});
+
 const permissionProcedureBuilder = <TParams extends ProcedureParams>(
   procedure: ProcedureBuilder<TParams>
 ): PendingPermissionProcedureBuilder<TParams> => {
   return {
     input: (input) => {
-      return permissionProcedureBuilder(procedure.input(input as any));
+      return permissionProcedureBuilder(
+        procedure.input(input as any).use(markProjectId as any) as any
+      );
     },
     use: (middleware) => {
       return procedure

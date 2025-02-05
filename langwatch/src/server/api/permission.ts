@@ -1,7 +1,7 @@
 import {
   OrganizationUserRole,
   TeamUserRole,
-  type PrismaClient
+  type PrismaClient,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import type { Session } from "next-auth";
@@ -65,6 +65,33 @@ export const OrganizationRoleGroup = Object.fromEntries(
   keyof typeof organizationRolePermissionMapping,
   keyof typeof organizationRolePermissionMapping
 >;
+
+type PermissionGuardedString = {
+  value: string;
+  isValidated: boolean;
+};
+
+export const permissionGuardedString = <
+  T extends string | PermissionGuardedString | undefined,
+>(
+  value: T,
+  isValidated = true
+): T => {
+  if (typeof value === "undefined") {
+    return value;
+  }
+
+  return {
+    value: isGuardedString(value) ? value.value : value,
+    isValidated: isValidated,
+  } as any as T;
+};
+
+export const isGuardedString = (
+  value: any
+): value is PermissionGuardedString => {
+  return typeof value === "object" && value !== null && "value" in value;
+};
 
 const isDemoProject = (projectId: string, roleGroup: string): boolean => {
   if (
@@ -141,6 +168,9 @@ export const checkPermissionOrPubliclyShared =
     }
 
     ctx.permissionChecked = true;
+    if (isGuardedString((input as any).projectId)) {
+      (input as any).projectId.validated = true;
+    }
     return next();
   };
 
@@ -156,6 +186,9 @@ export const checkUserPermissionForProject =
     }
 
     ctx.permissionChecked = true;
+    if (isGuardedString((input as any).projectId)) {
+      (input as any).projectId.validated = true;
+    }
     return next();
   };
 
@@ -207,6 +240,9 @@ export const checkUserPermissionForTeam =
     }
 
     ctx.permissionChecked = true;
+    if (isGuardedString((input as any).teamId)) {
+      (input as any).teamId.validated = true;
+    }
     return next();
   };
 
@@ -266,6 +302,9 @@ export const checkUserPermissionForOrganization =
     }
 
     ctx.permissionChecked = true;
+    if (isGuardedString((input as any).organizationId)) {
+      (input as any).organizationId.validated = true;
+    }
     return next();
   };
 

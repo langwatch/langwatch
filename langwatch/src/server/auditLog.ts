@@ -2,6 +2,7 @@ import type { NextApiRequest } from "next";
 import { getClientIp } from "../utils/getClientIp";
 import { prisma } from "./db";
 import { safeTruncate } from "../utils/truncate";
+import { permissionGuardedString } from "./api/permission";
 
 export const auditLog = async ({
   userId,
@@ -27,9 +28,9 @@ export const auditLog = async ({
 
   await prisma.auditLog.create({
     data: {
-      userId,
-      organizationId,
-      projectId,
+      userId: userId,
+      organizationId: permissionGuardedString(organizationId),
+      projectId: permissionGuardedString(projectId),
       action,
       args: args ? safeTruncate(args, 4 * 1024) : undefined,
       error: error?.toString(),

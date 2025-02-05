@@ -8,7 +8,7 @@ import {
   datasetRecordEntrySchema,
   datasetRecordFormSchema,
 } from "../../datasets/types.generated";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { TeamRoleGroup, checkUserPermissionForProject, skipPermissionCheck } from "../permission";
 import { createManyDatasetRecords } from "./datasetRecord";
 
 export const datasetRouter = createTRPCRouter({
