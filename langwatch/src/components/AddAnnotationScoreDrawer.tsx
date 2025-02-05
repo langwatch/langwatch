@@ -28,15 +28,31 @@ import { X } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useDrawer } from "./CurrentDrawer";
-import { HorizontalFormControl } from "./HorizontalFormControl";
 
 import { AnnotationScoreDataType } from "@prisma/client";
+import { FullWidthFormControl } from "./FullWidthFormControl";
 
-export const AddAnnotationScoreDrawer = () => {
+export const AddAnnotationScoreDrawer = ({
+  onClose,
+  onOverlayClick,
+}: {
+  onClose: () => void;
+  onOverlayClick: () => void;
+}) => {
   const { project } = useOrganizationTeamProject();
   const toast = useToast();
   const createAnnotationScore = api.annotationScore.create.useMutation();
   const { closeDrawer } = useDrawer();
+
+  const queryClient = api.useContext();
+
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      closeDrawer();
+    }
+  };
 
   const {
     register,
@@ -132,7 +148,10 @@ export const AddAnnotationScoreDrawer = () => {
             isClosable: true,
             position: "top-right",
           });
-          closeDrawer();
+          void queryClient.annotationScore.getAllActive.invalidate();
+          void queryClient.annotationScore.getAllActive.refetch();
+
+          handleClose();
           reset();
         },
         onError: (error) => {
@@ -155,9 +174,9 @@ export const AddAnnotationScoreDrawer = () => {
     <Drawer
       isOpen={true}
       placement="right"
-      size={"xl"}
-      onClose={closeDrawer}
-      onOverlayClick={closeDrawer}
+      size={"lg"}
+      onClose={handleClose}
+      onOverlayClick={handleClose}
     >
       <DrawerContent>
         <DrawerHeader>
@@ -173,22 +192,22 @@ export const AddAnnotationScoreDrawer = () => {
         <DrawerBody>
           {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
           <form onSubmit={handleSubmit(onSubmit)}>
-            <VStack spacing={4} align="start">
-              <HorizontalFormControl
+            <VStack spacing={2} align="start">
+              <FullWidthFormControl
                 label="Name"
                 helper="Give it a name that makes it easy to identify this score metric"
                 isInvalid={!!errors.name}
               >
                 <Input {...register("name")} required />
-              </HorizontalFormControl>
-              <HorizontalFormControl
+              </FullWidthFormControl>
+              <FullWidthFormControl
                 label="Description"
                 helper="Provide a description of the score metric"
                 isInvalid={!!errors.description}
               >
                 <Textarea {...register("description")} required />
-              </HorizontalFormControl>
-              <HorizontalFormControl
+              </FullWidthFormControl>
+              <FullWidthFormControl
                 label="Score Type"
                 helper={
                   watchDataType === "OPTION"
@@ -199,18 +218,22 @@ export const AddAnnotationScoreDrawer = () => {
                 }
                 isInvalid={!!errors.dataType}
               >
-                <Select
-                  {...register("dataType")}
-                  placeholder="Select score type"
-                  required
-                >
-                  <option value={AnnotationScoreDataType.OPTION}>
-                    Multiple choice
-                  </option>
-                  <option value={AnnotationScoreDataType.CHECKBOX}>
-                    Checkboxes
-                  </option>
-                </Select>
+                <HStack width="full">
+                  <VStack align="start" width="full" spacing={0}>
+                    <Select
+                      {...register("dataType")}
+                      placeholder="Select score type"
+                      required
+                    >
+                      <option value={AnnotationScoreDataType.OPTION}>
+                        Multiple choice
+                      </option>
+                      <option value={AnnotationScoreDataType.CHECKBOX}>
+                        Checkboxes
+                      </option>
+                    </Select>
+                  </VStack>
+                </HStack>
 
                 {watchDataType === "OPTION" && (
                   <FormControl mt={4}>
@@ -226,7 +249,6 @@ export const AddAnnotationScoreDrawer = () => {
                             <HStack key={index} spacing={2} width="full">
                               <Radio
                                 value={option}
-                                isDisabled={!option.trim()}
                                 isChecked={
                                   defaultRadioOption === option &&
                                   defaultRadioOption !== ""
@@ -361,7 +383,7 @@ export const AddAnnotationScoreDrawer = () => {
                     </VStack>
                   </FormControl>
                 )}
-              </HorizontalFormControl>
+              </FullWidthFormControl>
 
               <HStack width="full">
                 <Spacer />

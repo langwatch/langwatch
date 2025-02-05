@@ -15,9 +15,16 @@ import {
   VStack,
   useToast,
   Text,
+  RadioGroup,
+  Radio,
+  Checkbox,
+  CheckboxGroup,
+  Tag,
 } from "@chakra-ui/react";
 import { Bell, Plus, ThumbsUp } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
+import { CheckIcon } from "@chakra-ui/icons";
+import { AnnotationScoreDataType } from "@prisma/client";
 
 import { Switch } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -86,7 +93,7 @@ const AnnotationScorePage = () => {
             size="sm"
             colorScheme="orange"
             leftIcon={<Plus size={20} />}
-            onClick={() => openDrawer("addAnnotationScore", undefined)}
+            onClick={() => openDrawer("addAnnotationScore")}
           >
             Add new score metric
           </Button>
@@ -119,9 +126,9 @@ const AnnotationScorePage = () => {
                 <Thead>
                   <Tr>
                     <Th>Name</Th>
-                    <Th>Data Type</Th>
                     <Th>Description</Th>
-                    <Th>Options</Th>
+                    <Th>Score Type</Th>
+                    <Th>Score Options</Th>
                     <Th>Status</Th>
                   </Tr>
                 </Thead>
@@ -129,9 +136,27 @@ const AnnotationScorePage = () => {
                   {getAllAnnotationScores.data?.map((score) => (
                     <Tr key={score.id}>
                       <Td>{score.name}</Td>
-                      <Td>{score.dataType}</Td>
                       <Td>{score.description}</Td>
-                      <Td>{JSON.stringify(score.options)}</Td>
+                      <Td width="20%">
+                        <Text noOfLines={1}>
+                          {score.dataType === AnnotationScoreDataType.CHECKBOX
+                            ? "Checkbox"
+                            : "Multiple choice"}
+                        </Text>
+                      </Td>
+                      <Td>
+                        <ScoreOptions
+                          options={
+                            Array.isArray(score.options)
+                              ? (score.options as {
+                                  label: string;
+                                  value: number;
+                                }[])
+                              : []
+                          }
+                          dataType={score.dataType ?? ""}
+                        />
+                      </Td>
                       <Td textAlign="center">
                         <Switch
                           isChecked={score.active}
@@ -153,3 +178,33 @@ const AnnotationScorePage = () => {
 };
 
 export default AnnotationScorePage;
+
+const ScoreOptions = ({
+  options,
+  dataType,
+}: {
+  options: { label: string; value: number }[];
+  dataType: string;
+}) => {
+  return (
+    <>
+      {dataType === "CHECKBOX" ? (
+        <HStack>
+          <HStack flexWrap="wrap" gap={2} spacing={4}>
+            {options.map((option) => (
+              <Tag key={option.value}>{option.label}</Tag>
+            ))}
+          </HStack>
+        </HStack>
+      ) : (
+        <HStack>
+          <HStack flexWrap="wrap" gap={2} spacing={4}>
+            {options.map((option) => (
+              <Tag key={option.value}>{option.label}</Tag>
+            ))}
+          </HStack>
+        </HStack>
+      )}
+    </>
+  );
+};
