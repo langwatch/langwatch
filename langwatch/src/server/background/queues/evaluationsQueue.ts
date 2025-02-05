@@ -5,7 +5,7 @@ import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
 import { getDebugger } from "../../../utils/logger";
-import { QueueWithFallback } from "./queueWithFallback";
+import { QueueWithFallback, scheduleWithFallback } from "./queueWithFallback";
 import { runEvaluationJob } from "../workers/evaluationsWorker";
 import type { ConnectionOptions } from "bullmq";
 
