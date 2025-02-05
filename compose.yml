@@ -79,6 +79,7 @@ services:
     environment:
       - discovery.type=single-node
       - DISABLE_SECURITY_PLUGIN=true
+      - "_JAVA_OPTIONS=-XX:UseSVE=0"
       # Disable specific plugins
       - "plugins.anomaly_detection.enabled=false"
       - "plugins.flow_framework.enabled=false"

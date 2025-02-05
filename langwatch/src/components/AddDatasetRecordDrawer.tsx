@@ -12,19 +12,15 @@ import {
   useToast,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { useLocalStorage } from "usehooks-ts";
-import { type z } from "zod";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import type {
-  annotationScoreSchema,
   DatasetColumns,
   DatasetRecordEntry,
 } from "../server/datasets/types";
-import type { ElasticSearchEvaluation } from "../server/tracer/types";
-import { elasticSearchEvaluationsToEvaluations } from "../server/tracer/utils";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { useDrawer } from "./CurrentDrawer";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
@@ -78,44 +74,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       enabled: !!project,
       refetchOnWindowFocus: false,
     }
-  );
-
-  const evaluationsObject = api.traces.getEvaluationsMultiple.useQuery(
-    { projectId: project?.id ?? "", traceIds: traceIds },
-    {
-      enabled: !!project,
-      refetchOnWindowFocus: false,
-    }
-  );
-
-  const evaluations = useMemo(
-    () => Object.values(evaluationsObject.data ?? {}).flat(),
-    [evaluationsObject.data]
-  );
-
-  const annotationScores = api.annotation.getByTraceIds.useQuery(
-    { projectId: project?.id ?? "", traceIds: traceIds },
-    { enabled: !!project, refetchOnWindowFocus: false }
-  );
-
-  const getAnnotationScoreOptions = api.annotationScore.getAllActive.useQuery(
-    { projectId: project?.id ?? "" },
-    {
-      enabled: !!project?.id,
-      refetchOnWindowFocus: false,
-    }
-  );
-
-  const idNameMap = useMemo(
-    () =>
-      getAnnotationScoreOptions?.data?.reduce(
-        (map, obj) => {
-          map[obj.id] = obj.name;
-          return map;
-        },
-        {} as Record<string, string>
-      ),
-    [getAnnotationScoreOptions.data]
   );
 
   const datasets = api.dataset.getAll.useQuery(
@@ -229,49 +187,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
         },
       }
     );
-  };
-
-  const getEvaluationArray = (
-    data: ElasticSearchEvaluation[],
-    traceId: string
-  ) => {
-    if (!Array.isArray(data)) {
-      return [];
-    }
-
-    return elasticSearchEvaluationsToEvaluations(data)
-      .filter(
-        // TODO: fix this type assertion, evaluations should be included in the traces now, no need for trace_id
-        (item) =>
-          item.status === "processed" && (item as any).trace_id === traceId
-      )
-      .map((item) => {
-        return {
-          name: item.name,
-          type: item.type,
-          passed: item.passed,
-          score: item.score,
-          label: item.label,
-        };
-      });
-  };
-
-  const getAnnotationScoresArray = (
-    data: z.infer<typeof annotationScoreSchema>[],
-    idNameMap: Record<string, string>,
-    traceId: string
-  ) => {
-    return data
-      .filter((score) => score.traceId === traceId) // Filter out entries with matching traceId
-      .flatMap((score) => {
-        if (!("scoreOptions" in score)) return []; // Type guard
-        return Object.entries(score.scoreOptions ?? {})
-          .filter(([, option]) => option.value !== null)
-          .map(([key, option]) => ({
-            ...option,
-            name: idNameMap?.[key] ?? "",
-          }));
-      });
   };
 
   const [rowDataFromDataset, setRowDataFromDataset] = useState<
