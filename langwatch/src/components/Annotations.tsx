@@ -1,4 +1,4 @@
-import { Box, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Spacer, Text, Tooltip, VStack } from "@chakra-ui/react";
 import { useEffect } from "react";
 import { Edit, ThumbsDown, ThumbsUp } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -49,12 +49,14 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
             borderRadius={"lg"}
             onClick={
               isCurrentUser
-                ? () =>
+                ? (e) => {
+                    e.stopPropagation();
                     openDrawer("annotation", {
                       traceId: traceId,
                       action: "edit",
                       annotationId: annotation.id,
-                    })
+                    });
+                  }
                 : undefined
             }
             cursor={isCurrentUser ? "pointer" : "default"}
@@ -87,7 +89,11 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                   </Text>
                 </VStack>
                 <Spacer />
-                {isCurrentUser && <Edit size={"18px"} />}
+                {isCurrentUser && (
+                  <Tooltip label="Edit Annotation" placement="top" hasArrow>
+                    <Edit size={"18px"} />
+                  </Tooltip>
+                )}
               </HStack>
               <Text>{annotation.comment}</Text>
               <VStack align="start" spacing={1}>
@@ -116,7 +122,7 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                       return (
                         name && (
                           <Text key={key} fontSize={"sm"}>
-                            <HStack spacing={1} align="center">
+                            <HStack spacing={2} align="start">
                               <Text fontWeight="bold">{name}:</Text>
                               {typeof scoreOption === "object" &&
                                 "value" in scoreOption && (

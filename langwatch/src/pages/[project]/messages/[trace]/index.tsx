@@ -34,7 +34,7 @@ import type { Trace } from "../../../../server/tracer/types";
 import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
 
-import { CornerDownRight, Edit, ThumbsDown, ThumbsUp } from "react-feather";
+import { CornerDownRight, Edit } from "react-feather";
 import remarkGfm from "remark-gfm";
 import { Annotations } from "../../../../components/Annotations";
 import { useDrawer } from "../../../../components/CurrentDrawer";
@@ -447,6 +447,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
             <GridItem colSpan={3}>
               <Box
                 minWidth="65%"
+                height="100%"
                 position="relative"
                 borderRight="1px solid"
                 borderColor="gray.200"
