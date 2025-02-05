@@ -591,7 +591,7 @@ export const getAllTracesForProject = async ({
     | undefined = undefined;
   if (input.groupBy === "thread_id") {
     const threadIds = tracesResult.hits.hits
-      .map((hit) => hit._source?.metadata.thread_id)
+      .map((hit) => hit._source?.metadata?.thread_id)
       .filter((x) => x);
     const existingTraceIds = new Set(
       tracesResult.hits.hits
