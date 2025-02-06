@@ -154,8 +154,8 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           triggerData,
           triggerName: name,
           projectSlug: project!.slug,
-          triggerType: trigger.alertType!,
-          triggerMessage: trigger.message!,
+          triggerType: trigger.alertType ?? null,
+          triggerMessage: trigger.message ?? "",
         };
 
         updatedAt = getLatestUpdatedAt(traces);
@@ -185,8 +185,8 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           triggerData,
           triggerName: name,
           projectSlug: project!.slug,
-          triggerType: trigger.alertType!,
-          triggerMessage: trigger.message!,
+          triggerType: trigger.alertType ?? null,
+          triggerMessage: trigger.message ?? "",
         };
 
         updatedAt = getLatestUpdatedAt(traces);

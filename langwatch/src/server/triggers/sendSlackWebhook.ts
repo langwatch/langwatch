@@ -23,7 +23,7 @@ export const sendSlackWebhook = async ({
   triggerData: TriggerData[];
   triggerName: string;
   projectSlug: string;
-  triggerType: AlertType;
+  triggerType: AlertType | null;
   triggerMessage: string;
 }) => {
   const webhook = new IncomingWebhook(triggerWebhook);
