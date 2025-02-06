@@ -48,24 +48,25 @@ model Session {
 }
 
 model User {
-    id               String                   @id @default(nanoid())
-    name             String?
-    email            String?                  @unique
-    emailVerified    DateTime?
-    password         String? // for email/password auth without auth0
-    image            String?                  @db.Text
-    accounts         Account[]
-    sessions         Session[]
-    teamMemberships  TeamUser[]
-    orgMemberships   OrganizationUser[]
-    createdAt        DateTime                 @default(now())
-    updatedAt        DateTime                 @default(now()) @updatedAt
-    lastLoginAt      DateTime?
-    Annotation       Annotation[]
-    publicShares     PublicShare[]
-    Workflow         Workflow[]
-    WorkflowVersion  WorkflowVersion[]
-    annotationQueues AnnotationQueueMembers[]
+    id                   String                   @id @default(nanoid())
+    name                 String?
+    email                String?                  @unique
+    emailVerified        DateTime?
+    password             String? // for email/password auth without auth0
+    image                String?                  @db.Text
+    accounts             Account[]
+    sessions             Session[]
+    teamMemberships      TeamUser[]
+    orgMemberships       OrganizationUser[]
+    createdAt            DateTime                 @default(now())
+    updatedAt            DateTime                 @default(now()) @updatedAt
+    lastLoginAt          DateTime?
+    Annotation           Annotation[]
+    publicShares         PublicShare[]
+    Workflow             Workflow[]
+    WorkflowVersion      WorkflowVersion[]
+    annotationQueues     AnnotationQueueMembers[]
+    annotationQueueItems AnnotationQueueItem[]
 }
 
 model VerificationToken {
@@ -155,18 +156,18 @@ enum PIIRedactionLevel {
 }
 
 model Project {
-    id                   String            @id @default(nanoid())
+    id                   String                @id @default(nanoid())
     name                 String
-    slug                 String            @unique
-    apiKey               String            @unique
+    slug                 String                @unique
+    apiKey               String                @unique
     teamId               String
-    team                 Team              @relation(fields: [teamId], references: [id])
+    team                 Team                  @relation(fields: [teamId], references: [id])
     language             String
     framework            String
-    firstMessage         Boolean           @default(false)
-    integrated           Boolean           @default(false)
-    createdAt            DateTime          @default(now())
-    updatedAt            DateTime          @default(now()) @updatedAt
+    firstMessage         Boolean               @default(false)
+    integrated           Boolean               @default(false)
+    createdAt            DateTime              @default(now())
+    updatedAt            DateTime              @default(now()) @updatedAt
     userLinkTemplate     String?
     checks               Check[]
     costs                Cost[]
@@ -175,7 +176,7 @@ model Project {
     datasetRecords       DatasetRecord[]
     customGraphs         CustomGraph[]
     batchEvaluations     BatchEvaluation[]
-    piiRedactionLevel    PIIRedactionLevel @default(ESSENTIAL)
+    piiRedactionLevel    PIIRedactionLevel     @default(ESSENTIAL)
     triggers             Trigger[]
     experiments          Experiment[]
     annotations          Annotation[]
@@ -188,6 +189,7 @@ model Project {
     workflows            Workflow[]
     WorkflowVersion      WorkflowVersion[]
     AnnotationQueue      AnnotationQueue[]
+    AnnotationQueueItem  AnnotationQueueItem[]
 
     @@index([teamId])
 }
@@ -511,6 +513,7 @@ model AnnotationQueue {
     createdAt             DateTime                 @default(now())
     updatedAt             DateTime                 @default(now()) @updatedAt
     AnnotationQueueScores AnnotationQueueScores[]
+    AnnotationQueueItems  AnnotationQueueItem[]
 }
 
 model AnnotationQueueMembers {
@@ -533,6 +536,23 @@ model AnnotationQueueScores {
     @@id([annotationQueueId, annotationScoreId])
     @@index([annotationQueueId])
     @@index([annotationScoreId])
+}
+
+model AnnotationQueueItem {
+    id                String           @id @default(nanoid())
+    annotationQueueId String?
+    annotationQueue   AnnotationQueue? @relation(fields: [annotationQueueId], references: [id])
+    userId            String?
+    user              User?            @relation(fields: [userId], references: [id])
+    createdAt         DateTime         @default(now())
+    updatedAt         DateTime         @default(now()) @updatedAt
+    traceId           String
+    projectId         String
+    project           Project          @relation(fields: [projectId], references: [id])
+
+    @@index([annotationQueueId])
+    @@index([userId])
+    @@index([projectId])
 }
 
 model PublicShare {

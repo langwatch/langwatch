@@ -32,10 +32,25 @@ import { AddAnnotationScoreDrawer } from "./AddAnnotationScoreDrawer";
 
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 
-export const AddAnnotationQueueDrawer = () => {
+export const AddAnnotationQueueDrawer = ({
+  onClose,
+  onOverlayClick,
+}: {
+  onClose: () => void;
+  onOverlayClick: () => void;
+}) => {
   const { project, organization } = useOrganizationTeamProject();
   const toast = useToast();
   const createAnnotationQueue = api.annotation.createQueue.useMutation();
+
+  const handleClose = () => {
+    if (onClose && onOverlayClick) {
+      onClose();
+      onOverlayClick();
+    } else {
+      closeDrawer();
+    }
+  };
 
   const queryClient = api.useContext();
 
@@ -114,7 +129,7 @@ export const AddAnnotationQueueDrawer = () => {
             isClosable: true,
             position: "top-right",
           });
-          closeDrawer();
+          handleClose();
           reset();
         },
         onError: (error) => {

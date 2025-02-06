@@ -1,10 +1,27 @@
 import { Link } from "@chakra-ui/next-js";
 import {
+  Avatar,
   Box,
   Button,
+  Drawer,
   DrawerCloseButton,
   Heading,
   HStack,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
+  Popover,
+  PopoverArrow,
+  PopoverBody,
+  PopoverCloseButton,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTrigger,
+  Portal,
   Spacer,
   Tab,
   Table,
@@ -19,6 +36,8 @@ import {
   Thead,
   Tooltip,
   Tr,
+  useDisclosure,
+  useToast,
   VStack,
 } from "@chakra-ui/react";
 import {
@@ -41,10 +60,13 @@ import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { evaluationPassed } from "../checks/EvaluationStatus";
 import { Conversation } from "../../pages/[project]/messages/[trace]/index";
-import { Maximize2 } from "react-feather";
+import { Book, Maximize2, Plus, Users } from "react-feather";
 import { Minimize2 } from "react-feather";
 import { useRouter } from "next/router";
 import qs from "qs";
+
+import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
+import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 
 interface TraceEval {
   project?: Project;
@@ -59,7 +81,8 @@ export function TraceDetails(props: {
   traceView?: "span" | "full";
   onToggleView?: () => void;
 }) {
-  const { project, hasTeamPermission } = useOrganizationTeamProject();
+  const { project, hasTeamPermission, organization } =
+    useOrganizationTeamProject();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const router = useRouter();
 
@@ -80,6 +103,38 @@ export function TraceDetails(props: {
     }
   );
 
+  const annotationQueues = api.annotation.getQueues.useQuery(
+    { projectId: project?.id ?? "" },
+    {
+      enabled: !!project,
+    }
+  );
+
+  console.log("annotationQueues", annotationQueues.data);
+
+  const users =
+    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+      {
+        organizationId: organization?.id ?? "",
+      },
+      {
+        enabled: !!organization,
+      }
+    );
+
+  const userOptions = users.data?.members.map((member) => ({
+    label: member.user.name ?? "",
+    value: `user-${member.user.id}`,
+  }));
+
+  const queueOptions = annotationQueues.data?.map((queue) => ({
+    label: queue.name ?? "",
+    value: `queue-${queue.id}`,
+  }));
+
+  const options = [...(userOptions ?? []), ...(queueOptions ?? [])];
+
+  console.log("users", users.data?.members);
   useEffect(() => {
     if (evaluations.data) {
       const pendingChecks = evaluations.data.filter(
@@ -159,6 +214,39 @@ export function TraceDetails(props: {
   }, [props.selectedTab]);
 
   const { trace } = useTraceDetailsState(props.traceId);
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const queueDrawerOpen = useDisclosure();
+
+  const queueItem = api.annotation.createQueueItem.useMutation();
+
+  const toast = useToast();
+
+  const sendToQueue = () => {
+    queueItem.mutate(
+      {
+        projectId: project?.id ?? "",
+        traceId: props.traceId,
+        annotators: annotators.map((p) => p.id),
+      },
+      {
+        onSuccess: () => {
+          onClose();
+          toast({
+            title: "Annotators added to queue",
+            description:
+              "The annotators will be notified of the new queue item.",
+            status: "success",
+            isClosable: true,
+            position: "top-right",
+          });
+        },
+      }
+    );
+  };
+
+  const [annotators, setAnnotators] = useState<
+    { id: string; name: string | null }[]
+  >([]);
 
   useEffect(() => {
     if (trace.data?.metadata.thread_id) {
@@ -214,6 +302,13 @@ export function TraceDetails(props: {
               >
                 Annotate
               </Button>
+            )}
+            {hasTeamPermission(TeamRoleGroup.ANNOTATIONS_MANAGE) && (
+              <>
+                <Button colorScheme="black" variant="outline" onClick={onOpen}>
+                  Annotation Queue
+                </Button>
+              </>
             )}
             {hasTeamPermission(TeamRoleGroup.DATASETS_MANAGE) && (
               <Button
@@ -281,7 +376,6 @@ export function TraceDetails(props: {
           </TabList>
         </Tabs>
       </VStack>
-
       <Tabs width="full" index={tabIndex} onChange={setTabIndex}>
         <TabPanels>
           {canViewMessages && (
@@ -349,6 +443,155 @@ export function TraceDetails(props: {
           </TabPanel>
         </TabPanels>
       </Tabs>
+      <Modal isOpen={isOpen} onClose={onClose}>
+        <ModalOverlay />
+        <ModalContent minHeight="200px">
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack width="full" align="start">
+              <Text>Send to:</Text>
+              <Box
+                border="1px solid lightgray"
+                borderRadius={5}
+                paddingX={1}
+                minWidth="300px"
+              >
+                <MultiSelect
+                  options={options}
+                  onChange={(newValue) => {
+                    setAnnotators(
+                      newValue.map((v) => ({
+                        id: v.value,
+                        name: v.label,
+                      }))
+                    );
+                  }}
+                  value={annotators.map((p) => ({
+                    value: p.id,
+                    label: p.name ?? "",
+                  }))}
+                  isMulti
+                  closeMenuOnSelect={false}
+                  selectedOptionStyle="check"
+                  hideSelectedOptions={true}
+                  useBasicStyles
+                  variant="unstyled"
+                  placeholder="Add Participants"
+                  components={{
+                    Menu: ({ children, ...props }) => (
+                      <chakraComponents.Menu
+                        {...props}
+                        innerProps={{
+                          ...props.innerProps,
+                          style: { width: "300px" },
+                        }}
+                      >
+                        {children}
+                      </chakraComponents.Menu>
+                    ),
+                    Option: ({ children, ...props }) => (
+                      <chakraComponents.Option {...props}>
+                        <VStack align="start">
+                          <HStack>
+                            {props.data.value.startsWith("user-") ? (
+                              <Avatar
+                                name={props.data.label}
+                                color="white"
+                                size="xs"
+                              />
+                            ) : (
+                              <Box padding={1}>
+                                <Users size={18} />
+                              </Box>
+                            )}
+                            <Text>{children}</Text>
+                          </HStack>
+                        </VStack>
+                      </chakraComponents.Option>
+                    ),
+                    MultiValueLabel: ({ children, ...props }) => (
+                      <chakraComponents.MultiValueLabel {...props}>
+                        <VStack align="start" padding={1} paddingX={0}>
+                          <HStack>
+                            {props.data.value.startsWith("user-") ? (
+                              <Avatar
+                                name={props.data.label}
+                                color="white"
+                                size="xs"
+                              />
+                            ) : (
+                              <Box padding={1}>
+                                <Users size={18} />
+                              </Box>
+                            )}
+                            <Text>{children}</Text>
+                          </HStack>
+                        </VStack>
+                      </chakraComponents.MultiValueLabel>
+                    ),
+                    MenuList: (props) => (
+                      <chakraComponents.MenuList {...props} maxHeight={300}>
+                        <Box
+                          maxH="250px"
+                          overflowY="auto"
+                          css={{
+                            "&::-webkit-scrollbar": {
+                              display: "none",
+                            },
+                            msOverflowStyle: "none", // IE and Edge
+                            scrollbarWidth: "none", // Firefox
+                          }}
+                        >
+                          {props.children}
+                        </Box>
+                        <Box
+                          p={2}
+                          position="sticky"
+                          bottom={0}
+                          bg="white"
+                          borderTop="1px solid"
+                          borderColor="gray.100"
+                        >
+                          <Button
+                            width="100%"
+                            colorScheme="blue"
+                            onClick={queueDrawerOpen.onOpen}
+                            leftIcon={<Plus />}
+                            variant="outline"
+                            size="sm"
+                          >
+                            Add New Queue
+                          </Button>
+                        </Box>
+                      </chakraComponents.MenuList>
+                    ),
+                  }}
+                />
+              </Box>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button mr={3} onClick={onClose} variant="outline">
+              Cancel
+            </Button>
+            <Button colorScheme="orange" onClick={sendToQueue}>
+              Send
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>{" "}
+      <Drawer
+        isOpen={queueDrawerOpen.isOpen}
+        placement="right"
+        size={"lg"}
+        onClose={queueDrawerOpen.onClose}
+        onOverlayClick={queueDrawerOpen.onClose}
+      >
+        <AddAnnotationQueueDrawer
+          onClose={queueDrawerOpen.onClose}
+          onOverlayClick={queueDrawerOpen.onClose}
+        />
+      </Drawer>
     </VStack>
   );
 }

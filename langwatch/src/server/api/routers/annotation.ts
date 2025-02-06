@@ -218,4 +218,34 @@ export const annotationRouter = createTRPCRouter({
         },
       });
     }),
+  createQueueItem: protectedProcedure
+    .input(
+      z.object({
+        traceId: z.string(),
+        projectId: z.string(),
+        annotators: z.array(z.string()),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      for (const annotator of input.annotators) {
+        if (annotator.startsWith("queue")) {
+          await ctx.prisma.annotationQueueItem.create({
+            data: {
+              annotationQueueId: annotator.replace("queue-", ""),
+              traceId: input.traceId,
+              projectId: input.projectId,
+            },
+          });
+        } else {
+          await ctx.prisma.annotationQueueItem.create({
+            data: {
+              userId: annotator.replace("user-", ""),
+              traceId: input.traceId,
+              projectId: input.projectId,
+            },
+          });
+        }
+      }
+    }),
 });
