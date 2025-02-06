@@ -24,7 +24,6 @@ from deprecated import deprecated
 import httpx
 
 import nanoid
-import requests
 from langwatch.logger import get_logger
 from langwatch.types import (
     BaseSpan,
@@ -1029,7 +1028,9 @@ class ContextTrace:
         )
 
     def deferred_send_spans(self):
-        get_logger().debug(f"Scheduling for sending trace {self.trace_id} in 1s")
+        get_logger().debug(
+            f"Scheduling for sending trace {self.trace_id} in 1s to {langwatch.endpoint}"
+        )
         self._add_finished_at_to_missing_spans()
 
         if "PYTEST_CURRENT_TEST" in os.environ:
@@ -1183,33 +1184,42 @@ def send_spans(
     ):
         return
 
-    response = requests.post(
-        f"{langwatch.endpoint}/api/collector{force_sync}",
-        data=json.dumps(data, cls=SerializableWithStringFallback),
-        headers={
-            "X-Auth-Token": str(api_key),
-            "Content-Type": "application/json",
-        },
-    )
+    with httpx.Client(timeout=60.0) as client:
+        response = client.post(
+            f"{langwatch.endpoint}/api/collector{force_sync}",
+            json=data,
+            headers={
+                "X-Auth-Token": str(api_key),
+                "Content-Type": "application/json",
+            },
+        )
 
-    if response.status_code == 429:
-        json = response.json()
-        if "message" in json and "ERR_PLAN_LIMIT" in json["message"]:
-            warn(json["message"])
-        else:
-            warn("Rate limit exceeded, dropping message from being sent to LangWatch")
-    else:
-        if response.status_code >= 300 and response.status_code < 500:
+        if response.status_code == 429:
+            json_response = response.json()
+            if (
+                "message" in json_response
+                and "ERR_PLAN_LIMIT" in json_response["message"]
+            ):
+                warn(json_response["message"])
+            else:
+                warn(
+                    "Rate limit exceeded, dropping message from being sent to LangWatch"
+                )
+            return
+        elif response.status_code >= 300 and response.status_code < 500:
             try:
-                json = response.json()
-                if "message" in json:
-                    message = json["message"]
+                json_response = response.json()
+                if "message" in json_response:
+                    message = json_response["message"]
                     warn(f"LangWatch returned an error: {message}")
                 else:
                     warn(f"LangWatch returned an error: {response.content}")
             except:
                 warn(f"LangWatch returned an error: {response.content}")
+
         response.raise_for_status()
+
+    get_logger().debug(f"Trace {data['trace_id']} sent successfully")
 
 
 trace = ContextTrace

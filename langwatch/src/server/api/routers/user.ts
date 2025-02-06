@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { hash } from "bcrypt";
 import { z } from "zod";
-import { createTRPCRouter, publicProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 import { skipPermissionCheck } from "../permission";
 import { env } from "../../../env.mjs";
@@ -52,17 +52,13 @@ export const userRouter = createTRPCRouter({
 
       return { id: newUser.id };
     }),
-  updateLastLogin: publicProcedure
-    .input(
-      z.object({
-        userId: z.string(),
-      })
-    )
+  updateLastLogin: protectedProcedure
+    .input(z.object({}))
     .use(skipPermissionCheck)
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx }) => {
       await ctx.prisma.user.update({
         where: {
-          id: input.userId,
+          id: ctx.session.user.id,
         },
         data: {
           lastLoginAt: new Date(),

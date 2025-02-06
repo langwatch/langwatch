@@ -7,6 +7,10 @@ import {
 } from "bullmq";
 import { EventEmitter } from "events";
 import { connection } from "../../redis";
+import { getDebugger } from "../../../utils/logger";
+import * as Sentry from "@sentry/nextjs";
+
+export const debug = getDebugger("langwatch:queueWithFallback");
 
 // Queue that falls back to calling the worker directly if the queue is not available
 export class QueueWithFallback<
@@ -41,7 +45,46 @@ export class QueueWithFallback<
       await new Promise((resolve) => setTimeout(resolve, opts?.delay ?? 0));
       await this.worker(new Job(this, name, data, opts));
     }
-    return await super.add(name, data, opts);
+
+    try {
+      const timeoutState = { state: "waiting" };
+      const timeoutPromise = new Promise((resolve, reject) => {
+        setTimeout(() => {
+          if (timeoutState.state === "waiting") {
+            reject(
+              new Error("Timed out after 3s trying to insert on the queue")
+            );
+          } else {
+            resolve(undefined);
+          }
+        }, 3000);
+      });
+
+      const job = await Promise.race([
+        timeoutPromise,
+        super.add(name, data, opts).then((job) => {
+          timeoutState.state = "resolved";
+          return job;
+        }),
+      ]);
+
+      return job as Job<DataType, ResultType, NameType>;
+    } catch (error) {
+      debug(
+        "Failed sending to redis collector queue inserting trace directly, processing job synchronously.",
+        "Exception:",
+        error
+      );
+      Sentry.captureException(error, {
+        extra: {
+          message:
+            "Failed sending to redis collector queue inserting trace directly, processing job synchronously",
+          projectId: (data as any)?.projectId,
+        },
+      });
+
+      return await this.worker(new Job(this, name, data, opts));
+    }
   }
 
   async addBulk(
@@ -62,7 +105,31 @@ export class QueueWithFallback<
     if (!connection) {
       return undefined;
     }
-    return await super.getJob(id);
+    const timeoutState = { state: "waiting" };
+    const timeoutPromise = new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (timeoutState.state === "waiting") {
+          reject(new Error("Timed out after 3s trying to get job from redis"));
+        } else {
+          resolve(undefined);
+        }
+      }, 3000);
+    });
+
+    try {
+      const job = await Promise.race([
+        timeoutPromise,
+        super.getJob(id).then((job) => {
+          timeoutState.state = "resolved";
+          return job;
+        }),
+      ]);
+
+      return job as Job<DataType, ResultType, NameType>;
+    } catch (error) {
+      debug("Failed getting job from redis", error);
+      return undefined;
+    }
   }
 }
 

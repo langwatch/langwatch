@@ -653,3 +653,24 @@ model OrganizationFeature {
     @@index([feature])
     @@index([organizationId])
 }
+
+model AuditLog {
+    id             String   @id @default(cuid())
+    createdAt      DateTime @default(now())
+    userId         String
+    projectId      String?
+    organizationId String?
+    action         String
+    args           Json?
+    error          String?
+    ipAddress      String?
+    userAgent      String?
+    metadata       Json?
+
+    @@index([createdAt])
+    @@index([userId])
+    @@index([projectId])
+    @@index([organizationId])
+    @@index([action])
+    @@index([ipAddress])
+}

@@ -108,7 +108,7 @@ async def main(message: cl.Message):
 
     langwatch.get_current_trace().update(
         metadata={
-            "session_id": message.thread_id,
+            "thread_id": message.thread_id,
             "user_id": "my-test-user",
             "tags": ["User relevant question", "Second tag example"],
             "metadata": {"foo": "bar"},
