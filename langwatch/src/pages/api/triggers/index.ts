@@ -1,22 +1,17 @@
-import {
-  TriggerAction,
-  type AlertType,
-  type Project,
-  type Trigger,
-} from "@prisma/client";
+import { TriggerAction, type Project, type Trigger } from "@prisma/client";
+import * as Sentry from "@sentry/nextjs";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { getAllTracesForProject } from "~/server/api/routers/traces";
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
 import { prisma } from "../../../server/db";
-import * as Sentry from "@sentry/nextjs";
 
 import { type Trace } from "~/server/tracer/types";
 
 import {
   mapTraceToDatasetEntry,
-  type TRACE_EXPANSIONS,
   type Mapping,
+  type TRACE_EXPANSIONS,
 } from "~/components/datasets/DatasetMapping";
 
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord";
@@ -154,8 +149,8 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           triggerData,
           triggerName: name,
           projectSlug: project!.slug,
-          triggerType: trigger.alertType as AlertType,
-          triggerMessage: trigger.message as string,
+          triggerType: trigger.alertType ?? null,
+          triggerMessage: trigger.message ?? "",
         };
 
         updatedAt = getLatestUpdatedAt(traces);
@@ -185,8 +180,8 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           triggerData,
           triggerName: name,
           projectSlug: project!.slug,
-          triggerType: trigger.alertType as AlertType,
-          triggerMessage: trigger.message as string,
+          triggerType: trigger.alertType ?? null,
+          triggerMessage: trigger.message ?? "",
         };
 
         updatedAt = getLatestUpdatedAt(traces);
@@ -253,7 +248,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           }
         }
 
-        const createManyDatasetRecordsResult = await createManyDatasetRecords({
+        await createManyDatasetRecords({
           datasetId: datasetId,
           projectId: input.projectId,
           datasetRecords: entries,
@@ -278,7 +273,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
         return {
           triggerId,
           status: "error",
-          error: `Failed to add to dataset: ${error}`,
+          error: `Failed to add to dataset: ${error as string}`,
           traces: tracesToSend,
         };
       }
