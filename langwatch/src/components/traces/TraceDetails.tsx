@@ -222,6 +222,7 @@ export function TraceDetails(props: {
   const toast = useToast();
 
   const sendToQueue = () => {
+    console.log("annotators", annotators);
     queueItem.mutate(
       {
         projectId: project?.id ?? "",
@@ -305,9 +306,24 @@ export function TraceDetails(props: {
             )}
             {hasTeamPermission(TeamRoleGroup.ANNOTATIONS_MANAGE) && (
               <>
+                {/* <Popover>
+                  <PopoverTrigger> */}
                 <Button colorScheme="black" variant="outline" onClick={onOpen}>
                   Annotation Queue
                 </Button>
+                {/* </PopoverTrigger>
+                  <PopoverContent>
+                    <PopoverArrow />
+                    <PopoverCloseButton />
+                    <PopoverBody>
+                      <AddParticipants
+                        options={options}
+                        annotators={annotators}
+                        setAnnotators={setAnnotators}
+                      />
+                    </PopoverBody>
+                  </PopoverContent>
+                </Popover> */}
               </>
             )}
             {hasTeamPermission(TeamRoleGroup.DATASETS_MANAGE) && (
@@ -448,127 +464,12 @@ export function TraceDetails(props: {
         <ModalContent minHeight="200px">
           <ModalCloseButton />
           <ModalBody>
-            <VStack width="full" align="start">
-              <Text>Send to:</Text>
-              <Box
-                border="1px solid lightgray"
-                borderRadius={5}
-                paddingX={1}
-                minWidth="300px"
-              >
-                <MultiSelect
-                  options={options}
-                  onChange={(newValue) => {
-                    setAnnotators(
-                      newValue.map((v) => ({
-                        id: v.value,
-                        name: v.label,
-                      }))
-                    );
-                  }}
-                  value={annotators.map((p) => ({
-                    value: p.id,
-                    label: p.name ?? "",
-                  }))}
-                  isMulti
-                  closeMenuOnSelect={false}
-                  selectedOptionStyle="check"
-                  hideSelectedOptions={true}
-                  useBasicStyles
-                  variant="unstyled"
-                  placeholder="Add Participants"
-                  components={{
-                    Menu: ({ children, ...props }) => (
-                      <chakraComponents.Menu
-                        {...props}
-                        innerProps={{
-                          ...props.innerProps,
-                          style: { width: "300px" },
-                        }}
-                      >
-                        {children}
-                      </chakraComponents.Menu>
-                    ),
-                    Option: ({ children, ...props }) => (
-                      <chakraComponents.Option {...props}>
-                        <VStack align="start">
-                          <HStack>
-                            {props.data.value.startsWith("user-") ? (
-                              <Avatar
-                                name={props.data.label}
-                                color="white"
-                                size="xs"
-                              />
-                            ) : (
-                              <Box padding={1}>
-                                <Users size={18} />
-                              </Box>
-                            )}
-                            <Text>{children}</Text>
-                          </HStack>
-                        </VStack>
-                      </chakraComponents.Option>
-                    ),
-                    MultiValueLabel: ({ children, ...props }) => (
-                      <chakraComponents.MultiValueLabel {...props}>
-                        <VStack align="start" padding={1} paddingX={0}>
-                          <HStack>
-                            {props.data.value.startsWith("user-") ? (
-                              <Avatar
-                                name={props.data.label}
-                                color="white"
-                                size="xs"
-                              />
-                            ) : (
-                              <Box padding={1}>
-                                <Users size={18} />
-                              </Box>
-                            )}
-                            <Text>{children}</Text>
-                          </HStack>
-                        </VStack>
-                      </chakraComponents.MultiValueLabel>
-                    ),
-                    MenuList: (props) => (
-                      <chakraComponents.MenuList {...props} maxHeight={300}>
-                        <Box
-                          maxH="250px"
-                          overflowY="auto"
-                          css={{
-                            "&::-webkit-scrollbar": {
-                              display: "none",
-                            },
-                            msOverflowStyle: "none", // IE and Edge
-                            scrollbarWidth: "none", // Firefox
-                          }}
-                        >
-                          {props.children}
-                        </Box>
-                        <Box
-                          p={2}
-                          position="sticky"
-                          bottom={0}
-                          bg="white"
-                          borderTop="1px solid"
-                          borderColor="gray.100"
-                        >
-                          <Button
-                            width="100%"
-                            colorScheme="blue"
-                            onClick={queueDrawerOpen.onOpen}
-                            leftIcon={<Plus />}
-                            variant="outline"
-                            size="sm"
-                          >
-                            Add New Queue
-                          </Button>
-                        </Box>
-                      </chakraComponents.MenuList>
-                    ),
-                  }}
-                />
-              </Box>
-            </VStack>
+            <AddParticipants
+              options={options}
+              annotators={annotators}
+              setAnnotators={setAnnotators}
+              queueDrawerOpen={queueDrawerOpen}
+            />
           </ModalBody>
           <ModalFooter>
             <Button mr={3} onClick={onClose} variant="outline">
@@ -596,6 +497,150 @@ export function TraceDetails(props: {
   );
 }
 
+const AddParticipants = ({
+  options,
+  annotators,
+  setAnnotators,
+  queueDrawerOpen,
+}: {
+  options: any[];
+  annotators: any[];
+  setAnnotators: any;
+  queueDrawerOpen: any;
+}) => {
+  return (
+    <>
+      <VStack width="full" align="start" minHeight="250px">
+        <Text>Send to:</Text>
+        <Box
+          border="1px solid lightgray"
+          borderRadius={5}
+          paddingX={1}
+          minWidth="300px"
+        >
+          <MultiSelect
+            options={options}
+            onChange={(newValue) => {
+              setAnnotators(
+                newValue.map((v) => ({
+                  id: v.value,
+                  name: v.label,
+                }))
+              );
+            }}
+            value={annotators.map((p) => ({
+              value: p.id,
+              label: p.name ?? "",
+            }))}
+            isMulti
+            closeMenuOnSelect={false}
+            selectedOptionStyle="check"
+            hideSelectedOptions={true}
+            useBasicStyles
+            variant="unstyled"
+            placeholder="Add Participants"
+            components={{
+              Menu: ({ children, ...props }) => (
+                <chakraComponents.Menu
+                  {...props}
+                  innerProps={{
+                    ...props.innerProps,
+                    style: { width: "300px" },
+                  }}
+                >
+                  {children}
+                </chakraComponents.Menu>
+              ),
+              Option: ({ children, ...props }) => (
+                <chakraComponents.Option {...props}>
+                  <VStack align="start">
+                    <HStack>
+                      {props.data.value.startsWith("user-") ? (
+                        <Avatar
+                          name={props.data.label}
+                          color="white"
+                          size="xs"
+                        />
+                      ) : (
+                        <Box padding={1}>
+                          <Users size={18} />
+                        </Box>
+                      )}
+                      <Text>{children}</Text>
+                    </HStack>
+                  </VStack>
+                </chakraComponents.Option>
+              ),
+              MultiValueLabel: ({ children, ...props }) => (
+                <chakraComponents.MultiValueLabel {...props}>
+                  <VStack align="start" padding={1} paddingX={0}>
+                    <HStack>
+                      {props.data.value.startsWith("user-") ? (
+                        <Avatar
+                          name={props.data.label}
+                          color="white"
+                          size="xs"
+                        />
+                      ) : (
+                        <Box padding={1}>
+                          <Users size={18} />
+                        </Box>
+                      )}
+                      <Text>{children}</Text>
+                    </HStack>
+                  </VStack>
+                </chakraComponents.MultiValueLabel>
+              ),
+              MenuList: (props) => (
+                <chakraComponents.MenuList {...props} maxHeight={300}>
+                  <Box
+                    maxH="250px"
+                    overflowY="auto"
+                    css={{
+                      "&::-webkit-scrollbar": {
+                        display: "none",
+                      },
+                      msOverflowStyle: "none", // IE and Edge
+                      scrollbarWidth: "none", // Firefox
+                    }}
+                  >
+                    {props.children}
+                  </Box>
+                  <Box
+                    p={2}
+                    position="sticky"
+                    bottom={0}
+                    bg="white"
+                    borderTop="1px solid"
+                    borderColor="gray.100"
+                  >
+                    <Button
+                      width="100%"
+                      colorScheme="blue"
+                      onClick={queueDrawerOpen.onOpen}
+                      leftIcon={<Plus />}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Add New Queue
+                    </Button>
+                  </Box>
+                </chakraComponents.MenuList>
+              ),
+            }}
+          />
+        </Box>
+        {/* <Spacer />
+        <HStack width="full">
+          <Spacer />
+          <Button colorScheme="orange" size="sm">
+            Send
+          </Button>
+        </HStack> */}
+      </VStack>
+    </>
+  );
+};
 function Events({ traceId }: { traceId: string }) {
   const { trace } = useTraceDetailsState(traceId);
 

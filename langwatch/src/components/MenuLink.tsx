@@ -1,12 +1,20 @@
 import type { PropsWithChildren } from "react";
 import { Link } from "@chakra-ui/next-js";
 import { usePathname } from "next/navigation";
+import { HStack, Icon, Spacer, Text } from "@chakra-ui/react";
 
 export const MenuLink = ({
   paddingX = 4,
   href,
   children,
-}: PropsWithChildren<{ paddingX?: number; href: string }>) => {
+  icon,
+  menuEnd,
+}: PropsWithChildren<{
+  paddingX?: number;
+  href: string;
+  icon?: React.ComponentType<{ size?: string | number; color?: string }>;
+  menuEnd?: React.ReactNode;
+}>) => {
   const pathname = usePathname();
   const selected = pathname === href;
 
@@ -28,7 +36,12 @@ export const MenuLink = ({
         background: selected ? "orange.400" : "transparent",
       }}
     >
-      {children}
+      <HStack width="full">
+        {icon && <Icon as={icon} />}
+        <Text>{children}</Text>
+        <Spacer />
+        {menuEnd && menuEnd}
+      </HStack>
     </Link>
   );
 };

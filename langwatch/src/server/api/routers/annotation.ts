@@ -229,6 +229,7 @@ export const annotationRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       for (const annotator of input.annotators) {
+        console.log("annotator", annotator);
         if (annotator.startsWith("queue")) {
           await ctx.prisma.annotationQueueItem.create({
             data: {

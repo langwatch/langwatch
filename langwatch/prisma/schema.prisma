@@ -548,6 +548,7 @@ model AnnotationQueueItem {
     updatedAt         DateTime         @default(now()) @updatedAt
     traceId           String
     projectId         String
+    doneAt            DateTime?
     project           Project          @relation(fields: [projectId], references: [id])
 
     @@index([annotationQueueId])
