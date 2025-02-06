@@ -75,7 +75,7 @@ export const permissionGuardedString = <
   T extends string | PermissionGuardedString | undefined,
 >(
   value: T,
-  isValidated = true
+  isValidated: boolean | null = null
 ): T => {
   if (typeof value === "undefined") {
     return value;
@@ -83,7 +83,7 @@ export const permissionGuardedString = <
 
   return {
     value: isGuardedString(value) ? value.value : value,
-    isValidated: isValidated,
+    isValidated: isValidated ?? (isGuardedString(value) ? value.isValidated : true),
   } as any as T;
 };
 
