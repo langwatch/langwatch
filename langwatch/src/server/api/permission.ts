@@ -75,7 +75,7 @@ export const permissionGuardedString = <
   T extends string | PermissionGuardedString | undefined,
 >(
   value: T,
-  isValidated: boolean | null = null
+  isValidated: false | null = null
 ): T => {
   if (typeof value === "undefined") {
     return value;
