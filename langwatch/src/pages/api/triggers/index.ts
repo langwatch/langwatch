@@ -154,8 +154,8 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           triggerData,
           triggerName: name,
           projectSlug: project!.slug,
-          triggerType: trigger.alertType as AlertType,
-          triggerMessage: trigger.message as string,
+          triggerType: trigger.alertType!,
+          triggerMessage: trigger.message!,
         };
 
         updatedAt = getLatestUpdatedAt(traces);
@@ -185,8 +185,8 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           triggerData,
           triggerName: name,
           projectSlug: project!.slug,
-          triggerType: trigger.alertType as AlertType,
-          triggerMessage: trigger.message as string,
+          triggerType: trigger.alertType!,
+          triggerMessage: trigger.message!,
         };
 
         updatedAt = getLatestUpdatedAt(traces);
@@ -278,7 +278,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
         return {
           triggerId,
           status: "error",
-          error: `Failed to add to dataset: ${error}`,
+          error: `Failed to add to dataset: ${error as string}`,
           traces: tracesToSend,
         };
       }
