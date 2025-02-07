@@ -15,7 +15,7 @@ import {
   checkUserPermissionForProject,
   checkUserPermissionForTeam,
   skipPermissionCheck,
-  skipPermissionCheckAccountCreation,
+  skipPermissionCheckProjectCreation,
 } from "../permission";
 import { getOrganizationProjectsCount } from "./limits";
 import { dependencies } from "../../../injection/dependencies.server";
