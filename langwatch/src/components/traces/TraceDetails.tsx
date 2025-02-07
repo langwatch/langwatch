@@ -55,7 +55,7 @@ import { useDrawer } from "../CurrentDrawer";
 import { ShareButton } from "./ShareButton";
 import { SpanTree } from "./SpanTree";
 import { TraceSummary } from "./Summary";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { evaluationPassed } from "../checks/EvaluationStatus";
@@ -234,8 +234,14 @@ export function TraceDetails(props: {
           onClose();
           toast({
             title: "Annotators added to queue",
-            description:
-              "The annotators will be notified of the new queue item.",
+            description: (
+              <>
+                The annotators will be notified of the new queue item. <br />
+                <Link href={`/${project?.slug}/annotations/`}>
+                  View Queue Items
+                </Link>
+              </>
+            ),
             status: "success",
             isClosable: true,
             position: "top-right",
@@ -254,6 +260,10 @@ export function TraceDetails(props: {
       setThreadId(trace.data.metadata.thread_id);
     }
   }, [trace.data?.metadata.thread_id]);
+
+  const ref = useRef(null);
+
+  const popoverOpen = useDisclosure();
 
   return (
     <VStack
@@ -306,13 +316,31 @@ export function TraceDetails(props: {
             )}
             {hasTeamPermission(TeamRoleGroup.ANNOTATIONS_MANAGE) && (
               <>
-                {/* <Popover>
-                  <PopoverTrigger> */}
-                <Button colorScheme="black" variant="outline" onClick={onOpen}>
-                  Annotation Queue
-                </Button>
-                {/* </PopoverTrigger>
-                  <PopoverContent>
+                <Popover
+                  isOpen={popoverOpen.isOpen}
+                  onOpen={popoverOpen.onOpen}
+                  onClose={popoverOpen.onClose}
+                >
+                  <PopoverTrigger>
+                    <Button colorScheme="black" variant="outline">
+                      Annotation Queue
+                    </Button>
+                  </PopoverTrigger>
+                  {/* {popoverOpen.isOpen && (
+                    <Portal>
+                      <Box
+                        position="fixed"
+                        top={0}
+                        left={0}
+                        right={0}
+                        bottom={0}
+                        bg="blackAlpha.600"
+                        zIndex="100" // Higher than Drawer
+                        onClick={popoverOpen.onClose} // Clicking overlay closes popover
+                      />
+                    </Portal>
+                  )} */}
+                  <PopoverContent zIndex="2222">
                     <PopoverArrow />
                     <PopoverCloseButton />
                     <PopoverBody>
@@ -320,10 +348,12 @@ export function TraceDetails(props: {
                         options={options}
                         annotators={annotators}
                         setAnnotators={setAnnotators}
+                        queueDrawerOpen={queueDrawerOpen}
+                        sendToQueue={sendToQueue}
                       />
                     </PopoverBody>
                   </PopoverContent>
-                </Popover> */}
+                </Popover>
               </>
             )}
             {hasTeamPermission(TeamRoleGroup.DATASETS_MANAGE) && (
@@ -459,28 +489,11 @@ export function TraceDetails(props: {
           </TabPanel>
         </TabPanels>
       </Tabs>
-      <Modal isOpen={isOpen} onClose={onClose}>
+
+      {/* <Modal isOpen={popoverOpen.isOpen} onClose={popoverOpen.onClose}>
         <ModalOverlay />
-        <ModalContent minHeight="200px">
-          <ModalCloseButton />
-          <ModalBody>
-            <AddParticipants
-              options={options}
-              annotators={annotators}
-              setAnnotators={setAnnotators}
-              queueDrawerOpen={queueDrawerOpen}
-            />
-          </ModalBody>
-          <ModalFooter>
-            <Button mr={3} onClick={onClose} variant="outline">
-              Cancel
-            </Button>
-            <Button colorScheme="orange" onClick={sendToQueue}>
-              Send
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>{" "}
+        <ModalContent>
+      </Modal> */}
       <Drawer
         isOpen={queueDrawerOpen.isOpen}
         placement="right"
@@ -502,15 +515,17 @@ const AddParticipants = ({
   annotators,
   setAnnotators,
   queueDrawerOpen,
+  sendToQueue,
 }: {
   options: any[];
   annotators: any[];
   setAnnotators: any;
   queueDrawerOpen: any;
+  sendToQueue: () => void;
 }) => {
   return (
     <>
-      <VStack width="full" align="start" minHeight="250px">
+      <VStack width="full" align="start">
         <Text>Send to:</Text>
         <Box
           border="1px solid lightgray"
@@ -630,13 +645,13 @@ const AddParticipants = ({
             }}
           />
         </Box>
-        {/* <Spacer />
+        <Spacer />
         <HStack width="full">
           <Spacer />
-          <Button colorScheme="orange" size="sm">
+          <Button colorScheme="orange" size="sm" onClick={sendToQueue}>
             Send
           </Button>
-        </HStack> */}
+        </HStack>
       </VStack>
     </>
   );

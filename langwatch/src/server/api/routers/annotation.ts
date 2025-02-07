@@ -215,6 +215,29 @@ export const annotationRouter = createTRPCRouter({
               annotationScore: true,
             },
           },
+          AnnotationQueueItems: {
+            where: {
+              doneAt: null, // Only include pending items
+            },
+            include: {
+              createdByUser: true,
+            },
+          },
+        },
+      });
+    }),
+  getQueueItems: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.annotationQueueItem.findMany({
+        where: { projectId: input.projectId },
+        include: {
+          annotationQueue: true,
+          createdByUser: true,
+        },
+        orderBy: {
+          createdAt: "desc",
         },
       });
     }),
@@ -236,6 +259,7 @@ export const annotationRouter = createTRPCRouter({
               annotationQueueId: annotator.replace("queue-", ""),
               traceId: input.traceId,
               projectId: input.projectId,
+              createdByUserId: ctx.session.user.id,
             },
           });
         } else {
@@ -244,6 +268,7 @@ export const annotationRouter = createTRPCRouter({
               userId: annotator.replace("user-", ""),
               traceId: input.traceId,
               projectId: input.projectId,
+              createdByUserId: ctx.session.user.id,
             },
           });
         }

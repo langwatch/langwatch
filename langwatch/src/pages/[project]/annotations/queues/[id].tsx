@@ -35,7 +35,7 @@ import { api } from "~/utils/api";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useRouter } from "next/router";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
-import type { AppRouter } from "../../server/api/root";
+import type { AppRouter } from "../../../../server/api/root";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { TRPCClientErrorLike } from "@trpc/client";
@@ -43,28 +43,33 @@ import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
-
+import { useSession } from "next-auth/react";
 export default function Annotations() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, isDrawerOpen } = useDrawer();
   const router = useRouter();
+
+  const session = useSession();
+  const { id } = router.query;
+
   const { filterParams, queryOpts, nonEmptyFilters } = useFilterParams();
   const {
     assignedQueueItemsWithTraces,
     memberAccessibleQueueItemsWithTraces,
+
     queuesLoading,
   } = useAnnotationQueues();
 
-  const allQueueItems = [
-    ...(assignedQueueItemsWithTraces ?? []),
-    ...(memberAccessibleQueueItemsWithTraces ?? []),
-  ];
-
-  console.log("assignedQueueItemsWithTraces2", assignedQueueItemsWithTraces);
-
-  const allScoreOptionIds = assignedQueueItemsWithTraces?.map(
-    (queue) => queue.annotations?.map((item) => item.scoreOptions) ?? []
+  console.log(
+    "memberAccessibleQueueItemsWithTraces",
+    memberAccessibleQueueItemsWithTraces
   );
+
+  const allQueueItems = [
+    ...(memberAccessibleQueueItemsWithTraces?.filter(
+      (item) => item.annotationQueueId === id
+    ) ?? []),
+  ];
 
   const hasAnyFilters = nonEmptyFilters.length > 0;
   const traceGroups = api.traces.getAllForProject.useQuery(
@@ -107,48 +112,6 @@ export default function Annotations() {
       }
     );
   }
-
-  const scoreOptions = api.annotationScore.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    {
-      enabled: !!project,
-    }
-  );
-
-  const scoreOptionsIDArray = scoreOptions.data
-    ? scoreOptions.data.map((scoreOption) => scoreOption.id)
-    : [];
-
-  const annotationScoreValues = (
-    scoreOptions: Record<string, ScoreOption>,
-    scoreOptionsIDArray: string[]
-  ) => {
-    if (scoreOptionsIDArray.length > 0 && scoreOptions) {
-      console.log("scoreOptions", scoreOptions);
-      return scoreOptionsIDArray.map((id) => (
-        <Td key={id}>
-          <HStack>
-            <Text>
-              {" "}
-              {Array.isArray(scoreOptions[id]?.value)
-                ? scoreOptions[id]?.value.join(", ")
-                : scoreOptions[id]?.value}
-            </Text>
-            {scoreOptions[id]?.reason && (
-              <Tooltip label={scoreOptions[id]?.reason}>
-                <HelpCircle width={16} height={16} />
-              </Tooltip>
-            )}
-          </HStack>
-        </Td>
-      ));
-    } else {
-      if (scoreOptionsIDArray.length > 0) {
-        return scoreOptionsIDArray.map((_, i) => <Td key={i}></Td>);
-      }
-      return <Td></Td>;
-    }
-  };
 
   const openTraceDrawer = (traceId: string) => {
     openDrawer("traceDetails", {
@@ -211,11 +174,6 @@ export default function Annotations() {
                         <Th>Date Queued</Th>
                         <Th>Input</Th>
                         <Th>Output</Th>
-                        {scoreOptions.data &&
-                          scoreOptions.data.length > 0 &&
-                          scoreOptions.data?.map((key) => (
-                            <Th key={key.id}>{key.name}</Th>
-                          ))}
                         <Th>Trace Date</Th>
                       </Tr>
                     </Thead>
@@ -231,66 +189,43 @@ export default function Annotations() {
                           </Tr>
                         ))
                       ) : allQueueItems.length > 0 ? (
-                        allQueueItems.map((item) => {
-                          console.log("item", item);
-                          return (
-                            <Tr
-                              cursor="pointer"
-                              key={item.id}
-                              onClick={() => openTraceDrawer(item.traceId)}
-                            >
-                              <Td>
-                                <HStack>
-                                  <Avatar
-                                    size="sm"
-                                    name={item.createdByUser?.name ?? ""}
-                                  />
-                                  <Text>
-                                    {item.createdAt.toLocaleDateString()}
-                                  </Text>
-                                </HStack>
-                              </Td>
+                        allQueueItems.map((item) => (
+                          <Tr
+                            cursor="pointer"
+                            key={item.id}
+                            onClick={() => openTraceDrawer(item.traceId)}
+                          >
+                            <Td>{item.createdAt.toLocaleDateString()}</Td>
 
-                              <Td>
-                                <Tooltip label={item.trace?.input?.value}>
-                                  <Text
-                                    noOfLines={2}
-                                    display="block"
-                                    maxWidth={450}
-                                  >
-                                    {item.trace?.input?.value}
-                                  </Text>
-                                </Tooltip>
-                              </Td>
-                              <Td>
-                                <Tooltip label={item.trace?.output?.value}>
-                                  <Text
-                                    noOfLines={2}
-                                    display="block"
-                                    maxWidth={550}
-                                  >
-                                    {item.trace?.output?.value}
-                                  </Text>
-                                </Tooltip>
-                              </Td>
-                              {scoreOptions.data &&
-                                scoreOptions.data.length > 0 &&
-                                annotationScoreValues(
-                                  item.annotations[0]
-                                    ?.scoreOptions as unknown as Record<
-                                    string,
-                                    ScoreOption
-                                  >,
-                                  scoreOptionsIDArray
-                                )}
-                              <Td>
-                                {new Date(
-                                  item.trace?.timestamps.started_at ?? ""
-                                ).toLocaleDateString()}
-                              </Td>
-                            </Tr>
-                          );
-                        })
+                            <Td>
+                              <Tooltip label={item.trace?.input?.value}>
+                                <Text
+                                  noOfLines={2}
+                                  display="block"
+                                  maxWidth={450}
+                                >
+                                  {item.trace?.input?.value}
+                                </Text>
+                              </Tooltip>
+                            </Td>
+                            <Td>
+                              <Tooltip label={item.trace?.output?.value}>
+                                <Text
+                                  noOfLines={2}
+                                  display="block"
+                                  maxWidth={550}
+                                >
+                                  {item.trace?.output?.value}
+                                </Text>
+                              </Tooltip>
+                            </Td>
+                            <Td>
+                              {new Date(
+                                item.trace?.timestamps.started_at ?? ""
+                              ).toLocaleDateString()}
+                            </Td>
+                          </Tr>
+                        ))
                       ) : (
                         <Tr>
                           <Td colSpan={5}>

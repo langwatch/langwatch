@@ -48,25 +48,26 @@ model Session {
 }
 
 model User {
-    id                   String                   @id @default(nanoid())
-    name                 String?
-    email                String?                  @unique
-    emailVerified        DateTime?
-    password             String? // for email/password auth without auth0
-    image                String?                  @db.Text
-    accounts             Account[]
-    sessions             Session[]
-    teamMemberships      TeamUser[]
-    orgMemberships       OrganizationUser[]
-    createdAt            DateTime                 @default(now())
-    updatedAt            DateTime                 @default(now()) @updatedAt
-    lastLoginAt          DateTime?
-    Annotation           Annotation[]
-    publicShares         PublicShare[]
-    Workflow             Workflow[]
-    WorkflowVersion      WorkflowVersion[]
-    annotationQueues     AnnotationQueueMembers[]
-    annotationQueueItems AnnotationQueueItem[]
+    id                 String                   @id @default(nanoid())
+    name               String?
+    email              String?                  @unique
+    emailVerified      DateTime?
+    password           String? // for email/password auth without auth0
+    image              String?                  @db.Text
+    accounts           Account[]
+    sessions           Session[]
+    teamMemberships    TeamUser[]
+    orgMemberships     OrganizationUser[]
+    createdAt          DateTime                 @default(now())
+    updatedAt          DateTime                 @default(now()) @updatedAt
+    lastLoginAt        DateTime?
+    Annotation         Annotation[]
+    publicShares       PublicShare[]
+    Workflow           Workflow[]
+    WorkflowVersion    WorkflowVersion[]
+    annotationQueues   AnnotationQueueMembers[]
+    assignedQueueItems AnnotationQueueItem[]    @relation("AssignedTo")
+    createdQueueItems  AnnotationQueueItem[]    @relation("CreatedBy")
 }
 
 model VerificationToken {
@@ -543,9 +544,11 @@ model AnnotationQueueItem {
     annotationQueueId String?
     annotationQueue   AnnotationQueue? @relation(fields: [annotationQueueId], references: [id])
     userId            String?
-    user              User?            @relation(fields: [userId], references: [id])
+    user              User?            @relation("AssignedTo", fields: [userId], references: [id])
     createdAt         DateTime         @default(now())
     updatedAt         DateTime         @default(now()) @updatedAt
+    createdByUserId   String?
+    createdByUser     User?            @relation("CreatedBy", fields: [createdByUserId], references: [id])
     traceId           String
     projectId         String
     doneAt            DateTime?

@@ -44,7 +44,7 @@ export const AddAnnotationQueueDrawer = ({
   const createAnnotationQueue = api.annotation.createQueue.useMutation();
 
   const handleClose = () => {
-    if (onClose && onOverlayClick) {
+    if (onOverlayClick) {
       onClose();
       onOverlayClick();
     } else {
@@ -154,8 +154,8 @@ export const AddAnnotationQueueDrawer = ({
         isOpen={true}
         placement="right"
         size={"lg"}
-        onClose={closeDrawer}
-        onOverlayClick={closeDrawer}
+        onClose={handleClose}
+        onOverlayClick={handleClose}
       >
         <DrawerContent>
           <DrawerHeader>
