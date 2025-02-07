@@ -4,19 +4,15 @@ import { type AppType } from "next/app";
 
 import { api } from "~/utils/api";
 
-import { switchAnatomy } from "@chakra-ui/anatomy";
-import { tableAnatomy } from "@chakra-ui/anatomy";
 import {
   ChakraProvider,
-  defineStyle,
-  defineStyleConfig,
-  createMultiStyleConfigHelpers,
-  type StyleFunctionProps,
+  defaultConfig,
+  createSystem,
+  defineRecipe,
 } from "@chakra-ui/react";
 import "~/styles/globals.scss";
 import "~/styles/markdown.scss";
 
-import { extendTheme } from "@chakra-ui/react";
 import { Inter } from "next/font/google";
 import Head from "next/head";
 import { useRouter } from "next/router";
@@ -26,133 +22,116 @@ import { dependencies } from "../injection/dependencies.client";
 
 const inter = Inter({ subsets: ["latin"] });
 
-// eslint-disable-next-line @typescript-eslint/unbound-method
-const { definePartsStyle, defineMultiStyleConfig } =
-  createMultiStyleConfigHelpers(switchAnatomy.keys);
-
-const {
-  // eslint-disable-next-line @typescript-eslint/unbound-method
-  definePartsStyle: definePartsStyleTable,
-  // eslint-disable-next-line @typescript-eslint/unbound-method
-  defineMultiStyleConfig: defineMultiStyleConfigTable,
-} = createMultiStyleConfigHelpers(tableAnatomy.keys);
-
-export const theme = extendTheme({
-  styles: {
-    global: (_props: StyleFunctionProps) => ({
-      body: {
-        background: "#E5E7EB",
-      },
-    }),
-  },
-  fonts: {
-    heading: inter.style.fontFamily,
-    body: inter.style.fontFamily,
-  },
-  colors: {
-    gray: {
-      800: "#090F1D",
-      700: "#1F2937",
-      600: "#213B41",
-      500: "#51676C",
-      400: "#9CA3AF",
-      375: "#B8BDBD",
-      350: "#DDDDDD",
-      300: "#E5E7EB",
-      200: "#E6E9F0",
-      100: "#F2F4F8",
-      50: "#F7FAFC",
-    },
-    orange: {
-      700: "#c05621",
-      600: "#dd6b20",
-      500: "#ED8926",
-      400: "#ED8926",
-      300: "#FF9E2C",
-      200: "#FFD19B",
-      100: "#FFF3E4",
+export const system = createSystem(defaultConfig, {
+  globalCss: {
+    body: {
+      background: "#E5E7EB",
     },
   },
-  components: {
-    Table: defineMultiStyleConfigTable({
-      variants: {
-        grid: {
-          th: {
-            border: "1px solid",
-            borderColor: "gray.200",
-            background: "gray.50",
-          },
-          td: {
-            border: "1px solid",
-            borderColor: "gray.200",
-          },
+  theme: {
+    tokens: {
+      fonts: {
+        heading: {
+          value: inter.style.fontFamily,
+        },
+        body: {
+          value: inter.style.fontFamily,
         },
       },
-      sizes: {
-        xs: definePartsStyleTable({
-          tr: {
-            lineHeight: "1em",
-          },
-          th: {
-            fontSize: "11px",
-            paddingY: 2,
-            paddingX: 3,
-          },
-          td: {
-            fontSize: "13px",
-            paddingY: 2,
-            paddingX: 3,
-          },
-        }),
+      colors: {
+        gray: {
+          800: { value: "#090F1D" },
+          700: { value: "#1F2937" },
+          600: { value: "#213B41" },
+          500: { value: "#51676C" },
+          400: { value: "#9CA3AF" },
+          300: { value: "#E5E7EB" },
+          200: { value: "#E6E9F0" },
+          100: { value: "#F2F4F8" },
+          50: { value: "#F7FAFC" },
+        },
+        orange: {
+          700: { value: "#c05621" },
+          600: { value: "#dd6b20" },
+          500: { value: "#ED8926" },
+          300: { value: "#FF9E2C" },
+          200: { value: "#FFD19B" },
+          100: { value: "#FFF3E4" },
+        },
       },
-    }),
-    Card: defineStyleConfig({
-      baseStyle: {
-        container: {
+    },
+    recipes: {
+      table: defineRecipe({
+        variants: {
+          variant: {
+            grid: {
+              header: {
+                border: "1px solid",
+                borderColor: "gray.200",
+                background: "gray.50",
+              },
+              row: {
+                border: "1px solid",
+                borderColor: "gray.200",
+              },
+            },
+          },
+          sizes: {
+            xs: {
+              tr: {
+                lineHeight: "1em",
+              },
+              th: {
+                fontSize: "11px",
+                paddingY: 2,
+                paddingX: 3,
+              },
+              td: {
+                fontSize: "13px",
+                paddingY: 2,
+                paddingX: 3,
+              },
+            },
+          },
+        },
+      }),
+      card: defineRecipe({
+        base: {
           boxShadow: "0px 4px 10px 0px rgba(0, 0, 0, 0.06)",
         },
-      },
-    }),
-    Tag: defineStyleConfig({
-      baseStyle: {
-        container: {
+      }),
+      tag: defineRecipe({
+        base: {
           borderRadius: "62px",
           paddingX: 4,
         },
-      },
-    }),
-    Button: defineStyleConfig({
-      variants: {
-        outline: defineStyle({
-          borderColor: "gray.300",
-        }),
-      },
-    }),
-    Drawer: defineStyleConfig({
-      sizes: {
-        span: {
-          dialog: { maxWidth: "70%" },
-        },
-        full: {
-          dialog: { maxWidth: "100%" },
-        },
-        eval: {
-          dialog: { maxWidth: "1024px" },
-        },
-      },
-    }),
-    Switch: defineMultiStyleConfig({
-      variants: {
-        darkerTrack: definePartsStyle({
-          track: {
-            background: "gray.400",
-            _checked: {
-              background: "blue.500",
+      }),
+      button: defineRecipe({
+        variants: {
+          variant: {
+            outline: {
+              borderColor: "gray.300",
             },
           },
-        }),
-      },
-    }),
+        },
+      }),
+      drawer: defineRecipe({
+        variants: {
+          size: {
+            span: { maxWidth: "70%" },
+            full: { maxWidth: "100%" },
+            eval: { maxWidth: "1024px" },
+          },
+        },
+      }),
+      switch: defineRecipe({
+        variants: {
+          variant: {
+            darkerTrack: { control: { background: "gray.400" } },
+          },
+        },
+      }),
+    },
   },
 });
 
@@ -238,10 +217,7 @@ const LangWatch: AppType<{
       refetchInterval={0}
       refetchOnWindowFocus={false}
     >
-      <ChakraProvider
-        theme={theme}
-        toastOptions={{ defaultOptions: { position: "top-right" } }}
-      >
+      <ChakraProvider value={system}>
         <Head>
           <title>LangWatch</title>
         </Head>
