@@ -312,3 +312,12 @@ export const skipPermissionCheck = ({
 
   return next();
 };
+
+export const skipPermissionCheckProjectCreation = ({
+  ctx,
+  next,
+}: PermissionMiddlewareParams<object>) => {
+  ctx.permissionChecked = true;
+
+  return next();
+};
