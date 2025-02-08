@@ -3,16 +3,9 @@ import { analyticsMetrics } from "../../server/analytics/registry";
 import {
   GridItem,
   Card,
-  CardBody,
   Tabs,
-  TabList,
-  TabIndicator,
-  TabPanels,
-  TabPanel,
   VStack,
-  Tab,
   Grid,
-  CardHeader,
   Heading,
 } from "@chakra-ui/react";
 
@@ -85,11 +78,11 @@ export function UserMetrics() {
       gap={6}
     >
       <GridItem>
-        <Card>
-          <CardBody>
-            <Tabs variant="unstyled">
-              <TabList gap={8}>
-                <Tab paddingX={0} paddingBottom={4}>
+        <Card.Root>
+          <Card.Body>
+            <Tabs.Root variant="plain">
+              <Tabs.List gap={8}>
+                <Tabs.Trigger value="messages" paddingX={0} paddingBottom={4}>
                   <CustomGraph
                     input={{ ...messagesGraph, graphType: "summary" }}
                     titleProps={{
@@ -97,8 +90,8 @@ export function UserMetrics() {
                       color: "black",
                     }}
                   />
-                </Tab>
-                <Tab paddingX={0} paddingBottom={4}>
+                </Tabs.Trigger>
+                <Tabs.Trigger value="threads" paddingX={0} paddingBottom={4}>
                   <CustomGraph
                     input={{ ...threadsGraph, graphType: "summary" }}
                     titleProps={{
@@ -106,8 +99,8 @@ export function UserMetrics() {
                       color: "black",
                     }}
                   />
-                </Tab>
-                <Tab paddingX={0} paddingBottom={4}>
+                </Tabs.Trigger>
+                <Tabs.Trigger value="users" paddingX={0} paddingBottom={4}>
                   <CustomGraph
                     input={{ ...usersGraph, graphType: "summary" }}
                     titleProps={{
@@ -115,39 +108,37 @@ export function UserMetrics() {
                       color: "black",
                     }}
                   />
-                </Tab>
-              </TabList>
-              <TabIndicator
-                mt="-1.5px"
-                height="4px"
-                bg="orange.400"
-                borderRadius="1px"
-              />
-              <TabPanels>
-                <TabPanel>
-                  <CustomGraph input={messagesGraph} />
-                </TabPanel>
-                <TabPanel>
-                  <CustomGraph input={threadsGraph} />
-                </TabPanel>
-                <TabPanel>
-                  <CustomGraph input={usersGraph} />
-                </TabPanel>
-              </TabPanels>
-            </Tabs>
-          </CardBody>
-        </Card>
+                </Tabs.Trigger>
+                <Tabs.Indicator
+                  mt="-1.5px"
+                  height="4px"
+                  bg="orange.400"
+                  borderRadius="1px"
+                />
+              </Tabs.List>
+              <Tabs.Content value="messages">
+                <CustomGraph input={messagesGraph} />
+              </Tabs.Content>
+              <Tabs.Content value="threads">
+                <CustomGraph input={threadsGraph} />
+              </Tabs.Content>
+              <Tabs.Content value="users">
+                <CustomGraph input={usersGraph} />
+              </Tabs.Content>
+            </Tabs.Root>
+          </Card.Body>
+        </Card.Root>
       </GridItem>
       <GridItem rowSpan={2}>
-        <VStack spacing={6}>
-          <Card width="100%" minHeight={isNotQuickwit ? "328px" : "528px"}>
-            <CardHeader>
+        <VStack gap={6}>
+          <Card.Root width="100%" minHeight={isNotQuickwit ? "328px" : "528px"}>
+            <Card.Header>
               <Heading size="sm">Top Topics</Heading>
-            </CardHeader>
-            <CardBody maxHeight="260px" overflowY="scroll">
+            </Card.Header>
+            <Card.Body maxHeight="260px" overflowY="scroll">
               <TopicsSelector showTitle={false} />
-            </CardBody>
-          </Card>
+            </Card.Body>
+          </Card.Root>
           {isNotQuickwit && <SatisfactionGraphs />}
         </VStack>
       </GridItem>

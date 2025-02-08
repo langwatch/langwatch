@@ -1,12 +1,6 @@
 import {
   Card,
-  CardBody,
   HStack,
-  Tab,
-  TabIndicator,
-  TabList,
-  TabPanel,
-  TabPanels,
   Tabs,
   Text,
 } from "@chakra-ui/react";
@@ -52,38 +46,36 @@ export const SatisfactionGraphs = () => {
   };
 
   return (
-    <Card width="full" height="400px">
-      <CardBody padding={0}>
-        <Tabs variant="unstyled">
-          <TabList gap={0}>
-            <Tab width="50%" fontSize={14} paddingX={2} paddingY={4}>
+    <Card.Root width="full" height="400px">
+      <Card.Body padding={0}>
+        <Tabs.Root variant="plain">
+          <Tabs.List gap={0}>
+            <Tabs.Trigger value="input-sentiment" width="50%" fontSize={14} paddingX={2} paddingY={4}>
               <HStack flexWrap="nowrap">
-                <Text noOfLines={1}>Input Sentiment</Text>
+                <Text lineClamp={1}>Input Sentiment</Text>
               </HStack>
-            </Tab>
-            <Tab width="50%" fontSize={14} paddingX={2} paddingY={4}>
+            </Tabs.Trigger>
+            <Tabs.Trigger value="thumbs" width="50%" fontSize={14} paddingX={2} paddingY={4}>
               <HStack flexWrap="nowrap">
-                <Text noOfLines={1}>Thumbs Up/Down</Text>
+                <Text lineClamp={1}>Thumbs Up/Down</Text>
               </HStack>
-            </Tab>
-          </TabList>
-          <TabIndicator
-            height="4px"
-            bg="orange.400"
-            borderRadius="1px"
-            minWidth="50%"
-            maxWidth="50%"
-          />
-          <TabPanels>
-            <TabPanel padding={isNotQuickwit ? 0 : undefined}>
-              <CustomGraph input={inputSentimentGraph} hideGroupLabel={true} />
-            </TabPanel>
-            <TabPanel padding={isNotQuickwit ? 0 : undefined}>
-              <CustomGraph input={thumbsUpDownGraph} hideGroupLabel={true} />
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </CardBody>
-    </Card>
+            </Tabs.Trigger>
+            <Tabs.Indicator
+              height="4px"
+              bg="orange.400"
+              borderRadius="1px"
+              minWidth="50%"
+              maxWidth="50%"
+            />
+          </Tabs.List>
+          <Tabs.Content value="input-sentiment" padding={isNotQuickwit ? 0 : undefined}>
+            <CustomGraph input={inputSentimentGraph} hideGroupLabel={true} />
+          </Tabs.Content>
+          <Tabs.Content value="thumbs" padding={isNotQuickwit ? 0 : undefined}>
+            <CustomGraph input={thumbsUpDownGraph} hideGroupLabel={true} />
+          </Tabs.Content>
+        </Tabs.Root>
+      </Card.Body>
+    </Card.Root>
   );
 };

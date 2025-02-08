@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import type { IconButtonProps, SpanProps } from "@chakra-ui/react";
 import { ClientOnly, IconButton, Skeleton, Span } from "@chakra-ui/react";
 import { ThemeProvider, useTheme } from "next-themes";
@@ -34,6 +35,34 @@ export function useColorMode(): UseColorModeReturn {
     setColorMode: setTheme,
     toggleColorMode,
   };
+}
+
+function getComputedCSSVariableValue(variable: string) {
+  let value = getComputedStyle(document.documentElement).getPropertyValue(
+    variable
+  );
+
+  while (value.startsWith("var(")) {
+    // Extract the name of the referenced variable
+    const referencedVarName = value.slice(4, value.length - 1);
+    value = getComputedStyle(document.documentElement).getPropertyValue(
+      referencedVarName
+    );
+  }
+
+  return value.trim();
+}
+
+export function useColorRawValue(variable: string): string {
+  const [color, number] = variable.split(".");
+  const cssVariable = `--chakra-colors-${color}-${number}`;
+
+  const [value, setValue] = useState<string | null>(null);
+  useEffect(() => {
+    setValue(getComputedCSSVariableValue(cssVariable));
+  }, [cssVariable]);
+
+  return value ?? "pink";
 }
 
 export function useColorModeValue<T>(light: T, dark: T) {
