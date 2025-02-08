@@ -1,32 +1,19 @@
 import { Link } from "@chakra-ui/next-js";
 import {
   Alert,
-  AlertIcon,
   Avatar,
   Badge,
   Box,
   Button,
   HStack,
-  Hide,
   Input,
-  InputGroup,
-  InputLeftElement,
   Menu,
-  MenuButton,
-  MenuGroup,
-  MenuItem,
-  MenuList,
   Popover,
-  PopoverBody,
-  PopoverContent,
-  PopoverTrigger,
   Portal,
   Spacer,
   Text,
-  Tooltip,
   VStack,
-  useTheme,
-  type BoxProps,
+  type StackProps,
 } from "@chakra-ui/react";
 import { type Organization, type Project, type Team } from "@prisma/client";
 import { signIn, signOut } from "next-auth/react";
@@ -42,7 +29,6 @@ import {
   ChevronDown,
   ChevronRight,
   Edit,
-  GitHub,
   Lock,
   MessageSquare,
   Plus,
@@ -75,6 +61,10 @@ import { DiscordOutlineIcon } from "./icons/DiscordOutline";
 import { LogoIcon } from "./icons/LogoIcon";
 import { PuzzleIcon } from "./icons/PuzzleIcon";
 import { useTableView } from "./messages/HeaderButtons";
+import { useColorRawValue } from "./ui/color-mode";
+import { InputGroup } from "./ui/input-group";
+import { Tooltip } from "./ui/tooltip";
+import { GitHub } from "./icons/GitHub";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -97,7 +87,7 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
           </>
         )}
         <ChevronRight width="12" style={{ minWidth: "12px" }} />
-        <HoverableBigText noOfLines={1} expandable={false}>
+        <HoverableBigText lineClamp={1} expandable={false}>
           {currentRoute.title}
         </HoverableBigText>
       </HStack>
@@ -213,9 +203,8 @@ const SideMenuLink = ({
       </Badge>
     ) : null;
 
-  const theme = useTheme();
-  const orange400 = theme.colors.orange["400"];
-  const gray700 = theme.colors.gray["700"];
+  const orange400 = useColorRawValue("orange.400");
+  const gray700 = useColorRawValue("gray.700");
 
   const IconElem = icon as any;
   const iconNode =
@@ -255,7 +244,7 @@ const SideMenuLink = ({
       }}
       cursor="pointer"
     >
-      <HStack align="center" spacing={4} minHeight="21px">
+      <HStack align="center" gap={4} minHeight="21px">
         <VStack align="start" position="relative">
           {iconNode}
 
@@ -285,6 +274,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
   const router = useRouter();
   const currentRoute = findCurrentRoute(router.pathname);
   const { data: session } = useRequiredSession();
+  const [open, setOpen] = useState(false);
 
   const sortByName = (a: { name: string }, b: { name: string }) =>
     a.name.toLowerCase() < b.name.toLowerCase()
@@ -301,37 +291,32 @@ export const ProjectSelector = React.memo(function ProjectSelector({
     }))
   );
 
-  const [isOpen, setIsOpen] = useState(false);
-
   return (
-    <Menu
-      isOpen={isOpen}
-      onOpen={() => setIsOpen(true)}
-      onClose={() => setIsOpen(false)}
-    >
-      <MenuButton
-        as={Button}
-        variant="outline"
-        borderColor="gray.300"
-        fontSize={13}
-        paddingX={4}
-        paddingY={1}
-        height="auto"
-        fontWeight="normal"
-        minWidth="fit-content"
-      >
-        <HStack gap={2}>
-          <ProjectTechStackIcon project={project} />
-          <Box>{project.name}</Box>
-          <Box>
-            <ChevronDown width={14} />
-          </Box>
-        </HStack>
-      </MenuButton>
+    <Menu.Root open={open} onOpenChange={setOpen}>
+      <Menu.Trigger asChild>
+        <Button
+          variant="outline"
+          borderColor="gray.300"
+          fontSize={13}
+          paddingX={4}
+          paddingY={1}
+          height="auto"
+          fontWeight="normal"
+          minWidth="fit-content"
+        >
+          <HStack gap={2}>
+            <ProjectTechStackIcon project={project} />
+            <Box>{project.name}</Box>
+            <Box>
+              <ChevronDown width={14} />
+            </Box>
+          </HStack>
+        </Button>
+      </Menu.Trigger>
       <Portal>
         <Box zIndex="popover" padding={0}>
-          {isOpen && (
-            <MenuList zIndex="popover">
+          {open && (
+            <Menu.Content zIndex="popover">
               <>
                 {projectGroups
                   .filter((projectGroup) =>
@@ -340,7 +325,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                     )
                   )
                   .map((projectGroup) => (
-                    <MenuGroup
+                    <Menu.ItemGroup
                       key={projectGroup.team.id}
                       title={
                         projectGroup.organization.name +
@@ -365,7 +350,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                             textDecoration: "none",
                           }}
                         >
-                          <MenuItem
+                          <Menu.Item
                             icon={
                               <HStack width="26px" justify="center">
                                 <ProjectTechStackIcon project={project} />
@@ -374,21 +359,21 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                             fontSize="14px"
                           >
                             {project.name}
-                          </MenuItem>
+                          </Menu.Item>
                         </Link>
                       ))}
                       <AddProjectButton
                         team={projectGroup.team}
                         organization={projectGroup.organization}
                       />
-                    </MenuGroup>
+                    </Menu.ItemGroup>
                   ))}
               </>
-            </MenuList>
+            </Menu.Content>
           )}
         </Box>
       </Portal>
-    </Menu>
+    </Menu.Root>
   );
 });
 
@@ -417,12 +402,12 @@ export const AddProjectButton = ({
         textDecoration: "none",
       }}
     >
-      <MenuItem icon={<Plus />} fontSize="14px">
+      <Menu.Item icon={<Plus />} fontSize="14px">
         New Project
-      </MenuItem>
+      </Menu.Item>
     </Link>
   ) : (
-    <Tooltip label="You reached the limit of max new projects, click to upgrade your plan to add more projects">
+    <Tooltip content="You reached the limit of max new projects, click to upgrade your plan to add more projects">
       <Link
         href={`/settings/subscription`}
         _hover={{
@@ -435,7 +420,7 @@ export const AddProjectButton = ({
           });
         }}
       >
-        <MenuItem
+        <Menu.Item
           icon={<Lock />}
           fontSize="14px"
           color="gray.400"
@@ -444,7 +429,7 @@ export const AddProjectButton = ({
           }}
         >
           New Project
-        </MenuItem>
+        </Menu.Item>
       </Link>
     </Tooltip>
   );
@@ -454,10 +439,9 @@ export const DashboardLayout = ({
   children,
   publicPage = false,
   ...props
-}: { publicPage?: boolean } & BoxProps) => {
+}: { publicPage?: boolean } & StackProps) => {
   const router = useRouter();
-  const theme = useTheme();
-  const gray400 = theme.colors.gray["400"];
+  const gray400 = useColorRawValue("gray.400");
 
   const { data: session } = useRequiredSession({ required: !publicPage });
 
@@ -533,7 +517,7 @@ export const DashboardLayout = ({
       width="full"
       minHeight="100vh"
       alignItems={"stretch"}
-      spacing={0}
+      gap={0}
       overflowX={["auto", "auto", "clip"]}
     >
       <Head>
@@ -576,7 +560,7 @@ export const DashboardLayout = ({
           paddingX={0}
           paddingTop={5}
           paddingBottom={3}
-          spacing={6}
+          gap={6}
           height="100vh"
           align="start"
           width={isHovered ? "200px" : "full"}
@@ -588,7 +572,7 @@ export const DashboardLayout = ({
           <VStack
             width="full"
             height="full"
-            spacing={0}
+            gap={0}
             paddingTop={1}
             align="start"
           >
@@ -770,75 +754,79 @@ export const DashboardLayout = ({
       <VStack
         minWidth={`calc(100vw - ${menuWidth}px)`}
         maxWidth={`calc(100vw - ${menuWidth}px)`}
-        spacing={0}
+        gap={0}
         background="gray.100"
         {...props}
       >
         {usage.data &&
           usage.data.currentMonthMessagesCount >=
             usage.data.activePlan.maxMessagesPerMonth && (
-            <Alert
+            <Alert.Root
               status="warning"
               width="full"
               borderBottom="1px solid"
               borderBottomColor="yellow.300"
             >
-              <AlertIcon />
-              <Text>
-                You reached the limit of{" "}
-                {numeral(usage.data.activePlan.maxMessagesPerMonth).format()}{" "}
-                messages for this month, new messages will not be processed.{" "}
-                <Link
-                  href="/settings/subscription"
-                  textDecoration="underline"
-                  _hover={{
-                    textDecoration: "none",
-                  }}
-                  onClick={() => {
-                    trackEvent("subscription_hook_click", {
-                      project_id: project?.id,
-                      hook: "new_messages_limit_reached",
-                    });
-                  }}
-                >
-                  Click here
-                </Link>{" "}
-                to upgrade your plan.
-              </Text>
-            </Alert>
+              <Alert.Indicator />
+              <Alert.Content>
+                <Text>
+                  You reached the limit of{" "}
+                  {numeral(usage.data.activePlan.maxMessagesPerMonth).format()}{" "}
+                  messages for this month, new messages will not be processed.{" "}
+                  <Link
+                    href="/settings/subscription"
+                    textDecoration="underline"
+                    _hover={{
+                      textDecoration: "none",
+                    }}
+                    onClick={() => {
+                      trackEvent("subscription_hook_click", {
+                        project_id: project?.id,
+                        hook: "new_messages_limit_reached",
+                      });
+                    }}
+                  >
+                    Click here
+                  </Link>{" "}
+                  to upgrade your plan.
+                </Text>
+              </Alert.Content>
+            </Alert.Root>
           )}
         {usage.data &&
           usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
-            <Alert
+            <Alert.Root
               status="warning"
               width="full"
               borderBottom="1px solid"
               borderBottomColor="yellow.300"
             >
-              <AlertIcon />
-              <Text>
-                You reached the limit of{" "}
-                {numeral(usage.data.maxMonthlyUsageLimit).format("$0.00")} usage
-                cost for this month, evaluations and guardrails will not be
-                processed.{" "}
-                <Link
-                  href="/settings/usage"
-                  textDecoration="underline"
-                  _hover={{
-                    textDecoration: "none",
-                  }}
-                  onClick={() => {
-                    trackEvent("subscription_hook_click", {
-                      project_id: project?.id,
-                      hook: "usage_cost_limit_reached",
-                    });
-                  }}
-                >
-                  Go to settings
-                </Link>{" "}
-                to check your usage spending limit or upgrade your plan.
-              </Text>
-            </Alert>
+              <Alert.Indicator />
+              <Alert.Content>
+                <Text>
+                  You reached the limit of{" "}
+                  {numeral(usage.data.maxMonthlyUsageLimit).format("$0.00")}{" "}
+                  usage cost for this month, evaluations and guardrails will not
+                  be processed.{" "}
+                  <Link
+                    href="/settings/usage"
+                    textDecoration="underline"
+                    _hover={{
+                      textDecoration: "none",
+                    }}
+                    onClick={() => {
+                      trackEvent("subscription_hook_click", {
+                        project_id: project?.id,
+                        hook: "usage_cost_limit_reached",
+                      });
+                    }}
+                  >
+                    Go to settings
+                  </Link>{" "}
+                  to check your usage spending limit or upgrade your plan.
+                </Text>
+              </Alert.Content>
+            </Alert.Root>
           )}
         <HStack
           position="relative"
@@ -865,9 +853,9 @@ export const DashboardLayout = ({
                 to LangWatch to monitor your projects
               </Text>
             )}
-            <Hide below="lg">
+            <Box display={["none", "none", "block"]}>
               <Breadcrumbs currentRoute={currentRoute} />
-            </Hide>
+            </Box>
           </HStack>
           {project && (
             <form
@@ -890,14 +878,10 @@ export const DashboardLayout = ({
                 }
               }}
             >
-              <InputGroup borderColor="gray.300">
-                <InputLeftElement
-                  paddingY={1.5}
-                  height="auto"
-                  pointerEvents="none"
-                >
-                  <Search color={gray400} width={16} />
-                </InputLeftElement>
+              <InputGroup
+                borderColor="gray.300"
+                startElement={<Search color={gray400} width={16} />}
+              >
                 <Input
                   name="query"
                   type="search"
@@ -914,10 +898,10 @@ export const DashboardLayout = ({
           )}
           <HStack gap={6} flex={1}>
             <Spacer />
-            <HStack spacing={4}>
+            <HStack gap={4}>
               {integrationsLeft ? (
-                <Popover placement="bottom-end">
-                  <PopoverTrigger>
+                <Popover.Root placement="bottom-end">
+                  <Popover.Trigger>
                     <Button position="relative" variant="ghost">
                       <ChecklistIcon />
                       <Badge
@@ -932,41 +916,43 @@ export const DashboardLayout = ({
                         {integrationsLeft}
                       </Badge>
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent>
-                    <PopoverBody padding={4}>
+                  </Popover.Trigger>
+                  <Popover.Content>
+                    <Popover.Body>
                       <IntegrationChecks />
-                    </PopoverBody>
-                  </PopoverContent>
-                </Popover>
+                    </Popover.Body>
+                  </Popover.Content>
+                </Popover.Root>
               ) : (
                 <Box width={["auto", "auto", "auto", "55px"]} />
               )}
-              <Menu>
-                <MenuButton
-                  as={Button}
-                  variant="unstyled"
-                  {...(publicPage
-                    ? { onClick: () => void signIn("auth0") }
-                    : {})}
-                >
-                  <Avatar
-                    name={user?.name ?? undefined}
-                    backgroundColor={"orange.400"}
-                    color="white"
-                    size="sm"
-                  />
-                </MenuButton>
+              <Menu.Root>
+                <Menu.Trigger asChild>
+                  <Button
+                    variant="plain"
+                    {...(publicPage
+                      ? { onClick: () => void signIn("auth0") }
+                      : {})}
+                  >
+                    <Avatar.Root
+                      size="sm"
+                      backgroundColor="orange.400"
+                      color="white"
+                    >
+                      <Avatar.Fallback name={user?.name ?? undefined} />
+                    </Avatar.Root>
+                  </Button>
+                </Menu.Trigger>
                 {session && (
                   <Portal>
-                    <MenuList zIndex="popover">
+                    <Menu.Content zIndex="popover">
                       {dependencies.ExtraMenuItems && (
                         <dependencies.ExtraMenuItems />
                       )}
-                      <MenuGroup
+                      <Menu.ItemGroup
                         title={`${session.user.name} (${session.user.email})`}
                       >
-                        <MenuItem
+                        <Menu.Item
                           onClick={() =>
                             void signOut({
                               callbackUrl: window.location.origin,
@@ -974,12 +960,12 @@ export const DashboardLayout = ({
                           }
                         >
                           Logout
-                        </MenuItem>
-                      </MenuGroup>
-                    </MenuList>
+                        </Menu.Item>
+                      </Menu.ItemGroup>
+                    </Menu.Content>
                   </Portal>
                 )}
-              </Menu>
+              </Menu.Root>
             </HStack>
           </HStack>
         </HStack>
