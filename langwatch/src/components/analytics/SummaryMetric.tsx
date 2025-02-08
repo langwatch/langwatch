@@ -2,17 +2,16 @@ import {
   Box,
   Heading,
   Skeleton,
-  Tooltip,
   VStack,
   Text,
   HStack,
-  type TypographyProps,
-  type ColorProps,
+  type SystemStyleObject,
   Spacer,
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import { ArrowDown, ArrowUp, HelpCircle } from "react-feather";
 import { Delayed } from "../Delayed";
+import { Tooltip } from "../ui/tooltip";
 
 export function SummaryMetric({
   label,
@@ -30,16 +29,16 @@ export function SummaryMetric({
   tooltip?: string;
   increaseIs?: "good" | "bad" | "neutral";
   titleProps?: {
-    fontSize?: TypographyProps["fontSize"];
-    color?: ColorProps["color"];
-    fontWeight?: TypographyProps["fontWeight"];
+    fontSize?: SystemStyleObject["fontSize"];
+    color?: SystemStyleObject["color"];
+    fontWeight?: SystemStyleObject["fontWeight"];
   };
 }) {
   return (
     <VStack
       minWidth="92px"
       maxWidth="192px"
-      spacing={4}
+      gap={4}
       align="start"
       justifyContent="space-between"
       borderLeftWidth="1px"
@@ -52,14 +51,14 @@ export function SummaryMetric({
         color="gray.500"
         fontWeight="normal"
         lineHeight="1.5em"
-        noOfLines={3}
+        lineClamp={3}
         wordBreak="break-word"
         title={label}
         {...(titleProps ?? {})}
       >
         {label}
         {tooltip && (
-          <Tooltip label={tooltip}>
+          <Tooltip content={tooltip}>
             <HelpCircle
               style={{
                 display: "inline-block",
@@ -95,7 +94,7 @@ export function SummaryMetricValue({
   increaseIs?: "good" | "bad" | "neutral";
 }) {
   return (
-    <VStack align="start" spacing={1}>
+    <VStack align="start" gap={1}>
       <Box fontSize="28" fontWeight="600">
         {current !== undefined ? (
           typeof format === "function" ? (
@@ -141,7 +140,7 @@ function MetricChange({
     <HStack
       fontSize="13"
       fontWeight={600}
-      spacing={1}
+      gap={1}
       color={
         change * increaseReversal == 0
           ? "gray.500"

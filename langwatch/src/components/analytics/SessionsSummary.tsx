@@ -1,10 +1,7 @@
 import {
   Card,
-  CardBody,
-  CardHeader,
   HStack,
   Heading,
-  Tooltip,
 } from "@chakra-ui/react";
 import { HelpCircle } from "react-feather";
 import { api } from "../../utils/api";
@@ -12,6 +9,7 @@ import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { SummaryMetric } from "./SummaryMetric";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { QuickwitNote } from "./QuickwitNote";
+import { Tooltip } from "../ui/tooltip";
 
 export const SessionsSummary = () => {
   const publicEnv = usePublicEnv();
@@ -26,18 +24,18 @@ export const SessionsSummary = () => {
   );
 
   return (
-    <Card overflow={"scroll"}>
-      <CardHeader>
-        <HStack>
+    <Card.Root overflow="scroll">
+      <Card.Header>
+        <HStack gap={2}>
           <Heading size="sm">User Sessions</Heading>
-          <Tooltip label="A session is a period of user activity without breaks longer than one hour">
+          <Tooltip content="A session is a period of user activity without breaks longer than one hour">
             <HelpCircle width="14px" />
           </Tooltip>
         </HStack>
-      </CardHeader>
-      <CardBody>
+      </Card.Header>
+      <Card.Body>
         {isNotQuickwit ? (
-          <HStack spacing={0} align="stretch">
+          <HStack gap={0} align="stretch">
             <SummaryMetric
               label="Bouncing Rate"
               current={
@@ -101,7 +99,7 @@ export const SessionsSummary = () => {
         ) : isQuickwit ? (
           <QuickwitNote />
         ) : null}
-      </CardBody>
-    </Card>
+      </Card.Body>
+    </Card.Root>
   );
 };

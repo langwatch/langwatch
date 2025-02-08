@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader, Heading } from "@chakra-ui/react";
+import { Card, Heading } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { analyticsMetrics } from "../../server/analytics/registry";
 import { TeamRoleGroup } from "../../server/api/permission";
@@ -70,13 +70,13 @@ export const LLMSummary = () => {
   };
 
   return (
-    <Card>
-      <CardHeader>
+    <Card.Root>
+      <Card.Header>
         <Heading size="sm">Summary</Heading>
-      </CardHeader>
-      <CardBody>
+      </Card.Header>
+      <Card.Body>
         <CustomGraph input={llmSummary} />
-      </CardBody>
-    </Card>
+      </Card.Body>
+    </Card.Root>
   );
 };

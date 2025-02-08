@@ -1,13 +1,10 @@
 import {
   Alert,
-  AlertIcon,
   Box,
   HStack,
   Spinner,
-  useTheme,
-  type ColorProps,
-  type TypographyProps,
   Flex,
+  type SystemStyleObject,
 } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
@@ -52,6 +49,7 @@ import { useFilterParams } from "../../hooks/useFilterParams";
 import { QuickwitNote } from "./QuickwitNote";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { Delayed } from "../Delayed";
+import { useColorRawValue } from "../../components/ui/color-mode";
 
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
@@ -110,9 +108,9 @@ export function CustomGraph({
 }: {
   input: CustomGraphInput;
   titleProps?: {
-    fontSize?: TypographyProps["fontSize"];
-    color?: ColorProps["color"];
-    fontWeight?: TypographyProps["fontWeight"];
+    fontSize?: SystemStyleObject["fontSize"];
+    color?: SystemStyleObject["color"];
+    fontWeight?: SystemStyleObject["fontWeight"];
   };
   hideGroupLabel?: boolean;
 }) {
@@ -147,9 +145,9 @@ const CustomGraph_ = React.memo(
   }: {
     input: CustomGraphInput;
     titleProps?: {
-      fontSize?: TypographyProps["fontSize"];
-      color?: ColorProps["color"];
-      fontWeight?: TypographyProps["fontWeight"];
+      fontSize?: SystemStyleObject["fontSize"];
+      color?: SystemStyleObject["color"];
+      fontWeight?: SystemStyleObject["fontWeight"];
     };
     hideGroupLabel?: boolean;
     enabled?: boolean;
@@ -292,8 +290,7 @@ const CustomGraph_ = React.memo(
     );
 
     const getColor = useGetRotatingColorForCharts();
-    const theme = useTheme();
-    const gray400 = theme.colors.gray["400"];
+    const gray400 = useColorRawValue("gray.400");
 
     const formatDate = (date: string) =>
       date && format(new Date(date), "MMM d");
@@ -327,17 +324,20 @@ const CustomGraph_ = React.memo(
             </Delayed>
           )}
           {timeseries.error && (
-            <Alert
+            <Alert.Root
               status="error"
               position="absolute"
-              variant="left-accent"
+              borderStartWidth="4px"
+              borderStartColor="colorPalette.solid"
               width="fit-content"
               right={4}
               top={4}
             >
-              <AlertIcon />
-              Error loading graph data
-            </Alert>
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Description>Error loading graph data</Alert.Description>
+              </Alert.Content>
+            </Alert.Root>
           )}
           {input.graphType !== "summary" && allEmpty && (
             <Box
@@ -375,7 +375,7 @@ const CustomGraph_ = React.memo(
       );
 
       return container(
-        <HStack spacing={0} align="start" minHeight="101px" overflowX={"auto"}>
+        <HStack gap={0} align="start" minHeight="101px" overflowX={"auto"}>
           <Flex paddingBottom={3}>
             {timeseries.isLoading &&
               Object.entries(seriesSet).map(([key, series]) => (
