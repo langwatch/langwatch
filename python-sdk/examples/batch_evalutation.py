@@ -5,9 +5,9 @@ from langwatch.batch_evaluation import BatchEvaluation, DatasetEntry
 
 
 def callback(entry: DatasetEntry):
-    # generate messages for entry.input using your LLM
-    # input_data = entry.get("input")
-    # Assuming entry contains an "input" field
+    # generate messages for entry["input"] using your LLM
+    # input_data = entry["input"]
+    # Assuming the dataset contains an "input" column
 
     # Process the input data using your LLM and generate a response
     # response = f"Generated response for input: {input_data}"
