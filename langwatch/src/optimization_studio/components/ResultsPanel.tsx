@@ -22,12 +22,12 @@ import type { Node } from "@xyflow/react";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, X } from "react-feather";
 import {
-  BatchEvaluationV2EvaluationResults,
-  BatchEvaluationV2EvaluationSummary,
   BatchEvaluationV2RunList,
-  EvaluationProgressBar,
   useBatchEvaluationState,
 } from "../../components/experiments/BatchEvaluationV2";
+import { BatchEvaluationV2EvaluationResults } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationV2EvaluationResults";
+import { BatchEvaluationV2EvaluationSummary } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationSummary";
+import { EvaluationProgressBar } from "../../components/experiments/BatchEvaluationV2/EvaluationProgressBar";
 import {
   DSPyExperimentRunList,
   DSPyExperimentSummary,
