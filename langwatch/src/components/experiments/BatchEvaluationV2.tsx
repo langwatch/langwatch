@@ -21,7 +21,7 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ExternalLink } from "react-feather";
+import { Download, ExternalLink } from "react-feather";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { VersionBox } from "../../optimization_studio/components/History";
 import type { AppRouter } from "../../server/api/root";
@@ -33,7 +33,10 @@ import {
   formatEvaluationSummary,
   getFinishedAt,
 } from "./BatchEvaluationV2/BatchEvaluationSummary";
-import { BatchEvaluationV2EvaluationResults } from "./BatchEvaluationV2/BatchEvaluationV2EvaluationResults";
+import {
+  BatchEvaluationV2EvaluationResults,
+  useBatchEvaluationDownloadCSV,
+} from "./BatchEvaluationV2/BatchEvaluationV2EvaluationResults";
 
 export function BatchEvaluationV2({
   project,
@@ -51,6 +54,13 @@ export function BatchEvaluationV2({
   } = useBatchEvaluationState({
     project,
     experiment,
+  });
+
+  const { downloadCSV, isDownloadCSVEnabled } = useBatchEvaluationDownloadCSV({
+    project,
+    experiment,
+    runId: selectedRunId,
+    isFinished,
   });
 
   return (
@@ -77,11 +87,21 @@ export function BatchEvaluationV2({
           spacing={8}
           padding={6}
         >
-          <HStack width="full" align="end" spacing={6}>
+          <HStack width="full" align="end" spacing={4}>
             <Heading as="h1" size="lg">
               {experiment.name ?? experiment.slug}
             </Heading>
             <Spacer />
+            <Button
+              size="sm"
+              colorScheme="blue"
+              leftIcon={<Download size={16} />}
+              onClick={() => void downloadCSV()}
+              disabled={!isDownloadCSVEnabled}
+              marginBottom="-6px"
+            >
+              Export to CSV
+            </Button>
             {experiment.workflowId && (
               <Button
                 as={"a"}

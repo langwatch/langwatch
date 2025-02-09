@@ -26,7 +26,6 @@ type RenderableRow = {
 type EvaluationResultsTableRow = {
   datasetColumns: RenderableRow[];
   cost: RenderableRow;
-  evaluationsCost: RenderableRow;
   duration: RenderableRow;
   evaluationsColumns: Record<
     string,
@@ -97,10 +96,6 @@ const evaluationResultsTableRow = (
       ),
       value: () => datasetEntry?.cost?.toString() ?? "",
     },
-    evaluationsCost: {
-      render: () => <Td>{evaluationsCost}</Td>,
-      value: () => evaluationsCost?.toString() ?? "",
-    },
     duration: {
       render: () => (
         <Td>
@@ -122,6 +117,10 @@ const evaluationResultsTableRow = (
           return [
             evaluator,
             {
+              evaluationCost: {
+                render: () => <Td>{evaluation?.cost}</Td>,
+                value: () => evaluation?.cost?.toString() ?? "",
+              },
               evaluationInputs: Array.from(evaluationInputsColumns).map(
                 (column) => ({
                   render: () =>
