@@ -238,6 +238,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
                 >
                   {tabIndex === index ? (
                     <BatchEvaluationV2EvaluationResult
+                      evaluator={evaluator}
                       results={results}
                       datasetByIndex={datasetByIndex}
                       datasetColumns={datasetColumns}
