@@ -9,7 +9,6 @@ import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "next/router";
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
-import { useDrawer } from "~/components/CurrentDrawer";
 import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -20,7 +19,6 @@ import type { AppRouter } from "../../server/api/root";
 
 export default function Annotations() {
   const { project } = useOrganizationTeamProject();
-  const { openDrawer, isDrawerOpen } = useDrawer();
   const router = useRouter();
   const { filterParams, queryOpts, nonEmptyFilters } = useFilterParams();
 
@@ -100,8 +98,6 @@ export default function Annotations() {
       }>;
     };
   }
-
-  console.log("traces", annotations.data);
 
   const groupByTraceId = (dataArray: Annotation[]) => {
     return Object.values(

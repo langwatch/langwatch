@@ -1,10 +1,10 @@
-import { Container, Heading } from "@chakra-ui/react";
+import { Container } from "@chakra-ui/react";
 
 import { useRouter } from "next/router";
 
+import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
-import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 export default function Annotations() {
   const router = useRouter();
 
@@ -21,11 +21,6 @@ export default function Annotations() {
       (item) => item.annotationQueueId === id
     ) ?? []),
   ];
-
-  console.log(
-    "memberAccessibleQueueItemsWithTraces",
-    memberAccessibleQueueItemsWithTraces
-  );
 
   const queueName = memberAccessibleQueueItemsWithTraces?.find(
     (item) => item.annotationQueueId === id

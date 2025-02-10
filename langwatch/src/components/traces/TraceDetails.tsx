@@ -7,21 +7,12 @@ import {
   DrawerCloseButton,
   Heading,
   HStack,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
   Popover,
   PopoverArrow,
   PopoverBody,
   PopoverCloseButton,
   PopoverContent,
-  PopoverHeader,
   PopoverTrigger,
-  Portal,
   Spacer,
   Tab,
   Table,
@@ -45,28 +36,27 @@ import {
   type Project,
   type PublicShare,
 } from "@prisma/client";
+import { useRouter } from "next/router";
+import qs from "qs";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Maximize2, Minimize2, Plus, Users } from "react-feather";
 import type { ElasticSearchEvaluation } from "~/server/tracer/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
+import { Conversation } from "../../pages/[project]/messages/[trace]/index";
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
+import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { Annotations } from "../Annotations";
-import { EvaluationStatusItem } from "./EvaluationStatusItem";
+import { evaluationPassed } from "../checks/EvaluationStatus";
 import { useDrawer } from "../CurrentDrawer";
+import { EvaluationStatusItem } from "./EvaluationStatusItem";
 import { ShareButton } from "./ShareButton";
 import { SpanTree } from "./SpanTree";
 import { TraceSummary } from "./Summary";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
-import { formatTimeAgo } from "../../utils/formatTimeAgo";
-import { evaluationPassed } from "../checks/EvaluationStatus";
-import { Conversation } from "../../pages/[project]/messages/[trace]/index";
-import { Book, Maximize2, Plus, Users } from "react-feather";
-import { Minimize2 } from "react-feather";
-import { useRouter } from "next/router";
-import qs from "qs";
 
+import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 
 interface TraceEval {
   project?: Project;

@@ -1,22 +1,12 @@
-import {
-  Avatar,
-  Badge,
-  Divider,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Avatar, Divider, HStack, Text, VStack } from "@chakra-ui/react";
+import { useRouter } from "next/router";
 import { type PropsWithChildren } from "react";
+import { Check, Edit, Inbox, Users } from "react-feather";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
-import { Check, Edit, Inbox, Users } from "react-feather";
+import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
-import { api } from "~/utils/api";
-import { useRouter } from "next/router";
-import { usePeriodSelector } from "./PeriodSelector";
-import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 
 export default function AnnotationsLayout({
   children,
@@ -30,7 +20,6 @@ export default function AnnotationsLayout({
     assignedQueueItemsWithTraces,
     memberAccessibleQueueItemsWithTraces,
     memberAccessibleQueues,
-    doneQueueItemsWithTraces,
   } = useAnnotationQueues();
 
   const totalItems =

@@ -1,38 +1,14 @@
-import {
-  Avatar,
-  Card,
-  CardBody,
-  Container,
-  HStack,
-  Heading,
-  Skeleton,
-  Table,
-  TableContainer,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
-} from "@chakra-ui/react";
+import { Container } from "@chakra-ui/react";
 
-import { useRouter } from "next/router";
-import { HelpCircle } from "react-feather";
-import { FilterSidebar } from "~/components/filters/FilterSidebar";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
-
+import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
-import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 
 export default function Annotations() {
   const {
     assignedQueueItemsWithTraces,
     memberAccessibleQueueItemsWithTraces,
     queuesLoading,
-    scoreOptions,
   } = useAnnotationQueues();
 
   const allQueueItems = [

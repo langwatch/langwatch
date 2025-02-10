@@ -1,14 +1,11 @@
-import { Container, Heading } from "@chakra-ui/react";
+import { Container } from "@chakra-ui/react";
 
-import { useRouter } from "next/router";
-
+import { useSession } from "next-auth/react";
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
-import { useSession } from "next-auth/react";
 
 export default function Annotations() {
-  const router = useRouter();
   const session = useSession();
 
   const {
