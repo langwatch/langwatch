@@ -6,6 +6,7 @@ import {
 import { getEvaluatorDefinitions } from "./getEvaluator";
 import type { CheckPreconditions } from "./types";
 import { extractRAGTextualContext } from "../background/workers/collector/rag";
+import safe from "safe-regex2";
 
 export type PreconditionTrace = Pick<
   ElasticSearchTrace,
@@ -75,6 +76,10 @@ export function evaluatePreconditions(
         break;
       case "matches_regex":
         try {
+          if (!safe(precondition.value)) {
+            throw new Error("Invalid regex");
+          }
+
           // TODO: should we do a match on each item of the array here?
           const regex = new RegExp(precondition.value, "gi");
           if (!regex.test(valueToCheckStringOrStringified)) {
