@@ -19,7 +19,7 @@ export const sendInviteEmail = async ({
 }) => {
   const acceptInviteUrl = `${env.BASE_HOST}/invite/accept?inviteCode=${inviteCode}`;
 
-  const emailHtml = render(
+  const emailHtml = await render(
     <Html lang="en" dir="ltr">
       <Container
         style={{

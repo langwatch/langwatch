@@ -28,7 +28,7 @@ export const sendTriggerEmail = async ({
   triggerType: AlertType | null;
   triggerMessage: string;
 }) => {
-  const emailHtml = render(
+  const emailHtml = await render(
     <Html lang="en" dir="ltr">
       <Container
         style={{
