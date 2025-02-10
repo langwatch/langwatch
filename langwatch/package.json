@@ -62,7 +62,7 @@
     "@react-email/heading": "^0.0.9",
     "@react-email/html": "^0.0.6",
     "@react-email/img": "^0.0.6",
-    "@react-email/render": "^0.0.11",
+    "@react-email/render": "^1.0.3",
     "@sendgrid/mail": "^8.1.1",
     "@sentry/nextjs": "^8.49.0",
     "@sentry/node": "^8.49.0",
