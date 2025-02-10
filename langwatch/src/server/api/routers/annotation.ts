@@ -174,20 +174,7 @@ export const annotationRouter = createTRPCRouter({
         },
       });
     }),
-  // getAllGroupedByTraceId: protectedProcedure
-  //   .input(z.object({ projectId: z.string() }))
-  //   .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
-  //   .query(async ({ ctx, input }) => {
-  //     return ctx.prisma.annotation.groupBy({
-  //       by: ["traceId"],
-  //       where: {
-  //         projectId: input.projectId,
-  //       },
-  //       _count: {
-  //         _all: true,
-  //       },
-  //     });
-  //   }),
+
   createOrUpdateQueue: protectedProcedure
     .input(
       z.object({
@@ -207,18 +194,6 @@ export const annotationRouter = createTRPCRouter({
       });
 
       if (input.queueId) {
-        // await ctx.prisma.annotationQueueMembers.deleteMany({
-        //   where: {
-        //     annotationQueueId: input.queueId,
-        //     projectId: input.projectId,
-        //   },
-        // });
-        // await ctx.prisma.annotationQueueScores.deleteMany({
-        //   where: {
-        //     annotationQueueId: input.queueId,
-        //     projectId: input.projectId,
-        //   },
-        // });
         return ctx.prisma.annotationQueue.update({
           data: {
             projectId: input.projectId,
