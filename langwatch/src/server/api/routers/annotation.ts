@@ -188,7 +188,7 @@ export const annotationRouter = createTRPCRouter({
   //       },
   //     });
   //   }),
-  createQueue: protectedProcedure
+  createOrUpdateQueue: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
@@ -196,6 +196,7 @@ export const annotationRouter = createTRPCRouter({
         description: z.string(),
         userIds: z.array(z.string()),
         scoreTypeIds: z.array(z.string()),
+        queueId: z.string().optional(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
@@ -205,39 +206,77 @@ export const annotationRouter = createTRPCRouter({
         strict: true,
       });
 
-      const existingAnnotationQueue =
-        await ctx.prisma.annotationQueue.findFirst({
-          where: {
+      if (input.queueId) {
+        // await ctx.prisma.annotationQueueMembers.deleteMany({
+        //   where: {
+        //     annotationQueueId: input.queueId,
+        //     projectId: input.projectId,
+        //   },
+        // });
+        // await ctx.prisma.annotationQueueScores.deleteMany({
+        //   where: {
+        //     annotationQueueId: input.queueId,
+        //     projectId: input.projectId,
+        //   },
+        // });
+        return ctx.prisma.annotationQueue.update({
+          data: {
+            projectId: input.projectId,
+            name: input.name,
             slug: slug,
+            description: input.description,
+            members: {
+              deleteMany: {},
+              create: input.userIds.map((userId) => ({
+                userId,
+              })),
+            },
+            AnnotationQueueScores: {
+              deleteMany: {},
+              create: input.scoreTypeIds.map((scoreTypeId) => ({
+                annotationScoreId: scoreTypeId,
+              })),
+            },
+          },
+          where: {
+            id: input.queueId,
             projectId: input.projectId,
           },
         });
+      } else {
+        const existingAnnotationQueue =
+          await ctx.prisma.annotationQueue.findFirst({
+            where: {
+              slug: slug,
+              projectId: input.projectId,
+            },
+          });
 
-      if (existingAnnotationQueue) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "A annotation queue with this name already exists.",
+        if (existingAnnotationQueue) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "A annotation queue with this name already exists.",
+          });
+        }
+        return ctx.prisma.annotationQueue.create({
+          data: {
+            projectId: input.projectId,
+            name: input.name,
+            slug: slug,
+            description: input.description,
+            members: {
+              create: input.userIds.map((userId) => ({
+                userId,
+              })),
+            },
+            AnnotationQueueScores: {
+              create: input.scoreTypeIds.map((scoreTypeId) => ({
+                annotationScoreId: scoreTypeId,
+              })),
+            },
+          },
         });
       }
-
-      return ctx.prisma.annotationQueue.create({
-        data: {
-          projectId: input.projectId,
-          name: input.name,
-          slug: slug,
-          description: input.description,
-          members: {
-            create: input.userIds.map((userId) => ({
-              userId,
-            })),
-          },
-          AnnotationQueueScores: {
-            create: input.scoreTypeIds.map((scoreTypeId) => ({
-              annotationScoreId: scoreTypeId,
-            })),
-          },
-        },
-      });
     }),
   getQueues: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -246,7 +285,11 @@ export const annotationRouter = createTRPCRouter({
       return ctx.prisma.annotationQueue.findMany({
         where: { projectId: input.projectId },
         include: {
-          members: true,
+          members: {
+            include: {
+              user: true,
+            },
+          },
           AnnotationQueueScores: {
             include: {
               annotationScore: true,
@@ -257,6 +300,9 @@ export const annotationRouter = createTRPCRouter({
               createdByUser: true,
             },
           },
+        },
+        orderBy: {
+          createdAt: "desc",
         },
       });
     }),
@@ -358,6 +404,26 @@ export const annotationRouter = createTRPCRouter({
         where: { id: input.queueItemId, projectId: input.projectId },
         data: {
           doneAt: new Date(),
+        },
+      });
+    }),
+  getQueueById: protectedProcedure
+    .input(z.object({ queueId: z.string(), projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.annotationQueue.findUnique({
+        where: { id: input.queueId, projectId: input.projectId },
+        include: {
+          members: {
+            include: {
+              user: true,
+            },
+          },
+          AnnotationQueueScores: {
+            include: {
+              annotationScore: true,
+            },
+          },
         },
       });
     }),

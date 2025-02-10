@@ -109,13 +109,19 @@ export function useAnnotationQueues() {
         (annotation) => annotation.traceId === item.traceId
       );
 
+      const queue = memberAccessibleQueues?.find(
+        (queue) => queue.id === item.annotationQueueId
+      );
+
       return {
         ...item,
         trace: traces.data?.find((trace) => trace.trace_id === item.traceId),
         annotations: relevantAnnotations,
-        queueName: memberAccessibleQueues?.find(
-          (queue) => queue.id === item.annotationQueueId
-        )?.name,
+        members: queue?.members.map((member) => ({
+          ...member,
+          user: member.user,
+        })),
+        queueName: queue?.name,
         scoreOptions: relevantAnnotations?.flatMap((annotation) =>
           annotation.scoreOptions ? Object.keys(annotation.scoreOptions) : []
         ),

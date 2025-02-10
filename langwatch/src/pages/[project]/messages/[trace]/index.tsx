@@ -538,7 +538,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                 </Message>
               </Box>
             </GridItem>
-            <GridItem minWidth="300px">
+            <GridItem minWidth="350px">
               <Annotations traceId={trace.trace_id} />
             </GridItem>
           </Grid>

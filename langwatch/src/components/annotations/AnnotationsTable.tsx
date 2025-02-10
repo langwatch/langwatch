@@ -1,5 +1,6 @@
 import {
   Avatar,
+  Button,
   Card,
   CardBody,
   Heading,
@@ -8,10 +9,12 @@ import {
   Link,
   Menu,
   MenuButton,
+  MenuItem,
   MenuList,
   Radio,
   RadioGroup,
   Skeleton,
+  Spacer,
   StackDivider,
   Table,
   TableContainer,
@@ -27,7 +30,7 @@ import {
 } from "@chakra-ui/react";
 
 import { useRouter } from "next/router";
-import { Edit, MessageCircle, MoreVertical } from "react-feather";
+import { Archive, Edit, MessageCircle, MoreVertical } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import type { Annotation } from "@prisma/client";
@@ -35,6 +38,7 @@ import { useState } from "react";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "../CurrentDrawer";
 import { NoDataInfoBlock } from "../NoDataInfoBlock";
+import { ChevronDownIcon } from "@chakra-ui/icons";
 
 export const AnnotationsTable = ({
   allQueueItems,
@@ -44,6 +48,7 @@ export const AnnotationsTable = ({
   noDataDescription,
   heading,
   tableHeader,
+  queueId,
 }: {
   allQueueItems: any[];
   queuesLoading: boolean;
@@ -52,6 +57,7 @@ export const AnnotationsTable = ({
   noDataDescription?: string;
   heading?: string;
   tableHeader?: React.ReactNode;
+  queueId?: string;
 }) => {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
@@ -94,7 +100,9 @@ export const AnnotationsTable = ({
     };
   };
 
-  const [selectedAnnotations, setSelectedAnnotations] = useState<string[]>([]);
+  const [selectedAnnotations, setSelectedAnnotations] = useState<string[]>([
+    "pending",
+  ]);
 
   const annotationScoreValues = (
     annotations: Record<string, ScoreOption>[],
@@ -141,108 +149,173 @@ export const AnnotationsTable = ({
       return <Td></Td>;
     }
   };
-  return (
-    <VStack align="start" marginTop={4} width="full">
-      <HStack justifyContent="space-between" width="full" paddingBottom={4}>
-        {tableHeader ? (
-          tableHeader
-        ) : (
-          <Heading as={"h1"} size="lg">
-            {heading}
-          </Heading>
-        )}
-        {!isDone && (
-          <Menu>
-            <MenuButton
-              as={IconButton}
-              aria-label="Options"
-              icon={<MoreVertical />}
-              variant="outline"
-            />
-            <MenuList>
-              <RadioGroup
-                defaultValue="all"
-                onChange={(value) => setSelectedAnnotations([value])}
-              >
-                <VStack align="start" padding={2}>
-                  <Radio value="all">All Annotations</Radio>
-                  <Radio value="completed">Completed</Radio>
-                  <Radio value="pending">Pending</Radio>
-                </VStack>
-              </RadioGroup>
-            </MenuList>
-          </Menu>
-        )}
-      </HStack>
-      <HStack align="start" spacing={6} width="full">
-        <Card flex={1} overflowX="auto">
+
+  const handleEditQueue = () => {
+    openDrawer("addAnnotationQueue", {
+      queueId: queueId,
+    });
+  };
+
+  const queueItemsFiltered = allQueueItems.filter((item) => {
+    if (selectedAnnotations.includes("all")) {
+      return true;
+    }
+    if (selectedAnnotations.includes("completed")) {
+      return item.doneAt;
+    }
+    if (selectedAnnotations.includes("pending")) {
+      return !item.doneAt;
+    }
+    return true;
+  });
+  if (queuesLoading) {
+    return (
+      <VStack align="start" marginTop={4} width="full">
+        <HStack width="full" paddingBottom={4} alignItems="flex-end">
+          <Skeleton height="32px" width="200px" />
+          <Spacer />
+          <Skeleton height="32px" width="100px" />
+        </HStack>
+        <Card flex={1} width="full" overflowX="auto">
           <CardBody padding={0}>
-            {!queuesLoading && allQueueItems.length == 0 ? (
-              <NoDataInfoBlock
-                title={noDataTitle ?? "No annotations yet"}
-                description={
-                  noDataDescription ??
-                  "Annotate your messages to add more context and improve your analysis."
-                }
-                docsInfo={
-                  <Text>
-                    To get started with annotations, please visit our{" "}
-                    <Link
-                      href="https://docs.langwatch.ai/features/annotations"
-                      target="_blank"
-                      color="orange.400"
-                    >
-                      documentation
-                    </Link>
-                    .
-                  </Text>
-                }
-                icon={<Edit />}
-              />
-            ) : (
-              <TableContainer width="full" maxWidth="100%">
-                <Table variant="simple">
-                  <Thead>
-                    <Tr>
-                      <Th></Th>
-                      {!isDone && <Th>Date created</Th>}
-                      <Th>Input</Th>
-                      <Th>Output</Th>
-                      <Th>Comments</Th>
-                      {scoreOptions.data &&
-                        scoreOptions.data.length > 0 &&
-                        scoreOptions.data?.map((key) => (
-                          <Th key={key.id}>{key.name}</Th>
-                        ))}
-                      <Th>Trace Date</Th>
+            <TableContainer width="full">
+              <Table variant="simple">
+                <Thead>
+                  <Tr>
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <Th key={i}>
+                        <Skeleton height="20px" width="100px" />
+                      </Th>
+                    ))}
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Tr key={i}>
+                      {Array.from({ length: 6 }).map((_, j) => (
+                        <Td key={j}>
+                          <Skeleton
+                            height="20px"
+                            width={j === 2 || j === 3 ? "200px" : "100px"}
+                          />
+                        </Td>
+                      ))}
                     </Tr>
-                  </Thead>
-                  <Tbody>
-                    {queuesLoading ? (
-                      Array.from({ length: 3 }).map((_, i) => (
-                        <Tr key={i}>
-                          {Array.from({ length: 4 }).map((_, i) => (
-                            <Td key={i}>
-                              <Skeleton height="20px" />
-                            </Td>
+                  ))}
+                </Tbody>
+              </Table>
+            </TableContainer>
+          </CardBody>
+        </Card>
+      </VStack>
+    );
+  } else {
+    return (
+      <VStack align="start" marginTop={4} width="full">
+        <HStack width="full" paddingBottom={4} alignItems="flex-end">
+          {tableHeader ? (
+            tableHeader
+          ) : (
+            <Heading as={"h1"} size="lg">
+              {heading}
+            </Heading>
+          )}
+          <Spacer />
+          {!isDone && (
+            <Menu>
+              <MenuButton
+                as={Button}
+                rightIcon={<ChevronDownIcon />}
+                variant="outline"
+              >
+                Status
+              </MenuButton>
+              <MenuList>
+                <RadioGroup
+                  defaultValue="pending"
+                  onChange={(value) => setSelectedAnnotations([value])}
+                >
+                  <VStack align="start" padding={2}>
+                    <Radio value="pending">Pending</Radio>
+                    <Radio value="all">All Annotations</Radio>
+                    <Radio value="completed">Completed</Radio>
+                  </VStack>
+                </RadioGroup>
+              </MenuList>
+            </Menu>
+          )}
+          {queueId && (
+            <Menu>
+              <MenuButton as={Button} variant={"outline"} minWidth={0}>
+                <MoreVertical size={16} />
+              </MenuButton>
+              <MenuList>
+                <MenuItem
+                  icon={<Edit size={16} />}
+                  onClick={() => handleEditQueue()}
+                >
+                  Edit queue
+                </MenuItem>
+              </MenuList>
+            </Menu>
+          )}
+        </HStack>
+        <HStack align="start" spacing={6} width="full">
+          <Card flex={1} overflowX="auto">
+            <CardBody padding={0}>
+              {!queuesLoading && allQueueItems.length == 0 ? (
+                <NoDataInfoBlock
+                  title={noDataTitle ?? "No annotations yet"}
+                  description={
+                    noDataDescription ??
+                    "Annotate your messages to add more context and improve your analysis."
+                  }
+                  docsInfo={
+                    <Text>
+                      To get started with annotations, please visit our{" "}
+                      <Link
+                        href="https://docs.langwatch.ai/features/annotations"
+                        target="_blank"
+                        color="orange.400"
+                      >
+                        documentation
+                      </Link>
+                      .
+                    </Text>
+                  }
+                  icon={<Edit />}
+                />
+              ) : (
+                <TableContainer width="full" maxWidth="100%">
+                  <Table variant="simple">
+                    <Thead>
+                      <Tr>
+                        <Th></Th>
+                        {!isDone && <Th>Date created</Th>}
+                        <Th>Input</Th>
+                        <Th>Output</Th>
+                        <Th>Comments</Th>
+                        {scoreOptions.data &&
+                          scoreOptions.data.length > 0 &&
+                          scoreOptions.data?.map((key) => (
+                            <Th key={key.id}>{key.name}</Th>
                           ))}
-                        </Tr>
-                      ))
-                    ) : allQueueItems.length > 0 ? (
-                      allQueueItems
-                        .filter((item) => {
-                          if (selectedAnnotations.includes("all")) {
-                            return true;
-                          }
-                          if (selectedAnnotations.includes("completed")) {
-                            return item.doneAt;
-                          }
-                          if (selectedAnnotations.includes("pending")) {
-                            return !item.doneAt;
-                          }
-                          return true;
-                        })
-                        .map((item) => {
+                        <Th>Trace Date</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {queuesLoading ? (
+                        Array.from({ length: 3 }).map((_, i) => (
+                          <Tr key={i}>
+                            {Array.from({ length: 4 }).map((_, i) => (
+                              <Td key={i}>
+                                <Skeleton height="20px" />
+                              </Td>
+                            ))}
+                          </Tr>
+                        ))
+                      ) : queueItemsFiltered.length > 0 ? (
+                        queueItemsFiltered.map((item) => {
                           return (
                             <Tr
                               cursor="pointer"
@@ -378,22 +451,23 @@ export const AnnotationsTable = ({
                             </Tr>
                           );
                         })
-                    ) : (
-                      <Tr>
-                        <Td colSpan={5}>
-                          <Text>
-                            No annotations found for selected filters or period.
-                          </Text>
-                        </Td>
-                      </Tr>
-                    )}
-                  </Tbody>
-                </Table>
-              </TableContainer>
-            )}
-          </CardBody>
-        </Card>
-      </HStack>
-    </VStack>
-  );
+                      ) : (
+                        <Tr>
+                          <Td colSpan={5}>
+                            <Text>
+                              No annotations found for selected filters.
+                            </Text>
+                          </Td>
+                        </Tr>
+                      )}
+                    </Tbody>
+                  </Table>
+                </TableContainer>
+              )}
+            </CardBody>
+          </Card>
+        </HStack>
+      </VStack>
+    );
+  }
 };

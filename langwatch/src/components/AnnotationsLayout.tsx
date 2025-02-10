@@ -1,12 +1,20 @@
-import { Avatar, Divider, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Avatar,
+  Button,
+  Divider,
+  HStack,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { type PropsWithChildren } from "react";
-import { Check, Edit, Inbox, Users } from "react-feather";
+import { Check, Edit, Inbox, Plus, PlusCircle, Users } from "react-feather";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
+import { useDrawer } from "./CurrentDrawer";
 
 export default function AnnotationsLayout({
   children,
@@ -39,6 +47,7 @@ export default function AnnotationsLayout({
 
   const router = useRouter();
   const id = router.query.id;
+  const { openDrawer } = useDrawer();
 
   return (
     <DashboardLayout>
@@ -100,9 +109,17 @@ export default function AnnotationsLayout({
             All
           </MenuLink>
           <Divider />
-          <Text fontSize="sm" fontWeight="500" paddingX={4} paddingY={2}>
-            My Queues
-          </Text>
+          <HStack width="full" justify="space-between" paddingRight={3}>
+            <Text fontSize="sm" fontWeight="500" paddingX={4} paddingY={2}>
+              My Queues
+            </Text>
+            <Plus
+              onClick={() => openDrawer("addAnnotationQueue", undefined)}
+              width={18}
+              height={18}
+              cursor="pointer"
+            />
+          </HStack>
           {memberAccessibleQueues?.map((queue) => (
             <MenuLink
               key={queue.id}

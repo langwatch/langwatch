@@ -31,21 +31,34 @@ import { FullWidthFormControl } from "./FullWidthFormControl";
 import { AddAnnotationScoreDrawer } from "./AddAnnotationScoreDrawer";
 
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
+import { useRouter } from "next/router";
 
 export const AddAnnotationQueueDrawer = ({
   onClose,
   onOverlayClick,
+  queueId,
 }: {
-  onClose: () => void;
-  onOverlayClick: () => void;
+  onClose?: () => void;
+  onOverlayClick?: () => void;
+  queueId?: string;
 }) => {
   const { project, organization } = useOrganizationTeamProject();
   const toast = useToast();
-  const createAnnotationQueue = api.annotation.createQueue.useMutation();
+  const createOrUpdateQueue = api.annotation.createOrUpdateQueue.useMutation();
+
+  const queue = api.annotation.getQueueById.useQuery(
+    {
+      queueId: queueId ?? "",
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project,
+    }
+  );
 
   const handleClose = () => {
     if (onOverlayClick) {
-      onClose();
+      onClose?.();
       onOverlayClick();
     } else {
       closeDrawer();
@@ -74,7 +87,6 @@ export const AddAnnotationQueueDrawer = ({
         enabled: !!organization,
       }
     );
-
   const {
     register,
     handleSubmit,
@@ -83,8 +95,8 @@ export const AddAnnotationQueueDrawer = ({
     watch,
   } = useForm({
     defaultValues: {
-      name: "",
-      description: "",
+      name: queue.data?.name ?? "",
+      description: queue.data?.description ?? "",
     },
   });
 
@@ -95,11 +107,21 @@ export const AddAnnotationQueueDrawer = ({
 
   const [participants, setParticipants] = useState<
     { id: string; name: string | null }[]
-  >([]);
+  >(
+    queue.data?.members.map((member) => ({
+      id: member.user.id,
+      name: member.user.name,
+    })) ?? []
+  );
 
   const [scoreTypes, setScoreTypes] = useState<
     { id: string; name: string | null }[]
-  >([]);
+  >(
+    queue.data?.AnnotationQueueScores.map((score) => ({
+      id: score.annotationScore.id,
+      name: score.annotationScore.name,
+    })) ?? []
+  );
 
   const onSubmit = (data: FormData) => {
     if (participants.length === 0 || scoreTypes.length === 0) {
@@ -110,21 +132,26 @@ export const AddAnnotationQueueDrawer = ({
       });
       return;
     }
-    createAnnotationQueue.mutate(
+    createOrUpdateQueue.mutate(
       {
         name: data.name,
         description: data.description ?? "",
         userIds: participants.map((p) => p.id),
         projectId: project?.id ?? "",
         scoreTypeIds: scoreTypes.map((s) => s.id),
+        queueId: queueId,
       },
       {
         onSuccess: (data) => {
           void queryClient.annotation.getQueues.invalidate();
           void queryClient.annotation.getQueues.refetch();
+          void queryClient.annotation.getQueueById.invalidate();
+          void queryClient.annotation.getQueueById.refetch();
           toast({
-            title: "Annotation Queue Created",
-            description: `Successfully created ${data.name} annotation queue`,
+            title: `Annotation Queue ${queueId ? "Updated" : "Created"}`,
+            description: `Successfully ${queueId ? "updated" : "created"} ${
+              data.name
+            } annotation queue`,
             status: "success",
             duration: 5000,
             isClosable: true,
