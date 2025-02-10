@@ -20,7 +20,7 @@ import {
   useToast,
 } from "@chakra-ui/react";
 import { useForm } from "react-hook-form";
-
+import slugify from "slugify";
 import { useState } from "react";
 import { Plus } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -80,6 +80,7 @@ export const AddAnnotationQueueDrawer = ({
     handleSubmit,
     formState: { errors },
     reset,
+    watch,
   } = useForm({
     defaultValues: {
       name: "",
@@ -147,6 +148,12 @@ export const AddAnnotationQueueDrawer = ({
   };
 
   const scoreTypeDrawerOpen = useDisclosure();
+
+  const name = watch("name");
+  const slug = slugify((name || "").replace("_", "-"), {
+    lower: true,
+    strict: true,
+  });
 
   return (
     <>
@@ -252,6 +259,7 @@ export const AddAnnotationQueueDrawer = ({
                   isInvalid={!!errors.name}
                 >
                   <Input {...register("name")} required />
+                  {slug && <FormHelperText>slug: {slug}</FormHelperText>}
                 </FullWidthFormControl>
 
                 <FullWidthFormControl

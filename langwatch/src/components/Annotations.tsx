@@ -1,6 +1,17 @@
-import { Box, HStack, Spacer, Text, Tooltip, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  HStack,
+  Spacer,
+  Text,
+  Tooltip,
+  VStack,
+  Card,
+  CardBody,
+  Avatar,
+  StackDivider,
+} from "@chakra-ui/react";
 import { useEffect } from "react";
-import { Edit, ThumbsDown, ThumbsUp } from "react-feather";
+import { Edit, ThumbsDown, ThumbsUp, MessageCircle } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
@@ -38,15 +49,14 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
   }, [isAnnotationDrawerOpen]);
 
   return (
-    <VStack spacing={2} align="start">
+    <VStack spacing={3} align="start">
       {annotations.data?.map((annotation) => {
         const isCurrentUser = data?.user?.id === annotation.user?.id;
         return (
-          <Box
+          <Card
             backgroundColor={"gray.100"}
             width={"full"}
-            padding={6}
-            borderRadius={"lg"}
+            shadow={"md"}
             onClick={
               isCurrentUser
                 ? (e) => {
@@ -62,97 +72,107 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
             cursor={isCurrentUser ? "pointer" : "default"}
             key={annotation.id}
           >
-            <VStack align="start">
-              <HStack width="full" align={"top"}>
-                <VStack align="start" spacing={0}>
-                  <Text fontWeight="bold">
-                    {annotation.user?.name ?? (
-                      <HStack marginBottom={2}>
-                        <Box
-                          borderRadius={5}
-                          paddingY={0.5}
-                          paddingX={2}
-                          border="1px solid"
-                          borderColor="gray.500"
-                          fontSize="xs"
-                        >
-                          API
-                        </Box>
-                        <Text color="gray.500" fontSize="sm">
-                          - {annotation.email ? annotation.email : "anonymous"}
-                        </Text>
-                      </HStack>
-                    )}
-                  </Text>
-                  <Text fontSize="sm">
-                    {annotation.createdAt.toLocaleString()}
-                  </Text>
-                </VStack>
-                <Spacer />
-                {isCurrentUser && (
-                  <Tooltip label="Edit Annotation" placement="top" hasArrow>
-                    <Edit size={"18px"} />
-                  </Tooltip>
-                )}
-              </HStack>
-              <Text>{annotation.comment}</Text>
-              <VStack align="start" spacing={1}>
+            <CardBody>
+              <VStack align="start" spacing={3}>
+                <HStack width="full" align={"top"}>
+                  <Avatar size="sm" name={annotation.user?.name ?? undefined} />
+                  <VStack align="start" spacing={0}>
+                    <Text fontWeight="bold" fontSize="sm">
+                      {annotation.user?.name ?? (
+                        <HStack marginBottom={2}>
+                          <Box
+                            borderRadius={5}
+                            paddingY={0.5}
+                            paddingX={2}
+                            border="1px solid"
+                            borderColor="gray.500"
+                            fontSize="xs"
+                          >
+                            API
+                          </Box>
+                          <Text color="gray.500" fontSize="sm">
+                            -{" "}
+                            {annotation.email ? annotation.email : "anonymous"}
+                          </Text>
+                        </HStack>
+                      )}
+                    </Text>
+                    <Text fontSize="xs">
+                      {annotation.createdAt.toLocaleString()}
+                    </Text>
+                  </VStack>
+                  <Spacer />
+                  {isCurrentUser && (
+                    <Tooltip label="Edit Annotation" placement="top" hasArrow>
+                      <Edit size={"18px"} />
+                    </Tooltip>
+                  )}
+                </HStack>
+                <Text>{annotation.comment}</Text>
                 {annotation.isThumbsUp === true ? (
                   <ThumbsUp size={"20px"} />
                 ) : annotation.isThumbsUp === false ? (
                   <ThumbsDown size={"20px"} />
                 ) : null}
-                {annotation.scoreOptions &&
-                  typeof annotation.scoreOptions === "object" &&
-                  Object.entries(annotation.scoreOptions).map(
-                    ([key, scoreOption]) => {
-                      if (!scoreOption) return null;
-                      const name = scoreOptions.data?.find(
-                        (option) => option.id === key
-                      )?.name;
+                <HStack
+                  align="start"
+                  spacing={2}
+                  wrap="wrap"
+                  divider={<StackDivider borderColor="gray.400" />}
+                >
+                  {console.log(annotation.scoreOptions)}
 
-                      if (
-                        typeof scoreOption === "object" &&
-                        scoreOption !== null &&
-                        "value" in scoreOption &&
-                        (scoreOption.value === null || scoreOption.value === "")
-                      ) {
-                        return null;
-                      }
-                      return (
-                        name && (
-                          <Text key={key} fontSize={"sm"}>
-                            <HStack spacing={2} align="start">
-                              <Text fontWeight="bold">{name}:</Text>
-                              {typeof scoreOption === "object" &&
-                                "value" in scoreOption && (
-                                  <HStack spacing={1} wrap="wrap">
-                                    <Text>
-                                      {[scoreOption.value ?? []]
-                                        .flat()
-                                        .map(String)
-                                        .join(", ")}
-                                    </Text>
-                                    {scoreOption.reason && (
-                                      <Text key={key}>
-                                        (
-                                        {typeof scoreOption.reason === "object"
-                                          ? JSON.stringify(scoreOption.reason)
-                                          : scoreOption.reason}
-                                        )
+                  {annotation.scoreOptions &&
+                    typeof annotation.scoreOptions === "object" &&
+                    Object.entries(annotation.scoreOptions).map(
+                      ([key, scoreOption]) => {
+                        if (!scoreOption || !("value" in scoreOption))
+                          return null;
+                        const name = scoreOptions.data?.find(
+                          (option) => option.id === key
+                        )?.name;
+                        if (!name || !scoreOption.value) return null;
+                        return (
+                          name && (
+                            <Text key={key} fontSize={"sm"}>
+                              <VStack align="start" spacing={0}>
+                                <Text fontSize="xs" fontWeight="500">
+                                  {name}:
+                                </Text>
+                                {typeof scoreOption === "object" &&
+                                  "value" in scoreOption && (
+                                    <HStack spacing={1} wrap="wrap">
+                                      <Text fontSize="xs">
+                                        {Array.isArray(scoreOption.value)
+                                          ? scoreOption.value.join(",")
+                                          : String(scoreOption.value ?? "")}
                                       </Text>
-                                    )}
-                                  </HStack>
-                                )}
-                            </HStack>
-                          </Text>
-                        )
-                      );
-                    }
-                  )}
+                                      {scoreOption.reason && (
+                                        <Tooltip
+                                          label={
+                                            typeof scoreOption.reason ===
+                                            "object"
+                                              ? JSON.stringify(
+                                                  scoreOption.reason
+                                                )
+                                              : scoreOption.reason
+                                          }
+                                        >
+                                          <MessageCircle size={"12px"} />
+                                        </Tooltip>
+                                      )}
+                                    </HStack>
+                                  )}
+                              </VStack>
+                            </Text>
+                          )
+                        );
+                      }
+                    )}
+                </HStack>
               </VStack>
-            </VStack>
-          </Box>
+            </CardBody>
+          </Card>
         );
       })}
     </VStack>

@@ -10,7 +10,7 @@ import {
 import { type PropsWithChildren } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
-import { Inbox, Users } from "react-feather";
+import { Check, Edit, Inbox, Users } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
@@ -30,6 +30,7 @@ export default function AnnotationsLayout({
     assignedQueueItemsWithTraces,
     memberAccessibleQueueItemsWithTraces,
     memberAccessibleQueues,
+    doneQueueItemsWithTraces,
   } = useAnnotationQueues();
 
   const totalItems =
@@ -42,9 +43,12 @@ export default function AnnotationsLayout({
     myQueues: (
       <Avatar name={user?.name ?? ""} width={5} height={5} size="2xs" />
     ),
+    all: <Edit width={20} height={20} />,
+    done: <Check width={20} height={20} />,
   };
 
   const router = useRouter();
+  const id = router.query.id;
 
   return (
     <DashboardLayout>
@@ -66,26 +70,49 @@ export default function AnnotationsLayout({
           </Text>
           <MenuLink
             href={`/${project?.slug}/annotations`}
+            icon={menuItems.all}
+            isSelectedAnnotation={router.pathname === "/[project]/annotations"}
+          >
+            All
+          </MenuLink>
+          <MenuLink
+            href={`/${project?.slug}/annotations/inbox`}
             icon={menuItems.inbox}
             menuEnd={
               <Text fontSize="xs" fontWeight="500">
-                {totalItems}
+                {totalItems > 0 ? totalItems : ""}
               </Text>
             }
-            isSelectedAnnotation={router.pathname === "/[project]/annotations"}
+            isSelectedAnnotation={
+              router.pathname === "/[project]/annotations/inbox"
+            }
           >
             Inbox
           </MenuLink>
           <MenuLink
-            href={`/${project?.slug}/annotations/users/${user?.id}`}
+            href={`/${project?.slug}/annotations/users/me`}
+            isSelectedAnnotation={
+              router.pathname === "/[project]/annotations/users/me"
+            }
             icon={menuItems.myQueues}
             menuEnd={
               <Text fontSize="xs" fontWeight="500">
-                {assignedQueueItemsWithTraces?.length}
+                {(assignedQueueItemsWithTraces?.length ?? 0) > 0
+                  ? assignedQueueItemsWithTraces?.length
+                  : ""}
               </Text>
             }
           >
             {user?.name?.split(" ")[0]} (You)
+          </MenuLink>
+          <MenuLink
+            href={`/${project?.slug}/annotations/done`}
+            icon={menuItems.done}
+            isSelectedAnnotation={
+              router.pathname === "/[project]/annotations/done"
+            }
+          >
+            Done
           </MenuLink>
           <Divider />
           <Text fontSize="sm" fontWeight="500" paddingX={4} paddingY={2}>
@@ -95,10 +122,16 @@ export default function AnnotationsLayout({
             <MenuLink
               key={queue.id}
               href={`/${project?.slug}/annotations/queues/${queue.id}`}
+              isSelectedAnnotation={
+                router.pathname ===
+                `/${project?.slug}/annotations/queues/${queue.id}`
+              }
               icon={menuItems.queues}
               menuEnd={
                 <Text fontSize="xs" fontWeight="500">
-                  {queue.AnnotationQueueItems.length}
+                  {queue.AnnotationQueueItems.length > 0
+                    ? queue.AnnotationQueueItems.length
+                    : ""}
                 </Text>
               }
             >

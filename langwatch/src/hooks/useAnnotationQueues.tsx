@@ -18,6 +18,8 @@ export function useAnnotationQueues() {
     }
   );
 
+  console.log("queues", queues.data);
+
   const queueItems = api.annotation.getQueueItems.useQuery(
     {
       projectId: project?.id ?? "",
@@ -29,10 +31,28 @@ export function useAnnotationQueues() {
 
   console.log("queueItems", queueItems.data);
 
+  const doneQueueItems = api.annotation.getDoneQueueItems.useQuery(
+    {
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project,
+    }
+  );
+
+  const doneQueueItemsFiltered = doneQueueItems.data?.filter(
+    (item) =>
+      item.userId === user?.id ||
+      item.annotationQueue?.members.some((member) => member.userId === user?.id)
+  );
+
   const assignedQueueItems = queueItems.data?.filter(
     (item) => item.userId === user?.id
   );
   const traceIdsForAssignedQueueItems = assignedQueueItems?.flatMap(
+    (item) => item.traceId
+  );
+  const doneTraceIdsForAssignedQueueItems = doneQueueItemsFiltered?.flatMap(
     (item) => item.traceId
   );
 
@@ -48,6 +68,7 @@ export function useAnnotationQueues() {
   const traceIds = [
     ...(traceIdsForAssignedQueueItems ?? []),
     ...(traceIdsForMemberAccessibleQueueItems ?? []),
+    ...(doneTraceIdsForAssignedQueueItems ?? []),
   ];
 
   const traces = api.traces.getTracesWithSpans.useQuery(
@@ -97,12 +118,32 @@ export function useAnnotationQueues() {
     })
   );
 
-  console.log("assignedQueueItemsWithTraces", assignedQueueItemsWithTraces);
+  const doneQueueItemsWithTraces = doneQueueItemsFiltered?.map((item) => ({
+    ...item,
+    trace: traces.data?.find((trace) => trace.trace_id === item.traceId),
+    annotations: annotations.data?.filter(
+      (annotation) => annotation.traceId === item.traceId
+    ),
+    scoreOptions: annotations.data
+      ?.filter((annotation) => annotation.traceId === item.traceId)
+      ?.flatMap((annotation) =>
+        annotation.scoreOptions ? Object.keys(annotation.scoreOptions) : []
+      ),
+  }));
+
+  const scoreOptions = api.annotationScore.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    {
+      enabled: !!project,
+    }
+  );
 
   return {
     assignedQueueItemsWithTraces,
     memberAccessibleQueueItemsWithTraces,
+    doneQueueItemsWithTraces,
     memberAccessibleQueues,
+    scoreOptions,
     queuesLoading: queues.isLoading || queueItems.isLoading || traces.isLoading,
   };
 }

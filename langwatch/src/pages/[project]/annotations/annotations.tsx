@@ -65,14 +65,7 @@ export default function Annotations() {
     setPeriod,
   } = usePeriodSelector();
 
-  type RouterOutput = inferRouterOutputs<AppRouter>;
-  type AnnotationsQuery = UseTRPCQueryResult<
-    | RouterOutput["annotation"]["getAll"]
-    | RouterOutput["annotation"]["getByTraceIds"],
-    TRPCClientErrorLike<AppRouter>
-  >;
-
-  let annotations: AnnotationsQuery;
+  let annotations;
 
   if (hasAnyFilters) {
     const traceIds =

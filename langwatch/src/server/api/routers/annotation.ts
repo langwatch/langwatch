@@ -8,7 +8,9 @@ import {
   checkPermissionOrPubliclyShared,
   checkUserPermissionForProject,
 } from "../permission";
-
+import { useCallback } from "react";
+import { TRPCError } from "@trpc/server";
+import slugify from "slugify";
 const scoreOptionSchema = z.object({
   value: z
     .union([z.string(), z.array(z.string())])
@@ -184,10 +186,31 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
+      const slug = slugify(input.name.replace("_", "-"), {
+        lower: true,
+        strict: true,
+      });
+
+      const existingAnnotationQueue =
+        await ctx.prisma.annotationQueue.findFirst({
+          where: {
+            slug: slug,
+            projectId: input.projectId,
+          },
+        });
+
+      if (existingAnnotationQueue) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "A annotation queue with this name already exists.",
+        });
+      }
+
       return ctx.prisma.annotationQueue.create({
         data: {
           projectId: input.projectId,
           name: input.name,
+          slug: slug,
           description: input.description,
           members: {
             create: input.userIds.map((userId) => ({
@@ -231,9 +254,28 @@ export const annotationRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationQueueItem.findMany({
-        where: { projectId: input.projectId },
+        where: { projectId: input.projectId, doneAt: null },
         include: {
           annotationQueue: true,
+          createdByUser: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+    }),
+  getDoneQueueItems: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.annotationQueueItem.findMany({
+        where: { projectId: input.projectId, doneAt: { not: null } },
+        include: {
+          annotationQueue: {
+            include: {
+              members: true,
+            },
+          },
           createdByUser: true,
         },
         orderBy: {
@@ -253,25 +295,62 @@ export const annotationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       for (const annotator of input.annotators) {
         console.log("annotator", annotator);
+        console.log("input.traceId", input.traceId);
+        console.log("input.projectId", input.projectId);
         if (annotator.startsWith("queue")) {
-          await ctx.prisma.annotationQueueItem.create({
-            data: {
+          await ctx.prisma.annotationQueueItem.upsert({
+            where: {
+              projectId: input.projectId,
+              traceId_annotationQueueId_projectId: {
+                traceId: input.traceId,
+                annotationQueueId: annotator.replace("queue-", ""),
+                projectId: input.projectId,
+              },
+            },
+            create: {
               annotationQueueId: annotator.replace("queue-", ""),
               traceId: input.traceId,
               projectId: input.projectId,
               createdByUserId: ctx.session.user.id,
             },
+            update: {
+              annotationQueueId: annotator.replace("queue-", ""),
+              doneAt: null,
+            },
           });
         } else {
-          await ctx.prisma.annotationQueueItem.create({
-            data: {
+          await ctx.prisma.annotationQueueItem.upsert({
+            where: {
+              projectId: input.projectId,
+              traceId_userId_projectId: {
+                traceId: input.traceId,
+                userId: annotator.replace("user-", ""),
+                projectId: input.projectId,
+              },
+            },
+            create: {
               userId: annotator.replace("user-", ""),
               traceId: input.traceId,
               projectId: input.projectId,
               createdByUserId: ctx.session.user.id,
             },
+            update: {
+              userId: annotator.replace("user-", ""),
+              doneAt: null,
+            },
           });
         }
       }
+    }),
+  markQueueItemDone: protectedProcedure
+    .input(z.object({ queueItemId: z.string(), projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.annotationQueueItem.update({
+        where: { id: input.queueItemId, projectId: input.projectId },
+        data: {
+          doneAt: new Date(),
+        },
+      });
     }),
 });

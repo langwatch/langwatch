@@ -507,6 +507,7 @@ enum PublicShareResourceTypes {
 model AnnotationQueue {
     id                    String                   @id @default(nanoid())
     name                  String
+    slug                  String
     projectId             String
     description           String?
     project               Project                  @relation(fields: [projectId], references: [id])
@@ -515,6 +516,8 @@ model AnnotationQueue {
     updatedAt             DateTime                 @default(now()) @updatedAt
     AnnotationQueueScores AnnotationQueueScores[]
     AnnotationQueueItems  AnnotationQueueItem[]
+
+    @@unique([projectId, slug])
 }
 
 model AnnotationQueueMembers {
@@ -554,6 +557,8 @@ model AnnotationQueueItem {
     doneAt            DateTime?
     project           Project          @relation(fields: [projectId], references: [id])
 
+    @@unique([traceId, userId, projectId])
+    @@unique([traceId, annotationQueueId, projectId])
     @@index([annotationQueueId])
     @@index([userId])
     @@index([projectId])

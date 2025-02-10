@@ -2,23 +2,24 @@ import { Container, Heading } from "@chakra-ui/react";
 
 import { useRouter } from "next/router";
 
+import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
-import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
+import { useSession } from "next-auth/react";
+
 export default function Annotations() {
   const router = useRouter();
-
-  const { id } = router.query;
+  const session = useSession();
 
   const {
-    memberAccessibleQueueItemsWithTraces,
+    assignedQueueItemsWithTraces,
 
     queuesLoading,
   } = useAnnotationQueues();
 
   const allQueueItems = [
-    ...(memberAccessibleQueueItemsWithTraces?.filter(
-      (item) => item.annotationQueueId === id
+    ...(assignedQueueItemsWithTraces?.filter(
+      (item) => item.userId === session.data?.user.id
     ) ?? []),
   ];
 
@@ -31,7 +32,6 @@ export default function Annotations() {
         <Heading as={"h4"} size="md" fontWeight="normal">
           Inbox
         </Heading>
-
         <AnnotationsTable
           allQueueItems={allQueueItems}
           queuesLoading={queuesLoading}
