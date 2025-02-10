@@ -136,11 +136,11 @@ const startMetricsServer = () => {
           .then((metrics) => {
             res.end(metrics);
           })
-          .catch((err) => {
-            res.writeHead(500).end(err);
+          .catch(() => {
+            res.writeHead(500).end();
           });
       } catch (err) {
-        res.writeHead(500).end(err);
+        res.writeHead(500).end();
       }
     } else {
       res.writeHead(404).end();
