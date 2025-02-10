@@ -217,9 +217,10 @@ export function TraceDetails(props: {
       },
       {
         onSuccess: () => {
+          popoverOpen.onClose();
           onClose();
           toast({
-            title: "Trace added to annotation queues",
+            title: "Trace added to annotation queue",
             description: (
               <>
                 <Link
@@ -314,20 +315,6 @@ export function TraceDetails(props: {
                       Annotation Queue
                     </Button>
                   </PopoverTrigger>
-                  {/* {popoverOpen.isOpen && (
-                    <Portal>
-                      <Box
-                        position="fixed"
-                        top={0}
-                        left={0}
-                        right={0}
-                        bottom={0}
-                        bg="blackAlpha.600"
-                        zIndex="100" // Higher than Drawer
-                        onClick={popoverOpen.onClose} // Clicking overlay closes popover
-                      />
-                    </Portal>
-                  )} */}
                   <PopoverContent zIndex="2222">
                     <PopoverArrow />
                     <PopoverCloseButton />
@@ -338,6 +325,7 @@ export function TraceDetails(props: {
                         setAnnotators={setAnnotators}
                         queueDrawerOpen={queueDrawerOpen}
                         sendToQueue={sendToQueue}
+                        isLoading={queueItem.isLoading}
                       />
                     </PopoverBody>
                   </PopoverContent>
@@ -478,10 +466,6 @@ export function TraceDetails(props: {
         </TabPanels>
       </Tabs>
 
-      {/* <Modal isOpen={popoverOpen.isOpen} onClose={popoverOpen.onClose}>
-        <ModalOverlay />
-        <ModalContent>
-      </Modal> */}
       <Drawer
         isOpen={queueDrawerOpen.isOpen}
         placement="right"
@@ -504,12 +488,14 @@ const AddParticipants = ({
   setAnnotators,
   queueDrawerOpen,
   sendToQueue,
+  isLoading,
 }: {
   options: any[];
   annotators: any[];
   setAnnotators: any;
   queueDrawerOpen: any;
   sendToQueue: () => void;
+  isLoading: boolean;
 }) => {
   return (
     <>
@@ -636,7 +622,12 @@ const AddParticipants = ({
         <Spacer />
         <HStack width="full">
           <Spacer />
-          <Button colorScheme="orange" size="sm" onClick={sendToQueue}>
+          <Button
+            colorScheme="orange"
+            size="sm"
+            onClick={sendToQueue}
+            isLoading={isLoading}
+          >
             Send
           </Button>
         </HStack>

@@ -326,7 +326,7 @@ export const AnnotationsTable = ({
                                     display="block"
                                     maxWidth={450}
                                   >
-                                    {item.trace?.input?.value}
+                                    {item.trace?.input?.value ?? "<empty>"}
                                   </Text>
                                 </Tooltip>
                               </Td>
@@ -337,7 +337,7 @@ export const AnnotationsTable = ({
                                     display="block"
                                     maxWidth={550}
                                   >
-                                    {item.trace?.output?.value}
+                                    {item.trace?.output?.value ?? "<empty>"}
                                   </Text>
                                 </Tooltip>
                               </Td>
