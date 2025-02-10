@@ -219,15 +219,14 @@ export function TraceDetails(props: {
         onSuccess: () => {
           onClose();
           toast({
-            title: "Annotators added to queue",
+            title: "Trace added to annotation queues",
             description: (
               <>
-                The annotators will be notified of the new queue item. <br />
                 <Link
                   href={`/${project?.slug}/annotations/`}
                   textDecoration="underline"
                 >
-                  View Queued Items
+                  View Queues
                 </Link>
               </>
             ),
