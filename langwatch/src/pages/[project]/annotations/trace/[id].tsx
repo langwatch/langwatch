@@ -44,10 +44,7 @@ const AnnotationQueuePicker = () => {
     (item) => item.trace?.trace_id === traceId
   );
 
-  console.log("currentQueueItem", currentQueueItemIndex);
-
   const navigateToTrace = (traceId: string) => {
-    console.log("asdsadsadadss", traceId);
     router.push(`/${project?.slug}/annotations/trace/${traceId}`);
   };
 
@@ -77,7 +74,6 @@ const AnnotationQueuePicker = () => {
               isDisabled={currentQueueItemIndex === allQueueItems.length - 1}
               onClick={() => {
                 const nextItem = allQueueItems[currentQueueItemIndex + 1];
-                console.log(nextItem);
                 if (nextItem) {
                   navigateToTrace(nextItem.trace?.trace_id ?? "");
                 }

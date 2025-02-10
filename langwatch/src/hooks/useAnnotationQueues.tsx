@@ -18,18 +18,15 @@ export function useAnnotationQueues() {
     }
   );
 
-  console.log("queues", queues.data);
-
   const queueItems = api.annotation.getQueueItems.useQuery(
     {
       projectId: project?.id ?? "",
     },
     {
       enabled: !!project,
+      refetchOnWindowFocus: false,
     }
   );
-
-  console.log("queueItems", queueItems.data);
 
   const doneQueueItems = api.annotation.getDoneQueueItems.useQuery(
     {
@@ -37,6 +34,7 @@ export function useAnnotationQueues() {
     },
     {
       enabled: !!project,
+      refetchOnWindowFocus: false,
     }
   );
 
@@ -78,6 +76,7 @@ export function useAnnotationQueues() {
     },
     {
       enabled: !!project?.id,
+      refetchOnWindowFocus: false,
     }
   );
 
@@ -87,6 +86,7 @@ export function useAnnotationQueues() {
     },
     {
       enabled: !!project?.id,
+      refetchOnWindowFocus: false,
     }
   );
 
@@ -104,18 +104,23 @@ export function useAnnotationQueues() {
   }));
 
   const memberAccessibleQueueItemsWithTraces = memberAccessibleQueueItems?.map(
-    (item) => ({
-      ...item,
-      trace: traces.data?.find((trace) => trace.trace_id === item.traceId),
-      annotations: annotations.data?.filter(
+    (item) => {
+      const relevantAnnotations = annotations.data?.filter(
         (annotation) => annotation.traceId === item.traceId
-      ),
-      scoreOptions: annotations.data
-        ?.filter((annotation) => annotation.traceId === item.traceId)
-        ?.flatMap((annotation) =>
+      );
+
+      return {
+        ...item,
+        trace: traces.data?.find((trace) => trace.trace_id === item.traceId),
+        annotations: relevantAnnotations,
+        queueName: memberAccessibleQueues?.find(
+          (queue) => queue.id === item.annotationQueueId
+        )?.name,
+        scoreOptions: relevantAnnotations?.flatMap((annotation) =>
           annotation.scoreOptions ? Object.keys(annotation.scoreOptions) : []
         ),
-    })
+      };
+    }
   );
 
   const doneQueueItemsWithTraces = doneQueueItemsFiltered?.map((item) => ({

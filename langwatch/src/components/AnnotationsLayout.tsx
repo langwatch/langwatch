@@ -34,8 +34,9 @@ export default function AnnotationsLayout({
   } = useAnnotationQueues();
 
   const totalItems =
-    (assignedQueueItemsWithTraces?.length ?? 0) +
-    (memberAccessibleQueueItemsWithTraces?.length ?? 0);
+    (assignedQueueItemsWithTraces?.filter((item) => !item.doneAt).length ?? 0) +
+    (memberAccessibleQueueItemsWithTraces?.filter((item) => !item.doneAt)
+      .length ?? 0);
 
   const menuItems = {
     inbox: <Inbox width={20} height={20} />,
@@ -68,13 +69,7 @@ export default function AnnotationsLayout({
           <Text fontSize="md" fontWeight="500" paddingX={4} paddingY={2}>
             Annotations
           </Text>
-          <MenuLink
-            href={`/${project?.slug}/annotations`}
-            icon={menuItems.all}
-            isSelectedAnnotation={router.pathname === "/[project]/annotations"}
-          >
-            All
-          </MenuLink>
+
           <MenuLink
             href={`/${project?.slug}/annotations/inbox`}
             icon={menuItems.inbox}
@@ -97,22 +92,23 @@ export default function AnnotationsLayout({
             icon={menuItems.myQueues}
             menuEnd={
               <Text fontSize="xs" fontWeight="500">
-                {(assignedQueueItemsWithTraces?.length ?? 0) > 0
-                  ? assignedQueueItemsWithTraces?.length
-                  : ""}
+                {(() => {
+                  const count =
+                    assignedQueueItemsWithTraces?.filter((item) => !item.doneAt)
+                      .length ?? 0;
+                  return count > 0 ? count : "";
+                })()}
               </Text>
             }
           >
             {user?.name?.split(" ")[0]} (You)
           </MenuLink>
           <MenuLink
-            href={`/${project?.slug}/annotations/done`}
-            icon={menuItems.done}
-            isSelectedAnnotation={
-              router.pathname === "/[project]/annotations/done"
-            }
+            href={`/${project?.slug}/annotations`}
+            icon={menuItems.all}
+            isSelectedAnnotation={router.pathname === "/[project]/annotations"}
           >
-            Done
+            All
           </MenuLink>
           <Divider />
           <Text fontSize="sm" fontWeight="500" paddingX={4} paddingY={2}>
@@ -129,9 +125,12 @@ export default function AnnotationsLayout({
               icon={menuItems.queues}
               menuEnd={
                 <Text fontSize="xs" fontWeight="500">
-                  {queue.AnnotationQueueItems.length > 0
-                    ? queue.AnnotationQueueItems.length
-                    : ""}
+                  {(() => {
+                    const pendingCount = queue.AnnotationQueueItems.filter(
+                      (item) => !item.doneAt
+                    ).length;
+                    return pendingCount > 0 ? pendingCount : "";
+                  })()}
                 </Text>
               }
             >

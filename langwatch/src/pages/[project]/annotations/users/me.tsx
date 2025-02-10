@@ -25,16 +25,13 @@ export default function Annotations() {
 
   return (
     <AnnotationsLayout>
-      <Container maxWidth={"calc(100vw - 320px)"} padding={6}>
-        <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
-          Annotations
-        </Heading>
-        <Heading as={"h4"} size="md" fontWeight="normal">
-          Inbox
-        </Heading>
+      <Container maxWidth={"calc(100vw - 360px)"} padding={6}>
         <AnnotationsTable
           allQueueItems={allQueueItems}
           queuesLoading={queuesLoading}
+          noDataTitle="No queued annotations for you"
+          noDataDescription="You have no annotations assigned to you."
+          heading="Your annotations"
         />
       </Container>
     </AnnotationsLayout>

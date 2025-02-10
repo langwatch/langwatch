@@ -120,13 +120,15 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                   wrap="wrap"
                   divider={<StackDivider borderColor="gray.400" />}
                 >
-                  {console.log(annotation.scoreOptions)}
-
                   {annotation.scoreOptions &&
                     typeof annotation.scoreOptions === "object" &&
                     Object.entries(annotation.scoreOptions).map(
                       ([key, scoreOption]) => {
-                        if (!scoreOption || !("value" in scoreOption))
+                        if (
+                          !scoreOption ||
+                          typeof scoreOption !== "object" ||
+                          !("value" in scoreOption)
+                        )
                           return null;
                         const name = scoreOptions.data?.find(
                           (option) => option.id === key

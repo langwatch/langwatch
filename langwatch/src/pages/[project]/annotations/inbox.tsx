@@ -40,57 +40,15 @@ export default function Annotations() {
     ...(memberAccessibleQueueItemsWithTraces ?? []),
   ];
 
-  const scoreOptionsIDArray = scoreOptions.data
-    ? scoreOptions.data.map((scoreOption) => scoreOption.id)
-    : [];
-
-  type ScoreOption = {
-    value: string | string[];
-    reason?: string | null;
-  };
-  const annotationScoreValues = (
-    scoreOptions: Record<string, ScoreOption>,
-    scoreOptionsIDArray: string[]
-  ) => {
-    if (scoreOptionsIDArray.length > 0 && scoreOptions) {
-      console.log("scoreOptions", scoreOptions);
-      return scoreOptionsIDArray.map((id) => (
-        <Td key={id}>
-          <HStack>
-            <Text>
-              {" "}
-              {Array.isArray(scoreOptions[id]?.value)
-                ? scoreOptions[id]?.value.join(", ")
-                : scoreOptions[id]?.value}
-            </Text>
-            {scoreOptions[id]?.reason && (
-              <Tooltip label={scoreOptions[id]?.reason}>
-                <HelpCircle width={16} height={16} />
-              </Tooltip>
-            )}
-          </HStack>
-        </Td>
-      ));
-    } else {
-      if (scoreOptionsIDArray.length > 0) {
-        return scoreOptionsIDArray.map((_, i) => <Td key={i}></Td>);
-      }
-      return <Td></Td>;
-    }
-  };
-
   return (
     <AnnotationsLayout>
-      <Container maxWidth={"calc(100vw - 320px)"} padding={6}>
-        <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
-          Annotations
-        </Heading>
-        <Heading as={"h4"} size="md" fontWeight="normal">
-          Inbox
-        </Heading>
+      <Container maxWidth={"calc(100vw - 360px)"} padding={6}>
         <AnnotationsTable
+          heading="Inbox"
           allQueueItems={allQueueItems}
           queuesLoading={queuesLoading}
+          noDataTitle="Your inbox is empty"
+          noDataDescription="Send messages to your annotation queue to get started."
         />
       </Container>
     </AnnotationsLayout>

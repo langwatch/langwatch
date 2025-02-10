@@ -50,7 +50,6 @@ const AnnotationScorePage = () => {
       },
       { enabled: !!organization }
     );
-  console.log(getAllAnnotationQueues.data);
 
   return (
     <SettingsLayout>

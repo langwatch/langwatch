@@ -174,6 +174,20 @@ export const annotationRouter = createTRPCRouter({
         },
       });
     }),
+  // getAllGroupedByTraceId: protectedProcedure
+  //   .input(z.object({ projectId: z.string() }))
+  //   .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+  //   .query(async ({ ctx, input }) => {
+  //     return ctx.prisma.annotation.groupBy({
+  //       by: ["traceId"],
+  //       where: {
+  //         projectId: input.projectId,
+  //       },
+  //       _count: {
+  //         _all: true,
+  //       },
+  //     });
+  //   }),
   createQueue: protectedProcedure
     .input(
       z.object({
@@ -239,9 +253,6 @@ export const annotationRouter = createTRPCRouter({
             },
           },
           AnnotationQueueItems: {
-            where: {
-              doneAt: null, // Only include pending items
-            },
             include: {
               createdByUser: true,
             },
@@ -254,7 +265,7 @@ export const annotationRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationQueueItem.findMany({
-        where: { projectId: input.projectId, doneAt: null },
+        where: { projectId: input.projectId },
         include: {
           annotationQueue: true,
           createdByUser: true,
@@ -294,9 +305,6 @@ export const annotationRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       for (const annotator of input.annotators) {
-        console.log("annotator", annotator);
-        console.log("input.traceId", input.traceId);
-        console.log("input.projectId", input.projectId);
         if (annotator.startsWith("queue")) {
           await ctx.prisma.annotationQueueItem.upsert({
             where: {

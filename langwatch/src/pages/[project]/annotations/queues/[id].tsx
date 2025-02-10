@@ -22,19 +22,24 @@ export default function Annotations() {
     ) ?? []),
   ];
 
+  console.log(
+    "memberAccessibleQueueItemsWithTraces",
+    memberAccessibleQueueItemsWithTraces
+  );
+
+  const queueName = memberAccessibleQueueItemsWithTraces?.find(
+    (item) => item.annotationQueueId === id
+  )?.queueName;
+
   return (
     <AnnotationsLayout>
-      <Container maxWidth={"calc(100vw - 320px)"} padding={6}>
-        <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
-          Annotations
-        </Heading>
-        <Heading as={"h4"} size="md" fontWeight="normal">
-          Inbox
-        </Heading>
-
+      <Container maxWidth={"calc(100vw - 360px)"} padding={6}>
         <AnnotationsTable
           allQueueItems={allQueueItems}
           queuesLoading={queuesLoading}
+          noDataTitle="No queued annotations for this queue"
+          noDataDescription="Add a message to this queue to get started."
+          heading={queueName}
         />
       </Container>
     </AnnotationsLayout>

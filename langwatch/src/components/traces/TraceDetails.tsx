@@ -110,8 +110,6 @@ export function TraceDetails(props: {
     }
   );
 
-  console.log("annotationQueues", annotationQueues.data);
-
   const users =
     api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
       {
@@ -134,7 +132,6 @@ export function TraceDetails(props: {
 
   const options = [...(userOptions ?? []), ...(queueOptions ?? [])];
 
-  console.log("users", users.data?.members);
   useEffect(() => {
     if (evaluations.data) {
       const pendingChecks = evaluations.data.filter(
@@ -222,7 +219,6 @@ export function TraceDetails(props: {
   const toast = useToast();
 
   const sendToQueue = () => {
-    console.log("annotators", annotators);
     queueItem.mutate(
       {
         projectId: project?.id ?? "",
@@ -237,8 +233,11 @@ export function TraceDetails(props: {
             description: (
               <>
                 The annotators will be notified of the new queue item. <br />
-                <Link href={`/${project?.slug}/annotations/`}>
-                  View Queue Items
+                <Link
+                  href={`/${project?.slug}/annotations/`}
+                  textDecoration="underline"
+                >
+                  View Queued Items
                 </Link>
               </>
             ),

@@ -2,10 +2,20 @@ import {
   Avatar,
   Card,
   CardBody,
+  Heading,
   HStack,
+  IconButton,
+  Link,
+  Menu,
+  MenuButton,
+  MenuList,
+  Radio,
+  RadioGroup,
   Skeleton,
+  StackDivider,
   Table,
   TableContainer,
+  Tag,
   Tbody,
   Td,
   Text,
@@ -14,26 +24,34 @@ import {
   Tooltip,
   Tr,
   VStack,
-  StackDivider,
-  Tag,
 } from "@chakra-ui/react";
 
 import { useRouter } from "next/router";
-import { HelpCircle } from "react-feather";
-import { FilterSidebar } from "~/components/filters/FilterSidebar";
+import { Edit, MessageCircle, MoreVertical } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
+import type { Annotation } from "@prisma/client";
+import { useState } from "react";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "../CurrentDrawer";
+import { NoDataInfoBlock } from "../NoDataInfoBlock";
 
 export const AnnotationsTable = ({
   allQueueItems,
   queuesLoading,
   isDone,
+  noDataTitle,
+  noDataDescription,
+  heading,
+  tableHeader,
 }: {
   allQueueItems: any[];
   queuesLoading: boolean;
   isDone?: boolean;
+  noDataTitle?: string;
+  noDataDescription?: string;
+  heading?: string;
+  tableHeader?: React.ReactNode;
 }) => {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
@@ -41,7 +59,9 @@ export const AnnotationsTable = ({
   const { openDrawer, isDrawerOpen } = useDrawer();
 
   const openAnnotationQueue = (queueItemId: string) => {
-    void router.push(`/${project?.slug}/annotations/queue/${queueItemId}`);
+    void router.push(
+      `/${project?.slug}/annotations/my-queue?queue-item=${queueItemId}`
+    );
   };
 
   const openTraceDrawer = (traceId: string) => {
@@ -51,8 +71,12 @@ export const AnnotationsTable = ({
     });
   };
 
-  const handleTraceClick = (traceId: string, queueItemId: string) => {
-    if (isDone) {
+  const handleTraceClick = (
+    traceId: string,
+    queueItemId: string,
+    doneAt: Date | null
+  ) => {
+    if (isDone || doneAt) {
       openTraceDrawer(traceId);
     } else {
       openAnnotationQueue(queueItemId);
@@ -64,17 +88,19 @@ export const AnnotationsTable = ({
     : [];
 
   type ScoreOption = {
-    value: string | string[];
-    reason?: string | null;
+    [key: string]: {
+      value: string | string[];
+      reason?: string | null;
+    };
   };
+
+  const [selectedAnnotations, setSelectedAnnotations] = useState<string[]>([]);
 
   const annotationScoreValues = (
     annotations: Record<string, ScoreOption>[],
     scoreOptionsIDArray: string[]
   ) => {
     if (scoreOptionsIDArray.length > 0 && annotations.length > 0) {
-      console.log("scoreOptions", annotations);
-      console.log("scoreOptionsIDArray", scoreOptionsIDArray);
       return scoreOptionsIDArray.map((id) => (
         <Td key={id} minWidth={200}>
           <VStack
@@ -84,20 +110,24 @@ export const AnnotationsTable = ({
             spacing={2}
           >
             {annotations.map((annotation) =>
-              annotation.scoreOptions[id]?.value ? (
+              annotation.scoreOptions?.[id]?.value ? (
                 <>
-                  {Array.isArray(annotation.scoreOptions[id]?.value) ? (
-                    <HStack spacing={1} wrap="wrap">
-                      {annotation.scoreOptions[id]?.value.map((val, index) => (
-                        <Tag key={index}>{val}</Tag>
-                      ))}
-                    </HStack>
-                  ) : (
-                    <Tag>{annotation.scoreOptions[id]?.value}</Tag>
-                  )}
-                  {/* <Tooltip label={annotation.scoreOptions[id]?.reason}>
-                    <HelpCircle width={16} height={16} />
-                  </Tooltip> */}
+                  <HStack spacing={0}>
+                    {Array.isArray(annotation.scoreOptions?.[id]?.value) ? (
+                      <HStack spacing={1} wrap="wrap">
+                        {annotation.scoreOptions?.[id]?.value.map(
+                          (val, index) => <Tag key={index}>{val}</Tag>
+                        )}
+                      </HStack>
+                    ) : (
+                      <Tag>{annotation.scoreOptions?.[id]?.value}</Tag>
+                    )}
+                    {annotation.scoreOptions?.[id]?.reason && (
+                      <Tooltip label={annotation.scoreOptions[id]?.reason}>
+                        <MessageCircle width={16} height={16} />
+                      </Tooltip>
+                    )}
+                  </HStack>
                 </>
               ) : null
             )}
@@ -112,147 +142,258 @@ export const AnnotationsTable = ({
     }
   };
   return (
-    <HStack width="full" align="start" spacing={6} marginTop={6}>
-      <Card flex={1}>
-        <CardBody>
-          {queuesLoading ? (
-            <Skeleton height="20px" />
-          ) : allQueueItems.length == 0 ? (
-            <Text>All Tasks completed</Text>
-          ) : (
-            <TableContainer>
-              <Table variant="simple">
-                <Thead>
-                  <Tr>
-                    <Th></Th>
-                    <Th>Date Queued</Th>
-                    <Th>Input</Th>
-                    <Th>Output</Th>
-                    <Th>Comments</Th>
-                    {scoreOptions.data &&
-                      scoreOptions.data.length > 0 &&
-                      scoreOptions.data?.map((key) => (
-                        <Th key={key.id}>{key.name}</Th>
-                      ))}
-                    <Th>Trace Date</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {queuesLoading ? (
-                    Array.from({ length: 3 }).map((_, i) => (
-                      <Tr key={i}>
-                        {Array.from({ length: 4 }).map((_, i) => (
-                          <Td key={i}>
-                            <Skeleton height="20px" />
-                          </Td>
-                        ))}
-                      </Tr>
-                    ))
-                  ) : allQueueItems.length > 0 ? (
-                    allQueueItems.map((item) => {
-                      console.log("item", item);
-                      return (
-                        <Tr
-                          cursor="pointer"
-                          key={item.id}
-                          onClick={() =>
-                            handleTraceClick(item.traceId, item.id)
-                          }
-                        >
-                          <Td padding={0}>
-                            <HStack>
-                              {item.annotations.map((annotation) => (
-                                <Avatar
-                                  size="sm"
-                                  name={annotation.user.name ?? ""}
-                                  css={{
-                                    border: "2px solid white",
-                                    "&:not(:first-of-type)": {
-                                      marginLeft: "-20px",
-                                    },
-                                  }}
-                                />
-                              ))}
-                            </HStack>
-                          </Td>
-                          <Td>
-                            <Text>{item.createdAt.toLocaleDateString()}</Text>
-                          </Td>
-
-                          <Td>
-                            <Tooltip label={item.trace?.input?.value}>
-                              <Text
-                                noOfLines={2}
-                                display="block"
-                                maxWidth={450}
-                              >
-                                {item.trace?.input?.value}
-                              </Text>
-                            </Tooltip>
-                          </Td>
-                          <Td>
-                            <Tooltip label={item.trace?.output?.value}>
-                              <Text
-                                noOfLines={2}
-                                display="block"
-                                maxWidth={550}
-                              >
-                                {item.trace?.output?.value}
-                              </Text>
-                            </Tooltip>
-                          </Td>
-                          <Td>
-                            <VStack
-                              align="start"
-                              spacing={2}
-                              divider={<StackDivider color="red" />}
-                            >
-                              {item.annotations.map((annotation) =>
-                                annotation.comment ? (
-                                  <Text
-                                    key={annotation.id}
-                                    width="full"
-                                    textAlign="left"
-                                    whiteSpace="pre-wrap"
-                                    wordBreak="break-word"
-                                    width={"300px"}
-                                  >
-                                    {annotation.comment}
-                                  </Text>
-                                ) : null
-                              )}
-                            </VStack>
-                          </Td>
-                          {scoreOptions.data &&
-                            scoreOptions.data.length > 0 &&
-                            annotationScoreValues(
-                              item.annotations,
-                              scoreOptionsIDArray
-                            )}
-                          <Td>
-                            {new Date(
-                              item.trace?.timestamps.started_at ?? ""
-                            ).toLocaleDateString()}
-                          </Td>
-                        </Tr>
-                      );
-                    })
-                  ) : (
+    <VStack align="start" marginTop={4} width="full">
+      <HStack justifyContent="space-between" width="full" paddingBottom={4}>
+        {tableHeader ? (
+          tableHeader
+        ) : (
+          <Heading as={"h1"} size="lg">
+            {heading}
+          </Heading>
+        )}
+        {!isDone && (
+          <Menu>
+            <MenuButton
+              as={IconButton}
+              aria-label="Options"
+              icon={<MoreVertical />}
+              variant="outline"
+            />
+            <MenuList>
+              <RadioGroup
+                defaultValue="all"
+                onChange={(value) => setSelectedAnnotations([value])}
+              >
+                <VStack align="start" padding={2}>
+                  <Radio value="all">All Annotations</Radio>
+                  <Radio value="completed">Completed</Radio>
+                  <Radio value="pending">Pending</Radio>
+                </VStack>
+              </RadioGroup>
+            </MenuList>
+          </Menu>
+        )}
+      </HStack>
+      <HStack align="start" spacing={6} width="full">
+        <Card flex={1} overflowX="auto">
+          <CardBody padding={0}>
+            {!queuesLoading && allQueueItems.length == 0 ? (
+              <NoDataInfoBlock
+                title={noDataTitle ?? "No annotations yet"}
+                description={
+                  noDataDescription ??
+                  "Annotate your messages to add more context and improve your analysis."
+                }
+                docsInfo={
+                  <Text>
+                    To get started with annotations, please visit our{" "}
+                    <Link
+                      href="https://docs.langwatch.ai/features/annotations"
+                      target="_blank"
+                      color="orange.400"
+                    >
+                      documentation
+                    </Link>
+                    .
+                  </Text>
+                }
+                icon={<Edit />}
+              />
+            ) : (
+              <TableContainer width="full" maxWidth="100%">
+                <Table variant="simple">
+                  <Thead>
                     <Tr>
-                      <Td colSpan={5}>
-                        <Text>
-                          No annotations found for selected filters or period.
-                        </Text>
-                      </Td>
+                      <Th></Th>
+                      {!isDone && <Th>Date created</Th>}
+                      <Th>Input</Th>
+                      <Th>Output</Th>
+                      <Th>Comments</Th>
+                      {scoreOptions.data &&
+                        scoreOptions.data.length > 0 &&
+                        scoreOptions.data?.map((key) => (
+                          <Th key={key.id}>{key.name}</Th>
+                        ))}
+                      <Th>Trace Date</Th>
                     </Tr>
-                  )}
-                </Tbody>
-              </Table>
-            </TableContainer>
-          )}
-        </CardBody>
-      </Card>
-      <FilterSidebar />
-    </HStack>
+                  </Thead>
+                  <Tbody>
+                    {queuesLoading ? (
+                      Array.from({ length: 3 }).map((_, i) => (
+                        <Tr key={i}>
+                          {Array.from({ length: 4 }).map((_, i) => (
+                            <Td key={i}>
+                              <Skeleton height="20px" />
+                            </Td>
+                          ))}
+                        </Tr>
+                      ))
+                    ) : allQueueItems.length > 0 ? (
+                      allQueueItems
+                        .filter((item) => {
+                          if (selectedAnnotations.includes("all")) {
+                            return true;
+                          }
+                          if (selectedAnnotations.includes("completed")) {
+                            return item.doneAt;
+                          }
+                          if (selectedAnnotations.includes("pending")) {
+                            return !item.doneAt;
+                          }
+                          return true;
+                        })
+                        .map((item) => {
+                          return (
+                            <Tr
+                              cursor="pointer"
+                              key={item.id}
+                              onClick={() =>
+                                handleTraceClick(
+                                  item.traceId,
+                                  item.id,
+                                  item.doneAt
+                                )
+                              }
+                              backgroundColor={
+                                item.doneAt ? "gray.50" : "white"
+                              }
+                              padding={2}
+                            >
+                              <Td>
+                                <HStack>
+                                  {item.createdByUser && (
+                                    <Avatar
+                                      size="sm"
+                                      name={item.createdByUser?.name ?? ""}
+                                      css={{
+                                        border: "2px solid white",
+                                        "&:not(:first-of-type)": {
+                                          marginLeft: "-20px",
+                                        },
+                                      }}
+                                    />
+                                  )}
+                                  {[
+                                    ...(new Map(
+                                      item.annotations.map(
+                                        (
+                                          annotation: Annotation & {
+                                            user: {
+                                              name: string | null;
+                                              id: string;
+                                            };
+                                          }
+                                        ) => [annotation.user.id, annotation]
+                                      )
+                                    ).values() as Iterable<
+                                      Annotation & {
+                                        user: { name: string | null };
+                                      }
+                                    >),
+                                  ].map((annotation) => (
+                                    <Avatar
+                                      size="sm"
+                                      name={annotation.user.name ?? ""}
+                                      css={{
+                                        border: "2px solid white",
+                                        "&:not(:first-of-type)": {
+                                          marginLeft: "-20px",
+                                        },
+                                      }}
+                                    />
+                                  ))}
+                                </HStack>
+                              </Td>
+                              {!isDone && (
+                                <Td>
+                                  <Text>
+                                    {item.createdAt
+                                      ? `${item.createdAt.getDate()}/${item.createdAt.toLocaleDateString(
+                                          "en-US",
+                                          {
+                                            month: "short",
+                                          }
+                                        )}`
+                                      : "-"}
+                                  </Text>
+                                </Td>
+                              )}
+
+                              <Td>
+                                <Tooltip label={item.trace?.input?.value}>
+                                  <Text
+                                    noOfLines={2}
+                                    display="block"
+                                    maxWidth={450}
+                                  >
+                                    {item.trace?.input?.value}
+                                  </Text>
+                                </Tooltip>
+                              </Td>
+                              <Td>
+                                <Tooltip label={item.trace?.output?.value}>
+                                  <Text
+                                    noOfLines={2}
+                                    display="block"
+                                    maxWidth={550}
+                                  >
+                                    {item.trace?.output?.value}
+                                  </Text>
+                                </Tooltip>
+                              </Td>
+                              <Td>
+                                <VStack
+                                  align="start"
+                                  spacing={2}
+                                  divider={<StackDivider color="red" />}
+                                >
+                                  {item.annotations.map(
+                                    (annotation: Annotation) =>
+                                      annotation.comment ? (
+                                        <Text
+                                          key={annotation.id}
+                                          width="full"
+                                          textAlign="left"
+                                          whiteSpace="pre-wrap"
+                                          wordBreak="break-word"
+                                          minWidth={400}
+                                        >
+                                          {annotation.comment}
+                                        </Text>
+                                      ) : null
+                                  )}
+                                </VStack>
+                              </Td>
+                              {scoreOptions.data &&
+                                scoreOptions.data.length > 0 &&
+                                annotationScoreValues(
+                                  item.annotations,
+                                  scoreOptionsIDArray
+                                )}
+                              <Td>
+                                {new Date(
+                                  item.trace?.timestamps.started_at ?? ""
+                                ).toLocaleDateString()}
+                              </Td>
+                            </Tr>
+                          );
+                        })
+                    ) : (
+                      <Tr>
+                        <Td colSpan={5}>
+                          <Text>
+                            No annotations found for selected filters or period.
+                          </Text>
+                        </Td>
+                      </Tr>
+                    )}
+                  </Tbody>
+                </Table>
+              </TableContainer>
+            )}
+          </CardBody>
+        </Card>
+      </HStack>
+    </VStack>
   );
 };

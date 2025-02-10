@@ -1,45 +1,22 @@
 import { DownloadIcon } from "@chakra-ui/icons";
-import { Link } from "@chakra-ui/next-js";
-import {
-  Avatar,
-  Button,
-  Card,
-  CardBody,
-  Container,
-  HStack,
-  Heading,
-  Skeleton,
-  Spacer,
-  Table,
-  TableContainer,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
-} from "@chakra-ui/react";
+import { Button, Container, HStack, Heading, Spacer } from "@chakra-ui/react";
 import Parse from "papaparse";
 
-import { useEffect } from "react";
-import { Edit, HelpCircle, ThumbsDown, ThumbsUp } from "react-feather";
-import { useDrawer } from "~/components/CurrentDrawer";
-import { DashboardLayout } from "~/components/DashboardLayout";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { FilterSidebar } from "~/components/filters/FilterSidebar";
-import { FilterToggle } from "~/components/filters/FilterToggle";
-import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
-import { api } from "~/utils/api";
-import { useFilterParams } from "~/hooks/useFilterParams";
-import { useRouter } from "next/router";
-import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
-import type { AppRouter } from "../../server/api/root";
+import type { Annotation, User } from "@prisma/client";
+import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import type { TRPCClientErrorLike } from "@trpc/client";
-import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { useRouter } from "next/router";
+import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
+import { useDrawer } from "~/components/CurrentDrawer";
+import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
+import { useFilterParams } from "~/hooks/useFilterParams";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { Trace } from "~/server/tracer/types";
+import { api } from "~/utils/api";
+import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
+import type { AppRouter } from "../../server/api/root";
 
 export default function Annotations() {
   const { project } = useOrganizationTeamProject();
@@ -96,16 +73,65 @@ export default function Annotations() {
     );
   }
 
-  const scoreOptions = api.annotationScore.getAll.useQuery(
-    { projectId: project?.id ?? "" },
+  const traceIds = annotations.data?.map((annotation) => annotation.traceId);
+
+  const traces = api.traces.getTracesWithSpans.useQuery(
     {
-      enabled: !!project,
+      projectId: project?.id ?? "",
+      traceIds: traceIds ?? [],
+    },
+    {
+      enabled: !!project?.id,
+      refetchOnWindowFocus: false,
     }
   );
+  interface GroupedAnnotations {
+    [key: string]: {
+      traceId: string;
+      trace?: Trace;
+      annotations: Array<{
+        comment: string | null;
+        scoreOptions: Record<
+          string,
+          { value: string | string[]; reason: string }
+        >;
+        createdAt: Date;
+        user: User;
+      }>;
+    };
+  }
 
-  const scoreOptionsIDArray = scoreOptions.data
-    ? scoreOptions.data.map((scoreOption) => scoreOption.id)
-    : [];
+  console.log("traces", annotations.data);
+
+  const groupByTraceId = (dataArray: Annotation[]) => {
+    return Object.values(
+      dataArray.reduce((acc: GroupedAnnotations, item) => {
+        if (!acc[item.traceId]) {
+          acc[item.traceId] = {
+            traceId: item.traceId,
+            annotations: [],
+            trace: traces.data?.find(
+              (trace) => trace.trace_id === item.traceId
+            ),
+          };
+        }
+
+        acc[item.traceId]!.annotations.push({
+          comment: item.comment,
+          scoreOptions: item.scoreOptions as Record<
+            string,
+            { value: string | string[]; reason: string }
+          >,
+          user: (item as any).user,
+          createdAt: item.createdAt,
+        });
+
+        return acc;
+      }, {})
+    );
+  };
+
+  const groupedAnnotations = groupByTraceId(annotations.data ?? []);
 
   const downloadCSV = () => {
     const fields = [
@@ -147,190 +173,35 @@ export default function Annotations() {
     link.remove();
   };
 
-  const openTraceDrawer = (traceId: string) => {
-    openDrawer("traceDetails", {
-      traceId: traceId,
-      selectedTab: "annotations",
-    });
-  };
-
-  const isAnnotationDrawerOpen = isDrawerOpen("annotation");
-  const isTraceDrawerOpen = isDrawerOpen("traceDetails");
-
-  useEffect(() => {
-    void annotations.refetch();
-  }, [isAnnotationDrawerOpen, isTraceDrawerOpen]);
-
-  interface ScoreOption {
-    value: string;
-    reason?: string;
-  }
-
-  const annotationScoreValues = (
-    scoreOptions: Record<string, ScoreOption>,
-    scoreOptionsIDArray: string[]
-  ) => {
-    if (scoreOptionsIDArray.length > 0 && scoreOptions) {
-      return scoreOptionsIDArray.map((id) => (
-        <Td key={id}>
-          <HStack>
-            <Text>{scoreOptions[id]?.value}</Text>
-            {scoreOptions[id]?.reason && (
-              <Tooltip label={scoreOptions[id]?.reason}>
-                <HelpCircle width={16} height={16} />
-              </Tooltip>
-            )}
-          </HStack>
-        </Td>
-      ));
-    } else {
-      if (scoreOptionsIDArray.length > 0) {
-        return scoreOptionsIDArray.map((_, i) => <Td key={i}></Td>);
-      }
-      return <Td></Td>;
-    }
-  };
-
+  const tableHeader = (
+    <HStack width="full" align="top">
+      <Heading as={"h1"} size="lg" paddingTop={1}>
+        All Annotations
+      </Heading>
+      <Spacer />
+      <Button
+        colorScheme="black"
+        minWidth="fit-content"
+        variant="ghost"
+        onClick={() => downloadCSV()}
+      >
+        Export all <DownloadIcon marginLeft={2} />
+      </Button>
+      <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+    </HStack>
+  );
   return (
     <AnnotationsLayout>
-      <Container maxW={"calc(100vw - 250px)"} padding={6} marginTop={8}>
-        <HStack width="full" align="top">
-          <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
-            Annotations
-          </Heading>
-          <Spacer />
-          <Button
-            colorScheme="black"
-            minWidth="fit-content"
-            variant="ghost"
-            onClick={() => downloadCSV()}
-          >
-            Export all <DownloadIcon marginLeft={2} />
-          </Button>
-          <PeriodSelector
-            period={{ startDate, endDate }}
-            setPeriod={setPeriod}
-          />
-          <FilterToggle />
-        </HStack>
-        <HStack width="full" align="start" spacing={6}>
-          <Card flex={1}>
-            <CardBody>
-              {annotations.data &&
-              annotations.data.length == 0 &&
-              scoreOptions.data &&
-              scoreOptions.data.length == 0 ? (
-                <NoDataInfoBlock
-                  title="No annotations yet"
-                  description="Annotate your messages to add more context and improve your analysis."
-                  docsInfo={
-                    <Text>
-                      To get started with annotations, please visit our{" "}
-                      <Link
-                        href="https://docs.langwatch.ai/features/annotations"
-                        target="_blank"
-                        color="orange.400"
-                      >
-                        documentation
-                      </Link>
-                      .
-                    </Text>
-                  }
-                  icon={<Edit />}
-                />
-              ) : (
-                <TableContainer>
-                  <Table variant="simple">
-                    <Thead>
-                      <Tr>
-                        <Th>User</Th>
-                        <Th>Comment</Th>
-                        <Th>Trace ID</Th>
-                        <Th>Rating</Th>
-
-                        {scoreOptions.data &&
-                          scoreOptions.data.length > 0 &&
-                          scoreOptions.data?.map((key) => (
-                            <Th key={key.id}>{key.name}</Th>
-                          ))}
-                        <Th>Created At</Th>
-                      </Tr>
-                    </Thead>
-                    <Tbody>
-                      {annotations.isLoading ? (
-                        Array.from({ length: 3 }).map((_, i) => (
-                          <Tr key={i}>
-                            {Array.from({ length: 4 }).map((_, i) => (
-                              <Td key={i}>
-                                <Skeleton height="20px" />
-                              </Td>
-                            ))}
-                          </Tr>
-                        ))
-                      ) : annotations.data && annotations.data.length > 0 ? (
-                        annotations.data?.map((annotation) => (
-                          <Tr
-                            cursor="pointer"
-                            key={annotation.id}
-                            onClick={() => openTraceDrawer(annotation.traceId)}
-                          >
-                            <Td>
-                              <Avatar
-                                name={annotation.user?.name ?? undefined}
-                                backgroundColor={"orange.400"}
-                                color="white"
-                                size="sm"
-                              />
-                            </Td>
-                            <Td>
-                              <Tooltip label={annotation.comment}>
-                                <Text
-                                  noOfLines={2}
-                                  display="block"
-                                  maxWidth={450}
-                                >
-                                  {annotation.comment}
-                                </Text>
-                              </Tooltip>
-                            </Td>
-                            <Td>{annotation.traceId}</Td>
-                            <Td>
-                              {annotation.isThumbsUp === true ? (
-                                <ThumbsUp />
-                              ) : annotation.isThumbsUp === false ? (
-                                <ThumbsDown />
-                              ) : null}
-                            </Td>
-                            {scoreOptions.data &&
-                              scoreOptions.data.length > 0 &&
-                              annotationScoreValues(
-                                annotation.scoreOptions as unknown as Record<
-                                  string,
-                                  ScoreOption
-                                >,
-                                scoreOptionsIDArray
-                              )}
-                            <Td>{annotation.createdAt.toLocaleString()}</Td>
-                          </Tr>
-                        ))
-                      ) : (
-                        <Tr>
-                          <Td colSpan={5}>
-                            <Text>
-                              No annotations found for selected filters or
-                              period.
-                            </Text>
-                          </Td>
-                        </Tr>
-                      )}
-                    </Tbody>
-                  </Table>
-                </TableContainer>
-              )}
-            </CardBody>
-          </Card>
-          <FilterSidebar />
-        </HStack>
+      <Container maxW={"calc(100vw - 360px)"} padding={6}>
+        <AnnotationsTable
+          allQueueItems={groupedAnnotations}
+          queuesLoading={annotations.isLoading}
+          heading="Annotations"
+          isDone={true}
+          tableHeader={tableHeader}
+          noDataTitle="No annotations yet"
+          noDataDescription="Annotate your messages to add more context and improve your analysis."
+        />
       </Container>
     </AnnotationsLayout>
   );

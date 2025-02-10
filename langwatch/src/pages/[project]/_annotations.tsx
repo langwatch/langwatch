@@ -52,7 +52,6 @@ export default function Annotations() {
     scoreOptionsIDArray: string[]
   ) => {
     if (scoreOptionsIDArray.length > 0 && scoreOptions) {
-      console.log("scoreOptions", scoreOptions);
       return scoreOptionsIDArray.map((id) => (
         <Td key={id}>
           <HStack>
@@ -179,7 +178,6 @@ export const AnnotationsTable = ({
                     ))
                   ) : allQueueItems.length > 0 ? (
                     allQueueItems.map((item) => {
-                      console.log("item", item);
                       return (
                         <Tr
                           cursor="pointer"
