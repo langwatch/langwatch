@@ -351,10 +351,10 @@ export default async function handler(
     return res.status(200).json({ message: "No changes" });
   }
 
-  if (existingTrace?.version && existingTrace.version > 30) {
+  if (existingTrace?.version && existingTrace.version > 256) {
     return res.status(400).json({
       message:
-        "Over 30 updates were sent for this trace already, no more updates will be accepted",
+        "Over 256 updates were sent for this trace already, no more updates will be accepted",
     });
   }
 
