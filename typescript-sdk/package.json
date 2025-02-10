@@ -28,7 +28,7 @@
     "node": ">=18.0.0"
   },
   "devDependencies": {
-    "@ai-sdk/openai": "^0.0.18",
+    "@ai-sdk/openai": "^1.1.9",
     "@eslint/js": "^9.4.0",
     "@types/debug": "^4.1.12",
     "@types/eslint__js": "^8.42.3",
