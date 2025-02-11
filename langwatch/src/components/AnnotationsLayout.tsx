@@ -1,14 +1,7 @@
-import {
-  Avatar,
-  Button,
-  Divider,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Avatar, Divider, HStack, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { type PropsWithChildren } from "react";
-import { Check, Edit, Inbox, Plus, PlusCircle, Users } from "react-feather";
+import { Check, Edit, Inbox, Plus, Users } from "react-feather";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
@@ -69,16 +62,14 @@ export default function AnnotationsLayout({
           </Text>
 
           <MenuLink
-            href={`/${project?.slug}/annotations/inbox`}
+            href={`/${project?.slug}/annotations`}
             icon={menuItems.inbox}
             menuEnd={
               <Text fontSize="xs" fontWeight="500">
                 {totalItems > 0 ? totalItems : ""}
               </Text>
             }
-            isSelectedAnnotation={
-              router.pathname === "/[project]/annotations/inbox"
-            }
+            isSelectedAnnotation={router.pathname === "/[project]/annotations"}
           >
             Inbox
           </MenuLink>
@@ -102,9 +93,11 @@ export default function AnnotationsLayout({
             {user?.name?.split(" ")[0]} (You)
           </MenuLink>
           <MenuLink
-            href={`/${project?.slug}/annotations`}
+            href={`/${project?.slug}/annotations/all`}
             icon={menuItems.all}
-            isSelectedAnnotation={router.pathname === "/[project]/annotations"}
+            isSelectedAnnotation={
+              router.pathname === "/[project]/annotations/all"
+            }
           >
             All
           </MenuLink>

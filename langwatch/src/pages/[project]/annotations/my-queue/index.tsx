@@ -62,10 +62,19 @@ export default function TraceAnnotations() {
         <Conversation traceId={currentQueueItem?.trace?.trace_id ?? ""} />
         <Spacer />
         {currentQueueItem?.trace && (
-          <AnnotationQueuePicker
-            queueItems={allQueueItems}
-            currentQueueItem={currentQueueItem}
-          />
+          <Box
+            position="sticky"
+            bottom={0}
+            left={0}
+            right={0}
+            width="100%"
+            backgroundColor="white"
+          >
+            <AnnotationQueuePicker
+              queueItems={allQueueItems}
+              currentQueueItem={currentQueueItem}
+            />
+          </Box>
         )}
       </VStack>
     </DashboardLayout>
@@ -107,7 +116,10 @@ const AnnotationQueuePicker = ({
           if (nextItem) {
             navigateToQueue(nextItem.id);
           } else {
-            window.location.reload();
+            void router.replace(`/${project?.slug}/annotations/my-queue`);
+            // .then(() => {
+            //   router.reload();
+            // });
           }
           await queryClient.annotation.getQueueItems.invalidate();
         },

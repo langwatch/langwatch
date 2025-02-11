@@ -36,9 +36,7 @@ export default function SettingsLayout({
           <MenuLink href="/settings/annotation-scores">
             Annotation Scores
           </MenuLink>
-          <MenuLink href="/settings/annotation-queues">
-            Annotation Queues
-          </MenuLink>
+
           <MenuLink href="/settings/usage">Usage & Billing</MenuLink>
           <MenuLink href="/settings/subscription">Subscription</MenuLink>
         </VStack>

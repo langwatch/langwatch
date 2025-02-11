@@ -5,7 +5,6 @@ import {
   CardBody,
   Heading,
   HStack,
-  IconButton,
   Link,
   Menu,
   MenuButton,
@@ -30,15 +29,15 @@ import {
 } from "@chakra-ui/react";
 
 import { useRouter } from "next/router";
-import { Archive, Edit, MessageCircle, MoreVertical } from "react-feather";
+import { Edit, MessageCircle, MoreVertical } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
+import { ChevronDownIcon } from "@chakra-ui/icons";
 import type { Annotation } from "@prisma/client";
 import { useState } from "react";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "../CurrentDrawer";
 import { NoDataInfoBlock } from "../NoDataInfoBlock";
-import { ChevronDownIcon } from "@chakra-ui/icons";
 
 export const AnnotationsTable = ({
   allQueueItems,

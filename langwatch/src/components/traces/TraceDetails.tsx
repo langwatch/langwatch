@@ -31,14 +31,10 @@ import {
   useToast,
   VStack,
 } from "@chakra-ui/react";
-import {
-  type Annotation,
-  type Project,
-  type PublicShare,
-} from "@prisma/client";
+import { type Project, type PublicShare } from "@prisma/client";
 import { useRouter } from "next/router";
 import qs from "qs";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Maximize2, Minimize2, Plus, Users } from "react-feather";
 import type { ElasticSearchEvaluation } from "~/server/tracer/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -47,7 +43,6 @@ import { Conversation } from "../../pages/[project]/messages/[trace]/index";
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
-import { Annotations } from "../Annotations";
 import { evaluationPassed } from "../checks/EvaluationStatus";
 import { useDrawer } from "../CurrentDrawer";
 import { EvaluationStatusItem } from "./EvaluationStatusItem";
@@ -56,6 +51,7 @@ import { SpanTree } from "./SpanTree";
 import { TraceSummary } from "./Summary";
 
 import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
+import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
 
 interface TraceEval {
@@ -138,16 +134,6 @@ export function TraceDetails(props: {
     }
   }, [evaluations.data]);
 
-  const annotationsQuery = api.annotation.getByTraceId.useQuery(
-    {
-      projectId: project?.id ?? "",
-      traceId: props.traceId,
-    },
-    {
-      enabled: !!project?.id,
-    }
-  );
-
   const anyGuardrails = !!evaluations.data?.some((x) => x.is_guardrail);
 
   const indexes = Object.fromEntries(
@@ -156,7 +142,6 @@ export function TraceDetails(props: {
       "traceDetails",
       ...(anyGuardrails ? ["guardrails"] : []),
       "evaluations",
-      "annotations",
       "events",
     ].map((tab, index) => [tab, index])
   );
@@ -201,7 +186,6 @@ export function TraceDetails(props: {
   }, [props.selectedTab]);
 
   const { trace } = useTraceDetailsState(props.traceId);
-  const { isOpen, onOpen, onClose } = useDisclosure();
   const queueDrawerOpen = useDisclosure();
 
   const queueItem = api.annotation.createQueueItem.useMutation();
@@ -218,7 +202,6 @@ export function TraceDetails(props: {
       {
         onSuccess: () => {
           popoverOpen.onClose();
-          onClose();
           toast({
             title: "Trace added to annotation queue",
             description: (
@@ -250,9 +233,8 @@ export function TraceDetails(props: {
     }
   }, [trace.data?.metadata.thread_id]);
 
-  const ref = useRef(null);
-
   const popoverOpen = useDisclosure();
+  const commentState = useAnnotationCommentStore();
 
   return (
     <VStack
@@ -293,12 +275,15 @@ export function TraceDetails(props: {
               <Button
                 colorScheme="black"
                 variant="outline"
-                onClick={() =>
-                  openDrawer("annotation", {
+                onClick={() => {
+                  commentState.setCommentState({
+                    isVisible: true,
                     traceId: props.traceId,
                     action: "new",
-                  })
-                }
+                    annotationId: undefined,
+                  });
+                  setTabIndex(indexes.messages ?? 0);
+                }}
               >
                 Annotate
               </Button>
@@ -374,12 +359,7 @@ export function TraceDetails(props: {
                 evaluations={evaluations.data}
               />
             </Tab>
-            <Tab>
-              Annotations{" "}
-              {annotationsQuery.data && (
-                <AnnotationMsgs annotations={annotationsQuery.data} />
-              )}
-            </Tab>
+
             <Tab>
               Events{" "}
               {trace.data?.events && trace.data.events.length > 0 && (
@@ -436,30 +416,7 @@ export function TraceDetails(props: {
               />
             )}
           </TabPanel>
-          <TabPanel paddingX={6} paddingY={4}>
-            {tabIndex === indexes.annotations && (
-              <>
-                {annotationsQuery.isLoading ? (
-                  <Text>Loading...</Text>
-                ) : annotationsQuery.data &&
-                  annotationsQuery.data.length > 0 ? (
-                  <Annotations traceId={props.traceId} />
-                ) : (
-                  <Text>
-                    No annotations found.{" "}
-                    <Link
-                      href="https://docs.langwatch.ai/features/annotations"
-                      target="_blank"
-                      textDecoration="underline"
-                    >
-                      Get started with annotations
-                    </Link>
-                    .
-                  </Text>
-                )}
-              </>
-            )}
-          </TabPanel>
+
           <TabPanel paddingX={6} paddingY={4}>
             {tabIndex === indexes.events && <Events traceId={props.traceId} />}
           </TabPanel>
@@ -830,23 +787,6 @@ const EvaluationsCount = (trace: TraceEval) => {
       fontSize={"sm"}
     >
       {totalProcessed > 0 ? totalProcessed : total}
-    </Text>
-  );
-};
-
-const AnnotationMsgs = ({ annotations }: { annotations: Annotation[] }) => {
-  if (!annotations.length) return null;
-
-  return (
-    <Text
-      marginLeft={3}
-      borderRadius={"md"}
-      paddingX={2}
-      backgroundColor={"green.500"}
-      color={"white"}
-      fontSize={"sm"}
-    >
-      {annotations.length}
     </Text>
   );
 };

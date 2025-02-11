@@ -1,26 +1,31 @@
 import {
+  Avatar,
   Box,
+  Card,
+  CardBody,
   HStack,
   Spacer,
+  StackDivider,
   Text,
   Tooltip,
   VStack,
-  Card,
-  CardBody,
-  Avatar,
-  StackDivider,
 } from "@chakra-ui/react";
 import { useEffect } from "react";
-import { Edit, ThumbsDown, ThumbsUp, MessageCircle } from "react-feather";
+import { Edit, MessageCircle, ThumbsDown, ThumbsUp } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
 import { useDrawer } from "./CurrentDrawer";
 
+import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
+import { AnnotationComment } from "./annotations/AnnotationComment";
+
 export const Annotations = ({ traceId }: { traceId: string }) => {
   const { data } = useRequiredSession();
   const { isDrawerOpen, openDrawer } = useDrawer();
   const { project, isPublicRoute } = useOrganizationTeamProject();
+
+  const commentState = useAnnotationCommentStore();
 
   const annotations = api.annotation.getByTraceId.useQuery(
     {
@@ -52,6 +57,14 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
     <VStack spacing={3} align="start">
       {annotations.data?.map((annotation) => {
         const isCurrentUser = data?.user?.id === annotation.user?.id;
+
+        if (
+          commentState.annotationId === annotation.id &&
+          commentState.action === "edit"
+        ) {
+          return <AnnotationComment key={annotation.id} />;
+        }
+
         return (
           <Card
             backgroundColor={"gray.100"}
@@ -61,7 +74,8 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
               isCurrentUser
                 ? (e) => {
                     e.stopPropagation();
-                    openDrawer("annotation", {
+                    commentState.setCommentState({
+                      isVisible: true,
                       traceId: traceId,
                       action: "edit",
                       annotationId: annotation.id,
@@ -177,6 +191,9 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
           </Card>
         );
       })}
+      {commentState.isVisible && commentState.action === "new" && (
+        <AnnotationComment key={commentState.annotationId ?? ""} />
+      )}
     </VStack>
   );
 };

@@ -19,10 +19,10 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import { useForm } from "react-hook-form";
-import slugify from "slugify";
 import { useState } from "react";
 import { Plus } from "react-feather";
+import { useForm } from "react-hook-form";
+import slugify from "slugify";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useDrawer } from "./CurrentDrawer";
@@ -31,7 +31,6 @@ import { FullWidthFormControl } from "./FullWidthFormControl";
 import { AddAnnotationScoreDrawer } from "./AddAnnotationScoreDrawer";
 
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
-import { useRouter } from "next/router";
 
 export const AddAnnotationQueueDrawer = ({
   onClose,

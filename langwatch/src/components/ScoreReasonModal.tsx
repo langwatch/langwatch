@@ -61,7 +61,7 @@ export function ScoreReasonModal({
                 onClose();
               }}
             >
-              Confirm
+              Add
             </Button>
           </ModalFooter>
         </ModalContent>

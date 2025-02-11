@@ -28,7 +28,7 @@ export default function Annotations() {
           queuesLoading={queuesLoading}
           noDataTitle="No queued annotations for you"
           noDataDescription="You have no annotations assigned to you."
-          heading="Your annotations"
+          heading="My Queue"
         />
       </Container>
     </AnnotationsLayout>
