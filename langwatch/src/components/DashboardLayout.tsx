@@ -717,7 +717,11 @@ export const DashboardLayout = ({
                 ) {
                   void router.replace({ query: { ...router.query, query } });
                 } else {
-                  void router.push(`/${project.slug}/messages?query=${query}`);
+                  void router.push(
+                    `/${project.slug}/messages?query=${encodeURIComponent(
+                      query
+                    )}`
+                  );
                 }
               }}
             >

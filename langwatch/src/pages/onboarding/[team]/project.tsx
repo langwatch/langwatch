@@ -129,7 +129,11 @@ export default function ProjectOnboarding() {
       },
       {
         onSuccess: (data) => {
-          if (returnTo) {
+          if (
+            returnTo &&
+            (returnTo.startsWith("/") ||
+              returnTo.startsWith(window.location.origin))
+          ) {
             window.location.href = returnTo;
           } else {
             window.location.href = `/${data.projectSlug}/messages`;

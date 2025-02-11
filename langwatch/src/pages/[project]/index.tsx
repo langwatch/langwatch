@@ -74,7 +74,10 @@ function Index() {
 
   const router = useRouter();
   const returnTo = router.query.return_to;
-  if (typeof returnTo === "string") {
+  if (
+    typeof returnTo === "string" &&
+    (returnTo.startsWith("/") || returnTo.startsWith(window.location.origin))
+  ) {
     void router.push(returnTo);
     return null;
   }
