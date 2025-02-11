@@ -46,10 +46,10 @@
     "@langchain/core": "^0.2.7",
     "@opentelemetry/otlp-transformer": "^0.56.0",
     "@opentelemetry/sdk-trace-base": "^1.29.0",
-    "ai": "^3.1.23",
+    "ai": "^4.0.14",
     "eventemitter3": "^5.0.1",
     "javascript-stringify": "^2.1.0",
-    "nanoid": "^5.0.7",
+    "nanoid": "^5.0.9",
     "openai": "^4.47.3",
     "zod": "^3.22.4",
     "zod-validation-error": "^3.3.0"
