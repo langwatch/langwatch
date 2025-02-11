@@ -303,6 +303,10 @@ export const runEvaluation = async ({
 
   const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
 
+  if (!evaluator) {
+    throw new Error(`Evaluator ${evaluatorType} not found`);
+  }
+
   let evaluatorEnv: Record<string, string> = Object.fromEntries(
     (evaluator.envVars ?? []).map((envVar) => [envVar, process.env[envVar]!])
   );
