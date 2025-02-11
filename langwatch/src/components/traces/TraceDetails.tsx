@@ -72,7 +72,8 @@ export function TraceDetails(props: {
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const router = useRouter();
 
-  const canViewMessages = router.query.view == "table";
+  const canViewMessages =
+    router.query.view == "table" || router.query["drawer.view"] == "table";
 
   const { openDrawer } = useDrawer();
 

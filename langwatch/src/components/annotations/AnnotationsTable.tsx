@@ -72,7 +72,7 @@ export const AnnotationsTable = ({
   const openTraceDrawer = (traceId: string) => {
     openDrawer("traceDetails", {
       traceId: traceId,
-      selectedTab: "annotations",
+      view: "table",
     });
   };
 

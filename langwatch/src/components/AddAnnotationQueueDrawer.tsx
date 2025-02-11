@@ -143,9 +143,7 @@ export const AddAnnotationQueueDrawer = ({
       {
         onSuccess: (data) => {
           void queryClient.annotation.getQueues.invalidate();
-          void queryClient.annotation.getQueues.refetch();
           void queryClient.annotation.getQueueById.invalidate();
-          void queryClient.annotation.getQueueById.refetch();
           toast({
             title: `Annotation Queue ${queueId ? "Updated" : "Created"}`,
             description: `Successfully ${queueId ? "updated" : "created"} ${

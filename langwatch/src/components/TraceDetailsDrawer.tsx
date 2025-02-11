@@ -13,6 +13,7 @@ import { TraceDetails } from "./traces/TraceDetails";
 interface TraceDetailsDrawerProps {
   traceId: string;
   selectedTab?: string;
+  view?: "table" | "span";
 }
 
 export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {

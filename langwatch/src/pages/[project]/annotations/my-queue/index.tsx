@@ -40,9 +40,7 @@ export default function TraceAnnotations() {
 
   const refetchQueueItems = async () => {
     await queryClient.annotation.getQueueItems.invalidate();
-    await queryClient.annotation.getQueueItems.refetch();
     await queryClient.annotation.getQueues.invalidate();
-    await queryClient.annotation.getQueues.refetch();
   };
 
   if (allQueueItems.length === 0 && !queuesLoading) {

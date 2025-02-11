@@ -15,6 +15,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Trace } from "~/server/tracer/types";
 import { api } from "~/utils/api";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
+import type { AppRouter } from "~/server/api/root";
 
 export default function Annotations() {
   const { project } = useOrganizationTeamProject();

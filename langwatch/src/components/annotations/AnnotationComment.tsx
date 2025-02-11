@@ -149,7 +149,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
 
             commentState.resetComment();
             void queryClient.annotation.getByTraceId.invalidate();
-            void queryClient.annotation.getByTraceId.refetch();
+            void queryClient.annotation.getAll.invalidate();
           },
           onError: () => {
             toast({
@@ -185,7 +185,6 @@ export function AnnotationComment({ key = "" }: { key: string }) {
             reset();
             commentState.resetComment();
             void queryClient.annotation.getByTraceId.invalidate();
-            void queryClient.annotation.getByTraceId.refetch();
           },
           onError: () => {
             toast({
@@ -219,7 +218,6 @@ export function AnnotationComment({ key = "" }: { key: string }) {
             position: "top-right",
           });
           void queryClient.annotation.getByTraceId.invalidate();
-          void queryClient.annotation.getByTraceId.refetch();
           commentState.resetComment();
         },
       }
