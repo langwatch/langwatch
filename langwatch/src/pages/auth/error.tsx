@@ -15,17 +15,16 @@ export default function Error({ session }: { session: Session | null }) {
     setTimeout(() => {
       if (typeof window !== "undefined" && typeof document !== "undefined") {
         if (isAuth0) {
-          const fromReferrer = !!document.referrer;
-          if (fromReferrer) {
-            // @ts-ignore
-            window.location = document.referrer;
+          const referrer = document.referrer;
+          // Check if referrer is from our own domain
+          const isValidDomain = referrer?.startsWith(window.location.origin);
+          if (isValidDomain) {
+            window.location.href = referrer;
           } else {
-            // @ts-ignore
-            window.location = "/";
+            window.location.href = "/";
           }
         } else {
-          // @ts-ignore
-          window.location = "/auth/signin";
+          window.location.href = "/auth/signin";
         }
       }
     }, 3000);
