@@ -17,23 +17,34 @@ import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { Conversation } from "../../messages/[trace]/index";
+import { useMemo } from "react";
 
 export default function TraceAnnotations() {
   const router = useRouter();
   const { "queue-item": queueItem } = router.query;
-
   const {
     assignedQueueItemsWithTraces,
     memberAccessibleQueueItemsWithTraces,
     queuesLoading,
   } = useAnnotationQueues();
 
-  let allQueueItems = [
-    ...(assignedQueueItemsWithTraces ?? []),
-    ...(memberAccessibleQueueItemsWithTraces ?? []),
-  ];
+  const allQueueItems = useMemo(() => {
+    const items = [
+      ...(assignedQueueItemsWithTraces ?? []),
+      ...(memberAccessibleQueueItemsWithTraces ?? []),
+    ];
+    return items.filter((item) => !item.doneAt);
+  }, [assignedQueueItemsWithTraces, memberAccessibleQueueItemsWithTraces]);
 
-  allQueueItems = allQueueItems.filter((item) => !item.doneAt);
+  const queryClient = api.useContext();
+
+  const refetchQueueItems = async () => {
+    await queryClient.annotation.getQueueItems.invalidate();
+    await queryClient.annotation.getQueueItems.refetch();
+    await queryClient.annotation.getQueues.invalidate();
+    await queryClient.annotation.getQueues.refetch();
+  };
+
   if (allQueueItems.length === 0 && !queuesLoading) {
     return (
       <AnnotationsLayout>
@@ -73,6 +84,7 @@ export default function TraceAnnotations() {
             <AnnotationQueuePicker
               queueItems={allQueueItems}
               currentQueueItem={currentQueueItem}
+              refetchQueueItems={refetchQueueItems}
             />
           </Box>
         )}
@@ -84,13 +96,14 @@ export default function TraceAnnotations() {
 const AnnotationQueuePicker = ({
   queueItems,
   currentQueueItem,
+  refetchQueueItems,
 }: {
   queueItems: AnnotationQueueItem[];
   currentQueueItem: AnnotationQueueItem;
+  refetchQueueItems: () => Promise<void>;
 }) => {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
-  const queryClient = api.useContext();
 
   const currentQueueItemIndex = queueItems.findIndex(
     (item) => item.id === currentQueueItem.id
@@ -112,16 +125,13 @@ const AnnotationQueuePicker = ({
       },
       {
         onSuccess: async () => {
+          await refetchQueueItems();
           const nextItem = queueItems[currentQueueItemIndex + 1];
           if (nextItem) {
             navigateToQueue(nextItem.id);
           } else {
-            void router.replace(`/${project?.slug}/annotations/my-queue`);
-            // .then(() => {
-            //   router.reload();
-            // });
+            await router.replace(`/${project?.slug}/annotations/my-queue`);
           }
-          await queryClient.annotation.getQueueItems.invalidate();
         },
       }
     );
