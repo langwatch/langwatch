@@ -47,7 +47,7 @@
     "@elastic/elasticsearch": "^8.15.0",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
-    "@google-cloud/dlp": "^5.1.0",
+    "@google-cloud/dlp": "^5.12.0",
     "@hookform/resolvers": "^3.3.2",
     "@microlink/react-json-view": "^1.23.1",
     "@monaco-editor/react": "^4.6.0",
@@ -64,10 +64,10 @@
     "@react-email/img": "^0.0.6",
     "@react-email/render": "^1.0.3",
     "@sendgrid/mail": "^8.1.1",
-    "@sentry/nextjs": "^8.49.0",
-    "@sentry/node": "^8.49.0",
-    "@sentry/opentelemetry": "^8.48.0",
-    "@sentry/profiling-node": "^8.49.0",
+    "@sentry/nextjs": "^9.0.0",
+    "@sentry/node": "^9.0.0",
+    "@sentry/opentelemetry": "^9.0.0",
+    "@sentry/profiling-node": "^9.0.0",
     "@slack/webhook": "7.0.4",
     "@t3-oss/env-nextjs": "^0.6.0",
     "@tanstack/react-query": "^4.29.25",
@@ -184,6 +184,11 @@
     "tsx": "^4.7.0",
     "typescript": "^5.1.6",
     "vitest": "^0.34.6"
+  },
+  "overrides": {
+    "cross-spawn": "^7.0.6",
+    "exec-sh": "^0.4.0",
+    "glob": "^11.0.1"
   },
   "ct3aMetadata": {
     "initVersion": "7.19.0"
