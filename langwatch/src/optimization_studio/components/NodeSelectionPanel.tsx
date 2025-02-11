@@ -447,20 +447,20 @@ export function CustomDragLayer() {
     isDragging: monitor.isDragging(),
   })) as {
     isDragging: boolean;
-    item: { node: Node } | undefined;
+    item: { node?: Node } | undefined;
     currentOffset: XYPosition;
   };
 
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (item && ref.current) {
+    if (item && item.node &&ref.current) {
       const { width, height } = ref.current.getBoundingClientRect();
       item.node.width = width;
       item.node.height = height;
     }
   }, [isDragging, item]);
 
-  if (!isDragging || !item) {
+  if (!isDragging || !item || !item.node) {
     return null;
   }
 

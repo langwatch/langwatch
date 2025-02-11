@@ -1,13 +1,15 @@
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import type { Project } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
-import { Job, Worker, type JobsOptions } from "bullmq";
+import { Worker } from "bullmq";
+import { nanoid } from "nanoid";
 import type {
   CollectorCheckAndAdjustJob,
   CollectorJob,
 } from "~/server/background/types";
 import { env } from "../../../env.mjs";
 import { getDebugger } from "../../../utils/logger";
+import { safeTruncate } from "../../../utils/truncate";
 import { flattenObjectKeys } from "../../api/utils";
 import { prisma } from "../../db";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
@@ -28,6 +30,7 @@ import {
 } from "../../tracer/types";
 import { elasticSearchSpanToSpan } from "../../tracer/utils";
 import { COLLECTOR_QUEUE, collectorQueue } from "../queues/collectorQueue";
+import { getFirstInputAsText, getLastOutputAsText } from "./collector/common";
 import { mapEvaluations, scheduleEvaluations } from "./collector/evaluations";
 import {
   addGuardrailCosts,
@@ -37,10 +40,6 @@ import {
 import { cleanupPIIs } from "./collector/piiCheck";
 import { addInputAndOutputForRAGs } from "./collector/rag";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
-import { safeTruncate } from "../../../utils/truncate";
-import { nanoid } from "nanoid";
-import { getFirstInputAsText, getLastOutputAsText } from "./collector/common";
-import { type QueueWithFallback } from "../queues/queueWithFallback";
 
 export const debug = getDebugger("langwatch:workers:collectorWorker");
 

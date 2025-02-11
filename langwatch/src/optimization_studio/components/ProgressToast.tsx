@@ -12,7 +12,7 @@ import {
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
-import { EvaluationProgressBar } from "../../components/experiments/BatchEvaluationV2";
+import { EvaluationProgressBar } from "../../components/experiments/BatchEvaluationV2/EvaluationProgressBar";
 
 export function ProgressToast() {
   return (

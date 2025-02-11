@@ -31,15 +31,13 @@ import {
 import { useRouter } from "next/router";
 import { useCallback, useState } from "react";
 import {
-  Code,
-  Globe,
-  Play,
-  Box as BoxIcon,
-  AlertTriangle,
-  CheckCircle,
   ArrowUp,
   ArrowUpCircle,
+  Box as BoxIcon,
+  CheckCircle,
+  Code,
   Lock,
+  Play,
 } from "react-feather";
 import { RenderCode } from "~/components/code/RenderCode";
 import { SmallLabel } from "../../components/SmallLabel";
@@ -52,13 +50,11 @@ import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
 
 import type { Project } from "@prisma/client";
-import { type Edge, type Node } from "@xyflow/react";
+import { type Edge } from "@xyflow/react";
 import { useForm } from "react-hook-form";
 import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
-import { checkIsEvaluator } from "../utils/nodeUtils";
-import NextLink from "next/link";
 import { trackEvent } from "../../utils/tracking";
-import { getEntryInputs } from "../utils/nodeUtils";
+import { checkIsEvaluator, getEntryInputs } from "../utils/nodeUtils";
 
 export function Publish({ isDisabled }: { isDisabled: boolean }) {
   const publishModal = useDisclosure();
@@ -122,12 +118,9 @@ function PublishMenu({
   onTogglePublish: () => void;
   onToggleApi: () => void;
 }) {
-  const { workflowId, getWorkflow } = useWorkflowStore(
-    ({ workflow_id: workflowId, getWorkflow }) => ({
-      workflowId,
-      getWorkflow,
-    })
-  );
+  const { workflowId } = useWorkflowStore(({ workflow_id: workflowId }) => ({
+    workflowId,
+  }));
 
   const nodes = useWorkflowStore((state) => state.nodes);
 
@@ -221,7 +214,7 @@ function PublishMenu({
     toggleSaveAsComponentMutation.mutate({
       workflowId,
       projectId: project.id,
-      isComponent: !publishedWorkflow.data?.isComponent ?? false,
+      isComponent: !publishedWorkflow.data?.isComponent,
       isEvaluator: publishedWorkflow.data?.isEvaluator ?? false,
     });
   };
@@ -234,7 +227,7 @@ function PublishMenu({
     toggleSaveAsEvaluatorMutation.mutate({
       workflowId,
       projectId: project.id,
-      isEvaluator: !publishedWorkflow.data?.isEvaluator ?? false,
+      isEvaluator: !publishedWorkflow.data?.isEvaluator,
       isComponent: publishedWorkflow.data?.isComponent ?? false,
     });
   };
