@@ -381,12 +381,22 @@ export const annotationRouter = createTRPCRouter({
         },
       });
     }),
-  getQueueById: protectedProcedure
-    .input(z.object({ queueId: z.string(), projectId: z.string() }))
+  getQueueBySlugOrId: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        slug: z.string().optional(),
+        queueId: z.string().optional(),
+      })
+    )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationQueue.findUnique({
-        where: { id: input.queueId, projectId: input.projectId },
+        where: input.queueId
+          ? { id: input.queueId, projectId: input.projectId }
+          : {
+              projectId_slug: { projectId: input.projectId, slug: input.slug! },
+            },
         include: {
           members: {
             include: {

@@ -72,10 +72,9 @@ export function TraceDetails(props: {
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const router = useRouter();
 
-  const canViewMessages =
-    router.query.view == "table" || router.query["drawer.view"] == "table";
+  const canViewMessages = router.query.view == "table";
 
-  const { openDrawer } = useDrawer();
+  const { openDrawer, closeDrawer } = useDrawer();
 
   const [evaluationsCheckInterval, setEvaluationsCheckInterval] = useState<
     number | undefined
@@ -278,12 +277,15 @@ export function TraceDetails(props: {
                 variant="outline"
                 onClick={() => {
                   commentState.setCommentState({
-                    isVisible: true,
                     traceId: props.traceId,
                     action: "new",
                     annotationId: undefined,
                   });
-                  setTabIndex(indexes.messages ?? 0);
+                  if (!canViewMessages) {
+                    closeDrawer();
+                  } else {
+                    setTabIndex(indexes.messages ?? 0);
+                  }
                 }}
               >
                 Annotate

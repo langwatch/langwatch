@@ -45,7 +45,7 @@ export const AddAnnotationQueueDrawer = ({
   const toast = useToast();
   const createOrUpdateQueue = api.annotation.createOrUpdateQueue.useMutation();
 
-  const queue = api.annotation.getQueueById.useQuery(
+  const queue = api.annotation.getQueueBySlugOrId.useQuery(
     {
       queueId: queueId ?? "",
       projectId: project?.id ?? "",
@@ -143,7 +143,7 @@ export const AddAnnotationQueueDrawer = ({
       {
         onSuccess: (data) => {
           void queryClient.annotation.getQueues.invalidate();
-          void queryClient.annotation.getQueueById.invalidate();
+          void queryClient.annotation.getQueueBySlugOrId.invalidate();
           toast({
             title: `Annotation Queue ${queueId ? "Updated" : "Created"}`,
             description: `Successfully ${queueId ? "updated" : "created"} ${

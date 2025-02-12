@@ -21,12 +21,12 @@ export default function Annotations() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
 
-  const { id } = router.query;
+  const { slug } = router.query;
 
-  const queue = api.annotation.getQueueById.useQuery(
+  const queue = api.annotation.getQueueBySlugOrId.useQuery(
     {
-      queueId: id as string,
       projectId: project?.id as string,
+      slug: slug as string,
     },
     { enabled: !!project?.id }
   );
@@ -39,13 +39,14 @@ export default function Annotations() {
 
   const allQueueItems = [
     ...(memberAccessibleQueueItemsWithTraces?.filter(
-      (item) => item.annotationQueueId === id
+      (item) => item.annotationQueueId === queue.data?.id
     ) ?? []),
   ];
 
   const queueMembers = queue.data?.members?.map((member) => member.user);
 
   const QueueHeader = () => {
+    if (!queue.data) return null;
     return (
       <VStack width="full" align="start">
         <Heading size="lg">{queue.data?.name}</Heading>
@@ -65,14 +66,19 @@ export default function Annotations() {
 
   return (
     <AnnotationsLayout>
-      <Container maxWidth={"calc(100vw - 360px)"} padding={6}>
+      <Container
+        maxWidth={"calc(100vw - 330px)"}
+        padding={0}
+        margin={0}
+        backgroundColor="white"
+      >
         <AnnotationsTable
           allQueueItems={allQueueItems}
           queuesLoading={queuesLoading || queue.isLoading}
           noDataTitle="No queued annotations for this queue"
           noDataDescription="Add a message to this queue to get started."
           tableHeader={<QueueHeader />}
-          queueId={id as string}
+          queueId={queue.data?.id as string}
         />
       </Container>
     </AnnotationsLayout>

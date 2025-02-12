@@ -46,7 +46,12 @@ export default function TraceAnnotations() {
   if (allQueueItems.length === 0 && !queuesLoading) {
     return (
       <AnnotationsLayout>
-        <VStack height="100%" width="full" justify="center">
+        <VStack
+          height="100%"
+          width="full"
+          justify="center"
+          backgroundColor="gray.100"
+        >
           <Image src="/images/tasks-done.png" alt="All Done" />
           <Text fontSize="xl" fontWeight="500">
             All tasks complete

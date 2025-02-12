@@ -14,7 +14,6 @@ import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
 interface TraceDetailsDrawerProps {
   traceId: string;
   selectedTab?: string;
-  view?: "table" | "span";
 }
 
 export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {

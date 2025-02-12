@@ -44,7 +44,14 @@ export default function AnnotationsLayout({
 
   return (
     <DashboardLayout>
-      <HStack align="start" width="full" height="full">
+      <HStack
+        align="start"
+        width="full"
+        height="full"
+        background="gray.50"
+        spacing={0}
+        position="relative"
+      >
         <VStack
           align="start"
           background="white"
@@ -116,10 +123,10 @@ export default function AnnotationsLayout({
           {memberAccessibleQueues?.map((queue) => (
             <MenuLink
               key={queue.id}
-              href={`/${project?.slug}/annotations/queues/${queue.id}`}
+              href={`/${project?.slug}/annotations/queues/${queue.slug}`}
               isSelectedAnnotation={
                 router.pathname ===
-                `/${project?.slug}/annotations/queues/${queue.id}`
+                `/${project?.slug}/annotations/queues/${queue.slug}`
               }
               icon={menuItems.queues}
               menuEnd={

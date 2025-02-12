@@ -68,7 +68,6 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                 ? (e) => {
                     e.stopPropagation();
                     commentState.setCommentState({
-                      isVisible: true,
                       traceId: traceId,
                       action: "edit",
                       annotationId: annotation.id,
@@ -184,7 +183,7 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
           </Card>
         );
       })}
-      {commentState.isVisible && commentState.action === "new" && (
+      {commentState.action === "new" && (
         <AnnotationComment key={commentState.annotationId ?? ""} />
       )}
     </VStack>

@@ -18,7 +18,12 @@ export default function Annotations() {
 
   return (
     <AnnotationsLayout>
-      <Container maxWidth={"calc(100vw - 360px)"} padding={6}>
+      <Container
+        maxWidth={"calc(100vw - 330px)"}
+        padding={0}
+        margin={0}
+        backgroundColor="white"
+      >
         <AnnotationsTable
           heading="Inbox"
           allQueueItems={allQueueItems}

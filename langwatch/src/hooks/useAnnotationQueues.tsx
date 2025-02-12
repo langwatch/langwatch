@@ -150,6 +150,8 @@ export function useAnnotationQueues() {
   );
 
   return {
+    assignedQueueItems,
+    memberAccessibleQueueItems,
     assignedQueueItemsWithTraces,
     memberAccessibleQueueItemsWithTraces,
     doneQueueItemsWithTraces,

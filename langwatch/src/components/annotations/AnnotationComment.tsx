@@ -516,6 +516,10 @@ const ReasonButtons = ({
   setTempValue: (value: string | string[]) => void;
 }) => (
   <>
+    <Text fontSize="sm">
+      {watch(`scoreOptions.${scoreTypeId}.reason`) &&
+        `Reason: ${watch(`scoreOptions.${scoreTypeId}.reason`)}`}
+    </Text>
     <HStack width="full">
       <Spacer />
       <Button
@@ -541,9 +545,5 @@ const ReasonButtons = ({
         Apply
       </Button>
     </HStack>
-    <Text fontSize="sm">
-      {watch(`scoreOptions.${scoreTypeId}.reason`) &&
-        `Reason: ${watch(`scoreOptions.${scoreTypeId}.reason`)}`}
-    </Text>
   </>
 );

@@ -401,7 +401,6 @@ const TraceMessages = React.forwardRef(function TraceMessages(
               e.stopPropagation();
 
               setCommentState({
-                isVisible: true,
                 traceId: trace.trace_id,
                 action: "new",
                 annotationId: undefined,

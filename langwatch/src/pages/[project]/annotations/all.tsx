@@ -188,7 +188,7 @@ export default function Annotations() {
   );
   return (
     <AnnotationsLayout>
-      <Container maxW={"calc(100vw - 360px)"} padding={6}>
+      <Container maxW={"calc(100vw - 360px)"} padding={0} margin={0}>
         <AnnotationsTable
           allQueueItems={groupedAnnotations}
           queuesLoading={annotations.isLoading}
