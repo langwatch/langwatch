@@ -192,6 +192,7 @@ export function TraceDetails(props: {
   const queueItem = api.annotation.createQueueItem.useMutation();
 
   const toast = useToast();
+  const popover = useDisclosure();
 
   const sendToQueue = () => {
     queueItem.mutate(
@@ -202,7 +203,7 @@ export function TraceDetails(props: {
       },
       {
         onSuccess: () => {
-          popoverOpen.onClose();
+          popover.onClose();
           toast({
             title: "Trace added to annotation queue",
             description: (
@@ -234,7 +235,6 @@ export function TraceDetails(props: {
     }
   }, [trace.data?.metadata.thread_id]);
 
-  const popoverOpen = useDisclosure();
   const commentState = useAnnotationCommentStore();
 
   return (
@@ -292,9 +292,9 @@ export function TraceDetails(props: {
             {hasTeamPermission(TeamRoleGroup.ANNOTATIONS_MANAGE) && (
               <>
                 <Popover
-                  isOpen={popoverOpen.isOpen}
-                  onOpen={popoverOpen.onOpen}
-                  onClose={popoverOpen.onClose}
+                  isOpen={popover.isOpen}
+                  onOpen={popover.onOpen}
+                  onClose={popover.onClose}
                 >
                   <PopoverTrigger>
                     <Button colorScheme="black" variant="outline">

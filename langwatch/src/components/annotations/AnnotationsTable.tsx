@@ -122,8 +122,10 @@ export const AnnotationsTable = ({
                   <HStack spacing={0}>
                     {Array.isArray(annotation.scoreOptions?.[id]?.value) ? (
                       <HStack spacing={1} wrap="wrap">
-                        {annotation.scoreOptions?.[id]?.value.map(
-                          (val, index) => <Tag key={index}>{val}</Tag>
+                        {(annotation.scoreOptions?.[id]?.value as string[]).map(
+                          (val, index) => (
+                            <Tag key={index}>{val}</Tag>
+                          )
                         )}
                       </HStack>
                     ) : (
