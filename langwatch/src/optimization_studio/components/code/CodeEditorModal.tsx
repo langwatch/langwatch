@@ -20,7 +20,6 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
 
 import monokaiTheme from "./Monokai.json";
 import { useCallback, useEffect, useState } from "react";
-import type { editor } from "monaco-editor";
 
 export function CodeEditorModal({
   code,
