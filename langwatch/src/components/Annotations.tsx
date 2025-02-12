@@ -46,13 +46,6 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
     }
   );
 
-  const isAnnotationDrawerOpen = isDrawerOpen("annotation");
-
-  useEffect(() => {
-    void annotations.refetch();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAnnotationDrawerOpen]);
-
   return (
     <VStack spacing={3} align="start">
       {annotations.data?.map((annotation) => {

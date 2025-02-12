@@ -11,8 +11,6 @@ import { UploadCSVModal } from "./datasets/UploadCSVModal";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
 
-import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
-
 type DrawerProps = {
   open: string;
 } & Record<string, any>;
@@ -72,7 +70,6 @@ export function CurrentDrawer() {
 
 export function useDrawer() {
   const router = useRouter();
-  const commentState = useAnnotationCommentStore();
 
   const openDrawer = <T extends keyof typeof drawers>(
     drawer: T,
@@ -116,7 +113,6 @@ export function useDrawer() {
   };
 
   const closeDrawer = () => {
-    commentState.resetComment();
     void router.push(
       "?" +
         qs.stringify(

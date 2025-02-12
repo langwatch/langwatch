@@ -9,6 +9,7 @@ import { useState } from "react";
 import { Maximize2, Minimize2 } from "react-feather";
 import { useDrawer } from "./CurrentDrawer";
 import { TraceDetails } from "./traces/TraceDetails";
+import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
 
 interface TraceDetailsDrawerProps {
   traceId: string;
@@ -18,6 +19,7 @@ interface TraceDetailsDrawerProps {
 
 export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
   const { closeDrawer } = useDrawer();
+  const commentState = useAnnotationCommentStore();
 
   const [traceView, setTraceView] = useState<"span" | "full">("span");
 
@@ -33,6 +35,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
       size={traceView}
       onClose={() => {
         closeDrawer();
+        commentState.resetComment();
       }}
     >
       <DrawerContent paddingX={0}>
