@@ -48,7 +48,7 @@ export default function AnnotationsLayout({
         align="start"
         width="full"
         height="full"
-        background="gray.50"
+        background="gray.100"
         spacing={0}
         position="relative"
       >

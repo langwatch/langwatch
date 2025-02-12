@@ -14,6 +14,7 @@ import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
 interface TraceDetailsDrawerProps {
   traceId: string;
   selectedTab?: string;
+  showMessages?: boolean;
 }
 
 export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
@@ -47,6 +48,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
           <TraceDetails
             traceId={props.traceId}
             selectedTab={props.selectedTab}
+            showMessages={props.showMessages}
             traceView={traceView}
             onToggleView={toggleView}
           />

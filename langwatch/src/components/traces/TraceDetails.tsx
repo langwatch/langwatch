@@ -65,6 +65,7 @@ export function TraceDetails(props: {
   selectedTab?: string;
   publicShare?: PublicShare;
   traceView?: "span" | "full";
+  showMessages?: boolean;
   onToggleView?: () => void;
 }) {
   const { project, hasTeamPermission, organization } =
@@ -72,7 +73,7 @@ export function TraceDetails(props: {
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const router = useRouter();
 
-  const canViewMessages = router.query.view == "table";
+  const canViewMessages = props.showMessages ?? router.query.view == "table";
 
   const { openDrawer, closeDrawer } = useDrawer();
 

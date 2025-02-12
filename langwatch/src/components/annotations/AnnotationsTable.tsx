@@ -72,7 +72,7 @@ export const AnnotationsTable = ({
   const openTraceDrawer = (traceId: string) => {
     openDrawer("traceDetails", {
       traceId: traceId,
-      view: "table",
+      showMessages: true,
     });
   };
 
@@ -398,7 +398,7 @@ export const AnnotationsTable = ({
                                     >),
                                   ].map((item) => (
                                     <Avatar
-                                      key={item.user.id}
+                                      key={item.user.name}
                                       size="sm"
                                       name={item.user.name ?? ""}
                                       css={{
