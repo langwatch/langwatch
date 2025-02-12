@@ -212,7 +212,9 @@ const buildDataForEvaluation = async (
         input: input as string | undefined,
         output: output as string | undefined,
         contexts: Array.isArray(contexts)
-          ? contexts.map((context) => context.toString())
+          ? contexts.map((context) =>
+              typeof context === "string" ? context : JSON.stringify(context)
+            )
           : contexts
           ? [contexts]
           : [],

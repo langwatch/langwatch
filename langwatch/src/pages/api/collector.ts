@@ -292,7 +292,8 @@ export default async function handler(
 
   Sentry.getCurrentScope()?.setPropagationContext({
     traceId,
-    spanId: traceId,
+    sampleRand: 1,
+    propagationSpanId: traceId,
   });
 
   const traceIds = Array.from(
