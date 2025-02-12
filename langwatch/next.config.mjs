@@ -18,7 +18,7 @@ const cspHeader = `
     form-action 'self';
     frame-ancestors 'none';
     upgrade-insecure-requests;
-`
+`;
 
 /**
  * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially useful
@@ -61,7 +61,7 @@ const config = {
           },
           {
             key: "Content-Security-Policy",
-            value: cspHeader.replace(/\n/g, ''),
+            value: cspHeader.replace(/\n/g, ""),
           },
           {
             key: "X-Content-Type-Options",
@@ -116,6 +116,9 @@ export default withSentryConfig(config, {
 
   widenClientFileUpload: true,
   tunnelRoute: "/monitoring",
-  hideSourceMaps: true,
+  sourcemaps: {
+    disable: false,
+    deleteSourcemapsAfterUpload: true,
+  },
   disableLogger: true,
 });

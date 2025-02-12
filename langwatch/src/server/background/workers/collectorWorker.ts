@@ -82,7 +82,8 @@ export async function processCollectorJob(
 
   Sentry.getCurrentScope().setPropagationContext({
     traceId: data.traceId,
-    spanId: nanoid(),
+    sampleRand: 1,
+    parentSpanId: data.traceId,
   });
 
   const result = await Sentry.startSpan(
