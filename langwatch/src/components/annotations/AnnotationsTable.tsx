@@ -431,8 +431,10 @@ export const AnnotationsTable = ({
                               <Tooltip label={item.trace?.input?.value}>
                                 <Text
                                   noOfLines={2}
+                                  maxWidth="350px"
+                                  textOverflow="ellipsis"
                                   display="block"
-                                  maxWidth={450}
+                                  wordBreak="break-word"
                                 >
                                   {item.trace?.input?.value ?? "<empty>"}
                                 </Text>
@@ -442,8 +444,10 @@ export const AnnotationsTable = ({
                               <Tooltip label={item.trace?.output?.value}>
                                 <Text
                                   noOfLines={2}
+                                  maxWidth="350px"
+                                  textOverflow="ellipsis"
                                   display="block"
-                                  maxWidth={550}
+                                  wordBreak="break-word"
                                 >
                                   {item.trace?.output?.value ?? "<empty>"}
                                 </Text>
@@ -465,6 +469,7 @@ export const AnnotationsTable = ({
                                         whiteSpace="pre-wrap"
                                         wordBreak="break-word"
                                         minWidth={400}
+                                        paddingX={4}
                                       >
                                         {annotation.comment}
                                       </Text>
