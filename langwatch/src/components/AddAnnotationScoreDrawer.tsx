@@ -149,7 +149,6 @@ export const AddAnnotationScoreDrawer = ({
             position: "top-right",
           });
           void queryClient.annotationScore.getAllActive.invalidate();
-          void queryClient.annotationScore.getAllActive.refetch();
 
           handleClose();
           reset();

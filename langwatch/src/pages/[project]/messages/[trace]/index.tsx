@@ -48,11 +48,14 @@ import { formatTimeAgo } from "../../../../utils/formatTimeAgo";
 import { isJson } from "../../../../utils/isJson";
 import { isPythonRepr } from "../../../../utils/parsePythonInsideJson";
 
+import { useAnnotationCommentStore } from "../../../../hooks/useAnnotationCommentStore";
+
 export default function TraceDetails() {
   const router = useRouter();
   const { traceId, trace } = useTraceDetailsState(
     (router.query.trace as string) ?? ""
   );
+
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -301,6 +304,8 @@ const TraceMessages = React.forwardRef(function TraceMessages(
 
   const [showAnnotationHover, setShowAnnotationHover] = useState(false);
 
+  const { setCommentState } = useAnnotationCommentStore();
+
   const translate = () => {
     setTranslationActive(!translationActive);
 
@@ -394,9 +399,11 @@ const TraceMessages = React.forwardRef(function TraceMessages(
             backgroundColor="white"
             onClick={(e) => {
               e.stopPropagation();
-              openDrawer("annotation", {
+
+              setCommentState({
                 traceId: trace.trace_id,
                 action: "new",
+                annotationId: undefined,
               });
             }}
             cursor="pointer"
@@ -442,7 +449,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
           }
         }}
       >
-        <Container maxWidth="1200px">
+        <Container maxWidth="1400px">
           <Grid templateColumns="repeat(4, 1fr)">
             <GridItem colSpan={3}>
               <Box
@@ -538,7 +545,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                 </Message>
               </Box>
             </GridItem>
-            <GridItem minWidth="300px">
+            <GridItem minWidth="420px" paddingRight={6}>
               <Annotations traceId={trace.trace_id} />
             </GridItem>
           </Grid>

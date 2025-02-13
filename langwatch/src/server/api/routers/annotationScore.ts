@@ -55,7 +55,7 @@ export const annotationScoreRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.findMany({
-        where: { projectId: input.projectId },
+        where: { projectId: input.projectId, active: true },
         orderBy: { createdAt: "desc" },
       });
     }),

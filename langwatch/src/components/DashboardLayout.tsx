@@ -73,6 +73,7 @@ import { usePublicEnv } from "../hooks/usePublicEnv";
 import { DiscordOutlineIcon } from "./icons/DiscordOutline";
 import { ChatBalloonIcon } from "./icons/ChatBalloon";
 import { HoverableBigText } from "./HoverableBigText";
+import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -108,11 +109,13 @@ const SideMenuLink = ({
   label,
   path,
   project,
+  badgeNumber,
 }: {
   icon: React.ComponentType<{ size?: string | number; color?: string }>;
   label: string;
   path: string;
   project?: Project;
+  badgeNumber?: number;
 }) => {
   const router = useRouter();
   const currentRoute = findCurrentRoute(router.pathname);
@@ -164,8 +167,21 @@ const SideMenuLink = ({
           });
         }}
       >
-        <VStack>
+        <VStack position="relative">
           <IconElem size={24} color={isActive ? orange400 : undefined} />
+
+          {badgeNumber && badgeNumber > 0 && (
+            <Box position="absolute" top={4} left={4}>
+              <Badge
+                backgroundColor="green.500"
+                color="white"
+                borderRadius="full"
+                paddingX={1.5}
+              >
+                {badgeNumber}
+              </Badge>
+            </Box>
+          )}
         </VStack>
       </Link>
     </Tooltip>
@@ -379,6 +395,16 @@ export const DashboardLayout = ({
 
   const [query, setQuery] = useState(router.query.query as string);
 
+  const { assignedQueueItems, memberAccessibleQueueItems } =
+    useAnnotationQueues();
+
+  const totalQueueItems = useMemo(
+    () =>
+      (assignedQueueItems?.filter((item) => !item.doneAt)?.length ?? 0) +
+      (memberAccessibleQueueItems?.filter((item) => !item.doneAt)?.length ?? 0),
+    [assignedQueueItems, memberAccessibleQueueItems]
+  );
+
   const integrationChecks = useIntegrationChecks();
 
   const integrationsLeft = useMemo(() => {
@@ -483,6 +509,7 @@ export const DashboardLayout = ({
               icon={Edit}
               label={projectRoutes.annotations.title}
               project={project}
+              badgeNumber={totalQueueItems}
             />
             <SideMenuLink
               path={projectRoutes.triggers.path}

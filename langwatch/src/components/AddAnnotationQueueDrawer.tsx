@@ -19,10 +19,10 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import { useForm } from "react-hook-form";
-
 import { useState } from "react";
 import { Plus } from "react-feather";
+import { useForm } from "react-hook-form";
+import slugify from "slugify";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useDrawer } from "./CurrentDrawer";
@@ -32,10 +32,37 @@ import { AddAnnotationScoreDrawer } from "./AddAnnotationScoreDrawer";
 
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 
-export const AddAnnotationQueueDrawer = () => {
+export const AddAnnotationQueueDrawer = ({
+  onClose,
+  onOverlayClick,
+  queueId,
+}: {
+  onClose?: () => void;
+  onOverlayClick?: () => void;
+  queueId?: string;
+}) => {
   const { project, organization } = useOrganizationTeamProject();
   const toast = useToast();
-  const createAnnotationQueue = api.annotation.createQueue.useMutation();
+  const createOrUpdateQueue = api.annotation.createOrUpdateQueue.useMutation();
+
+  const queue = api.annotation.getQueueBySlugOrId.useQuery(
+    {
+      queueId: queueId ?? "",
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project,
+    }
+  );
+
+  const handleClose = () => {
+    if (onOverlayClick) {
+      onClose?.();
+      onOverlayClick();
+    } else {
+      closeDrawer();
+    }
+  };
 
   const queryClient = api.useContext();
 
@@ -59,16 +86,16 @@ export const AddAnnotationQueueDrawer = () => {
         enabled: !!organization,
       }
     );
-
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
+    watch,
   } = useForm({
     defaultValues: {
-      name: "",
-      description: "",
+      name: queue.data?.name ?? "",
+      description: queue.data?.description ?? "",
     },
   });
 
@@ -79,11 +106,21 @@ export const AddAnnotationQueueDrawer = () => {
 
   const [participants, setParticipants] = useState<
     { id: string; name: string | null }[]
-  >([]);
+  >(
+    queue.data?.members.map((member) => ({
+      id: member.user.id,
+      name: member.user.name,
+    })) ?? []
+  );
 
   const [scoreTypes, setScoreTypes] = useState<
     { id: string; name: string | null }[]
-  >([]);
+  >(
+    queue.data?.AnnotationQueueScores.map((score) => ({
+      id: score.annotationScore.id,
+      name: score.annotationScore.name,
+    })) ?? []
+  );
 
   const onSubmit = (data: FormData) => {
     if (participants.length === 0 || scoreTypes.length === 0) {
@@ -94,27 +131,30 @@ export const AddAnnotationQueueDrawer = () => {
       });
       return;
     }
-    createAnnotationQueue.mutate(
+    createOrUpdateQueue.mutate(
       {
         name: data.name,
         description: data.description ?? "",
         userIds: participants.map((p) => p.id),
         projectId: project?.id ?? "",
         scoreTypeIds: scoreTypes.map((s) => s.id),
+        queueId: queueId,
       },
       {
         onSuccess: (data) => {
           void queryClient.annotation.getQueues.invalidate();
-          void queryClient.annotation.getQueues.refetch();
+          void queryClient.annotation.getQueueBySlugOrId.invalidate();
           toast({
-            title: "Annotation Queue Created",
-            description: `Successfully created ${data.name} annotation queue`,
+            title: `Annotation Queue ${queueId ? "Updated" : "Created"}`,
+            description: `Successfully ${queueId ? "updated" : "created"} ${
+              data.name
+            } annotation queue`,
             status: "success",
             duration: 5000,
             isClosable: true,
             position: "top-right",
           });
-          closeDrawer();
+          handleClose();
           reset();
         },
         onError: (error) => {
@@ -133,14 +173,20 @@ export const AddAnnotationQueueDrawer = () => {
 
   const scoreTypeDrawerOpen = useDisclosure();
 
+  const name = watch("name");
+  const slug = slugify((name || "").replace("_", "-"), {
+    lower: true,
+    strict: true,
+  });
+
   return (
     <>
       <Drawer
         isOpen={true}
         placement="right"
         size={"lg"}
-        onClose={closeDrawer}
-        onOverlayClick={closeDrawer}
+        onClose={handleClose}
+        onOverlayClick={handleClose}
       >
         <DrawerContent>
           <DrawerHeader>
@@ -237,6 +283,7 @@ export const AddAnnotationQueueDrawer = () => {
                   isInvalid={!!errors.name}
                 >
                   <Input {...register("name")} required />
+                  {slug && <FormHelperText>slug: {slug}</FormHelperText>}
                 </FullWidthFormControl>
 
                 <FullWidthFormControl

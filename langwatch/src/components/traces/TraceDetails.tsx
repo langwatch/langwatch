@@ -1,10 +1,18 @@
 import { Link } from "@chakra-ui/next-js";
 import {
+  Avatar,
   Box,
   Button,
+  Drawer,
   DrawerCloseButton,
   Heading,
   HStack,
+  Popover,
+  PopoverArrow,
+  PopoverBody,
+  PopoverCloseButton,
+  PopoverContent,
+  PopoverTrigger,
   Spacer,
   Tab,
   Table,
@@ -19,32 +27,32 @@ import {
   Thead,
   Tooltip,
   Tr,
+  useDisclosure,
+  useToast,
   VStack,
 } from "@chakra-ui/react";
-import {
-  type Annotation,
-  type Project,
-  type PublicShare,
-} from "@prisma/client";
+import { type Project, type PublicShare } from "@prisma/client";
+import { useRouter } from "next/router";
+import qs from "qs";
+import { useCallback, useEffect, useState } from "react";
+import { Maximize2, Minimize2, Plus, Users } from "react-feather";
 import type { ElasticSearchEvaluation } from "~/server/tracer/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
+import { Conversation } from "../../pages/[project]/messages/[trace]/index";
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
-import { Annotations } from "../Annotations";
-import { EvaluationStatusItem } from "./EvaluationStatusItem";
+import { formatTimeAgo } from "../../utils/formatTimeAgo";
+import { evaluationPassed } from "../checks/EvaluationStatus";
 import { useDrawer } from "../CurrentDrawer";
+import { EvaluationStatusItem } from "./EvaluationStatusItem";
 import { ShareButton } from "./ShareButton";
 import { SpanTree } from "./SpanTree";
 import { TraceSummary } from "./Summary";
-import { useCallback, useEffect, useState } from "react";
-import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
-import { formatTimeAgo } from "../../utils/formatTimeAgo";
-import { evaluationPassed } from "../checks/EvaluationStatus";
-import { Conversation } from "../../pages/[project]/messages/[trace]/index";
-import { Maximize2 } from "react-feather";
-import { Minimize2 } from "react-feather";
-import { useRouter } from "next/router";
-import qs from "qs";
+
+import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
+import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
+import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
 
 interface TraceEval {
   project?: Project;
@@ -57,15 +65,17 @@ export function TraceDetails(props: {
   selectedTab?: string;
   publicShare?: PublicShare;
   traceView?: "span" | "full";
+  showMessages?: boolean;
   onToggleView?: () => void;
 }) {
-  const { project, hasTeamPermission } = useOrganizationTeamProject();
+  const { project, hasTeamPermission, organization } =
+    useOrganizationTeamProject();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const router = useRouter();
 
-  const canViewMessages = router.query.view == "table";
+  const canViewMessages = props.showMessages ?? router.query.view == "table";
 
-  const { openDrawer } = useDrawer();
+  const { openDrawer, closeDrawer } = useDrawer();
 
   const [evaluationsCheckInterval, setEvaluationsCheckInterval] = useState<
     number | undefined
@@ -79,6 +89,35 @@ export function TraceDetails(props: {
       refetchOnWindowFocus: false,
     }
   );
+
+  const annotationQueues = api.annotation.getQueues.useQuery(
+    { projectId: project?.id ?? "" },
+    {
+      enabled: !!project,
+    }
+  );
+
+  const users =
+    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+      {
+        organizationId: organization?.id ?? "",
+      },
+      {
+        enabled: !!organization,
+      }
+    );
+
+  const userOptions = users.data?.members.map((member) => ({
+    label: member.user.name ?? "",
+    value: `user-${member.user.id}`,
+  }));
+
+  const queueOptions = annotationQueues.data?.map((queue) => ({
+    label: queue.name ?? "",
+    value: `queue-${queue.id}`,
+  }));
+
+  const options = [...(userOptions ?? []), ...(queueOptions ?? [])];
 
   useEffect(() => {
     if (evaluations.data) {
@@ -96,16 +135,6 @@ export function TraceDetails(props: {
     }
   }, [evaluations.data]);
 
-  const annotationsQuery = api.annotation.getByTraceId.useQuery(
-    {
-      projectId: project?.id ?? "",
-      traceId: props.traceId,
-    },
-    {
-      enabled: !!project?.id,
-    }
-  );
-
   const anyGuardrails = !!evaluations.data?.some((x) => x.is_guardrail);
 
   const indexes = Object.fromEntries(
@@ -114,7 +143,6 @@ export function TraceDetails(props: {
       "traceDetails",
       ...(anyGuardrails ? ["guardrails"] : []),
       "evaluations",
-      "annotations",
       "events",
     ].map((tab, index) => [tab, index])
   );
@@ -159,12 +187,55 @@ export function TraceDetails(props: {
   }, [props.selectedTab]);
 
   const { trace } = useTraceDetailsState(props.traceId);
+  const queueDrawerOpen = useDisclosure();
+
+  const queueItem = api.annotation.createQueueItem.useMutation();
+
+  const toast = useToast();
+  const popover = useDisclosure();
+
+  const sendToQueue = () => {
+    queueItem.mutate(
+      {
+        projectId: project?.id ?? "",
+        traceId: props.traceId,
+        annotators: annotators.map((p) => p.id),
+      },
+      {
+        onSuccess: () => {
+          popover.onClose();
+          toast({
+            title: "Trace added to annotation queue",
+            description: (
+              <>
+                <Link
+                  href={`/${project?.slug}/annotations/`}
+                  textDecoration="underline"
+                >
+                  View Queues
+                </Link>
+              </>
+            ),
+            status: "success",
+            isClosable: true,
+            position: "top-right",
+          });
+        },
+      }
+    );
+  };
+
+  const [annotators, setAnnotators] = useState<
+    { id: string; name: string | null }[]
+  >([]);
 
   useEffect(() => {
     if (trace.data?.metadata.thread_id) {
       setThreadId(trace.data.metadata.thread_id);
     }
   }, [trace.data?.metadata.thread_id]);
+
+  const commentState = useAnnotationCommentStore();
 
   return (
     <VStack
@@ -205,15 +276,50 @@ export function TraceDetails(props: {
               <Button
                 colorScheme="black"
                 variant="outline"
-                onClick={() =>
-                  openDrawer("annotation", {
+                onClick={() => {
+                  commentState.setCommentState({
                     traceId: props.traceId,
                     action: "new",
-                  })
-                }
+                    annotationId: undefined,
+                  });
+                  if (!canViewMessages) {
+                    closeDrawer();
+                  } else {
+                    setTabIndex(indexes.messages ?? 0);
+                  }
+                }}
               >
                 Annotate
               </Button>
+            )}
+            {hasTeamPermission(TeamRoleGroup.ANNOTATIONS_MANAGE) && (
+              <>
+                <Popover
+                  isOpen={popover.isOpen}
+                  onOpen={popover.onOpen}
+                  onClose={popover.onClose}
+                >
+                  <PopoverTrigger>
+                    <Button colorScheme="black" variant="outline">
+                      Annotation Queue
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent zIndex="2222">
+                    <PopoverArrow />
+                    <PopoverCloseButton />
+                    <PopoverBody>
+                      <AddParticipants
+                        options={options}
+                        annotators={annotators}
+                        setAnnotators={setAnnotators}
+                        queueDrawerOpen={queueDrawerOpen}
+                        sendToQueue={sendToQueue}
+                        isLoading={queueItem.isLoading}
+                      />
+                    </PopoverBody>
+                  </PopoverContent>
+                </Popover>
+              </>
             )}
             {hasTeamPermission(TeamRoleGroup.DATASETS_MANAGE) && (
               <Button
@@ -257,12 +363,7 @@ export function TraceDetails(props: {
                 evaluations={evaluations.data}
               />
             </Tab>
-            <Tab>
-              Annotations{" "}
-              {annotationsQuery.data && (
-                <AnnotationMsgs annotations={annotationsQuery.data} />
-              )}
-            </Tab>
+
             <Tab>
               Events{" "}
               {trace.data?.events && trace.data.events.length > 0 && (
@@ -281,7 +382,6 @@ export function TraceDetails(props: {
           </TabList>
         </Tabs>
       </VStack>
-
       <Tabs width="full" index={tabIndex} onChange={setTabIndex}>
         <TabPanels>
           {canViewMessages && (
@@ -320,39 +420,182 @@ export function TraceDetails(props: {
               />
             )}
           </TabPanel>
-          <TabPanel paddingX={6} paddingY={4}>
-            {tabIndex === indexes.annotations && (
-              <>
-                {annotationsQuery.isLoading ? (
-                  <Text>Loading...</Text>
-                ) : annotationsQuery.data &&
-                  annotationsQuery.data.length > 0 ? (
-                  <Annotations traceId={props.traceId} />
-                ) : (
-                  <Text>
-                    No annotations found.{" "}
-                    <Link
-                      href="https://docs.langwatch.ai/features/annotations"
-                      target="_blank"
-                      textDecoration="underline"
-                    >
-                      Get started with annotations
-                    </Link>
-                    .
-                  </Text>
-                )}
-              </>
-            )}
-          </TabPanel>
+
           <TabPanel paddingX={6} paddingY={4}>
             {tabIndex === indexes.events && <Events traceId={props.traceId} />}
           </TabPanel>
         </TabPanels>
       </Tabs>
+
+      <Drawer
+        isOpen={queueDrawerOpen.isOpen}
+        placement="right"
+        size={"lg"}
+        onClose={queueDrawerOpen.onClose}
+        onOverlayClick={queueDrawerOpen.onClose}
+      >
+        <AddAnnotationQueueDrawer
+          onClose={queueDrawerOpen.onClose}
+          onOverlayClick={queueDrawerOpen.onClose}
+        />
+      </Drawer>
     </VStack>
   );
 }
 
+const AddParticipants = ({
+  options,
+  annotators,
+  setAnnotators,
+  queueDrawerOpen,
+  sendToQueue,
+  isLoading,
+}: {
+  options: any[];
+  annotators: any[];
+  setAnnotators: any;
+  queueDrawerOpen: any;
+  sendToQueue: () => void;
+  isLoading: boolean;
+}) => {
+  return (
+    <>
+      <VStack width="full" align="start">
+        <Text>Send to:</Text>
+        <Box
+          border="1px solid lightgray"
+          borderRadius={5}
+          paddingX={1}
+          minWidth="300px"
+        >
+          <MultiSelect
+            options={options}
+            onChange={(newValue) => {
+              setAnnotators(
+                newValue.map((v) => ({
+                  id: v.value,
+                  name: v.label,
+                }))
+              );
+            }}
+            value={annotators.map((p) => ({
+              value: p.id,
+              label: p.name ?? "",
+            }))}
+            isMulti
+            closeMenuOnSelect={false}
+            selectedOptionStyle="check"
+            hideSelectedOptions={true}
+            useBasicStyles
+            variant="unstyled"
+            placeholder="Add Participants"
+            components={{
+              Menu: ({ children, ...props }) => (
+                <chakraComponents.Menu
+                  {...props}
+                  innerProps={{
+                    ...props.innerProps,
+                    style: { width: "300px" },
+                  }}
+                >
+                  {children}
+                </chakraComponents.Menu>
+              ),
+              Option: ({ children, ...props }) => (
+                <chakraComponents.Option {...props}>
+                  <VStack align="start">
+                    <HStack>
+                      {props.data.value.startsWith("user-") ? (
+                        <Avatar
+                          name={props.data.label}
+                          color="white"
+                          size="xs"
+                        />
+                      ) : (
+                        <Box padding={1}>
+                          <Users size={18} />
+                        </Box>
+                      )}
+                      <Text>{children}</Text>
+                    </HStack>
+                  </VStack>
+                </chakraComponents.Option>
+              ),
+              MultiValueLabel: ({ children, ...props }) => (
+                <chakraComponents.MultiValueLabel {...props}>
+                  <VStack align="start" padding={1} paddingX={0}>
+                    <HStack>
+                      {props.data.value.startsWith("user-") ? (
+                        <Avatar
+                          name={props.data.label}
+                          color="white"
+                          size="xs"
+                        />
+                      ) : (
+                        <Box padding={1}>
+                          <Users size={18} />
+                        </Box>
+                      )}
+                      <Text>{children}</Text>
+                    </HStack>
+                  </VStack>
+                </chakraComponents.MultiValueLabel>
+              ),
+              MenuList: (props) => (
+                <chakraComponents.MenuList {...props} maxHeight={300}>
+                  <Box
+                    maxH="250px"
+                    overflowY="auto"
+                    css={{
+                      "&::-webkit-scrollbar": {
+                        display: "none",
+                      },
+                      msOverflowStyle: "none", // IE and Edge
+                      scrollbarWidth: "none", // Firefox
+                    }}
+                  >
+                    {props.children}
+                  </Box>
+                  <Box
+                    p={2}
+                    position="sticky"
+                    bottom={0}
+                    bg="white"
+                    borderTop="1px solid"
+                    borderColor="gray.100"
+                  >
+                    <Button
+                      width="100%"
+                      colorScheme="blue"
+                      onClick={queueDrawerOpen.onOpen}
+                      leftIcon={<Plus />}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Add New Queue
+                    </Button>
+                  </Box>
+                </chakraComponents.MenuList>
+              ),
+            }}
+          />
+        </Box>
+        <Spacer />
+        <HStack width="full">
+          <Spacer />
+          <Button
+            colorScheme="orange"
+            size="sm"
+            onClick={sendToQueue}
+            isLoading={isLoading}
+          >
+            Send
+          </Button>
+        </HStack>
+      </VStack>
+    </>
+  );
+};
 function Events({ traceId }: { traceId: string }) {
   const { trace } = useTraceDetailsState(traceId);
 
@@ -548,23 +791,6 @@ const EvaluationsCount = (trace: TraceEval) => {
       fontSize={"sm"}
     >
       {totalProcessed > 0 ? totalProcessed : total}
-    </Text>
-  );
-};
-
-const AnnotationMsgs = ({ annotations }: { annotations: Annotation[] }) => {
-  if (!annotations.length) return null;
-
-  return (
-    <Text
-      marginLeft={3}
-      borderRadius={"md"}
-      paddingX={2}
-      backgroundColor={"green.500"}
-      color={"white"}
-      fontSize={"sm"}
-    >
-      {annotations.length}
     </Text>
   );
 };
