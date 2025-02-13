@@ -43,7 +43,7 @@
     "vitest": "^0.5.0"
   },
   "dependencies": {
-    "@langchain/core": "^0.2.7",
+    "@langchain/core": "^0.3.33",
     "@opentelemetry/otlp-transformer": "^0.56.0",
     "@opentelemetry/sdk-trace-base": "^1.29.0",
     "ai": "^4.0.14",
