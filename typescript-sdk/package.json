@@ -46,7 +46,7 @@
     "@langchain/core": "^0.2.7",
     "@opentelemetry/otlp-transformer": "^0.56.0",
     "@opentelemetry/sdk-trace-base": "^1.29.0",
-    "ai": "^4.0.14",
+    "ai": "^4.1.1",
     "eventemitter3": "^5.0.1",
     "javascript-stringify": "^2.1.0",
     "nanoid": "^5.0.9",
