@@ -50,7 +50,7 @@
     "eventemitter3": "^5.0.1",
     "javascript-stringify": "^2.1.0",
     "nanoid": "^5.0.9",
-    "openai": "^4.47.3",
+    "openai": "^4.80.0",
     "zod": "^3.22.4",
     "zod-validation-error": "^3.3.0"
   }
