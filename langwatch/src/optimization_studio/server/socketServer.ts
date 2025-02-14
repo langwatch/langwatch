@@ -221,10 +221,14 @@ const invokeLambda = async (
   };
 
   if (process.env.LANGWATCH_NLP_SERVICE_INVOKE_ARN) {
-    const lambda = new LambdaClient({});
+    const arn = process.env.LANGWATCH_NLP_SERVICE_INVOKE_ARN;
+    const region =
+      process.env.AWS_REGION ??
+      arn.replace(/^arn:aws:lambda:([^:]+):.*$/, "$1");
+    const lambda = new LambdaClient({ region });
 
     const command = new InvokeWithResponseStreamCommand({
-      FunctionName: process.env.LANGWATCH_NLP_SERVICE_INVOKE_ARN,
+      FunctionName: arn,
       InvocationType: "RequestResponse",
       Payload: JSON.stringify({
         rawPath: "/studio/execute",
