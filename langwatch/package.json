@@ -37,6 +37,7 @@
     "@ai-sdk/google": "^1.0.3",
     "@ai-sdk/openai": "^1.0.4",
     "@aws-sdk/client-bedrock-runtime": "^3.721.0",
+    "@aws-sdk/client-lambda": "^3.744.0",
     "@aws-sdk/client-ses": "^3.645.0",
     "@aws-sdk/client-sns": "^3.637.0",
     "@chakra-ui/icons": "^2.1.1",
