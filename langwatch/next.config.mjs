@@ -9,9 +9,9 @@ const __dirname = path.dirname(__filename);
 
 const cspHeader = `
     default-src 'self';
-    script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.googletagmanager.com https://cdn.eu.pendo.io;
+    script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.googletagmanager.com https://cdn.eu.pendo.io https://client.crisp.chat https://static.hsappstatic.net;
     style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.eu.pendo.io;
-    img-src 'self' blob: data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://data.eu.pendo.io;
+    img-src 'self' blob: data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.googletagmanager.com https://data.eu.pendo.io;
     font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
     object-src 'none';
     base-uri 'self';
@@ -20,6 +20,7 @@ const cspHeader = `
     upgrade-insecure-requests;
     connect-src 'self' https://data.eu.pendo.io;
     worker-src 'self' blob:;
+    frame-src 'self' https://www.youtube.com;
 `;
 
 /**
