@@ -513,7 +513,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                   ) : trace.output?.value &&
                     (isJson(trace.output.value) ||
                       isPythonRepr(trace.output.value)) ? (
-                    <MessageCardJsonOutput trace={trace} />
+                    <MessageCardJsonOutput value={trace.output.value} />
                   ) : trace.output?.value ? (
                     <Markdown
                       remarkPlugins={[remarkGfm]}
