@@ -246,6 +246,11 @@ export const typedValueToText = (
         return stringified(json.llm.replies[0]);
       }
 
+      // Optimization Studio
+      if (json.end !== undefined) {
+        return stringIfSpecialKeys(json.end);
+      }
+
       return undefined;
     };
 
