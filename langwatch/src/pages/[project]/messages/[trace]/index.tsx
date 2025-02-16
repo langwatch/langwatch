@@ -464,7 +464,6 @@ const TraceMessages = React.forwardRef(function TraceMessages(
               >
                 {showAnnotationHover && <AnnotationHover />}
                 <Message
-                  trace={trace}
                   author="Input"
                   avatar={<Avatar size="sm" />}
                   timestamp={trace.timestamps.started_at}
@@ -482,7 +481,6 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                   </Text>
                 </Message>
                 <Message
-                  trace={trace}
                   author={project?.name ?? ""}
                   avatar={
                     <Avatar
@@ -556,14 +554,12 @@ const TraceMessages = React.forwardRef(function TraceMessages(
 });
 
 function Message({
-  trace,
   author,
   avatar,
   timestamp,
   paddingTop,
   children,
 }: PropsWithChildren<{
-  trace?: Trace;
   author: string;
   avatar: React.ReactNode;
   timestamp?: number;

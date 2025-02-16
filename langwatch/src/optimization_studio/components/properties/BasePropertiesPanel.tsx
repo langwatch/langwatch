@@ -278,11 +278,9 @@ export function FieldsDefinition({
 
 export function FieldsForm({
   node,
-  title,
   field,
 }: {
   node: Node<Component>;
-  title: string;
   field: "parameters" | "inputs" | "outputs";
 }) {
   const { default_llm, setNode, parameters, setNodeParameter } =
@@ -680,9 +678,7 @@ export function BasePropertiesPanel({
       {children}
       {!isWorkflow(node) && (
         <>
-          {!hideParameters && (
-            <FieldsForm node={node} field="parameters" title="Parameters" />
-          )}
+          {!hideParameters && <FieldsForm node={node} field="parameters" />}
 
           {!hideInputs && (
             <FieldsDefinition

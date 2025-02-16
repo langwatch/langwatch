@@ -183,6 +183,7 @@ export const ChatBox = ({
         ]);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [executionStatus]);
 
   useEffect(() => {

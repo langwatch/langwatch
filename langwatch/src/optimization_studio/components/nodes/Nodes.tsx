@@ -60,7 +60,7 @@ function NodeInputs({
   inputs,
   selected,
 }: {
-  node: Node<Component>;
+  node?: Node<Component>;
   namespace: string;
   inputs: Field[];
   selected: boolean;
@@ -97,7 +97,7 @@ function NodeInputs({
           <TypeLabel type={input.type} />
           <Spacer />
           {input.optional &&
-            (node.type !== "end" ||
+            (!node || node.type !== "end" ||
               (input.identifier !== "score" &&
                 input.identifier !== "passed")) && (
               <Text color="gray.400">(optional)</Text>
