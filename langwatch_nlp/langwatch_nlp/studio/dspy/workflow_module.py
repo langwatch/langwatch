@@ -15,7 +15,11 @@ from langwatch_nlp.studio.dspy.reporting_module import ReportingModule
 import dspy
 
 from langwatch_nlp.studio.utils import get_node_by_id, validate_identifier
-from langevals_core.base_evaluator import SingleEvaluationResult, EvaluationResultError
+from langevals_core.base_evaluator import (
+    SingleEvaluationResult,
+    EvaluationResultError,
+    EvaluationResult,
+)
 from langwatch_nlp.studio.dspy.patched_optional_image import patch_optional_image
 
 patch_optional_image()
@@ -275,13 +279,23 @@ class WorkflowModule(ReportingModule):
                     traceback=[],
                 )
 
+            if node.type == "end":
+                result = EvaluationResult.model_validate(
+                    {"status": "processed", **result}, strict=False  # type: ignore
+                )
             result = cast(SingleEvaluationResult, result)
             duration = round((time.time() - start_time) * 1000)
             evaluation_results[node.id] = EvaluationResultWithMetadata(
                 result=result, inputs=inputs, duration=duration
             )
             if result.status == "processed":
-                evaluation_scores[node.id] = result.score
+                evaluation_scores[node.id] = (
+                    result.score
+                    if result.score is not None
+                    else float(result.passed)
+                    if result.passed is not None
+                    else 0
+                )
 
         score = 0
         if self.evaluation_weighting == "mean":

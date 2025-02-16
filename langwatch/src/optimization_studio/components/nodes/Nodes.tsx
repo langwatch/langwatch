@@ -13,7 +13,7 @@ import {
   Text,
   Tooltip,
   VStack,
-  type ButtonProps
+  type ButtonProps,
 } from "@chakra-ui/react";
 
 import {
@@ -21,7 +21,7 @@ import {
   NodeToolbar,
   Position,
   type Node,
-  type NodeProps
+  type NodeProps,
 } from "@xyflow/react";
 import React, { useMemo, type Ref } from "react";
 import { useDragLayer } from "react-dnd";
@@ -44,7 +44,7 @@ import {
   type Component,
   type ComponentType,
   type Field,
-  type LLMConfig
+  type LLMConfig,
 } from "../../types/dsl";
 import { checkIsEvaluator } from "../../utils/nodeUtils";
 import { ComponentIcon } from "../ColorfulBlockIcons";
@@ -55,10 +55,12 @@ export function getNodeDisplayName(node: { id: string; data: Component }) {
 }
 
 function NodeInputs({
+  node,
   namespace,
   inputs,
   selected,
 }: {
+  node: Node<Component>;
   namespace: string;
   inputs: Field[];
   selected: boolean;
@@ -94,7 +96,12 @@ function NodeInputs({
           <Text color="gray.400">:</Text>
           <TypeLabel type={input.type} />
           <Spacer />
-          {input.optional && <Text color="gray.400">(optional)</Text>}
+          {input.optional &&
+            (node.type !== "end" ||
+              (input.identifier !== "score" &&
+                input.identifier !== "passed")) && (
+              <Text color="gray.400">(optional)</Text>
+            )}
         </HStack>
       ))}
     </>
@@ -360,6 +367,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
         <>
           <NodeSectionTitle>{props.inputsTitle ?? "Inputs"}</NodeSectionTitle>
           <NodeInputs
+            node={node}
             namespace="inputs"
             inputs={props.data.inputs}
             selected={!!props.selected || isHovered}

@@ -96,7 +96,11 @@ async def execute_evaluation(
         ]
 
         evaluator = Evaluate(
-            devset=examples, num_threads=10, display_progress=True, display_table=False
+            devset=examples,
+            num_threads=10,
+            display_progress=True,
+            display_table=False,
+            provide_traceback=True,
         )
 
         reporting = EvaluationReporting(
@@ -106,18 +110,19 @@ async def execute_evaluation(
             total=len(examples),
             queue=queue,
         )
-        await asyncify(evaluator)(
-            module, metric=reporting.evaluate_and_report
-        )
+        await asyncify(evaluator)(module, metric=reporting.evaluate_and_report)
         await reporting.wait_for_completion()
     except Exception as e:
         yield error_evaluation_event(run_id, str(e), stopped_at=int(time.time() * 1000))
         if valid:
-            sentry_sdk.capture_exception(e, extras={
-                "run_id": run_id,
-                "workflow_id": workflow.workflow_id,
-                "workflow_version_id": event.workflow_version_id,
-            })
+            sentry_sdk.capture_exception(
+                e,
+                extras={
+                    "run_id": run_id,
+                    "workflow_id": workflow.workflow_id,
+                    "workflow_version_id": event.workflow_version_id,
+                },
+            )
             EvaluationReporting.post_results(
                 workflow.api_key,
                 {

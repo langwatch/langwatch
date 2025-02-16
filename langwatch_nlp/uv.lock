@@ -796,7 +796,7 @@ wheels = [
 
 [[package]]
 name = "google-cloud-aiplatform"
-version = "1.70.0"
+version = "1.71.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "docstring-parser" },
@@ -811,9 +811,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "shapely" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/88/06/bc8028c03d4bedb85114c780a9f749b67ff06ce29d25dc7f1a99622f2692/google-cloud-aiplatform-1.70.0.tar.gz", hash = "sha256:e8edef6dbc7911380d0ea55c47544e799f62b891cb1a83b504ca1c09fff9884b", size = 6311624 }
+sdist = { url = "https://files.pythonhosted.org/packages/ed/d6/3fbc064701c93c0bb76a54f8348e3389e6b9115aaffaae316f39d01e92bb/google-cloud-aiplatform-1.71.1.tar.gz", hash = "sha256:0013527e06853382ff0885898195bb7f3cf4a70eb7e5d53e4b1a28c8bd1775e2", size = 7491661 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/46/d9/280e5a9b5caf69322f64fa55f62bf447d76c5fe30e8df6e93373f22c4bd7/google_cloud_aiplatform-1.70.0-py2.py3-none-any.whl", hash = "sha256:690e6041f03d3aa85102ac3f316c958d6f43a99aefb7fb3f8938dee56d08abd9", size = 5267225 },
+    { url = "https://files.pythonhosted.org/packages/c8/37/c87b883be064b6c015b91a26cc454d667c797e0d01a85c47ac73e8aa565e/google_cloud_aiplatform-1.71.1-py2.py3-none-any.whl", hash = "sha256:4cd49bbc7f8ad88b92029a090b834ebacf9efadc844226f1e74d015d68f69ef5", size = 6189637 },
 ]
 
 [[package]]
@@ -1469,7 +1469,7 @@ wheels = [
 
 [[package]]
 name = "langevals-core"
-version = "0.1.10"
+version = "0.1.12"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "litellm" },
@@ -1477,10 +1477,11 @@ dependencies = [
     { name = "pydantic" },
     { name = "tenacity" },
     { name = "tqdm" },
+    { name = "vertexai" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c6/5b/78eb86f5376da43d495e84bba1fab3d5d38d1fe44cae8e0740b8788cacdf/langevals_core-0.1.10.tar.gz", hash = "sha256:b5933b9219b6d99bd3f0730936271a2da6e2a3e9840f1190117e031b13e8d96b", size = 5114 }
+sdist = { url = "https://files.pythonhosted.org/packages/36/39/52b7550313c9b73a7a2e7e8e8baf236bbd042bf2b9ac2f074b33e47042eb/langevals_core-0.1.12.tar.gz", hash = "sha256:9c0cc94159ea4031dc304e0060365b4921656b9fe0c238d65ecbf1b9c56d9f76", size = 5279 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cc/a6/c842bc325343b96596cdc9f0871ca399ac379fa69a6792fc2f29e897ee20/langevals_core-0.1.10-py3-none-any.whl", hash = "sha256:81dfb3f51e77a9b4d11751b2521fd1f7ee76d3dcc62514b8a28042153a8f8b0e", size = 6009 },
+    { url = "https://files.pythonhosted.org/packages/16/ca/3dccd9dd60623616b0214549413e471f0020412317d986e763a3cd5e25a2/langevals_core-0.1.12-py3-none-any.whl", hash = "sha256:70710d611e468352e272224dc15320adecdf6447c129e597d3e3e2e90c4ec1c9", size = 6251 },
 ]
 
 [[package]]
@@ -1568,7 +1569,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27.0,<0.28" },
     { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=6.29.5,<7" },
     { name = "langchain-community", specifier = ">=0.0.28,<0.1" },
-    { name = "langevals-core", specifier = ">=0.1.10,<0.2" },
+    { name = "langevals-core", specifier = ">=0.1.12,<0.2" },
     { name = "langwatch", specifier = ">=0.1.37,<0.2" },
     { name = "litellm", extras = ["proxy"], specifier = ">=1.53.7,<2" },
     { name = "mangum", specifier = ">=0.17.0,<0.18" },
@@ -3298,6 +3299,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/64/07/91582d69320f6f6daaf2d8072608a4ad8884683d4840e7e4f3a9dbdcc639/validators-0.34.0.tar.gz", hash = "sha256:647fe407b45af9a74d245b943b18e6a816acf4926974278f6dd617778e1e781f", size = 70955 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6e/78/36828a4d857b25896f9774c875714ba4e9b3bc8a92d2debe3f4df3a83d4f/validators-0.34.0-py3-none-any.whl", hash = "sha256:c804b476e3e6d3786fa07a30073a4ef694e617805eb1946ceee3fe5a9b8b1321", size = 43536 },
+]
+
+[[package]]
+name = "vertexai"
+version = "1.71.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "google-cloud-aiplatform" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/14/40/3de2395f98ea374e78234d9728d595aa0ad8bad4f2d77c59d9fc9492e7bc/vertexai-1.71.1.tar.gz", hash = "sha256:cd74fe42ea05bb155aff0a4c150fd3d8af74df399297560a09027fa85e1fdbd7", size = 9288 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1a/76/162f62df15ce89ffb7587bf68cf7f81c49c4a7f326a3737b07ffc5253e52/vertexai-1.71.1-py3-none-any.whl", hash = "sha256:86162d5fe18badc76044a0950c8cd8accc7a81c16d787adf7430db32881d6063", size = 7268 },
 ]
 
 [[package]]
