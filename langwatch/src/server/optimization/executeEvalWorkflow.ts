@@ -11,6 +11,8 @@ import {
   checkIsEvaluator,
   getEntryInputs,
 } from "../../optimization_studio/utils/nodeUtils";
+import { lambdaFetch } from "../../utils/lambdaFetch";
+import type { EvaluationResult } from "../tracer/types";
 
 const getWorkFlow = (state: Workflow) => {
   return {
@@ -145,8 +147,10 @@ export async function executeWorkflowEvaluation(
   };
 
   const event = await addEnvs(messageWithoutEnvs, projectId);
-  const response = await fetch(
-    `${process.env.LANGWATCH_NLP_SERVICE}/studio/execute_sync`,
+  const response = await lambdaFetch<{ result: EvaluationResult }>(
+    process.env.LANGWATCH_NLP_SERVICE_INVOKE_ARN ??
+      process.env.LANGWATCH_NLP_SERVICE!,
+    "/studio/execute_sync",
     {
       method: "POST",
       headers: {
@@ -167,12 +171,21 @@ export async function executeWorkflowEvaluation(
 
   // Process the result
   if (data.result) {
-    if ("score" in data.result) {
-      const parsedScore = parseFloat(data.result.score);
+    if (
+      "score" in data.result &&
+      (typeof data.result.score === "number" ||
+        typeof data.result.score === "string")
+    ) {
+      const parsedScore = parseFloat(data.result.score + "");
       data.result.score = isNaN(parsedScore) ? 0 : parsedScore;
     }
-    if ("passed" in data.result) {
-      data.result.passed = data.result.passed === "true";
+    if (
+      "passed" in data.result &&
+      (typeof data.result.passed === "boolean" ||
+        typeof data.result.passed === "string")
+    ) {
+      data.result.passed =
+        data.result.passed === true || data.result.passed + "" === "true";
     }
   }
 
