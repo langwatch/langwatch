@@ -46,8 +46,10 @@ import { api } from "../../utils/api";
 
 export function FieldsFilters() {
   const { nonEmptyFilters } = useFilterParams();
-  const { openDrawer } = useDrawer();
+  const { openDrawer, isDrawerOpen } = useDrawer();
   const { hasTeamPermission } = useOrganizationTeamProject();
+
+  const isEditMode = isDrawerOpen("editTriggerFilter");
 
   const filterKeys: FilterField[] = [
     "spans.model",
@@ -79,7 +81,7 @@ export function FieldsFilters() {
 
         <Spacer />
 
-        {hasTeamPermission(TeamRoleGroup.TRIGGERS_MANAGE) && (
+        {hasTeamPermission(TeamRoleGroup.TRIGGERS_MANAGE) && !isEditMode && (
           <Tooltip label="Create a filter to add a trigger.">
             <Button
               colorScheme="orange"
