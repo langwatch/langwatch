@@ -178,7 +178,7 @@ const callPython = async (
       }
     }
     if (events === 0) {
-      throw new Error(`Studio invalid response: ${chunksBuffer}`);
+      console.error(`Studio invalid response: ${chunksBuffer}`);
     }
   } catch (error) {
     console.error("Error reading stream:", error);

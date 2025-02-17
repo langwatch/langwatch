@@ -163,7 +163,7 @@ export const typedValueToText = (
         .join("");
     }
   } else if (typed.type == "json") {
-    const stringIfSpecialKeys = (json: any) => {
+    const stringIfSpecialKeys = (json: any): string | undefined => {
       // TODO: test those
       if (json.text !== undefined) {
         return stringified(json.text);
@@ -246,6 +246,11 @@ export const typedValueToText = (
         return stringified(json.llm.replies[0]);
       }
 
+      // Optimization Studio
+      if (json.end !== undefined) {
+        return stringIfSpecialKeys(json.end);
+      }
+
       return undefined;
     };
 
@@ -264,7 +269,7 @@ export const typedValueToText = (
       ) {
         const firstItem = json[Object.keys(json)[0]!];
         if (typeof firstItem === "object" && stringIfSpecialKeys(firstItem)) {
-          return stringIfSpecialKeys(firstItem);
+          return stringIfSpecialKeys(firstItem)!;
         }
         return stringified(firstItem);
       }
