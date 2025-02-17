@@ -1,7 +1,10 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "../db";
 import { getProjectModelProviders } from "../api/routers/modelProviders";
-import { type Workflow } from "../../optimization_studio/types/dsl";
+import {
+  type ExecutionStatus,
+  type Workflow,
+} from "../../optimization_studio/types/dsl";
 import { nanoid } from "nanoid";
 import type { StudioClientEvent } from "../../optimization_studio/types/events";
 import { type Edge, type Node } from "@xyflow/react";
@@ -13,6 +16,8 @@ import {
 } from "../../optimization_studio/utils/nodeUtils";
 import { lambdaFetch } from "../../utils/lambdaFetch";
 import type { EvaluationResult } from "../tracer/types";
+import { dataForFilter } from "../api/routers/analytics/dataForFilter";
+import type { SingleEvaluationResult } from "../evaluations/evaluators.generated";
 
 const getWorkFlow = (state: Workflow) => {
   return {
@@ -97,7 +102,53 @@ const checkForRequiredLLMKeys = (
   return true;
 };
 
-export async function executeWorkflowEvaluation(
+export async function runEvaluationWorkflow(
+  workflowId: string,
+  projectId: string,
+  inputs: Record<string, string>,
+  versionId?: string
+): Promise<{
+  result: SingleEvaluationResult;
+  status: ExecutionStatus;
+}> {
+  try {
+    const data = await runWorkflow(workflowId, projectId, inputs, versionId);
+
+    // Process the result
+    if (data.result) {
+      if (
+        "score" in data.result &&
+        (typeof data.result.score === "number" ||
+          typeof data.result.score === "string")
+      ) {
+        const parsedScore = parseFloat(data.result.score + "");
+        data.result.score = isNaN(parsedScore) ? 0 : parsedScore;
+      }
+      if (
+        "passed" in data.result &&
+        (typeof data.result.passed === "boolean" ||
+          typeof data.result.passed === "string")
+      ) {
+        data.result.passed =
+          data.result.passed === true || data.result.passed + "" === "true";
+      }
+    }
+
+    return data;
+  } catch (error) {
+    return {
+      status: "error",
+      result: {
+        status: "error",
+        details: (error as Error).message,
+        error_type: "WORKFLOW_ERROR",
+        traceback: [(error as Error).stack ?? ""],
+      },
+    };
+  }
+}
+
+export async function runWorkflow(
   workflowId: string,
   projectId: string,
   inputs: Record<string, string>,
@@ -147,7 +198,10 @@ export async function executeWorkflowEvaluation(
   };
 
   const event = await addEnvs(messageWithoutEnvs, projectId);
-  const response = await lambdaFetch<{ result: EvaluationResult }>(
+  const response = await lambdaFetch<{
+    result: any;
+    status: ExecutionStatus;
+  }>(
     process.env.LANGWATCH_NLP_SERVICE_INVOKE_ARN ??
       process.env.LANGWATCH_NLP_SERVICE!,
     "/studio/execute_sync",
@@ -160,34 +214,9 @@ export async function executeWorkflowEvaluation(
     }
   );
 
-  const data = await response.json();
-
   if (!response.ok) {
-    return {
-      status: "error",
-      ...data,
-    };
+    throw new Error(`Error running workflow: ${response.statusText}`);
   }
 
-  // Process the result
-  if (data.result) {
-    if (
-      "score" in data.result &&
-      (typeof data.result.score === "number" ||
-        typeof data.result.score === "string")
-    ) {
-      const parsedScore = parseFloat(data.result.score + "");
-      data.result.score = isNaN(parsedScore) ? 0 : parsedScore;
-    }
-    if (
-      "passed" in data.result &&
-      (typeof data.result.passed === "boolean" ||
-        typeof data.result.passed === "string")
-    ) {
-      data.result.passed =
-        data.result.passed === true || data.result.passed + "" === "true";
-    }
-  }
-
-  return data;
+  return await response.json();
 }

@@ -41,7 +41,7 @@ import {
 } from "../../metrics";
 import type { ElasticSearchSpan, Trace } from "~/server/tracer/types";
 
-import { executeWorkflowEvaluation } from "../../optimization/executeEvalWorkflow";
+import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
 
 const debug = getDebugger("langwatch:workers:evaluationsWorker");
 
@@ -588,7 +588,7 @@ const customEvaluation = async (
   evaluatorType: EvaluatorTypes,
   data: Record<string, any>,
   trace?: Trace
-) => {
+): Promise<SingleEvaluationResult> => {
   const workflowId = evaluatorType.split("/")[1];
 
   const project = await prisma.project.findUnique({
@@ -622,7 +622,7 @@ const customEvaluation = async (
     throw new Error("Workflow ID is required");
   }
 
-  const response = await executeWorkflowEvaluation(
+  const response = await runEvaluationWorkflow(
     workflowId,
     project.id,
     requestBody
@@ -632,13 +632,13 @@ const customEvaluation = async (
 
   if (status != "success") {
     return {
-      status: "error",
       ...result,
-    };
+      status: "error",
+    } as any;
   }
 
   return {
-    status: "processed",
     ...result,
+    status: "processed",
   };
 };

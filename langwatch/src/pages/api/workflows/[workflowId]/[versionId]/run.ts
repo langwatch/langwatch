@@ -1,5 +1,5 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
-import { executeWorkflowEvaluation } from "~/server/optimization/executeEvalWorkflow";
+import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
 import { prisma } from "../../../../../server/db";
 
 export default async function handler(
@@ -56,7 +56,7 @@ export async function runWorkflow(
   }
 
   try {
-    const result = await executeWorkflowEvaluation(
+    const result = await runWorkflowFn(
       workflowId,
       project.id,
       req.body,
