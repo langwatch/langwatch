@@ -360,11 +360,8 @@ export default function Members() {
                       </Tr>
                     ) : (
                       triggers.data?.map((trigger) => {
-                        const lastRunAt = new Date(trigger.lastRunAt);
-                        const lastRunAtFormatted = lastRunAt.toLocaleString();
-
                         return (
-                          <Tr key={trigger.id}>
+                          <Tr key={trigger.id} data-trigger-id={trigger.id}>
                             <Td>{trigger.name}</Td>
                             <Td>{triggerActionName(trigger.action)}</Td>
                             <Td>

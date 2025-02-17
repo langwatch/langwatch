@@ -672,12 +672,11 @@ export const ApiModalContent = () => {
         </Text>
         <Box padding={4} backgroundColor={"#272822"}>
           <RenderCode
-            code={`# Set your API key and endpoint URL
-LANGWATCH_API_KEY="your_langwatch_api_key"
-LANGWATCH_ENDPOINT="${langwatchEndpoint()}/api/optimization/${workflowId}"
+            code={`# Set your API key
+LANGWATCH_API_KEY="${project?.apiKey ?? "your_langwatch_api_key"}"
 
 # Use curl to send the POST request, e.g.:
-curl -X POST "$LANGWATCH_ENDPOINT" \\
+curl -X POST "${langwatchEndpoint()}/api/workflows/${workflowId}/run" \\
      -H "X-Auth-Token: $LANGWATCH_API_KEY" \\
      -H "Content-Type: application/json" \\
      -d @- <<EOF

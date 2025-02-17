@@ -62,10 +62,10 @@ def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
 
 
 def apiCall(inputs, api_key, endpoint, workflow_id, version_id):
-
-    url = endpoint + "/api/optimization/" + workflow_id
     if version_id:
-        url += "/" + version_id
+        url = endpoint + "/api/workflows/" + workflow_id + "/" + version_id + "/run"
+    else:
+        url = endpoint + "/api/workflows/" + workflow_id + "/run"
 
     response = httpx.post(
         url,

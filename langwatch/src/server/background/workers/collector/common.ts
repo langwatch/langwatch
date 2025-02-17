@@ -163,44 +163,44 @@ export const typedValueToText = (
         .join("");
     }
   } else if (typed.type == "json") {
-    const stringIfSpecialKeys = (json: any): string | undefined => {
+    const specialKeysMapping = (json: any): string | undefined => {
       // TODO: test those
       if (json.text !== undefined) {
-        return stringified(json.text);
+        return json.text;
       }
       if (json.input !== undefined) {
-        return stringified(json.input);
+        return json.input;
       }
       if (json.question !== undefined) {
-        return stringified(json.question);
+        return json.question;
       }
       if (json.user_query !== undefined) {
-        return stringified(json.user_query);
+        return json.user_query;
       }
       if (json.query !== undefined) {
-        return stringified(json.user_query);
+        return json.user_query;
       }
       // Langflow
       if (json.input_value !== undefined) {
-        return stringified(json.input_value);
+        return json.input_value;
       }
       // TODO: test this happens for finding outputs
       if (json.output !== undefined) {
-        return stringified(json.output);
+        return json.output;
       }
 
       if (json.answer !== undefined) {
-        return stringified(json.answer);
+        return json.answer;
       }
 
       // Chainlit
       if (json.content !== undefined) {
-        return stringified(json.content);
+        return json.content;
       }
 
       // Haystack
       if (json.prompt !== undefined) {
-        return stringified(json.prompt);
+        return json.prompt;
       }
 
       // Langgraph on Flowise
@@ -208,47 +208,67 @@ export const typedValueToText = (
         json.messages?.length > 0 &&
         json.messages?.[json.messages?.length - 1]?.content !== undefined
       ) {
-        return stringified(json.messages[json.messages?.length - 1].content);
+        return json.messages[json.messages?.length - 1].content;
       }
       if (json.return_values?.output !== undefined) {
-        return stringified(json.return_values.output);
+        return json.return_values.output;
       }
 
       // LangChain
       if (typeof json.inputs === "object" && json.inputs.input !== undefined) {
-        return stringified(json.inputs.input);
+        return json.inputs.input;
       }
       if (typeof json.inputs === "object" && json.inputs.text !== undefined) {
-        return stringified(json.inputs.text);
+        return json.inputs.text;
       }
       if (typeof json.inputs === "object" && json.inputs.query !== undefined) {
-        return stringified(json.inputs.query);
+        return json.inputs.query;
       }
       if (
         typeof json.inputs === "object" &&
         json.inputs.question !== undefined
       ) {
-        return stringified(json.inputs.question);
+        return json.inputs.question;
       }
       if (
         typeof json.outputs === "object" &&
         json.outputs.output !== undefined
       ) {
-        return stringified(json.outputs.output);
+        return json.outputs.output;
       }
       if (typeof json.outputs === "string") {
         return json.outputs;
       }
       if (typeof json.outputs === "object" && json.outputs.text !== undefined) {
-        return stringified(json.outputs.text);
+        return json.outputs.text;
       }
       if (Array.isArray(json.llm?.replies)) {
-        return stringified(json.llm.replies[0]);
+        return json.llm.replies[0];
       }
 
       // Optimization Studio
       if (json.end !== undefined) {
-        return stringIfSpecialKeys(json.end);
+        return specialKeysMapping(json.end) ?? json.end;
+      }
+
+      return undefined;
+    };
+
+    const firstAndOnlyKey = (json: any) => {
+      if (
+        typeof json === "object" &&
+        !Array.isArray(json) &&
+        Object.keys(json).length === 1
+      ) {
+        const firstItem = json[Object.keys(json)[0]!];
+        const mapped =
+          typeof firstItem === "object"
+            ? specialKeysMapping(firstItem)
+            : undefined;
+        if (mapped !== undefined) {
+          return stringified(mapped);
+        }
+        return stringified(firstItem);
       }
 
       return undefined;
@@ -257,24 +277,12 @@ export const typedValueToText = (
     try {
       const json = typed.value as any;
 
-      const value = stringIfSpecialKeys(json);
+      const value = specialKeysMapping(json);
       if (value !== undefined) {
-        return value;
+        return firstAndOnlyKey(value) ?? stringified(value);
       }
 
-      if (
-        typeof json === "object" &&
-        !Array.isArray(json) &&
-        Object.keys(json).length === 1
-      ) {
-        const firstItem = json[Object.keys(json)[0]!];
-        if (typeof firstItem === "object" && stringIfSpecialKeys(firstItem)) {
-          return stringIfSpecialKeys(firstItem)!;
-        }
-        return stringified(firstItem);
-      }
-
-      return stringified(typed.value);
+      return firstAndOnlyKey(json) ?? stringified(json);
     } catch (_e) {
       return typed.value?.toString() ?? "";
     }

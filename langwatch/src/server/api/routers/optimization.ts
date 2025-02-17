@@ -23,7 +23,7 @@ export const optimizationRouter = createTRPCRouter({
       const apiKey = project?.apiKey;
 
       const response = await fetch(
-        `${process.env.BASE_HOST}/api/optimization/${workflowId}`,
+        `${process.env.BASE_HOST}/api/workflows/${workflowId}/run`,
         {
           method: "POST",
           body: JSON.stringify(inputMessages[0]),
