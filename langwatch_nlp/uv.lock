@@ -213,30 +213,30 @@ wheels = [
 
 [[package]]
 name = "boto3"
-version = "1.35.74"
+version = "1.36.21"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore" },
     { name = "jmespath" },
     { name = "s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/31/5f/50bd4b633906eda677034fa47f6ff948ef593592b35d0b4d433eff6a9333/boto3-1.35.74.tar.gz", hash = "sha256:88370c6845ba71a4dae7f6b357099df29b3965da584be040c8e72c9902bc9492", size = 111018 }
+sdist = { url = "https://files.pythonhosted.org/packages/af/cb/745ca9a661be42f3dc0c5b6ea4d3182d9dd5dfd4204aad4910af20775a26/boto3-1.36.21.tar.gz", hash = "sha256:41eb2b73eb612d300e629e3328b83f1ffea0fc6633e75c241a72a76746c1db26", size = 110999 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/dd/1b/4a06d781bf3427284f24c67b870f1062c5b189bb5b069c8bfe77aa816997/boto3-1.35.74-py3-none-any.whl", hash = "sha256:dab5bddbbe57dc707b6f6a1f25dc2823b8e234b6fe99fafef7fc406ab73031b9", size = 139178 },
+    { url = "https://files.pythonhosted.org/packages/39/99/7f5c7a16e205e19089e7f0d8716e9d1a5207bf4736f82a7d0c602bd0a40c/boto3-1.36.21-py3-none-any.whl", hash = "sha256:f94faa7cf932d781f474d87f8b4c14a033af95ac1460136b40d75e7a30086ef0", size = 139179 },
 ]
 
 [[package]]
 name = "botocore"
-version = "1.35.74"
+version = "1.36.21"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jmespath" },
     { name = "python-dateutil" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f7/47/386dbeea2fa25f50c96c0ff093427e93bb4af1be4cd1d62d82bf83d6be06/botocore-1.35.74.tar.gz", hash = "sha256:de5c4fa9a24cef3a758974857b5c5820a12fad345ebf33c052a5988e88f33634", size = 13397053 }
+sdist = { url = "https://files.pythonhosted.org/packages/69/9f/17b7610f2bfc5ccba6d2395f1cc856dd3e7e50f0088fc22949e56ae9f569/botocore-1.36.21.tar.gz", hash = "sha256:da746240e2ad64fd4997f7f3664a0a8e303d18075fc1d473727cb6375080ea16", size = 13523380 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e6/29/dcf0d3c0b10175bc6350700c894175d21c476e5423eb0066249b3c416296/botocore-1.35.74-py3-none-any.whl", hash = "sha256:9ac9d33d84dd9f05b35085de081552342a2c9ae22e3c4ee105723c9e92c07bd9", size = 13198368 },
+    { url = "https://files.pythonhosted.org/packages/7b/b4/8f1dc71437d12a61ca1daac534bc32fa6ccf207011eab7465d8c8a46dc06/botocore-1.36.21-py3-none-any.whl", hash = "sha256:24a7052e792639dc2726001bd474cd0aaa959c1e18ddd92c17f3adc6efa1b132", size = 13352864 },
 ]
 
 [[package]]
@@ -1469,9 +1469,10 @@ wheels = [
 
 [[package]]
 name = "langevals-core"
-version = "0.1.12"
+version = "0.1.13"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "boto3" },
     { name = "litellm" },
     { name = "pandas" },
     { name = "pydantic" },
@@ -1479,9 +1480,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "vertexai" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/36/39/52b7550313c9b73a7a2e7e8e8baf236bbd042bf2b9ac2f074b33e47042eb/langevals_core-0.1.12.tar.gz", hash = "sha256:9c0cc94159ea4031dc304e0060365b4921656b9fe0c238d65ecbf1b9c56d9f76", size = 5279 }
+sdist = { url = "https://files.pythonhosted.org/packages/fa/2d/019a01f248d5566d1bafd2596e62d8ee0f43ae7f385a7259de4c82c54341/langevals_core-0.1.13.tar.gz", hash = "sha256:adc4612008167f80a2ff9e34a2065ef8418574a2d295b8ca2f11a5834f84f98e", size = 5342 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/16/ca/3dccd9dd60623616b0214549413e471f0020412317d986e763a3cd5e25a2/langevals_core-0.1.12-py3-none-any.whl", hash = "sha256:70710d611e468352e272224dc15320adecdf6447c129e597d3e3e2e90c4ec1c9", size = 6251 },
+    { url = "https://files.pythonhosted.org/packages/a4/02/add2cbbcfdd5be1bc0c0a9266944a64e17398312eb9dfa352010e33004f1/langevals_core-0.1.13-py3-none-any.whl", hash = "sha256:8177465406ad7082a0798e6d81bda413009f874e60909f92d6d309e96b542cd3", size = 6442 },
 ]
 
 [[package]]
@@ -1569,7 +1570,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27.0,<0.28" },
     { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=6.29.5,<7" },
     { name = "langchain-community", specifier = ">=0.0.28,<0.1" },
-    { name = "langevals-core", specifier = ">=0.1.12,<0.2" },
+    { name = "langevals-core", specifier = ">=0.1.13,<0.2" },
     { name = "langwatch", specifier = ">=0.1.37,<0.2" },
     { name = "litellm", extras = ["proxy"], specifier = ">=1.53.7,<2" },
     { name = "mangum", specifier = ">=0.17.0,<0.18" },
@@ -2795,14 +2796,14 @@ wheels = [
 
 [[package]]
 name = "s3transfer"
-version = "0.10.4"
+version = "0.11.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c0/0a/1cdbabf9edd0ea7747efdf6c9ab4e7061b085aa7f9bfc36bb1601563b069/s3transfer-0.10.4.tar.gz", hash = "sha256:29edc09801743c21eb5ecbc617a152df41d3c287f67b615f73e5f750583666a7", size = 145287 }
+sdist = { url = "https://files.pythonhosted.org/packages/62/45/2323b5928f86fd29f9afdcef4659f68fa73eaa5356912b774227f5cf46b5/s3transfer-0.11.2.tar.gz", hash = "sha256:3b39185cb72f5acc77db1a58b6e25b977f28d20496b6e58d6813d75f464d632f", size = 147885 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/66/05/7957af15543b8c9799209506df4660cba7afc4cf94bfb60513827e96bed6/s3transfer-0.10.4-py3-none-any.whl", hash = "sha256:244a76a24355363a68164241438de1b72f8781664920260c48465896b712a41e", size = 83175 },
+    { url = "https://files.pythonhosted.org/packages/1b/ac/e7dc469e49048dc57f62e0c555d2ee3117fa30813d2a1a2962cce3a2a82a/s3transfer-0.11.2-py3-none-any.whl", hash = "sha256:be6ecb39fadd986ef1701097771f87e4d2f821f27f6071c872143884d2950fbc", size = 84151 },
 ]
 
 [[package]]
