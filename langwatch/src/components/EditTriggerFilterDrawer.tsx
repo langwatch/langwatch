@@ -70,6 +70,7 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
         description: "Please add at least one filter",
         status: "error",
         position: "top-right",
+        isClosable: true,
       });
       return;
     }
