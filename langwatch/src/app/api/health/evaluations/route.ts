@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
   const maxAttempts = 3;
   while (attempts < maxAttempts) {
     response = await fetch(
-      `${env.BASE_HOST}/api/evaluations/pii-detection/evaluate`,
+      `${env.BASE_HOST}/api/evaluations/presidio/pii_detection/evaluate`,
       {
         method: "POST",
         headers: {
