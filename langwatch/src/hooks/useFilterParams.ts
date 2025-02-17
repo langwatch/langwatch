@@ -97,6 +97,40 @@ export const useFilterParams = () => {
     );
   };
 
+  const setFilters = (filtersToSet: Record<FilterField, FilterParam>) => {
+    void router.push(
+      "?" +
+        qs.stringify(
+          {
+            ...Object.fromEntries(
+              Object.entries(router.query).filter(
+                ([key]) =>
+                  !Object.values(availableFilters).some((f) =>
+                    key.startsWith(f.urlKey)
+                  )
+              )
+            ),
+            ...Object.entries(filtersToSet).reduce(
+              (acc, [filter, params]) => ({
+                ...acc,
+                [availableFilters[filter as keyof typeof availableFilters]
+                  .urlKey]: params,
+              }),
+              {}
+            ),
+          },
+          {
+            allowDots: true,
+            arrayFormat: "comma",
+            // @ts-ignore of course it exists
+            allowEmptyArrays: true,
+          }
+        ),
+      undefined,
+      { shallow: true, scroll: false }
+    );
+  };
+
   const clearFilters = () => {
     void router.push(
       {
@@ -122,6 +156,10 @@ export const useFilterParams = () => {
     ...(queryParams.query ? { query: queryParams.query as string } : {}),
   };
 
+  const getLatestFilters = () => {
+    return filterParams;
+  };
+
   const nonEmptyFilters = Object.values(filterParams.filters).filter((f) =>
     typeof f === "string"
       ? !!f
@@ -133,7 +171,9 @@ export const useFilterParams = () => {
   return {
     filters,
     setFilter,
+    setFilters,
     clearFilters,
+    getLatestFilters,
     filterParams,
     nonEmptyFilters,
     queryOpts: {

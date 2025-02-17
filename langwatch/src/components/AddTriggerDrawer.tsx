@@ -31,25 +31,20 @@ import { HorizontalFormControl } from "./HorizontalFormControl";
 
 import { useFilterParams } from "~/hooks/useFilterParams";
 
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
-import { usePublicEnv } from "../hooks/usePublicEnv";
-import { DatasetSelector } from "./datasets/DatasetSelector";
 import { useLocalStorage } from "usehooks-ts";
-import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "~/server/datasets/types";
-import { useEffect, useMemo, useState } from "react";
-import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
-import {
-  HeaderCheckboxComponent,
-  type DatasetColumnDef,
-} from "./datasets/DatasetGrid";
-import type { CustomCellRendererProps } from "@ag-grid-community/react";
+import { api } from "~/utils/api";
+import { usePublicEnv } from "../hooks/usePublicEnv";
+import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import type { Mapping } from "./datasets/DatasetMapping";
+import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
+import { DatasetSelector } from "./datasets/DatasetSelector";
 
 export function TriggerDrawer() {
   const { project, organization, team } = useOrganizationTeamProject();

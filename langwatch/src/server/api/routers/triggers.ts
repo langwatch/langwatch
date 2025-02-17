@@ -198,4 +198,29 @@ export const triggerRouter = createTRPCRouter({
         },
       });
     }),
+  getTriggerById: protectedProcedure
+    .input(z.object({ triggerId: z.string(), projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.trigger.findUnique({
+        where: { id: input.triggerId, projectId: input.projectId },
+      });
+    }),
+  updateTriggerFilters: protectedProcedure
+    .input(
+      z.object({
+        triggerId: z.string(),
+        projectId: z.string(),
+        filters: z.any(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.trigger.update({
+        where: { id: input.triggerId, projectId: input.projectId },
+        data: {
+          filters: JSON.stringify(input.filters),
+        },
+      });
+    }),
 });
