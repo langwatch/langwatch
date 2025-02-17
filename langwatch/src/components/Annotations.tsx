@@ -10,19 +10,16 @@ import {
   Tooltip,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect } from "react";
 import { Edit, MessageCircle, ThumbsDown, ThumbsUp } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
-import { useDrawer } from "./CurrentDrawer";
 
 import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
 import { AnnotationComment } from "./annotations/AnnotationComment";
 
 export const Annotations = ({ traceId }: { traceId: string }) => {
   const { data } = useRequiredSession();
-  const { isDrawerOpen, openDrawer } = useDrawer();
   const { project, isPublicRoute } = useOrganizationTeamProject();
 
   const commentState = useAnnotationCommentStore();
@@ -67,7 +64,8 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
               isCurrentUser
                 ? (e) => {
                     e.stopPropagation();
-                    commentState.setCommentState({
+
+                    commentState.setCommentState?.({
                       traceId: traceId,
                       action: "edit",
                       annotationId: annotation.id,
@@ -183,7 +181,7 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
           </Card>
         );
       })}
-      {commentState.action === "new" && (
+      {commentState.action === "new" && commentState.traceId === traceId && (
         <AnnotationComment key={commentState.annotationId ?? ""} />
       )}
     </VStack>

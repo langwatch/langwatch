@@ -400,7 +400,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
             onClick={(e) => {
               e.stopPropagation();
 
-              setCommentState({
+              setCommentState?.({
                 traceId: trace.trace_id,
                 action: "new",
                 annotationId: undefined,
@@ -543,7 +543,19 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                 </Message>
               </Box>
             </GridItem>
-            <GridItem minWidth="420px" paddingRight={6}>
+            <GridItem
+              minWidth="420px"
+              paddingRight={6}
+              onClick={(e) => {
+                e.stopPropagation();
+
+                setCommentState?.({
+                  traceId: trace.trace_id,
+                  action: "new",
+                  annotationId: undefined,
+                });
+              }}
+            >
               <Annotations traceId={trace.trace_id} />
             </GridItem>
           </Grid>
