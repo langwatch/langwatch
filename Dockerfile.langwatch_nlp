@@ -8,11 +8,12 @@ COPY python-sdk .
 
 WORKDIR /usr/src/app/langwatch_nlp
 
-COPY langwatch_nlp/.python-version langwatch_nlp/uv.lock langwatch_nlp/pyproject.toml /usr/src/app/langwatch_nlp/
-RUN sed -i 's/, editable = true//g' pyproject.toml
+COPY langwatch_nlp/.python-version langwatch_nlp/uv.lock langwatch_nlp/pyproject.toml langwatch_nlp/remove-editable-dependencies.sh .
+RUN ./remove-editable-dependencies.sh
 RUN uv sync
 
 COPY langwatch_nlp .
+RUN ./remove-editable-dependencies.sh
 
 # Preload for faster subsequent startups
 RUN PYTHONPATH=. uv run python langwatch_nlp/main.py
