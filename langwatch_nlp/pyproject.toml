@@ -42,3 +42,6 @@ dev = [
 
 [tool.uv]
 package = false
+
+[tool.uv.sources]
+langwatch = { path = "../python-sdk", editable = true }

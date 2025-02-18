@@ -40,7 +40,8 @@ jobs:
       - name: Build and push LangWatch NLP Docker image
         uses: docker/build-push-action@v6
         with:
-          context: ./langwatch_nlp
+          context: .
+          file: Dockerfile.langwatch_nlp
           push: true
           platforms: linux/amd64,linux/arm64/v8
           tags: langwatch/langwatch_nlp:latest

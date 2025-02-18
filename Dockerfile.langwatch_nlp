@@ -1,13 +1,17 @@
 FROM python:3.12-slim
 
-WORKDIR /usr/src/app
-
 RUN pip install uv
 
-COPY .python-version uv.lock pyproject.toml .
+WORKDIR /usr/src/app/python-sdk
+
+COPY python-sdk .
+
+WORKDIR /usr/src/app/langwatch_nlp
+
+COPY langwatch_nlp/.python-version langwatch_nlp/uv.lock langwatch_nlp/pyproject.toml .
 RUN uv sync
 
-COPY . .
+COPY langwatch_nlp .
 
 # Preload for faster subsequent startups
 RUN PYTHONPATH=. uv run python langwatch_nlp/main.py

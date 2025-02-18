@@ -28,7 +28,8 @@ services:
 
   langwatch_nlp:
     build:
-      context: ./langwatch_nlp
+      context: .
+      dockerfile: Dockerfile.langwatch_nlp
     env_file:
       - langwatch/.env
     ports:
