@@ -6,11 +6,10 @@ WORKDIR /usr/src/app/python-sdk
 
 COPY python-sdk .
 
-RUN uv build
-
 WORKDIR /usr/src/app/langwatch_nlp
 
-COPY langwatch_nlp/.python-version langwatch_nlp/uv.lock langwatch_nlp/pyproject.toml .
+COPY langwatch_nlp/.python-version langwatch_nlp/uv.lock langwatch_nlp/pyproject.toml /usr/src/app/langwatch_nlp/
+RUN sed -i '/, editable = true/d' pyproject.toml
 RUN uv sync
 
 COPY langwatch_nlp .
