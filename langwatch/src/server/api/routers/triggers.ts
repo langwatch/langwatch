@@ -19,7 +19,12 @@ export const triggerRouter = createTRPCRouter({
           members: z.string().array().optional(),
           slackWebhook: z.string().optional(),
           datasetId: z.string().optional(),
-          datasetMapping: z.any().optional(),
+          datasetMapping: z
+            .object({
+              mapping: z.any(),
+              expansions: z.array(z.string()).optional(),
+            })
+            .optional(),
         }),
       })
     )

@@ -396,7 +396,7 @@ export type Mapping = Record<
 >;
 export type MappingState = {
   mapping: Mapping;
-  expansions: (keyof typeof TRACE_EXPANSIONS)[];
+  expansions: Set<keyof typeof TRACE_EXPANSIONS>;
 };
 
 export const TracesMapping = ({
@@ -469,7 +469,7 @@ export const TracesMapping = ({
 
   const [mappingState, setMappingState_] = useState<MappingState>({
     mapping: {},
-    expansions: [],
+    expansions: new Set(),
   });
   const setMappingState = useCallback(
     (callback: (mappingState: MappingState) => MappingState) => {
@@ -521,7 +521,7 @@ export const TracesMapping = ({
           },
         ]) ?? []
       ),
-      expansions: Array.from(datasetMapping.expansions),
+      expansions: new Set(datasetMapping.expansions),
     };
 
     setMappingState_(mappingState);

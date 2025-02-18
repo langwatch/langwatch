@@ -42,7 +42,11 @@ import type {
 import { api } from "~/utils/api";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
-import type { Mapping, MappingState } from "./datasets/DatasetMapping";
+import type {
+  Mapping,
+  MappingState,
+  TRACE_EXPANSIONS,
+} from "./datasets/DatasetMapping";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 import { DatasetSelector } from "./datasets/DatasetSelector";
 
@@ -135,7 +139,7 @@ export function TriggerDrawer() {
   const [datasetTriggerMapping, setDatasetTriggerMapping] =
     useState<MappingState>({
       mapping: {},
-      expansions: [],
+      expansions: new Set(),
     });
 
   type Trigger = {
@@ -150,10 +154,12 @@ export function TriggerDrawer() {
     members?: string[];
     slackWebhook?: string;
     datasetId?: string;
-    datasetMapping?: {
-      mapping: Mapping;
-      expansions: string[];
-    };
+    datasetMapping?:
+      | {
+          mapping: Mapping;
+          expansions: Set<keyof typeof TRACE_EXPANSIONS> | undefined;
+        }
+      | undefined;
   };
 
   const onSubmit = (data: Trigger) => {
@@ -184,7 +190,17 @@ export function TriggerDrawer() {
         name: data.name,
         action: data.action,
         filters: filterParams.filters,
-        actionParams: actionParams,
+        actionParams: {
+          ...actionParams,
+          datasetMapping: actionParams.datasetMapping
+            ? {
+                mapping: actionParams.datasetMapping.mapping,
+                expansions: Array.from(
+                  actionParams.datasetMapping.expansions || []
+                ),
+              }
+            : undefined,
+        },
       },
       {
         onSuccess: () => {
