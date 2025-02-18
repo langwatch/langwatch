@@ -410,7 +410,7 @@ export const TracesMapping = ({
   traces: TraceWithSpans[];
   columnTypes?: DatasetColumns;
   setDatasetEntries: (entries: DatasetRecordEntry[]) => void;
-  setDatasetTriggerMapping: (mapping: MappingState) => void;
+  setDatasetTriggerMapping?: (mapping: MappingState) => void;
 }) => {
   const { project } = useOrganizationTeamProject();
 
@@ -476,7 +476,7 @@ export const TracesMapping = ({
       const newMappingState = callback(mappingState);
       setMappingState_(newMappingState);
       updateStoredMapping(newMappingState);
-      setDatasetTriggerMapping(newMappingState);
+      setDatasetTriggerMapping?.(newMappingState);
     },
     [mappingState, updateStoredMapping, setDatasetTriggerMapping]
   );
@@ -525,7 +525,7 @@ export const TracesMapping = ({
     };
 
     setMappingState_(mappingState);
-    setDatasetTriggerMapping(mappingState);
+    setDatasetTriggerMapping?.(mappingState);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columnTypes]);
