@@ -33,7 +33,7 @@ interface DatasetMappingPreviewProps {
   onEditColumns: () => void;
   onRowDataChange: (entries: DatasetRecordEntry[]) => void;
   paragraph?: string;
-  setDatasetTriggerMapping: (mapping: MappingState) => void;
+  setDatasetTriggerMapping?: (mapping: MappingState) => void;
 }
 
 export function DatasetMappingPreview({
