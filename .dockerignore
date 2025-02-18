@@ -9,3 +9,16 @@
 .github
 .env
 **/.env
+**/.venv
+
+langwatch_nlp/.venv
+langwatch_nlp/.pytest_cache
+langwatch_nlp/.ipynb_checkpoints
+
+dist
+python-sdk/dist
+python-sdk/.ipynb_checkpoints
+python-sdk/.pytest_cache
+python-sdk/.chainlit
+python-sdk/.files
+python-sdk/examples

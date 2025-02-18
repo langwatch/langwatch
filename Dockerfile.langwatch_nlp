@@ -6,6 +6,8 @@ WORKDIR /usr/src/app/python-sdk
 
 COPY python-sdk .
 
+RUN uv build
+
 WORKDIR /usr/src/app/langwatch_nlp
 
 COPY langwatch_nlp/.python-version langwatch_nlp/uv.lock langwatch_nlp/pyproject.toml .
@@ -20,4 +22,4 @@ ENV RUNNING_IN_DOCKER=true
 
 EXPOSE 5561
 
-CMD uv run uvicorn langwatch_nlp.main:app --host 0.0.0.0 --port 5561 --timeout-keep-alive 4500 | tee /var/log/uvicorn.log
+CMD uv --no-cache run uvicorn langwatch_nlp.main:app --host 0.0.0.0 --port 5561 --timeout-keep-alive 4500 | tee /var/log/uvicorn.log
