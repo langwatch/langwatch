@@ -157,13 +157,13 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
 
         await sendTriggerEmail(triggerInfo);
         await addTriggersSent(triggerId, triggerData);
+
         if (project) {
           void updateAlert(triggerId, updatedAt, project.id);
         } else {
           throw new Error("Project not found for triggerId: " + triggerId);
         }
       } catch (error) {
-        console.error("Error in SEND_EMAIL trigger:", error);
         Sentry.captureException(error, {
           extra: {
             triggerId,
@@ -194,7 +194,6 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           throw new Error("Project not found for triggerId: " + triggerId);
         }
       } catch (error) {
-        console.error("Error in SEND_SLACK_MESSAGE trigger:", error);
         Sentry.captureException(error, {
           extra: {
             triggerId,
@@ -260,9 +259,15 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           projectSlug: project!.slug,
         };
 
+        updatedAt = getLatestUpdatedAt(traces);
+
         await addTriggersSent(triggerId, triggerData);
+        if (project) {
+          void updateAlert(triggerId, updatedAt, project.id);
+        } else {
+          throw new Error("Project not found for triggerId: " + triggerId);
+        }
       } catch (error) {
-        console.error("Error in ADD_TO_DATASET trigger:", error);
         Sentry.captureException(error, {
           extra: {
             triggerId,
