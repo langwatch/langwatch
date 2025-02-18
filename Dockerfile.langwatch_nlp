@@ -5,21 +5,20 @@ RUN pip install uv
 WORKDIR /usr/src/app/python-sdk
 
 COPY python-sdk .
+RUN uv build
 
 WORKDIR /usr/src/app/langwatch_nlp
 
-COPY langwatch_nlp/.python-version langwatch_nlp/uv.lock langwatch_nlp/pyproject.toml langwatch_nlp/remove-editable-dependencies.sh .
-RUN ./remove-editable-dependencies.sh
-RUN uv sync
+COPY langwatch_nlp/.python-version langwatch_nlp/uv.lock langwatch_nlp/pyproject.toml .
+RUN uv sync --no-editable
 
 COPY langwatch_nlp .
-RUN ./remove-editable-dependencies.sh
 
 # Preload for faster subsequent startups
-RUN PYTHONPATH=. uv run python langwatch_nlp/main.py
+RUN PYTHONPATH=. uv run --no-editable python langwatch_nlp/main.py
 
 ENV RUNNING_IN_DOCKER=true
 
 EXPOSE 5561
 
-CMD uv --no-cache run uvicorn langwatch_nlp.main:app --host 0.0.0.0 --port 5561 --timeout-keep-alive 4500 | tee /var/log/uvicorn.log
+CMD uv --no-cache run --no-sync --no-editable uvicorn langwatch_nlp.main:app --host 0.0.0.0 --port 5561 --timeout-keep-alive 4500 | tee /var/log/uvicorn.log
