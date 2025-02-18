@@ -1,7 +1,7 @@
-import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { AlertType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
 
 import { nanoid } from "nanoid";
@@ -194,7 +194,6 @@ export const triggerRouter = createTRPCRouter({
         },
         data: {
           active: input.active,
-          lastRunAt: new Date().getTime(),
         },
       });
     }),

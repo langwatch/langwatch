@@ -11,9 +11,16 @@ import {
   VStack,
 } from "@chakra-ui/react";
 
+import type {
+  Annotation,
+  AnnotationScore,
+  Dataset,
+  User,
+} from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 import { z } from "zod";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
@@ -27,15 +34,7 @@ import type {
 } from "../../server/tracer/types";
 import { datasetSpanSchema } from "../../server/tracer/types.generated";
 import { getRAGChunks, getRAGInfo } from "../../server/tracer/utils";
-import { useLocalStorage } from "usehooks-ts";
 import { api } from "../../utils/api";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type {
-  Annotation,
-  AnnotationScore,
-  Dataset,
-  User,
-} from "@prisma/client";
 
 type TraceWithSpansAndAnnotations = TraceWithSpans & {
   annotations?: (Annotation & {
@@ -395,19 +394,26 @@ export type Mapping = Record<
     subkey?: string;
   }
 >;
+export type MappingState = {
+  mapping: Mapping;
+  expansions: (keyof typeof TRACE_EXPANSIONS)[];
+};
 
 export const TracesMapping = ({
   dataset,
   traces,
   columnTypes,
   setDatasetEntries,
+  setDatasetTriggerMapping,
 }: {
   dataset: Dataset;
   traces: TraceWithSpans[];
   columnTypes?: DatasetColumns;
   setDatasetEntries: (entries: DatasetRecordEntry[]) => void;
+  setDatasetTriggerMapping: (mapping: MappingState) => void;
 }) => {
   const { project } = useOrganizationTeamProject();
+
   const annotationScores = api.annotation.getByTraceIds.useQuery(
     {
       projectId: project?.id ?? "",
@@ -438,11 +444,6 @@ export const TracesMapping = ({
     expansions: (keyof typeof TRACE_EXPANSIONS)[];
   }) ?? { mapping: {}, expansions: [] };
 
-  type MappingState = {
-    mapping: Mapping;
-    expansions: Set<keyof typeof TRACE_EXPANSIONS>;
-  };
-
   const trpc = api.useContext();
   const updateStoredMapping_ = api.dataset.updateMapping.useMutation();
   const updateStoredMapping = useCallback(
@@ -468,15 +469,16 @@ export const TracesMapping = ({
 
   const [mappingState, setMappingState_] = useState<MappingState>({
     mapping: {},
-    expansions: new Set(),
+    expansions: [],
   });
   const setMappingState = useCallback(
     (callback: (mappingState: MappingState) => MappingState) => {
       const newMappingState = callback(mappingState);
       setMappingState_(newMappingState);
       updateStoredMapping(newMappingState);
+      setDatasetTriggerMapping(newMappingState);
     },
-    [mappingState, updateStoredMapping]
+    [mappingState, updateStoredMapping, setDatasetTriggerMapping]
   );
   const mapping = mappingState.mapping;
 
@@ -509,17 +511,22 @@ export const TracesMapping = ({
   const now = useMemo(() => new Date().getTime(), []);
 
   useEffect(() => {
-    setMappingState_({
+    const mappingState = {
       mapping: Object.fromEntries(
         columnTypes?.map(({ name }) => [
           name,
           datasetMapping.mapping[name] ?? {
-            source: DATASET_INFERRED_MAPPINGS_BY_NAME[name] ?? "",
+            source: (DATASET_INFERRED_MAPPINGS_BY_NAME[name] ??
+              "") as keyof typeof TRACE_MAPPINGS,
           },
         ]) ?? []
       ),
-      expansions: new Set(datasetMapping.expansions),
-    });
+      expansions: Array.from(datasetMapping.expansions),
+    };
+
+    setMappingState_(mappingState);
+    setDatasetTriggerMapping(mappingState);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columnTypes]);
 

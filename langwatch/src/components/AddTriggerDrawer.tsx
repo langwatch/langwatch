@@ -42,7 +42,7 @@ import type {
 import { api } from "~/utils/api";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
-import type { Mapping } from "./datasets/DatasetMapping";
+import type { Mapping, MappingState } from "./datasets/DatasetMapping";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 import { DatasetSelector } from "./datasets/DatasetSelector";
 
@@ -132,13 +132,11 @@ export function TriggerDrawer() {
     DatasetRecordEntry[]
   >([]);
 
-  const [datasetMapping] = useLocalStorage<{
-    mapping: Mapping;
-    expansions: string[];
-  }>("datasetMapping", {
-    mapping: {},
-    expansions: [],
-  });
+  const [datasetTriggerMapping, setDatasetTriggerMapping] =
+    useState<MappingState>({
+      mapping: {},
+      expansions: [],
+    });
 
   type Trigger = {
     name: string;
@@ -163,7 +161,7 @@ export function TriggerDrawer() {
       members: [],
       slackWebhook: "",
       datasetId: datasetId,
-      datasetMapping: datasetMapping,
+      datasetMapping: datasetTriggerMapping,
     };
     if (data.action === TriggerAction.SEND_EMAIL) {
       actionParams = {
@@ -176,7 +174,7 @@ export function TriggerDrawer() {
     } else if (data.action === TriggerAction.ADD_TO_DATASET) {
       actionParams = {
         datasetId: datasetId,
-        datasetMapping: datasetMapping,
+        datasetMapping: datasetTriggerMapping,
       };
     }
 
@@ -409,6 +407,7 @@ export function TriggerDrawer() {
                     onEditColumns={editDataset.onOpen}
                     onRowDataChange={setRowDataFromDataset}
                     paragraph="This is a sample of the data will look when added to the dataset."
+                    setDatasetTriggerMapping={setDatasetTriggerMapping}
                   />
                 )}
               </>

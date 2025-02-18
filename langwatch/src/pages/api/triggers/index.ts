@@ -107,18 +107,21 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
   const traces = await getAllTracesForProject({ input });
 
   const getTracesToSend = async (traces: TraceGroups, triggerId: string) => {
-    const tracesToSend = [];
+    const traceIds = traces.groups.flatMap((group) =>
+      group.map((trace) => trace.trace_id)
+    );
 
-    for (const group of traces.groups) {
-      const results = await Promise.all(
-        group.map((trace) =>
-          hasTriggerSent(triggerId, trace.trace_id, input.projectId)
-        )
-      );
-      if (results.some((sent) => !sent)) {
-        tracesToSend.push(group);
-      }
-    }
+    const triggersSent = await triggerSentForMany(
+      triggerId,
+      traceIds,
+      input.projectId
+    );
+
+    const tracesToSend = traces.groups.filter((group) => {
+      return group.every((trace) => {
+        return !triggersSent.some((sent) => sent.traceId === trace.trace_id);
+      });
+    });
 
     return tracesToSend;
   };
@@ -153,16 +156,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           triggerMessage: trigger.message ?? "",
         };
 
-        updatedAt = getLatestUpdatedAt(traces);
-
         await sendTriggerEmail(triggerInfo);
-        await addTriggersSent(triggerId, triggerData);
-
-        if (project) {
-          void updateAlert(triggerId, updatedAt, project.id);
-        } else {
-          throw new Error("Project not found for triggerId: " + triggerId);
-        }
       } catch (error) {
         Sentry.captureException(error, {
           extra: {
@@ -184,15 +178,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           triggerMessage: trigger.message ?? "",
         };
 
-        updatedAt = getLatestUpdatedAt(traces);
-
         await sendSlackWebhook(triggerInfo);
-        await addTriggersSent(triggerId, triggerData);
-        if (project) {
-          void updateAlert(triggerId, updatedAt, project.id);
-        } else {
-          throw new Error("Project not found for triggerId: " + triggerId);
-        }
       } catch (error) {
         Sentry.captureException(error, {
           extra: {
@@ -258,15 +244,6 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           triggerName: name,
           projectSlug: project!.slug,
         };
-
-        updatedAt = getLatestUpdatedAt(traces);
-
-        await addTriggersSent(triggerId, triggerData);
-        if (project) {
-          void updateAlert(triggerId, updatedAt, project.id);
-        } else {
-          throw new Error("Project not found for triggerId: " + triggerId);
-        }
       } catch (error) {
         Sentry.captureException(error, {
           extra: {
@@ -275,22 +252,18 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
             action: TriggerAction.ADD_TO_DATASET,
           },
         });
-        return {
-          triggerId,
-          status: "error",
-          error: `Failed to add to dataset: ${error as string}`,
-          traces: tracesToSend,
-        };
       }
     }
+
+    await addTriggersSent(triggerId, triggerData);
+    updatedAt = getLatestUpdatedAt(traces);
+    void updateAlert(triggerId, updatedAt, project?.id ?? "");
 
     return {
       triggerId,
       updatedAt: updatedAt,
       status: "triggered",
       totalFound: tracesToSend.length,
-      triggerInfo,
-      traces: tracesToSend,
     };
   }
 
@@ -327,15 +300,19 @@ const addTriggersSent = async (
   });
 };
 
-const hasTriggerSent = async (
+const triggerSentForMany = async (
   triggerId: string,
-  traceId: string,
+  traceIds: string[],
   projectId: string
 ) => {
-  const triggerSent = await prisma.triggerSent.findUnique({
-    where: { triggerId_traceId: { triggerId, traceId }, projectId },
+  const triggerSent = await prisma.triggerSent.findMany({
+    where: {
+      triggerId,
+      traceId: { in: traceIds },
+      projectId,
+    },
   });
-  return triggerSent !== null;
+  return triggerSent;
 };
 
 interface TraceGroups {
