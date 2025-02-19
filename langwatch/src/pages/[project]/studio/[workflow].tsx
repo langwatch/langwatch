@@ -4,6 +4,7 @@ import { useLoadWorkflow } from "../../../optimization_studio/hooks/useLoadWorkf
 import { useWorkflowStore } from "../../../optimization_studio/hooks/useWorkflowStore";
 import type { Workflow } from "../../../optimization_studio/types/dsl";
 import ErrorPage from "next/error";
+import { api } from "../../../utils/api";
 
 export default function Studio() {
   const { workflow } = useLoadWorkflow();
@@ -16,6 +17,15 @@ export default function Studio() {
     })
   );
   const { clear } = useWorkflowStore.temporal.getState();
+
+  const queryClient = api.useContext();
+  useEffect(() => {
+    // Invalidate the workflow once navigating away to make sure when comming back
+    // that is doesn't accidentaly renders the previous version of the workflow
+    return () => {
+      queryClient.workflow.getById.invalidate();
+    };
+  }, []);
 
   useEffect(() => {
     const dsl = workflow.data?.currentVersion?.dsl as unknown as

@@ -165,6 +165,10 @@ const PageMenuLink = ({
 
 let recentMenuLinkClick = false;
 
+export const setRecentMenuLinkClick = (value: boolean) => {
+  recentMenuLinkClick = value;
+};
+
 const SideMenuLink = ({
   size = "md",
   icon,
