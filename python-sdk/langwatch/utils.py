@@ -216,7 +216,6 @@ def reduce_payload_size(
     max_list_dict_length=5000,
     depth: int = 0,
 ) -> T:
-    print("max_string_length", max_string_length)
 
     if max_string_length is None:
         return obj
