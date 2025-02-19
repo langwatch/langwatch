@@ -437,6 +437,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
                       isFinished={isFinished}
                       size={size}
                       hasScrolled={hasScrolled}
+                      workflowId={experiment.workflowId}
                     />
                   ) : null}
                 </TabPanel>

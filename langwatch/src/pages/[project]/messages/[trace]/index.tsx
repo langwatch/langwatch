@@ -26,7 +26,6 @@ import React, {
   useState,
   type PropsWithChildren,
 } from "react";
-import Markdown from "react-markdown";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../../../hooks/useTraceDetailsState";
@@ -35,7 +34,6 @@ import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
 
 import { CornerDownRight, Edit } from "react-feather";
-import remarkGfm from "remark-gfm";
 import { Annotations } from "../../../../components/Annotations";
 import { useDrawer } from "../../../../components/CurrentDrawer";
 import { EventsCounter } from "../../../../components/messages/EventsCounter";
@@ -49,6 +47,7 @@ import { isJson } from "../../../../utils/isJson";
 import { isPythonRepr } from "../../../../utils/parsePythonInsideJson";
 
 import { useAnnotationCommentStore } from "../../../../hooks/useAnnotationCommentStore";
+import { Markdown } from "../../../../components/Markdown";
 
 export default function TraceDetails() {
   const router = useRouter();
@@ -470,10 +469,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                   paddingTop="20px"
                 >
                   <Text paddingY="6px" marginBottom="38px">
-                    <Markdown
-                      remarkPlugins={[remarkGfm]}
-                      className="markdown markdown-conversation-history"
-                    >
+                    <Markdown className="markdown markdown-conversation-history">
                       {translatedTextInput && translationActive
                         ? translatedTextInput
                         : getExtractedInput(trace)}
@@ -513,10 +509,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                       isPythonRepr(trace.output.value)) ? (
                     <MessageCardJsonOutput value={trace.output.value} />
                   ) : trace.output?.value ? (
-                    <Markdown
-                      remarkPlugins={[remarkGfm]}
-                      className="markdown markdown-conversation-history"
-                    >
+                    <Markdown className="markdown markdown-conversation-history">
                       {translatedTextOutput && translationActive
                         ? translatedTextOutput
                         : trace.output.value}
