@@ -105,7 +105,6 @@ class ContextSpan:
     model: Optional[str] = None
     params: Optional[SpanParams] = None
     metrics: Optional[SpanMetrics] = None
-    max_string_length: Optional[int] = 5000
 
     def __init__(
         self,

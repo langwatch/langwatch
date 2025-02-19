@@ -220,6 +220,9 @@ def reduce_payload_size(
     if max_string_length is None:
         return obj
 
+    if max_string_length < 100:
+        raise ValueError("max_string_length must be at least 100")
+
     if type(obj) == list and all(
         validate_safe(ChatMessage, item, ["role"]) for item in obj
     ):
