@@ -1,23 +1,17 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
-import { prisma } from "../db";
-import { getProjectModelProviders } from "../api/routers/modelProviders";
+import { type Node } from "@xyflow/react";
+import { nanoid } from "nanoid";
+import { addEnvs } from "../../optimization_studio/server/addEnvs";
 import {
   type ExecutionStatus,
   type Workflow,
 } from "../../optimization_studio/types/dsl";
-import { nanoid } from "nanoid";
 import type { StudioClientEvent } from "../../optimization_studio/types/events";
-import { type Edge, type Node } from "@xyflow/react";
-import { type MaybeStoredModelProvider } from "../modelProviders/registry";
-import { addEnvs } from "../../optimization_studio/server/addEnvs";
-import {
-  checkIsEvaluator,
-  getEntryInputs,
-} from "../../optimization_studio/utils/nodeUtils";
+import { getEntryInputs } from "../../optimization_studio/utils/nodeUtils";
 import { lambdaFetch } from "../../utils/lambdaFetch";
-import type { EvaluationResult } from "../tracer/types";
-import { dataForFilter } from "../api/routers/analytics/dataForFilter";
+import { getProjectModelProviders } from "../api/routers/modelProviders";
+import { prisma } from "../db";
 import type { SingleEvaluationResult } from "../evaluations/evaluators.generated";
+import { type MaybeStoredModelProvider } from "../modelProviders/registry";
 
 const getWorkFlow = (state: Workflow) => {
   return {

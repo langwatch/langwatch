@@ -103,6 +103,7 @@ export type ESBatchEvaluation = {
   dataset: {
     index: number;
     entry: Record<string, any>;
+    predicted?: Record<string, any>;
     cost?: number | null;
     duration?: number | null;
     error?: string | null;
@@ -113,7 +114,7 @@ export type ESBatchEvaluation = {
     status: "processed" | "skipped" | "error";
     index: number;
     duration?: number | null;
-    inputs: Record<string, any>;
+    inputs?: Record<string, any>;
     score?: number | null;
     label?: string | null;
     passed?: boolean | null;

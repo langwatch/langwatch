@@ -315,6 +315,7 @@ export const batchEvaluationMapping: ElasticSearchMappingFrom<ESBatchEvaluation>
       properties: {
         index: { type: "integer" },
         entry: { type: FLATENNED_TYPE } as any,
+        predicted: { type: FLATENNED_TYPE } as any,
         cost: { type: "float" },
         duration: { type: "integer" },
         error: { type: "text" },

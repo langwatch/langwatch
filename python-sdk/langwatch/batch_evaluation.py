@@ -257,7 +257,7 @@ class BatchEvaluation:
             )
 
             with self.lock:
-                self.add_to_batch(record, results)
+                self.add_to_batch(record, callbackResponse, results)
                 self.progress += 1
 
             return results
@@ -268,7 +268,12 @@ class BatchEvaluation:
 
         return asyncio.run(gather_results(coroutines))
 
-    def add_to_batch(self, record: DatasetRecord, results: BatchEvaluationResultRecord):
+    def add_to_batch(
+        self,
+        record: DatasetRecord,
+        callbackResponse: Optional[Union[str, int, float, Dict[str, Any]]],
+        results: BatchEvaluationResultRecord,
+    ):
         predicted = {
             "index": record.index,
             "entry": record.entry.model_dump(),
@@ -276,6 +281,15 @@ class BatchEvaluation:
         }
         if results.error:
             predicted["error"] = results.error
+
+        if (
+            isinstance(callbackResponse, str)
+            or isinstance(callbackResponse, int)
+            or isinstance(callbackResponse, float)
+        ):
+            predicted["predicted"] = {"output": callbackResponse}
+        elif isinstance(callbackResponse, dict):
+            predicted["predicted"] = callbackResponse
 
         self.batch["dataset"].append(predicted)
 
@@ -286,7 +300,6 @@ class BatchEvaluation:
                 "status": result.status,
                 "index": record.index,
                 "duration": result.duration,
-                "inputs": results.entry.model_dump(),
             }
 
             if result.status == "processed":
@@ -404,7 +417,9 @@ async def run_evaluation(
         elif result["status"] == "skipped":
             evaluation_result = EvaluationResultSkipped.model_validate(result)
         else:
-            evaluation_result = EvaluationResultError.model_validate(result)
+            evaluation_result = EvaluationResultError.model_validate(
+                {"traceback": [], **(result or {})}
+            )
 
         evaluation_result.duration = duration
 

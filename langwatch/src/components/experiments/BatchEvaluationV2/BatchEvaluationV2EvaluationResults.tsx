@@ -1,8 +1,6 @@
 import {
   Alert,
   AlertIcon,
-  Box,
-  Button,
   HStack,
   Menu,
   MenuButton,
@@ -25,15 +23,15 @@ import {
   useToast,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
+import Parse from "papaparse";
 import React, { useEffect, useState } from "react";
+import { Download, ExternalLink, MoreVertical } from "react-feather";
 import type { ESBatchEvaluation } from "../../../server/experiments/types";
 import { api } from "../../../utils/api";
 import {
   BatchEvaluationV2EvaluationResult,
   evaluationResultsTableData,
 } from "./BatchEvaluationV2EvaluationResult";
-import { Download, ExternalLink, MoreVertical } from "react-feather";
-import Parse from "papaparse";
 
 export const useBatchEvaluationResults = ({
   project,
@@ -86,6 +84,12 @@ export const useBatchEvaluationResults = ({
     )
   );
 
+  const predictedColumns = new Set(
+    Object.values(datasetByIndex ?? {}).flatMap((item) =>
+      Object.keys(item.predicted ?? {})
+    )
+  );
+
   let resultsByEvaluator = run.data?.evaluations.reduce(
     (acc, evaluation) => {
       if (!acc[evaluation.evaluator]) {
@@ -116,6 +120,7 @@ export const useBatchEvaluationResults = ({
     run,
     datasetByIndex,
     datasetColumns,
+    predictedColumns,
     resultsByEvaluator,
   };
 };
@@ -133,13 +138,18 @@ export const useBatchEvaluationDownloadCSV = ({
 }) => {
   const toast = useToast();
 
-  const { run, datasetByIndex, datasetColumns, resultsByEvaluator } =
-    useBatchEvaluationResults({
-      project,
-      experiment,
-      runId,
-      isFinished,
-    });
+  const {
+    run,
+    datasetByIndex,
+    datasetColumns,
+    predictedColumns,
+    resultsByEvaluator,
+  } = useBatchEvaluationResults({
+    project,
+    experiment,
+    runId,
+    isFinished,
+  });
 
   const downloadCSV = async () => {
     try {
@@ -165,11 +175,15 @@ export const useBatchEvaluationDownloadCSV = ({
     const tableData = evaluationResultsTableData(
       resultsByEvaluator,
       datasetByIndex,
-      datasetColumns
+      datasetColumns,
+      predictedColumns
     );
 
     const csvHeaders = [
       ...Array.from(tableData.headers.datasetColumns),
+      ...Array.from(tableData.headers.predictedColumns).map((c) =>
+        tableData.headers.datasetColumns.has(c) ? `predicted_${c}` : c
+      ),
       tableData.headers.cost,
       tableData.headers.duration,
       ...Object.entries(tableData.headers.evaluationColumns).flatMap(
@@ -189,6 +203,7 @@ export const useBatchEvaluationDownloadCSV = ({
 
     const csvData = tableData.rows.map((row) => [
       ...row.datasetColumns.map((cell) => cell.value()),
+      ...row.predictedColumns.map((cell) => cell.value()),
       row.cost.value(),
       row.duration.value(),
       ...Object.entries(row.evaluationsColumns).flatMap(([_, item]) => [
@@ -235,13 +250,18 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
   }) {
     const [tabIndex, setTabIndex] = useState(0);
 
-    const { run, datasetByIndex, datasetColumns, resultsByEvaluator } =
-      useBatchEvaluationResults({
-        project,
-        experiment,
-        runId,
-        isFinished,
-      });
+    const {
+      run,
+      datasetByIndex,
+      datasetColumns,
+      predictedColumns,
+      resultsByEvaluator,
+    } = useBatchEvaluationResults({
+      project,
+      experiment,
+      runId,
+      isFinished,
+    });
 
     const [hasScrolled, setHasScrolled] = useState(false);
 
@@ -381,6 +401,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
                 <MenuItem
                   icon={<Download size={16} />}
                   onClick={() => void downloadCSV()}
+                  isDisabled={!isDownloadCSVEnabled}
                 >
                   Export to CSV
                 </MenuItem>
@@ -412,6 +433,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
                       results={results}
                       datasetByIndex={datasetByIndex}
                       datasetColumns={datasetColumns}
+                      predictedColumns={predictedColumns}
                       isFinished={isFinished}
                       size={size}
                       hasScrolled={hasScrolled}

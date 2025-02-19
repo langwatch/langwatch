@@ -25,6 +25,7 @@ type RenderableRow = {
 
 type EvaluationResultsTableRow = {
   datasetColumns: RenderableRow[];
+  predictedColumns: RenderableRow[];
   cost: RenderableRow;
   duration: RenderableRow;
   evaluationsColumns: Record<
@@ -43,6 +44,7 @@ const evaluationResultsTableRow = (
     ESBatchEvaluation["evaluations"][number] | undefined
   >,
   datasetColumns: Set<string>,
+  predictedColumns: Set<string>,
   evaluationColumns: Record<
     string,
     {
@@ -70,6 +72,20 @@ const evaluationResultsTableRow = (
         </Td>
       ),
       value: () => datasetEntry?.entry[column] ?? "-",
+    })),
+    predictedColumns: Array.from(predictedColumns).map((column) => ({
+      render: () => (
+        <Td key={`predicted-${column}`} maxWidth="250px">
+          {datasetEntry ? (
+            <HoverableBigText>
+              {datasetEntry.predicted?.[column] ?? "-"}
+            </HoverableBigText>
+          ) : (
+            "-"
+          )}
+        </Td>
+      ),
+      value: () => datasetEntry?.predicted?.[column] ?? "-",
     })),
     cost: {
       render: () => (
@@ -137,14 +153,14 @@ const evaluationResultsTableRow = (
                       <Td key={`evaluation-entry-${column}`} maxWidth="250px">
                         {evaluation ? (
                           <HoverableBigText>
-                            {evaluation.inputs[column] ?? "-"}
+                            {evaluation.inputs?.[column] ?? "-"}
                           </HoverableBigText>
                         ) : (
                           "-"
                         )}
                       </Td>
                     ),
-                  value: () => evaluation?.inputs[column] ?? "",
+                  value: () => evaluation?.inputs?.[column] ?? "",
                 })
               ),
               evaluationResults: Array.from(evaluationResultsColumns).map(
@@ -258,7 +274,8 @@ const evaluationResultsTableRow = (
 export const evaluationResultsTableData = (
   resultsByEvaluator: Record<string, ESBatchEvaluation["evaluations"]>,
   datasetByIndex: Record<number, ESBatchEvaluation["dataset"][number]>,
-  datasetColumns: Set<string>
+  datasetColumns: Set<string>,
+  predictedColumns: Set<string>
 ) => {
   const evaluationColumns = Object.fromEntries(
     Object.entries(resultsByEvaluator).map(([evaluator, results]) => [
@@ -274,6 +291,7 @@ export const evaluationResultsTableData = (
   return {
     headers: {
       datasetColumns,
+      predictedColumns,
       cost: "Cost",
       duration: "Duration",
       evaluationColumns,
@@ -291,6 +309,7 @@ export const evaluationResultsTableData = (
         datasetEntry,
         evaluationsForEntry,
         datasetColumns,
+        predictedColumns,
         evaluationColumns
       );
     }),
@@ -350,6 +369,7 @@ export function BatchEvaluationV2EvaluationResult({
   results,
   datasetByIndex,
   datasetColumns,
+  predictedColumns,
   isFinished,
   size = "md",
   hasScrolled,
@@ -358,6 +378,7 @@ export function BatchEvaluationV2EvaluationResult({
   results: ESBatchEvaluation["evaluations"];
   datasetByIndex: Record<number, ESBatchEvaluation["dataset"][number]>;
   datasetColumns: Set<string>;
+  predictedColumns: Set<string>;
   isFinished: boolean;
   size?: "sm" | "md";
   hasScrolled: boolean;
@@ -365,7 +386,8 @@ export function BatchEvaluationV2EvaluationResult({
   const tableData = evaluationResultsTableData(
     { [evaluator]: results },
     datasetByIndex,
-    datasetColumns
+    datasetColumns,
+    predictedColumns
   );
   const evaluatorHeaders = tableData.headers.evaluationColumns[evaluator]!;
 
@@ -418,14 +440,21 @@ export function BatchEvaluationV2EvaluationResult({
               <Text>Dataset</Text>
             </Th>
 
-            {results.length > 0 && (
-              <Th
-                colSpan={evaluatorHeaders.evaluationInputsColumns.size}
-                paddingY={2}
-              >
-                <Text>Evaluation Entry</Text>
+            {predictedColumns.size > 0 && (
+              <Th colSpan={predictedColumns.size} paddingY={2}>
+                <Text>Predicted</Text>
               </Th>
             )}
+
+            {results.length > 0 &&
+              evaluatorHeaders.evaluationInputsColumns.size > 0 && (
+                <Th
+                  colSpan={evaluatorHeaders.evaluationInputsColumns.size}
+                  paddingY={2}
+                >
+                  <Text>Evaluation Entry</Text>
+                </Th>
+              )}
 
             <Th rowSpan={2}>Cost</Th>
             <Th rowSpan={2}>Duration</Th>
@@ -444,6 +473,11 @@ export function BatchEvaluationV2EvaluationResult({
                 {column}
               </Th>
             ))}
+            {Array.from(tableData.headers.predictedColumns).map((column) => (
+              <Th key={`predicted-${column}`} paddingY={2}>
+                {column}
+              </Th>
+            ))}
             {Array.from(evaluatorHeaders.evaluationInputsColumns).map(
               (column) => (
                 <Th key={`evaluation-entry-${column}`} paddingY={2}>
@@ -459,6 +493,8 @@ export function BatchEvaluationV2EvaluationResult({
               <Td width="35px">{index + 1}</Td>
 
               {Array.from(row.datasetColumns).map((column) => column.render())}
+
+              {Array.from(row.predictedColumns).map((column) => column.render())}
 
               {Array.from(
                 row.evaluationsColumns[evaluator]?.evaluationInputs ?? []
