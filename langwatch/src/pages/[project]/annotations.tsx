@@ -1,4 +1,4 @@
-import { Container } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
@@ -18,12 +18,7 @@ export default function Annotations() {
 
   return (
     <AnnotationsLayout>
-      <Container
-        maxWidth={"calc(100vw - 330px)"}
-        padding={0}
-        margin={0}
-        backgroundColor="white"
-      >
+      <Box backgroundColor="white" width="full" overflowX="auto">
         <AnnotationsTable
           heading="Inbox"
           allQueueItems={allQueueItems}
@@ -31,7 +26,7 @@ export default function Annotations() {
           noDataTitle="Your inbox is empty"
           noDataDescription="Send messages to your annotation queue to get started."
         />
-      </Container>
+      </Box>
     </AnnotationsLayout>
   );
 }

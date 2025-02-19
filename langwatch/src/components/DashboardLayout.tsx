@@ -34,16 +34,17 @@ import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import numeral from "numeral";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Bell,
   BookOpen,
+  CheckSquare,
   ChevronDown,
   ChevronRight,
   Edit,
+  GitHub,
   Lock,
   MessageSquare,
-  Play,
   Plus,
   Search,
   Settings,
@@ -51,7 +52,10 @@ import {
   Table,
   TrendingUp,
 } from "react-feather";
+import { useDebounceValue } from "usehooks-ts";
+import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
 import { dependencies } from "../injection/dependencies.client";
 import { OrganizationRoleGroup } from "../server/api/permission";
@@ -60,21 +64,17 @@ import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { CurrentDrawer } from "./CurrentDrawer";
+import { HoverableBigText } from "./HoverableBigText";
+import { IconWrapper } from "./IconWrapper";
 import { IntegrationChecks, useIntegrationChecks } from "./IntegrationChecks";
 import { LoadingScreen } from "./LoadingScreen";
 import { ProjectTechStackIcon } from "./TechStack";
+import { ChatBalloonIcon } from "./icons/ChatBalloon";
 import { ChecklistIcon } from "./icons/Checklist";
-import { GitHub } from "react-feather";
+import { DiscordOutlineIcon } from "./icons/DiscordOutline";
 import { LogoIcon } from "./icons/LogoIcon";
 import { PuzzleIcon } from "./icons/PuzzleIcon";
 import { useTableView } from "./messages/HeaderButtons";
-import { IconWrapper } from "./IconWrapper";
-import { usePublicEnv } from "../hooks/usePublicEnv";
-import { DiscordOutlineIcon } from "./icons/DiscordOutline";
-import { ChatBalloonIcon } from "./icons/ChatBalloon";
-import { HoverableBigText } from "./HoverableBigText";
-import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
-import { useDebounceValue } from "usehooks-ts";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -112,6 +112,7 @@ const PageMenuLink = ({
   project,
   badgeNumber,
   isHovered,
+  iconStyle,
 }: {
   icon: React.ComponentType<{ size?: string | number; color?: string }>;
   label: string;
@@ -119,6 +120,7 @@ const PageMenuLink = ({
   project?: Project;
   badgeNumber?: number;
   isHovered?: boolean;
+  iconStyle?: React.CSSProperties;
 }) => {
   const router = useRouter();
   const currentRoute = findCurrentRoute(router.pathname);
@@ -156,9 +158,12 @@ const PageMenuLink = ({
       isActive={isActive}
       badgeNumber={badgeNumber}
       isHovered={isHovered}
+      iconStyle={iconStyle}
     />
   );
 };
+
+let recentMenuLinkClick = false;
 
 const SideMenuLink = ({
   size = "md",
@@ -170,6 +175,7 @@ const SideMenuLink = ({
   badgeNumber,
   isHovered,
   onClick,
+  iconStyle,
 }: {
   size?: "sm" | "md";
   icon:
@@ -182,6 +188,7 @@ const SideMenuLink = ({
   badgeNumber?: number;
   isHovered?: boolean;
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+  iconStyle?: React.CSSProperties;
 }) => {
   const badge =
     badgeNumber && badgeNumber > 0 ? (
@@ -197,14 +204,18 @@ const SideMenuLink = ({
 
   const theme = useTheme();
   const orange400 = theme.colors.orange["400"];
-  const orange600 = theme.colors.orange["600"];
+  const gray700 = theme.colors.gray["700"];
 
   const IconElem = icon as any;
   const iconNode =
     typeof IconElem == "function" || IconElem.render ? (
       <IconElem
-        size={size === "sm" ? 18 : 24}
-        color={isActive ? orange400 : undefined}
+        size={24}
+        color={isActive ? orange400 : gray700}
+        style={{
+          transform: size === "sm" ? "scale(0.8)" : "scale(0.9)",
+          ...iconStyle,
+        }}
       />
     ) : (
       (icon as any)
@@ -212,10 +223,11 @@ const SideMenuLink = ({
 
   return (
     <Link
+      role="group"
       variant="unstyled"
       width="full"
       paddingX={6}
-      paddingY={size === "sm" ? 3 : 4}
+      paddingY={size === "sm" ? 2 : 3}
       href={href}
       aria-label={label}
       onClick={(e) => {
@@ -223,12 +235,14 @@ const SideMenuLink = ({
           project_id: project?.id,
           menu_item: label,
         });
+        recentMenuLinkClick = true;
         onClick?.(e);
       }}
-      fontSize={size === "sm" ? 14 : 15}
+      fontSize={size === "sm" ? 13 : 14}
       _hover={{
         backgroundColor: "gray.50",
       }}
+      cursor="pointer"
     >
       <HStack align="center" spacing={4} minHeight="21px">
         <VStack align="start" position="relative">
@@ -241,7 +255,9 @@ const SideMenuLink = ({
           )}
         </VStack>
         {isHovered && (
-          <Text color={isActive ? orange600 : undefined}>{label}</Text>
+          <Text color={isActive ? "orange.600" : "gray.900"} marginTop="-1px">
+            {label}
+          </Text>
         )}
       </HStack>
     </Link>
@@ -473,9 +489,16 @@ export const DashboardLayout = ({
     ).length;
   }, [integrationChecks.data]);
 
-  const [isHovered, setIsHovered] = useDebounceValue(false, 200, {
+  const [isHovered, setIsHovered] = useDebounceValue(recentMenuLinkClick, 200, {
     leading: true,
   });
+
+  useEffect(() => {
+    if (recentMenuLinkClick) {
+      setIsHovered(true);
+      recentMenuLinkClick = false;
+    }
+  }, [setIsHovered]);
 
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return <ErrorPage statusCode={404} />;
@@ -495,9 +518,16 @@ export const DashboardLayout = ({
 
   const user = session?.user;
   const currentRoute = findCurrentRoute(router.pathname);
+  const menuWidth = 73;
 
   return (
-    <HStack width="full" minHeight="100vh" alignItems={"stretch"} spacing={0}>
+    <HStack
+      width="full"
+      minHeight="100vh"
+      alignItems={"stretch"}
+      spacing={0}
+      overflowX={["auto", "auto", "clip"]}
+    >
       <Head>
         <title>
           LangWatch{project ? ` - ${project.name}` : ""}
@@ -513,7 +543,7 @@ export const DashboardLayout = ({
           onMouseEnter={() => setIsHovered(true)}
           width="20px"
           top={0}
-          left="78px"
+          left={menuWidth + 5 + "px"}
           height="100vh"
         ></Box>
       )}
@@ -522,19 +552,23 @@ export const DashboardLayout = ({
         borderRightColor="gray.300"
         background="white"
         onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        onMouseLeave={() => {
+          setIsHovered(false);
+          recentMenuLinkClick = false;
+        }}
         transition="all 0.2s ease-in-out"
-        width={isHovered ? "200px" : "73px"}
-        minWidth={isHovered ? "200px" : "73px"}
+        width={isHovered ? "200px" : menuWidth + "px"}
+        minWidth={isHovered ? "200px" : menuWidth + "px"}
         overflowX="hidden"
+        height="100vh"
+        position="sticky"
+        top={0}
       >
         <VStack
           paddingX={0}
-          paddingTop={8}
+          paddingTop={5}
           paddingBottom={3}
           spacing={6}
-          position="sticky"
-          top={0}
           height="100vh"
           align="start"
           width={isHovered ? "200px" : "full"}
@@ -547,7 +581,7 @@ export const DashboardLayout = ({
             width="full"
             height="full"
             spacing={0}
-            paddingTop={0}
+            paddingTop={1}
             align="start"
           >
             <PageMenuLink
@@ -564,12 +598,7 @@ export const DashboardLayout = ({
               project={project}
               isHovered={isHovered}
             />
-            {/* <SideMenuLink
-              path={projectRoutes.analytics.path}
-              icon={TrendingUp}
-              label={projectRoutes.analytics.title}
-              project={project}
-            />*/}
+
             <PageMenuLink
               path={projectRoutes.evaluations.path}
               icon={Shield}
@@ -585,12 +614,6 @@ export const DashboardLayout = ({
               project={project}
               isHovered={isHovered}
             />
-            {/* <SideMenuLink
-              path={projectRoutes.playground.path}
-              icon={ImageIcon}
-              label={projectRoutes.playground.title}
-              project={project}
-            /> */}
 
             <PageMenuLink
               path={projectRoutes.datasets.path}
@@ -606,18 +629,21 @@ export const DashboardLayout = ({
               project={project}
               badgeNumber={totalQueueItems}
               isHovered={isHovered}
+              iconStyle={{ marginLeft: "1px" }}
             />
+
+            <PageMenuLink
+              path={projectRoutes.experiments.path}
+              icon={CheckSquare}
+              label={projectRoutes.experiments.title}
+              project={project}
+              isHovered={isHovered}
+            />
+
             <PageMenuLink
               path={projectRoutes.triggers.path}
               icon={Bell}
               label={projectRoutes.triggers.title}
-              project={project}
-              isHovered={isHovered}
-            />
-            <PageMenuLink
-              path={projectRoutes.experiments.path}
-              icon={Play}
-              label={projectRoutes.experiments.title}
               project={project}
               isHovered={isHovered}
             />
@@ -645,7 +671,11 @@ export const DashboardLayout = ({
             <SideMenuLink
               size="sm"
               href="https://docs.langwatch.ai"
-              icon={BookOpen}
+              icon={
+                <IconWrapper width="18px" height="18px" marginLeft="1px">
+                  <BookOpen />
+                </IconWrapper>
+              }
               label="Documentation"
               isActive={false}
               project={project}
@@ -656,7 +686,7 @@ export const DashboardLayout = ({
               size="sm"
               href="https://github.com/langwatch/langwatch"
               icon={
-                <IconWrapper width="20px" height="20px">
+                <IconWrapper width="18px" height="18px">
                   <GitHub />
                 </IconWrapper>
               }
@@ -670,7 +700,7 @@ export const DashboardLayout = ({
               size="sm"
               href="https://discord.gg/kT4PhDS2gH"
               icon={
-                <IconWrapper width="20px" height="20px">
+                <IconWrapper width="18px" height="18px">
                   <DiscordOutlineIcon />
                 </IconWrapper>
               }
@@ -699,7 +729,7 @@ export const DashboardLayout = ({
                     minHeight={0}
                     backgroundColor="blue.500"
                     transition="all 0.2s ease-in-out"
-                    _hover={{
+                    _groupHover={{
                       transform: "scale(1.2)",
                     }}
                     _active={{
@@ -730,8 +760,8 @@ export const DashboardLayout = ({
         </VStack>
       </Box>
       <VStack
-        width="full"
-        maxWidth="calc(100vw - 90px)"
+        minWidth={`calc(100vw - ${menuWidth}px)`}
+        maxWidth={`calc(100vw - ${menuWidth}px)`}
         spacing={0}
         background="gray.100"
         {...props}
