@@ -1135,6 +1135,7 @@ class ContextTrace:
             response = client.post(
                 f"{langwatch.endpoint}/api/trace/{self.trace_id}/share",
                 headers={"X-Auth-Token": str(self.api_key)},
+                timeout=15,
             )
             response.raise_for_status()
             path = response.json()["path"]
@@ -1145,6 +1146,7 @@ class ContextTrace:
             response = client.post(
                 f"{langwatch.endpoint}/api/trace/{self.trace_id}/unshare",
                 headers={"X-Auth-Token": str(self.api_key)},
+                timeout=15,
             )
             response.raise_for_status()
 

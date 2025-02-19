@@ -265,7 +265,7 @@ class EvaluationReporting:
             f"{langwatch.endpoint}/api/evaluations/batch/log_results",
             headers={"Authorization": f"Bearer {api_key}"},
             json=body,
-            timeout=10,
+            timeout=60,
         )
         response.raise_for_status()
 
