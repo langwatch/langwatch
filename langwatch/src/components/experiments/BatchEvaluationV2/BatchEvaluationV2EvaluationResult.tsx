@@ -66,8 +66,8 @@ const evaluationResultsTableRow = (
     0
   );
 
-  const stringifyIfObject = (value: any) =>
-    typeof value === "object" ? JSON.stringify(value) : value;
+  const stringify = (value: any) =>
+    typeof value === "object" ? JSON.stringify(value) : `${value}`;
 
   return {
     datasetColumns: Array.from(datasetColumns).map((column) => ({
@@ -83,28 +83,28 @@ const evaluationResultsTableRow = (
             />
           ) : datasetEntry ? (
             <HoverableBigText>
-              {stringifyIfObject(datasetEntry.entry[column])}
+              {stringify(datasetEntry.entry[column])}
             </HoverableBigText>
           ) : (
             "-"
           )}
         </Td>
       ),
-      value: () => stringifyIfObject(datasetEntry?.entry[column]),
+      value: () => stringify(datasetEntry?.entry[column]),
     })),
     predictedColumns: Array.from(predictedColumns).map((column) => ({
       render: () => (
         <Td key={`predicted-${column}`} maxWidth="250px">
           {datasetEntry ? (
             <HoverableBigText>
-              {stringifyIfObject(datasetEntry.predicted?.[column])}
+              {stringify(datasetEntry.predicted?.[column])}
             </HoverableBigText>
           ) : (
             "-"
           )}
         </Td>
       ),
-      value: () => stringifyIfObject(datasetEntry?.predicted?.[column]),
+      value: () => stringify(datasetEntry?.predicted?.[column]),
     })),
     cost: {
       render: () => (
@@ -193,7 +193,7 @@ const evaluationResultsTableRow = (
                       <Td key={`evaluation-entry-${column}`} maxWidth="250px">
                         {evaluation ? (
                           <HoverableBigText>
-                            {evaluation.inputs?.[column] ?? "-"}
+                            {stringify(evaluation.inputs?.[column] ?? "-")}
                           </HoverableBigText>
                         ) : (
                           "-"

@@ -163,10 +163,17 @@ const PageMenuLink = ({
   );
 };
 
-let recentMenuLinkClick = false;
-
 export const setRecentMenuLinkClick = (value: boolean) => {
-  recentMenuLinkClick = value;
+  if (typeof window !== "undefined") {
+    (window as any).recentMenuLinkClick = value;
+  }
+};
+
+const getRecentMenuLinkClick = () => {
+  if (typeof window !== "undefined") {
+    return (window as any).recentMenuLinkClick ?? false;
+  }
+  return false;
 };
 
 const SideMenuLink = ({
@@ -239,7 +246,7 @@ const SideMenuLink = ({
           project_id: project?.id,
           menu_item: label,
         });
-        recentMenuLinkClick = true;
+        setRecentMenuLinkClick(true);
         onClick?.(e);
       }}
       fontSize={size === "sm" ? 13 : 14}
@@ -493,14 +500,18 @@ export const DashboardLayout = ({
     ).length;
   }, [integrationChecks.data]);
 
-  const [isHovered, setIsHovered] = useDebounceValue(recentMenuLinkClick, 200, {
-    leading: true,
-  });
+  const [isHovered, setIsHovered] = useDebounceValue(
+    getRecentMenuLinkClick(),
+    200,
+    {
+      leading: true,
+    }
+  );
 
   useEffect(() => {
-    if (recentMenuLinkClick) {
+    if (getRecentMenuLinkClick()) {
       setIsHovered(true);
-      recentMenuLinkClick = false;
+      setRecentMenuLinkClick(false);
     }
   }, [setIsHovered]);
 
@@ -558,7 +569,7 @@ export const DashboardLayout = ({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => {
           setIsHovered(false);
-          recentMenuLinkClick = false;
+          setRecentMenuLinkClick(false);
         }}
         transition="all 0.2s ease-in-out"
         width={isHovered ? "200px" : menuWidth + "px"}
