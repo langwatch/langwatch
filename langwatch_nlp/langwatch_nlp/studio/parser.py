@@ -71,6 +71,7 @@ def apiCall(inputs, api_key, endpoint, workflow_id, version_id):
         url,
         headers={"X-Auth-Token": api_key},
         json=inputs,
+        timeout=600,  # 10 minutes
     )
 
     return response.json()

@@ -83,7 +83,9 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
 
   return (
     <HStack width="full" spacing={3}>
-      {currentVersion && <VersionBox version={currentVersion} />}
+      {currentVersion && (
+        <VersionBox version={currentVersion} minWidth="44px" />
+      )}
       <VStack align="start" width="full" spacing={1}>
         <HStack>
           <Text fontWeight={600} fontSize={13} noOfLines={1}>
@@ -119,9 +121,13 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
             color="white"
             size="2xs"
           />
-          <Text fontSize={12}>
+          <Text fontSize={12} noOfLines={1}>
             {currentVersion?.author?.name}
-            {" · "}
+          </Text>
+          <Text fontSize={12} flexShrink={0}>
+            ·
+          </Text>
+          <Text fontSize={12} flexShrink={0}>
             {currentVersion?.updatedAt &&
               formatTimeAgo(currentVersion.updatedAt.getTime())}
           </Text>
