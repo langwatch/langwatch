@@ -25,6 +25,7 @@ import type { UnsetMarker } from "@trpc/server/dist/core/internals/utils";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { type PermissionMiddleware } from "./permission";
+import { auditLog } from "../auditLog";
 
 /**
  * 1. CONTEXT
@@ -143,6 +144,57 @@ const enforcePermissionCheck = t.middleware(({ ctx, next }) => {
   return next();
 });
 
+const auditLogTRPCErrors = t.middleware(
+  async ({ ctx, next, path, type, input }) => {
+    const result = await next();
+    if (
+      (type !== "mutation" || !ctx.permissionChecked) && // avoid duplicated audit logs for mutations
+      !result.ok &&
+      result.error instanceof TRPCError &&
+      result.error.code !== "INTERNAL_SERVER_ERROR" &&
+      ctx.session?.user.id
+    ) {
+      await auditLog({
+        userId: ctx.session.user.id,
+        organizationId: (input as any)?.organizationId,
+        projectId: (input as any)?.projectId,
+        action: path,
+        args: input,
+        error: result.error,
+        req: ctx.req,
+      });
+    }
+
+    return result;
+  }
+);
+
+const auditLogMutations = t.middleware(
+  async ({ ctx, next, type, path, input }) => {
+    if (
+      type !== "mutation" ||
+      !ctx.session?.user ||
+      path === "user.updateLastLogin"
+    ) {
+      return next();
+    }
+
+    let result = await next();
+
+    await auditLog({
+      userId: ctx.session.user.id,
+      organizationId: (input as any)?.organizationId,
+      projectId: (input as any)?.projectId,
+      action: path,
+      args: input,
+      error: !result.ok ? result.error : undefined,
+      req: ctx.req,
+    });
+
+    return result;
+  }
+);
+
 /**
  * Protected (authenticated) procedure
  *
@@ -151,7 +203,9 @@ const enforcePermissionCheck = t.middleware(({ ctx, next }) => {
  *
  * @see https://trpc.io/docs/procedures
  */
-const authProtectedProcedure = t.procedure.use(enforceUserIsAuthed);
+const authProtectedProcedure = t.procedure
+  .use(enforceUserIsAuthed)
+  .use(auditLogTRPCErrors);
 
 type OverwriteIfDefined<TType, TWith> = UnsetMarker extends TType
   ? TWith
@@ -197,7 +251,8 @@ const permissionProcedureBuilder = <TParams extends ProcedureParams>(
     use: (middleware) => {
       return procedure
         .use(middleware as any)
-        .use(enforcePermissionCheck as any) as any;
+        .use(enforcePermissionCheck as any)
+        .use(auditLogMutations as any) as any;
     },
   };
 };

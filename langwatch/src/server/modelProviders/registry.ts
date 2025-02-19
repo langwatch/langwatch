@@ -91,6 +91,15 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
+  deepseek: {
+    name: "DeepSeek",
+    apiKey: "DEEPSEEK_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      DEEPSEEK_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2023-01-01"),
+  },
   groq: {
     name: "Groq",
     apiKey: "GROQ_API_KEY",

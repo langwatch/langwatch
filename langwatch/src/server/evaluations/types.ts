@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { rAGChunkSchema } from "../tracer/types.generated";
 import type {
   EvaluationResult,
   EvaluationResultError,

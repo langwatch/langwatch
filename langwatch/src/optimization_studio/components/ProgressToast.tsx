@@ -7,12 +7,12 @@ import {
   HStack,
   Progress,
   Spacer,
-  Text,
   VStack,
 } from "@chakra-ui/react";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
+import { EvaluationProgressBar } from "../../components/experiments/BatchEvaluationV2/EvaluationProgressBar";
 
 export function ProgressToast() {
   return (
@@ -42,7 +42,7 @@ export function EvaluationProgressToast() {
   return (
     <BaseProgressToast
       description="Running evaluation"
-      progress={<EvaluationProgressBar />}
+      progress={<EvaluationProgressBar evaluationState={evaluationState} />}
       onClick={() => {
         setOpenResultsPanelRequest("evaluations");
       }}
@@ -74,7 +74,7 @@ export function OptimizationProgressToast() {
   return (
     <BaseProgressToast
       description="Running optimization"
-      progress={<EvaluationProgressBar />}
+      progress={<OptimizationProgressBar />}
       onClick={() => {
         setOpenResultsPanelRequest("optimizations");
       }}
@@ -136,45 +136,6 @@ export function BaseProgressToast({
         {progress}
       </VStack>
     </Alert>
-  );
-}
-
-export function EvaluationProgressBar({
-  size = "xs",
-}: {
-  size?: "xs" | "sm" | "md" | "lg";
-}) {
-  const { evaluationState } = useWorkflowStore(({ state }) => ({
-    evaluationState: state.evaluation,
-  }));
-
-  const progress = evaluationState?.progress ?? 0;
-  const total = evaluationState?.total ?? 100;
-  const isIndeterminate =
-    evaluationState?.status === "waiting" || !evaluationState?.total;
-
-  return (
-    <HStack width="full" spacing={4}>
-      {!isIndeterminate && size !== "xs" && (
-        <Text whiteSpace="nowrap">{Math.round((progress / total) * 100)}%</Text>
-      )}
-      <Progress
-        size={size}
-        width="full"
-        colorScheme="blue"
-        isIndeterminate={isIndeterminate}
-        isAnimated
-        borderRadius="sm"
-        value={progress}
-        max={total ? total : undefined}
-        hasStripe
-      />
-      {!isIndeterminate && size !== "xs" && (
-        <Text whiteSpace="nowrap">
-          {progress} / {total}
-        </Text>
-      )}
-    </HStack>
   );
 }
 

@@ -35,7 +35,7 @@ const debug = getDebugger("langwatch:collector");
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: "5mb",
+      sizeLimit: process.env.COLLECTOR_MAX_BODY_SIZE ?? "5mb",
     },
   },
 };
@@ -292,7 +292,8 @@ export default async function handler(
 
   Sentry.getCurrentScope()?.setPropagationContext({
     traceId,
-    spanId: traceId,
+    sampleRand: 1,
+    propagationSpanId: traceId,
   });
 
   const traceIds = Array.from(
@@ -351,10 +352,10 @@ export default async function handler(
     return res.status(200).json({ message: "No changes" });
   }
 
-  if (existingTrace?.version && existingTrace.version > 30) {
+  if (existingTrace?.version && existingTrace.version > 256) {
     return res.status(400).json({
       message:
-        "Over 30 updates were sent for this trace already, no more updates will be accepted",
+        "Over 256 updates were sent for this trace already, no more updates will be accepted",
     });
   }
 

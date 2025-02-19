@@ -36,6 +36,17 @@ export const metricsMiddleware = promBundle({
   includeStatusCode: true,
   includeUp: true,
   customLabels: { project_name: "langwatch" },
+  bypass: {
+    onRequest: (req) => {
+      if (
+        /^\/(api|_next|\[project\]|auth|settings|share|$)/.test(req.url ?? "")
+      ) {
+        return false;
+      }
+      return true;
+    },
+    onFinish: () => false,
+  },
   normalizePath: (req) => {
     if (req.url?.includes("/_next/static")) {
       return "/_next/static";

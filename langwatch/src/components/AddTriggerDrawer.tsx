@@ -31,25 +31,24 @@ import { HorizontalFormControl } from "./HorizontalFormControl";
 
 import { useFilterParams } from "~/hooks/useFilterParams";
 
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
-import { usePublicEnv } from "../hooks/usePublicEnv";
-import { DatasetSelector } from "./datasets/DatasetSelector";
 import { useLocalStorage } from "usehooks-ts";
-import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "~/server/datasets/types";
-import { useEffect, useMemo, useState } from "react";
+import { api } from "~/utils/api";
+import { usePublicEnv } from "../hooks/usePublicEnv";
+import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
+import type {
+  Mapping,
+  MappingState,
+  TRACE_EXPANSIONS,
+} from "./datasets/DatasetMapping";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
-import {
-  HeaderCheckboxComponent,
-  type DatasetColumnDef,
-} from "./datasets/DatasetGrid";
-import type { CustomCellRendererProps } from "@ag-grid-community/react";
-import type { Mapping } from "./datasets/DatasetMapping";
+import { DatasetSelector } from "./datasets/DatasetSelector";
 
 export function TriggerDrawer() {
   const { project, organization, team } = useOrganizationTeamProject();
@@ -137,13 +136,11 @@ export function TriggerDrawer() {
     DatasetRecordEntry[]
   >([]);
 
-  const [datasetMapping] = useLocalStorage<{
-    mapping: Mapping;
-    expansions: string[];
-  }>("datasetMapping", {
-    mapping: {},
-    expansions: [],
-  });
+  const [datasetTriggerMapping, setDatasetTriggerMapping] =
+    useState<MappingState>({
+      mapping: {},
+      expansions: new Set(),
+    });
 
   type Trigger = {
     name: string;
@@ -157,10 +154,12 @@ export function TriggerDrawer() {
     members?: string[];
     slackWebhook?: string;
     datasetId?: string;
-    datasetMapping?: {
-      mapping: Mapping;
-      expansions: string[];
-    };
+    datasetMapping?:
+      | {
+          mapping: Mapping;
+          expansions: Set<keyof typeof TRACE_EXPANSIONS> | undefined;
+        }
+      | undefined;
   };
 
   const onSubmit = (data: Trigger) => {
@@ -168,7 +167,7 @@ export function TriggerDrawer() {
       members: [],
       slackWebhook: "",
       datasetId: datasetId,
-      datasetMapping: datasetMapping,
+      datasetMapping: datasetTriggerMapping,
     };
     if (data.action === TriggerAction.SEND_EMAIL) {
       actionParams = {
@@ -181,7 +180,7 @@ export function TriggerDrawer() {
     } else if (data.action === TriggerAction.ADD_TO_DATASET) {
       actionParams = {
         datasetId: datasetId,
-        datasetMapping: datasetMapping,
+        datasetMapping: datasetTriggerMapping,
       };
     }
 
@@ -191,7 +190,17 @@ export function TriggerDrawer() {
         name: data.name,
         action: data.action,
         filters: filterParams.filters,
-        actionParams: actionParams,
+        actionParams: {
+          ...actionParams,
+          datasetMapping: actionParams.datasetMapping
+            ? {
+                mapping: actionParams.datasetMapping.mapping,
+                expansions: Array.from(
+                  actionParams.datasetMapping.expansions || []
+                ),
+              }
+            : undefined,
+        },
       },
       {
         onSuccess: () => {
@@ -414,6 +423,7 @@ export function TriggerDrawer() {
                     onEditColumns={editDataset.onOpen}
                     onRowDataChange={setRowDataFromDataset}
                     paragraph="This is a sample of the data will look when added to the dataset."
+                    setDatasetTriggerMapping={setDatasetTriggerMapping}
                   />
                 )}
               </>

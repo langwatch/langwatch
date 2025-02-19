@@ -106,5 +106,11 @@
   },
   "bedrock/amazon.titan-embed-text-v2:0": {
     "mode": "embedding"
+  },
+  "deepseek/deepseek-reasoner": {
+    "mode": "chat"
+  },
+  "deepseek/deepseek-chat": {
+    "mode": "chat"
   }
 }

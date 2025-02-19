@@ -62,10 +62,10 @@ def parse_component(node: Node, workflow: Workflow) -> dspy.Module:
 
 
 def apiCall(inputs, api_key, endpoint, workflow_id, version_id):
-
-    url = endpoint + "/api/optimization/" + workflow_id
     if version_id:
-        url += "/" + version_id
+        url = endpoint + "/api/workflows/" + workflow_id + "/" + version_id + "/run"
+    else:
+        url = endpoint + "/api/workflows/" + workflow_id + "/run"
 
     response = httpx.post(
         url,
@@ -102,18 +102,28 @@ def parse_signature(
     class_dict = {}
     annotations = {}
 
+    field_type_to_dspy_type = {
+        FieldType.image: dspy.Image,
+        FieldType.str: str,
+        FieldType.int: int,
+        FieldType.float: float,
+        FieldType.bool: bool,
+    }
+
     # Add input fields
     if component.inputs:
         for input_field in component.inputs:
-            annotations[input_field.identifier] = (
-                dspy.Image if input_field.type == FieldType.image else str
-            )
+            annotations[input_field.identifier] = field_type_to_dspy_type[
+                input_field.type
+            ]
             class_dict[input_field.identifier] = dspy.InputField()
 
     # Add output fields
     if component.outputs:
         for output_field in component.outputs:
-            annotations[output_field.identifier] = str
+            annotations[output_field.identifier] = field_type_to_dspy_type[
+                output_field.type
+            ]
             class_dict[output_field.identifier] = dspy.OutputField()
 
     class_dict["__annotations__"] = annotations

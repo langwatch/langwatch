@@ -1,14 +1,24 @@
 import type { PropsWithChildren } from "react";
 import { Link } from "@chakra-ui/next-js";
 import { usePathname } from "next/navigation";
+import { HStack, Icon, Spacer, Text } from "@chakra-ui/react";
 
 export const MenuLink = ({
   paddingX = 4,
   href,
   children,
-}: PropsWithChildren<{ paddingX?: number; href: string }>) => {
+  icon,
+  menuEnd,
+  isSelectedAnnotation,
+}: PropsWithChildren<{
+  paddingX?: number;
+  href: string;
+  icon?: React.ReactNode;
+  menuEnd?: React.ReactNode;
+  isSelectedAnnotation?: boolean;
+}>) => {
   const pathname = usePathname();
-  const selected = pathname === href;
+  const selected = isSelectedAnnotation ?? pathname === href;
 
   return (
     <Link
@@ -17,6 +27,7 @@ export const MenuLink = ({
       paddingY={2}
       width="full"
       position="relative"
+      background={isSelectedAnnotation ? "gray.50" : "transparent"}
       _hover={{ background: "gray.50" }}
       _before={{
         content: '""',
@@ -25,10 +36,16 @@ export const MenuLink = ({
         top: 0,
         bottom: 0,
         width: "4px",
-        background: selected ? "orange.400" : "transparent",
+        background:
+          selected && !isSelectedAnnotation ? "orange.400" : "transparent",
       }}
     >
-      {children}
+      <HStack width="full">
+        {icon && icon}
+        <Text>{children}</Text>
+        <Spacer />
+        {menuEnd && menuEnd}
+      </HStack>
     </Link>
   );
 };

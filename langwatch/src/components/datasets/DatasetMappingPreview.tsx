@@ -14,17 +14,16 @@ import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
-import { TracesMapping } from "./DatasetMapping";
 import {
   DatasetGrid,
   HeaderCheckboxComponent,
   type DatasetColumnDef,
 } from "./DatasetGrid";
 
-import { api } from "~/utils/api";
-import { useMemo } from "react";
 import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import type { Dataset } from "@prisma/client";
+import { useMemo } from "react";
+import { TracesMapping, type MappingState } from "./DatasetMapping";
 
 interface DatasetMappingPreviewProps {
   traces: any[]; // Replace 'any' with your trace type
@@ -34,6 +33,7 @@ interface DatasetMappingPreviewProps {
   onEditColumns: () => void;
   onRowDataChange: (entries: DatasetRecordEntry[]) => void;
   paragraph?: string;
+  setDatasetTriggerMapping?: (mapping: MappingState) => void;
 }
 
 export function DatasetMappingPreview({
@@ -44,6 +44,7 @@ export function DatasetMappingPreview({
   onRowDataChange,
   paragraph,
   selectedDataset,
+  setDatasetTriggerMapping,
 }: DatasetMappingPreviewProps) {
   const columnDefs = useMemo(() => {
     if (!selectedDataset) {
@@ -99,9 +100,11 @@ export function DatasetMappingPreview({
           </FormHelperText>
 
           <TracesMapping
+            dataset={selectedDataset}
             traces={traces}
             columnTypes={columnTypes}
             setDatasetEntries={onRowDataChange}
+            setDatasetTriggerMapping={setDatasetTriggerMapping}
           />
         </VStack>
         <VStack align="start" width="full" height="full">

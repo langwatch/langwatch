@@ -48,23 +48,26 @@ model Session {
 }
 
 model User {
-    id              String             @id @default(nanoid())
-    name            String?
-    email           String?            @unique
-    emailVerified   DateTime?
-    password        String? // for email/password auth without auth0
-    image           String?            @db.Text
-    accounts        Account[]
-    sessions        Session[]
-    teamMemberships TeamUser[]
-    orgMemberships  OrganizationUser[]
-    createdAt       DateTime           @default(now())
-    updatedAt       DateTime           @default(now()) @updatedAt
-    lastLoginAt     DateTime?
-    Annotation      Annotation[]
-    publicShares    PublicShare[]
-    Workflow        Workflow[]
-    WorkflowVersion WorkflowVersion[]
+    id                 String                   @id @default(nanoid())
+    name               String?
+    email              String?                  @unique
+    emailVerified      DateTime?
+    password           String? // for email/password auth without auth0
+    image              String?                  @db.Text
+    accounts           Account[]
+    sessions           Session[]
+    teamMemberships    TeamUser[]
+    orgMemberships     OrganizationUser[]
+    createdAt          DateTime                 @default(now())
+    updatedAt          DateTime                 @default(now()) @updatedAt
+    lastLoginAt        DateTime?
+    Annotation         Annotation[]
+    publicShares       PublicShare[]
+    Workflow           Workflow[]
+    WorkflowVersion    WorkflowVersion[]
+    annotationQueues   AnnotationQueueMembers[]
+    assignedQueueItems AnnotationQueueItem[]    @relation("AssignedTo")
+    createdQueueItems  AnnotationQueueItem[]    @relation("CreatedBy")
 }
 
 model VerificationToken {
@@ -157,18 +160,18 @@ enum PIIRedactionLevel {
 }
 
 model Project {
-    id                   String            @id @default(nanoid())
+    id                   String                @id @default(nanoid())
     name                 String
-    slug                 String            @unique
-    apiKey               String            @unique
+    slug                 String                @unique
+    apiKey               String                @unique
     teamId               String
-    team                 Team              @relation(fields: [teamId], references: [id])
+    team                 Team                  @relation(fields: [teamId], references: [id])
     language             String
     framework            String
-    firstMessage         Boolean           @default(false)
-    integrated           Boolean           @default(false)
-    createdAt            DateTime          @default(now())
-    updatedAt            DateTime          @default(now()) @updatedAt
+    firstMessage         Boolean               @default(false)
+    integrated           Boolean               @default(false)
+    createdAt            DateTime              @default(now())
+    updatedAt            DateTime              @default(now()) @updatedAt
     userLinkTemplate     String?
     checks               Check[]
     costs                Cost[]
@@ -177,7 +180,7 @@ model Project {
     datasetRecords       DatasetRecord[]
     customGraphs         CustomGraph[]
     batchEvaluations     BatchEvaluation[]
-    piiRedactionLevel    PIIRedactionLevel @default(ESSENTIAL)
+    piiRedactionLevel    PIIRedactionLevel     @default(ESSENTIAL)
     triggers             Trigger[]
     experiments          Experiment[]
     annotations          Annotation[]
@@ -189,6 +192,8 @@ model Project {
     publicShares         PublicShare[]
     workflows            Workflow[]
     WorkflowVersion      WorkflowVersion[]
+    AnnotationQueue      AnnotationQueue[]
+    AnnotationQueueItem  AnnotationQueueItem[]
     s3Endpoint           String?
     s3AccessKeyId        String?
     s3SecretAccessKey    String?
@@ -309,6 +314,7 @@ model Dataset {
     archivedAt       DateTime?
     datasetRecords   DatasetRecord[]
     batchEvaluations BatchEvaluation[]
+    mapping          Json?
     useS3            Boolean           @default(false)
     s3RecordCount    Int?
 
@@ -479,19 +485,24 @@ enum AnnotationScoreDataType {
     CATEGORICAL
     BOOLEAN
     LIKERT
+    OPTION
+    CHECKBOX
 }
 
 model AnnotationScore {
-    id          String                  @id @default(nanoid())
-    name        String
-    projectId   String
-    project     Project                 @relation(fields: [projectId], references: [id])
-    createdAt   DateTime                @default(now())
-    updatedAt   DateTime                @default(now()) @updatedAt
-    description String?
-    active      Boolean                 @default(true)
-    dataType    AnnotationScoreDataType
-    options     Json?
+    id                    String                   @id @default(nanoid())
+    name                  String
+    projectId             String
+    project               Project                  @relation(fields: [projectId], references: [id])
+    createdAt             DateTime                 @default(now())
+    updatedAt             DateTime                 @default(now()) @updatedAt
+    description           String?
+    active                Boolean                  @default(true)
+    dataType              AnnotationScoreDataType?
+    options               Json?
+    defaultValue          Json?
+    global                Boolean                  @default(false)
+    AnnotationQueueScores AnnotationQueueScores[]
 
     @@index([projectId])
 }
@@ -499,6 +510,66 @@ model AnnotationScore {
 enum PublicShareResourceTypes {
     TRACE
     THREAD
+}
+
+model AnnotationQueue {
+    id                    String                   @id @default(nanoid())
+    name                  String
+    slug                  String
+    projectId             String
+    description           String?
+    project               Project                  @relation(fields: [projectId], references: [id])
+    members               AnnotationQueueMembers[]
+    createdAt             DateTime                 @default(now())
+    updatedAt             DateTime                 @default(now()) @updatedAt
+    AnnotationQueueScores AnnotationQueueScores[]
+    AnnotationQueueItems  AnnotationQueueItem[]
+
+    @@unique([projectId, slug])
+}
+
+model AnnotationQueueMembers {
+    annotationQueueId String
+    userId            String
+    user              User            @relation(fields: [userId], references: [id])
+    annotationQueue   AnnotationQueue @relation(fields: [annotationQueueId], references: [id])
+
+    @@id([annotationQueueId, userId])
+    @@index([annotationQueueId])
+    @@index([userId])
+}
+
+model AnnotationQueueScores {
+    annotationQueueId String
+    annotationScoreId String
+    annotationScore   AnnotationScore @relation(fields: [annotationScoreId], references: [id])
+    annotationQueue   AnnotationQueue @relation(fields: [annotationQueueId], references: [id])
+
+    @@id([annotationQueueId, annotationScoreId])
+    @@index([annotationQueueId])
+    @@index([annotationScoreId])
+}
+
+model AnnotationQueueItem {
+    id                String           @id @default(nanoid())
+    annotationQueueId String?
+    annotationQueue   AnnotationQueue? @relation(fields: [annotationQueueId], references: [id])
+    userId            String?
+    user              User?            @relation("AssignedTo", fields: [userId], references: [id])
+    createdAt         DateTime         @default(now())
+    updatedAt         DateTime         @default(now()) @updatedAt
+    createdByUserId   String?
+    createdByUser     User?            @relation("CreatedBy", fields: [createdByUserId], references: [id])
+    traceId           String
+    projectId         String
+    doneAt            DateTime?
+    project           Project          @relation(fields: [projectId], references: [id])
+
+    @@unique([traceId, userId, projectId])
+    @@unique([traceId, annotationQueueId, projectId])
+    @@index([annotationQueueId])
+    @@index([userId])
+    @@index([projectId])
 }
 
 model PublicShare {
@@ -598,4 +669,25 @@ model OrganizationFeature {
     @@unique([feature, organizationId])
     @@index([feature])
     @@index([organizationId])
+}
+
+model AuditLog {
+    id             String   @id @default(cuid())
+    createdAt      DateTime @default(now())
+    userId         String
+    projectId      String?
+    organizationId String?
+    action         String
+    args           Json?
+    error          String?
+    ipAddress      String?
+    userAgent      String?
+    metadata       Json?
+
+    @@index([createdAt])
+    @@index([userId])
+    @@index([projectId])
+    @@index([organizationId])
+    @@index([action])
+    @@index([ipAddress])
 }

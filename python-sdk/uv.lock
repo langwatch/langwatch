@@ -2054,7 +2054,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.1.37"
+version = "0.1.39"
 source = { editable = "." }
 dependencies = [
     { name = "coolname" },
@@ -2063,7 +2063,6 @@ dependencies = [
     { name = "nanoid" },
     { name = "pandas" },
     { name = "pydantic" },
-    { name = "requests" },
     { name = "retry" },
     { name = "tqdm" },
 ]
@@ -2156,7 +2155,6 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'test'", specifier = ">=0.21.1,<0.22.0" },
     { name = "pytest-httpx", marker = "extra == 'test'", specifier = ">=0.30.0,<0.31.0" },
     { name = "python-dotenv", marker = "extra == 'dev'", specifier = "==1.0.1" },
-    { name = "requests", specifier = ">=2.31.0,<3.0.0" },
     { name = "requests-mock", marker = "extra == 'test'", specifier = ">=1.11.0,<2.0.0" },
     { name = "retry", specifier = ">=0.9.2,<0.10.0" },
     { name = "streamlit", marker = "extra == 'dev'", specifier = ">=1.37.1,<2.0.0" },

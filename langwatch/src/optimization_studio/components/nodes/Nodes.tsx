@@ -13,8 +13,6 @@ import {
   Text,
   Tooltip,
   VStack,
-  Alert,
-  AlertIcon,
   type ButtonProps,
 } from "@chakra-ui/react";
 
@@ -22,12 +20,10 @@ import {
   Handle,
   NodeToolbar,
   Position,
-  useReactFlow,
-  useUpdateNodeInternals,
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import React, { useEffect, useMemo, type Ref } from "react";
+import React, { useMemo, type Ref } from "react";
 import { useDragLayer } from "react-dnd";
 import {
   Check,
@@ -44,27 +40,27 @@ import { useShallow } from "zustand/react/shallow";
 import { useComponentExecution } from "../../hooks/useComponentExecution";
 import { useWorkflowExecution } from "../../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import { useComponentVersion } from "../../hooks/useComponentVersion";
 import {
   type Component,
   type ComponentType,
   type Field,
-  type Custom,
   type LLMConfig,
 } from "../../types/dsl";
+import { checkIsEvaluator } from "../../utils/nodeUtils";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import { LLMModelDisplay } from "../properties/modals/LLMConfigModal";
-import { checkIsEvaluator } from "../../utils/nodeUtils";
 
 export function getNodeDisplayName(node: { id: string; data: Component }) {
   return node.data.name ?? node.data.cls ?? node.id;
 }
 
 function NodeInputs({
+  node,
   namespace,
   inputs,
   selected,
 }: {
+  node?: Node<Component>;
   namespace: string;
   inputs: Field[];
   selected: boolean;
@@ -100,7 +96,12 @@ function NodeInputs({
           <Text color="gray.400">:</Text>
           <TypeLabel type={input.type} />
           <Spacer />
-          {input.optional && <Text color="gray.400">(optional)</Text>}
+          {input.optional &&
+            (!node || node.type !== "end" ||
+              (input.identifier !== "score" &&
+                input.identifier !== "passed")) && (
+              <Text color="gray.400">(optional)</Text>
+            )}
         </HStack>
       ))}
     </>
@@ -243,13 +244,13 @@ export const ComponentNode = forwardRef(function ComponentNode(
     isDragging: monitor.isDragging(),
   })) as {
     isDragging: boolean;
-    item: { node: Node } | undefined;
+    item: { node?: Node } | undefined;
   };
 
   const isNotDroppable = useMemo(
     () =>
       isDragging &&
-      item?.node.type === "prompting_technique" &&
+      item?.node?.type === "prompting_technique" &&
       props.type !== "signature",
     [isDragging, item, props.type]
   );
@@ -366,6 +367,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
         <>
           <NodeSectionTitle>{props.inputsTitle ?? "Inputs"}</NodeSectionTitle>
           <NodeInputs
+            node={node}
             namespace="inputs"
             inputs={props.data.inputs}
             selected={!!props.selected || isHovered}

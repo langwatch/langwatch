@@ -25,10 +25,10 @@ export const sendTriggerEmail = async ({
   triggerData: TriggerData[];
   triggerName: string;
   projectSlug: string;
-  triggerType: AlertType;
+  triggerType: AlertType | null;
   triggerMessage: string;
 }) => {
-  const emailHtml = render(
+  const emailHtml = await render(
     <Html lang="en" dir="ltr">
       <Container
         style={{
@@ -59,7 +59,9 @@ export const sendTriggerEmail = async ({
 
   await sendEmail({
     to: triggerEmails,
-    subject: `${triggerType ? `(${triggerType}) ` : ""}Trigger - ${triggerName}`,
+    subject: `${
+      triggerType ? `(${triggerType}) ` : ""
+    }Trigger - ${triggerName}`,
     html: emailHtml,
   });
 };

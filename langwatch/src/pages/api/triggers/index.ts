@@ -1,22 +1,17 @@
-import {
-  TriggerAction,
-  type AlertType,
-  type Project,
-  type Trigger,
-} from "@prisma/client";
+import { TriggerAction, type Project, type Trigger } from "@prisma/client";
+import * as Sentry from "@sentry/nextjs";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { getAllTracesForProject } from "~/server/api/routers/traces";
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
 import { prisma } from "../../../server/db";
-import * as Sentry from "@sentry/nextjs";
 
 import { type Trace } from "~/server/tracer/types";
 
 import {
   mapTraceToDatasetEntry,
-  type TRACE_EXPANSIONS,
   type Mapping,
+  type TRACE_EXPANSIONS,
 } from "~/components/datasets/DatasetMapping";
 
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord";
@@ -112,18 +107,21 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
   const traces = await getAllTracesForProject({ input });
 
   const getTracesToSend = async (traces: TraceGroups, triggerId: string) => {
-    const tracesToSend = [];
+    const traceIds = traces.groups.flatMap((group) =>
+      group.map((trace) => trace.trace_id)
+    );
 
-    for (const group of traces.groups) {
-      const results = await Promise.all(
-        group.map((trace) =>
-          hasTriggerSent(triggerId, trace.trace_id, input.projectId)
-        )
-      );
-      if (results.some((sent) => !sent)) {
-        tracesToSend.push(group);
-      }
-    }
+    const triggersSent = await triggerSentForMany(
+      triggerId,
+      traceIds,
+      input.projectId
+    );
+
+    const tracesToSend = traces.groups.filter((group) => {
+      return group.every((trace) => {
+        return !triggersSent.some((sent) => sent.traceId === trace.trace_id);
+      });
+    });
 
     return tracesToSend;
   };
@@ -154,21 +152,12 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           triggerData,
           triggerName: name,
           projectSlug: project!.slug,
-          triggerType: trigger.alertType as AlertType,
-          triggerMessage: trigger.message as string,
+          triggerType: trigger.alertType ?? null,
+          triggerMessage: trigger.message ?? "",
         };
 
-        updatedAt = getLatestUpdatedAt(traces);
-
         await sendTriggerEmail(triggerInfo);
-        await addTriggersSent(triggerId, triggerData);
-        if (project) {
-          void updateAlert(triggerId, updatedAt, project.id);
-        } else {
-          throw new Error("Project not found for triggerId: " + triggerId);
-        }
       } catch (error) {
-        console.error("Error in SEND_EMAIL trigger:", error);
         Sentry.captureException(error, {
           extra: {
             triggerId,
@@ -185,21 +174,12 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           triggerData,
           triggerName: name,
           projectSlug: project!.slug,
-          triggerType: trigger.alertType as AlertType,
-          triggerMessage: trigger.message as string,
+          triggerType: trigger.alertType ?? null,
+          triggerMessage: trigger.message ?? "",
         };
 
-        updatedAt = getLatestUpdatedAt(traces);
-
         await sendSlackWebhook(triggerInfo);
-        await addTriggersSent(triggerId, triggerData);
-        if (project) {
-          void updateAlert(triggerId, updatedAt, project.id);
-        } else {
-          throw new Error("Project not found for triggerId: " + triggerId);
-        }
       } catch (error) {
-        console.error("Error in SEND_SLACK_MESSAGE trigger:", error);
         Sentry.captureException(error, {
           extra: {
             triggerId,
@@ -253,7 +233,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           }
         }
 
-        const createManyDatasetRecordsResult = await createManyDatasetRecords({
+        await createManyDatasetRecords({
           datasetId: datasetId,
           projectId: input.projectId,
           datasetRecords: entries,
@@ -264,10 +244,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           triggerName: name,
           projectSlug: project!.slug,
         };
-
-        await addTriggersSent(triggerId, triggerData);
       } catch (error) {
-        console.error("Error in ADD_TO_DATASET trigger:", error);
         Sentry.captureException(error, {
           extra: {
             triggerId,
@@ -275,22 +252,18 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
             action: TriggerAction.ADD_TO_DATASET,
           },
         });
-        return {
-          triggerId,
-          status: "error",
-          error: `Failed to add to dataset: ${error}`,
-          traces: tracesToSend,
-        };
       }
     }
+
+    await addTriggersSent(triggerId, triggerData);
+    updatedAt = getLatestUpdatedAt(traces);
+    void updateAlert(triggerId, updatedAt, project?.id ?? "");
 
     return {
       triggerId,
       updatedAt: updatedAt,
       status: "triggered",
       totalFound: tracesToSend.length,
-      triggerInfo,
-      traces: tracesToSend,
     };
   }
 
@@ -327,15 +300,19 @@ const addTriggersSent = async (
   });
 };
 
-const hasTriggerSent = async (
+const triggerSentForMany = async (
   triggerId: string,
-  traceId: string,
+  traceIds: string[],
   projectId: string
 ) => {
-  const triggerSent = await prisma.triggerSent.findUnique({
-    where: { triggerId_traceId: { triggerId, traceId }, projectId },
+  const triggerSent = await prisma.triggerSent.findMany({
+    where: {
+      triggerId,
+      traceId: { in: traceIds },
+      projectId,
+    },
   });
-  return triggerSent !== null;
+  return triggerSent;
 };
 
 interface TraceGroups {

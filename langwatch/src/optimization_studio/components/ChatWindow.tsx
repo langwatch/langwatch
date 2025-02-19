@@ -6,11 +6,6 @@ import {
   Input,
   InputGroup,
   InputRightElement,
-  Stack,
-  Text,
-  Tooltip,
-  useDisclosure,
-  VStack,
   Modal,
   ModalBody,
   ModalCloseButton,
@@ -18,7 +13,12 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
+  Stack,
+  Text,
+  Tooltip,
+  VStack,
 } from "@chakra-ui/react";
+import { type Edge, type Node } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
 import { Play, Send } from "react-feather";
 import { useForm } from "react-hook-form";
@@ -28,10 +28,10 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { RunningStatus } from "./ExecutionState";
-import { type Edge, type Node } from "@xyflow/react";
 
 import { useSocketClient } from "../hooks/useSocketClient";
-import { checkIsEvaluator, getEntryInputs } from "../utils/nodeUtils";
+import { getEntryInputs } from "../utils/nodeUtils";
+
 interface ChatWindowProps {
   isOpen: boolean;
   onClose: () => void;
@@ -163,8 +163,6 @@ export const ChatBox = ({
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
-  const entryEdges = edges.filter((edge) => edge.source === "entry");
-
   const entryInputs = getEntryInputs(edges, nodes);
 
   useEffect(() => {
@@ -185,6 +183,7 @@ export const ChatBox = ({
         ]);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [executionStatus]);
 
   useEffect(() => {
@@ -193,7 +192,7 @@ export const ChatBox = ({
     }
   }, [isOpen]);
 
-  const { inputs, handleInputChange } = useMultipleInputs(entryEdges);
+  const { inputs, handleInputChange } = useMultipleInputs(entryInputs);
 
   const sendMultiMessage = () => {
     const message = entryInputs
@@ -283,7 +282,7 @@ export const ChatBox = ({
                     maxWidth="70%"
                     mb={2}
                   >
-                    <Text
+                    <Box
                       bg="gray.200"
                       p={2}
                       borderRadius="lg"
@@ -295,7 +294,7 @@ export const ChatBox = ({
                       ) : (
                         output
                       )}
-                    </Text>
+                    </Box>
                   </Box>
                 ) : null
               )}

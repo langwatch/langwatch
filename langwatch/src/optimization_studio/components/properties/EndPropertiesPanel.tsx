@@ -1,70 +1,39 @@
-import { useUpdateNodeInternals, type Node } from "@xyflow/react";
-import type { End } from "../../types/dsl";
-import { BasePropertiesPanel } from "./BasePropertiesPanel";
-import { Text, Switch, HStack, Alert, AlertIcon } from "@chakra-ui/react";
+import { Alert, AlertIcon, Text } from "@chakra-ui/react";
+import { type Node } from "@xyflow/react";
 import { useState } from "react";
 import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
+import type { End, Field } from "../../types/dsl";
+import { BasePropertiesPanel } from "./BasePropertiesPanel";
 
-export const evaluatorInputs = [
+export const evaluatorInputs: Field[] = [
   {
     type: "float",
     identifier: "score",
+    optional: true,
   },
   {
     type: "bool",
     identifier: "passed",
+    optional: true,
   },
   {
     type: "str",
     identifier: "details",
+    optional: true,
   },
 ];
 
 export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
-  const { node, setNode } = useWorkflowStore(
+  const { node } = useWorkflowStore(
     (state) => ({
       node: state.nodes.find((n) => n.id === initialNode.id) as Node<End>,
-      setNode: state.setNode,
     }),
 
     // Add equality function to ensure proper updates
     (prev, next) => prev.node === next.node
   );
 
-  const updateNodeInternals = useUpdateNodeInternals();
-
-  const [isEvaluator, setIsEvaluator] = useState(
-    () => node.data.behave_as === "evaluator"
-  );
-
-  const setAsEvaluator = () => {
-    if (!isEvaluator) {
-      setNode({
-        id: node.id,
-        data: {
-          ...node.data,
-          inputs: evaluatorInputs,
-          behave_as: "evaluator",
-          fields: [],
-        } as End,
-      });
-      updateNodeInternals(node.id);
-      setIsEvaluator(true);
-    } else {
-      setNode({
-        id: node.id,
-        data: {
-          ...node.data,
-          inputs: [{ type: "str", identifier: "output" }],
-          fields: [],
-          behave_as: undefined,
-        } as End,
-      });
-
-      updateNodeInternals(node.id);
-      setIsEvaluator(false);
-    }
-  };
+  const [isEvaluator] = useState(() => node.data.behave_as === "evaluator");
 
   return (
     <BasePropertiesPanel
@@ -73,16 +42,20 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
       hideParameters
       inputsTitle="Results"
     >
-      <HStack>
-        <Text>Use as Evaluator</Text>
-        <Switch isChecked={isEvaluator} onChange={() => setAsEvaluator()} />
-      </HStack>
-      {isEvaluator && (
-        <Alert status="warning">
-          <AlertIcon />
-          <Text>Score or Passed must be provided</Text>
-        </Alert>
-      )}
+      {isEvaluator &&
+        !node.data.inputs?.some(
+          (input) =>
+            (input.identifier === "score" && input.type === "float") ||
+            (input.identifier === "passed" && input.type === "bool")
+        ) && (
+          <Alert status="warning">
+            <AlertIcon />
+            <Text>
+              Results must include either a <b>score</b> or a <b>passed</b>{" "}
+              field.
+            </Text>
+          </Alert>
+        )}
     </BasePropertiesPanel>
   );
 }

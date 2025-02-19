@@ -223,7 +223,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
             >
               <Divider marginBottom={2} />
               <HStack width="full" spacing={3}>
-                <VersionBox version={version} />
+                <VersionBox version={version} minWidth="48px" />
                 <VStack align="start" width="full" spacing={1}>
                   <HStack>
                     <Text fontWeight={600} fontSize={13} noOfLines={1}>
@@ -283,14 +283,15 @@ export const VersionBox = ({
   return (
     <Box
       backgroundColor={version?.autoSaved ? "orange.50" : "orange.100"}
-      padding={3}
-      borderRadius={6}
+      paddingY={3}
+      paddingX={2}
+      borderRadius={4}
       fontWeight={600}
       fontSize={13}
       color="gray.600"
       whiteSpace="nowrap"
       textAlign="center"
-      minWidth="48px"
+      minWidth="0px"
       height="44px"
       {...props}
     >

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { type Dataset, type DatasetRecord } from "@prisma/client";
 import {
   PrismaClient,
   type Dataset,
@@ -99,6 +100,16 @@ export const datasetRecordRouter = createTRPCRouter({
       return getFullDataset({
         datasetId: input.datasetId,
         projectId: input.projectId,
+      });
+    }),
+  download: protectedProcedure
+    .input(z.object({ projectId: z.string(), datasetId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
+    .mutation(async ({ input }) => {
+      return getFullDataset({
+        datasetId: input.datasetId,
+        projectId: input.projectId,
+        limitMb: null,
       });
     }),
   getHead: protectedProcedure
@@ -480,149 +491,86 @@ export const getFullDataset = async ({
   datasetId,
   projectId,
   entrySelection = "all",
+  limitMb = 5,
 }: {
   datasetId: string;
   projectId: string;
   entrySelection?: "first" | "last" | "random" | "all";
-}) => {
+  limitMb?: number | null;
+}): Promise<
+  | (Dataset & {
+      datasetRecords: DatasetRecord[];
+      truncated?: boolean;
+      count: number;
+    })
+  | null
+> => {
   const dataset = await prisma.dataset.findFirst({
     where: { id: datasetId, projectId },
   });
 
   if (!dataset) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Dataset not found",
-    });
+    return null;
   }
 
-  if (dataset.useS3) {
-    const s3Client = await createS3Client(projectId);
+  const count = await prisma.datasetRecord.count({
+    where: { datasetId, projectId },
+  });
 
-    let records: any[] = [];
-
-    try {
-      const { Body } = await s3Client.send(
-        new GetObjectCommand({
-          Bucket: "langwatch",
-          Key: `datasets/${projectId}/${datasetId}`,
-        })
-      );
-
-      const content = await Body?.transformToString();
-      records = JSON.parse(content ?? "[]");
-      if (entrySelection !== "all") {
-        const count = records.length;
-        records = records.filter((_, index) => {
-          switch (entrySelection) {
-            case "first":
-              return index === 0;
-            case "last":
-              return index === count - 1;
-            case "random":
-              return index === Math.floor(Math.random() * count);
-            default:
-              return true;
-          }
-        });
-      }
-    } catch (error) {
-      if ((error as any).name === "NoSuchKey") {
-        records = [];
-      } else {
-        throw error;
-      }
-    }
-
+  if (entrySelection === "random" || entrySelection === "last") {
     return {
       ...dataset,
-      datasetRecords: records.map((record: any) => ({
-        id: record.id,
-        entry: record.entry,
-        datasetId: record.datasetId,
-        projectId: record.projectId,
-        createdAt: record.insertedAt,
-        updatedAt: record.insertedAt,
-      })),
-    };
-  } else {
-    let count = 0;
-    if (entrySelection === "random" || entrySelection === "last") {
-      count = await prisma.datasetRecord.count({
+      count,
+      datasetRecords: await prisma.datasetRecord.findMany({
         where: { datasetId, projectId },
-      });
-    }
+        orderBy: { createdAt: "asc" },
+        take: 1,
+        skip:
+          entrySelection === "last"
+            ? Math.max(count - 1, 0)
+            : entrySelection === "random"
+            ? Math.floor(Math.random() * count)
+            : 0,
+      }),
+    };
+  }
 
-    const dataset = await prisma.dataset.findFirst({
-      where: { id: datasetId, projectId },
-      include: {
-        datasetRecords: {
-          orderBy: { createdAt: "asc" },
-          take: entrySelection === "all" ? undefined : 1,
-          skip:
-            entrySelection === "last"
-              ? Math.max(count - 1, 0)
-              : entrySelection === "random"
-              ? Math.floor(Math.random() * count)
-              : 0,
-        },
-      },
+  let truncatedDatasetRecords: DatasetRecord[] = [];
+  let truncated = false;
+  let totalSize = 0;
+  let currentPage = 0;
+  const BATCH_SIZE = 500;
+
+  // Fetch records in batches
+  while (!truncated) {
+    const records = await prisma.datasetRecord.findMany({
+      where: { datasetId, projectId },
+      orderBy: { createdAt: "asc" },
+      take: BATCH_SIZE,
+      skip: currentPage * BATCH_SIZE,
     });
 
-    return dataset;
-  }
-};
+    if (records.length === 0) break;
 
-export const createS3Client = async (projectId: string) => {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-  });
+    for (const record of records) {
+      const recordSize = JSON.stringify(record.entry).length;
+      if (!limitMb || totalSize + recordSize < limitMb * 1024 * 1024) {
+        truncatedDatasetRecords.push(record);
+        totalSize += recordSize;
+      } else {
+        truncated = true;
+        break;
+      }
+    }
 
-  if (!project) {
-    throw new Error("Project not found");
-  }
-
-  const organization = await prisma.organization.findFirst({
-    where: {
-      teams: {
-        some: {
-          projects: {
-            some: { id: projectId },
-          },
-        },
-      },
-    },
-  });
-
-  if (!organization) {
-    throw new Error("Organization not found");
+    if (truncated || records.length < BATCH_SIZE) break;
+    currentPage++;
   }
 
-  const s3Config = {
-    endpoint:
-      project.s3Endpoint ?? organization?.s3Endpoint ?? env.S3_ENDPOINT!,
-    accessKeyId:
-      project.s3AccessKeyId ??
-      organization?.s3AccessKeyId ??
-      env.S3_ACCESS_KEY_ID!,
-    secretAccessKey:
-      project.s3SecretAccessKey ??
-      organization?.s3SecretAccessKey ??
-      env.S3_SECRET_ACCESS_KEY!,
+  return {
+    ...dataset,
+    datasetRecords: truncatedDatasetRecords,
+    truncated,
+    count,
   };
-
-  const s3Client = new S3Client({
-    endpoint: s3Config.endpoint,
-    credentials: {
-      accessKeyId: s3Config.accessKeyId,
-      secretAccessKey: s3Config.secretAccessKey,
-    },
-    forcePathStyle: true,
-  });
-
-  if (!s3Client) {
-    throw new Error("Failed to create S3 client");
-  }
-
-  return s3Client;
 };

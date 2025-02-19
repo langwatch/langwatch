@@ -165,11 +165,19 @@ export function MessageCard({
                 if (!linkActive) e.preventDefault();
               }}
             >
-              <Text noOfLines={1} wordBreak="break-all">
-                <Markdown remarkPlugins={[remarkGfm]} className="markdown markdown-without-margin">
-                  {getExtractedInput(trace)}
-                </Markdown>
-              </Text>
+              {isJson(trace.input?.value ?? "") ||
+              isPythonRepr(trace.input?.value ?? "") ? (
+                <MessageCardJsonOutput value={trace.input?.value ?? ""} />
+              ) : (
+                <Text noOfLines={1} wordBreak="break-all" lineHeight="2.1em">
+                  <Markdown
+                    remarkPlugins={[remarkGfm]}
+                    className="markdown markdown-without-margin"
+                  >
+                    {getExtractedInput(trace)}
+                  </Markdown>
+                </Text>
+              )}
             </LinkOverlay>
           </Box>
         </VStack>
@@ -199,7 +207,7 @@ export function MessageCard({
               {trace.output?.value &&
               (isJson(trace.output.value) ||
                 isPythonRepr(trace.output.value)) ? (
-                <MessageCardJsonOutput trace={trace} />
+                <MessageCardJsonOutput value={trace.output.value} />
               ) : trace.output?.value ? (
                 <Markdown remarkPlugins={[remarkGfm]} className="markdown">
                   {getSlicedOutput(trace)}
@@ -530,10 +538,9 @@ export const getSlicedExpectedOutput = (trace: Trace) => {
   );
 };
 
-export function MessageCardJsonOutput({ trace }: { trace: Trace }) {
-  const output = trace.output?.value ?? "";
+export function MessageCardJsonOutput({ value }: { value: string }) {
   const json = JSON.stringify(
-    parsePythonInsideJson(isPythonRepr(output) ? output : JSON.parse(output)),
+    parsePythonInsideJson(isPythonRepr(value) ? value : JSON.parse(value)),
     null,
     2
   );

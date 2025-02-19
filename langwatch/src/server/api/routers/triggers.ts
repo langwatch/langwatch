@@ -1,7 +1,7 @@
-import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { AlertType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
 
 import { nanoid } from "nanoid";
@@ -19,7 +19,12 @@ export const triggerRouter = createTRPCRouter({
           members: z.string().array().optional(),
           slackWebhook: z.string().optional(),
           datasetId: z.string().optional(),
-          datasetMapping: z.any().optional(),
+          datasetMapping: z
+            .object({
+              mapping: z.any(),
+              expansions: z.array(z.string()).optional(),
+            })
+            .optional(),
         }),
       })
     )
@@ -194,7 +199,31 @@ export const triggerRouter = createTRPCRouter({
         },
         data: {
           active: input.active,
-          lastRunAt: new Date().getTime(),
+        },
+      });
+    }),
+  getTriggerById: protectedProcedure
+    .input(z.object({ triggerId: z.string(), projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.trigger.findUnique({
+        where: { id: input.triggerId, projectId: input.projectId },
+      });
+    }),
+  updateTriggerFilters: protectedProcedure
+    .input(
+      z.object({
+        triggerId: z.string(),
+        projectId: z.string(),
+        filters: z.any(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.trigger.update({
+        where: { id: input.triggerId, projectId: input.projectId },
+        data: {
+          filters: JSON.stringify(input.filters),
         },
       });
     }),

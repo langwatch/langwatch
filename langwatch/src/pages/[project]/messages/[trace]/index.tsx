@@ -34,7 +34,7 @@ import type { Trace } from "../../../../server/tracer/types";
 import { api } from "../../../../utils/api";
 import { isNotFound } from "../../../../utils/trpcError";
 
-import { CornerDownRight, Edit, ThumbsDown, ThumbsUp } from "react-feather";
+import { CornerDownRight, Edit } from "react-feather";
 import remarkGfm from "remark-gfm";
 import { Annotations } from "../../../../components/Annotations";
 import { useDrawer } from "../../../../components/CurrentDrawer";
@@ -48,11 +48,14 @@ import { formatTimeAgo } from "../../../../utils/formatTimeAgo";
 import { isJson } from "../../../../utils/isJson";
 import { isPythonRepr } from "../../../../utils/parsePythonInsideJson";
 
+import { useAnnotationCommentStore } from "../../../../hooks/useAnnotationCommentStore";
+
 export default function TraceDetails() {
   const router = useRouter();
   const { traceId, trace } = useTraceDetailsState(
     (router.query.trace as string) ?? ""
   );
+
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -301,6 +304,8 @@ const TraceMessages = React.forwardRef(function TraceMessages(
 
   const [showAnnotationHover, setShowAnnotationHover] = useState(false);
 
+  const { setCommentState } = useAnnotationCommentStore();
+
   const translate = () => {
     setTranslationActive(!translationActive);
 
@@ -394,9 +399,11 @@ const TraceMessages = React.forwardRef(function TraceMessages(
             backgroundColor="white"
             onClick={(e) => {
               e.stopPropagation();
-              openDrawer("annotation", {
+
+              setCommentState?.({
                 traceId: trace.trace_id,
                 action: "new",
+                annotationId: undefined,
               });
             }}
             cursor="pointer"
@@ -442,11 +449,12 @@ const TraceMessages = React.forwardRef(function TraceMessages(
           }
         }}
       >
-        <Container maxWidth="1200px">
+        <Container maxWidth="1400px">
           <Grid templateColumns="repeat(4, 1fr)">
             <GridItem colSpan={3}>
               <Box
                 minWidth="65%"
+                height="100%"
                 position="relative"
                 borderRight="1px solid"
                 borderColor="gray.200"
@@ -456,7 +464,6 @@ const TraceMessages = React.forwardRef(function TraceMessages(
               >
                 {showAnnotationHover && <AnnotationHover />}
                 <Message
-                  trace={trace}
                   author="Input"
                   avatar={<Avatar size="sm" />}
                   timestamp={trace.timestamps.started_at}
@@ -474,7 +481,6 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                   </Text>
                 </Message>
                 <Message
-                  trace={trace}
                   author={project?.name ?? ""}
                   avatar={
                     <Avatar
@@ -505,7 +511,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                   ) : trace.output?.value &&
                     (isJson(trace.output.value) ||
                       isPythonRepr(trace.output.value)) ? (
-                    <MessageCardJsonOutput trace={trace} />
+                    <MessageCardJsonOutput value={trace.output.value} />
                   ) : trace.output?.value ? (
                     <Markdown
                       remarkPlugins={[remarkGfm]}
@@ -537,7 +543,19 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                 </Message>
               </Box>
             </GridItem>
-            <GridItem minWidth="300px">
+            <GridItem
+              minWidth="420px"
+              paddingRight={6}
+              onClick={(e) => {
+                e.stopPropagation();
+
+                setCommentState?.({
+                  traceId: trace.trace_id,
+                  action: "new",
+                  annotationId: undefined,
+                });
+              }}
+            >
               <Annotations traceId={trace.trace_id} />
             </GridItem>
           </Grid>
@@ -548,14 +566,12 @@ const TraceMessages = React.forwardRef(function TraceMessages(
 });
 
 function Message({
-  trace,
   author,
   avatar,
   timestamp,
   paddingTop,
   children,
 }: PropsWithChildren<{
-  trace?: Trace;
   author: string;
   avatar: React.ReactNode;
   timestamp?: number;

@@ -1,15 +1,16 @@
 import { useRouter } from "next/router";
 import qs from "qs";
-import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
-import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
-import { TriggerDrawer } from "./AddTriggerDrawer";
-import { AnnotationDrawer } from "./AnnotationDrawer";
+import { ErrorBoundary } from "react-error-boundary";
+import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
 import { AddAnnotationScoreDrawer } from "./AddAnnotationScoreDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
-import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
-import { UploadCSVModal } from "./datasets/UploadCSVModal";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
-import { ErrorBoundary } from "react-error-boundary";
+import { TriggerDrawer } from "./AddTriggerDrawer";
+import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
+import { UploadCSVModal } from "./datasets/UploadCSVModal";
+import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
+import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
+import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
 
 type DrawerProps = {
   open: string;
@@ -19,12 +20,13 @@ const drawers = {
   traceDetails: TraceDetailsDrawer,
   batchEvaluation: BatchEvaluationDrawer,
   trigger: TriggerDrawer,
-  annotation: AnnotationDrawer,
   addAnnotationScore: AddAnnotationScoreDrawer,
+  addAnnotationQueue: AddAnnotationQueueDrawer,
   addDatasetRecord: AddDatasetRecordDrawerV2,
   llmModelCost: LLMModelCostDrawer,
   uploadCSV: UploadCSVModal,
   addOrEditDataset: AddOrEditDatasetDrawer,
+  editTriggerFilter: EditTriggerFilterDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 // workaround to pass complexProps to drawers
@@ -73,7 +75,7 @@ export function useDrawer() {
 
   const openDrawer = <T extends keyof typeof drawers>(
     drawer: T,
-    props: Parameters<(typeof drawers)[T]>[0],
+    props?: Parameters<(typeof drawers)[T]>[0],
     { replace }: { replace?: boolean } = {}
   ) => {
     complexProps = Object.fromEntries(

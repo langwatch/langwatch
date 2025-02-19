@@ -197,7 +197,7 @@ export function WorkflowPropertiesPanel() {
         <Select
           size="sm"
           value={isEvaluator ? "evaluator" : "workflow"}
-          onChange={(e) => {
+          onChange={() => {
             setAsEvaluator();
           }}
         >

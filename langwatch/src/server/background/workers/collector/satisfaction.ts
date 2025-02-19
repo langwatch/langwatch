@@ -4,6 +4,7 @@ import { TRACE_INDEX, esClient, traceIndexId } from "../../../elasticsearch";
 import type { Trace } from "../../../tracer/types";
 import { prepareLitellmParams } from "~/server/api/routers/modelProviders";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../../../utils/constants";
+import { lambdaFetch } from "../../../../utils/lambdaFetch";
 
 type SatisfactionScoreResult = {
   score_normalized: number;
@@ -34,22 +35,27 @@ export const scoreSatisfactionFromInput = async ({
   }
 
   const embeddingsModel = await getProjectEmbeddingsModel(projectId);
-  const response = await fetch(`${env.LANGWATCH_NLP_SERVICE}/sentiment`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      text: input.value,
-      embeddings_litellm_params: {
-        ...prepareLitellmParams(
-          embeddingsModel.model,
-          embeddingsModel.modelProvider
-        ),
-        dimensions: OPENAI_EMBEDDING_DIMENSION,
+  const response = await lambdaFetch<SatisfactionScoreResult>(
+    process.env.LANGWATCH_NLP_SERVICE_INVOKE_ARN ??
+      process.env.LANGWATCH_NLP_SERVICE!,
+    "/sentiment",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    }),
-  });
+      body: JSON.stringify({
+        text: input.value,
+        embeddings_litellm_params: {
+          ...prepareLitellmParams(
+            embeddingsModel.model,
+            embeddingsModel.modelProvider
+          ),
+          dimensions: OPENAI_EMBEDDING_DIMENSION,
+        },
+      }),
+    }
+  );
 
   if (!response.ok) {
     throw new Error(

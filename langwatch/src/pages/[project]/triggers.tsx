@@ -58,11 +58,13 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { HoverableBigText } from "~/components/HoverableBigText";
+import { useDrawer } from "~/components/CurrentDrawer";
 
 export default function Members() {
   const { project, organizations } = useOrganizationTeamProject();
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { openDrawer } = useDrawer();
 
   const triggers = api.trigger.getTriggers.useQuery(
     {
@@ -358,11 +360,8 @@ export default function Members() {
                       </Tr>
                     ) : (
                       triggers.data?.map((trigger) => {
-                        const lastRunAt = new Date(trigger.lastRunAt);
-                        const lastRunAtFormatted = lastRunAt.toLocaleString();
-
                         return (
-                          <Tr key={trigger.id}>
+                          <Tr key={trigger.id} data-trigger-id={trigger.id}>
                             <Td>{trigger.name}</Td>
                             <Td>{triggerActionName(trigger.action)}</Td>
                             <Td>
@@ -432,6 +431,17 @@ export default function Members() {
                                       Customize Message
                                     </MenuItem>
                                   )}
+                                  <MenuItem
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      openDrawer("editTriggerFilter", {
+                                        triggerId: trigger.id,
+                                      });
+                                    }}
+                                    icon={<Filter size={14} />}
+                                  >
+                                    Edit Filters
+                                  </MenuItem>
                                   <MenuItem
                                     color="red.600"
                                     onClick={(event) => {

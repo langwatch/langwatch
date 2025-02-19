@@ -6,46 +6,37 @@ import {
   Card,
   CardBody,
   CardHeader,
-  Divider,
   HStack,
   Heading,
   Skeleton,
   Spacer,
   Spinner,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Table,
-  TableContainer,
-  Tabs,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
   Tooltip,
-  Tr,
   VStack,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
-import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ExternalLink } from "react-feather";
-import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
-import { VersionBox } from "../../optimization_studio/components/History";
-import type { ESBatchEvaluation } from "../../server/experiments/types";
-import { api } from "../../utils/api";
-import { formatMilliseconds } from "../../utils/formatMilliseconds";
-import { formatTimeAgo } from "../../utils/formatTimeAgo";
-import { getColorForString } from "../../utils/rotatingColors";
-import { HoverableBigText } from "../HoverableBigText";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
+import { useRouter } from "next/router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Download, ExternalLink } from "react-feather";
+import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
+import { VersionBox } from "../../optimization_studio/components/History";
 import type { AppRouter } from "../../server/api/root";
-import numeral from "numeral";
-import React from "react";
+import { api } from "../../utils/api";
+import { formatTimeAgo } from "../../utils/formatTimeAgo";
+import { getColorForString } from "../../utils/rotatingColors";
+import {
+  BatchEvaluationV2EvaluationSummary,
+  formatEvaluationSummary,
+  getFinishedAt,
+} from "./BatchEvaluationV2/BatchEvaluationSummary";
+import {
+  BatchEvaluationV2EvaluationResults,
+  useBatchEvaluationDownloadCSV,
+} from "./BatchEvaluationV2/BatchEvaluationV2EvaluationResults";
 
 export function BatchEvaluationV2({
   project,
@@ -65,6 +56,13 @@ export function BatchEvaluationV2({
     experiment,
   });
 
+  const { downloadCSV, isDownloadCSVEnabled } = useBatchEvaluationDownloadCSV({
+    project,
+    experiment,
+    runId: selectedRunId,
+    isFinished,
+  });
+
   return (
     <HStack align="start" width="full" height="full" spacing={0}>
       <BatchEvaluationV2RunList
@@ -73,7 +71,15 @@ export function BatchEvaluationV2({
         selectedRunId={selectedRunId}
         setSelectedRunId={setSelectedRunId}
       />
-      <Box width="calc(100vw - 398px)" height="full" position="relative">
+      <VStack
+        width="full"
+        height="fit-content"
+        minHeight="100%"
+        position="relative"
+        spacing={0}
+        justify="space-between"
+        minWidth="0"
+      >
         <VStack
           align="start"
           width="full"
@@ -81,11 +87,21 @@ export function BatchEvaluationV2({
           spacing={8}
           padding={6}
         >
-          <HStack width="full" align="end" spacing={6}>
+          <HStack width="full" align="end" spacing={4}>
             <Heading as="h1" size="lg">
               {experiment.name ?? experiment.slug}
             </Heading>
             <Spacer />
+            <Button
+              size="sm"
+              colorScheme="blue"
+              leftIcon={<Download size={16} />}
+              onClick={() => void downloadCSV()}
+              disabled={!isDownloadCSVEnabled}
+              marginBottom="-6px"
+            >
+              Export to CSV
+            </Button>
             {experiment.workflowId && (
               <Button
                 as={"a"}
@@ -113,32 +129,30 @@ export function BatchEvaluationV2({
           ) : batchEvaluationRuns.data?.runs.length === 0 ? (
             <Text>Waiting for results...</Text>
           ) : (
-            selectedRun && (
-              <>
-                <Card width="100%">
-                  <CardHeader>
-                    <Heading as="h2" size="md">
-                      {selectedRun.workflow_version?.commitMessage ??
-                        "Evaluation Results"}
-                    </Heading>
-                  </CardHeader>
-                  <CardBody paddingTop={0}>
-                    <BatchEvaluationV2EvaluationResults
-                      project={project}
-                      experiment={experiment}
-                      runId={selectedRun.run_id}
-                      isFinished={isFinished}
-                    />
-                  </CardBody>
-                </Card>
-              </>
-            )
+            <>
+              <Card width="100%">
+                <CardHeader>
+                  <Heading as="h2" size="md">
+                    {selectedRun?.workflow_version?.commitMessage ??
+                      "Evaluation Results"}
+                  </Heading>
+                </CardHeader>
+                <CardBody paddingTop={0}>
+                  <BatchEvaluationV2EvaluationResults
+                    project={project}
+                    experiment={experiment}
+                    runId={selectedRun?.run_id}
+                    isFinished={isFinished}
+                  />
+                </CardBody>
+              </Card>
+            </>
           )}
         </VStack>
         {selectedRun && (
-          <BatchEvaluationV2EvaluationSummary run={selectedRun} />
+          <BatchEvaluationV2EvaluationSummary run={selectedRun} showProgress />
         )}
-      </Box>
+      </VStack>
     </HStack>
   );
 }
@@ -257,6 +271,10 @@ export function BatchEvaluationV2RunList({
   setSelectedRunId: (runId: string) => void;
   size?: "sm" | "md";
 }) {
+  const hasAnyVersion = batchEvaluationRuns.data?.runs.some(
+    (run) => run.workflow_version
+  );
+
   return (
     <VStack
       align="start"
@@ -299,8 +317,8 @@ export function BatchEvaluationV2RunList({
             (r) => r.run_id === selectedRunId
           ) && (
             <HStack
-              paddingX={size === "sm" ? 2 : 6}
-              paddingY={size === "sm" ? 2 : 4}
+              paddingX={size === "sm" ? 2 : 4}
+              paddingY={size === "sm" ? 2 : 3}
               width="100%"
               cursor="pointer"
               role="button"
@@ -310,7 +328,7 @@ export function BatchEvaluationV2RunList({
               }}
               spacing={3}
             >
-              <VersionBox />
+              <VersionBox minWidth={hasAnyVersion ? "48px" : "0"} />
               <VStack align="start" spacing={2} width="100%" paddingRight={2}>
                 <HStack width="100%">
                   <Skeleton width="100%" height="12px" />
@@ -321,14 +339,16 @@ export function BatchEvaluationV2RunList({
             </HStack>
           )}
           {batchEvaluationRuns.data?.runs.map((run) => {
-            const runCost = run.summary.cost;
+            const runCost =
+              (run.summary.dataset_cost ?? 0) +
+              (run.summary.evaluations_cost ?? 0);
             const runName = run.workflow_version?.commitMessage ?? run.run_id;
 
             return (
               <HStack
                 key={run?.run_id ?? "new"}
-                paddingX={size === "sm" ? 2 : 6}
-                paddingY={size === "sm" ? 2 : 4}
+                paddingX={size === "sm" ? 2 : 4}
+                paddingY={size === "sm" ? 2 : 3}
                 width="100%"
                 cursor="pointer"
                 role="button"
@@ -348,9 +368,13 @@ export function BatchEvaluationV2RunList({
                 spacing={3}
               >
                 {run.workflow_version ? (
-                  <VersionBox version={run.workflow_version} />
+                  <VersionBox
+                    version={run.workflow_version}
+                    minWidth={hasAnyVersion ? "48px" : "0"}
+                  />
                 ) : (
                   <VersionBox
+                    minWidth={hasAnyVersion ? "48px" : "0"}
                     backgroundColor={
                       run.timestamps.stopped_at
                         ? "red.200"
@@ -438,644 +462,3 @@ export function BatchEvaluationV2RunList({
     </VStack>
   );
 }
-
-export const BatchEvaluationV2EvaluationResults = React.memo(
-  function BatchEvaluationV2EvaluationResults({
-    project,
-    experiment,
-    runId,
-    isFinished,
-    size = "md",
-  }: {
-    project: Project;
-    experiment: Experiment;
-    runId: string | undefined;
-    isFinished: boolean;
-    size?: "sm" | "md";
-  }) {
-    const [keepRefetching, setKeepRefetching] = useState(true);
-    const [tabIndex, setTabIndex] = useState(0);
-
-    const run = api.experiments.getExperimentBatchEvaluationRun.useQuery(
-      {
-        projectId: project.id,
-        experimentSlug: experiment.slug,
-        runId: runId ?? "",
-      },
-      {
-        enabled: !!runId,
-        refetchInterval: keepRefetching ? 1000 : false,
-        refetchOnMount: false,
-        refetchOnWindowFocus: false,
-      }
-    );
-
-    useEffect(() => {
-      if (isFinished) {
-        setTimeout(() => {
-          setKeepRefetching(false);
-        }, 2_000);
-      } else {
-        setKeepRefetching(true);
-      }
-    }, [isFinished]);
-
-    const datasetByIndex = run.data?.dataset.reduce(
-      (acc, item) => {
-        acc[item.index] = item;
-        return acc;
-      },
-      {} as Record<number, ESBatchEvaluation["dataset"][number]>
-    );
-
-    let resultsByEvaluator = run.data?.evaluations.reduce(
-      (acc, evaluation) => {
-        if (!acc[evaluation.evaluator]) {
-          acc[evaluation.evaluator] = [];
-        }
-        acc[evaluation.evaluator]!.push(evaluation);
-        return acc;
-      },
-      {} as Record<string, ESBatchEvaluation["evaluations"]>
-    );
-
-    resultsByEvaluator = Object.fromEntries(
-      Object.entries(resultsByEvaluator ?? {}).sort((a, b) =>
-        a[0].localeCompare(b[0])
-      )
-    );
-
-    if (
-      Object.keys(resultsByEvaluator ?? {}).length === 0 &&
-      (run.data?.dataset.length ?? 0) > 0
-    ) {
-      resultsByEvaluator = {
-        all: [],
-      };
-    }
-
-    const [hasScrolled, setHasScrolled] = useState(false);
-
-    if (run.error) {
-      return (
-        <Alert status="error">
-          <AlertIcon />
-          Error loading evaluation results
-        </Alert>
-      );
-    }
-
-    if (!resultsByEvaluator || !datasetByIndex) {
-      return (
-        <VStack spacing={0} width="full" height="full" minWidth="0">
-          <Tabs
-            size={size}
-            width="full"
-            height="full"
-            display="flex"
-            flexDirection="column"
-            minHeight="0"
-            overflowX="auto"
-            padding={0}
-          >
-            <TabList>
-              <Tab>
-                <Skeleton width="60px" height="22px" />
-              </Tab>
-            </TabList>
-            <TabPanels
-              minWidth="full"
-              minHeight="0"
-              overflowY="auto"
-              onScroll={() => setHasScrolled(true)}
-            >
-              <TabPanel padding={0}>
-                <Table size={size === "sm" ? "xs" : "sm"} variant="grid">
-                  <Thead>
-                    <Tr>
-                      <Th rowSpan={2} width="50px">
-                        <Skeleton width="100%" height="52px" />
-                      </Th>
-                      <Th>
-                        <Skeleton width="100%" height="18px" />
-                      </Th>
-                      <Th>
-                        <Skeleton width="100%" height="18px" />
-                      </Th>
-                      <Th>
-                        <Skeleton width="100%" height="18px" />
-                      </Th>
-                    </Tr>
-                    <Tr>
-                      <Th>
-                        <Skeleton width="100%" height="18px" />
-                      </Th>
-                      <Th>
-                        <Skeleton width="100%" height="18px" />
-                      </Th>
-                      <Th>
-                        <Skeleton width="100%" height="18px" />
-                      </Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    <Tr>
-                      <Td>
-                        <Skeleton width="100%" height="18px" />
-                      </Td>
-                      <Td>
-                        <Skeleton width="100%" height="18px" />
-                      </Td>
-                      <Td>
-                        <Skeleton width="100%" height="18px" />
-                      </Td>
-                      <Td>
-                        <Skeleton width="100%" height="18px" />
-                      </Td>
-                    </Tr>
-                  </Tbody>
-                </Table>
-              </TabPanel>
-            </TabPanels>
-          </Tabs>
-        </VStack>
-      );
-    }
-
-    const datasetColumns = new Set(
-      Object.values(datasetByIndex).flatMap((item) =>
-        Object.keys(item.entry ?? {})
-      )
-    );
-
-    if (Object.keys(resultsByEvaluator).length === 0) {
-      return <Text padding={4}>No results</Text>;
-    }
-
-    return (
-      <Tabs
-        size={size}
-        width="full"
-        height="full"
-        display="flex"
-        flexDirection="column"
-        minHeight="0"
-        overflowX="auto"
-        position="relative"
-        onChange={(index) => setTabIndex(index)}
-        index={tabIndex}
-      >
-        <Box
-          position="absolute"
-          top={1}
-          right={2}
-          color="gray.400"
-          fontSize="12px"
-        >
-          {runId}
-        </Box>
-        <TabList>
-          {Object.entries(resultsByEvaluator).map(([evaluator, results]) => (
-            <Tab key={evaluator}>
-              {results.find((r) => r.name)?.name ?? evaluator}
-            </Tab>
-          ))}
-        </TabList>
-        <TabPanels minWidth="full" minHeight="0" overflowY="auto">
-          {Object.entries(resultsByEvaluator).map(
-            ([evaluator, results], index) => {
-              return (
-                <TabPanel
-                  key={evaluator}
-                  padding={0}
-                  minWidth="full"
-                  width="fit-content"
-                  minHeight="0"
-                >
-                  {tabIndex === index ? (
-                    <BatchEvaluationV2EvaluationResult
-                      results={results}
-                      datasetByIndex={datasetByIndex}
-                      datasetColumns={datasetColumns}
-                      isFinished={isFinished}
-                      size={size}
-                      hasScrolled={hasScrolled}
-                    />
-                  ) : null}
-                </TabPanel>
-              );
-            }
-          )}
-        </TabPanels>
-      </Tabs>
-    );
-  }
-);
-
-export function BatchEvaluationV2EvaluationResult({
-  results,
-  datasetByIndex,
-  datasetColumns,
-  isFinished,
-  size = "md",
-  hasScrolled,
-}: {
-  results: ESBatchEvaluation["evaluations"];
-  datasetByIndex: Record<number, ESBatchEvaluation["dataset"][number]>;
-  datasetColumns: Set<string>;
-  isFinished: boolean;
-  size?: "sm" | "md";
-  hasScrolled: boolean;
-}) {
-  const evaluationInputsColumns = new Set(
-    results.flatMap((result) => Object.keys(result.inputs ?? {}))
-  );
-  const evaluatorResultsColumnsMap = {
-    passed: false,
-    score: false,
-    label: false,
-    details: false,
-  };
-  for (const result of results) {
-    if (result.score !== undefined && result.score !== null) {
-      evaluatorResultsColumnsMap.score = true;
-    }
-    if (result.passed !== undefined && result.passed !== null) {
-      evaluatorResultsColumnsMap.passed = true;
-    }
-    if (result.label !== undefined && result.label !== null) {
-      evaluatorResultsColumnsMap.label = true;
-    }
-    if (result.details !== undefined && result.details !== null) {
-      evaluatorResultsColumnsMap.details = true;
-    }
-  }
-  const evaluationResultsColumns = new Set(
-    Object.entries(evaluatorResultsColumnsMap)
-      .filter(([_key, value]) => value)
-      .map(([key]) => key)
-  );
-
-  const totalRows = Math.max(
-    ...Object.values(datasetByIndex).map((d) => d.index + 1)
-  );
-
-  // Scroll to the bottom on rerender if component was at the bottom previously
-  const containerRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const container = containerRef.current;
-
-    return () => {
-      let isAtBottom = true;
-      const scrollParent = container?.parentElement?.parentElement;
-      if (scrollParent) {
-        const currentScrollTop = scrollParent.scrollTop;
-        const scrollParentHeight = scrollParent.clientHeight;
-
-        isAtBottom =
-          currentScrollTop + scrollParentHeight + 32 >=
-          scrollParent.scrollHeight;
-      }
-
-      if (isAtBottom || (!hasScrolled && !isFinished)) {
-        setTimeout(() => {
-          if (!containerRef.current || hasScrolled) return;
-          scrollParent?.scrollTo({
-            // eslint-disable-next-line react-hooks/exhaustive-deps
-            top: containerRef.current.scrollHeight,
-            behavior: "smooth",
-          });
-        }, 100);
-        setTimeout(() => {
-          if (!containerRef.current || hasScrolled) return;
-          scrollParent?.scrollTo({
-            // eslint-disable-next-line react-hooks/exhaustive-deps
-            top: containerRef.current.scrollHeight,
-            behavior: "smooth",
-          });
-        }, 1000);
-      }
-    };
-  }, [results, isFinished, hasScrolled]);
-
-  return (
-    <TableContainer ref={containerRef}>
-      <Table size={size === "sm" ? "xs" : "sm"} variant="grid">
-        <Thead>
-          <Tr>
-            <Th width="35px" rowSpan={2}></Th>
-
-            <Th colSpan={datasetColumns.size} paddingY={2}>
-              <Text>Dataset</Text>
-            </Th>
-
-            {results.length > 0 && (
-              <Th colSpan={evaluationInputsColumns.size} paddingY={2}>
-                <Text>Evaluation Entry</Text>
-              </Th>
-            )}
-
-            <Th rowSpan={2}>Cost</Th>
-            <Th rowSpan={2}>Duration</Th>
-
-            {Array.from(evaluationResultsColumns).map((column) => (
-              <Th key={`evaluation-result-${column}`} rowSpan={2}>
-                {column}
-              </Th>
-            ))}
-          </Tr>
-          <Tr>
-            {Array.from(datasetColumns).map((column) => (
-              <Th key={`dataset-${column}`} paddingY={2}>
-                {column}
-              </Th>
-            ))}
-            {Array.from(evaluationInputsColumns).map((column) => (
-              <Th key={`evaluation-entry-${column}`} paddingY={2}>
-                {column}
-              </Th>
-            ))}
-          </Tr>
-        </Thead>
-        <Tbody>
-          {Array.from({ length: totalRows }).map((_, index) => {
-            const evaluation = results.find((r) => r.index === index);
-            const datasetEntry = datasetByIndex[index];
-
-            return (
-              <Tr key={index}>
-                <Td width="35px">{index + 1}</Td>
-
-                {Array.from(datasetColumns).map((column) => (
-                  <Td key={`dataset-${column}`} maxWidth="250px">
-                    {datasetEntry ? (
-                      <HoverableBigText>
-                        {datasetEntry.entry[column] ?? "-"}
-                      </HoverableBigText>
-                    ) : (
-                      "-"
-                    )}
-                  </Td>
-                ))}
-
-                {datasetEntry?.error
-                  ? Array.from(evaluationInputsColumns).map((column) => (
-                      <Td
-                        key={`evaluation-entry-${column}`}
-                        background="red.200"
-                      >
-                        <Tooltip label={datasetEntry.error}>
-                          <Box noOfLines={1}>Error</Box>
-                        </Tooltip>
-                      </Td>
-                    ))
-                  : Array.from(evaluationInputsColumns).map((column) => (
-                      <Td key={`evaluation-entry-${column}`} maxWidth="250px">
-                        {evaluation ? (
-                          <HoverableBigText>
-                            {evaluation.inputs[column] ?? "-"}
-                          </HoverableBigText>
-                        ) : (
-                          "-"
-                        )}
-                      </Td>
-                    ))}
-
-                <Td>
-                  {datasetEntry?.cost ? (
-                    <FormatMoney
-                      amount={datasetEntry?.cost ?? 0}
-                      currency="USD"
-                      format="$0.00[00]"
-                    />
-                  ) : (
-                    "-"
-                  )}
-                </Td>
-                <Td>
-                  {datasetEntry?.duration
-                    ? formatMilliseconds(datasetEntry.duration)
-                    : "-"}
-                </Td>
-
-                {Array.from(evaluationResultsColumns).map((column) => {
-                  if (column !== "details" && evaluation?.status === "error") {
-                    return (
-                      <Td
-                        key={`evaluation-result-${column}`}
-                        background="red.200"
-                      >
-                        <Tooltip label={evaluation.details}>
-                          <Box noOfLines={1}>Error</Box>
-                        </Tooltip>
-                      </Td>
-                    );
-                  }
-
-                  if (
-                    column !== "details" &&
-                    evaluation?.status === "skipped"
-                  ) {
-                    return (
-                      <Td
-                        key={`evaluation-result-${column}`}
-                        background="yellow.100"
-                      >
-                        <Tooltip label={evaluation.details}>
-                          <Box noOfLines={1}>Skipped</Box>
-                        </Tooltip>
-                      </Td>
-                    );
-                  }
-
-                  const value = (
-                    evaluation as Record<string, any> | undefined
-                  )?.[column];
-                  return (
-                    <Td
-                      key={`evaluation-result-${column}`}
-                      background={
-                        value === false
-                          ? "red.100"
-                          : value === true
-                          ? "green.100"
-                          : "none"
-                      }
-                    >
-                      {column === "details" ? (
-                        <HoverableBigText
-                          noOfLines={3}
-                          maxWidth="300px"
-                          whiteSpace="pre-wrap"
-                        >
-                          {value}
-                        </HoverableBigText>
-                      ) : value === false ? (
-                        "false"
-                      ) : value === true ? (
-                        "true"
-                      ) : (
-                        value ?? "-"
-                      )}
-                    </Td>
-                  );
-                })}
-              </Tr>
-            );
-          })}
-        </Tbody>
-      </Table>
-    </TableContainer>
-  );
-}
-
-const getFinishedAt = (
-  timestamps: ESBatchEvaluation["timestamps"],
-  currentTimestamp: number
-) => {
-  if (timestamps.finished_at) {
-    return timestamps.finished_at;
-  }
-  if (
-    currentTimestamp - new Date(timestamps.updated_at).getTime() >
-    2 * 60 * 1000
-  ) {
-    return new Date(timestamps.updated_at).getTime();
-  }
-  return undefined;
-};
-
-export function BatchEvaluationV2EvaluationSummary({
-  run,
-}: {
-  run: NonNullable<
-    UseTRPCQueryResult<
-      inferRouterOutputs<AppRouter>["experiments"]["getExperimentBatchEvaluationRuns"],
-      TRPCClientErrorLike<AppRouter>
-    >["data"]
-  >["runs"][number];
-}) {
-  const [currentTimestamp, setCurrentTimestamp] = useState(0);
-  const finishedAt = useMemo(() => {
-    return getFinishedAt(run.timestamps, currentTimestamp);
-  }, [run.timestamps, currentTimestamp]);
-
-  const runtime = Math.max(
-    run.timestamps.created_at
-      ? (finishedAt ?? currentTimestamp) -
-          new Date(run.timestamps.created_at).getTime()
-      : 0,
-    0
-  );
-
-  useEffect(() => {
-    if (finishedAt) return;
-
-    const interval = setInterval(() => {
-      setCurrentTimestamp(new Date().getTime());
-    }, 1000);
-
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!finishedAt]);
-
-  return (
-    <HStack
-      position="sticky"
-      left={0}
-      bottom={0}
-      width="100%"
-      background="white"
-      borderTop="1px solid"
-      borderColor="gray.200"
-      paddingY={4}
-      paddingX={6}
-      spacing={5}
-    >
-      {Object.entries(run.summary.evaluations).map(([_, evaluation]) => {
-        return (
-          <>
-            <VStack align="start" spacing={1}>
-              <Text fontWeight="500">{evaluation.name}</Text>
-              <Text>{formatEvaluationSummary(evaluation)}</Text>
-            </VStack>
-            <Divider orientation="vertical" height="48px" />
-          </>
-        );
-      })}
-      <VStack align="start" spacing={1}>
-        <Text fontWeight="500" noOfLines={1}>
-          Mean Cost
-        </Text>
-        <Text noOfLines={1} whiteSpace="nowrap">
-          <FormatMoney
-            amount={run.summary.dataset_average_cost}
-            currency="USD"
-            format="$0.00[00]"
-          />
-        </Text>
-      </VStack>
-      <Divider orientation="vertical" height="48px" />
-      <VStack align="start" spacing={1}>
-        <Text fontWeight="500" noOfLines={1}>
-          Mean Duration
-        </Text>
-        <Text>{formatMilliseconds(run.summary.dataset_average_duration)}</Text>
-      </VStack>
-      <Divider orientation="vertical" height="48px" />
-      <VStack align="start" spacing={1}>
-        <Text fontWeight="500" noOfLines={1}>
-          Total Cost
-        </Text>
-        <Text noOfLines={1} whiteSpace="nowrap">
-          <FormatMoney
-            amount={run.summary.cost}
-            currency="USD"
-            format="$0.00[00]"
-          />
-        </Text>
-      </VStack>
-      <Divider orientation="vertical" height="48px" />
-      <VStack align="start" spacing={1}>
-        <Text fontWeight="500" noOfLines={1}>
-          Runtime
-        </Text>
-        <Text noOfLines={1} whiteSpace="nowrap">
-          {numeral(runtime / 1000).format("00:00:00")}
-        </Text>
-      </VStack>
-      {run.timestamps.stopped_at && (
-        <>
-          <Spacer />
-          <HStack>
-            <Box
-              width="12px"
-              height="12px"
-              background="red.500"
-              borderRadius="full"
-            />
-            <Text>Stopped</Text>
-          </HStack>
-        </>
-      )}
-    </HStack>
-  );
-}
-
-const formatEvaluationSummary = (
-  evaluation: {
-    average_score: number;
-    average_passed?: number;
-  },
-  short = false
-): string => {
-  return evaluation.average_passed !== undefined
-    ? numeral(evaluation.average_passed).format("0.[0]%") +
-        (short ? " " : " pass") +
-        (short || evaluation.average_passed == evaluation.average_score
-          ? ""
-          : ` (${numeral(evaluation.average_score).format(
-              "0.0[0]"
-            )} avg. score)`)
-    : numeral(evaluation.average_score).format("0.[00]");
-};

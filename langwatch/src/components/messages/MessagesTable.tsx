@@ -38,6 +38,7 @@ import {
   Tr,
   VStack,
   useDisclosure,
+  useToast,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
@@ -106,6 +107,8 @@ export function MessagesTable() {
     { projectId: project?.id ?? "" },
     {
       enabled: project?.id !== undefined,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
     }
   );
 
@@ -120,6 +123,7 @@ export function MessagesTable() {
     { projectId: project?.id ?? "", traceIds },
     {
       enabled: project?.id !== undefined,
+      refetchOnWindowFocus: false,
     }
   );
 
@@ -820,6 +824,7 @@ export function MessagesTable() {
   ).filter(([_, { enabled }]) => enabled);
 
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const toast = useToast();
 
   const fetchAllTraces = async () => {
     const allGroups = [];
@@ -886,6 +891,20 @@ export function MessagesTable() {
   };
 
   const downloadCSV = async (selection = false) => {
+    try {
+      await downloadCSV_(selection);
+    } catch (error) {
+      toast({
+        title: "Error Downloading CSV",
+        status: "error",
+        description: (error as any).toString(),
+        duration: null,
+      });
+      console.error(error);
+    }
+  };
+
+  const downloadCSV_ = async (selection = false) => {
     const traceGroups_ = selection
       ? traceGroups.data ?? {
           groups: [],

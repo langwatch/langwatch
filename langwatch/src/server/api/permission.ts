@@ -1,7 +1,7 @@
 import {
   OrganizationUserRole,
   TeamUserRole,
-  type PrismaClient
+  type PrismaClient,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import type { Session } from "next-auth";
@@ -296,7 +296,28 @@ export const backendHasOrganizationPermission = async (
 export const skipPermissionCheck = ({
   ctx,
   next,
+  input,
 }: PermissionMiddlewareParams<object>) => {
   ctx.permissionChecked = true;
+
+  const SENSITIVE_KEYS = ["organizationId", "teamId", "projectId"];
+
+  for (const key of SENSITIVE_KEYS) {
+    if (key in input) {
+      throw new Error(
+        `${key} is not allowed to be used without permission check`
+      );
+    }
+  }
+
+  return next();
+};
+
+export const skipPermissionCheckProjectCreation = ({
+  ctx,
+  next,
+}: PermissionMiddlewareParams<object>) => {
+  ctx.permissionChecked = true;
+
   return next();
 };

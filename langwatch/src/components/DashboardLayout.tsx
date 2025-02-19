@@ -72,6 +72,8 @@ import { IconWrapper } from "./IconWrapper";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { DiscordOutlineIcon } from "./icons/DiscordOutline";
 import { ChatBalloonIcon } from "./icons/ChatBalloon";
+import { HoverableBigText } from "./HoverableBigText";
+import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -82,7 +84,7 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
         <Link href="/">Dashboard</Link>
         {currentRoute.parent && (
           <>
-            <ChevronRight width="12" />
+            <ChevronRight width="12" style={{ minWidth: "12px" }} />
             <Link
               href={projectRoutes[currentRoute.parent].path.replace(
                 "[project]",
@@ -93,8 +95,10 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
             </Link>
           </>
         )}
-        <ChevronRight width="12" />
-        <Text>{currentRoute.title}</Text>
+        <ChevronRight width="12" style={{ minWidth: "12px" }} />
+        <HoverableBigText noOfLines={1} expandable={false}>
+          {currentRoute.title}
+        </HoverableBigText>
       </HStack>
     )
   );
@@ -105,11 +109,13 @@ const SideMenuLink = ({
   label,
   path,
   project,
+  badgeNumber,
 }: {
   icon: React.ComponentType<{ size?: string | number; color?: string }>;
   label: string;
   path: string;
   project?: Project;
+  badgeNumber?: number;
 }) => {
   const router = useRouter();
   const currentRoute = findCurrentRoute(router.pathname);
@@ -161,8 +167,21 @@ const SideMenuLink = ({
           });
         }}
       >
-        <VStack>
+        <VStack position="relative">
           <IconElem size={24} color={isActive ? orange400 : undefined} />
+
+          {badgeNumber && badgeNumber > 0 && (
+            <Box position="absolute" top={4} left={4}>
+              <Badge
+                backgroundColor="green.500"
+                color="white"
+                borderRadius="full"
+                paddingX={1.5}
+              >
+                {badgeNumber}
+              </Badge>
+            </Box>
+          )}
         </VStack>
       </Link>
     </Tooltip>
@@ -195,8 +214,14 @@ export const ProjectSelector = React.memo(function ProjectSelector({
     }))
   );
 
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
-    <Menu>
+    <Menu
+      isOpen={isOpen}
+      onOpen={() => setIsOpen(true)}
+      onClose={() => setIsOpen(false)}
+    >
       <MenuButton
         as={Button}
         variant="outline"
@@ -218,59 +243,62 @@ export const ProjectSelector = React.memo(function ProjectSelector({
       </MenuButton>
       <Portal>
         <Box zIndex="popover" padding={0}>
-          <MenuList zIndex="popover">
-            <>
-              {projectGroups
-                .filter((projectGroup) =>
-                  projectGroup.team.members.some(
-                    (member) => member.userId === session?.user.id
+          {isOpen && (
+            <MenuList zIndex="popover">
+              <>
+                {projectGroups
+                  .filter((projectGroup) =>
+                    projectGroup.team.members.some(
+                      (member) => member.userId === session?.user.id
+                    )
                   )
-                )
-                .map((projectGroup) => (
-                  <MenuGroup
-                    key={projectGroup.team.id}
-                    title={
-                      projectGroup.organization.name +
-                      (projectGroup.team.name !== projectGroup.organization.name
-                        ? " - " + projectGroup.team.name
-                        : "")
-                    }
-                  >
-                    {projectGroup.projects.map((project) => (
-                      <Link
-                        key={project.id}
-                        href={
-                          currentRoute?.path.includes("[project]")
-                            ? currentRoute.path
-                                .replace("[project]", project.slug)
-                                .replace(/\[.*?\]/g, "")
-                                .replace(/\/\/+/g, "/")
-                            : `/${project.slug}?return_to=${window.location.pathname}`
-                        }
-                        _hover={{
-                          textDecoration: "none",
-                        }}
-                      >
-                        <MenuItem
-                          icon={
-                            <HStack width="26px" justify="center">
-                              <ProjectTechStackIcon project={project} />
-                            </HStack>
+                  .map((projectGroup) => (
+                    <MenuGroup
+                      key={projectGroup.team.id}
+                      title={
+                        projectGroup.organization.name +
+                        (projectGroup.team.name !==
+                        projectGroup.organization.name
+                          ? " - " + projectGroup.team.name
+                          : "")
+                      }
+                    >
+                      {projectGroup.projects.map((project) => (
+                        <Link
+                          key={project.id}
+                          href={
+                            currentRoute?.path.includes("[project]")
+                              ? currentRoute.path
+                                  .replace("[project]", project.slug)
+                                  .replace(/\[.*?\]/g, "")
+                                  .replace(/\/\/+/g, "/")
+                              : `/${project.slug}?return_to=${window.location.pathname}`
                           }
-                          fontSize="14px"
+                          _hover={{
+                            textDecoration: "none",
+                          }}
                         >
-                          {project.name}
-                        </MenuItem>
-                      </Link>
-                    ))}
-                    <AddProjectButton
-                      team={projectGroup.team}
-                      organization={projectGroup.organization}
-                    />
-                  </MenuGroup>
-                ))}
-            </>
-          </MenuList>
+                          <MenuItem
+                            icon={
+                              <HStack width="26px" justify="center">
+                                <ProjectTechStackIcon project={project} />
+                              </HStack>
+                            }
+                            fontSize="14px"
+                          >
+                            {project.name}
+                          </MenuItem>
+                        </Link>
+                      ))}
+                      <AddProjectButton
+                        team={projectGroup.team}
+                        organization={projectGroup.organization}
+                      />
+                    </MenuGroup>
+                  ))}
+              </>
+            </MenuList>
+          )}
         </Box>
       </Portal>
     </Menu>
@@ -366,6 +394,16 @@ export const DashboardLayout = ({
   const publicEnv = usePublicEnv();
 
   const [query, setQuery] = useState(router.query.query as string);
+
+  const { assignedQueueItems, memberAccessibleQueueItems } =
+    useAnnotationQueues();
+
+  const totalQueueItems = useMemo(
+    () =>
+      (assignedQueueItems?.filter((item) => !item.doneAt)?.length ?? 0) +
+      (memberAccessibleQueueItems?.filter((item) => !item.doneAt)?.length ?? 0),
+    [assignedQueueItems, memberAccessibleQueueItems]
+  );
 
   const integrationChecks = useIntegrationChecks();
 
@@ -471,6 +509,7 @@ export const DashboardLayout = ({
               icon={Edit}
               label={projectRoutes.annotations.title}
               project={project}
+              badgeNumber={totalQueueItems}
             />
             <SideMenuLink
               path={projectRoutes.triggers.path}
@@ -705,7 +744,11 @@ export const DashboardLayout = ({
                 ) {
                   void router.replace({ query: { ...router.query, query } });
                 } else {
-                  void router.push(`/${project.slug}/messages?query=${query}`);
+                  void router.push(
+                    `/${project.slug}/messages?query=${encodeURIComponent(
+                      query
+                    )}`
+                  );
                 }
               }}
             >

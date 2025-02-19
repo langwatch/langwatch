@@ -142,4 +142,23 @@ export const datasetRouter = createTRPCRouter({
 
       return { success: true };
     }),
+  updateMapping: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        datasetId: z.string(),
+        mapping: z.object({
+          mapping: z.record(z.string(), z.any()),
+          expansions: z.array(z.string()),
+        }),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      const { projectId, datasetId, mapping } = input;
+      return await ctx.prisma.dataset.update({
+        where: { id: datasetId, projectId },
+        data: { mapping },
+      });
+    }),
 });

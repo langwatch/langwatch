@@ -2,12 +2,14 @@ import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import type { Project } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { Worker } from "bullmq";
+import { nanoid } from "nanoid";
 import type {
   CollectorCheckAndAdjustJob,
   CollectorJob,
 } from "~/server/background/types";
 import { env } from "../../../env.mjs";
 import { getDebugger } from "../../../utils/logger";
+import { safeTruncate } from "../../../utils/truncate";
 import { flattenObjectKeys } from "../../api/utils";
 import { prisma } from "../../db";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
@@ -28,6 +30,7 @@ import {
 } from "../../tracer/types";
 import { elasticSearchSpanToSpan } from "../../tracer/utils";
 import { COLLECTOR_QUEUE, collectorQueue } from "../queues/collectorQueue";
+import { getFirstInputAsText, getLastOutputAsText } from "./collector/common";
 import { mapEvaluations, scheduleEvaluations } from "./collector/evaluations";
 import {
   addGuardrailCosts,
@@ -37,11 +40,8 @@ import {
 import { cleanupPIIs } from "./collector/piiCheck";
 import { addInputAndOutputForRAGs } from "./collector/rag";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
-import { safeTruncate } from "../../../utils/truncate";
-import { nanoid } from "nanoid";
-import { getFirstInputAsText, getLastOutputAsText } from "./collector/common";
 
-const debug = getDebugger("langwatch:workers:collectorWorker");
+export const debug = getDebugger("langwatch:workers:collectorWorker");
 
 export const scheduleTraceCollectionWithFallback = async (
   collectorJob: CollectorJob,
@@ -53,44 +53,9 @@ export const scheduleTraceCollectionWithFallback = async (
     return;
   }
 
-  try {
-    const timeoutState = { state: "waiting" };
-    const timeoutPromise = new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (timeoutState.state === "waiting") {
-          reject(new Error("Timed out after 3s trying to insert on the queue"));
-        } else {
-          resolve(undefined);
-        }
-      }, 3000);
-    });
-
-    await Promise.race([
-      timeoutPromise,
-      collectorQueue
-        .add("collector", collectorJob, {
-          jobId: `collector_${collectorJob.traceId}_md5:${collectorJob.paramsMD5}`,
-        })
-        .then(() => {
-          timeoutState.state = "resolved";
-        }),
-    ]);
-  } catch (error) {
-    debug(
-      "Failed sending to redis collector queue inserting trace directly, processing job synchronously.",
-      "Exception:",
-      error
-    );
-    Sentry.captureException(error, {
-      extra: {
-        message:
-          "Failed sending to redis collector queue inserting trace directly, processing job synchronously",
-        projectId: collectorJob.projectId,
-      },
-    });
-
-    await processCollectorJob(undefined, collectorJob);
-  }
+  await collectorQueue.add("collector", collectorJob, {
+    jobId: `collector_${collectorJob.traceId}_md5:${collectorJob.paramsMD5}`,
+  });
 };
 
 export async function processCollectorJob(
@@ -117,7 +82,8 @@ export async function processCollectorJob(
 
   Sentry.getCurrentScope().setPropagationContext({
     traceId: data.traceId,
-    spanId: nanoid(),
+    sampleRand: 1,
+    parentSpanId: data.traceId,
   });
 
   const result = await Sentry.startSpan(
@@ -327,7 +293,7 @@ const processCollectorJob_ = async (
   } catch {
     try {
       // Remove the existing job and start a new one to rerun adjust
-      await job.remove();
+      await job?.remove();
       await checkAndAdjust();
     } catch {
       // If that fails too because adjust is running, start a new job with different id for later
@@ -466,7 +432,7 @@ const updateTrace = async (
   });
 };
 
-const processCollectorCheckAndAdjustJob = async (
+export const processCollectorCheckAndAdjustJob = async (
   id: string | undefined,
   data: CollectorCheckAndAdjustJob
 ) => {

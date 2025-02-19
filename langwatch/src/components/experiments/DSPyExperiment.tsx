@@ -348,6 +348,10 @@ export function DSPyExperimentRunList({
   size?: "md" | "sm";
   incomingRunIds?: string[];
 }) {
+  const hasAnyVersion = dspyRunsPlusIncoming?.some(
+    (run) => run.workflow_version
+  );
+
   return (
     <VStack
       align="start"
@@ -438,7 +442,7 @@ export function DSPyExperimentRunList({
             >
               {!dspyRuns.data?.find((r) => r.runId === run.runId) ? (
                 <>
-                  <VersionBox />
+                  <VersionBox minWidth={hasAnyVersion ? "48px" : "0"} />
                   <VStack
                     align="start"
                     spacing={2}
@@ -455,7 +459,10 @@ export function DSPyExperimentRunList({
               ) : (
                 <>
                   {run.workflow_version ? (
-                    <VersionBox version={run.workflow_version} />
+                    <VersionBox
+                      version={run.workflow_version}
+                      minWidth={hasAnyVersion ? "48px" : "0"}
+                    />
                   ) : (
                     <Box
                       width="24px"
