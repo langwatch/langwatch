@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
-import { type Dataset, type DatasetRecord } from "@prisma/client";
 import {
   PrismaClient,
   type Dataset,
@@ -512,6 +511,69 @@ export const getFullDataset = async ({
   if (!dataset) {
     return null;
   }
+  if (dataset.useS3) {
+    const s3Client = await createS3Client(projectId);
+
+    let records: any[] = [];
+
+    try {
+      const { Body } = await s3Client.send(
+        new GetObjectCommand({
+          Bucket: "langwatch",
+          Key: `datasets/${projectId}/${datasetId}`,
+        })
+      );
+
+      const content = await Body?.transformToString();
+      records = JSON.parse(content ?? "[]");
+      if (entrySelection !== "all") {
+        const count = records.length;
+        records = records.filter((_, index) => {
+          switch (entrySelection) {
+            case "first":
+              return index === 0;
+            case "last":
+              return index === count - 1;
+            case "random":
+              return index === Math.floor(Math.random() * count);
+            default:
+              return true;
+          }
+        });
+      }
+    } catch (error) {
+      if ((error as any).name === "NoSuchKey") {
+        records = [];
+      } else {
+        throw error;
+      }
+    }
+
+    if (entrySelection === "random" || entrySelection === "last") {
+      return {
+        ...dataset,
+        count: records.length,
+        datasetRecords: records.slice(
+          entrySelection === "last"
+            ? -1 // Get the last record
+            : entrySelection === "random"
+            ? Math.floor(Math.random() * records.length) // Get a random record
+            : 0, // Default case (if needed)
+          entrySelection === "last"
+            ? undefined // No limit for the last record
+            : entrySelection === "random"
+            ? Math.floor(Math.random() * records.length) + 1 // Get one random record
+            : undefined // Default case (if needed)
+        ),
+      };
+    }
+
+    return {
+      ...dataset,
+      count: records.length,
+      datasetRecords: records,
+    };
+  }
 
   const count = await prisma.datasetRecord.count({
     where: { datasetId, projectId },
@@ -573,4 +635,58 @@ export const getFullDataset = async ({
     truncated,
     count,
   };
+};
+
+export const createS3Client = async (projectId: string) => {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+  });
+
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  const organization = await prisma.organization.findFirst({
+    where: {
+      teams: {
+        some: {
+          projects: {
+            some: { id: projectId },
+          },
+        },
+      },
+    },
+  });
+
+  if (!organization) {
+    throw new Error("Organization not found");
+  }
+
+  const s3Config = {
+    endpoint:
+      project.s3Endpoint ?? organization?.s3Endpoint ?? env.S3_ENDPOINT!,
+    accessKeyId:
+      project.s3AccessKeyId ??
+      organization?.s3AccessKeyId ??
+      env.S3_ACCESS_KEY_ID!,
+    secretAccessKey:
+      project.s3SecretAccessKey ??
+      organization?.s3SecretAccessKey ??
+      env.S3_SECRET_ACCESS_KEY!,
+  };
+
+  const s3Client = new S3Client({
+    endpoint: s3Config.endpoint,
+    credentials: {
+      accessKeyId: s3Config.accessKeyId,
+      secretAccessKey: s3Config.secretAccessKey,
+    },
+    forcePathStyle: true,
+  });
+
+  if (!s3Client) {
+    throw new Error("Failed to create S3 client");
+  }
+
+  return s3Client;
 };
