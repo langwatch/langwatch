@@ -211,8 +211,16 @@ class SerializableWithStringFallback(SerializableAndPydanticEncoder):
 
 
 def reduce_payload_size(
-    obj: T, max_string_length=5000, max_list_dict_length=50000, depth=0
+    obj: T,
+    max_string_length: Optional[int] = None,
+    max_list_dict_length=5000,
+    depth: int = 0,
 ) -> T:
+    print("max_string_length", max_string_length)
+
+    if max_string_length is None:
+        return obj
+
     if type(obj) == list and all(
         validate_safe(ChatMessage, item, ["role"]) for item in obj
     ):
@@ -230,7 +238,7 @@ def reduce_payload_size(
             return truncate_string(item)
         elif isinstance(item, (list, dict)):
             return reduce_payload_size(
-                item, max_string_length, max_list_dict_length, depth=depth + 1
+                item, max_string_length, max_string_length * 10, depth=depth + 1
             )
         else:
             return item

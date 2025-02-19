@@ -105,6 +105,7 @@ class ContextSpan:
     model: Optional[str] = None
     params: Optional[SpanParams] = None
     metrics: Optional[SpanMetrics] = None
+    max_string_length: Optional[int] = 5000
 
     def __init__(
         self,
@@ -484,23 +485,33 @@ class ContextSpan:
                     parent_id=str(self.parent.span_id) if self.parent else None,
                     trace_id=str(self.trace.trace_id),
                     input=(
-                        reduce_payload_size(autoconvert_typed_values(self.input))
+                        reduce_payload_size(
+                            autoconvert_typed_values(self.input),
+                            max_string_length=self.trace.max_string_length,
+                        )
                         if self.input
                         else None
                     ),
                     output=(
-                        reduce_payload_size(autoconvert_typed_values(self.output))
+                        reduce_payload_size(
+                            autoconvert_typed_values(self.output),
+                            max_string_length=self.trace.max_string_length,
+                        )
                         if self.output
                         else None
                     ),
                     error=(
-                        reduce_payload_size(capture_exception(self.error))
+                        reduce_payload_size(
+                            capture_exception(self.error),
+                            max_string_length=self.trace.max_string_length,
+                        )
                         if self.error
                         else None
                     ),
                     timestamps=self.timestamps,
                     contexts=reduce_payload_size(
-                        autoconvert_rag_contexts(self.contexts or [])
+                        autoconvert_rag_contexts(self.contexts or []),
+                        max_string_length=self.trace.max_string_length,
                     ),
                     params=self.params,
                     metrics=self.metrics,
@@ -515,17 +526,26 @@ class ContextSpan:
                     parent_id=str(self.parent.span_id) if self.parent else None,
                     trace_id=str(self.trace.trace_id),
                     input=(
-                        reduce_payload_size(autoconvert_typed_values(self.input))
+                        reduce_payload_size(
+                            autoconvert_typed_values(self.input),
+                            max_string_length=self.trace.max_string_length,
+                        )
                         if self.input
                         else None
                     ),
                     output=(
-                        reduce_payload_size(autoconvert_typed_values(self.output))
+                        reduce_payload_size(
+                            autoconvert_typed_values(self.output),
+                            max_string_length=self.trace.max_string_length,
+                        )
                         if self.output
                         else None
                     ),
                     error=(
-                        reduce_payload_size(capture_exception(self.error))
+                        reduce_payload_size(
+                            capture_exception(self.error),
+                            max_string_length=self.trace.max_string_length,
+                        )
                         if self.error
                         else None
                     ),
@@ -544,17 +564,26 @@ class ContextSpan:
                     parent_id=str(self.parent.span_id) if self.parent else None,
                     trace_id=str(self.trace.trace_id),
                     input=(
-                        reduce_payload_size(autoconvert_typed_values(self.input))
+                        reduce_payload_size(
+                            autoconvert_typed_values(self.input),
+                            max_string_length=self.trace.max_string_length,
+                        )
                         if self.input
                         else None
                     ),
                     output=(
-                        reduce_payload_size(autoconvert_typed_values(self.output))
+                        reduce_payload_size(
+                            autoconvert_typed_values(self.output),
+                            max_string_length=self.trace.max_string_length,
+                        )
                         if self.output
                         else None
                     ),
                     error=(
-                        reduce_payload_size(capture_exception(self.error))
+                        reduce_payload_size(
+                            capture_exception(self.error),
+                            max_string_length=self.trace.max_string_length,
+                        )
                         if self.error
                         else None
                     ),
@@ -643,7 +672,7 @@ class ContextTrace:
     root_span: Optional[ContextSpan] = None
     evaluations: List[Evaluation] = []
     disable_sending: bool = False
-
+    max_string_length: Optional[int] = 5000
     _capture_input: bool = True
     _capture_output: bool = True
     _skip_root_span: bool = False
@@ -658,6 +687,7 @@ class ContextTrace:
         expected_output: Optional[str] = None,
         api_key: Optional[str] = None,
         disable_sending: bool = False,
+        max_string_length: Optional[int] = 5000,
         # Span constructor parameters
         span_id: Optional[str] = None,
         capture_input: bool = True,
@@ -678,6 +708,7 @@ class ContextTrace:
         self.api_key = api_key or langwatch.api_key
         self.disable_sending = disable_sending
         self.spans: Dict[str, Span] = {}
+        self.max_string_length = max_string_length
 
         self._capture_input = capture_input
         self._capture_output = capture_output
@@ -731,6 +762,7 @@ class ContextTrace:
             "metadata": self.metadata,
             "api_key": self.api_key,
             "disable_sending": self.disable_sending,
+            "max_string_length": self.max_string_length,
             # Span constructor parameters
             "capture_input": self._capture_input,
             "capture_output": self._capture_output,
