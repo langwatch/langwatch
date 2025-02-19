@@ -110,6 +110,8 @@ async def execute_evaluation(
             total=len(examples),
             queue=queue,
         )
+        # Send initial empty batch to create the experiment in LangWatch
+        reporting.send_batch()
         await asyncify(evaluator)(module, metric=reporting.evaluate_and_report)
         await reporting.wait_for_completion()
     except Exception as e:

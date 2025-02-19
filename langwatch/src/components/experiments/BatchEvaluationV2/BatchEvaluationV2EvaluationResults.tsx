@@ -7,6 +7,7 @@ import {
   MenuItem,
   MenuList,
   Skeleton,
+  Spacer,
   Tab,
   TabList,
   TabPanel,
@@ -112,7 +113,7 @@ export const useBatchEvaluationResults = ({
     (run.data?.dataset.length ?? 0) > 0
   ) {
     resultsByEvaluator = {
-      all: [],
+      Predictions: [],
     };
   }
 
@@ -361,7 +362,13 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
     }
 
     if (Object.keys(resultsByEvaluator).length === 0) {
-      return <Text padding={4}>No results</Text>;
+      return (
+        <Text padding={4}>
+          {!isFinished
+            ? "Waiting for first results to arrive..."
+            : "No results"}
+        </Text>
+      );
     }
 
     return (
@@ -377,13 +384,26 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
         onChange={(index) => setTabIndex(index)}
         index={tabIndex}
       >
-        <HStack position="absolute" top={1} right={2}>
-          <Text color="gray.400" fontSize="12px">
+        <HStack top={1} right={2}>
+          <TabList minWidth={0}>
+            {Object.entries(resultsByEvaluator).map(([evaluator, results]) => (
+              <Tab
+                key={evaluator}
+                noOfLines={1}
+                whiteSpace="nowrap"
+                minWidth={0}
+              >
+                {results.find((r) => r.name)?.name ?? evaluator}
+              </Tab>
+            ))}
+          </TabList>
+          <Spacer />
+          <Text color="gray.400" fontSize="12px" flexShrink={0}>
             {runId}
           </Text>
           {size === "sm" && (
             <Menu>
-              <MenuButton>
+              <MenuButton flexShrink={0} paddingRight={1} marginRight={1}>
                 <MoreVertical size={16} />
               </MenuButton>
               <MenuList>
@@ -409,13 +429,6 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
             </Menu>
           )}
         </HStack>
-        <TabList>
-          {Object.entries(resultsByEvaluator).map(([evaluator, results]) => (
-            <Tab key={evaluator}>
-              {results.find((r) => r.name)?.name ?? evaluator}
-            </Tab>
-          ))}
-        </TabList>
         <TabPanels minWidth="full" minHeight="0" overflowY="auto">
           {Object.entries(resultsByEvaluator).map(
             ([evaluator, results], index) => {

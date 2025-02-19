@@ -20,10 +20,7 @@ import type { ESBatchEvaluation } from "../../../server/experiments/types";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
 import { HoverableBigText } from "../../HoverableBigText";
-import {
-  ExternalImage,
-  isImageUrl,
-} from "../../ExternalImage";
+import { ExternalImage, isImageUrl } from "../../ExternalImage";
 
 type RenderableRow = {
   render: () => JSX.Element;
@@ -62,6 +59,10 @@ const evaluationResultsTableRow = (
 ): EvaluationResultsTableRow => {
   const evaluationsCost = Object.values(evaluationsForEntry).reduce(
     (acc, curr) => (acc ?? 0) + (curr?.cost ?? 0),
+    0
+  );
+  const evaluationsDuration = Object.values(evaluationsForEntry).reduce(
+    (acc, curr) => (acc ?? 0) + (curr?.duration ?? 0),
     0
   );
 
@@ -133,9 +134,30 @@ const evaluationResultsTableRow = (
     duration: {
       render: () => (
         <Td>
-          {datasetEntry?.duration
-            ? formatMilliseconds(datasetEntry.duration)
-            : "-"}
+          <Tooltip
+            label={
+              <VStack align="start" spacing={0}>
+                <Text>
+                  Prediction duration:{" "}
+                  {datasetEntry?.duration
+                    ? formatMilliseconds(datasetEntry.duration)
+                    : "-"}
+                </Text>
+                <Text>
+                  Evaluation duration:{" "}
+                  {evaluationsDuration
+                    ? formatMilliseconds(evaluationsDuration)
+                    : "-"}
+                </Text>
+              </VStack>
+            }
+          >
+            {!!datasetEntry?.duration || !!evaluationsDuration
+              ? formatMilliseconds(
+                  (datasetEntry?.duration ?? 0) + (evaluationsDuration ?? 0)
+                )
+              : "-"}
+          </Tooltip>
         </Td>
       ),
       value: () => datasetEntry?.duration?.toString() ?? "",

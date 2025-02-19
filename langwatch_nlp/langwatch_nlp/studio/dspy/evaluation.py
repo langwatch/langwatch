@@ -141,8 +141,6 @@ class EvaluationReporting:
         evaluation, evaluation_results = pred.evaluation(example, return_results=True)
 
         if self.progress == 0:
-            # Send initial empty batch to create the experiment in LangWatch
-            self.send_batch()
             self.last_sent = 0
 
         with self.lock:
