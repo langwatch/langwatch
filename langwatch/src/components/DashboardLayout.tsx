@@ -6,7 +6,6 @@ import {
   Badge,
   Box,
   Button,
-  Center,
   HStack,
   Hide,
   Input,
@@ -198,14 +197,14 @@ const SideMenuLink = ({
 
   const theme = useTheme();
   const orange400 = theme.colors.orange["400"];
-  const gray600 = theme.colors.gray["600"];
+  const orange600 = theme.colors.orange["600"];
 
   const IconElem = icon as any;
   const iconNode =
     typeof IconElem == "function" || IconElem.render ? (
       <IconElem
         size={size === "sm" ? 18 : 24}
-        color={isActive ? orange400 : gray600}
+        color={isActive ? orange400 : undefined}
       />
     ) : (
       (icon as any)
@@ -215,8 +214,8 @@ const SideMenuLink = ({
     <Link
       variant="unstyled"
       width="full"
-      paddingX={4}
-      paddingY={size === "sm" ? 2 : 3}
+      paddingX={6}
+      paddingY={size === "sm" ? 3 : 4}
       href={href}
       aria-label={label}
       onClick={(e) => {
@@ -226,12 +225,12 @@ const SideMenuLink = ({
         });
         onClick?.(e);
       }}
-      fontSize={size === "sm" ? 10 : 11}
+      fontSize={size === "sm" ? 14 : 15}
       _hover={{
         backgroundColor: "gray.50",
       }}
     >
-      <VStack align="center" spacing={1} minHeight="21px">
+      <HStack align="center" spacing={4} minHeight="21px">
         <VStack align="start" position="relative">
           {iconNode}
 
@@ -241,10 +240,10 @@ const SideMenuLink = ({
             </Box>
           )}
         </VStack>
-        {/* {isHovered && ( */}
-        <Text color={isActive ? "orange.600" : "gray.600"}>{label}</Text>
-        {/* )} */}
-      </VStack>
+        {isHovered && (
+          <Text color={isActive ? orange600 : undefined}>{label}</Text>
+        )}
+      </HStack>
     </Link>
   );
 };
@@ -496,7 +495,6 @@ export const DashboardLayout = ({
 
   const user = session?.user;
   const currentRoute = findCurrentRoute(router.pathname);
-  const menuWidth = 88;
 
   return (
     <HStack width="full" minHeight="100vh" alignItems={"stretch"} spacing={0}>
@@ -515,7 +513,7 @@ export const DashboardLayout = ({
           onMouseEnter={() => setIsHovered(true)}
           width="20px"
           top={0}
-          left={menuWidth + 5 + "px"}
+          left="78px"
           height="100vh"
         ></Box>
       )}
@@ -526,8 +524,8 @@ export const DashboardLayout = ({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         transition="all 0.2s ease-in-out"
-        width={menuWidth + "px"}
-        minWidth={menuWidth + "px"}
+        width={isHovered ? "200px" : "73px"}
+        minWidth={isHovered ? "200px" : "73px"}
         overflowX="hidden"
       >
         <VStack
@@ -539,12 +537,10 @@ export const DashboardLayout = ({
           top={0}
           height="100vh"
           align="start"
-          width="full"
+          width={isHovered ? "200px" : "full"}
         >
-          <Box fontSize={32} fontWeight="bold" width="full">
-            <Center>
-              <LogoIcon width={25} height={34} />
-            </Center>
+          <Box fontSize={32} fontWeight="bold" paddingX={6}>
+            <LogoIcon width={25} height={34} />
           </Box>
 
           <VStack
@@ -646,7 +642,7 @@ export const DashboardLayout = ({
             )}
 
             <Spacer />
-            {/* <SideMenuLink
+            <SideMenuLink
               size="sm"
               href="https://docs.langwatch.ai"
               icon={BookOpen}
@@ -682,7 +678,7 @@ export const DashboardLayout = ({
               isActive={false}
               project={project}
               isHovered={isHovered}
-            /> */}
+            />
             {(window as any)?.$crisp && (
               <SideMenuLink
                 size="sm"
