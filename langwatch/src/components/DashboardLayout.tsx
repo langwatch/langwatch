@@ -74,6 +74,7 @@ import { DiscordOutlineIcon } from "./icons/DiscordOutline";
 import { ChatBalloonIcon } from "./icons/ChatBalloon";
 import { HoverableBigText } from "./HoverableBigText";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
+import { useDebounceValue } from "usehooks-ts";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -104,27 +105,24 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   );
 };
 
-const SideMenuLink = ({
+const PageMenuLink = ({
   icon,
   label,
   path,
   project,
   badgeNumber,
+  isHovered,
 }: {
   icon: React.ComponentType<{ size?: string | number; color?: string }>;
   label: string;
   path: string;
   project?: Project;
   badgeNumber?: number;
+  isHovered?: boolean;
 }) => {
   const router = useRouter();
   const currentRoute = findCurrentRoute(router.pathname);
   const { isTableView } = useTableView();
-
-  const theme = useTheme();
-  const orange400 = theme.colors.orange["400"];
-
-  const IconElem = icon;
 
   const isActive =
     currentRoute?.path === path ||
@@ -147,44 +145,106 @@ const SideMenuLink = ({
     : "";
 
   return (
-    <Tooltip
-      label={label === "Home" ? "Analytics" : label}
-      hasArrow
-      placement="right"
-      gutter={16}
-    >
-      <Link
-        href={
-          project
-            ? path.replace("[project]", project.slug) + viewModeQuery
-            : "/auth/signin"
-        }
-        aria-label={label}
-        onClick={() => {
-          trackEvent("side_menu_click", {
-            project_id: project?.id,
-            menu_item: label,
-          });
-        }}
-      >
-        <VStack position="relative">
-          <IconElem size={24} color={isActive ? orange400 : undefined} />
+    <SideMenuLink
+      icon={icon}
+      label={label}
+      href={
+        project
+          ? path.replace("[project]", project.slug) + viewModeQuery
+          : "/auth/signin"
+      }
+      isActive={isActive}
+      badgeNumber={badgeNumber}
+      isHovered={isHovered}
+    />
+  );
+};
 
-          {badgeNumber && badgeNumber > 0 && (
-            <Box position="absolute" top={4} left={4}>
-              <Badge
-                backgroundColor="green.500"
-                color="white"
-                borderRadius="full"
-                paddingX={1.5}
-              >
-                {badgeNumber}
-              </Badge>
+const SideMenuLink = ({
+  size = "md",
+  icon,
+  label,
+  href,
+  project,
+  isActive,
+  badgeNumber,
+  isHovered,
+  onClick,
+}: {
+  size?: "sm" | "md";
+  icon:
+    | React.ComponentType<{ size?: string | number; color?: string }>
+    | React.ReactNode;
+  label: string;
+  href: string;
+  project?: Project;
+  isActive: boolean;
+  badgeNumber?: number;
+  isHovered?: boolean;
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+}) => {
+  const badge =
+    badgeNumber && badgeNumber > 0 ? (
+      <Badge
+        backgroundColor="green.500"
+        color="white"
+        borderRadius="full"
+        paddingX={1.5}
+      >
+        {badgeNumber}
+      </Badge>
+    ) : null;
+
+  const theme = useTheme();
+  const orange400 = theme.colors.orange["400"];
+  const orange600 = theme.colors.orange["600"];
+
+  const IconElem = icon as any;
+  const iconNode =
+    typeof IconElem == "function" || IconElem.render ? (
+      <IconElem
+        size={size === "sm" ? 18 : 24}
+        color={isActive ? orange400 : undefined}
+      />
+    ) : (
+      (icon as any)
+    );
+
+  return (
+    <Link
+      variant="unstyled"
+      width="full"
+      paddingX={6}
+      paddingY={size === "sm" ? 3 : 4}
+      href={href}
+      aria-label={label}
+      onClick={(e) => {
+        trackEvent("side_menu_click", {
+          project_id: project?.id,
+          menu_item: label,
+        });
+        onClick?.(e);
+      }}
+      fontSize={size === "sm" ? 14 : 15}
+      _hover={{
+        backgroundColor: "gray.50",
+      }}
+    >
+      <HStack align="center" spacing={4} minHeight="21px">
+        <VStack align="start" position="relative">
+          {iconNode}
+
+          {badge && (
+            <Box position="absolute" bottom="-8px" right="-8px">
+              {badge}
             </Box>
           )}
         </VStack>
-      </Link>
-    </Tooltip>
+        {isHovered && (
+          <Text color={isActive ? orange600 : undefined}>{label}</Text>
+        )}
+      </HStack>
+    </Link>
   );
 };
 
@@ -413,6 +473,10 @@ export const DashboardLayout = ({
     ).length;
   }, [integrationChecks.data]);
 
+  const [isHovered, setIsHovered] = useDebounceValue(false, 200, {
+    leading: true,
+  });
+
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return <ErrorPage statusCode={404} />;
   }
@@ -442,42 +506,63 @@ export const DashboardLayout = ({
             : ""}
         </title>
       </Head>
+      {!isHovered && (
+        <Box
+          position="fixed"
+          zIndex={4}
+          onMouseEnter={() => setIsHovered(true)}
+          width="20px"
+          top={0}
+          left="78px"
+          height="100vh"
+        ></Box>
+      )}
       <Box
         borderRightWidth="1px"
         borderRightColor="gray.300"
         background="white"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        transition="all 0.2s ease-in-out"
+        width={isHovered ? "200px" : "73px"}
+        minWidth={isHovered ? "200px" : "73px"}
+        overflowX="hidden"
       >
         <VStack
-          paddingX={6}
-          paddingY={8}
+          paddingX={0}
+          paddingTop={8}
+          paddingBottom={3}
           spacing={6}
           position="sticky"
           top={0}
           height="100vh"
+          align="start"
+          width={isHovered ? "200px" : "full"}
         >
-          <Box fontSize={32} fontWeight="bold">
+          <Box fontSize={32} fontWeight="bold" paddingX={6}>
             <LogoIcon width={25} height={34} />
           </Box>
 
-          <VStack height="full" spacing={7}>
-            <SideMenuLink
-              path={projectRoutes.workflows.path}
-              icon={PuzzleIcon}
-              label={projectRoutes.workflows.title}
-              project={project}
-            />
-
-            <SideMenuLink
+          <VStack
+            width="full"
+            height="full"
+            spacing={0}
+            paddingTop={0}
+            align="start"
+          >
+            <PageMenuLink
               path={projectRoutes.home.path}
               icon={TrendingUp}
               label={projectRoutes.home.title}
               project={project}
+              isHovered={isHovered}
             />
-            <SideMenuLink
+            <PageMenuLink
               path={projectRoutes.messages.path}
               icon={MessageSquare}
               label={projectRoutes.messages.title}
               project={project}
+              isHovered={isHovered}
             />
             {/* <SideMenuLink
               path={projectRoutes.analytics.path}
@@ -485,11 +570,20 @@ export const DashboardLayout = ({
               label={projectRoutes.analytics.title}
               project={project}
             />*/}
-            <SideMenuLink
+            <PageMenuLink
               path={projectRoutes.evaluations.path}
               icon={Shield}
               label={projectRoutes.evaluations.title}
               project={project}
+              isHovered={isHovered}
+            />
+
+            <PageMenuLink
+              path={projectRoutes.workflows.path}
+              icon={PuzzleIcon}
+              label={projectRoutes.workflows.title}
+              project={project}
+              isHovered={isHovered}
             />
             {/* <SideMenuLink
               path={projectRoutes.playground.path}
@@ -498,30 +592,34 @@ export const DashboardLayout = ({
               project={project}
             /> */}
 
-            <SideMenuLink
+            <PageMenuLink
               path={projectRoutes.datasets.path}
               icon={Table}
               label={projectRoutes.datasets.title}
               project={project}
+              isHovered={isHovered}
             />
-            <SideMenuLink
+            <PageMenuLink
               path={projectRoutes.annotations.path}
               icon={Edit}
               label={projectRoutes.annotations.title}
               project={project}
               badgeNumber={totalQueueItems}
+              isHovered={isHovered}
             />
-            <SideMenuLink
+            <PageMenuLink
               path={projectRoutes.triggers.path}
               icon={Bell}
               label={projectRoutes.triggers.title}
               project={project}
+              isHovered={isHovered}
             />
-            <SideMenuLink
+            <PageMenuLink
               path={projectRoutes.experiments.path}
               icon={Play}
               label={projectRoutes.experiments.title}
               project={project}
+              isHovered={isHovered}
             />
 
             {/*<SideMenuLink
@@ -534,97 +632,99 @@ export const DashboardLayout = ({
               OrganizationRoleGroup.ORGANIZATION_VIEW
             ) ||
               isPublicRoute) && (
-              <SideMenuLink
+              <PageMenuLink
                 path={projectRoutes.settings.path}
                 icon={Settings}
                 label={projectRoutes.settings.title}
                 project={project}
+                isHovered={isHovered}
               />
             )}
 
             <Spacer />
-            <VStack spacing={6}>
-              <Tooltip
-                hasArrow
-                placement="right"
-                gutter={16}
-                label="Documentation"
-              >
-                <Link href="https://docs.langwatch.ai" target="_blank">
-                  <IconWrapper width="20px" height="20px">
-                    <BookOpen />
-                  </IconWrapper>
-                </Link>
-              </Tooltip>
+            <SideMenuLink
+              size="sm"
+              href="https://docs.langwatch.ai"
+              icon={BookOpen}
+              label="Documentation"
+              isActive={false}
+              project={project}
+              isHovered={isHovered}
+            />
 
-              <>
-                <Tooltip
-                  hasArrow
-                  placement="right"
-                  gutter={16}
-                  label="Star us on GitHub"
-                >
-                  <Link
-                    href="https://github.com/langwatch/langwatch"
-                    target="_blank"
-                  >
-                    <IconWrapper width="20px" height="20px">
-                      <GitHub />
-                    </IconWrapper>
-                  </Link>
-                </Tooltip>
-                <Tooltip
-                  hasArrow
-                  placement="right"
-                  gutter={16}
-                  label="Join our community"
-                >
-                  <Link href="https://discord.gg/kT4PhDS2gH" target="_blank">
-                    <IconWrapper width="20px" height="20px">
-                      <DiscordOutlineIcon />
-                    </IconWrapper>
-                  </Link>
-                </Tooltip>
-              </>
-            </VStack>
+            <SideMenuLink
+              size="sm"
+              href="https://github.com/langwatch/langwatch"
+              icon={
+                <IconWrapper width="20px" height="20px">
+                  <GitHub />
+                </IconWrapper>
+              }
+              label="GitHub"
+              isActive={false}
+              project={project}
+              isHovered={isHovered}
+            />
+
+            <SideMenuLink
+              size="sm"
+              href="https://discord.gg/kT4PhDS2gH"
+              icon={
+                <IconWrapper width="20px" height="20px">
+                  <DiscordOutlineIcon />
+                </IconWrapper>
+              }
+              label="Community"
+              isActive={false}
+              project={project}
+              isHovered={isHovered}
+            />
             {(window as any)?.$crisp && (
-              <Tooltip hasArrow placement="right" gutter={16} label="Live Help">
-                <Button
-                  position="relative"
-                  color="white"
-                  variant="link"
-                  size="xs"
-                  padding={2}
-                  marginX={-2}
-                  borderRadius="full"
-                  minWidth={0}
-                  minHeight={0}
-                  onClick={() => {
-                    (window as any)?.$crisp.push(["do", "chat:show"]);
-                    (window as any)?.$crisp.push(["do", "chat:toggle"]);
-                  }}
-                  backgroundColor="blue.500"
-                  _hover={{
-                    transform: "scale(1.2)",
-                  }}
-                  _active={{
-                    color: "white",
-                  }}
-                >
-                  <ChatBalloonIcon width={20} height={20} />
+              <SideMenuLink
+                size="sm"
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  (window as any)?.$crisp.push(["do", "chat:show"]);
+                  (window as any)?.$crisp.push(["do", "chat:toggle"]);
+                }}
+                icon={
                   <Box
-                    position="absolute"
-                    bottom="0px"
-                    right="0px"
-                    width="10px"
-                    height="10px"
+                    position="relative"
+                    color="white"
+                    padding={2}
+                    marginX={-2}
                     borderRadius="full"
-                    backgroundColor="green.500"
-                    border="1px solid"
-                    borderColor="white"
-                  />
-                </Button>
-              </Tooltip>
+                    minWidth={0}
+                    minHeight={0}
+                    backgroundColor="blue.500"
+                    transition="all 0.2s ease-in-out"
+                    _hover={{
+                      transform: "scale(1.2)",
+                    }}
+                    _active={{
+                      color: "white",
+                    }}
+                  >
+                    <ChatBalloonIcon width={20} height={20} />
+                    <Box
+                      position="absolute"
+                      bottom="0px"
+                      right="0px"
+                      width="10px"
+                      height="10px"
+                      borderRadius="full"
+                      backgroundColor="green.500"
+                      border="1px solid"
+                      borderColor="white"
+                    />
+                  </Box>
+                }
+                label="Live Help"
+                isActive={false}
+                project={project}
+                isHovered={isHovered}
+              />
             )}
           </VStack>
         </VStack>
