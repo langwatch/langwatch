@@ -365,7 +365,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
       return (
         <Text padding={4}>
           {!isFinished
-            ? "Waiting for first results to arrive..."
+            ? "Waiting for the first results to arrive..."
             : "No results"}
         </Text>
       );

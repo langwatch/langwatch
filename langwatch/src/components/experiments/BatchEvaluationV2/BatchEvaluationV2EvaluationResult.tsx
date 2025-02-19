@@ -79,7 +79,7 @@ const evaluationResultsTableRow = (
               minWidth="24px"
               minHeight="24px"
               maxHeight="120px"
-              maxWidth="360px"
+              maxWidth="100%"
             />
           ) : datasetEntry ? (
             <HoverableBigText>

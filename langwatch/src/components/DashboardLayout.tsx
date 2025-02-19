@@ -508,13 +508,6 @@ export const DashboardLayout = ({
     }
   );
 
-  useEffect(() => {
-    if (getRecentMenuLinkClick()) {
-      setIsHovered(true);
-      setRecentMenuLinkClick(false);
-    }
-  }, [setIsHovered]);
-
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return <ErrorPage statusCode={404} />;
   }
