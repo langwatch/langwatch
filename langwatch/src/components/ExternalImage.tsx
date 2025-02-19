@@ -15,13 +15,21 @@ export const isImageUrl = (str: string): boolean => {
 
   try {
     // Try to create URL object to validate URL format
-    new URL(str);
+    const url_ = new URL(str);
 
     // Check for common image extensions
     const imageExtensionRegex = /\.(jpeg|jpg|gif|png|webp|svg|bmp)(\?.*)?$/i;
 
     // Check if URL contains an image file extension
     if (imageExtensionRegex.test(str)) {
+      return true;
+    }
+
+    // Check if url is from commonly used image hosting sites which don't end up in the imageExtensionRegex
+    if (
+      url_.hostname.endsWith("gstatic.com") ||
+      url_.hostname.endsWith("googleusercontent.com")
+    ) {
       return true;
     }
 
