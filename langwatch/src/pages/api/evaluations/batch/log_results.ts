@@ -168,19 +168,19 @@ const processBatchEvaluation = async (
     dataset:
       param.dataset?.map((entry) => ({
         ...entry,
-        ...(entry.entry ? { entry: safeTruncate(entry.entry, 8 * 1024) } : {}),
+        ...(entry.entry ? { entry: safeTruncate(entry.entry, 32 * 1024) } : {}),
         ...(entry.predicted
-          ? { predicted: safeTruncate(entry.predicted, 8 * 1024) }
+          ? { predicted: safeTruncate(entry.predicted, 32 * 1024) }
           : {}),
       })) ?? [],
     evaluations:
       param.evaluations?.map((evaluation) => ({
         ...evaluation,
         ...(evaluation.inputs
-          ? { inputs: safeTruncate(evaluation.inputs, 8 * 1024) }
+          ? { inputs: safeTruncate(evaluation.inputs, 32 * 1024) }
           : {}),
         ...(evaluation.details
-          ? { details: safeTruncate(evaluation.details, 4 * 1024) }
+          ? { details: safeTruncate(evaluation.details, 32 * 1024) }
           : {}),
       })) ?? [],
     timestamps: {

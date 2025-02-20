@@ -82,7 +82,7 @@ export default function MessagesOrIntegrationGuide() {
                       }}
                     >
                       <HStack spacing={3}>
-                        <Lock size={24} color="#777" />
+                        <Lock size={14} color="#777" />
 
                         <Text fontSize={18} color="gray.600">
                           Create new
@@ -102,7 +102,7 @@ export default function MessagesOrIntegrationGuide() {
                       borderColor="#999"
                       padding={1}
                     >
-                      <Plus size={20} color="#777" />
+                      <Plus size={14} color="#777" />
                     </Box>
 
                     <Text fontSize={18} color="gray.500">

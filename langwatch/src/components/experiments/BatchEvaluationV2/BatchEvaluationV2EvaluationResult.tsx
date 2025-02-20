@@ -1,5 +1,7 @@
 import {
   Box,
+  HStack,
+  Image,
   Table,
   TableContainer,
   Tbody,
@@ -13,10 +15,12 @@ import {
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import { useEffect, useRef } from "react";
+import { Info } from "react-feather";
 import type { ESBatchEvaluation } from "../../../server/experiments/types";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
 import { HoverableBigText } from "../../HoverableBigText";
+import { ExternalImage, isImageUrl } from "../../ExternalImage";
 
 type RenderableRow = {
   render: () => JSX.Element;
@@ -57,35 +61,50 @@ const evaluationResultsTableRow = (
     (acc, curr) => (acc ?? 0) + (curr?.cost ?? 0),
     0
   );
+  const evaluationsDuration = Object.values(evaluationsForEntry).reduce(
+    (acc, curr) => (acc ?? 0) + (curr?.duration ?? 0),
+    0
+  );
+
+  const stringify = (value: any) =>
+    typeof value === "object" ? JSON.stringify(value) : `${value}`;
 
   return {
     datasetColumns: Array.from(datasetColumns).map((column) => ({
       render: () => (
         <Td key={`dataset-${column}`} maxWidth="250px">
-          {datasetEntry ? (
+          {datasetEntry && isImageUrl(datasetEntry.entry[column]) ? (
+            <ExternalImage
+              src={datasetEntry.entry[column]}
+              minWidth="24px"
+              minHeight="24px"
+              maxHeight="120px"
+              maxWidth="100%"
+            />
+          ) : datasetEntry ? (
             <HoverableBigText>
-              {datasetEntry.entry[column] ?? "-"}
+              {stringify(datasetEntry.entry[column])}
             </HoverableBigText>
           ) : (
             "-"
           )}
         </Td>
       ),
-      value: () => datasetEntry?.entry[column] ?? "-",
+      value: () => stringify(datasetEntry?.entry[column]),
     })),
     predictedColumns: Array.from(predictedColumns).map((column) => ({
       render: () => (
         <Td key={`predicted-${column}`} maxWidth="250px">
           {datasetEntry ? (
             <HoverableBigText>
-              {datasetEntry.predicted?.[column] ?? "-"}
+              {stringify(datasetEntry.predicted?.[column])}
             </HoverableBigText>
           ) : (
             "-"
           )}
         </Td>
       ),
-      value: () => datasetEntry?.predicted?.[column] ?? "-",
+      value: () => stringify(datasetEntry?.predicted?.[column]),
     })),
     cost: {
       render: () => (
@@ -115,9 +134,30 @@ const evaluationResultsTableRow = (
     duration: {
       render: () => (
         <Td>
-          {datasetEntry?.duration
-            ? formatMilliseconds(datasetEntry.duration)
-            : "-"}
+          <Tooltip
+            label={
+              <VStack align="start" spacing={0}>
+                <Text>
+                  Prediction duration:{" "}
+                  {datasetEntry?.duration
+                    ? formatMilliseconds(datasetEntry.duration)
+                    : "-"}
+                </Text>
+                <Text>
+                  Evaluation duration:{" "}
+                  {evaluationsDuration
+                    ? formatMilliseconds(evaluationsDuration)
+                    : "-"}
+                </Text>
+              </VStack>
+            }
+          >
+            {!!datasetEntry?.duration || !!evaluationsDuration
+              ? formatMilliseconds(
+                  (datasetEntry?.duration ?? 0) + (evaluationsDuration ?? 0)
+                )
+              : "-"}
+          </Tooltip>
         </Td>
       ),
       value: () => datasetEntry?.duration?.toString() ?? "",
@@ -153,7 +193,7 @@ const evaluationResultsTableRow = (
                       <Td key={`evaluation-entry-${column}`} maxWidth="250px">
                         {evaluation ? (
                           <HoverableBigText>
-                            {evaluation.inputs?.[column] ?? "-"}
+                            {stringify(evaluation.inputs?.[column] ?? "-")}
                           </HoverableBigText>
                         ) : (
                           "-"
@@ -373,6 +413,7 @@ export function BatchEvaluationV2EvaluationResult({
   isFinished,
   size = "md",
   hasScrolled,
+  workflowId,
 }: {
   evaluator: string;
   results: ESBatchEvaluation["evaluations"];
@@ -382,6 +423,7 @@ export function BatchEvaluationV2EvaluationResult({
   isFinished: boolean;
   size?: "sm" | "md";
   hasScrolled: boolean;
+  workflowId: string | null;
 }) {
   const tableData = evaluationResultsTableData(
     { [evaluator]: results },
@@ -442,7 +484,14 @@ export function BatchEvaluationV2EvaluationResult({
 
             {predictedColumns.size > 0 && (
               <Th colSpan={predictedColumns.size} paddingY={2}>
-                <Text>Predicted</Text>
+                <HStack>
+                  <Text>Predicted</Text>
+                  {workflowId && (
+                    <Tooltip label="Values plugged in the End node will show up here">
+                      <Info size={14} />
+                    </Tooltip>
+                  )}
+                </HStack>
               </Th>
             )}
 
@@ -494,7 +543,9 @@ export function BatchEvaluationV2EvaluationResult({
 
               {Array.from(row.datasetColumns).map((column) => column.render())}
 
-              {Array.from(row.predictedColumns).map((column) => column.render())}
+              {Array.from(row.predictedColumns).map((column) =>
+                column.render()
+              )}
 
               {Array.from(
                 row.evaluationsColumns[evaluator]?.evaluationInputs ?? []

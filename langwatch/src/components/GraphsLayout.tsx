@@ -4,6 +4,7 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useFilterToggle } from "./filters/FilterToggle";
+import { SmallLabel } from "./SmallLabel";
 
 export default function GraphsLayout({ children }: PropsWithChildren) {
   const { project } = useOrganizationTeamProject();
@@ -25,9 +26,16 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
         >
           <MenuLink href={`/${project?.slug}`}>Overview</MenuLink>
           <VStack align="start" width="full" spacing={0}>
-            <Text fontWeight={"bold"} paddingX={4} paddingY={2}>
+            {/* TODO: reduce font size to 11 once the rest of the page also have a smaller fit */}
+            <SmallLabel
+              paddingX={4}
+              paddingTop={4}
+              paddingBottom={2}
+              color="gray.700"
+              fontSize="12px"
+            >
               Engagement
-            </Text>
+            </SmallLabel>
             <MenuLink href={`/${project?.slug}/analytics/users`} paddingX={6}>
               Users
             </MenuLink>
@@ -36,9 +44,15 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
             </MenuLink>
           </VStack>
           <VStack align="start" width="full" spacing={0}>
-            <Text fontWeight={"bold"} paddingX={4} paddingY={2}>
-              Observabilty
-            </Text>
+            <SmallLabel
+              paddingX={4}
+              paddingTop={4}
+              paddingBottom={2}
+              color="gray.700"
+              fontSize="12px"
+            >
+              Observability
+            </SmallLabel>
             <MenuLink href={`/${project?.slug}/analytics/metrics`} paddingX={6}>
               LLM Metrics
             </MenuLink>
@@ -50,9 +64,15 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
             </MenuLink>
           </VStack>
           <VStack align="start" width="full" spacing={0}>
-            <Text fontWeight={"bold"} paddingX={4} paddingY={2}>
+            <SmallLabel
+              paddingX={4}
+              paddingTop={4}
+              paddingBottom={2}
+              color="gray.700"
+              fontSize="12px"
+            >
               Custom
-            </Text>
+            </SmallLabel>
             <MenuLink href={`/${project?.slug}/analytics/reports`} paddingX={6}>
               Reports
             </MenuLink>

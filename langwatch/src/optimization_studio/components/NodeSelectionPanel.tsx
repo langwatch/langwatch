@@ -3,24 +3,23 @@ import {
   Box,
   Button,
   HStack,
-  position,
+  Link,
   Spacer,
   Text,
-  VStack,
   Tooltip,
-  Link,
+  VStack,
 } from "@chakra-ui/react";
-import {
-  useReactFlow,
-  type Node,
-  type Edge,
-  type XYPosition,
-} from "@xyflow/react";
+import { useReactFlow, type Node, type XYPosition } from "@xyflow/react";
 import { useEffect, useMemo, useRef } from "react";
-import { useDrag, useDragDropManager, useDragLayer } from "react-dnd";
+import { useDrag, useDragLayer } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
 import { BookOpen, Box as BoxIcon, ChevronsLeft, GitHub } from "react-feather";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 import { HoverableBigText } from "../../components/HoverableBigText";
+import { IconWrapper } from "../../components/IconWrapper";
+import { DiscordOutlineIcon } from "../../components/icons/DiscordOutline";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 import {
   updateCodeClassName,
   useWorkflowStore,
@@ -29,7 +28,6 @@ import { MODULES } from "../registry";
 import {
   type Component,
   type ComponentType,
-  type Signature,
   type Custom,
   type Field,
 } from "../types/dsl";
@@ -41,11 +39,6 @@ import {
 import { ComponentIcon } from "./ColorfulBlockIcons";
 import { NodeComponents } from "./nodes";
 import { PromptingTechniqueDraggingNode } from "./nodes/PromptingTechniqueNode";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
-import { IconWrapper } from "../../components/IconWrapper";
-import { DiscordOutlineIcon } from "../../components/icons/DiscordOutline";
-import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 export function NodeSelectionPanelButton({
   isOpen,
@@ -56,6 +49,7 @@ export function NodeSelectionPanelButton({
 }) {
   return (
     <Button
+      size="sm"
       display={isOpen ? "none" : "block"}
       background="white"
       borderRadius={4}
@@ -65,7 +59,10 @@ export function NodeSelectionPanelButton({
         setIsOpen(!isOpen);
       }}
     >
-      <BoxIcon size={22} />
+      <HStack>
+        <BoxIcon size={13} />
+        <Text>Components</Text>
+      </HStack>
     </Button>
   );
 }
@@ -279,7 +276,7 @@ export const NodeSelectionPanel = ({
               setIsOpen(!isOpen);
             }}
           >
-            {isOpen ? <ChevronsLeft size={18} /> : <BoxIcon size={18} />}
+            <ChevronsLeft size={18} />
           </Button>
         </HStack>
       </VStack>
@@ -453,7 +450,7 @@ export function CustomDragLayer() {
 
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (item && item.node &&ref.current) {
+    if (item && item.node && ref.current) {
       const { width, height } = ref.current.getBoundingClientRect();
       item.node.width = width;
       item.node.height = height;

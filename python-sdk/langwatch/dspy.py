@@ -175,6 +175,7 @@ class LangWatchDSPy:
                     "experiment_name": experiment,
                     "workflow_id": workflow_id,
                 },
+                timeout=60,
             )
         except Exception as e:
             raise Exception(f"Error initializing LangWatch experiment: {e}")
@@ -374,6 +375,7 @@ class LangWatchDSPy:
                 "Content-Type": "application/json",
             },
             data=json.dumps(data),  # type: ignore
+            timeout=60,
         )
         response.raise_for_status()
         self.steps_buffer = []

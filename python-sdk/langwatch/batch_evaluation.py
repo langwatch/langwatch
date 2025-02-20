@@ -134,7 +134,7 @@ class BatchEvaluation:
         dataset = get_dataset(self.dataset)
 
         print("Starting batch evaluation...")
-        with httpx.Client(timeout=300) as client:
+        with httpx.Client(timeout=60) as client:
             response = client.post(
                 f"{langwatch.endpoint}/api/experiment/init",
                 headers={"X-Auth-Token": langwatch.api_key or ""},
@@ -362,7 +362,7 @@ class BatchEvaluation:
             f"{langwatch.endpoint}/api/evaluations/batch/log_results",
             headers={"Authorization": f"Bearer {api_key}"},
             json=body,
-            timeout=10,
+            timeout=60,
         )
         response.raise_for_status()
 

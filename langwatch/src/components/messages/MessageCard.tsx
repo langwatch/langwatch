@@ -30,7 +30,6 @@ import {
   Shield,
   XCircle,
 } from "react-feather";
-import Markdown from "react-markdown";
 import type {
   EvaluationResult,
   Trace,
@@ -45,12 +44,12 @@ import { useDrawer } from "../CurrentDrawer";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { EventsCounter } from "./EventsCounter";
 import { evaluationPassed } from "../checks/EvaluationStatus";
-import remarkGfm from "remark-gfm";
 import { isJson } from "../../utils/isJson";
 import {
   isPythonRepr,
   parsePythonInsideJson,
 } from "../../utils/parsePythonInsideJson";
+import { Markdown } from "../Markdown";
 
 export type TraceWithGuardrail = Trace & {
   lastGuardrail: (EvaluationResult & { name?: string }) | undefined;
@@ -170,10 +169,7 @@ export function MessageCard({
                 <MessageCardJsonOutput value={trace.input?.value ?? ""} />
               ) : (
                 <Text noOfLines={1} wordBreak="break-all" lineHeight="2.1em">
-                  <Markdown
-                    remarkPlugins={[remarkGfm]}
-                    className="markdown markdown-without-margin"
-                  >
+                  <Markdown className="markdown markdown-without-margin">
                     {getExtractedInput(trace)}
                   </Markdown>
                 </Text>
@@ -209,7 +205,7 @@ export function MessageCard({
                 isPythonRepr(trace.output.value)) ? (
                 <MessageCardJsonOutput value={trace.output.value} />
               ) : trace.output?.value ? (
-                <Markdown remarkPlugins={[remarkGfm]} className="markdown">
+                <Markdown className="markdown">
                   {getSlicedOutput(trace)}
                 </Markdown>
               ) : trace.lastGuardrail ? (

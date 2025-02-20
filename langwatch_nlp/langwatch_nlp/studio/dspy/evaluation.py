@@ -141,8 +141,6 @@ class EvaluationReporting:
         evaluation, evaluation_results = pred.evaluation(example, return_results=True)
 
         if self.progress == 0:
-            # Send initial empty batch to create the experiment in LangWatch
-            self.send_batch()
             self.last_sent = 0
 
         with self.lock:
@@ -176,6 +174,11 @@ class EvaluationReporting:
         duration = pred.get_duration() if hasattr(pred, "get_duration") else None
         error = pred.get_error() if hasattr(pred, "get_error") else None
 
+        node_results = {
+            **pred.__dict__.get("_store", {}),
+            **{k: v for k, v in pred.__dict__.items() if not k.startswith("_")},
+        }
+
         predicted = {
             "index": example._index,
             "entry": entry,
@@ -184,6 +187,8 @@ class EvaluationReporting:
         }
         if error:
             predicted["error"] = str(error)
+        if "end" in node_results:
+            predicted["predicted"] = node_results["end"]
 
         self.batch["dataset"].append(predicted)
 
@@ -221,9 +226,6 @@ class EvaluationReporting:
 
     def send_batch(self, finished: bool = False):
         with self.lock:
-            if len(self.batch["dataset"]) == 0 and len(self.batch["evaluations"]) == 0:
-                return
-
             body = {
                 "experiment_slug": self.workflow.workflow_id,
                 "name": f"{self.workflow.name} - Evaluations",
@@ -265,7 +267,7 @@ class EvaluationReporting:
             f"{langwatch.endpoint}/api/evaluations/batch/log_results",
             headers={"Authorization": f"Bearer {api_key}"},
             json=body,
-            timeout=10,
+            timeout=60,
         )
         response.raise_for_status()
 

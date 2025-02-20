@@ -238,7 +238,8 @@ class WorkflowModule(ReportingModule):
         evaluation_nodes = [
             node
             for node in self.workflow.nodes
-            if node.type == "evaluator" or node.data.behave_as == "evaluator"
+            if node.type == "evaluator"
+            or (node.data.behave_as == "evaluator" and node.type != "end")
         ]
 
         if prediction_error:
@@ -279,10 +280,6 @@ class WorkflowModule(ReportingModule):
                     traceback=[],
                 )
 
-            if node.type == "end":
-                result = EvaluationResult.model_validate(
-                    {"status": "processed", **result}, strict=False  # type: ignore
-                )
             result = cast(SingleEvaluationResult, result)
             duration = round((time.time() - start_time) * 1000)
             evaluation_results[node.id] = EvaluationResultWithMetadata(
@@ -292,9 +289,7 @@ class WorkflowModule(ReportingModule):
                 evaluation_scores[node.id] = (
                     result.score
                     if result.score is not None
-                    else float(result.passed)
-                    if result.passed is not None
-                    else 0
+                    else float(result.passed) if result.passed is not None else 0
                 )
 
         score = 0

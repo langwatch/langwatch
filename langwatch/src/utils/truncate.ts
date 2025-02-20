@@ -86,8 +86,8 @@ const truncateWithSizeLimit = (
 
 export const safeTruncate = <T>(
   data: T,
-  maxTotalLength = 16 * 1024, // 16KB
-  stringLengths = [8 * 1024, 4 * 1024, 2 * 1024, 1024]
+  maxTotalLength = 32 * 1024, // 32KB
+  stringLengths = [24 * 1024, 16 * 1024, 8 * 1024, 4 * 1024, 2 * 1024, 1024]
 ): T => {
   try {
     return truncateWithSizeLimit(data, maxTotalLength, stringLengths) as T;

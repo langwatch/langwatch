@@ -17,28 +17,40 @@ export function AutoSave() {
   const autosave = api.workflow.autosave.useMutation();
   const [recentlySaved, setRecentlySaved] = useState(false);
 
-  const { setWorkflow, setPreviousWorkflow } = useWorkflowStore(
-    ({ setWorkflow, setPreviousWorkflow }) => ({
+  const {
+    setWorkflow,
+    setPreviousWorkflow,
+    hasPendingChanges,
+    getWorkflow,
+    getPreviousWorkflow,
+  } = useWorkflowStore(
+    ({
       setWorkflow,
       setPreviousWorkflow,
+      hasPendingChanges,
+      getWorkflow,
+      getPreviousWorkflow,
+    }) => ({
+      setWorkflow,
+      setPreviousWorkflow,
+      hasPendingChanges,
+      getWorkflow,
+      getPreviousWorkflow,
     })
   );
   const stateWorkflow = useWorkflowStore(
     // Use shallow to compare equality of the workflow values only, since object is always re-created
     useShallow((state) => state.getWorkflow())
   );
-  const previousWorkflow = useWorkflowStore(
-    // Same here
-    useShallow((state) => state.previousWorkflow)
-  );
+
   const saveIfChanged = useDebouncedCallback(
     () => {
       if (!project || !workflow.data) return;
 
-      if (
-        previousWorkflow &&
-        hasDSLChange(previousWorkflow, stateWorkflow, true)
-      ) {
+      const stateWorkflow = getWorkflow();
+      if (hasPendingChanges()) {
+        const previousWorkflow = getPreviousWorkflow()!;
+
         const setAsLatestVersion = hasDSLChange(
           previousWorkflow,
           stateWorkflow,

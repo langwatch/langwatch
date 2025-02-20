@@ -25,7 +25,7 @@ import { Link } from "@chakra-ui/next-js";
 import "@xyflow/react/dist/style.css";
 import Head from "next/head";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { TrendingUp } from "react-feather";
+import { BarChart2 } from "react-feather";
 import {
   Panel,
   PanelGroup,
@@ -34,7 +34,6 @@ import {
 } from "react-resizable-panels";
 import { useShallow } from "zustand/react/shallow";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
-import { ExpandedTextModal } from "../../components/HoverableBigText";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { titleCase } from "../../utils/stringCasing";
@@ -59,6 +58,7 @@ import { PropertiesPanel } from "./properties/PropertiesPanel";
 import { Publish } from "./Publish";
 import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
+import { setRecentMenuLinkClick } from "../../components/DashboardLayout";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {
   const [_, drop] = useDrop(() => ({
@@ -211,7 +211,12 @@ export default function OptimizationStudio() {
               borderColor="gray.350"
             >
               <HStack width="full">
-                <Link href={`/${project?.slug}/workflows`}>
+                <Link
+                  href={`/${project?.slug}/workflows`}
+                  onClick={() => {
+                    setRecentMenuLinkClick(true);
+                  }}
+                >
                   <LogoIcon width={24} height={24} />
                 </Link>
                 <RunningStatus />
@@ -279,6 +284,7 @@ export default function OptimizationStudio() {
                         setIsOpen={setNodeSelectionPanelIsOpen}
                       />
                       <Button
+                        size="sm"
                         display={isResultsPanelCollapsed ? "block" : "none"}
                         background="white"
                         borderRadius={4}
@@ -288,7 +294,10 @@ export default function OptimizationStudio() {
                           panelRef.current?.expand(70);
                         }}
                       >
-                        <TrendingUp size={22} />
+                        <HStack>
+                          <BarChart2 size={14} />
+                          <Text>Results</Text>
+                        </HStack>
                       </Button>
                     </HStack>
                     {isResultsPanelCollapsed && <ProgressToast />}
@@ -323,11 +332,11 @@ export default function OptimizationStudio() {
                             marginLeft: nodeSelectionPanelIsOpen
                               ? !isResultsPanelCollapsed
                                 ? "16px"
-                                : "80px"
+                                : "122px"
                               : !isResultsPanelCollapsed
-                              ? "80px"
-                              : "142px",
-                            marginBottom: "18px",
+                              ? "180px"
+                              : "262px",
+                            marginBottom: "15px",
                           }}
                         />
                         <ReactFlowBackground />

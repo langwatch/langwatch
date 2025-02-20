@@ -14,10 +14,9 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
-import remarkGfm from "remark-gfm";
-import Markdown from "react-markdown";
 import { isJson } from "../utils/isJson";
 import { RenderInputOutput } from "./traces/RenderInputOutput";
+import { Markdown } from "./Markdown";
 
 export function ExpandedTextModal({
   isOpen,
@@ -55,7 +54,7 @@ export function ExpandedTextModal({
             isJson(textExpanded) ? (
               <RenderInputOutput value={textExpanded} showTools={"copy-only"} />
             ) : (
-              <Markdown remarkPlugins={[remarkGfm]} className="markdown">
+              <Markdown className="markdown">
                 {typeof textExpanded === "string"
                   ? textExpanded
                       .replace(/\n(?![\n\-])/g, "\\\n")

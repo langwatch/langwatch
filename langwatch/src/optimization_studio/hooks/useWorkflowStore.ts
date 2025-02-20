@@ -21,6 +21,7 @@ import type {
 } from "../types/dsl";
 import { findLowestAvailableName } from "../utils/nodeUtils";
 import { snakeCaseToPascalCase } from "../../utils/stringCasing";
+import { hasDSLChange } from "../components/History";
 
 export type SocketStatus =
   | "disconnected"
@@ -47,6 +48,8 @@ type State = Workflow & {
 type WorkflowStore = State & {
   reset: () => void;
   getWorkflow: () => Workflow;
+  getPreviousWorkflow: () => Workflow | undefined;
+  hasPendingChanges: () => boolean;
   setWorkflow: (workflow: Partial<Workflow> & { workflowId?: string }) => void;
   setPreviousWorkflow: (workflow: Workflow | undefined) => void;
   setSocketStatus: (
@@ -154,6 +157,17 @@ const store = (
       edges: state.edges,
       state: state.state,
     };
+  },
+  getPreviousWorkflow: () => {
+    return get().previousWorkflow;
+  },
+  hasPendingChanges: () => {
+    const previousWorkflow = get().previousWorkflow;
+    const currentWorkflow = get().getWorkflow();
+    if (!previousWorkflow || !currentWorkflow) {
+      return false;
+    }
+    return hasDSLChange(previousWorkflow, currentWorkflow, true);
   },
   setWorkflow: (workflow: Partial<Workflow>) => {
     set(workflow);
