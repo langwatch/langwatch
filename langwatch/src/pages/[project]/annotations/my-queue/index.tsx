@@ -18,6 +18,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { Conversation } from "../../messages/[trace]/index";
 import { useMemo } from "react";
+import { TasksDone } from "../../../../components/icons/TasksDone";
 
 export default function TraceAnnotations() {
   const router = useRouter();
@@ -51,8 +52,9 @@ export default function TraceAnnotations() {
           width="full"
           justify="center"
           backgroundColor="gray.100"
+          marginTop="-48px"
         >
-          <Image src="/images/tasks-done.png" alt="All Done" />
+          <TasksDone />
           <Text fontSize="xl" fontWeight="500">
             All tasks complete
           </Text>
