@@ -1,27 +1,20 @@
-import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
-import {
-  PrismaClient,
-  type Dataset,
-  type DatasetRecord,
-  type Organization,
-  type Project,
-} from "@prisma/client";
+import { PrismaClient, type Dataset, type DatasetRecord } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { nanoid } from "nanoid";
+import { z } from "zod";
+import { env } from "../../../env.mjs";
 import {
   newDatasetEntriesSchema,
   type DatasetRecordEntry,
 } from "../../datasets/types";
-import { nanoid } from "nanoid";
 import { prisma } from "../../db";
-import { env } from "../../../env.mjs";
+import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 import {
-  S3Client,
-  PutObjectCommand,
-  ListObjectsV2Command,
   GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
 } from "@aws-sdk/client-s3";
 
 export const datasetRecordRouter = createTRPCRouter({
@@ -129,18 +122,9 @@ export const datasetRecordRouter = createTRPCRouter({
       }
 
       if (dataset.useS3) {
-        const s3Client = await createS3Client(input.projectId);
-        const { Body } = await s3Client.send(
-          new GetObjectCommand({
-            Bucket: "langwatch",
-            Key: `datasets/${input.projectId}/${dataset.id}`,
-          })
-        );
-
-        const content = await Body?.transformToString();
-        const records = JSON.parse(content ?? "[]").slice(0, 5);
+        const records = await fetchRecordsFromS3(input.projectId, dataset.id);
         const total = records.length;
-        dataset.datasetRecords = records;
+        (dataset as any).datasetRecords = records.slice(0, 5);
 
         return { dataset, total };
       } else {
@@ -216,15 +200,7 @@ const deleteManyDatasetRecords = async ({
     // Get existing records
     let records: any[] = [];
     try {
-      const { Body } = await s3Client.send(
-        new GetObjectCommand({
-          Bucket: "langwatch",
-          Key: `datasets/${projectId}/${datasetId}`,
-        })
-      );
-
-      const content = await Body?.transformToString();
-      records = JSON.parse(content ?? "[]");
+      records = await fetchRecordsFromS3(projectId, datasetId);
     } catch (error) {
       if ((error as any).name === "NoSuchKey") {
         throw new TRPCError({
@@ -301,15 +277,7 @@ const updateDatasetRecord = async ({
     // Get existing records
     let records: any[] = [];
     try {
-      const { Body } = await s3Client.send(
-        new GetObjectCommand({
-          Bucket: "langwatch",
-          Key: `datasets/${projectId}/${datasetId}`,
-        })
-      );
-
-      const content = await Body?.transformToString();
-      records = JSON.parse(content ?? "[]");
+      records = await fetchRecordsFromS3(projectId, datasetId);
     } catch (error) {
       if ((error as any).name === "NoSuchKey") {
         records = [];
@@ -431,8 +399,6 @@ export const createManyDatasetRecords = async ({
   }
 
   if (dataset.useS3) {
-    const s3Client = await createS3Client(projectId);
-
     const recordData = createDatasetRecords(
       datasetRecords,
       {
@@ -444,20 +410,15 @@ export const createManyDatasetRecords = async ({
 
     let existingRecords: any[] = [];
     try {
-      const { Body } = await s3Client.send(
-        new GetObjectCommand({
-          Bucket: "langwatch",
-          Key: `datasets/${projectId}/${datasetId}`,
-        })
-      );
-      const content = await Body?.transformToString();
-      existingRecords = JSON.parse(content ?? "[]");
+      existingRecords = await fetchRecordsFromS3(projectId, datasetId);
     } catch (error) {
       if ((error as any).name !== "NoSuchKey") throw error;
     }
 
     // Combine existing and new records
     const allRecords = [...existingRecords, ...recordData];
+
+    const s3Client = await createS3Client(projectId);
 
     await s3Client.send(
       new PutObjectCommand({
@@ -511,21 +472,19 @@ export const getFullDataset = async ({
   if (!dataset) {
     return null;
   }
-  if (dataset.useS3) {
-    const s3Client = await createS3Client(projectId);
 
+  const truncatedDatasetRecords: DatasetRecord[] = [];
+  let truncated = false;
+  let totalSize = 0;
+  let currentPage = 0;
+  const BATCH_SIZE = 500;
+
+  if (dataset.useS3) {
     let records: any[] = [];
 
     try {
-      const { Body } = await s3Client.send(
-        new GetObjectCommand({
-          Bucket: "langwatch",
-          Key: `datasets/${projectId}/${datasetId}`,
-        })
-      );
+      records = await fetchRecordsFromS3(projectId, datasetId);
 
-      const content = await Body?.transformToString();
-      records = JSON.parse(content ?? "[]");
       if (entrySelection !== "all") {
         const count = records.length;
         records = records.filter((_, index) => {
@@ -568,73 +527,117 @@ export const getFullDataset = async ({
       };
     }
 
+    while (!truncated) {
+      const allRecords = await fetchRecordsFromS3(projectId, datasetId);
+
+      const records = allRecords.slice(
+        currentPage * BATCH_SIZE,
+        (currentPage + 1) * BATCH_SIZE
+      );
+
+      if (records.length === 0) break;
+
+      for (const record of records) {
+        const recordSize = JSON.stringify(record.entry).length;
+        if (!limitMb || totalSize + recordSize < limitMb * 1024 * 1024) {
+          truncatedDatasetRecords.push(record);
+          totalSize += recordSize;
+        } else {
+          truncated = true;
+          break;
+        }
+      }
+
+      if (truncated || records.length < BATCH_SIZE) break;
+      currentPage++;
+    }
+
     return {
       ...dataset,
       count: records.length,
       datasetRecords: records,
     };
-  }
-
-  const count = await prisma.datasetRecord.count({
-    where: { datasetId, projectId },
-  });
-
-  if (entrySelection === "random" || entrySelection === "last") {
-    return {
-      ...dataset,
-      count,
-      datasetRecords: await prisma.datasetRecord.findMany({
-        where: { datasetId, projectId },
-        orderBy: { createdAt: "asc" },
-        take: 1,
-        skip:
-          entrySelection === "last"
-            ? Math.max(count - 1, 0)
-            : entrySelection === "random"
-            ? Math.floor(Math.random() * count)
-            : 0,
-      }),
-    };
-  }
-
-  let truncatedDatasetRecords: DatasetRecord[] = [];
-  let truncated = false;
-  let totalSize = 0;
-  let currentPage = 0;
-  const BATCH_SIZE = 500;
-
-  // Fetch records in batches
-  while (!truncated) {
-    const records = await prisma.datasetRecord.findMany({
+  } else {
+    const count = await prisma.datasetRecord.count({
       where: { datasetId, projectId },
-      orderBy: { createdAt: "asc" },
-      take: BATCH_SIZE,
-      skip: currentPage * BATCH_SIZE,
     });
 
-    if (records.length === 0) break;
-
-    for (const record of records) {
-      const recordSize = JSON.stringify(record.entry).length;
-      if (!limitMb || totalSize + recordSize < limitMb * 1024 * 1024) {
-        truncatedDatasetRecords.push(record);
-        totalSize += recordSize;
-      } else {
-        truncated = true;
-        break;
-      }
+    if (entrySelection === "random" || entrySelection === "last") {
+      return {
+        ...dataset,
+        count,
+        datasetRecords: await prisma.datasetRecord.findMany({
+          where: { datasetId, projectId },
+          orderBy: { createdAt: "asc" },
+          take: 1,
+          skip:
+            entrySelection === "last"
+              ? Math.max(count - 1, 0)
+              : entrySelection === "random"
+              ? Math.floor(Math.random() * count)
+              : 0,
+        }),
+      };
     }
 
-    if (truncated || records.length < BATCH_SIZE) break;
-    currentPage++;
+    // Fetch records in batches
+    while (!truncated) {
+      const records = await prisma.datasetRecord.findMany({
+        where: { datasetId, projectId },
+        orderBy: { createdAt: "asc" },
+        take: BATCH_SIZE,
+        skip: currentPage * BATCH_SIZE,
+      });
+
+      if (records.length === 0) break;
+
+      for (const record of records) {
+        const recordSize = JSON.stringify(record.entry).length;
+        if (!limitMb || totalSize + recordSize < limitMb * 1024 * 1024) {
+          truncatedDatasetRecords.push(record);
+          totalSize += recordSize;
+        } else {
+          truncated = true;
+          break;
+        }
+      }
+
+      if (truncated || records.length < BATCH_SIZE) break;
+      currentPage++;
+    }
+
+    return {
+      ...dataset,
+      datasetRecords: truncatedDatasetRecords,
+      truncated,
+      count,
+    };
+  }
+};
+
+const fetchRecordsFromS3 = async (projectId: string, datasetId: string) => {
+  const s3Client = await createS3Client(projectId);
+  let records: any[] = [];
+
+  try {
+    const { Body } = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: "langwatch",
+        Key: `datasets/${projectId}/${datasetId}`,
+      })
+    );
+
+    const content = await Body?.transformToString();
+    records = JSON.parse(content ?? "[]");
+  } catch (error) {
+    if ((error as any).name === "NoSuchKey") {
+      records = [];
+    } else {
+      throw error; // Rethrow other errors
+    }
   }
 
-  return {
-    ...dataset,
-    datasetRecords: truncatedDatasetRecords,
-    truncated,
-    count,
-  };
+  return records;
 };
 
 export const createS3Client = async (projectId: string) => {
