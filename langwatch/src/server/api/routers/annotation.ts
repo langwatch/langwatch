@@ -192,6 +192,13 @@ export const annotationRouter = createTRPCRouter({
         strict: true,
       });
 
+      if (slug == "all" || slug == "me" || slug == "my-queue") {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "A annotation queue name is reserved.",
+        });
+      }
+
       if (input.queueId) {
         return ctx.prisma.annotationQueue.update({
           data: {

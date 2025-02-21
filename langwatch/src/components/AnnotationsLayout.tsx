@@ -81,9 +81,9 @@ export default function AnnotationsLayout({
             Inbox
           </MenuLink>
           <MenuLink
-            href={`/${project?.slug}/annotations/users/me`}
+            href={`/${project?.slug}/annotations/me`}
             isSelectedAnnotation={
-              router.pathname === "/[project]/annotations/users/me"
+              router.pathname === "/[project]/annotations/me"
             }
             icon={menuItems.myQueues}
             menuEnd={
@@ -123,10 +123,10 @@ export default function AnnotationsLayout({
           {memberAccessibleQueues?.map((queue) => (
             <MenuLink
               key={queue.id}
-              href={`/${project?.slug}/annotations/queues/${queue.slug}`}
+              href={`/${project?.slug}/annotations/${queue.slug}`}
               isSelectedAnnotation={
                 router.pathname ===
-                `/${project?.slug}/annotations/queues/${queue.slug}`
+                `/${project?.slug}/annotations/${queue.slug}`
               }
               icon={menuItems.queues}
               menuEnd={

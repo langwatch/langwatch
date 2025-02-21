@@ -8,7 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { DashboardLayout } from "../../../../components/DashboardLayout";
+import { DashboardLayout } from "../../../components/DashboardLayout";
 
 import { type AnnotationQueueItem } from "@prisma/client";
 import { Check, ChevronLeft, ChevronRight } from "react-feather";
@@ -16,9 +16,9 @@ import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { Conversation } from "../../messages/[trace]/index";
+import { Conversation } from "../messages/[trace]/index";
 import { useMemo } from "react";
-import { TasksDone } from "../../../../components/icons/TasksDone";
+import { TasksDone } from "../../../components/icons/TasksDone";
 
 export default function TraceAnnotations() {
   const router = useRouter();
