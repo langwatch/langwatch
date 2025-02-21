@@ -2,7 +2,6 @@ import { PrismaClient, type Dataset, type DatasetRecord } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { env } from "../../../env.mjs";
 import {
   newDatasetEntriesSchema,
   type DatasetRecordEntry,
@@ -11,11 +10,9 @@ import { prisma } from "../../db";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
-import {
-  GetObjectCommand,
-  PutObjectCommand,
-  S3Client,
-} from "@aws-sdk/client-s3";
+import { StorageService } from "../../storage";
+
+const storageService = new StorageService();
 
 export const datasetRecordRouter = createTRPCRouter({
   create: protectedProcedure
@@ -122,7 +119,10 @@ export const datasetRecordRouter = createTRPCRouter({
       }
 
       if (dataset.useS3) {
-        const records = await fetchRecordsFromS3(input.projectId, dataset.id);
+        const records = await storageService.getObject(
+          input.projectId,
+          dataset.id
+        );
         const total = records.length;
         (dataset as any).datasetRecords = records.slice(0, 5);
 
@@ -195,12 +195,10 @@ const deleteManyDatasetRecords = async ({
   prisma: PrismaClient;
 }) => {
   if (useS3) {
-    const s3Client = await createS3Client(projectId);
-
     // Get existing records
     let records: any[] = [];
     try {
-      records = await fetchRecordsFromS3(projectId, datasetId);
+      records = await storageService.getObject(projectId, datasetId);
     } catch (error) {
       if ((error as any).name === "NoSuchKey") {
         throw new TRPCError({
@@ -222,13 +220,10 @@ const deleteManyDatasetRecords = async ({
     }
 
     // Save back to S3
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: "langwatch",
-        Key: `datasets/${projectId}/${datasetId}`,
-        Body: JSON.stringify(records),
-        ContentType: "application/json",
-      })
+    await storageService.putObject(
+      projectId,
+      datasetId,
+      JSON.stringify(records)
     );
 
     await prisma.dataset.update({
@@ -273,11 +268,10 @@ const updateDatasetRecord = async ({
   prisma: PrismaClient;
 }) => {
   if (useS3) {
-    const s3Client = await createS3Client(projectId);
     // Get existing records
     let records: any[] = [];
     try {
-      records = await fetchRecordsFromS3(projectId, datasetId);
+      records = await storageService.getObject(projectId, datasetId);
     } catch (error) {
       if ((error as any).name === "NoSuchKey") {
         records = [];
@@ -305,13 +299,10 @@ const updateDatasetRecord = async ({
     };
 
     // Save back to S3
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: "langwatch",
-        Key: `datasets/${projectId}/${datasetId}`,
-        Body: JSON.stringify(records),
-        ContentType: "application/json",
-      })
+    await storageService.putObject(
+      projectId,
+      datasetId,
+      JSON.stringify(records)
     );
 
     await prisma.dataset.update({
@@ -408,25 +399,18 @@ export const createManyDatasetRecords = async ({
       true
     );
 
-    let existingRecords: any[] = [];
-    try {
-      existingRecords = await fetchRecordsFromS3(projectId, datasetId);
-    } catch (error) {
-      if ((error as any).name !== "NoSuchKey") throw error;
-    }
+    const existingRecords = await storageService.getObject(
+      projectId,
+      datasetId
+    );
 
     // Combine existing and new records
     const allRecords = [...existingRecords, ...recordData];
 
-    const s3Client = await createS3Client(projectId);
-
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: "langwatch",
-        Key: `datasets/${projectId}/${datasetId}`,
-        Body: JSON.stringify(allRecords),
-        ContentType: "application/json",
-      })
+    await storageService.putObject(
+      projectId,
+      datasetId,
+      JSON.stringify(allRecords)
     );
 
     await prisma.dataset.update({
@@ -483,7 +467,7 @@ export const getFullDataset = async ({
     let records: any[] = [];
 
     try {
-      records = await fetchRecordsFromS3(projectId, datasetId);
+      records = await storageService.getObject(projectId, datasetId);
 
       if (entrySelection !== "all") {
         const count = records.length;
@@ -501,6 +485,8 @@ export const getFullDataset = async ({
         });
       }
     } catch (error) {
+      console.error(error);
+
       if ((error as any).name === "NoSuchKey") {
         records = [];
       } else {
@@ -528,7 +514,7 @@ export const getFullDataset = async ({
     }
 
     while (!truncated) {
-      const allRecords = await fetchRecordsFromS3(projectId, datasetId);
+      const allRecords = await storageService.getObject(projectId, datasetId);
 
       const records = allRecords.slice(
         currentPage * BATCH_SIZE,
@@ -613,83 +599,4 @@ export const getFullDataset = async ({
       count,
     };
   }
-};
-
-const fetchRecordsFromS3 = async (projectId: string, datasetId: string) => {
-  const s3Client = await createS3Client(projectId);
-  let records: any[] = [];
-
-  try {
-    const { Body } = await s3Client.send(
-      new GetObjectCommand({
-        Bucket: "langwatch",
-        Key: `datasets/${projectId}/${datasetId}`,
-      })
-    );
-
-    const content = await Body?.transformToString();
-    records = JSON.parse(content ?? "[]");
-  } catch (error) {
-    if ((error as any).name === "NoSuchKey") {
-      records = [];
-    } else {
-      throw error; // Rethrow other errors
-    }
-  }
-
-  return records;
-};
-
-export const createS3Client = async (projectId: string) => {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-  });
-
-  if (!project) {
-    throw new Error("Project not found");
-  }
-
-  const organization = await prisma.organization.findFirst({
-    where: {
-      teams: {
-        some: {
-          projects: {
-            some: { id: projectId },
-          },
-        },
-      },
-    },
-  });
-
-  if (!organization) {
-    throw new Error("Organization not found");
-  }
-
-  const s3Config = {
-    endpoint:
-      project.s3Endpoint ?? organization?.s3Endpoint ?? env.S3_ENDPOINT!,
-    accessKeyId:
-      project.s3AccessKeyId ??
-      organization?.s3AccessKeyId ??
-      env.S3_ACCESS_KEY_ID!,
-    secretAccessKey:
-      project.s3SecretAccessKey ??
-      organization?.s3SecretAccessKey ??
-      env.S3_SECRET_ACCESS_KEY!,
-  };
-
-  const s3Client = new S3Client({
-    endpoint: s3Config.endpoint,
-    credentials: {
-      accessKeyId: s3Config.accessKeyId,
-      secretAccessKey: s3Config.secretAccessKey,
-    },
-    forcePathStyle: true,
-  });
-
-  if (!s3Client) {
-    throw new Error("Failed to create S3 client");
-  }
-
-  return s3Client;
 };

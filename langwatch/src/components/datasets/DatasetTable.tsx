@@ -85,8 +85,18 @@ export function DatasetTable({
     {
       enabled: !!project && !!datasetId,
       refetchOnWindowFocus: false,
+      onError: (error) => {
+        toast({
+          title: "Error fetching dataset",
+          description: error.message,
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+      },
     }
   );
+
   const dataset = useMemo(
     () =>
       databaseDataset.data
@@ -557,16 +567,23 @@ export function DatasetTable({
                 first 5mb of data.
               </Alert>
             )}
-            <DatasetGrid
-              columnDefs={columnDefs}
-              rowData={localRowData}
-              onCellValueChanged={onCellValueChanged}
-              ref={gridRef}
-              domLayout="normal"
-              {...(loadingOverlayComponent !== undefined
-                ? { loadingOverlayComponent }
-                : {})}
-            />
+            {databaseDataset.error ? (
+              <Alert status="error" variant="subtle">
+                <AlertIcon />
+                <Text>{databaseDataset.error.message}</Text>
+              </Alert>
+            ) : (
+              <DatasetGrid
+                columnDefs={columnDefs}
+                rowData={localRowData}
+                onCellValueChanged={onCellValueChanged}
+                ref={gridRef}
+                domLayout="normal"
+                {...(loadingOverlayComponent !== undefined
+                  ? { loadingOverlayComponent }
+                  : {})}
+              />
+            )}
           </Box>
         </CardBody>
       </Card>
@@ -579,7 +596,6 @@ export function DatasetTable({
           left="0"
           bottom={isEmbedded ? "32px" : 6}
           marginTop={6}
-          marginLeft={6}
           backgroundColor="#ffffff"
           padding="8px"
           paddingX="16px"
