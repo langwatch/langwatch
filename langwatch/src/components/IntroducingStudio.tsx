@@ -122,7 +122,7 @@ export const IntroducingStudio = () => {
                   });
                   onOpen();
                 }}
-                variant="link"
+                variant="plain"
                 color="black"
               >
                 <Text>

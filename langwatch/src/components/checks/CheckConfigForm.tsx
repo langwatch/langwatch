@@ -327,7 +327,7 @@ export default function CheckConfigForm({
                           ] ?? availableEvaluators[checkType].name}
                         </Text>
                         <Button
-                          variant="link"
+                          variant="plain"
                           onClick={() => {
                             void router.push({
                               pathname: router.pathname + "/choose",

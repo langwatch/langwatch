@@ -78,7 +78,7 @@ export default function Datasets() {
               <HStack>
                 <Button
                   colorPalette="white"
-                  variant="link"
+                  variant="plain"
                   textDecoration="underline"
                   onClick={() => {
                     toast.close(`delete-dataset-${id}`);

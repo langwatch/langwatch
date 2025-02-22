@@ -61,7 +61,7 @@ export function DatasetSelector<T extends { datasetId: string }>({
           onCreateNew();
         }}
         minWidth="fit-content"
-        variant="link"
+        variant="plain"
         marginTop={2}
         fontWeight="normal"
       >
