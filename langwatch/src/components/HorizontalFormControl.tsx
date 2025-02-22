@@ -41,7 +41,7 @@ export function HorizontalFormControl({
       >
         <VStack align="start" gap={1} width="full" minWidth={minWidth}>
           <FormLabel margin={0}>{label}</FormLabel>
-          <FormHelperText margin={0} fontSize={13}>
+          <FormHelperText margin={0} fontSize="13px">
             {helper}
           </FormHelperText>
         </VStack>

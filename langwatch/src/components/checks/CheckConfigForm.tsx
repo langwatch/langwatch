@@ -340,13 +340,13 @@ export default function CheckConfigForm({
                           (change)
                         </Button>
                       </HStack>
-                      <Text fontSize={12} color="gray.500">
+                      <Text fontSize="12px" color="gray.500">
                         {availableEvaluators[checkType].description}
                       </Text>
                       {checkType.startsWith("legacy/") && (
                         <Alert status="warning" alignItems="start">
                           <AlertIcon />
-                          <Text fontSize={13}>
+                          <Text fontSize="13px">
                             You are using a legacy evaluator version, please
                             click the <b>change</b> button above to select a
                             newer version or a replacement for this evaluator.
@@ -369,13 +369,13 @@ export default function CheckConfigForm({
                         })}
                       />
                       {isNameAlreadyInUse && (
-                        <Text color="red.500" fontSize={13}>
+                        <Text color="red.500" fontSize="13px">
                           An evaluation with the same name already exists,
                           please choose a different name to have a different
                           slug identifier as well
                         </Text>
                       )}
-                      <Text fontSize={12} paddingLeft={4}>
+                      <Text fontSize="12px" paddingLeft={4}>
                         {nameValue && "slug: "}
                         {slug}
                       </Text>
@@ -441,7 +441,7 @@ export default function CheckConfigForm({
                               <FormLabel margin={0}>
                                 Execution Settings
                               </FormLabel>
-                              <FormHelperText margin={0} fontSize={13}>
+                              <FormHelperText margin={0} fontSize="13px">
                                 Configure how and when this evaluation is
                                 executed when a new message arrives
                               </FormHelperText>

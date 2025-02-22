@@ -171,12 +171,12 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                       <OverflownTextWithTooltip
                         lineClamp={1}
                         wordBreak="break-all"
-                        fontSize={15}
+                        fontSize="15px"
                       >
                         {topic.name}
                       </OverflownTextWithTooltip>
                     </Checkbox>
-                    <Text color="gray.500" fontSize={12} whiteSpace="nowrap">
+                    <Text color="gray.500" fontSize="12px" whiteSpace="nowrap">
                       {topic.count}
                     </Text>
                   </HStack>
@@ -193,7 +193,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                           paddingX={2}
                           paddingLeft={8}
                           fontWeight="normal"
-                          fontSize={15}
+                          fontSize="15px"
                         >
                           <Checkbox
                             borderColor="gray.400"
@@ -216,7 +216,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                           </Checkbox>
                           <Text
                             color="gray.500"
-                            fontSize={12}
+                            fontSize="12px"
                             whiteSpace="nowrap"
                           >
                             {subtopic.count}

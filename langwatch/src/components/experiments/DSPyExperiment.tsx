@@ -1268,7 +1268,7 @@ export function DSPyRunsScoresChart({
                 position="top"
                 offset={10}
                 fill={theme.colors.gray[700]}
-                fontSize={12}
+                fontSize="12px"
               />
             </ReferenceDot>
           )}

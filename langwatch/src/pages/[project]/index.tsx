@@ -127,12 +127,16 @@ function DocumentsMetrics() {
       </HStack>
       <Card.Root>
         <Card.Body>
-          <Tabs.Root variant="plain">
+          <Tabs.Root variant="plain" defaultValue="total-documents">
             <Tabs.List gap={12}>
-              <Tabs.Trigger paddingX={0} paddingBottom={4}>
+              <Tabs.Trigger
+                value="total-documents"
+                paddingX={0}
+                paddingBottom={4}
+              >
                 <VStack align="start">
                   <Text color="black">Total documents</Text>
-                  <Box fontSize={24} color="black" fontWeight="bold">
+                  <Box fontSize="24px" color="black" fontWeight="bold">
                     <DocumentsCountsSummary />
                   </Box>
                 </VStack>
@@ -144,7 +148,7 @@ function DocumentsMetrics() {
               bg="orange.400"
               borderRadius="1px"
             />
-            <Tabs.Content>
+            <Tabs.Content value="total-documents">
               <DocumentsCountsTable />
             </Tabs.Content>
           </Tabs.Root>

@@ -100,7 +100,7 @@ export function WorkflowPropertiesPanel() {
 
                 {isEditingName ? (
                   <Input
-                    fontSize={15}
+                    fontSize="15px"
                     marginLeft={1}
                     fontWeight={500}
                     variant="outline"
@@ -130,7 +130,7 @@ export function WorkflowPropertiesPanel() {
                   />
                 ) : (
                   <Text
-                    fontSize={16}
+                    fontSize="16px"
                     fontWeight={500}
                     onClick={() => {
                       setIsEditingName(true);
@@ -144,7 +144,7 @@ export function WorkflowPropertiesPanel() {
 
               {isEditingDescription ? (
                 <Textarea
-                  fontSize={12}
+                  fontSize="12px"
                   marginLeft={1}
                   fontWeight={300}
                   variant="outline"
@@ -175,7 +175,7 @@ export function WorkflowPropertiesPanel() {
                 />
               ) : (
                 <Text
-                  fontSize={12}
+                  fontSize="12px"
                   fontWeight={400}
                   onClick={() => {
                     setIsEditingDescription(true);
@@ -215,7 +215,7 @@ export function WorkflowPropertiesPanel() {
       </PropertyField>
       <PropertyField title="Enable Tracing">
         <HStack paddingX={2} width="full">
-          <Text fontSize={14}>
+          <Text fontSize="14px">
             Store execution traces when running this workflow
           </Text>
           <Spacer />

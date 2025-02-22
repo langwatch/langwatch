@@ -9,6 +9,7 @@ import {
   defaultConfig,
   createSystem,
   defineRecipe,
+  defineSlotRecipe,
 } from "@chakra-ui/react";
 import "~/styles/globals.scss";
 import "~/styles/markdown.scss";
@@ -54,13 +55,35 @@ export const system = createSystem(defaultConfig, {
           700: { value: "#c05621" },
           600: { value: "#dd6b20" },
           500: { value: "#ED8926" },
+          400: { value: "#ED8926" },
           300: { value: "#FF9E2C" },
           200: { value: "#FFD19B" },
           100: { value: "#FFF3E4" },
         },
       },
     },
+    semanticTokens: {
+      colors: {
+        gray: {
+          solid: { value: "{colors.gray.100}" },
+          contrast: { value: "{colors.gray.800}" },
+          subtle: { value: "{colors.gray.200}" },
+          focusRing: { value: "rgb(49, 130, 206)" },
+        },
+        orange: {
+          solid: { value: "#ED8926" },
+          focusRing: { value: "rgb(49, 130, 206)" },
+        },
+      },
+    },
     recipes: {
+      heading: defineRecipe({
+        variants: {
+          size: {
+            lg: { textStyle: "2xl" },
+          },
+        },
+      }),
       table: defineRecipe({
         variants: {
           variant: {
@@ -95,11 +118,6 @@ export const system = createSystem(defaultConfig, {
           },
         },
       }),
-      card: defineRecipe({
-        base: {
-          boxShadow: "0px 4px 10px 0px rgba(0, 0, 0, 0.06)",
-        },
-      }),
       tag: defineRecipe({
         base: {
           borderRadius: "62px",
@@ -111,6 +129,29 @@ export const system = createSystem(defaultConfig, {
           variant: {
             outline: {
               borderColor: "gray.300",
+            },
+          },
+          size: {
+            xs: {
+              _icon: {
+                flexShrink: 1,
+                width: "auto",
+                height: "auto",
+              },
+            },
+            sm: {
+              _icon: {
+                flexShrink: 1,
+                width: "auto",
+                height: "auto",
+              },
+            },
+            md: {
+              _icon: {
+                flexShrink: 1,
+                width: "auto",
+                height: "auto",
+              },
             },
           },
         },
@@ -128,6 +169,74 @@ export const system = createSystem(defaultConfig, {
         variants: {
           variant: {
             darkerTrack: { control: { background: "gray.400" } },
+          },
+        },
+      }),
+      separator: defineRecipe({
+        base: {
+          width: "full",
+        },
+      }),
+    },
+    slotRecipes: {
+      card: defineSlotRecipe({
+        slots: ["root"],
+        variants: {
+          variant: {
+            elevated: {
+              root: {
+                border: "none",
+                boxShadow: "0px 4px 10px 0px rgba(0, 0, 0, 0.06)",
+              },
+            },
+          },
+          size: {
+            md: {
+              root: {
+                "--card-padding": "spacing.5",
+              },
+            },
+          },
+        },
+        defaultVariants: {
+          variant: "elevated",
+          size: "md",
+        },
+      }),
+      checkbox: defineSlotRecipe({
+        slots: ["root", "control", "label"],
+        base: {
+          control: {
+            borderWidth: "2px",
+          },
+          label: {
+            fontWeight: "normal",
+          },
+        },
+        variants: {
+          variant: {
+            solid: {
+              control: {
+                borderColor: "gray.400",
+                "&:is([data-state=checked], [data-state=indeterminate])": {
+                  bg: "blue.500",
+                  color: "white",
+                  borderColor: "blue.500",
+                },
+              },
+            },
+          },
+        },
+        defaultVariants: {
+          // @ts-ignore
+          size: "sm",
+        },
+      }),
+      tabs: defineSlotRecipe({
+        slots: ["root", "list", "trigger"],
+        base: {
+          trigger: {
+            height: "auto",
           },
         },
       }),

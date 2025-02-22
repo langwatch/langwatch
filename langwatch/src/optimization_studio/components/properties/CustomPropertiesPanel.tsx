@@ -88,7 +88,7 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
       )}
       <VStack align="start" width="full" gap={1}>
         <HStack>
-          <Text fontWeight={600} fontSize={13} noOfLines={1}>
+          <Text fontWeight={600} fontSize="13px" noOfLines={1}>
             {currentVersion?.commitMessage}
           </Text>
           <Link
@@ -121,13 +121,13 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
             color="white"
             size="2xs"
           />
-          <Text fontSize={12} noOfLines={1}>
+          <Text fontSize="12px" noOfLines={1}>
             {currentVersion?.author?.name}
           </Text>
-          <Text fontSize={12} flexShrink={0}>
+          <Text fontSize="12px" flexShrink={0}>
             ·
           </Text>
-          <Text fontSize={12} flexShrink={0}>
+          <Text fontSize="12px" flexShrink={0}>
             {currentVersion?.updatedAt &&
               formatTimeAgo(currentVersion.updatedAt.getTime())}
           </Text>

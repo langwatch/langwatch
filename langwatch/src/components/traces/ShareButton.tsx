@@ -73,7 +73,7 @@ export function ShareButton({
           {shareState.data?.id ? "Public" : "Share"}
         </Button>
       </PopoverTrigger>
-      <PopoverContent fontSize={16} minWidth="400px">
+      <PopoverContent fontSize="16px" minWidth="400px">
         <PopoverArrow />
         <PopoverHeader fontWeight={600}>Share Trace</PopoverHeader>
         <PopoverBody>

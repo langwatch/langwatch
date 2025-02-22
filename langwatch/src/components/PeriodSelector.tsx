@@ -99,7 +99,7 @@ export function PeriodSelector({
   };
   setPeriod: (startDate: Date, endDate: Date) => void;
 }) {
-  const { open, onOpen, setOpen } = useDisclosure();
+  const { open, onOpen, onClose, setOpen } = useDisclosure();
 
   const daysDifference = getDaysDifference(startDate, endDate);
 
@@ -132,25 +132,30 @@ export function PeriodSelector({
   };
 
   return (
-    <Popover.Root positioning={{ placement: "bottom-end" }}>
+    <Popover.Root
+      open={open}
+      onOpenChange={({ open }) => setOpen(open)}
+      positioning={{ placement: "bottom-end" }}
+      size="sm"
+    >
       <Popover.Trigger asChild>
-        <Button variant="outline" minWidth="fit-content" onClick={onOpen}>
+        <Button variant="ghost" minWidth="fit-content" onClick={onOpen}>
           <HStack gap={2}>
             <Calendar size={16} />
             <Text>{getDateRangeLabel()}</Text>
             <Box>
-              <ChevronDown width={14} />
+              <ChevronDown width={12} />
             </Box>
           </HStack>
         </Button>
       </Popover.Trigger>
-      <Popover.Content>
+      <Popover.Content width="fit-content">
         <Popover.Arrow />
         <Popover.CloseTrigger />
         <Popover.Header>
-          <Heading size="sm">Select Date Range</Heading>
+          <Popover.Title>Select Date Range</Popover.Title>
         </Popover.Header>
-        <Popover.Body padding={4}>
+        <Popover.Body>
           <HStack align="start" gap={6}>
             <VStack gap={4}>
               <Field.Root>

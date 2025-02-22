@@ -1,7 +1,8 @@
-import { Box, Button, HStack, Text, Tooltip } from "@chakra-ui/react";
+import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { Filter, X } from "react-feather";
 import { useFilterParams } from "../../hooks/useFilterParams";
+import { Tooltip } from "../ui/tooltip";
 
 export const useFilterToggle = (
   { defaultShowFilters } = { defaultShowFilters: false }
@@ -51,10 +52,10 @@ export function FilterToggle({
 
   return (
     <Button
-      variant="outline"
+      variant="ghost"
+      backgroundColor={showFilters ? "gray.200" : undefined}
       onClick={() => setShowFilters(!showFilters)}
       minWidth="fit-content"
-      isActive={showFilters}
       paddingRight={hasAnyFilters ? 1 : undefined}
     >
       <HStack gap={0}>
@@ -78,11 +79,11 @@ export function FilterToggle({
         <Filter size={16} />
         <Text paddingLeft={2}>Filters</Text>
         {hasAnyFilters && (
-          <Tooltip label="Clear all filters" gutter={0}>
+          <Tooltip content="Clear all filters" positioning={{ gutter: 0 }}>
             <Button
               as={Box}
               role="button"
-              variant="unstyled"
+              variant="plain"
               width="fit-content"
               minWidth={0}
               display="flex"
@@ -90,10 +91,9 @@ export function FilterToggle({
                 e.stopPropagation();
                 clearFilters();
               }}
+              paddingX={2}
             >
-              <Box paddingX={2}>
-                <X width={12} style={{ minWidth: "12px" }} />
-              </Box>
+              <X width={12} style={{ minWidth: "12px" }} />
             </Button>
           </Tooltip>
         )}

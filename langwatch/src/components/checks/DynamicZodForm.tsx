@@ -350,7 +350,7 @@ const DynamicZodForm = ({
                     {camelCaseToTitleCase(key)}
                   </PropertySectionTitle>
                   {isOptional && (
-                    <Text color="gray.500" fontSize={12}>
+                    <Text color="gray.500" fontSize="12px">
                       (optional)
                     </Text>
                   )}

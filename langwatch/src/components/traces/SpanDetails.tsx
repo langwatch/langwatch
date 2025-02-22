@@ -45,7 +45,7 @@ export function SpanDetails({
     <VStack flexGrow={1} gap={3} align="start">
       <HStack width="full">
         <SpanTypeTag span={span} />
-        <Heading as="h2" fontSize={22}>
+        <Heading as="h2" fontSize="22px">
           {span.name ?? span.model}
         </Heading>
         <Spacer />
@@ -132,7 +132,7 @@ export function SpanDetails({
       {span.params && (
         <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
-            fontSize={13}
+            fontSize="13px"
             color="gray.400"
             textTransform="uppercase"
             fontWeight="bold"
@@ -166,7 +166,7 @@ export function SpanDetails({
       {span.input && (
         <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
-            fontSize={13}
+            fontSize="13px"
             color="gray.400"
             textTransform="uppercase"
             fontWeight="bold"
@@ -189,7 +189,7 @@ export function SpanDetails({
       {span.contexts && (
         <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
-            fontSize={13}
+            fontSize="13px"
             color="gray.400"
             textTransform="uppercase"
             fontWeight="bold"
@@ -229,7 +229,7 @@ export function SpanDetails({
       {span.error ? (
         <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
-            fontSize={13}
+            fontSize="13px"
             color="red.400"
             textTransform="uppercase"
             fontWeight="bold"
@@ -259,7 +259,7 @@ export function SpanDetails({
             width="full"
           >
             <Box
-              fontSize={13}
+              fontSize="13px"
               color="gray.400"
               textTransform="uppercase"
               fontWeight="bold"
@@ -338,7 +338,7 @@ export const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
             }[span.type]
       }
       backgroundColor={evaluationPassed_ === true ? "#ccf6c6" : undefined}
-      fontSize={13}
+      fontSize="13px"
     >
       {span.type.toUpperCase()}
     </Tag>

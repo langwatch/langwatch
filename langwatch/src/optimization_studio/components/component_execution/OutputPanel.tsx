@@ -48,7 +48,7 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
         <HStack align="center" width="full" paddingBottom={3}>
           <Heading
             as="h3"
-            fontSize={16}
+            fontSize="16px"
             fontWeight="bold"
             textTransform="uppercase"
             color="gray.600"
@@ -124,7 +124,7 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
             {node.data.execution_state.status === "error" && (
               <VStack width="full" align="start" gap={3}>
                 <Text
-                  fontSize={13}
+                  fontSize="13px"
                   fontWeight="bold"
                   textTransform="uppercase"
                   color="gray.600"
@@ -176,7 +176,7 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
                       }
                     >
                       <Text
-                        fontSize={13}
+                        fontSize="13px"
                         fontWeight="bold"
                         textTransform="uppercase"
                         color={

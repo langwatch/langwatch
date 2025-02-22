@@ -74,7 +74,7 @@ export function ConfigModal({
             borderBottom="1px solid"
             borderColor="gray.200"
           >
-            <Text fontSize={14} fontWeight={500}>
+            <Text fontSize="14px" fontWeight={500}>
               {title}
             </Text>
             <Spacer />

@@ -38,7 +38,7 @@ export function SummaryMetric({
     <VStack
       minWidth="92px"
       maxWidth="192px"
-      gap={4}
+      gap={2}
       align="start"
       justifyContent="space-between"
       borderLeftWidth="1px"
@@ -47,7 +47,7 @@ export function SummaryMetric({
       _first={{ paddingLeft: 0, borderLeft: "none" }}
     >
       <Heading
-        fontSize="13"
+        fontSize="12px"
         color="gray.500"
         fontWeight="normal"
         lineHeight="1.5em"
@@ -71,7 +71,6 @@ export function SummaryMetric({
           </Tooltip>
         )}
       </Heading>
-      <Spacer />
       <SummaryMetricValue
         current={current}
         previous={previous}
@@ -94,8 +93,8 @@ export function SummaryMetricValue({
   increaseIs?: "good" | "bad" | "neutral";
 }) {
   return (
-    <VStack align="start" gap={1}>
-      <Box fontSize="28" fontWeight="600">
+    <VStack align="start" gap={2}>
+      <Box fontSize="24px" fontWeight="600">
         {current !== undefined ? (
           typeof format === "function" ? (
             //@ts-ignore
@@ -138,7 +137,7 @@ function MetricChange({
 
   return change !== undefined ? (
     <HStack
-      fontSize="13"
+      fontSize="13px"
       fontWeight={600}
       gap={1}
       color={

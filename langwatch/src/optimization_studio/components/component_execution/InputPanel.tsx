@@ -123,7 +123,7 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
         <VStack align="start" gap={3} width="full">
           <Heading
             as="h3"
-            fontSize={16}
+            fontSize="16px"
             fontWeight="bold"
             textTransform="uppercase"
             color="gray.600"

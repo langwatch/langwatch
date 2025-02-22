@@ -28,6 +28,7 @@ import {
   ChevronDown,
   ChevronRight,
   Edit,
+  GitHub,
   Lock,
   MessageSquare,
   Plus,
@@ -63,7 +64,6 @@ import { useTableView } from "./messages/HeaderButtons";
 import { useColorRawValue } from "./ui/color-mode";
 import { InputGroup } from "./ui/input-group";
 import { Tooltip } from "./ui/tooltip";
-import { GitHub } from "./icons/GitHub";
 import { Link } from "./ui/link";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
@@ -71,7 +71,7 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
 
   return (
     currentRoute && (
-      <HStack gap={2} fontSize={13} color="gray.500">
+      <HStack gap={2} fontSize="13px" color="gray.500">
         <Link href="/">Dashboard</Link>
         {currentRoute.parent && (
           <>
@@ -224,7 +224,7 @@ const SideMenuLink = ({
   return (
     <Link
       role="group"
-      variant="unstyled"
+      variant="plain"
       width="full"
       paddingX={6}
       paddingY={size === "sm" ? 2 : 3}
@@ -292,12 +292,12 @@ export const ProjectSelector = React.memo(function ProjectSelector({
   );
 
   return (
-    <Menu.Root open={open} onOpenChange={setOpen}>
+    <Menu.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
       <Menu.Trigger asChild>
         <Button
           variant="outline"
           borderColor="gray.300"
-          fontSize={13}
+          fontSize="13px"
           paddingX={4}
           paddingY={1}
           height="auto"
@@ -565,7 +565,7 @@ export const DashboardLayout = ({
           align="start"
           width={isHovered ? "200px" : "full"}
         >
-          <Box fontSize={32} fontWeight="bold" paddingX={6}>
+          <Box fontSize="32px" fontWeight="bold" paddingX={6}>
             <LogoIcon width={25} height={34} />
           </Box>
 
@@ -881,14 +881,16 @@ export const DashboardLayout = ({
               <InputGroup
                 borderColor="gray.300"
                 startElement={<Search color={gray400} width={16} />}
+                width="full"
               >
                 <Input
                   name="query"
                   type="search"
                   placeholder="Search"
                   _placeholder={{ color: "gray.800" }}
-                  fontSize={14}
+                  fontSize="14px"
                   paddingY={1.5}
+                  width="full"
                   height="auto"
                   value={query ?? router.query.query}
                   onChange={(e) => setQuery(e.target.value)}

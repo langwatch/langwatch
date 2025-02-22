@@ -231,7 +231,7 @@ export const AddAnnotationQueueDrawer = ({
                     selectedOptionStyle="check"
                     hideSelectedOptions={true}
                     useBasicStyles
-                    variant="unstyled"
+                    variant="plain"
                     placeholder="Add Participants"
                     components={{
                       Menu: ({ children, ...props }) => (
@@ -329,7 +329,7 @@ export const AddAnnotationQueueDrawer = ({
                         selectedOptionStyle="check"
                         hideSelectedOptions={true}
                         useBasicStyles
-                        variant="unstyled"
+                        variant="plain"
                         placeholder="Add Score Type"
                         components={{
                           Menu: ({ children, ...props }) => (

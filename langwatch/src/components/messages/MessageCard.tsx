@@ -149,7 +149,7 @@ export function MessageCard({
       <VStack alignItems="flex-start" gap={8}>
         <VStack alignItems="flex-start" gap={2}>
           <Box
-            fontSize={11}
+            fontSize="11px"
             color="gray.400"
             textTransform="uppercase"
             fontWeight="bold"
@@ -180,7 +180,7 @@ export function MessageCard({
         {trace.error && !trace.output?.value ? (
           <VStack alignItems="flex-start" gap={2}>
             <Box
-              fontSize={11}
+              fontSize="11px"
               color="red.400"
               textTransform="uppercase"
               fontWeight="bold"
@@ -192,7 +192,7 @@ export function MessageCard({
         ) : (
           <VStack alignItems="flex-start" gap={2}>
             <Box
-              fontSize={11}
+              fontSize="11px"
               color="gray.400"
               textTransform="uppercase"
               fontWeight="bold"
@@ -229,7 +229,7 @@ export function MessageCard({
                   </HStack>
                   <VStack align="start">
                     <Text>Blocked by Guardrail</Text>
-                    <Text fontSize={13}>
+                    <Text fontSize="13px">
                       {trace.lastGuardrail.details
                         ? trace.lastGuardrail.details
                         : trace.lastGuardrail.name}
@@ -241,7 +241,7 @@ export function MessageCard({
               )}
             </Box>
             {trace.expected_output && (
-              <Alert status="warning" fontSize={13}>
+              <Alert status="warning" fontSize="13px">
                 <Box paddingRight={2}>
                   <CornerDownRight size="16" />
                 </Box>
@@ -262,7 +262,7 @@ export function MessageCard({
                   getColorForString("colors", traceTopic.id).background
                 }
                 color={getColorForString("colors", traceTopic.id).color}
-                fontSize={12}
+                fontSize="12px"
               >
                 {traceTopic.name}
               </Tag>
@@ -273,7 +273,7 @@ export function MessageCard({
                   getColorForString("colors", traceSubtopic.id).background
                 }
                 color={getColorForString("colors", traceSubtopic.id).color}
-                fontSize={12}
+                fontSize="12px"
               >
                 {traceSubtopic.name}
               </Tag>
@@ -283,13 +283,13 @@ export function MessageCard({
                 key={label}
                 background={getColorForString("colors", label).background}
                 color={getColorForString("colors", label).color}
-                fontSize={12}
+                fontSize="12px"
               >
                 {label}
               </Tag>
             ))}
           </HStack>
-          <HStack fontSize={12} color="gray.400">
+          <HStack fontSize="12px" color="gray.400">
             {!!trace.metadata.customer_id && (
               <>
                 <Box>

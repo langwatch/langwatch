@@ -375,7 +375,7 @@ export default function OrganizationOnboarding() {
               )}
               <FormControl marginTop={4} isInvalid={!!errors?.terms}>
                 <Checkbox {...register("terms", { required: true })}>
-                  <Text fontSize={14}>
+                  <Text fontSize="14px">
                     I agree with LangWatch{" "}
                     <Link
                       href="https://langwatch.ai/legal/terms-conditions"
@@ -394,7 +394,7 @@ export default function OrganizationOnboarding() {
 
               {utmCampaign && (
                 <FormControl>
-                  <Text fontSize={14}>
+                  <Text fontSize="14px">
                     You are signing up via the{" "}
                     <b>{titleCase(utmCampaign.replaceAll("-", " "))}</b>{" "}
                     campaign

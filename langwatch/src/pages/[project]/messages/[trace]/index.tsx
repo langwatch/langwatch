@@ -495,7 +495,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                   {trace.error && !trace.output?.value ? (
                     <VStack alignItems="flex-start" gap={2} paddingY={2}>
                       <Box
-                        fontSize={11}
+                        fontSize="11px"
                         color="red.400"
                         textTransform="uppercase"
                         fontWeight="bold"
@@ -530,7 +530,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                       </Text>
                     </Alert>
                   )}
-                  <HStack fontSize={13} color="gray.400">
+                  <HStack fontSize="13px" color="gray.400">
                     <EventsCounter trace={trace} addDot={false} />
                   </HStack>
                 </Message>

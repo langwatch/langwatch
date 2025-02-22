@@ -137,7 +137,7 @@ export const TeamRoleSelect = ({ field }: { field: any }) => {
               <Text>{children}</Text>
               <Text
                 color={props.isSelected ? "white" : "gray.500"}
-                fontSize={13}
+                fontSize="13px"
               >
                 {(props.data as any).description}
               </Text>

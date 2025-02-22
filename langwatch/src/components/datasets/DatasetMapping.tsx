@@ -724,7 +724,7 @@ export const TracesMapping = ({
             <FormLabel margin={0}>Expansions</FormLabel>
             <FormHelperText
               margin={0}
-              fontSize={13}
+              fontSize="13px"
               marginBottom={2}
               maxWidth="600px"
             >

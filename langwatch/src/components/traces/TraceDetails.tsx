@@ -487,7 +487,7 @@ const AddParticipants = ({
             selectedOptionStyle="check"
             hideSelectedOptions={true}
             useBasicStyles
-            variant="unstyled"
+            variant="plain"
             placeholder="Add Participants"
             components={{
               Menu: ({ children, ...props }) => (

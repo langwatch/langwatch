@@ -107,11 +107,7 @@ export function CustomGraph({
   hideGroupLabel = false,
 }: {
   input: CustomGraphInput;
-  titleProps?: {
-    fontSize?: SystemStyleObject["fontSize"];
-    color?: SystemStyleObject["color"];
-    fontWeight?: SystemStyleObject["fontWeight"];
-  };
+  titleProps?: SystemStyleObject;
   hideGroupLabel?: boolean;
 }) {
   const publicEnv = usePublicEnv();

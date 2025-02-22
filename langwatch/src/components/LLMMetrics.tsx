@@ -135,7 +135,7 @@ export function LLMMetrics() {
         <GridItem colSpan={isNotQuickwit ? 2 : undefined}>
           <Card.Root>
             <Card.Body>
-              <Tabs.Root variant="plain">
+              <Tabs.Root variant="plain" defaultValue="llmCallsGraph">
                 <Tabs.List gap={12}>
                   {isNotQuickwit && (
                     <Tabs.Trigger
