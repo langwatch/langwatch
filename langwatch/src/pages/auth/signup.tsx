@@ -12,7 +12,7 @@ import {
   VStack,
   useToast,
 } from "@chakra-ui/react";
-import { Link } from "@chakra-ui/next-js";
+import { Link } from "../../components/ui/link";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type Session } from "next-auth";
 import { getSession, signIn } from "next-auth/react";

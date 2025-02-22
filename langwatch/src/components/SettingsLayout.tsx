@@ -22,7 +22,7 @@ export default function SettingsLayout({
           fontSize="14px"
           minWidth="200px"
           height="full"
-          spacing={0}
+          gap={0}
           display={isSubscription ? "none" : "flex"}
         >
           <MenuLink href="/settings">General Settings</MenuLink>

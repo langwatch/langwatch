@@ -1,6 +1,5 @@
-import { VStack, List, ListIcon, ListItem, Link, Text } from "@chakra-ui/react";
-import { CheckCircleIcon } from "@chakra-ui/icons";
-import { Circle } from "react-feather";
+import { VStack, List, Link, Text } from "@chakra-ui/react";
+import { Circle, CheckCircle } from "react-feather";
 import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { trackEventOnce } from "../utils/tracking";
@@ -77,28 +76,30 @@ export const IntegrationChecks = () => {
 
   return (
     <VStack align="start" fontSize="15px">
-      <List spacing={4}>
-        <ListItem
+      <List.Root gap={4}>
+        <List.Item
           as={Link}
           className="group"
           display="block"
           href={`/settings/projects`}
         >
-          <ListIcon as={CheckCircleIcon} color={"green.500"} />
+          <List.Indicator asChild color="green.500">
+            <CheckCircle />
+          </List.Indicator>
           Create first project
-        </ListItem>
-        <ListItem
+        </List.Item>
+        <List.Item
           as={NextLink}
           className="group"
           display="block"
           href={`/${project?.slug}/messages`}
         >
-          <ListIcon
-            as={integrationChecks.data?.firstMessage ? CheckCircleIcon : Circle}
-            color={
-              integrationChecks.data?.firstMessage ? "green.500" : "gray.500"
-            }
-          />
+          <List.Indicator
+            asChild
+            color={integrationChecks.data?.firstMessage ? "green.500" : "gray.500"}
+          >
+            {integrationChecks.data?.firstMessage ? <CheckCircle /> : <Circle />}
+          </List.Indicator>
           <Text
             display="inline"
             borderBottomWidth="1px"
@@ -108,21 +109,19 @@ export const IntegrationChecks = () => {
           >
             Sync your first message
           </Text>
-        </ListItem>
-        <ListItem
+        </List.Item>
+        <List.Item
           as={NextLink}
           className="group"
           display="block"
           href={`/${project?.slug}/workflows`}
         >
-          <ListIcon
-            as={
-              integrationChecks.data?.workflows ? CheckCircleIcon : Circle
-            }
-            color={
-              integrationChecks.data?.workflows ? "green.500" : "gray.500"
-            }
-          />
+          <List.Indicator
+            asChild
+            color={integrationChecks.data?.workflows ? "green.500" : "gray.500"}
+          >
+            {integrationChecks.data?.workflows ? <CheckCircle /> : <Circle />}
+          </List.Indicator>
           <Text
             display="inline"
             borderBottomWidth="1px"
@@ -132,19 +131,19 @@ export const IntegrationChecks = () => {
           >
             Create your first workflow
           </Text>
-        </ListItem>
-        <ListItem
+        </List.Item>
+        <List.Item
           as={NextLink}
           className="group"
           display="block"
           href={`/${project?.slug}/evaluations`}
         >
-          <ListIcon
-            as={integrationChecks.data?.evaluations ? CheckCircleIcon : Circle}
-            color={
-              integrationChecks.data?.evaluations ? "green.500" : "gray.500"
-            }
-          />
+          <List.Indicator
+            asChild
+            color={integrationChecks.data?.evaluations ? "green.500" : "gray.500"}
+          >
+            {integrationChecks.data?.evaluations ? <CheckCircle /> : <Circle />}
+          </List.Indicator>
           <Text
             display="inline"
             borderBottomWidth="1px"
@@ -154,18 +153,20 @@ export const IntegrationChecks = () => {
           >
             Set up your first evaluation
           </Text>
-        </ListItem>
-        <ListItem
+        </List.Item>
+        <List.Item
           as={Link}
           className="group"
           display="block"
           href="https://docs.langwatch.ai/features/triggers"
           isExternal
         >
-          <ListIcon
-            as={integrationChecks.data?.triggers ? CheckCircleIcon : Circle}
+          <List.Indicator
+            asChild
             color={integrationChecks.data?.triggers ? "green.500" : "gray.500"}
-          />
+          >
+            {integrationChecks.data?.triggers ? <CheckCircle /> : <Circle />}
+          </List.Indicator>
           <Text
             display="inline"
             borderBottomWidth="1px"
@@ -175,18 +176,20 @@ export const IntegrationChecks = () => {
           >
             Set up an alert
           </Text>
-        </ListItem>
-        <ListItem
+        </List.Item>
+        <List.Item
           as={Link}
           className="group"
           display="block"
           href="https://docs.langwatch.ai/features/datasets"
           isExternal
         >
-          <ListIcon
-            as={integrationChecks.data?.datasets ? CheckCircleIcon : Circle}
+          <List.Indicator
+            asChild
             color={integrationChecks.data?.datasets ? "green.500" : "gray.500"}
-          />
+          >
+            {integrationChecks.data?.datasets ? <CheckCircle /> : <Circle />}
+          </List.Indicator>
           <Text
             display="inline"
             borderBottomWidth="1px"
@@ -196,19 +199,19 @@ export const IntegrationChecks = () => {
           >
             Create a dataset from the messages
           </Text>
-        </ListItem>
-        <ListItem
+        </List.Item>
+        <List.Item
           as={NextLink}
           className="group"
           display="block"
           href={`/${project?.slug}/analytics/reports`}
         >
-          <ListIcon
-            as={integrationChecks.data?.customGraphs ? CheckCircleIcon : Circle}
-            color={
-              integrationChecks.data?.customGraphs ? "green.500" : "gray.500"
-            }
-          />
+          <List.Indicator
+            asChild
+            color={integrationChecks.data?.customGraphs ? "green.500" : "gray.500"}
+          >
+            {integrationChecks.data?.customGraphs ? <CheckCircle /> : <Circle />}
+          </List.Indicator>
           <Text
             display="inline"
             borderBottomWidth="1px"
@@ -218,8 +221,8 @@ export const IntegrationChecks = () => {
           >
             Create a custom dashboard
           </Text>
-        </ListItem>
-      </List>
+        </List.Item>
+      </List.Root>
     </VStack>
   );
 };

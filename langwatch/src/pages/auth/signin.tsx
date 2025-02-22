@@ -1,18 +1,16 @@
 import {
   Alert,
   Button,
-  Card,
-  CardBody,
-  CardHeader,
+  Box,
   Container,
   HStack,
+  VStack,
   Heading,
   Input,
   Spacer,
-  VStack,
-  useToast,
+  Card,
 } from "@chakra-ui/react";
-import { Link } from "@chakra-ui/next-js";
+import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type GetServerSidePropsContext } from "next";
 import { type Session } from "next-auth";
@@ -24,6 +22,7 @@ import { z } from "zod";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { toaster } from "../../components/ui/toaster";
 
 export default function SignIn({ session }: { session: Session | null }) {
   const publicEnv = usePublicEnv();
@@ -45,7 +44,7 @@ export default function SignIn({ session }: { session: Session | null }) {
   }
 
   return isAuth0 ? (
-    <div style={{ padding: "12px" }}>Redirecting to Sign in...</div>
+    <Box padding="12px">Redirecting to Sign in...</Box>
   ) : (
     <SignInForm />
   );
@@ -84,7 +83,6 @@ function SignInForm() {
   });
 
   const [signInLoading, setSignInLoading] = useState(false);
-  const toast = useToast();
 
   const onSubmit = async (values: z.infer<typeof schema>) => {
     try {
@@ -99,7 +97,7 @@ function SignInForm() {
         throw new Error("Network response was not ok");
       }
     } catch (e) {
-      toast({
+      toaster.create({
         title: "Error",
         description: "Failed to sign up",
         status: "error",
@@ -112,16 +110,16 @@ function SignInForm() {
     <Container maxW="container.md" marginTop="calc(40vh - 164px)">
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        <Card>
-          <CardHeader>
-            <HStack spacing={4}>
+        <Card.Root>
+          <Card.Header>
+            <HStack gap={4}>
               <LogoIcon width={30.69} height={42} />
               <Heading size="lg" as="h1">
                 Sign in
               </Heading>
             </HStack>
-          </CardHeader>
-          <CardBody>
+          </Card.Header>
+          <Card.Body>
             <VStack width="full">
               <HorizontalFormControl
                 label="Email"
@@ -140,28 +138,33 @@ function SignInForm() {
                 <Input type="password" {...form.register("password")} />
               </HorizontalFormControl>
               {error && (
-                <Alert status="error">
-                  {error === "CredentialsSignin"
-                    ? "Invalid email or password"
-                    : error}
-                </Alert>
+                <Alert.Root status="error">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    {error === "CredentialsSignin"
+                      ? "Invalid email or password"
+                      : error}
+                  </Alert.Content>
+                </Alert.Root>
               )}
               <HStack width="full" paddingTop={4}>
-                <Link href="/auth/signup" textDecoration="underline">
-                  Register new account
-                </Link>
+                <Box asChild>
+                  <Link href="/auth/signup" style={{ textDecoration: "underline" }}>
+                    Register new account
+                  </Link>
+                </Box>
                 <Spacer />
                 <Button
-                  colorScheme="orange"
+                  colorPalette="orange"
                   type="submit"
-                  isLoading={signInLoading}
+                  loading={signInLoading}
                 >
                   Sign in
                 </Button>
               </HStack>
             </VStack>
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
       </form>
     </Container>
   );

@@ -1,5 +1,5 @@
 import { AddIcon, DeleteIcon, EditIcon } from "@chakra-ui/icons";
-import { Link } from "@chakra-ui/next-js";
+import { Link } from "../../../components/ui/link";
 import {
   Alert,
   AlertDescription,

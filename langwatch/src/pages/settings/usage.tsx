@@ -22,7 +22,7 @@ import {
   PeriodSelector,
   usePeriodSelector,
 } from "../../components/PeriodSelector";
-import { Link } from "@chakra-ui/next-js";
+import { Link } from "../../components/ui/link";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
 export default function Usage() {

@@ -1,7 +1,7 @@
 import type { PropsWithChildren } from "react";
-import { Link } from "@chakra-ui/next-js";
+import { Link, HStack, Spacer, Text } from "@chakra-ui/react";
 import { usePathname } from "next/navigation";
-import { HStack, Icon, Spacer, Text } from "@chakra-ui/react";
+import NextLink from "next/link";
 
 export const MenuLink = ({
   paddingX = 4,
@@ -22,7 +22,7 @@ export const MenuLink = ({
 
   return (
     <Link
-      href={href}
+      asChild
       paddingX={paddingX}
       paddingY={2}
       width="full"
@@ -40,12 +40,14 @@ export const MenuLink = ({
           selected && !isSelectedAnnotation ? "orange.400" : "transparent",
       }}
     >
-      <HStack width="full">
-        {icon && icon}
-        <Text>{children}</Text>
-        <Spacer />
-        {menuEnd && menuEnd}
-      </HStack>
+      <NextLink href={href}>
+        <HStack width="full" gap={2}>
+          {icon && icon}
+          <Text>{children}</Text>
+          <Spacer />
+          {menuEnd && menuEnd}
+        </HStack>
+      </NextLink>
     </Link>
   );
 };
