@@ -1,17 +1,11 @@
-import {
-  Box,
-  Dialog,
-  Text,
-  type BoxProps,
-  HStack,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Text, type BoxProps, HStack, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { isJson } from "../utils/isJson";
 import { RenderInputOutput } from "./traces/RenderInputOutput";
 import { Markdown } from "./Markdown";
 import { Switch } from "./ui/switch";
 import { Tooltip } from "./ui/tooltip";
+import { Dialog } from "./ui/dialog";
 
 export function ExpandedTextDialog({
   open,

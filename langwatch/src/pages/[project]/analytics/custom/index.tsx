@@ -31,6 +31,8 @@ import {
   AlignLeft,
   BarChart2,
   Check,
+  ChevronDown,
+  ChevronsDown,
   GitBranch,
   MoreVertical,
   PieChart,
@@ -301,8 +303,8 @@ export default function AnalyticsCustomGraph({
               setPeriod={setPeriod}
             />
           </HStack>
-          <HStack width="full" align="start" minHeight="500px" gap={8}>
-            <Card.Root minWidth="480px" minHeight="560px">
+          <HStack width="full" align="start" gap={8}>
+            <Card.Root minWidth="480px" minHeight="616px">
               <Card.Body>
                 <CustomGraphForm
                   form={form}
@@ -313,16 +315,17 @@ export default function AnalyticsCustomGraph({
             </Card.Root>
             <Card.Root width="full">
               <Card.Header paddingTop={3} paddingBottom={1} paddingX={3}>
-                <Flex>
+                <HStack width="full" justify="space-between">
                   <Input
                     {...form.control.register(`title`)}
                     border="none"
                     paddingX={2}
                     fontWeight="bold"
+                    fontSize="16px"
                   />
                   <Menu.Root>
                     <Menu.Trigger asChild>
-                      <Button variant="ghost">
+                      <Button variant="ghost" paddingX={0}>
                         <MoreVertical />
                       </Button>
                     </Menu.Trigger>
@@ -332,7 +335,7 @@ export default function AnalyticsCustomGraph({
                       </Menu.Item>
                     </Menu.Content>
                   </Menu.Root>
-                </Flex>
+                </HStack>
               </Card.Header>
               <Card.Body>
                 {debouncedCustomGraphInput && (
@@ -474,7 +477,7 @@ const customGraphFormToCustomGraphInput = (
     includePrevious: formData.includePrevious,
     timeScale: formData.timeScale,
     connected: formData.connected,
-    height: 550,
+    height: 517,
   };
 };
 
@@ -695,7 +698,9 @@ function CustomGraphForm({
                 defaultValue: "Users count",
               });
             }, 0);
-            setExpandedSeries([index.toString()]);
+            setTimeout(() => {
+              setExpandedSeries([index.toString()]);
+            }, 100);
             if (!form.getFieldState("includePrevious")?.isTouched) {
               form.setValue("includePrevious", false);
             }
@@ -817,18 +822,22 @@ function SeriesFieldItem({
       marginBottom={4}
     >
       <Accordion.ItemTrigger
-        as={Box}
         cursor="pointer"
         role="button"
         background="gray.100"
         fontWeight="bold"
         paddingLeft={1}
+        paddingRight={3}
       >
         <HStack width="full" gap={4}>
           <HStack width="full" gap={1}>
             <Menu.Root>
               <Menu.Trigger asChild>
-                <Button variant="plain" onClick={(e) => e.stopPropagation()}>
+                <Button
+                  variant="plain"
+                  padding={0}
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <Center>
                     <Box
                       width="32px"
@@ -883,6 +892,8 @@ function SeriesFieldItem({
               onClick={(e) => {
                 e.stopPropagation();
               }}
+              fontSize="14px"
+              fontWeight="normal"
               onDoubleClick={() => {
                 setExpandedSeries((prev) => {
                   if (Array.isArray(prev)) {
@@ -895,17 +906,29 @@ function SeriesFieldItem({
               }}
             />
           </HStack>
-          {seriesFields.fields.length > 1 && (
-            <Trash
-              role="button"
-              onClick={() => seriesFields.remove(index)}
-              width={16}
-            />
-          )}
+          <HStack gap={0}>
+            {seriesFields.fields.length > 1 && (
+              <Button
+                variant="plain"
+                padding={0}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  seriesFields.remove(index);
+                }}
+              >
+                <Trash width={16} />
+              </Button>
+            )}
+            <Accordion.ItemIndicator>
+              <ChevronDown />
+            </Accordion.ItemIndicator>
+          </HStack>
         </HStack>
       </Accordion.ItemTrigger>
       <Accordion.ItemContent>
-        <SeriesField form={form} index={index} />
+        <Box padding={3}>
+          <SeriesField form={form} index={index} />
+        </Box>
       </Accordion.ItemContent>
     </Accordion.Item>
   );
