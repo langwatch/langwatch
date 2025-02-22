@@ -1,5 +1,6 @@
-import { Box, Tooltip } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 import React, { useEffect, useRef, useState } from "react";
+import { Tooltip } from "./ui/tooltip";
 
 export function OverflownTextWithTooltip({
   children,
@@ -14,7 +15,11 @@ export function OverflownTextWithTooltip({
   }, []);
 
   return (
-    <Tooltip label={children} isDisabled={!isOverflown} placement="top">
+    <Tooltip
+      content={children}
+      disabled={!isOverflown}
+      positioning={{ placement: "top" }}
+    >
       <Box ref={ref} {...props}>
         {children}
       </Box>

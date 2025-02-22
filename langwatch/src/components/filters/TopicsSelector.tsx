@@ -1,11 +1,9 @@
 import {
-  Checkbox,
-  Divider,
+  Separator,
   HStack,
   Heading,
   Skeleton,
   Text,
-  Tooltip,
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
@@ -15,6 +13,8 @@ import { api } from "../../utils/api";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { Delayed } from "../Delayed";
+import { Tooltip } from "../ui/tooltip";
+import { Checkbox } from "../ui/checkbox";
 
 export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   const router = useRouter();
@@ -53,13 +53,13 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
     }
   );
 
-  const handleTopicChange = (topicId: string, isChecked: boolean) => {
-    const newTopics = isChecked
+  const handleTopicChange = (topicId: string, checked: boolean) => {
+    const newTopics = checked
       ? [...selectedTopics, topicId]
       : selectedTopics.filter((t) => t !== topicId);
 
     let newSubtopics = selectedSubtopics;
-    if (!isChecked) {
+    if (!checked) {
       const subtopics = topicCountsQuery.data?.subtopicCounts.filter(
         (subtopic) => subtopic.parentId === topicId
       );
@@ -89,8 +89,8 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
     );
   };
 
-  const handleSubtopicChange = (subtopicId: string, isChecked: boolean) => {
-    const newSubtopics = isChecked
+  const handleSubtopicChange = (subtopicId: string, checked: boolean) => {
+    const newSubtopics = checked
       ? [...selectedSubtopics, subtopicId]
       : selectedSubtopics.filter((t) => t !== subtopicId);
     const subtopicsQuery =
@@ -163,13 +163,13 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                       borderColor="gray.400"
                       gap={3}
                       flexGrow={1}
-                      isChecked={selectedTopics.includes(topic.id)}
+                      checked={selectedTopics.includes(topic.id)}
                       onChange={(e) =>
                         handleTopicChange(topic.id, e.target.checked)
                       }
                     >
                       <OverflownTextWithTooltip
-                        noOfLines={1}
+                        lineClamp={1}
                         wordBreak="break-all"
                         fontSize={15}
                       >
@@ -199,7 +199,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                             borderColor="gray.400"
                             gap={3}
                             flexGrow={1}
-                            isChecked={selectedSubtopics.includes(subtopic.id)}
+                            checked={selectedSubtopics.includes(subtopic.id)}
                             onChange={(e) =>
                               handleSubtopicChange(
                                 subtopic.id,
@@ -208,7 +208,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                             }
                           >
                             <OverflownTextWithTooltip
-                              noOfLines={1}
+                              lineClamp={1}
                               wordBreak="break-all"
                             >
                               {subtopic.name}
@@ -223,13 +223,16 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                           </Text>
                         </HStack>
                       ))}
-                  <Divider borderColor="gray.350" _last={{ display: "none" }} />
+                  <Separator
+                    borderColor="gray.350"
+                    _last={{ display: "none" }}
+                  />
                 </React.Fragment>
               ))
           ) : (
             <HStack>
               <Text>No topics found</Text>
-              <Tooltip label="Topics are assigned automatically to a group of messages. If you already have enough messages, it may take a day topics to be generated">
+              <Tooltip content="Topics are assigned automatically to a group of messages. If you already have enough messages, it may take a day topics to be generated">
                 <HelpCircle width="14px" />
               </Tooltip>
             </HStack>
