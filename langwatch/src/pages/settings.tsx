@@ -127,7 +127,7 @@ function SettingsForm({
                 <HorizontalFormControl
                   label="Name"
                   helper="The name of your organization"
-                  isInvalid={!!getFieldState("name").error}
+                  invalid={!!getFieldState("name").error}
                 >
                   {hasOrganizationPermission(
                     OrganizationRoleGroup.ORGANIZATION_MANAGE
@@ -293,7 +293,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             <HorizontalFormControl
               label="Name"
               helper="The name of the project"
-              isInvalid={!!formState.errors.name}
+              invalid={!!formState.errors.name}
             >
               <Input
                 width="full"
@@ -310,7 +310,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             <HorizontalFormControl
               label="Tech Stack"
               helper="The project language and framework"
-              isInvalid={
+              invalid={
                 !!formState.errors.language || !!formState.errors.framework
               }
             >
@@ -334,7 +334,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             <HorizontalFormControl
               label="PII Redaction Level"
               helper="The level of redaction for PII"
-              isInvalid={!!formState.errors.piiRedactionLevel}
+              invalid={!!formState.errors.piiRedactionLevel}
             >
               <Controller
                 control={control}

@@ -124,14 +124,14 @@ function SignInForm() {
               <HorizontalFormControl
                 label="Email"
                 helper="Enter your email"
-                isInvalid={form.formState.errors.email?.message !== undefined}
+                invalid={form.formState.errors.email?.message !== undefined}
               >
                 <Input type="email" {...form.register("email")} />
               </HorizontalFormControl>
               <HorizontalFormControl
                 label="Password"
                 helper="Enter your password"
-                isInvalid={
+                invalid={
                   form.formState.errors.password?.message !== undefined
                 }
               >

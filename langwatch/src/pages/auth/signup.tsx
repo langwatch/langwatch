@@ -138,21 +138,21 @@ function SignUpForm() {
               <HorizontalFormControl
                 label="Name"
                 helper="Enter your name"
-                isInvalid={form.formState.errors.name?.message !== undefined}
+                invalid={form.formState.errors.name?.message !== undefined}
               >
                 <Input {...form.register("name")} />
               </HorizontalFormControl>
               <HorizontalFormControl
                 label="Email"
                 helper="Enter your email"
-                isInvalid={form.formState.errors.email?.message !== undefined}
+                invalid={form.formState.errors.email?.message !== undefined}
               >
                 <Input type="email" {...form.register("email")} />
               </HorizontalFormControl>
               <HorizontalFormControl
                 label="Password"
                 helper="Enter your password"
-                isInvalid={
+                invalid={
                   form.formState.errors.password?.message !== undefined
                 }
               >
@@ -161,7 +161,7 @@ function SignUpForm() {
               <HorizontalFormControl
                 label="Confirm Password"
                 helper="Confirm your password"
-                isInvalid={
+                invalid={
                   form.formState.errors.confirmPassword?.message !== undefined
                 }
               >

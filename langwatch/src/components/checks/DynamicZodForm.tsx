@@ -378,7 +378,7 @@ const DynamicZodForm = ({
                   camelCaseToTitleCase(key) + (isOptional ? " (Optional)" : "")
                 }
                 helper={helperText}
-                isInvalid={isInvalid}
+                invalid={isInvalid}
               >
                 {renderField(
                   field,
