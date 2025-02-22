@@ -154,7 +154,7 @@ export function DatasetModal({
                 fontSize="14px"
                 fontWeight="bold"
                 color="gray.500"
-                variant="link"
+                variant="plain"
                 leftIcon={<ArrowLeft size={16} />}
                 onClick={() => setEditingDataset(undefined)}
               >

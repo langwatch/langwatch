@@ -109,7 +109,7 @@ export function UploadCSVModal({
           <ModalFooter>
             {onCreateFromScratch && (
               <Button
-                variant="link"
+                variant="plain"
                 colorPalette="gray"
                 fontWeight="normal"
                 color="blue.700"

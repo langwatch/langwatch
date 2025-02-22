@@ -51,7 +51,7 @@ export const useAlertOnComponent = () => {
                     <Text>{execution_state?.error}</Text>
                     {/* <Button
                       colorPalette="white"
-                      variant="link"
+                      variant="plain"
                       size="sm"
                       onClick={() => {
                         setSelectedNode(componentId);

@@ -35,7 +35,7 @@ export function FeedbackLink() {
                 target="_blank"
                 passHref
               >
-                <Button as="span" variant="link" leftIcon={<Discord />}>
+                <Button as="span" variant="plain" leftIcon={<Discord />}>
                   Discord
                 </Button>
               </NextLink>
@@ -44,7 +44,7 @@ export function FeedbackLink() {
                 target="_blank"
                 passHref
               >
-                <Button as="span" variant="link" leftIcon={<GitHub />}>
+                <Button as="span" variant="plain" leftIcon={<GitHub />}>
                   Github
                 </Button>
               </NextLink>
@@ -53,7 +53,7 @@ export function FeedbackLink() {
         </ModalContent>
       </Modal>
       <Button
-        variant="link"
+        variant="plain"
         onClick={onOpen}
         fontWeight="normal"
         color="gray.800"

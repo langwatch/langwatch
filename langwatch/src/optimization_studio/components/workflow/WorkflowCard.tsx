@@ -83,7 +83,7 @@ export function WorkflowCard({
               <HStack>
                 <Button
                   colorPalette="white"
-                  variant="link"
+                  variant="plain"
                   textDecoration="underline"
                   onClick={() => {
                     toast.close(`delete-workflow-${workflowId}`);
