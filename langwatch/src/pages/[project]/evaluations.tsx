@@ -120,7 +120,7 @@ export default function Checks() {
         key={check.id}
       >
         <CardBody width="full">
-          <HStack width="full" spacing={6}>
+          <HStack width="full" gap={6}>
             {hasTeamPermission(TeamRoleGroup.GUARDRAILS_MANAGE) && (
               <Switch
                 size="lg"
@@ -172,7 +172,7 @@ export default function Checks() {
   return (
     <DashboardLayout>
       <Container maxWidth="1200" padding={6}>
-        <VStack width="fill" spacing={4} align="stretch">
+        <VStack width="fill" gap={4} align="stretch">
           <HStack paddingTop={4}>
             <Heading as="h1">Guardrails and Evaluations</Heading>
             <Spacer />
@@ -197,7 +197,7 @@ export default function Checks() {
               </Button>
             )}
           </HStack>
-          <VStack align="start" width="full" spacing={4}>
+          <VStack align="start" width="full" gap={4}>
             {checks.isLoading ? (
               <VStack gap={4} width="full">
                 <Skeleton width="full" height="20px" />

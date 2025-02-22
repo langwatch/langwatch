@@ -91,7 +91,7 @@ export function DSPyExperiment({
   } = useDSPyExperimentState({ project, experiment });
 
   return (
-    <HStack align="start" width="full" height="full" spacing={0}>
+    <HStack align="start" width="full" height="full" gap={0}>
       <DSPyExperimentRunList
         dspyRuns={dspyRuns}
         selectedRuns={selectedRuns}
@@ -105,7 +105,7 @@ export function DSPyExperiment({
           width="100%"
           maxWidth="1200px"
           height="full"
-          spacing={8}
+          gap={8}
           padding={6}
         >
           <HStack width="full" align="end">
@@ -363,7 +363,7 @@ export function DSPyExperimentRunList({
       minWidth={size === "sm" ? "250px" : "300px"}
       maxWidth={size === "sm" ? "250px" : "300px"}
       height="full"
-      spacing={0}
+      gap={0}
     >
       {size !== "sm" && (
         <Heading as="h2" size="md" paddingX={6} paddingY={4}>
@@ -438,14 +438,14 @@ export function DSPyExperimentRunList({
                 );
                 setHighlightedRun(null);
               }}
-              spacing={3}
+              gap={3}
             >
               {!dspyRuns.data?.find((r) => r.runId === run.runId) ? (
                 <>
                   <VersionBox minWidth={hasAnyVersion ? "48px" : "0"} />
                   <VStack
                     align="start"
-                    spacing={2}
+                    gap={2}
                     width="100%"
                     paddingRight={2}
                   >
@@ -479,7 +479,7 @@ export function DSPyExperimentRunList({
                   <VStack
                     width="full"
                     align="start"
-                    spacing={0}
+                    gap={0}
                     paddingRight={2}
                   >
                     <HStack width="full">
@@ -571,10 +571,10 @@ export const RunDetails = React.memo(
     const runName = workflowVersion?.commitMessage ?? dspyStepSummary.run_id;
 
     return (
-      <VStack width="full" height="full" spacing={0} minWidth="0">
+      <VStack width="full" height="full" gap={0} minWidth="0">
         {size !== "sm" && (
-          <HStack width="full" spacing={8} padding={4}>
-            <HStack spacing={3}>
+          <HStack width="full" gap={8} padding={4}>
+            <HStack gap={3}>
               {workflowVersion ? (
                 <>
                   <VersionBox version={workflowVersion} />
@@ -1366,9 +1366,9 @@ export function DSPyExperimentSummary({
       borderColor="gray.200"
       paddingY={4}
       paddingX={6}
-      spacing={5}
+      gap={5}
     >
-      <VStack align="start" spacing={1}>
+      <VStack align="start" gap={1}>
         <Text fontWeight="500" noOfLines={1}>
           {!bestScoreLabel || bestScoreLabel === "score"
             ? "Best Score"
@@ -1379,7 +1379,7 @@ export function DSPyExperimentSummary({
         </Text>
       </VStack>
       <Divider orientation="vertical" height="48px" />
-      <VStack align="start" spacing={1}>
+      <VStack align="start" gap={1}>
         <Text fontWeight="500" noOfLines={1}>
           Total Cost
         </Text>

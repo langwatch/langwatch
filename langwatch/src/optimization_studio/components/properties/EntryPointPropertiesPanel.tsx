@@ -183,7 +183,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
               </Box>
             </Tooltip>
           </HStack>
-          <HStack width="full" spacing={0}>
+          <HStack width="full" gap={0}>
             <HStack width="full">
               <Text
                 fontSize="13px"
@@ -223,7 +223,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
               {form.formState.errors.train_size.message}
             </Text>
           )}
-          <HStack width="full" spacing={0}>
+          <HStack width="full" gap={0}>
             <HStack width="full">
               <Text
                 fontSize="13px"
@@ -274,7 +274,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
               {form.formState.errors.test_size.message}
             </Text>
           )}
-          <HStack width="full" spacing={4}>
+          <HStack width="full" gap={4}>
             <HStack width="full">
               <Text
                 fontSize="13px"

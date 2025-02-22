@@ -57,7 +57,7 @@ export function FilterToggle({
       isActive={showFilters}
       paddingRight={hasAnyFilters ? 1 : undefined}
     >
-      <HStack spacing={0}>
+      <HStack gap={0}>
         {filterParams.filters && hasAnyFilters && (
           <Box
             width="12px"

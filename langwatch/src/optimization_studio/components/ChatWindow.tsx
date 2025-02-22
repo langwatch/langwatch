@@ -233,7 +233,7 @@ export const ChatBox = ({
   };
 
   return (
-    <HStack align={"start"} spacing={1} height={"100%"}>
+    <HStack align={"start"} gap={1} height={"100%"}>
       <MultipleInput
         inputs={inputs}
         handleInputChange={handleInputChange}
@@ -242,7 +242,7 @@ export const ChatBox = ({
         entryInputs={entryInputs}
       />
       <VStack
-        spacing={4}
+        gap={4}
         align="stretch"
         width="100%"
         height={"100%"}
@@ -385,7 +385,7 @@ const MultipleInput = ({
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onSubmit={handleSubmit(onSubmit)}
       >
-        <Stack spacing={3} width={"full"}>
+        <Stack gap={3} width={"full"}>
           {entryInputs.map((edge, index) => {
             return (
               <Stack key={index}>

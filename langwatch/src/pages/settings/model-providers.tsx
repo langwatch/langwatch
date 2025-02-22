@@ -60,7 +60,7 @@ export default function ModelsPage() {
   return (
     <SettingsLayout>
       <VStack
-        spacing={6}
+        gap={6}
         width="full"
         maxWidth="920px"
         align="start"
@@ -86,7 +86,7 @@ export default function ModelsPage() {
         </Text>
         <Card width="full">
           <CardBody width="full" paddingY={4}>
-            <VStack spacing={0} width="full">
+            <VStack gap={0} width="full">
               {modelProviders.isLoading &&
                 Array.from({
                   length: Object.keys(modelProvidersRegistry).length,
@@ -373,8 +373,8 @@ function ModelProviderForm({
           }
           helper={""}
         >
-          <VStack align="start" width="full" spacing={4} paddingRight={4}>
-            <HStack spacing={6}>
+          <VStack align="start" width="full" gap={4} paddingRight={4}>
+            <HStack gap={6}>
               <Switch
                 {...enabledField}
                 // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -435,7 +435,7 @@ function ModelProviderForm({
                   </FormErrorMessage>
                 </FormControl>
 
-                <VStack width="full" spacing={4}>
+                <VStack width="full" gap={4}>
                   <Box width="full">
                     <SmallLabel>Models</SmallLabel>
                     <Controller

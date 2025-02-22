@@ -258,7 +258,7 @@ export function TriggerDrawer() {
             <PopoverCloseButton onClick={onClose} zIndex={1000} />
             <PopoverBody>
               <FormControl>
-                <Stack spacing={5} direction="column" marginRight={4}>
+                <Stack gap={5} direction="column" marginRight={4}>
                   {teamWithMembers.data &&
                     teamWithMembers.data?.members.map((member) => {
                       return (
@@ -323,14 +323,14 @@ export function TriggerDrawer() {
               minWidth="calc(50% - 16px)"
             >
               <RadioGroup defaultValue={TriggerAction.SEND_SLACK_MESSAGE}>
-                <Stack spacing={4}>
+                <Stack gap={4}>
                   <VStack align="start">
                     <Radio
                       size="md"
                       value={TriggerAction.SEND_SLACK_MESSAGE}
                       colorScheme="blue"
                       alignItems="start"
-                      spacing={3}
+                      gap={3}
                       paddingTop={2}
                       {...register("action")}
                     >
@@ -363,7 +363,7 @@ export function TriggerDrawer() {
                         value={TriggerAction.SEND_EMAIL}
                         colorScheme="blue"
                         alignItems="start"
-                        spacing={3}
+                        gap={3}
                         paddingTop={2}
                         isDisabled={!hasEmailProvider}
                         {...register("action")}
@@ -387,7 +387,7 @@ export function TriggerDrawer() {
                       value={TriggerAction.ADD_TO_DATASET}
                       colorScheme="blue"
                       alignItems="start"
-                      spacing={3}
+                      gap={3}
                       paddingTop={2}
                       {...register("action")}
                     >

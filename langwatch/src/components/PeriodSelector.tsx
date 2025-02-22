@@ -142,7 +142,7 @@ export function PeriodSelector({
     <Popover isOpen={isOpen} onClose={onClose} placement="bottom-end">
       <PopoverTrigger>
         <Button variant="outline" onClick={onOpen} minWidth="fit-content">
-          <HStack spacing={2}>
+          <HStack gap={2}>
             <Calendar size={16} />
             <Text>{getDateRangeLabel()}</Text>
             <Box>
@@ -158,8 +158,8 @@ export function PeriodSelector({
           <Heading size="sm">Select Date Range</Heading>
         </PopoverHeader>
         <PopoverBody padding={4}>
-          <HStack align="start" spacing={6}>
-            <VStack spacing={4}>
+          <HStack align="start" gap={6}>
+            <VStack gap={4}>
               <FormControl>
                 <FormLabel>Start Date</FormLabel>
                 <Input

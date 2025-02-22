@@ -79,7 +79,7 @@ const AnnotationScorePage = () => {
       <VStack
         paddingX={4}
         paddingY={6}
-        spacing={6}
+        gap={6}
         width="full"
         maxWidth="6xl"
         align="start"
@@ -190,7 +190,7 @@ const ScoreOptions = ({
     <>
       {dataType === "CHECKBOX" ? (
         <HStack>
-          <HStack flexWrap="wrap" gap={2} spacing={4}>
+          <HStack flexWrap="wrap" gap={2} gap={4}>
             {options.map((option) => (
               <Tag key={option.value}>{option.label}</Tag>
             ))}
@@ -198,7 +198,7 @@ const ScoreOptions = ({
         </HStack>
       ) : (
         <HStack>
-          <HStack flexWrap="wrap" gap={2} spacing={4}>
+          <HStack flexWrap="wrap" gap={2} gap={4}>
             {options.map((option) => (
               <Tag key={option.value}>{option.label}</Tag>
             ))}

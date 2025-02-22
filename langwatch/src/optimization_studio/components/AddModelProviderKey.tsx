@@ -28,7 +28,7 @@ export const AddModelProviderKey = ({
             be able to {runWhat}:
           </Text>
         </HStack>
-        <VStack align="start" width="full" spacing={3}>
+        <VStack align="start" width="full" gap={3}>
           {nodeProvidersWithoutCustomKeys.map((provider) => (
             <HStack key={provider} width="full">
               <Box height={6} width={6}>

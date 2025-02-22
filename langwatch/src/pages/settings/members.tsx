@@ -296,7 +296,7 @@ function MembersList({
       <VStack
         paddingX={4}
         paddingY={6}
-        spacing={6}
+        gap={6}
         width="full"
         maxWidth="980px"
         align="start"
@@ -310,7 +310,7 @@ function MembersList({
           organization.members.length >= activePlan.maxMembers ? (
             <Tooltip label="Upgrade your plan to add more members">
               <Button size="sm" colorScheme="orange" isDisabled={true}>
-                <HStack spacing={2}>
+                <HStack gap={2}>
                   <Lock size={20} />
                   <Text>Add members</Text>
                 </HStack>
@@ -322,7 +322,7 @@ function MembersList({
               colorScheme="orange"
               onClick={() => onAddMembersOpen()}
             >
-              <HStack spacing={2}>
+              <HStack gap={2}>
                 <Plus size={20} />
                 <Text>Add members</Text>
               </HStack>
@@ -466,18 +466,18 @@ function MembersList({
           </ModalHeader>
           <ModalCloseButton />
           <ModalBody paddingBottom={6}>
-            <VStack align="start" spacing={4}>
+            <VStack align="start" gap={4}>
               <Text>
                 Send the link below to the users you want to invite to join the
                 organization.
               </Text>
 
-              <VStack align="start" spacing={4} width="full">
+              <VStack align="start" gap={4} width="full">
                 {selectedInvites.map((invite) => (
                   <VStack
                     key={invite.inviteCode}
                     align="start"
-                    spacing={2}
+                    gap={2}
                     width="full"
                   >
                     <Text fontWeight="600">{invite.email}</Text>

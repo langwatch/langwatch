@@ -49,7 +49,7 @@ export default function AnnotationsLayout({
         width="full"
         height="full"
         background="gray.100"
-        spacing={0}
+        gap={0}
         position="relative"
       >
         <VStack
@@ -61,7 +61,7 @@ export default function AnnotationsLayout({
           fontSize="14px"
           minWidth="240px"
           height="full"
-          spacing={1}
+          gap={1}
           display={isSubscription ? "none" : "flex"}
         >
           <Text fontSize="md" fontWeight="500" paddingX={4} paddingY={2}>

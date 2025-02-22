@@ -108,7 +108,7 @@ function Index() {
       )}
       <AnalyticsHeader title="Analytics" />
 
-      <HStack align="start" width="full" spacing={8}>
+      <HStack align="start" width="full" gap={8}>
         <VStack align="start" width="full">
           <UserMetrics />
           <LLMMetrics />

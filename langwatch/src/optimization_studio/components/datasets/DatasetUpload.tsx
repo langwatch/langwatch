@@ -32,7 +32,7 @@ export function DatasetUpload({
 
   return (
     <Center height="calc(100vh - 384px)">
-      <VStack spacing={4}>
+      <VStack gap={4}>
         <Heading size="md">Upload CSV</Heading>
         <CSVReaderComponent
           onUploadAccepted={({ data, acceptedFile }) => {

@@ -76,9 +76,9 @@ export default function TraceDetails() {
         alignSelf="flex-start"
         alignItems="flex-start"
         width="full"
-        spacing={10}
+        gap={10}
       >
-        <VStack spacing={6} alignItems="flex-start" width="full">
+        <VStack gap={6} alignItems="flex-start" width="full">
           <HStack
             gap={5}
             align={{ base: "start", md: "center" }}
@@ -101,7 +101,7 @@ export default function TraceDetails() {
         <HStack
           align="start"
           width="full"
-          spacing={0}
+          gap={0}
           border="1px solid"
           borderColor="gray.200"
           alignItems="stretch"
@@ -173,7 +173,7 @@ export function Conversation({
       <VStack
         align="start"
         width="full"
-        spacing={0}
+        gap={0}
         background="white"
         borderBottom="1px solid"
         borderColor="gray.200"
@@ -205,7 +205,7 @@ export function Conversation({
                   paddingTop={4}
                   paddingBottom={4}
                 >
-                  <HStack spacing={3}>
+                  <HStack gap={3}>
                     <Spinner size="sm" />
                     <Text>Loading messages...</Text>
                   </HStack>
@@ -417,7 +417,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
   };
 
   return (
-    <VStack ref={ref as any} align="start" width="full" spacing={2}>
+    <VStack ref={ref as any} align="start" width="full" gap={2}>
       <Box
         width="full"
         borderY="1px solid"
@@ -493,7 +493,7 @@ const TraceMessages = React.forwardRef(function TraceMessages(
                   }
                 >
                   {trace.error && !trace.output?.value ? (
-                    <VStack alignItems="flex-start" spacing={2} paddingY={2}>
+                    <VStack alignItems="flex-start" gap={2} paddingY={2}>
                       <Box
                         fontSize={11}
                         color="red.400"
@@ -579,11 +579,11 @@ function Message({
   if (!project) return null;
 
   return (
-    <HStack width="full" paddingTop={paddingTop} align="start" spacing={3}>
+    <HStack width="full" paddingTop={paddingTop} align="start" gap={3}>
       {avatar}
       <VStack
         align="start"
-        spacing={0}
+        gap={0}
         width="full"
         className="content-hover"
         wordBreak="break-all"

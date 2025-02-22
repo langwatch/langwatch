@@ -44,7 +44,7 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
       <VStack
         paddingX={4}
         paddingY={6}
-        spacing={6}
+        gap={6}
         width="full"
         maxWidth="920px"
         align="start"
@@ -60,7 +60,7 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
             size="sm"
             colorScheme="orange"
           >
-            <HStack spacing={2}>
+            <HStack gap={2}>
               <Plus size={20} />
               <Text>Add new team</Text>
             </HStack>

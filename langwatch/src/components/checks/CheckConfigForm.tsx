@@ -302,17 +302,17 @@ export default function CheckConfigForm({
         {!checkType || isChoosing ? (
           <EvaluatorSelection form={form} />
         ) : (
-          <VStack spacing={6} align="start" width="full">
+          <VStack gap={6} align="start" width="full">
             <Card width="full">
               <CardBody>
-                <VStack spacing={0}>
+                <VStack gap={0}>
                   <HorizontalFormControl
                     label="Evaluation Type"
                     helper="Select the evaluation to run"
                     isInvalid={!!errors.checkType}
                   >
                     <VStack align="start" width="full">
-                      <HStack spacing={0}>
+                      <HStack gap={0}>
                         <Text>
                           {evaluatorTempNameMap[
                             availableEvaluators[checkType].name
@@ -353,7 +353,7 @@ export default function CheckConfigForm({
                     isInvalid={!!errors.name}
                     align="start"
                   >
-                    <VStack spacing={2} align="start">
+                    <VStack gap={2} align="start">
                       <Input
                         id="name"
                         {...register("name", {
@@ -388,7 +388,7 @@ export default function CheckConfigForm({
 
             <Card width="full" padding={0}>
               <CardBody padding={0}>
-                <VStack paddingX={4} spacing={0}>
+                <VStack paddingX={4} gap={0}>
                   <HorizontalFormControl
                     label="Execution Mode"
                     helper="Configure when this evaluation is executed"
@@ -429,7 +429,7 @@ export default function CheckConfigForm({
                       <AccordionButton paddingY={6}>
                         <Box as="span" flex="1" textAlign="left">
                           <FormControl>
-                            <VStack align="start" spacing={1}>
+                            <VStack align="start" gap={1}>
                               <FormLabel margin={0}>
                                 Execution Settings
                               </FormLabel>
@@ -574,7 +574,7 @@ const MappingsFields = ({
 }) => {
   return (
     <>
-      <VStack spacing={2} align="start" width="full">
+      <VStack gap={2} align="start" width="full">
         {requiredFields.length > 0 && (
           <>
             {requiredFields.map((field) => (

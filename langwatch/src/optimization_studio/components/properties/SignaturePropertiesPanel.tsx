@@ -58,7 +58,7 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
       hideParameters
       fieldsAfter={
         <>
-          <VStack width="full" align="start" spacing={2}>
+          <VStack width="full" align="start" gap={2}>
             <HStack width="full">
               <PropertySectionTitle>
                 Demonstrations{" "}
@@ -157,7 +157,7 @@ function PromptingTechniqueField({ value }: { value: string | undefined }) {
   return (
     <PropertyField title="Prompting Technique">
       <HStack
-        spacing={2}
+        gap={2}
         width="full"
         paddingX={3}
         paddingY={2}

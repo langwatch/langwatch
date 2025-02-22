@@ -61,7 +61,7 @@ function ProjectsList({
       <VStack
         paddingX={4}
         paddingY={6}
-        spacing={6}
+        gap={6}
         width="full"
         maxWidth="920px"
         align="start"
@@ -94,7 +94,7 @@ function ProjectsList({
                               size="sm"
                               colorScheme="orange"
                             >
-                              <HStack spacing={2}>
+                              <HStack gap={2}>
                                 <Plus size={20} />
                                 <Text>Add new project</Text>
                               </HStack>
@@ -118,7 +118,7 @@ function ProjectsList({
                                   _hover={{ background: "gray.50" }}
                                   color="gray.400"
                                 >
-                                  <HStack spacing={2}>
+                                  <HStack gap={2}>
                                     <Plus size={20} />
                                     <Text>Add new project</Text>
                                   </HStack>

@@ -96,7 +96,7 @@ export function EvaluationManualIntegration({
       : "";
 
     return (
-      <VStack align="start" width="full" spacing={3}>
+      <VStack align="start" width="full" gap={3}>
         <Text fontSize={14}>
           Add this import at the top of the file where the LLM call happens:
         </Text>
@@ -192,7 +192,7 @@ ${
       : "";
 
     return (
-      <VStack align="start" width="full" spacing={3}>
+      <VStack align="start" width="full" gap={3}>
         <Text fontSize={14}>
           First, set up your traces and spans capturing as explained in the{" "}
           <Link
@@ -260,7 +260,7 @@ ${
     : "";
 
   return (
-    <VStack spacing={4} align="start" width="full">
+    <VStack gap={4} align="start" width="full">
       <Heading as="h4" fontSize={16} fontWeight={500} paddingTop={4}>
         {executionMode === EvaluationExecutionMode.MANUALLY
           ? "Manual Integration"
@@ -318,7 +318,7 @@ ${
             <TypeScriptInstructions />
           </TabPanel>
           <TabPanel padding={0}>
-            <VStack align="start" width="full" spacing={3}>
+            <VStack align="start" width="full" gap={3}>
               <Box className="markdown" width="full">
                 <RenderCode
                   code={`# Set your API key and endpoint URL

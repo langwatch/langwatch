@@ -49,7 +49,7 @@ export function MultilineJSONCellEditor({
   const [jsonError, setJsonError] = useState<string | null>(null);
 
   return (
-    <VStack width="100%" minHeight="100%" spacing={0}>
+    <VStack width="100%" minHeight="100%" gap={0}>
       {jsonError && (
         <Tooltip
           maxWidth="700px"

@@ -61,7 +61,7 @@ export function PropertyField({
   tooltip?: React.ReactNode;
 }) {
   return (
-    <VStack align="start" spacing={3} width="full">
+    <VStack align="start" gap={3} width="full">
       <PropertySectionTitle tooltip={tooltip}>{title}</PropertySectionTitle>
       {children}
     </VStack>
@@ -130,7 +130,7 @@ export function FieldsDefinition({
     <VStack
       as="form"
       align="start"
-      spacing={3}
+      gap={3}
       width="full"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onSubmit={handleSubmit(onSubmit)}
@@ -212,7 +212,7 @@ export function FieldsDefinition({
                   borderRadius="8px"
                   paddingX={2}
                   paddingY={1}
-                  spacing={2}
+                  gap={2}
                   height="full"
                 >
                   <Box fontSize={13}>
@@ -323,7 +323,7 @@ export function FieldsForm({
     <VStack
       as="form"
       align="start"
-      spacing={3}
+      gap={3}
       width="full"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onChange={handleSubmit(onSubmit)}
@@ -378,7 +378,7 @@ export function FieldsForm({
                 }}
               >
                 <HStack
-                  spacing={2}
+                  gap={2}
                   fontSize={18}
                   fontWeight="bold"
                   color="white"
@@ -425,7 +425,7 @@ export function FieldsForm({
             key={field.id}
             isInvalid={!!errors.fields?.[index]?.identifier}
           >
-            <VStack align="start" spacing={3} width="full">
+            <VStack align="start" gap={3} width="full">
               <HStack width="full">
                 <PropertySectionTitle>
                   {camelCaseToTitleCase(field.identifier)}
@@ -542,7 +542,7 @@ export function BasePropertiesPanel({
   return (
     <VStack
       align="start"
-      spacing={6}
+      gap={6}
       padding={3}
       maxWidth="550px"
       width="25vw"
@@ -550,16 +550,16 @@ export function BasePropertiesPanel({
       height="full"
       overflowY="auto"
     >
-      <VStack spacing={2} width="full" align="start">
+      <VStack gap={2} width="full" align="start">
         <HStack
           paddingY={1}
           paddingLeft={2}
           width="full"
           justify="space-between"
-          spacing={0}
+          gap={0}
           alignItems="flex-start"
         >
-          <HStack spacing={2}>
+          <HStack gap={2}>
             {header ? (
               header
             ) : !isWorkflow(node) ? (
@@ -623,11 +623,11 @@ export function BasePropertiesPanel({
               </>
             ) : null}
           </HStack>
-          <HStack spacing={0} marginRight="-4px" hidden={isEditingName}>
+          <HStack gap={0} marginRight="-4px" hidden={isEditingName}>
             {!isWorkflow(node) && isExecutableComponent(node) && (
               <>
                 <HStack
-                  spacing={2}
+                  gap={2}
                   onClick={() => {
                     if (!propertiesExpanded) {
                       setPropertiesExpanded(true);

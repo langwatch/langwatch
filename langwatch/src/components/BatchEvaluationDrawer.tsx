@@ -533,7 +533,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                 </Tabs>
               </HStack>
 
-              <VStack width="full" paddingTop={6} spacing={4}></VStack>
+              <VStack width="full" paddingTop={6} gap={4}></VStack>
               <HStack gap={12} paddingY={8}>
                 <Spacer />
                 {checkError ? (

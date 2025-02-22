@@ -100,7 +100,7 @@ export function PromptingTechniqueWrapper({
       outlineColor={
         node.selected ? selectionColor : isHovered ? "gray.300" : "none"
       }
-      spacing={0}
+      gap={0}
       onClick={(e) => {
         let parent: HTMLElement | null = e.target as HTMLElement;
         while (parent && !parent.classList.contains("js-component-node")) {
@@ -144,7 +144,7 @@ export function PromptingTechniqueWrapper({
           </NodeToolbar>
         </Menu>
       )}
-      <HStack spacing={2} width="full" paddingX={3} paddingY={2}>
+      <HStack gap={2} width="full" paddingX={3} paddingY={2}>
         <ComponentIcon
           type={node.type as ComponentType}
           cls={node.data.cls}

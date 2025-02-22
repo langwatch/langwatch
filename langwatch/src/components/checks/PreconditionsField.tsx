@@ -51,7 +51,7 @@ export const PreconditionsField = ({
       label="Preconditions"
       helper="Conditions that must be met for this check to run"
     >
-      <VStack align="start" spacing={4}>
+      <VStack align="start" gap={4}>
         {evaluator?.requiredFields.includes("contexts") && (
           <Box borderLeft="4px solid" borderLeftColor="blue.400" width="full">
             <VStack
@@ -128,7 +128,7 @@ export const PreconditionsField = ({
                 <X />
               </Button>
               <SmallLabel>{index == 0 ? "When" : "and"}</SmallLabel>
-              <HStack spacing={4}>
+              <HStack gap={4}>
                 <Select
                   {...control.register(`preconditions.${index}.field`)}
                   minWidth="fit-content"

@@ -52,7 +52,7 @@ export default function Usage() {
       <VStack
         paddingX={4}
         paddingY={6}
-        spacing={6}
+        gap={6}
         width="full"
         maxWidth="920px"
         align="start"
@@ -68,7 +68,7 @@ export default function Usage() {
           <CardBody width="full">
             <VStack
               width="full"
-              spacing={4}
+              gap={4}
               paddingY={4}
               paddingX={4}
               align="start"
@@ -110,7 +110,7 @@ export default function Usage() {
                   <VStack
                     key={costGroup.project.id}
                     align="start"
-                    spacing={4}
+                    gap={4}
                     width="full"
                   >
                     <Heading size="sm" as="h3">

@@ -141,7 +141,7 @@ export default function Datasets() {
   return (
     <DashboardLayout>
       <Container maxW={"calc(100vw - 200px)"} padding={6} marginTop={8}>
-        <HStack width="full" align="top" spacing={6}>
+        <HStack width="full" align="top" gap={6}>
           <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
             Datasets and Evaluations
           </Heading>

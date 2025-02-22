@@ -16,7 +16,7 @@ import { EvaluationProgressBar } from "../../components/experiments/BatchEvaluat
 
 export function ProgressToast() {
   return (
-    <VStack spacing={4}>
+    <VStack gap={4}>
       <EvaluationProgressToast />
       <OptimizationProgressToast />
     </VStack>
@@ -113,9 +113,9 @@ export function BaseProgressToast({
       borderColor="gray.200"
       onClick={onClick}
     >
-      <VStack align="start" spacing={1}>
-        <VStack align="start" spacing={1} paddingY={2} paddingX={3}>
-          <HStack spacing={0}>
+      <VStack align="start" gap={1}>
+        <VStack align="start" gap={1} paddingY={2} paddingX={3}>
+          <HStack gap={0}>
             <AlertIcon />
             <AlertTitle>Please wait...</AlertTitle>
           </HStack>
@@ -147,7 +147,7 @@ export function OptimizationProgressBar({
   const isIndeterminate = true;
 
   return (
-    <HStack width="full" spacing={4}>
+    <HStack width="full" gap={4}>
       <Progress
         size={size}
         width="full"

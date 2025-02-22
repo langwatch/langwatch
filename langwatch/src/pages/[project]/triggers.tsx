@@ -206,7 +206,7 @@ export default function Members() {
       borderRadius="4px"
       fontSize={fontSize}
       width="100%"
-      spacing={2}
+      gap={2}
       paddingX={2}
       paddingY={1}
     >
@@ -309,7 +309,7 @@ export default function Members() {
   return (
     <DashboardLayout>
       <Container maxW={"calc(100vw - 200px)"} padding={6} marginTop={8}>
-        <HStack width="full" align="top" spacing={6} paddingBottom={6}>
+        <HStack width="full" align="top" gap={6} paddingBottom={6}>
           <Heading size="lg" as="h1">
             Triggers
           </Heading>
@@ -372,7 +372,7 @@ export default function Members() {
                             </Td>
 
                             <Td maxWidth="500px">
-                              <VStack spacing={2}>
+                              <VStack gap={2}>
                                 {applyChecks(
                                   trigger.checks?.filter(
                                     (check): check is Check => !!check
@@ -549,7 +549,7 @@ const TriggerForm = ({
   return (
     //eslint-disable-next-line @typescript-eslint/no-misused-promises
     <form onSubmit={handleSubmit(onSubmit)}>
-      <VStack spacing={4} align="start" width="full">
+      <VStack gap={4} align="start" width="full">
         <Text>
           Customize the notification message that will be sent when this trigger
           activates. This will replace the default message.

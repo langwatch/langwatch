@@ -145,8 +145,8 @@ const AnnotationQueuePicker = ({
   return (
     <Box boxShadow="0px -3px 15px rgba(0, 0, 0, 0.1)" padding={4} width="full">
       <VStack>
-        <HStack spacing={8}>
-          <HStack spacing={2}>
+        <HStack gap={8}>
+          <HStack gap={2}>
             <Button
               variant="outline"
               isDisabled={currentQueueItemIndex === 0}

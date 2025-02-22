@@ -27,7 +27,7 @@ export function WorkflowCardBase(props: React.ComponentProps<typeof VStack>) {
     <VStack
       align="start"
       padding={4}
-      spacing={4}
+      gap={4}
       borderRadius={8}
       background="white"
       boxShadow="md"
@@ -136,7 +136,7 @@ export function WorkflowCard({
 
   return (
     <WorkflowCardBase paddingX={0} {...props}>
-      <HStack spacing={4} paddingX={4} width="full">
+      <HStack gap={4} paddingX={4} width="full">
         <WorkflowIcon icon={icon} size={"lg"} />
         <Heading as={"h2"} size="sm" fontWeight={600}>
           {name}

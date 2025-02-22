@@ -74,7 +74,7 @@ export function ToggleTableView() {
       borderRadius="6px"
       border="1px solid"
       borderColor="gray.350"
-      spacing={0}
+      gap={0}
       position="relative"
     >
       <Box

@@ -53,9 +53,9 @@ export default function MessagesOrIntegrationGuide() {
   return (
     <DashboardLayout>
       <Container maxWidth="1200px" padding={6}>
-        <VStack spacing={8} width="full" align="start">
+        <VStack gap={8} width="full" align="start">
           <IntroducingStudio />
-          <HStack align="center" spacing={6}>
+          <HStack align="center" gap={6}>
             <Heading as={"h1"} size="lg" paddingTop={1}>
               Optimization Studio Workflows
             </Heading>
@@ -81,7 +81,7 @@ export default function MessagesOrIntegrationGuide() {
                         });
                       }}
                     >
-                      <HStack spacing={3}>
+                      <HStack gap={3}>
                         <Lock size={14} color="#777" />
 
                         <Text fontSize={18} color="gray.600">
@@ -95,7 +95,7 @@ export default function MessagesOrIntegrationGuide() {
             ) : (
               <WorkflowCardBase onClick={onOpen}>
                 <Center width="full" height="full">
-                  <HStack spacing={3}>
+                  <HStack gap={3}>
                     <Box
                       borderRadius="full"
                       border="2px solid"

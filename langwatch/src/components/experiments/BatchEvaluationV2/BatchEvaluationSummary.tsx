@@ -60,7 +60,7 @@ export function BatchEvaluationV2EvaluationSummary({
     <VStack
       width="full"
       background="white"
-      spacing={0}
+      gap={0}
       position="sticky"
       left={0}
       bottom={0}
@@ -69,11 +69,11 @@ export function BatchEvaluationV2EvaluationSummary({
       overflowX="auto"
       overflowY="hidden"
     >
-      <HStack width="100%" paddingY={4} paddingX={6} spacing={5}>
+      <HStack width="100%" paddingY={4} paddingX={6} gap={5}>
         {Object.entries(run.summary.evaluations).map(([_, evaluation]) => {
           return (
             <>
-              <VStack align="start" spacing={1}>
+              <VStack align="start" gap={1}>
                 <HoverableBigText
                   fontWeight="500"
                   noOfLines={2}
@@ -89,7 +89,7 @@ export function BatchEvaluationV2EvaluationSummary({
             </>
           );
         })}
-        <VStack align="start" spacing={1}>
+        <VStack align="start" gap={1}>
           <HoverableBigText fontWeight="500" noOfLines={2} expandable={false}>
             Mean Cost
           </HoverableBigText>
@@ -102,7 +102,7 @@ export function BatchEvaluationV2EvaluationSummary({
               currency="USD"
               format="$0.00[00]"
               tooltip={
-                <VStack align="start" spacing={0}>
+                <VStack align="start" gap={0}>
                   <Text>
                     Prediction mean cost:{" "}
                     {run.summary.dataset_average_cost
@@ -133,13 +133,13 @@ export function BatchEvaluationV2EvaluationSummary({
           </Text>
         </VStack>
         <Divider orientation="vertical" height="48px" />
-        <VStack align="start" spacing={1}>
+        <VStack align="start" gap={1}>
           <HoverableBigText fontWeight="500" noOfLines={1} expandable={false}>
             Mean Duration
           </HoverableBigText>
           <Tooltip
             label={
-              <VStack align="start" spacing={0}>
+              <VStack align="start" gap={0}>
                 <Text>
                   Prediction mean duration:{" "}
                   {run.summary.dataset_average_duration
@@ -166,7 +166,7 @@ export function BatchEvaluationV2EvaluationSummary({
           </Tooltip>
         </VStack>
         <Divider orientation="vertical" height="48px" />
-        <VStack align="start" spacing={1}>
+        <VStack align="start" gap={1}>
           <HoverableBigText fontWeight="500" noOfLines={1} expandable={false}>
             Total Cost
           </HoverableBigText>
@@ -179,7 +179,7 @@ export function BatchEvaluationV2EvaluationSummary({
               currency="USD"
               format="$0.00[00]"
               tooltip={
-                <VStack align="start" spacing={0}>
+                <VStack align="start" gap={0}>
                   <Text>
                     Prediction cost:{" "}
                     {run.summary.dataset_cost
@@ -210,7 +210,7 @@ export function BatchEvaluationV2EvaluationSummary({
           </Text>
         </VStack>
         <Divider orientation="vertical" height="48px" />
-        <VStack align="start" spacing={1}>
+        <VStack align="start" gap={1}>
           <Text fontWeight="500" noOfLines={1}>
             Runtime
           </Text>
@@ -239,7 +239,7 @@ export function BatchEvaluationV2EvaluationSummary({
           padding={3}
           borderTop="1px solid"
           borderColor="gray.200"
-          spacing={2}
+          gap={2}
         >
           <Text whiteSpace="nowrap" marginTop="-1px" paddingX={2}>
             Running

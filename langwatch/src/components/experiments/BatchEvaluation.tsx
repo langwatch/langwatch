@@ -229,7 +229,7 @@ export default function BatchEvaluation({
         justify="center"
         background="gray.50"
         padding={6}
-        spacing={6}
+        gap={6}
       >
         {Object.entries(averageScoresPerEvaluation).map(
           ([evaluation, score]) => (
@@ -239,7 +239,7 @@ export default function BatchEvaluation({
                   align="start"
                   justify="center"
                   height="full"
-                  spacing={2}
+                  gap={2}
                 >
                   <Text color="gray.700" fontSize="15px" fontWeight="500">
                     {evaluation}
@@ -309,7 +309,7 @@ export default function BatchEvaluation({
         )}
         <Card>
           <CardBody>
-            <VStack align="start" justify="center" height="full" spacing={2}>
+            <VStack align="start" justify="center" height="full" gap={2}>
               <Text color="gray.700" fontSize="15px" fontWeight="500">
                 Evaluations Cost
               </Text>
@@ -323,7 +323,7 @@ export default function BatchEvaluation({
         </Card>
         <Card>
           <CardBody>
-            <VStack align="start" justify="center" height="full" spacing={2}>
+            <VStack align="start" justify="center" height="full" gap={2}>
               <Text color="gray.700" fontSize="15px" fontWeight="500">
                 Runtime
               </Text>
@@ -376,7 +376,7 @@ export default function BatchEvaluation({
                   <VStack
                     key={evaluationKey}
                     align="start"
-                    spacing={8}
+                    gap={8}
                     paddingTop={12}
                   >
                     <Heading as={"h2"} size="md">

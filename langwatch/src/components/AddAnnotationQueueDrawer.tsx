@@ -295,7 +295,7 @@ export const AddAnnotationQueueDrawer = ({
                 </FullWidthFormControl>
 
                 <FormControl>
-                  <VStack align="start" spacing={1}>
+                  <VStack align="start" gap={1}>
                     <FormLabel margin={0}>Score Type</FormLabel>
                     <FormHelperText margin={0}>
                       Select the score type for this annotation queue

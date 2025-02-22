@@ -64,7 +64,7 @@ export function BatchEvaluationV2({
   });
 
   return (
-    <HStack align="start" width="full" height="full" spacing={0}>
+    <HStack align="start" width="full" height="full" gap={0}>
       <BatchEvaluationV2RunList
         batchEvaluationRuns={batchEvaluationRuns}
         selectedRun={selectedRun}
@@ -76,7 +76,7 @@ export function BatchEvaluationV2({
         height="fit-content"
         minHeight="100%"
         position="relative"
-        spacing={0}
+        gap={0}
         justify="space-between"
         minWidth="0"
       >
@@ -84,10 +84,10 @@ export function BatchEvaluationV2({
           align="start"
           width="full"
           height="full"
-          spacing={8}
+          gap={8}
           padding={6}
         >
-          <HStack width="full" align="end" spacing={4}>
+          <HStack width="full" align="end" gap={4}>
             <Heading as="h1" size="lg">
               {experiment.name ?? experiment.slug}
             </Heading>
@@ -286,7 +286,7 @@ export function BatchEvaluationV2RunList({
       minWidth={size === "sm" ? "250px" : "300px"}
       maxWidth={size === "sm" ? "250px" : "300px"}
       height="full"
-      spacing={0}
+      gap={0}
       overflowY="auto"
     >
       {size !== "sm" && (
@@ -326,10 +326,10 @@ export function BatchEvaluationV2RunList({
               _hover={{
                 background: "gray.100",
               }}
-              spacing={3}
+              gap={3}
             >
               <VersionBox minWidth={hasAnyVersion ? "48px" : "0"} />
-              <VStack align="start" spacing={2} width="100%" paddingRight={2}>
+              <VStack align="start" gap={2} width="100%" paddingRight={2}>
                 <HStack width="100%">
                   <Skeleton width="100%" height="12px" />
                   <Spinner size="xs" />
@@ -365,7 +365,7 @@ export function BatchEvaluationV2RunList({
                   e.stopPropagation();
                   setSelectedRunId(run.run_id);
                 }}
-                spacing={3}
+                gap={3}
               >
                 {run.workflow_version ? (
                   <VersionBox
@@ -382,7 +382,7 @@ export function BatchEvaluationV2RunList({
                     }
                   />
                 )}
-                <VStack align="start" spacing={0}>
+                <VStack align="start" gap={0}>
                   <Text
                     fontSize={size === "sm" ? "13px" : "14px"}
                     noOfLines={1}
@@ -402,7 +402,7 @@ export function BatchEvaluationV2RunList({
                   <HStack
                     color="gray.400"
                     fontSize={size === "sm" ? "12px" : "13px"}
-                    spacing={1}
+                    gap={1}
                   >
                     {Object.values(run.summary.evaluations)
                       .slice(0, 2)

@@ -115,7 +115,7 @@ export function RenderInputOutput(
             top={-2}
             right={-2}
             zIndex={1}
-            spacing="-1px"
+            gap="-1px"
           >
             {!forceRaw && props.showTools !== "copy-only" && (
               <Tooltip label="View Raw">
@@ -166,7 +166,7 @@ export function RenderInputOutput(
               top={-2}
               right={-2}
               zIndex={1}
-              spacing="-1px"
+              gap="-1px"
             >
               {renderCopyButton()}
             </HStack>

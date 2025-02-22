@@ -92,7 +92,7 @@ const TraceSummaryValues = React.forwardRef(function TraceSummaryValues(
         borderColor="gray.300"
         width="full"
         align="stretch"
-        spacing={[4, 4, 4, 4]}
+        gap={[4, 4, 4, 4]}
         flexDirection={{ base: "column", lg: "row" }}
         ref={ref as any}
       >

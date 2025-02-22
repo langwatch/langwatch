@@ -91,7 +91,7 @@ export function PlaygroundTabs() {
             <TabList>
               {state.tabs.map((tab, index) => (
                 <Tab key={index}>
-                  <HStack spacing={3}>
+                  <HStack gap={3}>
                     <Text whiteSpace="nowrap">{tab.name}</Text>
                     {state.tabs.length > 1 &&
                       index === state.activeTabIndex && (
@@ -120,7 +120,7 @@ export function PlaygroundTabs() {
             </TabList>
           </Box>
           <Spacer />
-          <HStack spacing={0} paddingRight={3}>
+          <HStack gap={0} paddingRight={3}>
             <Button
               color="gray.500"
               size="xs"
@@ -183,7 +183,7 @@ function PlaygroundTab({
       outline="1px solid"
       outlineColor="gray.200"
     >
-      <HStack spacing={0} overflowX="auto" height="full" minHeight={0}>
+      <HStack gap={0} overflowX="auto" height="full" minHeight={0}>
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}

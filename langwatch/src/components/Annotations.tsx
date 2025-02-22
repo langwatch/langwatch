@@ -44,7 +44,7 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
   );
 
   return (
-    <VStack spacing={3} align="start">
+    <VStack gap={3} align="start">
       {annotations.data?.map((annotation) => {
         const isCurrentUser = data?.user?.id === annotation.user?.id;
 
@@ -77,10 +77,10 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
             key={annotation.id}
           >
             <CardBody>
-              <VStack align="start" spacing={3}>
+              <VStack align="start" gap={3}>
                 <HStack width="full" align={"top"}>
                   <Avatar size="sm" name={annotation.user?.name ?? undefined} />
-                  <VStack align="start" spacing={0}>
+                  <VStack align="start" gap={0}>
                     <Text fontWeight="bold" fontSize="sm">
                       {annotation.user?.name ?? (
                         <HStack marginBottom={2}>
@@ -120,7 +120,7 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                 ) : null}
                 <HStack
                   align="start"
-                  spacing={2}
+                  gap={2}
                   wrap="wrap"
                   divider={<StackDivider borderColor="gray.400" />}
                 >
@@ -141,13 +141,13 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                         return (
                           name && (
                             <Text key={key} fontSize={"sm"}>
-                              <VStack align="start" spacing={0}>
+                              <VStack align="start" gap={0}>
                                 <Text fontSize="xs" fontWeight="500">
                                   {name}:
                                 </Text>
                                 {typeof scoreOption === "object" &&
                                   "value" in scoreOption && (
-                                    <HStack spacing={1} wrap="wrap">
+                                    <HStack gap={1} wrap="wrap">
                                       <Text fontSize="xs">
                                         {Array.isArray(scoreOption.value)
                                           ? scoreOption.value.join(",")

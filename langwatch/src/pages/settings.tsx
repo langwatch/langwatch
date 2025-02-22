@@ -108,7 +108,7 @@ function SettingsForm({
       <VStack
         paddingX={4}
         paddingY={6}
-        spacing={6}
+        gap={6}
         width="full"
         maxWidth="920px"
         align="start"
@@ -123,7 +123,7 @@ function SettingsForm({
         <Card width="full">
           <CardBody width="full" paddingY={2}>
             <form onSubmit={void handleSubmit(onSubmit)}>
-              <VStack spacing={0}>
+              <VStack gap={0}>
                 <HorizontalFormControl
                   label="Name"
                   helper="The name of your organization"

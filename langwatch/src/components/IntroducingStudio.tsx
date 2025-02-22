@@ -77,7 +77,7 @@ export const IntroducingStudio = () => {
         border="1px solid"
         borderColor="green.300"
       >
-        <HStack align="stretch" height="full" spacing={8}>
+        <HStack align="stretch" height="full" gap={8}>
           <iframe
             width="500"
             height="280"
@@ -89,7 +89,7 @@ export const IntroducingStudio = () => {
             }}
           ></iframe>
 
-          <VStack align="start" minHeight="full" spacing={4}>
+          <VStack align="start" minHeight="full" gap={4}>
             <Heading as="h2" size="md">
               NEW! Introducing LangWatch Optimization Studio
             </Heading>
@@ -135,7 +135,7 @@ export const IntroducingStudio = () => {
               with one of our experts
             </Text>
             <Spacer />
-            <HStack spacing={4}>
+            <HStack gap={4}>
               <Link href="/settings/subscription">
                 <Button
                   colorScheme="green"

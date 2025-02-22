@@ -44,7 +44,7 @@ export const useAlertOnComponent = () => {
               flexDirection="row"
             >
               <AlertIcon />
-              <VStack align="start" spacing={0} width="full">
+              <VStack align="start" gap={0} width="full">
                 <AlertTitle fontSize="md">Error</AlertTitle>
                 <AlertDescription>
                   <VStack align="start">
