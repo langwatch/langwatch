@@ -1,4 +1,3 @@
-import { Link } from "@chakra-ui/next-js";
 import {
   Alert,
   Avatar,
@@ -21,7 +20,7 @@ import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import numeral from "numeral";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Bell,
   BookOpen,
@@ -65,6 +64,7 @@ import { useColorRawValue } from "./ui/color-mode";
 import { InputGroup } from "./ui/input-group";
 import { Tooltip } from "./ui/tooltip";
 import { GitHub } from "./icons/GitHub";
+import { Link } from "./ui/link";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -982,7 +982,7 @@ export const DashboardLayout = ({
               <Spacer />
             </HStack>
           )}
-        <CurrentDrawer />
+        {/* <CurrentDrawer /> */}
         {children}
       </VStack>
     </HStack>

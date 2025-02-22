@@ -1,4 +1,4 @@
-import { Link } from "@chakra-ui/next-js";
+import { Link } from "./ui/link";
 import {
   Button,
   Drawer,
