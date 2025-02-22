@@ -224,7 +224,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                         </HStack>
                       ))}
                   <Separator
-                    borderColor="gray.350"
+                    borderColor="gray.200"
                     _last={{ display: "none" }}
                   />
                 </React.Fragment>
