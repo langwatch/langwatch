@@ -268,19 +268,8 @@ const updateDatasetRecord = async ({
   prisma: PrismaClient;
 }) => {
   if (useS3) {
-    // Get existing records
-    let records: any[] = [];
-    try {
-      records = await storageService.getObject(projectId, datasetId);
-    } catch (error) {
-      if ((error as any).name === "NoSuchKey") {
-        records = [];
-      } else {
-        throw error;
-      }
-    }
+    const { records } = await storageService.getObject(projectId, datasetId);
 
-    // Find and update the specific record
     const recordIndex = records.findIndex(
       (record: any) => record.id === recordId
     );
@@ -399,7 +388,7 @@ export const createManyDatasetRecords = async ({
       true
     );
 
-    const existingRecords = await storageService.getObject(
+    const { records: existingRecords } = await storageService.getObject(
       projectId,
       datasetId
     );
@@ -465,84 +454,48 @@ export const getFullDataset = async ({
 
   if (dataset.useS3) {
     let records: any[] = [];
+    let truncated = false;
+    let totalSize = 0;
+    let currentPage = 0;
 
     try {
-      records = await storageService.getObject(projectId, datasetId);
+      const { records: recordsFromStorage } = await storageService.getObject(
+        projectId,
+        datasetId
+      );
+      records = recordsFromStorage;
 
-      if (entrySelection !== "all") {
-        const count = records.length;
-        records = records.filter((_, index) => {
-          switch (entrySelection) {
-            case "first":
-              return index === 0;
-            case "last":
-              return index === count - 1;
-            case "random":
-              return index === Math.floor(Math.random() * count);
-            default:
-              return true;
-          }
-        });
+      while (!truncated) {
+        const batch = records.slice(
+          currentPage * BATCH_SIZE,
+          (currentPage + 1) * BATCH_SIZE
+        );
+
+        if (batch.length === 0) break;
+
+        const {
+          truncatedRecords: processedRecords,
+          truncated: batchTruncated,
+          totalSize: newTotalSize,
+        } = processBatchedRecords({ records: batch, limitMb, totalSize });
+
+        truncatedDatasetRecords.push(...processedRecords);
+        truncated = batchTruncated;
+        totalSize = newTotalSize;
+
+        if (truncated || batch.length < BATCH_SIZE) break;
+        currentPage++;
       }
-    } catch (error) {
-      console.error(error);
 
-      if ((error as any).name === "NoSuchKey") {
-        records = [];
-      } else {
-        throw error;
-      }
-    }
-
-    if (entrySelection === "random" || entrySelection === "last") {
       return {
         ...dataset,
         count: records.length,
-        datasetRecords: records.slice(
-          entrySelection === "last"
-            ? -1 // Get the last record
-            : entrySelection === "random"
-            ? Math.floor(Math.random() * records.length) // Get a random record
-            : 0, // Default case (if needed)
-          entrySelection === "last"
-            ? undefined // No limit for the last record
-            : entrySelection === "random"
-            ? Math.floor(Math.random() * records.length) + 1 // Get one random record
-            : undefined // Default case (if needed)
-        ),
+        datasetRecords: truncatedDatasetRecords,
+        truncated,
       };
+    } catch (error) {
+      throw error;
     }
-
-    while (!truncated) {
-      const allRecords = await storageService.getObject(projectId, datasetId);
-
-      const records = allRecords.slice(
-        currentPage * BATCH_SIZE,
-        (currentPage + 1) * BATCH_SIZE
-      );
-
-      if (records.length === 0) break;
-
-      for (const record of records) {
-        const recordSize = JSON.stringify(record.entry).length;
-        if (!limitMb || totalSize + recordSize < limitMb * 1024 * 1024) {
-          truncatedDatasetRecords.push(record);
-          totalSize += recordSize;
-        } else {
-          truncated = true;
-          break;
-        }
-      }
-
-      if (truncated || records.length < BATCH_SIZE) break;
-      currentPage++;
-    }
-
-    return {
-      ...dataset,
-      count: records.length,
-      datasetRecords: records,
-    };
   } else {
     const count = await prisma.datasetRecord.count({
       where: { datasetId, projectId },
@@ -577,16 +530,15 @@ export const getFullDataset = async ({
 
       if (records.length === 0) break;
 
-      for (const record of records) {
-        const recordSize = JSON.stringify(record.entry).length;
-        if (!limitMb || totalSize + recordSize < limitMb * 1024 * 1024) {
-          truncatedDatasetRecords.push(record);
-          totalSize += recordSize;
-        } else {
-          truncated = true;
-          break;
-        }
-      }
+      const {
+        truncatedRecords: processedRecords,
+        truncated: batchTruncated,
+        totalSize: newTotalSize,
+      } = processBatchedRecords({ records, limitMb, totalSize });
+
+      truncatedDatasetRecords.push(...processedRecords);
+      truncated = batchTruncated;
+      totalSize = newTotalSize;
 
       if (truncated || records.length < BATCH_SIZE) break;
       currentPage++;
@@ -599,4 +551,30 @@ export const getFullDataset = async ({
       count,
     };
   }
+};
+
+const processBatchedRecords = ({
+  records,
+  limitMb,
+  totalSize = 0,
+}: {
+  records: DatasetRecord[];
+  limitMb: number | null;
+  totalSize?: number;
+}) => {
+  const truncatedRecords: DatasetRecord[] = [];
+  let truncated = false;
+
+  for (const record of records) {
+    const recordSize = JSON.stringify(record.entry).length;
+    if (!limitMb || totalSize + recordSize < limitMb * 1024 * 1024) {
+      truncatedRecords.push(record);
+      totalSize += recordSize;
+    } else {
+      truncated = true;
+      break;
+    }
+  }
+
+  return { truncatedRecords, truncated, totalSize };
 };

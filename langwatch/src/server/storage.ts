@@ -23,15 +23,15 @@ export class StorageService {
     datasetId: string,
     data: string | Buffer
   ): Promise<void> {
-    if (true) {
+    if (env.DATASET_STORAGE_LOCAL) {
       const filePath = await this.getLocalStoragePath(projectId, datasetId);
       await fs.mkdir(path.dirname(filePath), { recursive: true });
-      await fs.writeFile(filePath, data);
+      await fs.writeFile(filePath, data as string);
     } else {
       const s3Client = await createS3Client(projectId);
       await s3Client.send(
         new PutObjectCommand({
-          Bucket: "langwatch",
+          Bucket: env.S3_BUCKET_NAME ?? "langwatch-storage-prod",
           Key: `datasets/${projectId}/${datasetId}`,
           Body: data,
           ContentType: "application/json",
@@ -41,15 +41,22 @@ export class StorageService {
   }
 
   async getObject(projectId: string, datasetId: string): Promise<any> {
-    if (true) {
+    if (env.DATASET_STORAGE_LOCAL) {
+      console.log("Getting object from local storage");
       const filePath = await this.getLocalStoragePath(projectId, datasetId);
       try {
         const fileContent = await fs.readFile(filePath, "utf-8");
         try {
           const json = JSON.parse(fileContent);
-          return json;
+          return {
+            records: json,
+            count: json.length,
+          };
         } catch {
-          return [];
+          return {
+            records: [],
+            count: 0,
+          };
         }
       } catch (error: any) {
         if (error.code === "ENOENT") {
@@ -61,15 +68,28 @@ export class StorageService {
     } else {
       const s3Client = await createS3Client(projectId);
 
-      const { Body } = await s3Client.send(
-        new GetObjectCommand({
-          Bucket: "langwatch",
-          Key: `datasets/${projectId}/${datasetId}`,
-        })
-      );
-
-      const content = await Body?.transformToString();
-      return JSON.parse(content ?? "[]");
+      try {
+        const { Body } = await s3Client.send(
+          new GetObjectCommand({
+            Bucket: env.S3_BUCKET_NAME ?? "langwatch-storage-prod",
+            Key: `datasets/${projectId}/${datasetId}`,
+          })
+        );
+        const content = await Body?.transformToString();
+        const json = JSON.parse(content ?? "[]");
+        return {
+          records: json,
+          count: json.length,
+        };
+      } catch (error: any) {
+        if (error.name === "NoSuchKey") {
+          return {
+            records: [],
+            count: 0,
+          };
+        }
+        throw error;
+      }
     }
   }
 }
@@ -120,8 +140,6 @@ export const createS3Client = async (projectId: string) => {
     },
     forcePathStyle: true,
   });
-
-  console.log("s3Client", s3Client);
 
   if (!s3Client) {
     throw new Error("Failed to create S3 client");
