@@ -25,7 +25,11 @@ export function ExpandedTextDialog({
   const [isFormatted, setIsFormatted] = useState(true);
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange} size="lg">
+    <Dialog.Root
+      open={open}
+      onOpenChange={({ open }) => onOpenChange(open)}
+      size="lg"
+    >
       <Dialog.Backdrop />
       <Dialog.Content>
         <Dialog.Header

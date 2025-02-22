@@ -1,8 +1,6 @@
 import {
   Box,
   Card,
-  CardBody,
-  CardHeader,
   GridItem,
   HStack,
   Heading,
@@ -194,105 +192,105 @@ export default function Users() {
   return (
     <GraphsLayout>
       <AnalyticsHeader title="LLM Metrics" />
-      <HStack alignItems={"start"}>
+      <HStack alignItems="start" gap={4}>
         <SimpleGrid
           templateColumns="repeat(4, 1fr)"
           gap={5}
           width={"100%"}
         >
-          <GridItem colSpan={2} display={"inline-grid"}>
-            <Card overflow={"scroll"}>
-              <CardHeader>
-                <HStack>
+          <GridItem colSpan={2} display="inline-grid">
+            <Card.Root overflow="scroll">
+              <Card.Header>
+                <HStack gap={2}>
                   <BarChart2 color="orange" />
                   <Heading size="sm">LLM Metrics</Heading>
                 </HStack>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <CustomGraph input={LLMMetrics as CustomGraphInput} />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
-          <GridItem colSpan={2} display={"inline-grid"}>
-            <Card overflow={"scroll"}>
-              <CardHeader>
-                <HStack>
+          <GridItem colSpan={2} display="inline-grid">
+            <Card.Root overflow="scroll">
+              <Card.Header>
+                <HStack gap={2}>
                   <BarChart2 color="orange" />
                   <Heading size="sm">Summary</Heading>
                 </HStack>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <CustomGraph input={LLMSummary as CustomGraphInput} />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
 
-          <GridItem colSpan={4} display={"inline-grid"}>
-            <Card>
-              <CardHeader>
-                <HStack>
+          <GridItem colSpan={4} display="inline-grid">
+            <Card.Root>
+              <Card.Header>
+                <HStack gap={2}>
                   <BarChart2 color="orange" />
                   <Heading size="sm">LLM Usage</Heading>
                 </HStack>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <CustomGraph input={LLMs as CustomGraphInput} />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
-          <GridItem colSpan={2} display={"inline-grid"}>
-            <Card>
-              <CardHeader>
-                <HStack>
+          <GridItem colSpan={2} display="inline-grid">
+            <Card.Root>
+              <Card.Header>
+                <HStack gap={2}>
                   <BarChart2 color="orange" />
                   <Heading size="sm">LLM Split</Heading>
                 </HStack>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <CustomGraph input={llmUsage as CustomGraphInput} />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
-          <GridItem colSpan={2} display={"inline-grid"}>
-            <Card>
-              <CardHeader>
-                <HStack>
+          <GridItem colSpan={2} display="inline-grid">
+            <Card.Root>
+              <Card.Header>
+                <HStack gap={2}>
                   <BarChart2 color="orange" />
                   <Heading size="sm">Average Completion Time</Heading>
                 </HStack>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <CustomGraph input={completionTime as CustomGraphInput} />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
-          <GridItem colSpan={2} display={"inline-grid"}>
-            <Card>
-              <CardHeader>
-                <HStack>
+          <GridItem colSpan={2} display="inline-grid">
+            <Card.Root>
+              <Card.Header>
+                <HStack gap={2}>
                   <BarChart2 color="orange" />
                   <Heading size="sm">Average Cost Per Message</Heading>
                 </HStack>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <CustomGraph input={totalCostPerModel as CustomGraphInput} />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
-          <GridItem colSpan={2} display={"inline-grid"}>
-            <Card>
-              <CardHeader>
-                <HStack>
+          <GridItem colSpan={2} display="inline-grid">
+            <Card.Root>
+              <Card.Header>
+                <HStack gap={2}>
                   <BarChart2 color="orange" />
                   <Heading size="sm">Average Tokens Per Message</Heading>
                 </HStack>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <CustomGraph
                   input={averageTokensPerMessage as CustomGraphInput}
                 />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
         </SimpleGrid>
         <Box padding={3}>

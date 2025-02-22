@@ -102,11 +102,13 @@ export const SelectValueText = React.forwardRef<
 
 export const SelectRoot = React.forwardRef<
   HTMLDivElement,
-  ChakraSelect.RootProps
+  Omit<ChakraSelect.RootProps, "onChange"> & {
+    onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  }
 >(function SelectRoot(props, ref) {
   return (
     <ChakraSelect.Root
-      {...props}
+      {...(props as any)}
       ref={ref}
       positioning={{ sameWidth: true, ...props.positioning }}
     >
@@ -120,7 +122,7 @@ export const SelectRoot = React.forwardRef<
       )}
     </ChakraSelect.Root>
   );
-}) as ChakraSelect.RootComponent;
+});
 
 interface SelectItemGroupProps extends ChakraSelect.ItemGroupProps {
   label: React.ReactNode;
