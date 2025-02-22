@@ -124,7 +124,7 @@ export function LLMMetrics() {
 
   return (
     <>
-      <Heading as="h1" size="lg" paddingBottom={6} paddingTop={10}>
+      <Heading as="h1" size="lg" paddingTop={6} paddingBottom={2}>
         LLM Metrics
       </Heading>
       <Grid

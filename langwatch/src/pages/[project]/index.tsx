@@ -121,11 +121,11 @@ function DocumentsMetrics() {
   return (
     <>
       <HStack width="full" align="top">
-        <Heading as="h1" size="lg" paddingBottom={6} paddingTop={10}>
+        <Heading as="h1" size="lg" paddingTop={6} paddingBottom={2}>
           Documents
         </Heading>
       </HStack>
-      <Card.Root>
+      <Card.Root width="full">
         <Card.Body>
           <Tabs.Root variant="plain" defaultValue="total-documents">
             <Tabs.List gap={12}>
