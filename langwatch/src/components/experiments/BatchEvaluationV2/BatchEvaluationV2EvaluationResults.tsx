@@ -389,7 +389,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
             {Object.entries(resultsByEvaluator).map(([evaluator, results]) => (
               <Tab
                 key={evaluator}
-                noOfLines={1}
+                lineClamp={1}
                 whiteSpace="nowrap"
                 minWidth={0}
               >

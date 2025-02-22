@@ -289,7 +289,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                                         <Td>
                                           <Tooltip label={description}>
                                             <Text
-                                              noOfLines={2}
+                                              lineClamp={2}
                                               display="block"
                                               maxWidth={230}
                                             >
@@ -393,7 +393,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                                         }
                                       >
                                         <Text
-                                          noOfLines={2}
+                                          lineClamp={2}
                                           display="block"
                                           maxWidth={230}
                                         >
@@ -498,7 +498,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                                         }
                                       >
                                         <Text
-                                          noOfLines={2}
+                                          lineClamp={2}
                                           display="block"
                                           maxWidth={230}
                                         >

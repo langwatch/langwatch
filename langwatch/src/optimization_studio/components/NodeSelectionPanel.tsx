@@ -424,7 +424,7 @@ export const NodeDraggable = (props: {
               behave_as={props.behave_as}
               size="md"
             />
-            <HoverableBigText noOfLines={1} expandable={false}>
+            <HoverableBigText lineClamp={1} expandable={false}>
               {props.component.name}
             </HoverableBigText>
             <Spacer />

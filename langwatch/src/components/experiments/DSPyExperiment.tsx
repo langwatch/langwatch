@@ -1369,21 +1369,21 @@ export function DSPyExperimentSummary({
       gap={5}
     >
       <VStack align="start" gap={1}>
-        <Text fontWeight="500" noOfLines={1}>
+        <Text fontWeight="500" lineClamp={1}>
           {!bestScoreLabel || bestScoreLabel === "score"
             ? "Best Score"
             : titleCase(bestScoreLabel)}
         </Text>
-        <Text noOfLines={1} whiteSpace="nowrap">
+        <Text lineClamp={1} whiteSpace="nowrap">
           {numeral(bestScore).format("0.[00]")}
         </Text>
       </VStack>
       <Divider orientation="vertical" height="48px" />
       <VStack align="start" gap={1}>
-        <Text fontWeight="500" noOfLines={1}>
+        <Text fontWeight="500" lineClamp={1}>
           Total Cost
         </Text>
-        <Text noOfLines={1} whiteSpace="nowrap">
+        <Text lineClamp={1} whiteSpace="nowrap">
           {run && totalCost ? (
             <FormatMoney amount={totalCost} currency="USD" format="$0.00[00]" />
           ) : (

@@ -225,7 +225,7 @@ export default function OptimizationStudio() {
                 )}
               </HStack>
               <HStack width="full" justify="center">
-                <Text noOfLines={1} fontSize="15px">
+                <Text lineClamp={1} fontSize="15px">
                   Optimization Studio - {name}
                 </Text>
                 <StatusCircle

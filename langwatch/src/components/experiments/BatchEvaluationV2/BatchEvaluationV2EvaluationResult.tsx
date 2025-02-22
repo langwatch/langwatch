@@ -186,7 +186,7 @@ const evaluationResultsTableRow = (
                         background="red.200"
                       >
                         <Tooltip label={datasetEntry.error}>
-                          <Box noOfLines={1}>Error</Box>
+                          <Box lineClamp={1}>Error</Box>
                         </Tooltip>
                       </Td>
                     ) : (
@@ -216,7 +216,7 @@ const evaluationResultsTableRow = (
                           background="red.200"
                         >
                           <Tooltip label={evaluation.details}>
-                            <Box noOfLines={1}>Error</Box>
+                            <Box lineClamp={1}>Error</Box>
                           </Tooltip>
                         </Td>
                       );
@@ -232,7 +232,7 @@ const evaluationResultsTableRow = (
                           background="yellow.100"
                         >
                           <Tooltip label={evaluation.details}>
-                            <Box noOfLines={1}>Skipped</Box>
+                            <Box lineClamp={1}>Skipped</Box>
                           </Tooltip>
                         </Td>
                       );
@@ -254,7 +254,7 @@ const evaluationResultsTableRow = (
                       >
                         {column === "details" ? (
                           <HoverableBigText
-                            noOfLines={3}
+                            lineClamp={3}
                             maxWidth="300px"
                             whiteSpace="pre-wrap"
                           >

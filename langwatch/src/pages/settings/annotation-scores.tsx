@@ -138,7 +138,7 @@ const AnnotationScorePage = () => {
                       <Td>{score.name}</Td>
                       <Td>{score.description}</Td>
                       <Td width="20%">
-                        <Text noOfLines={1}>
+                        <Text lineClamp={1}>
                           {score.dataType === AnnotationScoreDataType.CHECKBOX
                             ? "Checkbox"
                             : "Multiple choice"}

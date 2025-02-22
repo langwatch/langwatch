@@ -46,7 +46,7 @@ export function LLMModelDisplay({
       <Box
         fontSize={fontSize}
         fontFamily="mono"
-        noOfLines={1}
+        lineClamp={1}
         wordBreak="break-all"
       >
         {modelOption?.label}

@@ -76,12 +76,12 @@ export function BatchEvaluationV2EvaluationSummary({
               <VStack align="start" gap={1}>
                 <HoverableBigText
                   fontWeight="500"
-                  noOfLines={2}
+                  lineClamp={2}
                   expandable={false}
                 >
                   {evaluation.name}
                 </HoverableBigText>
-                <HoverableBigText noOfLines={1} expandable={false}>
+                <HoverableBigText lineClamp={1} expandable={false}>
                   {formatEvaluationSummary(evaluation)}
                 </HoverableBigText>
               </VStack>
@@ -90,10 +90,10 @@ export function BatchEvaluationV2EvaluationSummary({
           );
         })}
         <VStack align="start" gap={1}>
-          <HoverableBigText fontWeight="500" noOfLines={2} expandable={false}>
+          <HoverableBigText fontWeight="500" lineClamp={2} expandable={false}>
             Mean Cost
           </HoverableBigText>
-          <Text noOfLines={1} whiteSpace="nowrap">
+          <Text lineClamp={1} whiteSpace="nowrap">
             <FormatMoney
               amount={
                 (run.summary.dataset_average_cost ?? 0) +
@@ -134,7 +134,7 @@ export function BatchEvaluationV2EvaluationSummary({
         </VStack>
         <Divider orientation="vertical" height="48px" />
         <VStack align="start" gap={1}>
-          <HoverableBigText fontWeight="500" noOfLines={1} expandable={false}>
+          <HoverableBigText fontWeight="500" lineClamp={1} expandable={false}>
             Mean Duration
           </HoverableBigText>
           <Tooltip
@@ -167,10 +167,10 @@ export function BatchEvaluationV2EvaluationSummary({
         </VStack>
         <Divider orientation="vertical" height="48px" />
         <VStack align="start" gap={1}>
-          <HoverableBigText fontWeight="500" noOfLines={1} expandable={false}>
+          <HoverableBigText fontWeight="500" lineClamp={1} expandable={false}>
             Total Cost
           </HoverableBigText>
-          <Text noOfLines={1} whiteSpace="nowrap">
+          <Text lineClamp={1} whiteSpace="nowrap">
             <FormatMoney
               amount={
                 (run.summary.dataset_cost ?? 0) +
@@ -211,10 +211,10 @@ export function BatchEvaluationV2EvaluationSummary({
         </VStack>
         <Divider orientation="vertical" height="48px" />
         <VStack align="start" gap={1}>
-          <Text fontWeight="500" noOfLines={1}>
+          <Text fontWeight="500" lineClamp={1}>
             Runtime
           </Text>
-          <Text noOfLines={1} whiteSpace="nowrap">
+          <Text lineClamp={1} whiteSpace="nowrap">
             {numeral(runtime / 1000).format("00:00:00")}
           </Text>
         </VStack>

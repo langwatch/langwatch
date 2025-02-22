@@ -461,7 +461,7 @@ export function TryItOut({
                                 }
                               >
                                 <Text
-                                  noOfLines={1}
+                                  lineClamp={1}
                                   wordBreak="break-all"
                                   display="block"
                                 >
@@ -479,7 +479,7 @@ export function TryItOut({
                                 }
                               >
                                 <Text
-                                  noOfLines={1}
+                                  lineClamp={1}
                                   maxWidth="250px"
                                   display="block"
                                   color="red.400"
@@ -506,7 +506,7 @@ export function TryItOut({
                                   }
                                 >
                                   <Text
-                                    noOfLines={1}
+                                    lineClamp={1}
                                     display="block"
                                     maxWidth="250px"
                                   >
@@ -580,7 +580,7 @@ export function TryItOut({
                             <Td color={color} maxWidth="250px">
                               {runningResult &&
                                 (resultDetails ? (
-                                  <HoverableBigText noOfLines={3}>
+                                  <HoverableBigText lineClamp={3}>
                                     {resultDetails}
                                   </HoverableBigText>
                                 ) : runningResult.status === "loading" ? (

@@ -27,6 +27,7 @@ export const system = createSystem(defaultConfig, {
   globalCss: {
     body: {
       background: "#E5E7EB",
+      fontSize: "14px",
     },
     "*::selection": {
       // Chakra by default overrides browser selection color, I really don't like things overriding defaults
@@ -192,40 +193,6 @@ export const system = createSystem(defaultConfig, {
           focusRing: "none",
         },
       }),
-      table: defineRecipe({
-        variants: {
-          variant: {
-            grid: {
-              header: {
-                border: "1px solid",
-                borderColor: "gray.200",
-                background: "gray.50",
-              },
-              row: {
-                border: "1px solid",
-                borderColor: "gray.200",
-              },
-            },
-          },
-          sizes: {
-            xs: {
-              tr: {
-                lineHeight: "1em",
-              },
-              th: {
-                fontSize: "11px",
-                paddingY: 2,
-                paddingX: 3,
-              },
-              td: {
-                fontSize: "13px",
-                paddingY: 2,
-                paddingX: 3,
-              },
-            },
-          },
-        },
-      }),
       tag: defineRecipe({
         base: {
           borderRadius: "62px",
@@ -234,7 +201,7 @@ export const system = createSystem(defaultConfig, {
       }),
       button: defineRecipe({
         base: {
-          // focusVisibleRing: "none",
+          fontWeight: 600,
         },
         variants: {
           variant: {
@@ -316,6 +283,7 @@ export const system = createSystem(defaultConfig, {
         base: {
           control: {
             borderWidth: "1px",
+            cursor: "pointer",
           },
           label: {
             fontWeight: "normal",
@@ -325,7 +293,7 @@ export const system = createSystem(defaultConfig, {
           variant: {
             solid: {
               control: {
-                borderColor: "gray.400",
+                borderColor: "gray.350",
                 "&:is([data-state=checked], [data-state=indeterminate])": {
                   bg: "blue.500",
                   color: "white",
@@ -366,6 +334,69 @@ export const system = createSystem(defaultConfig, {
                   maxWidth: "16px",
                   maxHeight: "16px",
                 },
+              },
+            },
+          },
+        },
+      }),
+      table: defineSlotRecipe({
+        slots: ["root"],
+        base: {
+          columnHeader: {
+            fontWeight: "bold",
+            textStyle: "xs",
+            textTransform: "uppercase",
+            color: "gray.600",
+            letterSpacing: "wider",
+          },
+        },
+        variants: {
+          variant: {
+            // add grid variant following previous pattern
+            grid: {
+              columnHeader: {
+                border: "1px solid",
+                borderColor: "gray.200",
+                background: "gray.50",
+              },
+              cell: {
+                border: "1px solid",
+                borderColor: "gray.200",
+              },
+            },
+            line: {
+              columnHeader: {
+                borderColor: "gray.100",
+              },
+              cell: {
+                borderColor: "gray.100",
+              },
+            },
+          },
+          size: {
+            xs: {
+              row: {
+                lineHeight: "1em",
+              },
+              columnHeader: {
+                fontSize: "11px",
+                paddingY: 2,
+                paddingX: 3,
+              },
+              cell: {
+                fontSize: "13px",
+                paddingY: 2,
+                paddingX: 3,
+              },
+            },
+            sm: {
+              columnHeader: {
+                px: "2",
+                py: "2",
+              },
+              cell: {
+                px: "2",
+                py: "6px",
               },
             },
           },

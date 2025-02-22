@@ -1,4 +1,5 @@
-import { Box, Button, HStack, Tooltip } from "@chakra-ui/react";
+import { Box, Button, HStack } from "@chakra-ui/react";
+import { Tooltip } from "../../components/ui/tooltip";
 import { useRouter } from "next/router";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { List, Table, TrendingUp } from "react-feather";
@@ -55,11 +56,11 @@ export function ToggleTableView() {
 
   const sliderOnLeft = {
     left: "3px",
-    width: "125px",
+    width: "118px",
   };
   const sliderOnRight = {
-    left: "128px",
-    width: "139px",
+    left: "120px",
+    width: "128px",
   };
 
   const sliderProps =
@@ -86,7 +87,6 @@ export function ToggleTableView() {
         {...sliderProps}
       ></Box>
       <Button
-        leftIcon={<List size="14" />}
         height="32px"
         variant="ghost"
         _hover={{ background: "none" }}
@@ -98,10 +98,9 @@ export function ToggleTableView() {
             }
           : {})}
       >
-        List View
+        <List size="14" /> List View
       </Button>
       <Button
-        leftIcon={<Table size="14" />}
         height="32px"
         variant="ghost"
         _hover={{ background: "none" }}
@@ -113,7 +112,7 @@ export function ToggleTableView() {
             }
           : {})}
       >
-        Table View
+        <Table size="14" /> Table View
       </Button>
     </HStack>
   );
@@ -124,7 +123,7 @@ export function ToggleAnalytics() {
   const { project } = useOrganizationTeamProject();
 
   return (
-    <Tooltip label="Show analytics for those messages">
+    <Tooltip content="Show analytics for those messages">
       <Button
         variant="outline"
         minWidth={0}

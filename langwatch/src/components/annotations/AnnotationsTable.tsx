@@ -430,7 +430,7 @@ export const AnnotationsTable = ({
                             <Td>
                               <Tooltip label={item.trace?.input?.value}>
                                 <Text
-                                  noOfLines={2}
+                                  lineClamp={2}
                                   maxWidth="350px"
                                   textOverflow="ellipsis"
                                   display="block"
@@ -443,7 +443,7 @@ export const AnnotationsTable = ({
                             <Td>
                               <Tooltip label={item.trace?.output?.value}>
                                 <Text
-                                  noOfLines={2}
+                                  lineClamp={2}
                                   maxWidth="350px"
                                   textOverflow="ellipsis"
                                   display="block"
