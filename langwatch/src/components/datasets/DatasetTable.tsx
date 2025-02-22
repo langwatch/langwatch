@@ -489,7 +489,7 @@ export function DatasetTable({
           <>
             {isEmbedded && (
               <Button
-                colorScheme="gray"
+                colorPalette="gray"
                 minWidth="fit-content"
                 onClick={() =>
                   openDrawer("uploadCSV", {
@@ -513,7 +513,7 @@ export function DatasetTable({
               </Button>
             )}
             <Button
-              colorScheme="gray"
+              colorPalette="gray"
               minWidth="fit-content"
               onClick={() => dataset && downloadCSV()}
               leftIcon={<DownloadIcon />}
@@ -523,7 +523,7 @@ export function DatasetTable({
               Export
             </Button>
             <Button
-              colorScheme="gray"
+              colorPalette="gray"
               onClick={() => editDataset.onOpen()}
               minWidth="fit-content"
               leftIcon={<Edit2 height={16} />}
@@ -532,7 +532,7 @@ export function DatasetTable({
             </Button>
             {datasetId && !isEmbedded && (
               <Button
-                colorScheme="blue"
+                colorPalette="blue"
                 onClick={() => {
                   openDrawer("batchEvaluation", {
                     datasetSlug: databaseDataset.data?.slug,
@@ -638,7 +638,7 @@ export function DatasetTable({
           <HStack gap={3}>
             <Text>{selectedEntryIds.size} entries selected</Text>
             <Button
-              colorScheme="black"
+              colorPalette="black"
               minWidth="fit-content"
               variant="outline"
               onClick={() => void downloadCSV(true)}
@@ -648,7 +648,7 @@ export function DatasetTable({
 
             <Text>or</Text>
             <Button
-              colorScheme="red"
+              colorPalette="red"
               type="submit"
               variant="outline"
               minWidth="fit-content"

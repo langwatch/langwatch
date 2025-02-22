@@ -312,7 +312,7 @@ export function MessagesTable() {
           >
             <HStack>
               <Checkbox
-                colorScheme="blue"
+                colorPalette="blue"
                 isChecked={selectedTraceIds.includes(trace.trace_id)}
                 onChange={() => traceSelection(trace.trace_id)}
               />
@@ -432,7 +432,7 @@ export function MessagesTable() {
               }
             >
               {trace.lastGuardrail ? (
-                <Tag colorScheme="blue" paddingLeft={2}>
+                <Tag colorPalette="blue" paddingLeft={2}>
                   <TagLeftIcon boxSize="16px" as={Shield} />
                   <TagLabel>Blocked by Guardrail</TagLabel>
                 </Tag>
@@ -1029,7 +1029,7 @@ export function MessagesTable() {
           <Spacer />
           <Tooltip label={totalHits >= 10_000 ? "Up to 10.000 items" : ""}>
             <Button
-              colorScheme="black"
+              colorPalette="black"
               minWidth="fit-content"
               variant={downloadTraces.isLoading ? "outline" : "ghost"}
               onClick={() => void downloadCSV()}
@@ -1113,7 +1113,7 @@ export function MessagesTable() {
             <VStack gap={1} align="start">
               <Card height="fit-content" width="100%">
                 <Progress
-                  colorScheme="orange"
+                  colorPalette="orange"
                   value={downloadProgress}
                   size="xs"
                 />
@@ -1296,7 +1296,7 @@ export function MessagesTable() {
               {selectedTraceIds.length === 1 ? "trace" : "traces"} selected
             </Text>
             <Button
-              colorScheme="black"
+              colorPalette="black"
               minWidth="fit-content"
               variant="outline"
               onClick={() => void downloadCSV(true)}
@@ -1306,7 +1306,7 @@ export function MessagesTable() {
 
             <Text>or</Text>
             <Button
-              colorScheme="black"
+              colorPalette="black"
               type="submit"
               variant="outline"
               minWidth="fit-content"

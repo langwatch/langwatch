@@ -309,7 +309,7 @@ function MembersList({
           {!activePlan.overrideAddingLimitations &&
           organization.members.length >= activePlan.maxMembers ? (
             <Tooltip label="Upgrade your plan to add more members">
-              <Button size="sm" colorScheme="orange" isDisabled={true}>
+              <Button size="sm" colorPalette="orange" isDisabled={true}>
                 <HStack gap={2}>
                   <Lock size={20} />
                   <Text>Add members</Text>
@@ -319,7 +319,7 @@ function MembersList({
           ) : (
             <Button
               size="sm"
-              colorScheme="orange"
+              colorPalette="orange"
               onClick={() => onAddMembersOpen()}
             >
               <HStack gap={2}>
@@ -626,7 +626,7 @@ function MembersList({
                       <Td paddingLeft={0} paddingRight={0} paddingY={2}>
                         <Button
                           type="button"
-                          colorScheme="red"
+                          colorPalette="red"
                           onClick={() => remove(index)}
                         >
                           <Trash size={18} />
@@ -642,7 +642,7 @@ function MembersList({
             </ModalBody>
             <ModalFooter>
               <Button
-                colorScheme={
+                colorPalette={
                   createInvitesMutation.isLoading ? "gray" : "orange"
                 }
                 type="submit"

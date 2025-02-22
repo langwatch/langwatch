@@ -150,7 +150,7 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
 
           <HStack justifyContent="flex-end" marginY={5}>
             <Button
-              colorScheme="blue"
+              colorPalette="blue"
               type="submit"
               minWidth="fit-content"
               isLoading={updateTriggerFilters.isLoading}

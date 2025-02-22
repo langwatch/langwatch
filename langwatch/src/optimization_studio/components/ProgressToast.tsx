@@ -151,7 +151,7 @@ export function OptimizationProgressBar({
       <Progress
         size={size}
         width="full"
-        colorScheme="blue"
+        colorPalette="blue"
         isIndeterminate={isIndeterminate}
         isAnimated
         borderRadius="sm"

@@ -72,7 +72,7 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
               as={Button}
               size="sm"
               rightIcon={<ChevronDownIcon />}
-              colorScheme="blue"
+              colorPalette="blue"
             >
               Publish
             </MenuButton>
@@ -599,7 +599,7 @@ function PublishModalContent({
                   }}
                 >
                   <Button
-                    colorScheme="green"
+                    colorPalette="green"
                     leftIcon={<Play size={16} />}
                     variant="outline"
                   >
@@ -607,7 +607,7 @@ function PublishModalContent({
                   </Button>
                 </Link>
                 <Button
-                  colorScheme="green"
+                  colorPalette="green"
                   onClick={() => openApiModal()}
                   leftIcon={<Code size={16} />}
                   variant="outline"

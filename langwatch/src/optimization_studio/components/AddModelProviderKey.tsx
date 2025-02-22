@@ -42,7 +42,7 @@ export const AddModelProviderKey = ({
               <Spacer />
 
               <Link href="/settings/model-providers" target="_blank">
-                <Button colorScheme="orange" size="sm">
+                <Button colorPalette="orange" size="sm">
                   Add keys
                 </Button>
               </Link>

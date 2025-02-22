@@ -177,7 +177,7 @@ const AnnotationQueuePicker = ({
           </Text>
           <Button
             rightIcon={<Check />}
-            colorScheme="blue"
+            colorPalette="blue"
             isDisabled={
               currentQueueItem.doneAt !== null || markQueueItemDone.isLoading
             }

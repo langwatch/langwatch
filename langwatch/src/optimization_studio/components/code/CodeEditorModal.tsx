@@ -91,7 +91,7 @@ export function CodeEditorModal({
           <Button
             onClick={handleSave}
             variant="outline"
-            colorScheme="white"
+            colorPalette="white"
             size="lg"
           >
             Save

@@ -55,7 +55,7 @@ export function ScoreReasonModal({
               Leave Blank
             </Button>
             <Button
-              colorScheme="blue"
+              colorPalette="blue"
               onClick={() => {
                 onConfirm(scoreReason);
                 onClose();

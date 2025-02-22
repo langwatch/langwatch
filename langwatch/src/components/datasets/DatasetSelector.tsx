@@ -55,7 +55,7 @@ export function DatasetSelector<T extends { datasetId: string }>({
         </FormErrorMessage>
       )}
       <Button
-        colorScheme="blue"
+        colorPalette="blue"
         onClick={() => {
           setValue("datasetId" as Path<T>, "" as PathValue<T, Path<T>>);
           onCreateNew();

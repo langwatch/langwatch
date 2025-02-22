@@ -323,7 +323,7 @@ export function TryItOut({
                     <Play size={16} />
                   )
                 }
-                colorScheme="orange"
+                colorPalette="orange"
                 size="sm"
                 isDisabled={firstPassingPrecondition === -1}
                 onClick={() => {

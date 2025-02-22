@@ -92,7 +92,7 @@ function ProjectsList({
                               as={NextLink}
                               href={`/onboarding/${team.slug}/project`}
                               size="sm"
-                              colorScheme="orange"
+                              colorPalette="orange"
                             >
                               <HStack gap={2}>
                                 <Plus size={20} />

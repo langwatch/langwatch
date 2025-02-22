@@ -98,14 +98,14 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
             <ExternalLink size={14} />
           </Link>
           {currentVersion?.isPublishedVersion ? (
-            <Tag colorScheme="green" size="sm" paddingX={2}>
+            <Tag colorPalette="green" size="sm" paddingX={2}>
               Latest version
             </Tag>
           ) : (
             <Button
               size="xs"
               variant="outline"
-              colorScheme="gray"
+              colorPalette="gray"
               onClick={() => {
                 updateToLatestVersion();
               }}

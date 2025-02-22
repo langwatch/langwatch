@@ -94,7 +94,7 @@ export function BatchEvaluationV2({
             <Spacer />
             <Button
               size="sm"
-              colorScheme="blue"
+              colorPalette="blue"
               leftIcon={<Download size={16} />}
               onClick={() => void downloadCSV()}
               disabled={!isDownloadCSVEnabled}
@@ -111,7 +111,7 @@ export function BatchEvaluationV2({
                 leftIcon={<ExternalLink size={16} />}
                 textDecoration="none"
                 marginBottom="-6px"
-                colorScheme="orange"
+                colorPalette="orange"
               >
                 Open Workflow
               </Button>

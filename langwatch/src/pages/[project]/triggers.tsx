@@ -589,7 +589,7 @@ const TriggerForm = ({
         </VStack>
         <HStack width="full">
           <Spacer />
-          <Button type="submit" colorScheme="orange">
+          <Button type="submit" colorPalette="orange">
             Save Trigger
           </Button>
         </HStack>

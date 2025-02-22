@@ -70,7 +70,7 @@ export function DatasetUpload({
             </Text>
           )}
         <Button
-          colorScheme="blue"
+          colorPalette="blue"
           isDisabled={
             !uploadedDataset ||
             uploadedDataset.datasetRecords.length === 0 ||

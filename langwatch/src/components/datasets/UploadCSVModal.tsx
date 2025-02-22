@@ -110,7 +110,7 @@ export function UploadCSVModal({
             {onCreateFromScratch && (
               <Button
                 variant="link"
-                colorScheme="gray"
+                colorPalette="gray"
                 fontWeight="normal"
                 color="blue.700"
                 onClick={onCreateFromScratch}
@@ -120,7 +120,7 @@ export function UploadCSVModal({
             )}
             <Spacer />
             <Button
-              colorScheme="blue"
+              colorPalette="blue"
               isDisabled={
                 !uploadedDataset ||
                 uploadedDataset.datasetRecords.length === 0 ||

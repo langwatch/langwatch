@@ -486,7 +486,7 @@ function ModelProviderForm({
                   <Button
                     type="submit"
                     size="sm"
-                    colorScheme="orange"
+                    colorPalette="orange"
                     isLoading={localUpdateMutation.isLoading}
                   >
                     Save

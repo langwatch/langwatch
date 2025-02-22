@@ -154,7 +154,7 @@ export function EvaluatorSelection({
 
   return (
     <Tabs
-      colorScheme="orange"
+      colorPalette="orange"
       index={categories.indexOf(tab)}
       onChange={(index) => {
         void router.replace({
@@ -224,7 +224,7 @@ export function EvaluatorSelection({
                           {evaluator.beta && (
                             <Tag
                               size="sm"
-                              colorScheme="pink"
+                              colorPalette="pink"
                               paddingX={2}
                               fontSize="14px"
                               marginLeft="-4px"
@@ -243,7 +243,7 @@ export function EvaluatorSelection({
                               label={evaluator.missingEnvVars.join(", ")}
                             >
                               <Tag
-                                colorScheme="orange"
+                                colorPalette="orange"
                                 borderRadius="8px"
                                 padding="4px 8px"
                                 lineHeight="1.5em"
@@ -254,7 +254,7 @@ export function EvaluatorSelection({
                           )}
                         {/* <VStack align="start" gap={1}>
                           {(evaluator.missingEnvVars ?? []).map((envVar) => (
-                            <Tag colorScheme="red" key={envVar} fontSize="12px" paddingX={2}>
+                            <Tag colorPalette="red" key={envVar} fontSize="12px" paddingX={2}>
                               Missing {envVar}
                             </Tag>
                           ))}
@@ -273,7 +273,7 @@ export function EvaluatorSelection({
                               target="_blank"
                             >
                               <Tooltip label="Only messages with contexts can run this evaluation, click for more info">
-                                <Tag colorScheme="orange" whiteSpace="nowrap">
+                                <Tag colorPalette="orange" whiteSpace="nowrap">
                                   Requires Contexts
                                 </Tag>
                               </Tooltip>

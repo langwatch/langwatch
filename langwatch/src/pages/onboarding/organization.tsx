@@ -405,7 +405,7 @@ export default function OrganizationOnboarding() {
               <Divider />
               <HStack width="full">
                 <Button
-                  colorScheme="orange"
+                  colorPalette="orange"
                   type="submit"
                   disabled={createOrganization.isLoading}
                   onClick={() => {
@@ -504,7 +504,7 @@ export default function OrganizationOnboarding() {
                   Back
                 </Button>
                 <Button
-                  colorScheme="orange"
+                  colorPalette="orange"
                   type="submit"
                   disabled={createOrganization.isLoading}
                   onClick={() => checkSecondStep()}
@@ -619,7 +619,7 @@ export default function OrganizationOnboarding() {
                   Back
                 </Button>
                 <Button
-                  colorScheme="orange"
+                  colorPalette="orange"
                   type="submit"
                   disabled={
                     createOrganization.isLoading || createOrganization.isSuccess

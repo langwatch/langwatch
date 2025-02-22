@@ -365,7 +365,7 @@ const MultipleInput = ({
           }}
         />
         <InputRightElement padding={2}>
-          <Button size="sm" padding={2} colorScheme="orange" type="submit">
+          <Button size="sm" padding={2} colorPalette="orange" type="submit">
             <Send />
           </Button>
         </InputRightElement>
@@ -407,7 +407,7 @@ const MultipleInput = ({
             );
           })}
         </Stack>
-        <Button width="full" type="submit" colorScheme="orange">
+        <Button width="full" type="submit" colorPalette="orange">
           Submit
         </Button>
       </VStack>

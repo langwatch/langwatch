@@ -71,7 +71,7 @@ export default function Accept() {
               </AlertDescription>
             </Box>
           </Alert>
-          <Button colorScheme="orange" onClick={() => void signOut()}>
+          <Button colorPalette="orange" onClick={() => void signOut()}>
             Log Out and Try Again
           </Button>
         </VStack>

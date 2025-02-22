@@ -138,7 +138,7 @@ export const IntroducingStudio = () => {
             <HStack gap={4}>
               <Link href="/settings/subscription">
                 <Button
-                  colorScheme="green"
+                  colorPalette="green"
                   onClick={() => {
                     trackEvent("subscription_hook_click", {
                       project_id: project?.id,

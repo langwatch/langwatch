@@ -253,7 +253,7 @@ export function FieldsDefinition({
               </HStack>
               {!readOnly ? (
                 <Button
-                  colorScheme="gray"
+                  colorPalette="gray"
                   size="sm"
                   height="40px"
                   onClick={() => {

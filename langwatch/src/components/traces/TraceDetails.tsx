@@ -274,7 +274,7 @@ export function TraceDetails(props: {
           <HStack>
             {hasTeamPermission(TeamRoleGroup.ANNOTATIONS_MANAGE) && (
               <Button
-                colorScheme="black"
+                colorPalette="black"
                 variant="outline"
                 onClick={() => {
                   commentState.setCommentState({
@@ -300,7 +300,7 @@ export function TraceDetails(props: {
                   onClose={popover.onClose}
                 >
                   <PopoverTrigger>
-                    <Button colorScheme="black" variant="outline">
+                    <Button colorPalette="black" variant="outline">
                       Annotation Queue
                     </Button>
                   </PopoverTrigger>
@@ -323,7 +323,7 @@ export function TraceDetails(props: {
             )}
             {hasTeamPermission(TeamRoleGroup.DATASETS_MANAGE) && (
               <Button
-                colorScheme="black"
+                colorPalette="black"
                 type="submit"
                 variant="outline"
                 minWidth="fit-content"
@@ -566,7 +566,7 @@ const AddParticipants = ({
                   >
                     <Button
                       width="100%"
-                      colorScheme="blue"
+                      colorPalette="blue"
                       onClick={queueDrawerOpen.onOpen}
                       leftIcon={<Plus />}
                       variant="outline"
@@ -584,7 +584,7 @@ const AddParticipants = ({
         <HStack width="full">
           <Spacer />
           <Button
-            colorScheme="orange"
+            colorPalette="orange"
             size="sm"
             onClick={sendToQueue}
             isLoading={isLoading}

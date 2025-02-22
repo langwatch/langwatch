@@ -188,7 +188,7 @@ export default function Checks() {
             <Spacer />
             {hasTeamPermission(TeamRoleGroup.GUARDRAILS_MANAGE) && (
               <Button
-                colorScheme="orange"
+                colorPalette="orange"
                 as={NextLink}
                 href={`/${project.slug}/evaluations/new/choose`}
                 minWidth="fit-content"

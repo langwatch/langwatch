@@ -72,7 +72,7 @@ export function PlaygroundTabs() {
   return (
     <>
       <Tabs
-        colorScheme="orange"
+        colorPalette="orange"
         width="full"
         height="calc(100vh - 115px)"
         backgroundColor="white"

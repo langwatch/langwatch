@@ -80,7 +80,7 @@ export function Optimize() {
     <>
       <Tooltip label={isRunning ? "Optimization is running" : ""}>
         <Button
-          colorScheme="green"
+          colorPalette="green"
           size="sm"
           onClick={() => {
             trackEvent("optimize_click", { project_id: project?.id });

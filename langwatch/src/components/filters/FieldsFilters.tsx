@@ -84,7 +84,7 @@ export function FieldsFilters() {
         {hasTeamPermission(TeamRoleGroup.TRIGGERS_MANAGE) && !isEditMode && (
           <Tooltip label="Create a filter to add a trigger.">
             <Button
-              colorScheme="orange"
+              colorPalette="orange"
               onClick={() => openDrawer("trigger", undefined)}
               size="sm"
               isDisabled={!hasAnyFilters}
@@ -526,7 +526,7 @@ function RangeFilter({
         }}
       />
       <RangeSlider
-        colorScheme="orange"
+        colorPalette="orange"
         // eslint-disable-next-line jsx-a11y/aria-proptypes
         aria-label={["min", "max"]}
         min={min}

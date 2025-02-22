@@ -143,7 +143,7 @@ export const NewWorkflowForm = ({
       <ModalFooter>
         <Button
           type="submit"
-          colorScheme="blue"
+          colorPalette="blue"
           isLoading={createWorkflowMutation.isLoading}
           onClick={() => {
             void handleSubmit(onSubmit)();

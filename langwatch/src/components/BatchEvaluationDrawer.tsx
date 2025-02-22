@@ -544,7 +544,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                   <Spacer />
                 )}
 
-                <Button colorScheme="blue" type="submit" minWidth="fit-content">
+                <Button colorPalette="blue" type="submit" minWidth="fit-content">
                   Next step
                 </Button>
               </HStack>
@@ -561,7 +561,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
               <HStack align={"start"} gap={12} paddingY={4} width={"full"}>
                 <Spacer />
                 <Button
-                  colorScheme="blue"
+                  colorPalette="blue"
                   type="submit"
                   minWidth="fit-content"
                   onClick={() => setStep(1)}

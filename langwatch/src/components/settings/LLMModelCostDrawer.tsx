@@ -235,7 +235,7 @@ function LLMModelCostForm({
         </HorizontalFormControl>
         <Button
           marginTop={4}
-          colorScheme="orange"
+          colorPalette="orange"
           type="submit"
           minWidth="fit-content"
           isLoading={createOrUpdate.isLoading}

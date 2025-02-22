@@ -50,7 +50,7 @@ export const useAlertOnComponent = () => {
                   <VStack align="start">
                     <Text>{execution_state?.error}</Text>
                     {/* <Button
-                      colorScheme="white"
+                      colorPalette="white"
                       variant="link"
                       size="sm"
                       onClick={() => {

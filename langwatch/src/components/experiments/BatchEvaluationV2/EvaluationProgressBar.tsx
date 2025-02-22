@@ -22,7 +22,7 @@ export function EvaluationProgressBar({
       <Progress
         size={size}
         width="full"
-        colorScheme="blue"
+        colorPalette="blue"
         isIndeterminate={isIndeterminate}
         isAnimated
         borderRadius="sm"

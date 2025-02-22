@@ -380,7 +380,7 @@ export const AddAnnotationQueueDrawer = ({
                               >
                                 <Button
                                   width="100%"
-                                  colorScheme="blue"
+                                  colorPalette="blue"
                                   onClick={scoreTypeDrawerOpen.onOpen}
                                   leftIcon={<Plus />}
                                   variant="outline"
@@ -399,7 +399,7 @@ export const AddAnnotationQueueDrawer = ({
                 <HStack width="full">
                   <Spacer />
                   <Button
-                    colorScheme="orange"
+                    colorPalette="orange"
                     type="submit"
                     minWidth="fit-content"
                   >

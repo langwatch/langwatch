@@ -58,7 +58,7 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
             as={NextLink}
             href={`/settings/teams/new`}
             size="sm"
-            colorScheme="orange"
+            colorPalette="orange"
           >
             <HStack gap={2}>
               <Plus size={20} />

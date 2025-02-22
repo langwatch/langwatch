@@ -156,7 +156,7 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
           <HStack width="full" justify="end">
             <Button
               type="submit"
-              colorScheme="green"
+              colorPalette="green"
               rightIcon={<Play size={16} />}
             >
               Execute

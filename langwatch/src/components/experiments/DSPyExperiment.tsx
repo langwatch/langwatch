@@ -1401,7 +1401,7 @@ export function DSPyExperimentSummary({
         <ChakraTooltip label="Applies the optimization that resulted in the best score for this run to your workflow">
           <Button
             size="md"
-            colorScheme="green"
+            colorPalette="green"
             leftIcon={<LLMIcon />}
             onClick={() => {
               if (!bestScoreStep.data) return;

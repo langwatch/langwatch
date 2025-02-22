@@ -214,7 +214,7 @@ export default function BatchEvaluation({
 
           <Spacer />
           <Button
-            colorScheme="black"
+            colorPalette="black"
             minWidth="fit-content"
             variant="ghost"
             onClick={() => evaluations.data && downloadCSV()}
