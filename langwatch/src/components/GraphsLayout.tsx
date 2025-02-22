@@ -22,10 +22,10 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
           fontSize="14px"
           minWidth="180px"
           height="full"
-          spacing={1}
+          gap={1}
         >
           <MenuLink href={`/${project?.slug}`}>Overview</MenuLink>
-          <VStack align="start" width="full" spacing={0}>
+          <VStack align="start" width="full" gap={0}>
             {/* TODO: reduce font size to 11 once the rest of the page also have a smaller fit */}
             <SmallLabel
               paddingX={4}
@@ -43,7 +43,7 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
               Topics
             </MenuLink>
           </VStack>
-          <VStack align="start" width="full" spacing={0}>
+          <VStack align="start" width="full" gap={0}>
             <SmallLabel
               paddingX={4}
               paddingTop={4}
@@ -63,7 +63,7 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
               Evaluations
             </MenuLink>
           </VStack>
-          <VStack align="start" width="full" spacing={0}>
+          <VStack align="start" width="full" gap={0}>
             <SmallLabel
               paddingX={4}
               paddingTop={4}

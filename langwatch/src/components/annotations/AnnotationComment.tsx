@@ -242,7 +242,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
       <Card>
         <CardBody>
           {getAnnotation.isLoading ? (
-            <VStack align="start" spacing={3} width="full">
+            <VStack align="start" gap={3} width="full">
               <HStack>
                 <Skeleton>
                   <Avatar size="sm" />
@@ -250,7 +250,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                 <Skeleton height="20px" width="120px" />
               </HStack>
               <Skeleton height="40px" width="full" />
-              <HStack spacing={2} width="full">
+              <HStack gap={2} width="full">
                 <Skeleton height="24px" width="100px" />
                 <Skeleton height="24px" width="100px" />
                 <Skeleton height="24px" width="100px" />
@@ -263,7 +263,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
           ) : (
             /* eslint-disable-next-line @typescript-eslint/no-misused-promises */
             <form onSubmit={handleSubmit(onSubmit)}>
-              <VStack align="start" spacing={3}>
+              <VStack align="start" gap={3}>
                 <HStack width="full">
                   <Avatar name={session.data?.user.name ?? ""} size="sm" />
                   <Text>{session.data?.user.name}</Text>
@@ -292,7 +292,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                   }
                 />
 
-                <HStack spacing={2} width="full" wrap="wrap">
+                <HStack gap={2} width="full" wrap="wrap">
                   {getAnnotationScoring.data?.map((scoreType) => (
                     <ScoreBlock
                       key={scoreType.id}
@@ -446,7 +446,7 @@ const ScoreBlock = ({
                   setTempValue(values.map(String));
                 }}
               >
-                <VStack align="start" spacing={2}>
+                <VStack align="start" gap={2}>
                   {scoreType.options.map((option, index) => {
                     return (
                       <Checkbox value={option.value.toString()} key={index}>
@@ -474,7 +474,7 @@ const ScoreBlock = ({
                   setTempValue(value);
                 }}
               >
-                <VStack align="start" spacing={2}>
+                <VStack align="start" gap={2}>
                   {scoreType.options.map((option) => {
                     return (
                       <Radio value={option.value.toString()} key={option.value}>

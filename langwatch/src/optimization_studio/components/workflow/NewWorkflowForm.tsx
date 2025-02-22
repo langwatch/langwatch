@@ -110,7 +110,7 @@ export const NewWorkflowForm = ({
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     <form onSubmit={handleSubmit(onSubmit)}>
       <ModalBody>
-        <VStack spacing={4} align="stretch">
+        <VStack gap={4} align="stretch">
           <FormControl isInvalid={!!errors.name}>
             <EmojiPickerModal
               isOpen={emojiPicker.isOpen}

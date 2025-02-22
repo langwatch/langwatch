@@ -222,9 +222,9 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
               paddingBottom={2}
             >
               <Divider marginBottom={2} />
-              <HStack width="full" spacing={3}>
+              <HStack width="full" gap={3}>
                 <VersionBox version={version} minWidth="48px" />
-                <VStack align="start" width="full" spacing={1}>
+                <VStack align="start" width="full" gap={1}>
                   <HStack>
                     <Text fontWeight={600} fontSize={13} noOfLines={1}>
                       {version.commitMessage}

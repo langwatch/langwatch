@@ -44,9 +44,9 @@ export function DatasetSelection({
   const { openDrawer } = useDrawer();
 
   return (
-    <VStack align="start" spacing={12}>
-      <VStack align="start" spacing={4}>
-        <HStack spacing={6}>
+    <VStack align="start" gap={12}>
+      <VStack align="start" gap={4}>
+        <HStack gap={6}>
           <Heading size="md">Current Dataset</Heading>
           <Button
             size="sm"
@@ -84,9 +84,9 @@ export function DatasetSelection({
           }}
         />
       </VStack>
-      <VStack align="start" spacing={4}>
+      <VStack align="start" gap={4}>
         <Heading size="md">Datasets</Heading>
-        <HStack spacing={4} wrap="wrap">
+        <HStack gap={4} wrap="wrap">
           {datasets.data?.map((storedDataset) => {
             const dataset = {
               id: storedDataset.id,

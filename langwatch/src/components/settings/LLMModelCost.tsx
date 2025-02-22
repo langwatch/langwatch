@@ -52,7 +52,7 @@ export function LLMModelCost(props: { projectId?: string }) {
           colorScheme="orange"
           onClick={() => openDrawer("llmModelCost", {})}
         >
-          <HStack spacing={2}>
+          <HStack gap={2}>
             <Plus size={20} />
             <Text>Add New Model</Text>
           </HStack>

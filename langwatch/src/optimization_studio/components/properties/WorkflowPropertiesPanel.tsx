@@ -79,7 +79,7 @@ export function WorkflowPropertiesPanel() {
       node={workflow}
       header={
         <>
-          <HStack align="center" spacing={2}>
+          <HStack align="center" gap={2}>
             <VStack align="flex-start">
               <HStack align="center">
                 <EmojiPickerModal

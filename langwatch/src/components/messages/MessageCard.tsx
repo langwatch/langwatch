@@ -145,9 +145,9 @@ export function MessageCard({
   };
 
   return (
-    <VStack alignItems="flex-start" spacing={4} width="fill">
-      <VStack alignItems="flex-start" spacing={8}>
-        <VStack alignItems="flex-start" spacing={2}>
+    <VStack alignItems="flex-start" gap={4} width="fill">
+      <VStack alignItems="flex-start" gap={8}>
+        <VStack alignItems="flex-start" gap={2}>
           <Box
             fontSize={11}
             color="gray.400"
@@ -178,7 +178,7 @@ export function MessageCard({
           </Box>
         </VStack>
         {trace.error && !trace.output?.value ? (
-          <VStack alignItems="flex-start" spacing={2}>
+          <VStack alignItems="flex-start" gap={2}>
             <Box
               fontSize={11}
               color="red.400"
@@ -190,7 +190,7 @@ export function MessageCard({
             <Text color="red.900">{trace.error.message}</Text>
           </VStack>
         ) : (
-          <VStack alignItems="flex-start" spacing={2}>
+          <VStack alignItems="flex-start" gap={2}>
             <Box
               fontSize={11}
               color="gray.400"
@@ -215,7 +215,7 @@ export function MessageCard({
                   borderColor="gray.300"
                   borderRadius={6}
                   padding={4}
-                  spacing={4}
+                  gap={4}
                 >
                   <HStack>
                     <Box
@@ -255,7 +255,7 @@ export function MessageCard({
       <Spacer />
       <HStack width="full" alignItems="flex-end">
         <VStack gap={4} alignItems="flex-start">
-          <HStack spacing={2}>
+          <HStack gap={2}>
             {traceTopic && (
               <Tag
                 background={
@@ -417,7 +417,7 @@ export function MessageCard({
                   <PopoverArrow />
                   <PopoverHeader>Guardrails</PopoverHeader>
                   <PopoverBody>
-                    <VStack align="start" spacing={2}>
+                    <VStack align="start" gap={2}>
                       {guardrails.map((evaluation) => (
                         <CheckPassing
                           key={evaluation.evaluation_id}
@@ -477,7 +477,7 @@ export function MessageCard({
                   <PopoverArrow />
                   <PopoverHeader>Evaluations</PopoverHeader>
                   <PopoverBody>
-                    <VStack align="start" spacing={2}>
+                    <VStack align="start" gap={2}>
                       {evaluations.map((evaluation) => (
                         <CheckPassing
                           key={evaluation.evaluation_id}

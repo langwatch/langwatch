@@ -111,7 +111,7 @@ const evaluationResultsTableRow = (
         <Td>
           <Tooltip
             label={
-              <VStack align="start" spacing={0}>
+              <VStack align="start" gap={0}>
                 <Text>Prediction cost: {datasetEntry?.cost ?? "-"}</Text>
                 <Text>Evaluation cost: {evaluationsCost ?? "-"}</Text>
               </VStack>
@@ -136,7 +136,7 @@ const evaluationResultsTableRow = (
         <Td>
           <Tooltip
             label={
-              <VStack align="start" spacing={0}>
+              <VStack align="start" gap={0}>
                 <Text>
                   Prediction duration:{" "}
                   {datasetEntry?.duration

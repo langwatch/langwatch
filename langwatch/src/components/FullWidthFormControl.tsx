@@ -29,7 +29,7 @@ export function FullWidthFormControl({
   return (
     <FormControl paddingY={2} isInvalid={isInvalid} {...props}>
       <VStack width="full" align={align}>
-        <VStack align="start" spacing={1} width="full" minWidth={minWidth}>
+        <VStack align="start" gap={1} width="full" minWidth={minWidth}>
           <FormLabel margin={0}>{label}</FormLabel>
           <FormHelperText margin={0} fontSize={13}>
             {helper}

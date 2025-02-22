@@ -70,7 +70,7 @@ function NodeInputs({
       {inputs.map((input) => (
         <HStack
           key={input.identifier}
-          spacing={1}
+          gap={1}
           paddingX={2}
           paddingY={1}
           background="gray.100"
@@ -124,7 +124,7 @@ function NodeOutputs({
       {outputs.map((output) => (
         <HStack
           key={output.identifier}
-          spacing={1}
+          gap={1}
           paddingX={2}
           paddingY={1}
           background="gray.100"
@@ -267,7 +267,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
       borderRadius="12px"
       backgroundColor={props.backgroundColor ?? "white"}
       padding="10px"
-      spacing={2}
+      gap={2}
       align="start"
       color="gray.600"
       fontSize={11}
@@ -325,7 +325,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
           </NodeToolbar>
         </Menu>
       )}
-      <HStack spacing={2} width="full">
+      <HStack gap={2} width="full">
         <ComponentIcon
           type={props.type as ComponentType}
           cls={props.data.cls}

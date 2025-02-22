@@ -91,7 +91,7 @@ export const TeamUserRoleField = ({
         name={`role`}
         rules={{ required: "User role is required" }}
         render={({ field }) => (
-          <HStack spacing={6}>
+          <HStack gap={6}>
             <TeamRoleSelect
               field={{
                 ...field,

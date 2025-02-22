@@ -20,7 +20,7 @@ export default function Subscription() {
       <VStack
         paddingX={4}
         paddingY={6}
-        spacing={6}
+        gap={6}
         width="full"
         maxWidth="920px"
         align="start"
@@ -34,7 +34,7 @@ export default function Subscription() {
           <CardBody width="full">
             <VStack
               width="full"
-              spacing={4}
+              gap={4}
               paddingY={4}
               paddingX={4}
               align="start"

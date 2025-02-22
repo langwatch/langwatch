@@ -213,7 +213,7 @@ export function TechStackSelector<
     <>
       <FormControl>
         <FormLabel>Language</FormLabel>
-        <HStack {...languageGroup} spacing={6} alignItems="stretch" wrap="wrap">
+        <HStack {...languageGroup} gap={6} alignItems="stretch" wrap="wrap">
           {Object.entries(techStackLanguageOptions).map(([key, option]) => {
             const radio = languageGetRadioProps({ value: key });
             return (
@@ -237,7 +237,7 @@ export function TechStackSelector<
         <FormLabel>Library or Framework</FormLabel>
         <HStack
           {...frameworkGroup}
-          spacing={6}
+          gap={6}
           alignItems="stretch"
           wrap="wrap"
         >
@@ -287,7 +287,7 @@ export const ProjectTechStackIcon = ({ project }: { project: Project }) => {
 
   if (language.label === "Other" && framework.label === "Other") {
     return (
-      <HStack spacing={0} align="center" justify="center" color="gray.600">
+      <HStack gap={0} align="center" justify="center" color="gray.600">
         <IconWrapper>
           <PuzzleIcon />
         </IconWrapper>
@@ -296,7 +296,7 @@ export const ProjectTechStackIcon = ({ project }: { project: Project }) => {
   }
 
   return (
-    <HStack spacing={0}>
+    <HStack gap={0}>
       <Box marginRight="-6px">
         <IconWrapper>{language.icon}</IconWrapper>
       </Box>

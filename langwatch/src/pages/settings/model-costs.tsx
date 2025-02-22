@@ -9,7 +9,7 @@ export default function ModelsPage() {
   return (
     <SettingsLayout>
       <VStack
-        spacing={6}
+        gap={6}
         width="full"
         align="start"
         paddingY={6}

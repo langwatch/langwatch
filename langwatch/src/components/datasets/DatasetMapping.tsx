@@ -566,7 +566,7 @@ export const TracesMapping = ({
   ]);
 
   return (
-    <VStack align="start" width="full" spacing={2}>
+    <VStack align="start" width="full" gap={2}>
       {Object.entries(mapping).map(
         ([column, { source, key, subkey }], index) => {
           const mapping = source ? TRACE_MAPPINGS[source] : undefined;
@@ -580,7 +580,7 @@ export const TracesMapping = ({
 
           return (
             <HStack key={index}>
-              <VStack align="start" spacing={2}>
+              <VStack align="start" gap={2}>
                 <Select
                   width="200px"
                   flexShrink={0}
@@ -732,7 +732,7 @@ export const TracesMapping = ({
               line instead of an array for the following mappings:
             </FormHelperText>
           </VStack>
-          <VStack align="start" paddingTop={2} spacing={2}>
+          <VStack align="start" paddingTop={2} gap={2}>
             {Array.from(availableExpansions).map((expansion) => (
               <HStack key={expansion}>
                 <Switch

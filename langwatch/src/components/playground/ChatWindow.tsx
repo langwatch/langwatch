@@ -145,7 +145,7 @@ const ChatWindow = React.memo(function ChatWindow({
       marginLeft="-1px"
       marginTop="-1px"
       background="white"
-      spacing={0}
+      gap={0}
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
@@ -175,7 +175,7 @@ const ChatWindow = React.memo(function ChatWindow({
           mode="chat"
         />
         <Spacer />
-        <HStack spacing={0}>
+        <HStack gap={0}>
           <Button
             size="xs"
             color="gray.500"
@@ -198,7 +198,7 @@ const ChatWindow = React.memo(function ChatWindow({
           </Button>
         </HStack>
       </HStack>
-      <VStack width="full" height="full" minHeight={0} spacing={0}>
+      <VStack width="full" height="full" minHeight={0} gap={0}>
         <ChatSystemPrompt tabIndex={tabIndex} windowId={windowId} />
         <Messages
           tabIndex={tabIndex}
@@ -358,7 +358,7 @@ function ChatInputBox({
             justifyContent="end"
             paddingRight={2}
           >
-            <HStack spacing={2}>
+            <HStack gap={2}>
               {isFocused && (
                 <Checkbox
                   size="sm"

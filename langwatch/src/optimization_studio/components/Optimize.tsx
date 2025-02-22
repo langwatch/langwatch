@@ -346,7 +346,7 @@ export function OptimizeModalContent({
       <ModalHeader fontWeight={600}>Optimize Workflow</ModalHeader>
       <ModalCloseButton />
       <ModalBody display="flex" flexDirection="column" gap={4}>
-        <VStack align="start" width="full" spacing={4}>
+        <VStack align="start" width="full" gap={4}>
           <VStack align="start" width="full">
             <VersionToBeUsed
               form={
@@ -360,7 +360,7 @@ export function OptimizeModalContent({
               versionToBeEvaluated={versionToBeEvaluated}
             />
           </VStack>
-          <VStack align="start" width="full" spacing={2}>
+          <VStack align="start" width="full" gap={2}>
             <SmallLabel color="gray.600">Optimizer</SmallLabel>
             <Controller
               control={form.control}
@@ -372,7 +372,7 @@ export function OptimizeModalContent({
         </VStack>
         <HStack width="full">
           {"llm" in optimizer.params && (
-            <VStack align="start" width="full" spacing={2}>
+            <VStack align="start" width="full" gap={2}>
               <HStack>
                 <SmallLabel color="gray.600">Teacher LLM</SmallLabel>
                 <Tooltip label="The LLM that will be used to generate the prompts and/or demonstrations. You can, for example, use a more powerful LLM to teach a smaller one.">
@@ -405,7 +405,7 @@ export function OptimizeModalContent({
             </VStack>
           )}
           {"num_candidates" in optimizer.params && (
-            <VStack align="start" width="full" spacing={2}>
+            <VStack align="start" width="full" gap={2}>
               <HStack>
                 <SmallLabel color="gray.600">
                   Number of Candidate Prompts
@@ -425,7 +425,7 @@ export function OptimizeModalContent({
         </HStack>
         <HStack width="full">
           {"max_bootstrapped_demos" in optimizer.params && (
-            <VStack align="start" width="full" spacing={2}>
+            <VStack align="start" width="full" gap={2}>
               <HStack>
                 <SmallLabel color="gray.600">Max Bootstrapped Demos</SmallLabel>
                 <Tooltip label="Maximum number of few shot demonstrations generated on the fly by the optimizer">
@@ -441,7 +441,7 @@ export function OptimizeModalContent({
             </VStack>
           )}
           {"max_labeled_demos" in optimizer.params && (
-            <VStack align="start" width="full" spacing={2}>
+            <VStack align="start" width="full" gap={2}>
               <HStack>
                 <SmallLabel color="gray.600">Max Labeled Demos</SmallLabel>
                 <Tooltip label="Maximum number of few shot demonstrations coming from the original dataset. Caveat: the output field of the LLM node must have exactly the same name as the dataset column.">
@@ -458,7 +458,7 @@ export function OptimizeModalContent({
           )}
         </HStack>
         {/* {"max_rounds" in optimizer.params && (
-          <VStack align="start" width="full" spacing={2}>
+          <VStack align="start" width="full" gap={2}>
             <SmallLabel color="gray.600">Max Rounds</SmallLabel>
             <Input
               {...form.register("params.max_rounds")}
@@ -470,7 +470,7 @@ export function OptimizeModalContent({
         )} */}
       </ModalBody>
       <ModalFooter borderTop="1px solid" borderColor="gray.200" marginTop={4}>
-        <VStack align="start" width="full" spacing={3}>
+        <VStack align="start" width="full" gap={3}>
           {hasProvidersWithoutCustomKeys ? (
             <AddModelProviderKey
               runWhat="run optimizations"
@@ -486,7 +486,7 @@ export function OptimizeModalContent({
             </Alert>
           ) : null}
           <HStack width="full">
-            <VStack align="start" spacing={0}>
+            <VStack align="start" gap={0}>
               <Text fontWeight={500}>
                 {train.length} optimization set entries
               </Text>

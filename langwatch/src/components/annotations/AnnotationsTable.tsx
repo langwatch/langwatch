@@ -114,14 +114,14 @@ export const AnnotationsTable = ({
             divider={<StackDivider color="red" />}
             width="full"
             align="start"
-            spacing={2}
+            gap={2}
           >
             {annotations.map((annotation) =>
               annotation.scoreOptions?.[id]?.value ? (
                 <>
-                  <HStack spacing={0}>
+                  <HStack gap={0}>
                     {Array.isArray(annotation.scoreOptions?.[id]?.value) ? (
-                      <HStack spacing={1} wrap="wrap">
+                      <HStack gap={1} wrap="wrap">
                         {(annotation.scoreOptions?.[id]?.value as string[]).map(
                           (val, index) => (
                             <Tag key={index}>{val}</Tag>
@@ -265,7 +265,7 @@ export const AnnotationsTable = ({
             </Menu>
           )}
         </HStack>
-        <HStack align="start" spacing={6} width="full">
+        <HStack align="start" gap={6} width="full">
           <Box flex={1} overflowX="auto">
             {!queuesLoading && allQueueItems.length == 0 ? (
               <NoDataInfoBlock
@@ -337,7 +337,7 @@ export const AnnotationsTable = ({
                             <Td>
                               <Tooltip
                                 label={
-                                  <VStack align="start" spacing={0}>
+                                  <VStack align="start" gap={0}>
                                     {item.createdByUser && (
                                       <Text marginBottom={2}>
                                         Created by {item.createdByUser.name}
@@ -456,7 +456,7 @@ export const AnnotationsTable = ({
                             <Td>
                               <VStack
                                 align="start"
-                                spacing={2}
+                                gap={2}
                                 divider={<StackDivider color="red" />}
                               >
                                 {item.annotations.map(

@@ -28,7 +28,7 @@ export const ProjectIntegration = () => {
 
   return (
     <DashboardLayout backgroundColor="gray.100" maxWidth="100%">
-      <HStack spacing={0} width="full" height="full" align="start">
+      <HStack gap={0} width="full" height="full" align="start">
         <VStack
           align="start"
           background="white"
@@ -37,7 +37,7 @@ export const ProjectIntegration = () => {
           borderColor="gray.300"
           minWidth="280px"
           height="full"
-          spacing={6}
+          gap={6}
           display={["none", "none", "none", "flex"]}
         >
           <Heading as="h2" size="md">
@@ -45,7 +45,7 @@ export const ProjectIntegration = () => {
           </Heading>
           <IntegrationChecks />
         </VStack>
-        <VStack align="flex-start" spacing={6} width="full" padding={6}>
+        <VStack align="flex-start" gap={6} width="full" padding={6}>
           <HStack width={"full"}>
             <Heading as="h2" size="md">
               Integration guides
@@ -69,7 +69,7 @@ export const ProjectIntegration = () => {
                 when setting it up to point to this instance
               </Text>
             )}
-          <VStack width="full" align="stretch" spacing={6}>
+          <VStack width="full" align="stretch" gap={6}>
             <Card width="full">
               <CardHeader paddingBottom={0}>
                 <Heading as="h2" size="md">
@@ -77,7 +77,7 @@ export const ProjectIntegration = () => {
                 </Heading>
               </CardHeader>
               <CardBody>
-                <VStack spacing={6} align="start">
+                <VStack gap={6} align="start">
                   <Text>
                     Copy your LangWatch API key to use for the integration
                   </Text>
@@ -87,7 +87,7 @@ export const ProjectIntegration = () => {
                 </VStack>
               </CardBody>
             </Card>
-            <HStack width="full" spacing={8} align="stretch" justify="stretch">
+            <HStack width="full" gap={8} align="stretch" justify="stretch">
               <Card width="full">
                 <CardHeader>
                   <Heading as="h2" size="md">
@@ -95,7 +95,7 @@ export const ProjectIntegration = () => {
                   </Heading>
                 </CardHeader>
                 <CardBody>
-                  <VStack align="start" spacing={8}>
+                  <VStack align="start" gap={8}>
                     <Link
                       href="https://docs.langwatch.ai/integration/python/guide"
                       isExternal
@@ -106,7 +106,7 @@ export const ProjectIntegration = () => {
                         })
                       }
                     >
-                      <HStack align="center" fontSize={18} spacing={2}>
+                      <HStack align="center" fontSize={18} gap={2}>
                         <IconWrapper width="36px" height="36px">
                           {techStackLanguageOptions.python.icon}
                         </IconWrapper>
@@ -127,7 +127,7 @@ export const ProjectIntegration = () => {
                         })
                       }
                     >
-                      <HStack align="center" fontSize={18} spacing={2}>
+                      <HStack align="center" fontSize={18} gap={2}>
                         <IconWrapper width="36px" height="36px">
                           {techStackLanguageOptions.typescript.icon}
                         </IconWrapper>
@@ -148,7 +148,7 @@ export const ProjectIntegration = () => {
                         })
                       }
                     >
-                      <HStack align="center" fontSize={18} spacing={2}>
+                      <HStack align="center" fontSize={18} gap={2}>
                         <IconWrapper width="36px" height="36px">
                           {techStackLanguageOptions.other.icon}
                         </IconWrapper>
@@ -166,7 +166,7 @@ export const ProjectIntegration = () => {
                   </Heading>
                 </CardHeader>
                 <CardBody>
-                  <VStack spacing={6} align="start" height="full">
+                  <VStack gap={6} align="start" height="full">
                     <Text>
                       View our demo account to see how LangWatch works with a
                       sample chatbot.

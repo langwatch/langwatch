@@ -535,7 +535,7 @@ function PublishModalContent({
       <ModalHeader fontWeight={600}>Publish Workflow</ModalHeader>
       <ModalCloseButton />
       <ModalBody>
-        <VStack align="start" width="full" spacing={10}>
+        <VStack align="start" width="full" gap={10}>
           <Text fontSize="15px" color="black">
             Publish your workflow to make it available via API, as a component
             to other workflows, or as a custom evaluator.
@@ -551,7 +551,7 @@ function PublishModalContent({
         </VStack>
       </ModalBody>
       <ModalFooter borderTop="1px solid" borderColor="gray.200" marginTop={4}>
-        <VStack align="start" width="full" spacing={3}>
+        <VStack align="start" width="full" gap={3}>
           {hasProvidersWithoutCustomKeys && (
             <AddModelProviderKey
               runWhat="publish"

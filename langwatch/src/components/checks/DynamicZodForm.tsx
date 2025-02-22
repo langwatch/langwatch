@@ -86,7 +86,7 @@ const DynamicZodForm = ({
       );
     } else if (fieldSchema_ instanceof z.ZodBoolean) {
       return (
-        <HStack width="full" spacing={2}>
+        <HStack width="full" gap={2}>
           <Controller
             name={fullPath}
             control={control}
@@ -295,7 +295,7 @@ const DynamicZodForm = ({
       );
     } else if (fieldSchema_ instanceof z.ZodObject) {
       return (
-        <VStack width="full" spacing={2}>
+        <VStack width="full" gap={2}>
           {Object.keys(fieldSchema_.shape).map((key) => (
             <VStack key={key} align="start" width="full">
               {!(fieldSchema_.shape[key] instanceof z.ZodBoolean) && (
@@ -342,7 +342,7 @@ const DynamicZodForm = ({
                 key={key}
                 as="form"
                 align="start"
-                spacing={3}
+                gap={3}
                 width="full"
               >
                 <HStack width="full">

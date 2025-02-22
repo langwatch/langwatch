@@ -126,7 +126,7 @@ function SignUpForm() {
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <Card>
           <CardHeader>
-            <HStack spacing={4}>
+            <HStack gap={4}>
               <LogoIcon width={30.69} height={42} />
               <Heading size="lg" as="h1">
                 Sign up

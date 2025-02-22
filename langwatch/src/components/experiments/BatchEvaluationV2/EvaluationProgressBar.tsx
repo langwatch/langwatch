@@ -15,7 +15,7 @@ export function EvaluationProgressBar({
     evaluationState?.status === "waiting" || !evaluationState?.total;
 
   return (
-    <HStack width="full" spacing={4}>
+    <HStack width="full" gap={4}>
       {!isIndeterminate && size !== "xs" && (
         <Text whiteSpace="nowrap">{Math.round((progress / total) * 100)}%</Text>
       )}

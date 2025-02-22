@@ -190,7 +190,7 @@ export function EvaluationResults() {
   const evaluationStateRunId = evaluationState?.run_id;
 
   return (
-    <HStack align="start" width="full" height="full" spacing={0}>
+    <HStack align="start" width="full" height="full" gap={0}>
       <BatchEvaluationV2RunList
         batchEvaluationRuns={batchEvaluationRuns}
         selectedRun={selectedRun}
@@ -198,7 +198,7 @@ export function EvaluationResults() {
         setSelectedRunId={setSelectedRunId}
         size="sm"
       />
-      <VStack spacing={0} width="full" height="full" minWidth="0">
+      <VStack gap={0} width="full" height="full" minWidth="0">
         <BatchEvaluationV2EvaluationResults
           project={project}
           experiment={experiment.data}
@@ -218,7 +218,7 @@ export function EvaluationResults() {
               padding={3}
               borderTop="1px solid"
               borderColor="gray.200"
-              spacing={2}
+              gap={2}
             >
               <Text whiteSpace="nowrap" marginTop="-1px" paddingX={2}>
                 Running
@@ -480,7 +480,7 @@ export function LoadedOptimizationResults({
   const hasLogs = optimizationState?.run_id === currentSelectedRun;
 
   return (
-    <HStack align="start" width="full" height="full" spacing={0} minWidth="0">
+    <HStack align="start" width="full" height="full" gap={0} minWidth="0">
       <DSPyExperimentRunList
         dspyRuns={dspyRuns}
         selectedRuns={selectedRuns_}
@@ -490,7 +490,7 @@ export function LoadedOptimizationResults({
         size="sm"
         incomingRunIds={incomingRunIds}
       />
-      <VStack align="start" width="full" height="full" spacing={0} minWidth="0">
+      <VStack align="start" width="full" height="full" gap={0} minWidth="0">
         <VStack width="full" height="full" overflowY="auto" minWidth="0">
           {dspyRuns.isLoading ? (
             <Skeleton width="100%" height="30px" />

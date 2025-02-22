@@ -144,7 +144,7 @@ export function MessagesList() {
   return (
     <Container maxW={"calc(min(1440px, 100vw - 200px))"} padding={6}>
       <HStack width="full" align="top" paddingBottom={6}>
-        <HStack align="center" spacing={6}>
+        <HStack align="center" gap={6}>
           <Heading as={"h1"} size="lg" paddingTop={1}>
             Messages
           </Heading>
@@ -178,7 +178,7 @@ export function MessagesList() {
         <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
         <FilterToggle defaultShowFilters={true} />
       </HStack>
-      <HStack align="start" spacing={8}>
+      <HStack align="start" gap={8}>
         <VStack gap={6} width="full">
           {project && traceGroups.data && traceGroups.data.groups.length > 0 ? (
             <ExpandableMessages
@@ -363,7 +363,7 @@ const ExpandableMessages = React.memo(
               color="gray.500"
               cursor="default"
             >
-              <HStack spacing={1}>
+              <HStack gap={1}>
                 <Text>User ID: </Text>
                 <Text>{traceGroup[0]?.metadata.user_id ?? "null"}</Text>
                 <Divider orientation="vertical" height="20px" />
@@ -381,7 +381,7 @@ const ExpandableMessages = React.memo(
               color="gray.500"
               cursor="default"
             >
-              <HStack spacing={1}>
+              <HStack gap={1}>
                 <Text>Thread ID: </Text>
                 <Text>{traceGroup[0]?.metadata.thread_id ?? "null"}</Text>
                 <Divider orientation="vertical" height="20px" />
@@ -470,8 +470,8 @@ function MessageSkeleton() {
   return (
     <Card width="full" padding={0}>
       <CardBody padding={8}>
-        <VStack alignItems="flex-start" spacing={4}>
-          <HStack spacing={12} width="full">
+        <VStack alignItems="flex-start" gap={4}>
+          <HStack gap={12} width="full">
             <Box fontSize={24} fontWeight="bold" width="full">
               <Skeleton width="50%" height="20px" />
             </Box>
@@ -523,7 +523,7 @@ function GroupingSelector() {
   return (
     <Menu initialFocusRef={ref}>
       <MenuButton as={Button} variant="outline" minWidth="fit-content">
-        <HStack spacing={2}>
+        <HStack gap={2}>
           <Layers size={16} />
           <Box>{groups[groupBy]}</Box>
           <Box>
@@ -539,7 +539,7 @@ function GroupingSelector() {
               onClick={() => setGroupBy(key as keyof typeof groups)}
               {...(groupBy === key ? { ref: ref as any } : {})}
             >
-              <HStack spacing={2}>
+              <HStack gap={2}>
                 <Radio isChecked={groupBy === key} />
                 <Text>{value}</Text>
               </HStack>

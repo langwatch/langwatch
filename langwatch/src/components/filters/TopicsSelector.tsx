@@ -128,7 +128,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
     <VStack
       align="start"
       width="full"
-      spacing={6}
+      gap={6}
       ref={topicSelectorRef}
       minHeight={`${minHeight}px`}
     >
@@ -137,7 +137,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
           Topics
         </Heading>
       )}
-      <VStack width="full" spacing={4} align="start">
+      <VStack width="full" gap={4} align="start">
         {topicCountsQuery.isLoading ? (
           <Delayed>
             <Skeleton width="full" height="20px" />
@@ -152,7 +152,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
               .map((topic) => (
                 <React.Fragment key={topic.id}>
                   <HStack
-                    spacing={1}
+                    gap={1}
                     width="full"
                     paddingX={2}
                     fontWeight={
@@ -161,7 +161,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                   >
                     <Checkbox
                       borderColor="gray.400"
-                      spacing={3}
+                      gap={3}
                       flexGrow={1}
                       isChecked={selectedTopics.includes(topic.id)}
                       onChange={(e) =>
@@ -188,7 +188,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                       .map((subtopic) => (
                         <HStack
                           key={subtopic.id}
-                          spacing={1}
+                          gap={1}
                           width="full"
                           paddingX={2}
                           paddingLeft={8}
@@ -197,7 +197,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                         >
                           <Checkbox
                             borderColor="gray.400"
-                            spacing={3}
+                            gap={3}
                             flexGrow={1}
                             isChecked={selectedSubtopics.includes(subtopic.id)}
                             onChange={(e) =>

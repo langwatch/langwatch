@@ -92,7 +92,7 @@ export function DatasetMappingPreview({
 
   return (
     <FormControl width="full" paddingY={4}>
-      <HStack width="full" spacing="64px" align="start">
+      <HStack width="full" gap="64px" align="start">
         <VStack align="start" maxWidth="50%">
           <FormLabel margin={0}>Mapping</FormLabel>
           <FormHelperText margin={0} fontSize={13} marginBottom={2}>

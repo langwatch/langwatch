@@ -43,7 +43,7 @@ export default function NewTraceCheckConfig() {
   return (
     <DashboardLayout>
       <Container maxWidth="1200" padding={6}>
-        <VStack align="start" spacing={4}>
+        <VStack align="start" gap={4}>
           <Heading as="h1" size="xl" textAlign="center" paddingTop={4}>
             Setup Evaluation
           </Heading>

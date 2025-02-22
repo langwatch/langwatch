@@ -42,7 +42,7 @@ export function SpanDetails({
   );
 
   return (
-    <VStack flexGrow={1} spacing={3} align="start">
+    <VStack flexGrow={1} gap={3} align="start">
       <HStack width="full">
         <SpanTypeTag span={span} />
         <Heading as="h2" fontSize={22}>
@@ -130,7 +130,7 @@ export function SpanDetails({
         )}
       </VStack>
       {span.params && (
-        <VStack alignItems="flex-start" spacing={2} paddingTop={4} width="full">
+        <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
             fontSize={13}
             color="gray.400"
@@ -164,7 +164,7 @@ export function SpanDetails({
         </VStack>
       )}
       {span.input && (
-        <VStack alignItems="flex-start" spacing={2} paddingTop={4} width="full">
+        <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
             fontSize={13}
             color="gray.400"
@@ -187,7 +187,7 @@ export function SpanDetails({
         </VStack>
       )}
       {span.contexts && (
-        <VStack alignItems="flex-start" spacing={2} paddingTop={4} width="full">
+        <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
             fontSize={13}
             color="gray.400"
@@ -227,7 +227,7 @@ export function SpanDetails({
         </VStack>
       )}
       {span.error ? (
-        <VStack alignItems="flex-start" spacing={2} paddingTop={4} width="full">
+        <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
             fontSize={13}
             color="red.400"
@@ -254,7 +254,7 @@ export function SpanDetails({
         span.output !== null && (
           <VStack
             alignItems="flex-start"
-            spacing={2}
+            gap={2}
             paddingTop={4}
             width="full"
           >
@@ -377,7 +377,7 @@ export const SpanDuration = ({
       }
     >
       <HStack
-        spacing={"6px"}
+        gap={"6px"}
         color={span.error ? "red" : durationColor("span", duration)}
       >
         <Clock width={12} />

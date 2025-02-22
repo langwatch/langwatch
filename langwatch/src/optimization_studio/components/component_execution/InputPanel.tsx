@@ -120,7 +120,7 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
     >
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={handleSubmit(onSubmit)}>
-        <VStack align="start" spacing={3} width="full">
+        <VStack align="start" gap={3} width="full">
           <Heading
             as="h3"
             fontSize={16}

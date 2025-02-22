@@ -111,7 +111,7 @@ export function HoverableBigText({
       <Tooltip
         isDisabled={!isOverflown}
         label={
-          <VStack padding={0} spacing={0} width="full" display="block">
+          <VStack padding={0} gap={0} width="full" display="block">
             {expandable && (
               <Text
                 textAlign="center"

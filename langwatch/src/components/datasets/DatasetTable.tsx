@@ -456,7 +456,7 @@ export function DatasetTable({
         width="full"
         verticalAlign={"middle"}
         paddingBottom={6}
-        spacing={6}
+        gap={6}
       >
         <Heading as={"h1"} size="lg">
           {title ? (

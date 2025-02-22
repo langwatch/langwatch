@@ -136,7 +136,7 @@ export function Messages({
       height="full"
       overflowY="auto"
       align="start"
-      spacing={0}
+      gap={0}
       borderTop="1px solid"
       borderColor="gray.200"
     >
@@ -259,7 +259,7 @@ function MessageBlock({
       background={message.role === "user" ? "#FCFEFF" : "white"}
       align="start"
       fontSize="13px"
-      spacing={3}
+      gap={3}
     >
       {children}
     </HStack>

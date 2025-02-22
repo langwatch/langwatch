@@ -115,7 +115,7 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
     >
       {hasEvaluatorFields && (
         <FormProvider {...form}>
-          <VStack width="full" spacing={3}>
+          <VStack width="full" gap={3}>
             <DynamicZodForm
               schema={schema}
               evaluatorType={evaluator as keyof Evaluators}

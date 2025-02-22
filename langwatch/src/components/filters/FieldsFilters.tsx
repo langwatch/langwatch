@@ -75,7 +75,7 @@ export function FieldsFilters() {
   const hasAnyFilters = nonEmptyFilters.length > 0;
 
   return (
-    <VStack align="start" width="full" spacing={6}>
+    <VStack align="start" width="full" gap={6}>
       <HStack width={"full"}>
         <Heading size="md">Filters</Heading>
 
@@ -94,7 +94,7 @@ export function FieldsFilters() {
           </Tooltip>
         )}
       </HStack>
-      <VStack spacing={4} width="full">
+      <VStack gap={4} width="full">
         {filters.map(([id, filter]) => (
           <FieldsFilter key={id} filterId={id} filter={filter} />
         ))}
@@ -142,7 +142,7 @@ function FieldsFilter({
             fontWeight="normal"
             _hover={{ background: "white" }}
           >
-            <HStack width="full" spacing={0}>
+            <HStack width="full" gap={0}>
               <Text color="gray.500" fontWeight="500" paddingRight={4}>
                 {filter.name}
               </Text>
@@ -397,7 +397,7 @@ function ListSelection({
     <VStack
       width="full"
       align="start"
-      spacing={2}
+      gap={2}
       paddingY={2}
       maxHeight="300px"
       overflowY="scroll"
@@ -425,7 +425,7 @@ function ListSelection({
                 <Checkbox
                   width="full"
                   paddingY={1}
-                  spacing={3}
+                  gap={3}
                   isChecked={currentValues.includes(field.toString())}
                   onChange={(e) => {
                     e.stopPropagation();
@@ -440,7 +440,7 @@ function ListSelection({
                     }
                   }}
                 >
-                  <VStack width="full" align="start" spacing={"2px"}>
+                  <VStack width="full" align="start" gap={"2px"}>
                     {details && (
                       <Text fontSize="sm" color="gray.500">
                         {details}
@@ -467,7 +467,7 @@ function ListSelection({
       )}
       {filterData.isLoading &&
         Array.from({ length: keys && keys.length > 0 ? 2 : 5 }).map((_, i) => (
-          <Checkbox key={i} isChecked={false} paddingY={2} spacing={3}>
+          <Checkbox key={i} isChecked={false} paddingY={2} gap={3}>
             <Skeleton height="12px" width="120px" />
           </Checkbox>
         ))}
@@ -515,7 +515,7 @@ function RangeFilter({
   }, [min, max, !!filterData.data]);
 
   return (
-    <HStack width="full" spacing={4}>
+    <HStack width="full" gap={4}>
       <Input
         width="72px"
         paddingX={2}
@@ -574,7 +574,7 @@ function ThumbsUpDownVoteFilter({
     <VStack
       width="full"
       align="start"
-      spacing={2}
+      gap={2}
       paddingY={2}
       maxHeight="300px"
       overflowY="scroll"
@@ -588,7 +588,7 @@ function ThumbsUpDownVoteFilter({
           key={field}
           width="full"
           paddingY={1}
-          spacing={3}
+          gap={3}
           isChecked={!!(min && max && min <= field && max >= field)}
           onChange={(e) => {
             e.stopPropagation();
@@ -612,7 +612,7 @@ function ThumbsUpDownVoteFilter({
             }
           }}
         >
-          <VStack width="full" align="start" spacing={"2px"}>
+          <VStack width="full" align="start" gap={"2px"}>
             <Text>{label}</Text>
           </VStack>
         </Checkbox>

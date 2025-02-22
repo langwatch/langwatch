@@ -84,7 +84,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
   return (
     <VStack
       align="start"
-      spacing={2}
+      gap={2}
       marginLeft={level == 0 ? "0" : level == 1 ? "10px" : "26px"}
       position="relative"
     >
@@ -143,7 +143,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
           );
         }}
       >
-        <HStack spacing={4}>
+        <HStack gap={4}>
           <Box
             background="white"
             borderColor={span.error ? "red.400" : "gray.400"}
@@ -252,7 +252,7 @@ const TreeRenderer: React.FC<{ spans: ElasticSearchSpan[] }> = ({ spans }) => {
   );
 
   return (
-    <VStack align="start" flexShrink={0} spacing={6}>
+    <VStack align="start" flexShrink={0} gap={6}>
       {rootSpans.map((rootSpan) => {
         const span = tree[rootSpan.span_id];
         if (!span) return null;
@@ -334,7 +334,7 @@ export function SpanTree(props: SpanTreeProps) {
         <HStack
           align="start"
           width="full"
-          spacing={10}
+          gap={10}
           flexDirection={{ base: "column", xl: "row" }}
         >
           <TreeRenderer spans={spans.data} />

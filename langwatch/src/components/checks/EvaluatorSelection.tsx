@@ -205,7 +205,7 @@ export function EvaluatorSelection({
                       color={isDisabled ? "gray.400" : undefined}
                       background={isDisabled ? "gray.50" : "white"}
                     >
-                      <VStack align="start" spacing={4} position="relative">
+                      <VStack align="start" gap={4} position="relative">
                         {evaluator.isGuardrail && (
                           <Tooltip label="This evaluator can be used as a guardrail">
                             <Box
@@ -252,7 +252,7 @@ export function EvaluatorSelection({
                               </Tag>
                             </Tooltip>
                           )}
-                        {/* <VStack align="start" spacing={1}>
+                        {/* <VStack align="start" gap={1}>
                           {(evaluator.missingEnvVars ?? []).map((envVar) => (
                             <Tag colorScheme="red" key={envVar} fontSize="12px" paddingX={2}>
                               Missing {envVar}
@@ -334,7 +334,7 @@ export function EvaluatorSelection({
                       textDecoration: "none",
                     }}
                   >
-                    <VStack spacing={3}>
+                    <VStack gap={3}>
                       <Box p={3} borderRadius="full" bg="gray.100">
                         <Plus size={24} color="gray" />
                       </Box>

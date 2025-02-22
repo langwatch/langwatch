@@ -77,7 +77,7 @@ export function ShareButton({
         <PopoverArrow />
         <PopoverHeader fontWeight={600}>Share Trace</PopoverHeader>
         <PopoverBody>
-          <VStack align="start" fontWeight="normal" spacing={4}>
+          <VStack align="start" fontWeight="normal" gap={4}>
             {shareState.data?.id ? (
               <>
                 <Text>

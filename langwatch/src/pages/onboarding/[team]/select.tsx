@@ -143,7 +143,7 @@ export default function ProjectOnboardingSelect() {
           <FormControl>
             <RadioGroup value={""}>
               <Box>
-                <SimpleGrid columns={[1, null, 2]} spacing="20px">
+                <SimpleGrid columns={[1, null, 2]} gap="20px">
                   {Object.entries(projectTypes).map(([value, details]) => {
                     return (
                       <Box

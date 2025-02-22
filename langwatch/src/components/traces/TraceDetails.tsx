@@ -243,11 +243,11 @@ export function TraceDetails(props: {
       width="full"
       height="full"
       background="white"
-      spacing={0}
+      gap={0}
     >
       <VStack
         width="full"
-        spacing={0}
+        gap={0}
         position="sticky"
         top={0}
         zIndex={2}
@@ -710,7 +710,7 @@ function Evaluations(trace: TraceEval & { anyGuardrails: boolean }) {
       </Text>
     );
   return (
-    <VStack align="start" spacing={2}>
+    <VStack align="start" gap={2}>
       <>
         {evaluations?.map((evaluation) => (
           <EvaluationStatusItem
@@ -740,7 +740,7 @@ const Guardrails = (trace: TraceEval) => {
       </Text>
     );
   return (
-    <VStack align="start" spacing={2}>
+    <VStack align="start" gap={2}>
       <>
         {guardrails?.map((evaluation) => (
           <EvaluationStatusItem

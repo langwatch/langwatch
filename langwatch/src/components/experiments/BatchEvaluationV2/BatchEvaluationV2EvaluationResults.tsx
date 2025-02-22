@@ -286,7 +286,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
 
     if (!resultsByEvaluator || !datasetByIndex) {
       return (
-        <VStack spacing={0} width="full" height="full" minWidth="0">
+        <VStack gap={0} width="full" height="full" minWidth="0">
           <Tabs
             size={size}
             width="full"

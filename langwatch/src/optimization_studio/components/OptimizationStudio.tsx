@@ -202,7 +202,7 @@ export default function OptimizationStudio() {
       <ReactFlowProvider>
         <DndProvider backend={HTML5Backend}>
           <CustomDragLayer />
-          <VStack width="full" height="full" spacing={0}>
+          <VStack width="full" height="full" gap={0}>
             <HStack
               width="full"
               background="white"
@@ -233,7 +233,7 @@ export default function OptimizationStudio() {
                   tooltip={
                     socketStatus === "connecting-python" ||
                     socketStatus === "connecting-socket" ? (
-                      <VStack align="start" spacing={1} padding={2}>
+                      <VStack align="start" gap={1} padding={2}>
                         <HStack>
                           <StatusCircle
                             status={

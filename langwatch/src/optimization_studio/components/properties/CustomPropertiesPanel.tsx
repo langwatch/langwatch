@@ -82,11 +82,11 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
   };
 
   return (
-    <HStack width="full" spacing={3}>
+    <HStack width="full" gap={3}>
       {currentVersion && (
         <VersionBox version={currentVersion} minWidth="44px" />
       )}
-      <VStack align="start" width="full" spacing={1}>
+      <VStack align="start" width="full" gap={1}>
         <HStack>
           <Text fontWeight={600} fontSize={13} noOfLines={1}>
             {currentVersion?.commitMessage}

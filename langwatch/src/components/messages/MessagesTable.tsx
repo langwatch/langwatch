@@ -453,7 +453,7 @@ export function MessagesTable() {
       sortable: true,
       render: (trace, index) => (
         <Td key={index}>
-          <HStack spacing={1}>
+          <HStack gap={1}>
             {(trace.metadata.labels ?? []).map((label) => (
               <Tag
                 key={label}
@@ -999,7 +999,7 @@ export function MessagesTable() {
     <>
       <Container maxW={"calc(100vw - 50px)"} padding={6}>
         <HStack width="full" align="top" paddingBottom={6}>
-          <HStack align="center" spacing={6}>
+          <HStack align="center" gap={6}>
             <Heading as={"h1"} size="lg" paddingTop={1}>
               Messages
             </Heading>
@@ -1045,7 +1045,7 @@ export function MessagesTable() {
           <Popover isOpen={isOpen} onClose={onClose} placement="bottom-end">
             <PopoverTrigger>
               <Button variant="outline" onClick={onOpen} minWidth="fit-content">
-                <HStack spacing={2}>
+                <HStack gap={2}>
                   <List size={16} />
                   <Text>Columns</Text>
                   <Box>
@@ -1061,7 +1061,7 @@ export function MessagesTable() {
                 <Heading size="sm">Filter Messages</Heading>
               </PopoverHeader>
               <PopoverBody padding={4}>
-                <VStack align="start" spacing={2}>
+                <VStack align="start" gap={2}>
                   {Object.entries({
                     ...headerColumns,
                     ...selectedHeaderColumns,
@@ -1110,7 +1110,7 @@ export function MessagesTable() {
 
         <HStack align={"top"} gap={8}>
           <Box flex="1" minWidth="0">
-            <VStack spacing={1} align="start">
+            <VStack gap={1} align="start">
               <Card height="fit-content" width="100%">
                 <Progress
                   colorScheme="orange"
@@ -1162,7 +1162,7 @@ export function MessagesTable() {
                                     />
                                   </HStack>
                                 ) : (
-                                  <HStack spacing={1}>
+                                  <HStack gap={1}>
                                     <Text
                                       minWidth={headerColumns[columnKey]?.width}
                                       width="full"

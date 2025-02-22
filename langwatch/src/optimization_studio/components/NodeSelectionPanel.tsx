@@ -134,11 +134,11 @@ export const NodeSelectionPanel = ({
       width="300px"
       minWidth="300px"
     >
-      <VStack width="full" height="full" spacing={0}>
+      <VStack width="full" height="full" gap={0}>
         <VStack
           width="full"
           height="full"
-          spacing={4}
+          gap={4}
           align="start"
           overflowY="auto"
           padding={3}
@@ -243,7 +243,7 @@ export const NodeSelectionPanel = ({
           width="full"
           padding={3}
           paddingLeft={5}
-          spacing={4}
+          gap={4}
           background="white"
         >
           <Tooltip hasArrow gutter={16} label="Star us on GitHub">

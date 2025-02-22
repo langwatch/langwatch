@@ -14,7 +14,7 @@ export function CheckPassing({ check }: { check: ElasticSearchEvaluation }) {
   const evaluator = getEvaluatorDefinitions(checkType);
 
   return (
-    <HStack align="start" spacing={2}>
+    <HStack align="start" gap={2}>
       <Box paddingRight={2} color={evaluationStatusColor(check)}>
         <CheckStatusIcon check={check} />
       </Box>

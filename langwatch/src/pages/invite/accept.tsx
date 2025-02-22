@@ -59,7 +59,7 @@ export default function Accept() {
   if (acceptInviteMutation.isError) {
     return (
       <SetupLayout>
-        <VStack spacing={4}>
+        <VStack gap={4}>
           <Alert status="error">
             <AlertIcon />
             <Box>

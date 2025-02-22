@@ -305,7 +305,7 @@ export default function AnalyticsCustomGraph({
   return (
     <DashboardLayout>
       <Container maxWidth="1600" padding={6}>
-        <VStack width="full" align="start" spacing={6}>
+        <VStack width="full" align="start" gap={6}>
           <HStack width="full" align="top">
             <Heading as={"h1"} size="lg" paddingTop={1}>
               Custom Graph
@@ -317,7 +317,7 @@ export default function AnalyticsCustomGraph({
               setPeriod={setPeriod}
             />
           </HStack>
-          <HStack width="full" align="start" minHeight="500px" spacing={8}>
+          <HStack width="full" align="start" minHeight="500px" gap={8}>
             <Card minWidth="480px" minHeight="560px">
               <CardBody>
                 <CustomGraphForm
@@ -603,7 +603,7 @@ function CustomGraphForm({
   };
 
   return (
-    <VStack width="full" align="start" spacing={4} maxWidth="500px">
+    <VStack width="full" align="start" gap={4} maxWidth="500px">
       <FormControl>
         <FormLabel>Graph Type</FormLabel>
         <GraphTypeField form={form} />
@@ -736,7 +736,7 @@ function CustomGraphForm({
           />
         </FormControl>
       )}
-      <HStack width="full" spacing={2}>
+      <HStack width="full" gap={2}>
         <Spacer />
 
         {customId ? (
@@ -821,8 +821,8 @@ function SeriesFieldItem({
         fontWeight="bold"
         paddingLeft={1}
       >
-        <HStack width="full" spacing={4}>
-          <HStack width="full" spacing={1}>
+        <HStack width="full" gap={4}>
+          <HStack width="full" gap={1}>
             <Menu>
               <MenuButton
                 as={Button}
@@ -855,9 +855,9 @@ function SeriesFieldItem({
                       );
                     }}
                   >
-                    <VStack align="start" spacing={2}>
+                    <VStack align="start" gap={2}>
                       <Text>{camelCaseToTitleCase(key)}</Text>
-                      <HStack spacing={0} paddingLeft="12px">
+                      <HStack gap={0} paddingLeft="12px">
                         {colorSet.map((color, i) => {
                           return (
                             <Box
@@ -969,7 +969,7 @@ function SeriesField({
   ]);
 
   return (
-    <VStack align="start" width="full" spacing={4}>
+    <VStack align="start" width="full" gap={4}>
       <FormControl>
         <FormLabel>Metric</FormLabel>
         <Grid width="full" gap={3} templateColumns="repeat(4, 1fr)">
@@ -1161,7 +1161,7 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
                 <Box width="16px">
                   {props.isSelected && <Check width="16px" />}
                 </Box>
-                <VStack align="start" spacing={"2px"}>
+                <VStack align="start" gap={"2px"}>
                   {details && (
                     <Text
                       fontSize="sm"
@@ -1199,7 +1199,7 @@ function GraphTypeField({
           components={{
             Option: ({ children, ...props }) => (
               <chakraComponents.Option {...props}>
-                <HStack spacing={2}>
+                <HStack gap={2}>
                   {props.data.icon}
                   <Text>{children}</Text>
                 </HStack>
@@ -1212,7 +1212,7 @@ function GraphTypeField({
 
               return (
                 <chakraComponents.ValueContainer {...props}>
-                  <HStack spacing={2}>
+                  <HStack gap={2}>
                     {icon}
                     {children}
                   </HStack>

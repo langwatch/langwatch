@@ -242,7 +242,7 @@ export function TryItOut({
   const hasAnyLabels = evaluatorDefinition?.result.label;
 
   return (
-    <VStack width="full" spacing={6} marginTop={6}>
+    <VStack width="full" gap={6} marginTop={6}>
       <HStack width="full" align="end">
         <Heading as="h2" size="lg" textAlign="center" paddingTop={4}>
           Try it out
@@ -275,10 +275,10 @@ export function TryItOut({
           </Text>
         </Alert>
       )}
-      <HStack width="full" align="start" spacing={6} paddingBottom={6}>
+      <HStack width="full" align="start" gap={6} paddingBottom={6}>
         <Card width="full" minHeight="400px">
           <CardHeader>
-            <HStack spacing={4}>
+            <HStack gap={4}>
               <Text fontWeight="500">
                 {tracesPassingPreconditionsOnLoad.isLoading
                   ? "Fetching samples..."
@@ -362,7 +362,7 @@ export function TryItOut({
             </HStack>
           </CardHeader>
           <CardBody paddingX={2} paddingTop={0}>
-            <VStack width="full" align="start" spacing={6}>
+            <VStack width="full" align="start" gap={6}>
               <TableContainer>
                 <Table variant="simple">
                   <Thead>

@@ -78,7 +78,7 @@ export function DatasetPreview({
           }}
         >
           <HStack
-            spacing={2}
+            gap={2}
             fontSize={18}
             fontWeight="bold"
             color="white"

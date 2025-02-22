@@ -116,7 +116,7 @@ export function LLMConfigField({
         onChange={onChange}
       />
       <HStack
-        spacing={2}
+        gap={2}
         paddingX={2}
         width="full"
         align="center"
@@ -173,7 +173,7 @@ export function LLMConfigModal({
         helper={"The LLM model to use"}
         inputWidth="55%"
       >
-        <HStack width="full" spacing={2}>
+        <HStack width="full" gap={2}>
           <ModelSelector
             model={llmConfig.model ?? ""}
             options={allModelOptions}

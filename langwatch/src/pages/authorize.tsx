@@ -39,7 +39,7 @@ export default function Authorize() {
             </HStack>
           </CardHeader>
           <CardBody>
-            <VStack spacing={6}>
+            <VStack gap={6}>
               <Text>
                 Copy your LangWatch API key below and paste it into your command
                 line or notebook to authorize it.

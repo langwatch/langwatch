@@ -80,12 +80,12 @@ export const TeamForm = ({
       <VStack
         paddingX={4}
         paddingY={6}
-        spacing={6}
+        gap={6}
         width="full"
         maxWidth="920px"
         align="start"
       >
-        <Breadcrumb spacing="8px" separator={<ChevronRight width="12" />}>
+        <Breadcrumb gap="8px" separator={<ChevronRight width="12" />}>
           <BreadcrumbItem>
             <BreadcrumbLink as={NextLink} href="/settings/teams">
               Teams
@@ -105,7 +105,7 @@ export const TeamForm = ({
         </HStack>
         <Card width="full">
           <CardBody width="full" paddingY={2}>
-            <VStack spacing={0}>
+            <VStack gap={0}>
               <HorizontalFormControl
                 label="Name"
                 helper="The name of your team"
@@ -280,7 +280,7 @@ export const TeamForm = ({
                 size="sm"
                 colorScheme="orange"
               >
-                <HStack spacing={2}>
+                <HStack gap={2}>
                   <Plus size={20} />
                   <Text>Add new project</Text>
                 </HStack>

@@ -348,7 +348,7 @@ export function EvaluateModalContent({
       <ModalHeader fontWeight={600}>Evaluate Workflow</ModalHeader>
       <ModalCloseButton />
       <ModalBody>
-        <VStack align="start" width="full" spacing={4}>
+        <VStack align="start" width="full" gap={4}>
           <VStack align="start" width="full">
             <VersionToBeUsed
               form={
@@ -362,7 +362,7 @@ export function EvaluateModalContent({
               versionToBeEvaluated={versionToBeEvaluated}
             />
           </VStack>
-          <VStack align="start" width="full" spacing={2}>
+          <VStack align="start" width="full" gap={2}>
             <SmallLabel color="gray.600">Evaluate on</SmallLabel>
             <Controller
               control={form.control}
@@ -376,7 +376,7 @@ export function EvaluateModalContent({
         </VStack>
       </ModalBody>
       <ModalFooter borderTop="1px solid" borderColor="gray.200" marginTop={4}>
-        <VStack align="start" width="full" spacing={3}>
+        <VStack align="start" width="full" gap={3}>
           {hasProvidersWithoutCustomKeys && (
             <AddModelProviderKey
               runWhat="run evaluations"
