@@ -1,39 +1,34 @@
 import {
   Box,
-  ModalBody,
-  ModalCloseButton,
-  ModalHeader,
-  ModalContent,
-  ModalOverlay,
-  Modal,
-  Tooltip,
-  type BoxProps,
-  Switch,
-  HStack,
+  Dialog,
   Text,
+  type BoxProps,
+  HStack,
   VStack,
 } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { isJson } from "../utils/isJson";
 import { RenderInputOutput } from "./traces/RenderInputOutput";
 import { Markdown } from "./Markdown";
+import { Switch } from "./ui/switch";
+import { Tooltip } from "./ui/tooltip";
 
-export function ExpandedTextModal({
-  isOpen,
-  onClose,
+export function ExpandedTextDialog({
+  open,
+  onOpenChange,
   textExpanded,
 }: {
-  isOpen: boolean;
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   textExpanded: string | undefined;
 }) {
   const [isFormatted, setIsFormatted] = useState(true);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="4xl">
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader
+    <Dialog.Root open={open} onOpenChange={onOpenChange} size="lg">
+      <Dialog.Backdrop />
+      <Dialog.Content>
+        <Dialog.Header
           background="gray.100"
           padding={3}
           borderRadius="12px 12px 0 0"
@@ -42,15 +37,15 @@ export function ExpandedTextModal({
           <HStack>
             <Switch
               size="sm"
-              isChecked={isFormatted}
+              checked={isFormatted}
               onChange={() => setIsFormatted(!isFormatted)}
             />
             <Text>Formatted</Text>
           </HStack>
-        </ModalHeader>
-        <ModalCloseButton />
-        <ModalBody paddingY={6} paddingX={8}>
-          {isOpen && textExpanded && isFormatted ? (
+        </Dialog.Header>
+        <Dialog.CloseTrigger />
+        <Dialog.Body paddingY={6} paddingX={8}>
+          {open && textExpanded && isFormatted ? (
             isJson(textExpanded) ? (
               <RenderInputOutput value={textExpanded} showTools={"copy-only"} />
             ) : (
@@ -67,9 +62,9 @@ export function ExpandedTextModal({
               {textExpanded}
             </Box>
           ) : null}
-        </ModalBody>
-      </ModalContent>
-    </Modal>
+        </Dialog.Body>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }
 
@@ -109,8 +104,8 @@ export function HoverableBigText({
   return (
     <>
       <Tooltip
-        isDisabled={!isOverflown}
-        label={
+        disabled={!isOverflown}
+        content={
           <VStack padding={0} gap={0} width="full" display="block">
             {expandable && (
               <Text
@@ -138,7 +133,7 @@ export function HoverableBigText({
           width="full"
           height="full"
           whiteSpace="normal"
-          noOfLines={7}
+          lineClamp={7}
           {...props}
           {...(isOverflown &&
             expandable && {
@@ -151,9 +146,11 @@ export function HoverableBigText({
           {children}
         </Box>
       </Tooltip>
-      <ExpandedTextModal
-        isOpen={!!textExpanded}
-        onClose={() => setTextExpanded(undefined)}
+      <ExpandedTextDialog
+        open={!!textExpanded}
+        onOpenChange={(open) =>
+          setTextExpanded(open ? (expandedVersion_ as string) : undefined)
+        }
         textExpanded={textExpanded}
       />
     </>
