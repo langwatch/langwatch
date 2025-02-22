@@ -270,7 +270,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
       gap={2}
       align="start"
       color="gray.600"
-      fontSize={11}
+      fontSize="11px"
       minWidth="180px"
       boxShadow={`0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.2" : "0.1"})`}
       border="none"
@@ -332,7 +332,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
           behave_as={props.data.behave_as}
           size="md"
         />
-        <Text fontSize={12} fontWeight={500}>
+        <Text fontSize="12px" fontWeight={500}>
           {getNodeDisplayName(props)}
         </Text>
         <Spacer />
@@ -357,7 +357,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
             <HStack width="full">
               <LLMModelDisplay
                 model={(llmParam?.value as LLMConfig).model}
-                fontSize={11}
+                fontSize="11px"
                 showVersion={false}
               />
             </HStack>
@@ -525,7 +525,7 @@ export function ComponentExecutionButton({
                 onClick={() => {
                   node && startComponentExecution({ node });
                 }}
-                fontSize={13}
+                fontSize="13px"
               >
                 Run with manual input
               </MenuItem>
@@ -534,7 +534,7 @@ export function ComponentExecutionButton({
                 onClick={() => {
                   node && startWorkflowExecution({ untilNodeId: node.id });
                 }}
-                fontSize={13}
+                fontSize="13px"
               >
                 Run workflow until here
               </MenuItem>

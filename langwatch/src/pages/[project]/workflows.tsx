@@ -84,7 +84,7 @@ export default function MessagesOrIntegrationGuide() {
                       <HStack gap={3}>
                         <Lock size={14} color="#777" />
 
-                        <Text fontSize={18} color="gray.600">
+                        <Text fontSize="18px" color="gray.600">
                           Create new
                         </Text>
                       </HStack>
@@ -105,7 +105,7 @@ export default function MessagesOrIntegrationGuide() {
                       <Plus size={14} color="#777" />
                     </Box>
 
-                    <Text fontSize={18} color="gray.500">
+                    <Text fontSize="18px" color="gray.500">
                       Create new
                     </Text>
                   </HStack>

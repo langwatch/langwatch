@@ -358,7 +358,7 @@ const ExpandableMessages = React.memo(
               position="absolute"
               left="64px"
               marginTop="-22px"
-              fontSize={13}
+              fontSize="13px"
               fontWeight={600}
               color="gray.500"
               cursor="default"
@@ -376,7 +376,7 @@ const ExpandableMessages = React.memo(
               position="absolute"
               left="64px"
               marginTop="-22px"
-              fontSize={13}
+              fontSize="13px"
               fontWeight={600}
               color="gray.500"
               cursor="default"
@@ -472,7 +472,7 @@ function MessageSkeleton() {
       <CardBody padding={8}>
         <VStack alignItems="flex-start" gap={4}>
           <HStack gap={12} width="full">
-            <Box fontSize={24} fontWeight="bold" width="full">
+            <Box fontSize="24px" fontWeight="bold" width="full">
               <Skeleton width="50%" height="20px" />
             </Box>
           </HStack>

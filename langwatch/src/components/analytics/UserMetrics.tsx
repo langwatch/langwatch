@@ -1,13 +1,6 @@
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
 import { analyticsMetrics } from "../../server/analytics/registry";
-import {
-  GridItem,
-  Card,
-  Tabs,
-  VStack,
-  Grid,
-  Heading,
-} from "@chakra-ui/react";
+import { GridItem, Card, Tabs, VStack, Grid, Heading } from "@chakra-ui/react";
 
 import { SatisfactionGraphs } from "./SatisfactionGraph";
 import { SessionsSummary } from "./SessionsSummary";
@@ -80,32 +73,50 @@ export function UserMetrics() {
       <GridItem>
         <Card.Root>
           <Card.Body>
-            <Tabs.Root variant="plain">
+            <Tabs.Root variant="plain" defaultValue="messages">
               <Tabs.List gap={8}>
-                <Tabs.Trigger value="messages" paddingX={0} paddingBottom={4}>
+                <Tabs.Trigger
+                  value="messages"
+                  paddingX={0}
+                  paddingBottom={0}
+                  height="fit-content"
+                >
                   <CustomGraph
                     input={{ ...messagesGraph, graphType: "summary" }}
                     titleProps={{
-                      fontSize: 16,
+                      fontSize: 14,
                       color: "black",
+                      paddingBottom: 2,
                     }}
                   />
                 </Tabs.Trigger>
-                <Tabs.Trigger value="threads" paddingX={0} paddingBottom={4}>
+                <Tabs.Trigger
+                  value="threads"
+                  paddingX={0}
+                  paddingBottom={0}
+                  height="fit-content"
+                >
                   <CustomGraph
                     input={{ ...threadsGraph, graphType: "summary" }}
                     titleProps={{
-                      fontSize: 16,
+                      fontSize: 14,
                       color: "black",
+                      paddingBottom: 2,
                     }}
                   />
                 </Tabs.Trigger>
-                <Tabs.Trigger value="users" paddingX={0} paddingBottom={4}>
+                <Tabs.Trigger
+                  value="users"
+                  paddingX={0}
+                  paddingBottom={0}
+                  height="fit-content"
+                >
                   <CustomGraph
                     input={{ ...usersGraph, graphType: "summary" }}
                     titleProps={{
-                      fontSize: 16,
+                      fontSize: 14,
                       color: "black",
+                      paddingBottom: 2,
                     }}
                   />
                 </Tabs.Trigger>
@@ -114,6 +125,7 @@ export function UserMetrics() {
                   height="4px"
                   bg="orange.400"
                   borderRadius="1px"
+                  bottom={0}
                 />
               </Tabs.List>
               <Tabs.Content value="messages">
@@ -131,11 +143,11 @@ export function UserMetrics() {
       </GridItem>
       <GridItem rowSpan={2}>
         <VStack gap={6}>
-          <Card.Root width="100%" minHeight={isNotQuickwit ? "328px" : "528px"}>
-            <Card.Header>
+          <Card.Root width="100%" minHeight={isNotQuickwit ? "300px" : "528px"}>
+            <Card.Header paddingBottom={4}>
               <Heading size="sm">Top Topics</Heading>
             </Card.Header>
-            <Card.Body maxHeight="260px" overflowY="scroll">
+            <Card.Body maxHeight="240px" overflowY="scroll">
               <TopicsSelector showTitle={false} />
             </Card.Body>
           </Card.Root>

@@ -176,7 +176,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
               </IconWrapper>
             )}
           </HStack>
-          <HStack fontSize={13} color="gray.500">
+          <HStack fontSize="13px" color="gray.500">
             <SpanDuration span={span} />
             {(span.metrics?.prompt_tokens !== undefined ||
               span.metrics?.completion_tokens !== undefined) && (
@@ -193,7 +193,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
               span.metrics?.cost !== null && (
                 <>
                   <Text>·</Text>
-                  <Text fontSize={13} color="gray.500">
+                  <Text fontSize="13px" color="gray.500">
                     <SpanCost span={span} />
                   </Text>
                 </>
@@ -205,7 +205,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
               <>
                 <Text>·</Text>
                 <Text
-                  fontSize={13}
+                  fontSize="13px"
                   color={evaluationStatusColor(evaluationResult)}
                 >
                   {formatEvaluationSingleValue({
@@ -220,7 +220,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
                 <>
                   <Text>·</Text>
                   <Text
-                    fontSize={13}
+                    fontSize="13px"
                     color={evaluationStatusColor(evaluationResult)}
                   >
                     {evaluationResult.label}

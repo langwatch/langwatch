@@ -122,7 +122,7 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
       <PropertyField title="Instructions">
         <Textarea
           fontFamily="monospace"
-          fontSize={13}
+          fontSize="13px"
           value={(parameters.instructions?.value as string | undefined) ?? ""}
           onChange={(e) =>
             setNodeParameter(node.id, {
@@ -175,7 +175,7 @@ function PromptingTechniqueField({ value }: { value: string | undefined }) {
           cls={promptingTechniqueNode.data.cls}
           size="md"
         />
-        <Text fontSize={13} fontWeight={500}>
+        <Text fontSize="13px" fontWeight={500}>
           {promptingTechniqueNode.data.cls}
         </Text>
         <Spacer />

@@ -211,7 +211,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
           maxHeight="500px"
           overflowY="auto"
         >
-          <Text fontWeight={600} fontSize={16} paddingTop={2}>
+          <Text fontWeight={600} fontSize="16px" paddingTop={2}>
             Previous Versions
           </Text>
           {versions.data?.map((version) => (
@@ -226,7 +226,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                 <VersionBox version={version} minWidth="48px" />
                 <VStack align="start" width="full" gap={1}>
                   <HStack>
-                    <Text fontWeight={600} fontSize={13} noOfLines={1}>
+                    <Text fontWeight={600} fontSize="13px" noOfLines={1}>
                       {version.commitMessage}
                     </Text>
                     {version.isCurrentVersion && (
@@ -242,7 +242,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                       color="white"
                       size="2xs"
                     />
-                    <Text fontSize={12}>
+                    <Text fontSize="12px">
                       {version.author?.name}
                       {" · "}
                       <Tooltip
@@ -287,7 +287,7 @@ export const VersionBox = ({
       paddingX={2}
       borderRadius={4}
       fontWeight={600}
-      fontSize={13}
+      fontSize="13px"
       color="gray.600"
       whiteSpace="nowrap"
       textAlign="center"

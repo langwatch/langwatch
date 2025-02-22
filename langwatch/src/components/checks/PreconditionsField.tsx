@@ -153,7 +153,7 @@ export const PreconditionsField = ({
               </HStack>
               <HStack width="full">
                 {preconditions[index]?.rule.includes("regex") && (
-                  <Text fontSize={16}>{"/"}</Text>
+                  <Text fontSize="16px">{"/"}</Text>
                 )}
                 <Input
                   {...control.register(`preconditions.${index}.value`)}
@@ -164,7 +164,7 @@ export const PreconditionsField = ({
                   }
                 />
                 {preconditions[index]?.rule.includes("regex") && (
-                  <Text fontSize={16}>{"/gi"}</Text>
+                  <Text fontSize="16px">{"/gi"}</Text>
                 )}
               </HStack>
             </VStack>

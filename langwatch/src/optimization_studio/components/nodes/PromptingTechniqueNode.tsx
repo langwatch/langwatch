@@ -94,7 +94,7 @@ export function PromptingTechniqueWrapper({
       backgroundColor="#F7FAFC"
       borderRadius="12px"
       color="gray.600"
-      fontSize={10}
+      fontSize="10px"
       boxShadow={`0px 0px 4px 0px rgba(0, 0, 0, 0.1)`}
       outline={!!node.selected || isHovered ? "1.5px solid" : "none"}
       outlineColor={
@@ -150,7 +150,7 @@ export function PromptingTechniqueWrapper({
           cls={node.data.cls}
           size="sm"
         />
-        <Text fontSize={12} fontWeight={500}>
+        <Text fontSize="12px" fontWeight={500}>
           {node.data.cls}
         </Text>
       </HStack>

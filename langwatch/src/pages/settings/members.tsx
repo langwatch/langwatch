@@ -589,7 +589,7 @@ function MembersList({
                                             ? "white"
                                             : "gray.500"
                                         }
-                                        fontSize={13}
+                                        fontSize="13px"
                                       >
                                         {props.data.description}
                                       </Text>
@@ -618,7 +618,7 @@ function MembersList({
                               selectedOptionStyle="check"
                               hideSelectedOptions={false}
                               useBasicStyles
-                              variant="unstyled"
+                              variant="plain"
                             />
                           )}
                         />

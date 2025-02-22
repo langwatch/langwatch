@@ -461,7 +461,7 @@ export function MessagesTable() {
                 paddingX={2}
                 background={getColorForString("colors", label).background}
                 color={getColorForString("colors", label).color}
-                fontSize={12}
+                fontSize="12px"
               >
                 {label}
               </Tag>

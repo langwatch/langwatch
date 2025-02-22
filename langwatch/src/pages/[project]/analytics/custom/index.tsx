@@ -640,7 +640,7 @@ function CustomGraphForm({
         </FormControl>
       )}
       <FormControl>
-        <FormLabel fontSize={16}>Series</FormLabel>
+        <FormLabel fontSize="16px">Series</FormLabel>
         <Accordion
           width="full"
           allowMultiple={true}
@@ -826,7 +826,7 @@ function SeriesFieldItem({
             <Menu>
               <MenuButton
                 as={Button}
-                variant="unstyled"
+                variant="plain"
                 onClick={(e) => {
                   e.stopPropagation();
                 }}

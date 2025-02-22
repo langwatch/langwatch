@@ -1,25 +1,23 @@
 import { techStackLanguageOptions } from "./TechStack";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import {
-  Heading,
-  VStack,
-  Text,
-  HStack,
-  Spacer,
-  Spinner,
-  Link,
-  Card,
-  CardHeader,
-  CardBody,
-  Button,
   Box,
+  Button,
+  Card,
+  Heading,
+  HStack,
+  Spinner,
+  Spacer,
+  Text,
+  VStack,
 } from "@chakra-ui/react";
 import { DashboardLayout } from "./DashboardLayout";
-import { ExternalLinkIcon } from "@chakra-ui/icons";
 import { APIKeyCopyInput } from "../pages/authorize";
 import { IconWrapper } from "./IconWrapper";
 import { IntegrationChecks } from "./IntegrationChecks";
 import { trackEvent } from "../utils/tracking";
+import { ExternalLink } from "react-feather";
+import { Link } from "./ui/link";
 
 export const ProjectIntegration = () => {
   const { project, isRefetching } = useOrganizationTeamProject({
@@ -70,13 +68,13 @@ export const ProjectIntegration = () => {
               </Text>
             )}
           <VStack width="full" align="stretch" gap={6}>
-            <Card width="full">
-              <CardHeader paddingBottom={0}>
+            <Card.Root width="full">
+              <Card.Header paddingBottom={0}>
                 <Heading as="h2" size="md">
                   API Key
                 </Heading>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <VStack gap={6} align="start">
                   <Text>
                     Copy your LangWatch API key to use for the integration
@@ -85,16 +83,16 @@ export const ProjectIntegration = () => {
                     <APIKeyCopyInput />
                   </Box>
                 </VStack>
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
             <HStack width="full" gap={8} align="stretch" justify="stretch">
-              <Card width="full">
-                <CardHeader>
+              <Card.Root width="full">
+                <Card.Header>
                   <Heading as="h2" size="md">
                     Integration Guides
                   </Heading>
-                </CardHeader>
-                <CardBody>
+                </Card.Header>
+                <Card.Body>
                   <VStack align="start" gap={8}>
                     <Link
                       href="https://docs.langwatch.ai/integration/python/guide"
@@ -106,7 +104,7 @@ export const ProjectIntegration = () => {
                         })
                       }
                     >
-                      <HStack align="center" fontSize={18} gap={2}>
+                      <HStack align="center" fontSize="18px" gap={2}>
                         <IconWrapper width="36px" height="36px">
                           {techStackLanguageOptions.python.icon}
                         </IconWrapper>
@@ -114,7 +112,7 @@ export const ProjectIntegration = () => {
                           {techStackLanguageOptions.python.label} Integration
                           Guide
                         </Text>
-                        <ExternalLinkIcon />
+                        <ExternalLink />
                       </HStack>
                     </Link>
                     <Link
@@ -127,7 +125,7 @@ export const ProjectIntegration = () => {
                         })
                       }
                     >
-                      <HStack align="center" fontSize={18} gap={2}>
+                      <HStack align="center" fontSize="18px" gap={2}>
                         <IconWrapper width="36px" height="36px">
                           {techStackLanguageOptions.typescript.icon}
                         </IconWrapper>
@@ -135,7 +133,7 @@ export const ProjectIntegration = () => {
                           {techStackLanguageOptions.typescript.label}{" "}
                           Integration Guide
                         </Text>
-                        <ExternalLinkIcon />
+                        <ExternalLink />
                       </HStack>
                     </Link>
                     <Link
@@ -148,24 +146,24 @@ export const ProjectIntegration = () => {
                         })
                       }
                     >
-                      <HStack align="center" fontSize={18} gap={2}>
+                      <HStack align="center" fontSize="18px" gap={2}>
                         <IconWrapper width="36px" height="36px">
                           {techStackLanguageOptions.other.icon}
                         </IconWrapper>
                         <Text>Custom REST Integration Guide</Text>
-                        <ExternalLinkIcon />
+                        <ExternalLink />
                       </HStack>
                     </Link>
                   </VStack>
-                </CardBody>
-              </Card>
-              <Card width="full" minHeight="100%">
-                <CardHeader>
+                </Card.Body>
+              </Card.Root>
+              <Card.Root width="full" minHeight="100%">
+                <Card.Header>
                   <Heading as="h2" size="md">
                     Demo Account
                   </Heading>
-                </CardHeader>
-                <CardBody>
+                </Card.Header>
+                <Card.Body>
                   <VStack gap={6} align="start" height="full">
                     <Text>
                       View our demo account to see how LangWatch works with a
@@ -186,8 +184,8 @@ export const ProjectIntegration = () => {
                       </Button>
                     </Link>
                   </VStack>
-                </CardBody>
-              </Card>
+                </Card.Body>
+              </Card.Root>
             </HStack>
           </VStack>
           <Text fontSize="14px">
@@ -195,7 +193,7 @@ export const ProjectIntegration = () => {
             <Link
               textDecoration="underline"
               href="https://docs.langwatch.ai/support"
-              target="_blank"
+              isExternal
             >
               Troubleshooting & Support
             </Link>{" "}

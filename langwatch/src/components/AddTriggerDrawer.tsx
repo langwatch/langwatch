@@ -336,7 +336,7 @@ export function TriggerDrawer() {
                     >
                       <VStack align="start" marginTop={-1}>
                         <Text fontWeight="500">Send Slack Message</Text>
-                        <Text fontSize={13}>
+                        <Text fontSize="13px">
                           Add your slack webhook url to send a message to when
                           the trigger is activated.
                         </Text>
@@ -369,7 +369,7 @@ export function TriggerDrawer() {
                         {...register("action")}
                       >
                         <Text fontWeight="500">Email</Text>
-                        <Text fontSize={13}>
+                        <Text fontSize="13px">
                           Receive an email with the details and the items that
                           triggered the alert.
                         </Text>
@@ -393,7 +393,7 @@ export function TriggerDrawer() {
                     >
                       <VStack align="start" marginTop={-1}>
                         <Text fontWeight="500">Add to Dataset</Text>
-                        <Text fontSize={13}>
+                        <Text fontSize="13px">
                           Add entries to the dataset, this allows you to keep
                           track of the results of your triggers.
                         </Text>

@@ -1,9 +1,4 @@
-import {
-  Card,
-  HStack,
-  Tabs,
-  Text,
-} from "@chakra-ui/react";
+import { Card, HStack, Tabs, Text } from "@chakra-ui/react";
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 
@@ -46,17 +41,37 @@ export const SatisfactionGraphs = () => {
   };
 
   return (
-    <Card.Root width="full" height="400px">
+    <Card.Root width="full" height="360px">
       <Card.Body padding={0}>
-        <Tabs.Root variant="plain">
-          <Tabs.List gap={0}>
-            <Tabs.Trigger value="input-sentiment" width="50%" fontSize={14} paddingX={2} paddingY={4}>
-              <HStack flexWrap="nowrap">
+        <Tabs.Root variant="plain" defaultValue="input-sentiment">
+          <Tabs.List gap={0} width="100%">
+            <Tabs.Trigger
+              value="input-sentiment"
+              width="50%"
+              fontSize="14px"
+              paddingX={2}
+            >
+              <HStack
+                width="100%"
+                paddingY={2}
+                flexWrap="nowrap"
+                justifyContent="center"
+              >
                 <Text lineClamp={1}>Input Sentiment</Text>
               </HStack>
             </Tabs.Trigger>
-            <Tabs.Trigger value="thumbs" width="50%" fontSize={14} paddingX={2} paddingY={4}>
-              <HStack flexWrap="nowrap">
+            <Tabs.Trigger
+              value="thumbs"
+              width="50%"
+              fontSize="14px"
+              paddingX={2}
+            >
+              <HStack
+                width="100%"
+                paddingY={2}
+                flexWrap="nowrap"
+                justifyContent="center"
+              >
                 <Text lineClamp={1}>Thumbs Up/Down</Text>
               </HStack>
             </Tabs.Trigger>
@@ -66,9 +81,13 @@ export const SatisfactionGraphs = () => {
               borderRadius="1px"
               minWidth="50%"
               maxWidth="50%"
+              bottom={0}
             />
           </Tabs.List>
-          <Tabs.Content value="input-sentiment" padding={isNotQuickwit ? 0 : undefined}>
+          <Tabs.Content
+            value="input-sentiment"
+            padding={isNotQuickwit ? 0 : undefined}
+          >
             <CustomGraph input={inputSentimentGraph} hideGroupLabel={true} />
           </Tabs.Content>
           <Tabs.Content value="thumbs" padding={isNotQuickwit ? 0 : undefined}>

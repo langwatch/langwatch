@@ -1,4 +1,4 @@
-import { Button, HStack, Heading, Spacer } from "@chakra-ui/react";
+import { Box, Button, HStack, Heading, Spacer } from "@chakra-ui/react";
 import { MessageSquare } from "react-feather";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { FilterToggle } from "../filters/FilterToggle";
@@ -46,8 +46,10 @@ export function AnalyticsHeader({ title }: { title: string }) {
         </Tooltip>
       </HStack>
       <Spacer />
-      <FilterToggle />
-      <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+      <HStack marginBottom="-8px">
+        <FilterToggle />
+        <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+      </HStack>
     </HStack>
   );
 }

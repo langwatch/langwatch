@@ -191,7 +191,7 @@ export function FieldsDefinition({
                     }}
                     width="full"
                     fontFamily="monospace"
-                    fontSize={13}
+                    fontSize="13px"
                     border="none"
                     background="transparent"
                     padding="6px 0px 6px 12px"
@@ -199,7 +199,7 @@ export function FieldsDefinition({
                 ) : (
                   <Text
                     fontFamily="monospace"
-                    fontSize={13}
+                    fontSize="13px"
                     width="full"
                     padding="8px 0px 8px 12px"
                   >
@@ -215,7 +215,7 @@ export function FieldsDefinition({
                   gap={2}
                   height="full"
                 >
-                  <Box fontSize={13}>
+                  <Box fontSize="13px">
                     <TypeLabel type={watchedFields[index]?.type ?? ""} />
                   </Box>
                   {!readOnly ? (
@@ -379,7 +379,7 @@ export function FieldsForm({
               >
                 <HStack
                   gap={2}
-                  fontSize={18}
+                  fontSize="18px"
                   fontWeight="bold"
                   color="white"
                   background="rgba(0, 0, 0, .5)"
@@ -431,7 +431,7 @@ export function FieldsForm({
                   {camelCaseToTitleCase(field.identifier)}
                 </PropertySectionTitle>
                 {field.optional && (
-                  <Text color="gray.500" fontSize={12}>
+                  <Text color="gray.500" fontSize="12px">
                     (optional)
                   </Text>
                 )}
@@ -477,7 +477,7 @@ export function PropertySectionTitle({
 }) {
   return (
     <HStack paddingLeft={2}>
-      <NodeSectionTitle fontSize={12}>{children}</NodeSectionTitle>
+      <NodeSectionTitle fontSize="12px">{children}</NodeSectionTitle>
       {tooltip && (
         <Tooltip label={tooltip}>
           <Box marginBottom="-2px">
@@ -571,7 +571,7 @@ export function BasePropertiesPanel({
                 />
                 {isEditingName ? (
                   <Input
-                    fontSize={15}
+                    fontSize="15px"
                     marginLeft={1}
                     fontWeight={500}
                     variant="outline"
@@ -602,7 +602,7 @@ export function BasePropertiesPanel({
                 ) : (
                   <HoverableBigText
                     noOfLines={2}
-                    fontSize={15}
+                    fontSize="15px"
                     fontWeight={500}
                     onClick={() => {
                       if (node.type !== "prompting_technique") {
@@ -670,7 +670,7 @@ export function BasePropertiesPanel({
           </HStack>
         </HStack>
         {node.data?.description && (
-          <Text fontSize={12} color="gray.500" paddingX={2}>
+          <Text fontSize="12px" color="gray.500" paddingX={2}>
             {node.data?.description}
           </Text>
         )}

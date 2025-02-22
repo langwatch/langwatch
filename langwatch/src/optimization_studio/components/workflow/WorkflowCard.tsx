@@ -157,7 +157,7 @@ export function WorkflowCard({
       </HStack>
       <Divider />
       {description && (
-        <Text paddingX={4} color="gray.600" fontSize={14}>
+        <Text paddingX={4} color="gray.600" fontSize="14px">
           {description}
         </Text>
       )}

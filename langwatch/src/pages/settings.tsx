@@ -365,7 +365,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                             <Text>{children}</Text>
                             <Text
                               color={props.isSelected ? "white" : "gray.500"}
-                              fontSize={13}
+                              fontSize="13px"
                             >
                               {props.data.description}
                             </Text>

@@ -95,7 +95,7 @@ export function DatasetMappingPreview({
       <HStack width="full" gap="64px" align="start">
         <VStack align="start" maxWidth="50%">
           <FormLabel margin={0}>Mapping</FormLabel>
-          <FormHelperText margin={0} fontSize={13} marginBottom={2}>
+          <FormHelperText margin={0} fontSize="13px" marginBottom={2}>
             Map the trace data to the dataset columns
           </FormHelperText>
 
@@ -111,7 +111,7 @@ export function DatasetMappingPreview({
           <HStack width="full" align="end">
             <VStack align="start">
               <FormLabel margin={0}>Preview</FormLabel>
-              <FormHelperText margin={0} fontSize={13}>
+              <FormHelperText margin={0} fontSize="13px">
                 {paragraph
                   ? paragraph
                   : "Those are the rows that are going to be added, double click on the cell to edit them"}
