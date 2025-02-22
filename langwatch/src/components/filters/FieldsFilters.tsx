@@ -66,7 +66,7 @@ export function FieldsFilters() {
   const hasAnyFilters = nonEmptyFilters.length > 0;
 
   return (
-    <VStack align="start" width="full" gap={6}>
+    <VStack align="start" width="300px" gap={6}>
       <HStack width={"full"}>
         <Heading size="md">Filters</Heading>
 
@@ -107,7 +107,7 @@ function FieldsFilter({
 
   const searchRef = React.useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useDebounceValue("", 300);
-  const { onOpen, onClose, open } = useDisclosure();
+  const { open, setOpen } = useDisclosure();
   const current = filters[filterId] ?? [];
 
   const currentStringList = Array.isArray(current)
@@ -119,7 +119,7 @@ function FieldsFilter({
       <Popover.Root
         positioning={{ placement: "bottom" }}
         open={open}
-        onOpenChange={(open) => (open ? onOpen() : onClose())}
+        onOpenChange={({ open }) => setOpen(open)}
       >
         <Popover.Trigger asChild>
           <Button
@@ -129,25 +129,22 @@ function FieldsFilter({
             fontWeight="normal"
             _hover={{ background: "white" }}
           >
-            <HStack width="full" gap={0}>
+            <HStack width="full" gap={1}>
               <Text color="gray.500" fontWeight="500" paddingRight={4}>
                 {filter.name}
               </Text>
               {currentStringList.length > 0 ? (
                 <>
-                  <Text lineClamp={1} wordBreak="break-all" display="block">
-                    {currentStringList.join(", ")}
-                  </Text>
+                  <Text lineClamp={1}>{currentStringList.join(", ")}</Text>
                   <Spacer />
                   {currentStringList.length > 1 && (
-                    <Tag
-                      width="fit-content"
-                      padding={0}
+                    <Tag.Root
                       justifyContent="center"
                       display="flex"
+                      flexShrink={0}
                     >
-                      {currentStringList.length}
-                    </Tag>
+                      <Tag.Label>{currentStringList.length}</Tag.Label>
+                    </Tag.Root>
                   )}
                   <Tooltip
                     content={`Clear ${filter.name.toLowerCase()} filter`}
@@ -179,18 +176,22 @@ function FieldsFilter({
         </Popover.Trigger>
         <Popover.Content>
           <Popover.Header paddingY={1} paddingX={1}>
-            <InputGroup startElement={<Search width={16} color={gray400} />}>
-              <Input
-                placeholder="Search..."
-                border="none"
-                ref={searchRef}
-                _focusVisible={{ boxShadow: "none" }}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                }}
-              />
-            </InputGroup>
-          </Popover.Header>
+              <InputGroup
+                width="full"
+                startElement={<Search width={16} color={gray400} />}
+              >
+                <Input
+                  width="full"
+                  placeholder="Search..."
+                  border="none"
+                  ref={searchRef}
+                  _focusVisible={{ boxShadow: "none" }}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                  }}
+                />
+              </InputGroup>
+            </Popover.Header>
           <Popover.Body paddingY={1} paddingX={4}>
             {open && (
               <NestedListSelection
@@ -391,6 +392,19 @@ function ListSelection({
             details = labelDetailsMatch[1] ?? "";
           }
 
+          const onChange_ = (e: any) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (currentValues.includes(field.toString())) {
+              onChange(
+                currentValues.filter((v) => v.toString() !== field.toString())
+              );
+            } else {
+              onChange([...currentValues, field]);
+            }
+          };
+
           return (
             <React.Fragment key={field}>
               <HStack width="full">
@@ -399,18 +413,8 @@ function ListSelection({
                   paddingY={1}
                   gap={3}
                   checked={currentValues.includes(field.toString())}
-                  onChange={(e) => {
-                    e.stopPropagation();
-                    if (currentValues.includes(field.toString())) {
-                      onChange(
-                        currentValues.filter(
-                          (v) => v.toString() !== field.toString()
-                        )
-                      );
-                    } else {
-                      onChange([...currentValues, field]);
-                    }
-                  }}
+                  onClick={onChange_}
+                  onChange={onChange_}
                 >
                   <VStack width="full" align="start" gap={"2px"}>
                     {details && (

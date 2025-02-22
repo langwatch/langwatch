@@ -16,7 +16,7 @@ export function AnalyticsHeader({ title }: { title: string }) {
   } = usePeriodSelector();
 
   return (
-    <HStack width="full" align="top" paddingBottom={6}>
+    <HStack width="full" align="top" paddingBottom={4}>
       <HStack align="center" gap={6}>
         <Heading as={"h1"} size="lg" paddingTop={1}>
           {title}
@@ -46,7 +46,7 @@ export function AnalyticsHeader({ title }: { title: string }) {
         </Tooltip>
       </HStack>
       <Spacer />
-      <HStack marginBottom="-8px">
+      <HStack marginBottom="-8px" gap={0}>
         <FilterToggle />
         <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
       </HStack>
