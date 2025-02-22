@@ -325,7 +325,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                     Cancel
                   </Button>
                   <Button
-                    colorScheme="blue"
+                    colorPalette="blue"
                     type="submit"
                     minWidth="fit-content"
                     size="sm"
@@ -346,7 +346,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                     </Text>
                     <Link href={"/settings/annotation-scores"}>
                       <Button
-                        colorScheme="blue"
+                        colorPalette="blue"
                         minWidth="fit-content"
                         size="sm"
                       >
@@ -539,7 +539,7 @@ const ReasonButtons = ({
           onReasonClick(scoreTypeId);
           setValue(`scoreOptions.${scoreTypeId}.value`, tempValue);
         }}
-        colorScheme="blue"
+        colorPalette="blue"
         isDisabled={!tempValue}
       >
         Apply

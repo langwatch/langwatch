@@ -120,7 +120,7 @@ export function DatasetMappingPreview({
             <Spacer />
             <Button
               size="sm"
-              colorScheme="blue"
+              colorPalette="blue"
               variant="outline"
               leftIcon={<Edit2 height={16} />}
               onClick={onEditColumns}

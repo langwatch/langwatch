@@ -90,7 +90,7 @@ export function EditDataset({
         loadingOverlayComponent={loadingOverlayComponent}
       />
       <Button
-        colorScheme="blue"
+        colorPalette="blue"
         position="absolute"
         bottom="0"
         right="24px"

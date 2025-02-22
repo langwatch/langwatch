@@ -46,7 +46,7 @@ export default function Experiments() {
           </Heading>
           <Spacer />
           <Button
-            colorScheme="blue"
+            colorPalette="blue"
             onClick={() => {
               openDrawer("batchEvaluation", {
                 selectDataset: true,

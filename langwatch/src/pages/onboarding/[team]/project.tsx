@@ -228,7 +228,7 @@ export default function ProjectOnboarding() {
               }
             >
               <Button
-                colorScheme="orange"
+                colorPalette="orange"
                 type="submit"
                 isDisabled={
                   createProject.isLoading ||

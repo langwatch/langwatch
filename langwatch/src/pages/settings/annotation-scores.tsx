@@ -91,7 +91,7 @@ const AnnotationScorePage = () => {
           <Spacer />
           <Button
             size="sm"
-            colorScheme="orange"
+            colorPalette="orange"
             leftIcon={<Plus size={20} />}
             onClick={() => openDrawer("addAnnotationScore")}
           >

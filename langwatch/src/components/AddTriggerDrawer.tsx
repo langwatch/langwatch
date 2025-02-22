@@ -328,7 +328,7 @@ export function TriggerDrawer() {
                     <Radio
                       size="md"
                       value={TriggerAction.SEND_SLACK_MESSAGE}
-                      colorScheme="blue"
+                      colorPalette="blue"
                       alignItems="start"
                       gap={3}
                       paddingTop={2}
@@ -361,7 +361,7 @@ export function TriggerDrawer() {
                       <Radio
                         size="md"
                         value={TriggerAction.SEND_EMAIL}
-                        colorScheme="blue"
+                        colorPalette="blue"
                         alignItems="start"
                         gap={3}
                         paddingTop={2}
@@ -385,7 +385,7 @@ export function TriggerDrawer() {
                     <Radio
                       size="md"
                       value={TriggerAction.ADD_TO_DATASET}
-                      colorScheme="blue"
+                      colorPalette="blue"
                       alignItems="start"
                       gap={3}
                       paddingTop={2}
@@ -431,7 +431,7 @@ export function TriggerDrawer() {
 
             <HStack justifyContent="flex-end">
               <Button
-                colorScheme="blue"
+                colorPalette="blue"
                 type="submit"
                 minWidth="fit-content"
                 isLoading={createTrigger.isLoading}

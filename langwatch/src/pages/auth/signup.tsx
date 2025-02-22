@@ -176,7 +176,7 @@ function SignUpForm() {
                 </Link>
                 <Spacer />
                 <Button
-                  colorScheme="orange"
+                  colorPalette="orange"
                   type="submit"
                   isLoading={register.isLoading || signInLoading}
                 >

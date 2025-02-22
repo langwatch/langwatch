@@ -144,7 +144,7 @@ export const TeamForm = ({
               as={NextLink}
               href={`/settings/members`}
               size="sm"
-              colorScheme="orange"
+              colorPalette="orange"
             >
               <Text>Manage organization members</Text>
             </Button>
@@ -229,7 +229,7 @@ export const TeamForm = ({
                     <Td paddingLeft={0} paddingRight={0} paddingY={2}>
                       <Button
                         type="button"
-                        colorScheme="red"
+                        colorPalette="red"
                         isDisabled={members.fields.length === 1}
                         onClick={() => members.remove(index)}
                       >
@@ -262,7 +262,7 @@ export const TeamForm = ({
         {!team && (
           <HStack width="full">
             <Spacer />
-            <Button type="submit" colorScheme="orange" isLoading={isLoading}>
+            <Button type="submit" colorPalette="orange" isLoading={isLoading}>
               Create
             </Button>
           </HStack>
@@ -278,7 +278,7 @@ export const TeamForm = ({
                 as={NextLink}
                 href={`/onboarding/${team.slug}/project`}
                 size="sm"
-                colorScheme="orange"
+                colorPalette="orange"
               >
                 <HStack gap={2}>
                   <Plus size={20} />

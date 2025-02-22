@@ -240,7 +240,7 @@ export function AddRowsFromCSVModal({
             Close
           </Button>
           <Button
-            colorScheme="blue"
+            colorPalette="blue"
             isDisabled={
               recordEntries.length === 0 || !canUpload || hasErrors.length > 0
             }

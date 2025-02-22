@@ -549,7 +549,7 @@ export default function CheckConfigForm({
                 }
               >
                 <Button
-                  colorScheme="orange"
+                  colorPalette="orange"
                   type="submit"
                   minWidth="92px"
                   isLoading={isLoading}

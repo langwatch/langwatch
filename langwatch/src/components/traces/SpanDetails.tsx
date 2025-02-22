@@ -307,7 +307,7 @@ export const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
 
   return (
     <Tag
-      colorScheme={
+      colorPalette={
         span.error
           ? "red"
           : {

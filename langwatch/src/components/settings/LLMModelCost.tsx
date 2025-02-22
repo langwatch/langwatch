@@ -49,7 +49,7 @@ export function LLMModelCost(props: { projectId?: string }) {
         <Spacer />
         <Button
           size="md"
-          colorScheme="orange"
+          colorPalette="orange"
           onClick={() => openDrawer("llmModelCost", {})}
         >
           <HStack gap={2}>

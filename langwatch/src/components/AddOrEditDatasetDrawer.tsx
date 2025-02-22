@@ -322,7 +322,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               </VStack>
             )}
             <Button
-              colorScheme="blue"
+              colorPalette="blue"
               type="submit"
               minWidth="fit-content"
               isLoading={upsertDataset.isLoading}

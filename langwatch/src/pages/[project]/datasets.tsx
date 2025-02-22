@@ -77,7 +77,7 @@ export default function Datasets() {
             description: (
               <HStack>
                 <Button
-                  colorScheme="white"
+                  colorPalette="white"
                   variant="link"
                   textDecoration="underline"
                   onClick={() => {
@@ -147,7 +147,7 @@ export default function Datasets() {
           </Heading>
           <Spacer />
           <Button
-            colorScheme="blue"
+            colorPalette="blue"
             onClick={() => {
               openDrawer("batchEvaluation", {
                 selectDataset: true,
@@ -159,7 +159,7 @@ export default function Datasets() {
             Batch Evaluation
           </Button>
           <Button
-            colorScheme="blue"
+            colorPalette="blue"
             onClick={() => uploadCSVModal.onOpen()}
             minWidth="fit-content"
             leftIcon={<Upload height={17} width={17} strokeWidth={2.5} />}

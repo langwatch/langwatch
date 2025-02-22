@@ -228,7 +228,7 @@ export function EvaluationResults() {
                 size="lg"
               />
               <Button
-                colorScheme="red"
+                colorPalette="red"
                 onClick={() =>
                   stopEvaluationExecution({
                     run_id: evaluationStateRunId,
@@ -592,7 +592,7 @@ export function LoadedOptimizationResults({
                 </Button>
               )}
               <Button
-                colorScheme="red"
+                colorPalette="red"
                 onClick={() =>
                   stopOptimizationExecution({
                     run_id: optimizationStateRunId,

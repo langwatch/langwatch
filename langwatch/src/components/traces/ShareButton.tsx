@@ -64,7 +64,7 @@ export function ShareButton({
     >
       <PopoverTrigger>
         <Button
-          colorScheme="black"
+          colorPalette="black"
           variant="outline"
           leftIcon={
             shareState.data?.id ? <Globe size={16} /> : <Share size={16} />
@@ -91,7 +91,7 @@ export function ShareButton({
                   />
                   {hasSharePermission && (
                     <Button
-                      colorScheme="gray"
+                      colorPalette="gray"
                       isLoading={
                         unshareItemMutation.isLoading || shareState.isRefetching
                       }
@@ -156,7 +156,7 @@ export function ShareButton({
               <>
                 <Text>Are you sure you want to share this trace publicly?</Text>
                 <Button
-                  colorScheme="orange"
+                  colorPalette="orange"
                   isLoading={
                     shareItemMutation.isLoading || shareState.isRefetching
                   }

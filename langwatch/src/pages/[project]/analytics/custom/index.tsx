@@ -728,7 +728,7 @@ function CustomGraphForm({
               <Switch
                 onChange={onChange}
                 isChecked={value}
-                colorScheme="orange"
+                colorPalette="orange"
               >
                 Include previous period
               </Switch>
@@ -741,7 +741,7 @@ function CustomGraphForm({
 
         {customId ? (
           <Button
-            colorScheme="orange"
+            colorPalette="orange"
             onClick={updateGraph}
             isLoading={updateGraphById.isLoading}
             marginX={2}
@@ -751,7 +751,7 @@ function CustomGraphForm({
           </Button>
         ) : (
           <Button
-            colorScheme="orange"
+            colorPalette="orange"
             isLoading={addNewGraph.isLoading}
             onClick={() => {
               addGraph();

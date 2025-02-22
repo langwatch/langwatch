@@ -82,7 +82,7 @@ export function WorkflowCard({
             description: (
               <HStack>
                 <Button
-                  colorScheme="white"
+                  colorPalette="white"
                   variant="link"
                   textDecoration="underline"
                   onClick={() => {

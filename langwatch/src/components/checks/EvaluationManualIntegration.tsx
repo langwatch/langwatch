@@ -276,7 +276,7 @@ ${
         </Text>
         {evaluatorDefinition.requiredFields
           .map((field) => (
-            <Tag key={field} colorScheme="blue">
+            <Tag key={field} colorPalette="blue">
               {field} (required)
             </Tag>
           ))

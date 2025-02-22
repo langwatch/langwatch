@@ -193,7 +193,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
               <Button
                 type="submit"
                 alignSelf="end"
-                colorScheme="orange"
+                colorPalette="orange"
                 size="sm"
                 isLoading={commitVersion.isLoading}
                 isDisabled={!canSaveNewVersion}
@@ -230,7 +230,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                       {version.commitMessage}
                     </Text>
                     {version.isCurrentVersion && (
-                      <Tag colorScheme="green" size="sm" paddingX={2}>
+                      <Tag colorPalette="green" size="sm" paddingX={2}>
                         current
                       </Tag>
                     )}

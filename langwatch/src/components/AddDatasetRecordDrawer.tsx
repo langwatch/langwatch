@@ -165,7 +165,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             status: "success",
             description: (
               <Link
-                colorScheme="white"
+                colorPalette="white"
                 textDecoration={"underline"}
                 href={`/${project?.slug}/datasets/${datasetId}`}
               >
@@ -279,7 +279,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             >
               <Button
                 type="submit"
-                colorScheme="blue"
+                colorPalette="blue"
                 marginTop={6}
                 marginBottom={4}
                 isLoading={createDatasetRecord.isLoading}

@@ -181,7 +181,7 @@ export const ProjectIntegration = () => {
                       }
                       isExternal
                     >
-                      <Button colorScheme="orange" size="lg">
+                      <Button colorPalette="orange" size="lg">
                         View Demo
                       </Button>
                     </Link>
