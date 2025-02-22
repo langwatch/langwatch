@@ -165,7 +165,7 @@ function LLMModelCostForm({
         <HorizontalFormControl
           label="Model Name"
           helper="Identifier for your LLM model cost rule"
-          isInvalid={!!errors.model}
+          invalid={!!errors.model}
         >
           <Input required {...register("model")} />
           <FormErrorMessage>{errors.model?.message}</FormErrorMessage>
@@ -173,7 +173,7 @@ function LLMModelCostForm({
         <HorizontalFormControl
           label="Regex"
           helper="Regular expression used to match the model name captured during tracing"
-          isInvalid={!!errors.regex}
+          invalid={!!errors.regex}
         >
           <InputGroup>
             <InputLeftAddon paddingX={2} fontFamily="monospace">
@@ -196,7 +196,7 @@ function LLMModelCostForm({
         <HorizontalFormControl
           label="Input Cost Per Token"
           helper="Cost per input token in USD"
-          isInvalid={!!errors.inputCostPerToken}
+          invalid={!!errors.inputCostPerToken}
         >
           <InputGroup>
             <InputLeftAddon>$</InputLeftAddon>
@@ -216,7 +216,7 @@ function LLMModelCostForm({
         <HorizontalFormControl
           label="Output Cost Per Token"
           helper="Cost per output token in USD"
-          isInvalid={!!errors.outputCostPerToken}
+          invalid={!!errors.outputCostPerToken}
         >
           <InputGroup>
             <InputLeftAddon>$</InputLeftAddon>

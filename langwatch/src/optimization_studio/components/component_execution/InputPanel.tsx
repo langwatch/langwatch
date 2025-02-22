@@ -136,7 +136,7 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
               key={input.identifier}
               label={input.identifier}
               helper={""}
-              isInvalid={!!errors[input.identifier]}
+              invalid={!!errors[input.identifier]}
             >
               <Textarea
                 {...register(input.identifier)}

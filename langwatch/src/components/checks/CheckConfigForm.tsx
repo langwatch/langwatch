@@ -317,7 +317,7 @@ export default function CheckConfigForm({
                   <HorizontalFormControl
                     label="Evaluation Type"
                     helper="Select the evaluation to run"
-                    isInvalid={!!errors.checkType}
+                    invalid={!!errors.checkType}
                   >
                     <VStack align="start" width="full">
                       <HStack gap={0}>
@@ -358,7 +358,7 @@ export default function CheckConfigForm({
                   <HorizontalFormControl
                     label="Name"
                     helper="Used to identify the check and call it from the API"
-                    isInvalid={!!errors.name}
+                    invalid={!!errors.name}
                     align="start"
                   >
                     <VStack gap={2} align="start">
@@ -400,7 +400,7 @@ export default function CheckConfigForm({
                   <HorizontalFormControl
                     label="Execution Mode"
                     helper="Configure when this evaluation is executed"
-                    isInvalid={!!errors.executionMode}
+                    invalid={!!errors.executionMode}
                     align="start"
                     _last={{ borderBottomWidth: "1px" }}
                   >
@@ -502,7 +502,7 @@ export default function CheckConfigForm({
                         <HorizontalFormControl
                           label="Sampling"
                           helper="Run this check only on a sample of messages (min 0.01, max 1.0)"
-                          isInvalid={!!errors.sample}
+                          invalid={!!errors.sample}
                           align="start"
                         >
                           <Controller

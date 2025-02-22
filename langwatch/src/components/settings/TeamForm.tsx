@@ -109,7 +109,7 @@ export const TeamForm = ({
               <HorizontalFormControl
                 label="Name"
                 helper="The name of your team"
-                isInvalid={!!getFieldState("name").error}
+                invalid={!!getFieldState("name").error}
               >
                 <Input
                   width="full"

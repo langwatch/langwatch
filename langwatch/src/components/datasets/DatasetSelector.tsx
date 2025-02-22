@@ -31,7 +31,7 @@ export function DatasetSelector<T extends { datasetId: string }>({
     <HorizontalFormControl
       label="Dataset"
       helper="Add to an existing dataset or create a new one"
-      isInvalid={!!errors.datasetId}
+      invalid={!!errors.datasetId}
     >
       <Select
         {...register("datasetId" as Path<T>, {

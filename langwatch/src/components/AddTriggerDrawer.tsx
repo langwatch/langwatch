@@ -307,7 +307,7 @@ export function TriggerDrawer() {
             <HorizontalFormControl
               label="Name"
               helper="Give it a name that identifies what trigger it might be"
-              isInvalid={!!errors.name}
+              invalid={!!errors.name}
             >
               <Input
                 placeholder="Evaluation trigger"

@@ -251,7 +251,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               label="Name"
               helper="Give it a name that identifies what this group of examples is
               going to focus on"
-              isInvalid={!!errors.name}
+              invalid={!!errors.name}
             >
               <Input {...register("name")} />
               {slug && <FormHelperText>slug: {slug}</FormHelperText>}
@@ -261,7 +261,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
             <HorizontalFormControl
               label="Columns"
               helper="Which columns should be present in the dataset"
-              isInvalid={!!errors.columnTypes}
+              invalid={!!errors.columnTypes}
             >
               <VStack align="start">
                 <VStack align="start" width="full">

@@ -13,7 +13,7 @@ import { type PropsWithChildren, type ReactNode } from "react";
 export function HorizontalFormControl({
   label,
   helper,
-  isInvalid,
+  invalid,
   children,
   align,
   minWidth,
@@ -22,7 +22,7 @@ export function HorizontalFormControl({
 }: PropsWithChildren<{
   label: string | ReactNode;
   helper: string;
-  isInvalid?: boolean;
+  invalid?: boolean;
   inputWidth?: string;
 }> &
   StackProps) {
@@ -30,7 +30,7 @@ export function HorizontalFormControl({
     <FormControl
       borderBottomWidth="1px"
       paddingY={5}
-      isInvalid={isInvalid}
+      isInvalid={invalid}
       _last={{ border: "none" }}
       {...props}
     >
