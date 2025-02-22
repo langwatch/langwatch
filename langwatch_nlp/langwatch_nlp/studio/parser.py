@@ -109,6 +109,7 @@ def parse_signature(
         FieldType.int: int,
         FieldType.float: float,
         FieldType.bool: bool,
+        FieldType.list_str: list[str],
     }
 
     # Add input fields
