@@ -66,7 +66,7 @@ export const ExternalImage = ({
   if (error) {
     return (
       <Tooltip
-        label={<Text noOfLines={1}>Failed to load image: {src}</Text>}
+        label={<Text lineClamp={1}>Failed to load image: {src}</Text>}
         hasArrow
         placement="top"
       >

@@ -56,7 +56,7 @@ export function MultilineJSONCellEditor({
           label={<Text whiteSpace="pre-wrap">{jsonError}</Text>}
         >
           <Alert status="error">
-            <Text noOfLines={1}>{jsonError}</Text>
+            <Text lineClamp={1}>{jsonError}</Text>
           </Alert>
         </Tooltip>
       )}

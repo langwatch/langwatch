@@ -177,7 +177,7 @@ export default function Members() {
           <Tooltip
             label={(actionParams as { slackWebhook: string }).slackWebhook}
           >
-            <Text noOfLines={1} display="block">
+            <Text lineClamp={1} display="block">
               Webhook
             </Text>
           </Tooltip>
@@ -240,7 +240,7 @@ export default function Members() {
   const FilterValue = ({ children }: { children: React.ReactNode }) => {
     return (
       <Box padding={1} borderRightRadius="md">
-        <HoverableBigText noOfLines={1} expandable={false}>
+        <HoverableBigText lineClamp={1} expandable={false}>
           {children}
         </HoverableBigText>
       </Box>

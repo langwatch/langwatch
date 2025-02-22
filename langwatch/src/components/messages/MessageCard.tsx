@@ -168,7 +168,7 @@ export function MessageCard({
               isPythonRepr(trace.input?.value ?? "") ? (
                 <MessageCardJsonOutput value={trace.input?.value ?? ""} />
               ) : (
-                <Text noOfLines={1} wordBreak="break-all" lineHeight="2.1em">
+                <Text lineClamp={1} wordBreak="break-all" lineHeight="2.1em">
                   <Markdown className="markdown markdown-without-margin">
                     {getExtractedInput(trace)}
                   </Markdown>

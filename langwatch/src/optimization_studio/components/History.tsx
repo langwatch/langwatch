@@ -226,7 +226,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                 <VersionBox version={version} minWidth="48px" />
                 <VStack align="start" width="full" gap={1}>
                   <HStack>
-                    <Text fontWeight={600} fontSize="13px" noOfLines={1}>
+                    <Text fontWeight={600} fontSize="13px" lineClamp={1}>
                       {version.commitMessage}
                     </Text>
                     {version.isCurrentVersion && (

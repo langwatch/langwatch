@@ -161,7 +161,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
             <HoverableBigText
               color={!span.name && !span.model ? "gray.400" : undefined}
               maxWidth="180px"
-              noOfLines={1}
+              lineClamp={1}
               expandable={false}
             >
               {span.name ?? span.model ?? "(unnamed)"}

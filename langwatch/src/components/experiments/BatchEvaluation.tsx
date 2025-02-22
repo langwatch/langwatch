@@ -419,7 +419,7 @@ export default function BatchEvaluation({
                                 <Td>
                                   <Tooltip label={input}>
                                     <Text
-                                      noOfLines={2}
+                                      lineClamp={2}
                                       display="block"
                                       maxWidth={230}
                                     >
@@ -430,7 +430,7 @@ export default function BatchEvaluation({
                                 <Td>
                                   <Tooltip label={output}>
                                     <Text
-                                      noOfLines={2}
+                                      lineClamp={2}
                                       display="block"
                                       maxWidth={230}
                                     >
@@ -442,7 +442,7 @@ export default function BatchEvaluation({
                                   <Td>
                                     <Tooltip label={expected_output}>
                                       <Text
-                                        noOfLines={2}
+                                        lineClamp={2}
                                         display="block"
                                         maxWidth={230}
                                       >
@@ -500,7 +500,7 @@ export default function BatchEvaluation({
                                   >
                                     <Tooltip label={evaluation.details}>
                                       <Text
-                                        noOfLines={1}
+                                        lineClamp={1}
                                         wordBreak="break-all"
                                         display="block"
                                       >

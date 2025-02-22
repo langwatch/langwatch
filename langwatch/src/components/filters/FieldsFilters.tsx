@@ -85,7 +85,7 @@ export function FieldsFilters() {
           </Tooltip>
         )}
       </HStack>
-      <VStack gap={4} width="full">
+      <VStack gap={3} width="full">
         {filters.map(([id, filter]) => (
           <FieldsFilter key={id} filterId={id} filter={filter} />
         ))}

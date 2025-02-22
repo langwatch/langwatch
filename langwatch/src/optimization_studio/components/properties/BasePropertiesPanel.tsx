@@ -601,7 +601,7 @@ export function BasePropertiesPanel({
                   />
                 ) : (
                   <HoverableBigText
-                    noOfLines={2}
+                    lineClamp={2}
                     fontSize="15px"
                     fontWeight={500}
                     onClick={() => {

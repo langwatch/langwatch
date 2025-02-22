@@ -20,7 +20,7 @@ export function OverflownTextWithTooltip({
       disabled={!isOverflown}
       positioning={{ placement: "top" }}
     >
-      <Box ref={ref} {...props}>
+      <Box ref={ref} lineClamp={props.lineClamp ?? 1} {...props}>
         {children}
       </Box>
     </Tooltip>

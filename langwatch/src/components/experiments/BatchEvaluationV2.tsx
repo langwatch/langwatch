@@ -385,7 +385,7 @@ export function BatchEvaluationV2RunList({
                 <VStack align="start" gap={0}>
                   <Text
                     fontSize={size === "sm" ? "13px" : "14px"}
-                    noOfLines={1}
+                    lineClamp={1}
                     wordBreak="break-all"
                   >
                     {runName}
@@ -435,7 +435,7 @@ export function BatchEvaluationV2RunList({
                     color="gray.400"
                     fontSize={size === "sm" ? "12px" : "13px"}
                   >
-                    <Text whiteSpace="nowrap" noOfLines={1}>
+                    <Text whiteSpace="nowrap" lineClamp={1}>
                       {run.timestamps.created_at
                         ? formatTimeAgo(
                             run.timestamps.created_at,
