@@ -1,4 +1,5 @@
-import { Box, Fade } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
+import { motion, AnimatePresence } from "framer-motion";
 import { FullLogo } from "./icons/FullLogo";
 import { useEffect, useState } from "react";
 
@@ -28,9 +29,17 @@ export const LoadingScreen = () => {
       justifyContent="center"
     >
       {!logoVisibleOnce ? (
-        <Fade in={showLogo}>
-          <FullLogo />
-        </Fade>
+        <AnimatePresence>
+          {showLogo && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <FullLogo />
+            </motion.div>
+          )}
+        </AnimatePresence>
       ) : (
         <FullLogo />
       )}
