@@ -11,6 +11,7 @@ import {
   HStack,
   Heading,
   Input,
+  NativeSelect,
   Spacer,
   Text,
   Textarea,
@@ -220,56 +221,6 @@ const defaultValues: CustomGraphFormData = {
   timeScale: 1,
   includePrevious: true,
 };
-
-const metricsCollection = createListCollection({
-  items: Object.entries(analyticsMetrics).flatMap(([group, metrics]) =>
-    Object.entries(metrics).map(([metricKey, metric]) => ({
-      label: metric.label,
-      value: `${group}.${metricKey}`,
-      group: camelCaseToTitleCase(group),
-    }))
-  ),
-});
-
-const createAggregationsCollection = (metric: FlattenAnalyticsMetricsEnum) => {
-  const metricObj = getMetric(metric);
-  return createListCollection({
-    items: metricObj.allowedAggregations.map((agg) => ({
-      label: metricAggregations[agg],
-      value: agg,
-    })),
-  });
-};
-
-const pipelinesCollection = createListCollection({
-  items: [
-    { label: "all", value: "" },
-    ...Object.entries(analyticsPipelines).map(([key, { label }]) => ({
-      label,
-      value: key,
-    })),
-  ],
-});
-
-const pipelineAggregationsCollection = createListCollection({
-  items: Object.entries(pipelineAggregations).map(([key, label]) => ({
-    label,
-    value: key,
-  })),
-});
-
-const groupByCollection = createListCollection({
-  items: [
-    { label: "No grouping", value: "" },
-    ...Object.entries(analyticsGroups).flatMap(([groupParent, metrics]) =>
-      Object.entries(metrics).map(([groupKey, group]) => ({
-        label: group.label,
-        value: `${groupParent}.${groupKey}`,
-        group: camelCaseToTitleCase(groupParent),
-      }))
-    ),
-  ],
-});
 
 export default function AnalyticsCustomGraph({
   customId,
@@ -755,18 +706,24 @@ function CustomGraphForm({
       </Field.Root>
       <Field.Root>
         <Field.Label>Group by</Field.Label>
-        <Select.Root {...groupByField} collection={groupByCollection}>
-          <Select.Trigger>
-            <Select.ValueText />
-          </Select.Trigger>
-          <Select.Content>
-            {groupByCollection.items.map((item) => (
-              <Select.Item key={item.value} item={item}>
-                {item.label}
-              </Select.Item>
+        <NativeSelect.Root>
+          <NativeSelect.Field {...groupByField}>
+            <option value="">No grouping</option>
+            {Object.entries(analyticsGroups).map(([groupParent, metrics]) => (
+              <optgroup
+                key={groupParent}
+                label={camelCaseToTitleCase(groupParent)}
+              >
+                {Object.entries(metrics).map(([groupKey, group]) => (
+                  <option key={groupKey} value={`${groupParent}.${groupKey}`}>
+                    {group.label}
+                  </option>
+                ))}
+              </optgroup>
             ))}
-          </Select.Content>
-        </Select.Root>
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
       </Field.Root>
       {(!graphType || !summaryGraphTypes.includes(graphType.value)) && (
         <Field.Root>
@@ -1015,31 +972,32 @@ function SeriesField({
       <Field.Root>
         <Field.Label>Metric</Field.Label>
         <Grid width="full" gap={3} templateColumns="repeat(4, 1fr)">
-          <Select.Root
-            gridColumn="span 2"
-            collection={metricsCollection}
-            onChange={(e) => {
-              const metric_ = getMetric(e.target.value as any);
-              if (!metric_.allowedAggregations.includes(aggregation)) {
-                form.setValue(
-                  `series.${index}.aggregation`,
-                  metric_.allowedAggregations[0]!
-                );
-              }
-              void metricField.onChange(e);
-            }}
-          >
-            <Select.Trigger>
-              <Select.ValueText />
-            </Select.Trigger>
-            <Select.Content>
-              {metricsCollection.items.map((item) => (
-                <Select.Item key={item.value} item={item}>
-                  {item.label}
-                </Select.Item>
+          <NativeSelect.Root gridColumn="span 2">
+            <NativeSelect.Field
+              {...metricField}
+              onChange={(e) => {
+                const metric_ = getMetric(e.target.value as any);
+                if (!metric_.allowedAggregations.includes(aggregation)) {
+                  form.setValue(
+                    `series.${index}.aggregation`,
+                    metric_.allowedAggregations[0]!
+                  );
+                }
+                void metricField.onChange(e);
+              }}
+            >
+              {Object.entries(analyticsMetrics).map(([group, metrics]) => (
+                <optgroup key={group} label={camelCaseToTitleCase(group)}>
+                  {Object.entries(metrics).map(([metricKey, metric]) => (
+                    <option key={metricKey} value={`${group}.${metricKey}`}>
+                      {metric.label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
-            </Select.Content>
-          </Select.Root>
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
           {metric_?.requiresKey && (
             <Box gridColumn="span 2">
               <Controller
@@ -1072,63 +1030,52 @@ function SeriesField({
               />
             </Box>
           )}
-          <Select.Root
-            gridColumn="span 1"
-            collection={createAggregationsCollection(metric)}
-            {...form.control.register(`series.${index}.aggregation`)}
-          >
-            <Select.Trigger>
-              <Select.ValueText />
-            </Select.Trigger>
-            <Select.Content>
-              {createAggregationsCollection(metric).items.map((item) => (
-                <Select.Item key={item.value} item={item}>
-                  {item.label}
-                </Select.Item>
+          <NativeSelect.Root gridColumn="span 1">
+            <NativeSelect.Field
+              {...form.control.register(`series.${index}.aggregation`)}
+            >
+              {metric_?.allowedAggregations.map((agg) => (
+                <option key={agg} value={agg}>
+                  {metricAggregations[agg]}
+                </option>
               ))}
-            </Select.Content>
-          </Select.Root>
-          <Select.Root
-            gridColumn="span 1"
-            collection={pipelinesCollection}
-            {...form.control.register(`series.${index}.pipeline.field`)}
-          >
-            <Select.Trigger>
-              <Select.ValueText />
-            </Select.Trigger>
-            <Select.Content>
-              {pipelinesCollection.items
-                .filter((item) =>
-                  metric.includes("trace_id") ? item.value !== "trace_id" : true
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
+          <NativeSelect.Root gridColumn="span 1">
+            <NativeSelect.Field
+              {...form.control.register(`series.${index}.pipeline.field`)}
+            >
+              <option value="">all</option>
+              {Object.entries(analyticsPipelines)
+                .filter(([key]) =>
+                  metric.includes("trace_id") ? key !== "trace_id" : true
                 )
-                .map((item) => (
-                  <Select.Item key={item.value} item={item}>
-                    {item.label}
-                  </Select.Item>
+                .map(([key, { label }]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
                 ))}
-            </Select.Content>
-          </Select.Root>
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
         </Grid>
       </Field.Root>
       {pipelineField && (
         <Field.Root>
           <Field.Label>Aggregation</Field.Label>
-          <Select.Root
-            {...form.control.register(`series.${index}.pipeline.aggregation`)}
-            collection={pipelineAggregationsCollection}
-            minWidth="fit-content"
-          >
-            <Select.Trigger>
-              <Select.ValueText />
-            </Select.Trigger>
-            <Select.Content>
-              {pipelineAggregationsCollection.items.map((item) => (
-                <Select.Item key={item.value} item={item}>
-                  {item.label}
-                </Select.Item>
+          <NativeSelect.Root>
+            <NativeSelect.Field
+              {...form.control.register(`series.${index}.pipeline.aggregation`)}
+            >
+              {Object.entries(pipelineAggregations).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
               ))}
-            </Select.Content>
-          </Select.Root>
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
         </Field.Root>
       )}
     </VStack>
