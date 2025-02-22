@@ -1,19 +1,14 @@
 import {
-  Alert,
-  AlertDescription,
-  AlertIcon,
-  AlertTitle,
   Box,
   Card,
-  CardBody,
-  CardHeader,
   GridItem,
   HStack,
   Heading,
   Link,
   SimpleGrid,
   Text,
-  VStack
+  VStack,
+  Alert,
 } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
 import GraphsLayout from "~/components/GraphsLayout";
@@ -23,7 +18,6 @@ import {
 } from "~/components/analytics/CustomGraph";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-
 import { api } from "~/utils/api";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { getEvaluatorDefinitions } from "../../../server/evaluations/getEvaluator";
@@ -112,43 +106,42 @@ const creatChecks = (checks: any) => {
 
     return (
       <>
-        <GridItem colSpan={1} display={"inline-grid"}>
-          <Card>
-            <CardHeader>
-              <HStack>
+        <GridItem colSpan={1} display="inline-grid">
+          <Card.Root>
+            <Card.Header>
+              <HStack gap={2}>
                 <BarChart2 color="orange" />
                 <Heading size="sm">{traceCheck?.name}</Heading>
               </HStack>
               {!check.enabled && (
-                <Text textColor={"gray"} fontSize={"sm"}>
+                <Text textColor="gray" fontSize="sm">
                   (disabled)
                 </Text>
               )}
-            </CardHeader>
-            <CardBody>
+            </Card.Header>
+            <Card.Body>
               <CustomGraph input={checksSummary as CustomGraphInput} />
-            </CardBody>
-          </Card>
+            </Card.Body>
+          </Card.Root>
         </GridItem>
-        <GridItem colSpan={3} display={"inline-grid"}>
-          <Card>
-            <CardHeader>
-              <HStack>
+        <GridItem colSpan={3} display="inline-grid">
+          <Card.Root>
+            <Card.Header>
+              <HStack gap={2}>
                 <BarChart2 color="orange" />
                 <Heading size="sm">{traceCheck?.name}</Heading>
-
                 <Text fontWeight={300}>- {check.name}</Text>
               </HStack>
               {!check.enabled && (
-                <Text textColor={"gray"} fontSize={"sm"}>
+                <Text textColor="gray" fontSize="sm">
                   (disabled)
                 </Text>
               )}
-            </CardHeader>
-            <CardBody>
+            </Card.Header>
+            <Card.Body>
               <CustomGraph input={checksAverage as CustomGraphInput} />
-            </CardBody>
-          </Card>
+            </Card.Body>
+          </Card.Root>
         </GridItem>
       </>
     );
@@ -168,11 +161,16 @@ export default function Evaluations() {
     <GraphsLayout>
       <AnalyticsHeader title="Evaluations" />
       {checks.data && checks.data?.length === 0 && (
-        <Alert status="warning" variant="left-accent" marginBottom={6}>
-          <AlertIcon alignSelf="start" />
-          <VStack align="start">
-            <AlertTitle>No Evaluations yet</AlertTitle>
-            <AlertDescription>
+        <Alert.Root
+          colorPalette="warning"
+          borderStartWidth="4px"
+          borderStartColor="colorPalette.solid"
+          marginBottom={6}
+        >
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>No Evaluations yet</Alert.Title>
+            <Alert.Description>
               <Text as="span">
                 {
                   "The evaluation results will be displayed here. Setup evaluations for your project to see the results. Click "
@@ -185,16 +183,12 @@ export default function Evaluations() {
                 here
               </Link>
               <Text as="span"> to get started.</Text>
-            </AlertDescription>
-          </VStack>
-        </Alert>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
       )}
-      <HStack alignItems={"start"}>
-        <SimpleGrid
-          templateColumns="repeat(4, 1fr)"
-          gap={5}
-          width={"100%"}
-        >
+      <HStack alignItems="start" gap={4}>
+        <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width={"100%"}>
           {checks.data ? creatChecks(checks.data) : null}
         </SimpleGrid>
         <Box padding={3}>

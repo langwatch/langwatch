@@ -120,7 +120,8 @@ const PageMenuLink = ({
     currentRoute?.path === path ||
     (path.includes("/messages") && router.pathname.includes("/messages")) ||
     (path.includes("/evaluations") &&
-      router.pathname.includes("/evaluations")) ||
+      router.pathname.includes("/evaluations") &&
+      !router.pathname.includes("/analytics")) ||
     (path.includes("/datasets") && router.pathname.includes("/datasets")) ||
     (path.includes("/experiments") &&
       router.pathname.includes("/experiments")) ||
