@@ -1,18 +1,4 @@
-import {
-  Card,
-  CardBody,
-  CardHeader,
-  Grid,
-  GridItem,
-  Heading,
-  Tab,
-  TabIndicator,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
-  VStack,
-} from "@chakra-ui/react";
+import { Card, Grid, GridItem, Heading, Tabs, VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { analyticsMetrics } from "../server/analytics/registry";
 import { TeamRoleGroup } from "../server/api/permission";
@@ -138,7 +124,7 @@ export function LLMMetrics() {
 
   return (
     <>
-      <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={10}>
+      <Heading as="h1" size="lg" paddingBottom={6} paddingTop={10}>
         LLM Metrics
       </Heading>
       <Grid
@@ -147,12 +133,16 @@ export function LLMMetrics() {
         gap={6}
       >
         <GridItem colSpan={isNotQuickwit ? 2 : undefined}>
-          <Card>
-            <CardBody>
-              <Tabs variant="unstyled">
-                <TabList gap={12}>
+          <Card.Root>
+            <Card.Body>
+              <Tabs.Root variant="plain">
+                <Tabs.List gap={12}>
                   {isNotQuickwit && (
-                    <Tab paddingX={0} paddingBottom={4}>
+                    <Tabs.Trigger
+                      value="llmCallsGraph"
+                      paddingX={0}
+                      paddingBottom={4}
+                    >
                       <CustomGraph
                         input={{
                           ...llmCallsGraph,
@@ -164,10 +154,14 @@ export function LLMMetrics() {
                           color: "black",
                         }}
                       />
-                    </Tab>
+                    </Tabs.Trigger>
                   )}
                   {hasTeamPermission(TeamRoleGroup.COST_VIEW) && (
-                    <Tab paddingX={0} paddingBottom={4}>
+                    <Tabs.Trigger
+                      value="totalCostGraph"
+                      paddingX={0}
+                      paddingBottom={4}
+                    >
                       <CustomGraph
                         input={{ ...totalCostGraph, graphType: "summary" }}
                         titleProps={{
@@ -175,9 +169,13 @@ export function LLMMetrics() {
                           color: "black",
                         }}
                       />
-                    </Tab>
+                    </Tabs.Trigger>
                   )}
-                  <Tab paddingX={0} paddingBottom={4}>
+                  <Tabs.Trigger
+                    value="tokensGraph"
+                    paddingX={0}
+                    paddingBottom={4}
+                  >
                     <VStack align="start">
                       {isNotQuickwit ? (
                         <CustomGraph
@@ -199,51 +197,51 @@ export function LLMMetrics() {
                         <></>
                       )}
                     </VStack>
-                  </Tab>
-                </TabList>
-                <TabIndicator
+                  </Tabs.Trigger>
+                </Tabs.List>
+                <Tabs.Indicator
                   mt="-1.5px"
                   height="4px"
                   bg="orange.400"
                   borderRadius="1px"
                 />
-                <TabPanels>
+                <Tabs.Content value="llmCallsGraph">
                   {isNotQuickwit && (
-                    <TabPanel>
+                    <Tabs.Content value="llmCallsGraph">
                       <CustomGraph input={llmCallsGraph} />
-                    </TabPanel>
+                    </Tabs.Content>
                   )}
                   {hasTeamPermission(TeamRoleGroup.COST_VIEW) && (
-                    <TabPanel>
+                    <Tabs.Content value="totalCostGraph">
                       <CustomGraph input={totalCostGraph} />
-                    </TabPanel>
+                    </Tabs.Content>
                   )}
-                  <TabPanel>
+                  <Tabs.Content value="tokensGraph">
                     <CustomGraph input={tokensGraph} />
-                  </TabPanel>
-                </TabPanels>
-              </Tabs>
-            </CardBody>
-          </Card>
+                  </Tabs.Content>
+                </Tabs.Content>
+              </Tabs.Root>
+            </Card.Body>
+          </Card.Root>
         </GridItem>
         <GridItem>
           <LLMSummary />
         </GridItem>
         {isNotQuickwit && (
           <GridItem>
-            <Card height="full">
-              <CardHeader>
+            <Card.Root height="full">
+              <Card.Header>
                 <Heading size="sm">Evaluations Summary</Heading>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <CustomGraph
                   input={{
                     ...evaluationsSummary,
                     graphType: "summary",
                   }}
                 />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
         )}
       </Grid>

@@ -37,7 +37,7 @@ export function useColorMode(): UseColorModeReturn {
   };
 }
 
-function getComputedCSSVariableValue(variable: string) {
+export function getComputedCSSVariableValue(variable: string) {
   let value = getComputedStyle(document.documentElement).getPropertyValue(
     variable
   );
