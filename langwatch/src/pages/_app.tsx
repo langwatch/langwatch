@@ -252,13 +252,6 @@ export const system = createSystem(defaultConfig, {
           },
         },
       }),
-      switch: defineRecipe({
-        variants: {
-          variant: {
-            darkerTrack: { control: { background: "gray.400" } },
-          },
-        },
-      }),
       separator: defineRecipe({
         base: {
           width: "full",
@@ -409,6 +402,31 @@ export const system = createSystem(defaultConfig, {
               cell: {
                 px: "2",
                 py: "6px",
+              },
+            },
+          },
+        },
+      }),
+      switch: defineSlotRecipe({
+        slots: ["root", "control", "thumb"],
+        variants: {
+          variant: {
+            darkerTrack: {
+              control: {
+                background: "gray.400",
+                _checked: {
+                  background: "blue.500",
+                },
+              },
+              thumb: {
+                background: "white",
+                width: "var(--switch-height)",
+                height: "var(--switch-height)",
+                scale: "0.8",
+                boxShadow: "sm",
+                _checked: {
+                  background: "white",
+                },
               },
             },
           },

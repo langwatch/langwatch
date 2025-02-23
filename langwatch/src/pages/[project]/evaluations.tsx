@@ -1,23 +1,19 @@
 import {
-  Alert,
-  AlertIcon,
   Box,
   Button,
   Card,
-  CardBody,
   Container,
-  HStack,
+  Field,
   Heading,
-  LinkOverlay,
   Skeleton,
   Spacer,
   Spinner,
-  Switch,
   Text,
+  Alert,
+  HStack,
+  LinkOverlay,
   VStack,
-  useToast,
 } from "@chakra-ui/react";
-import NextLink from "next/link";
 import { ChevronRight } from "react-feather";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -25,14 +21,15 @@ import { api } from "../../utils/api";
 import type { CheckPreconditions } from "../../server/evaluations/types";
 import { camelCaseToLowerCase } from "../../utils/stringCasing";
 import { TeamRoleGroup } from "../../server/api/permission";
+import { toaster } from "../../components/ui/toaster";
+import { Switch } from "../../components/ui/switch";
+import { Link } from "../../components/ui/link";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
-import {
-  EvaluationExecutionMode,
-  type Check,
-} from "@prisma/client";
+import { EvaluationExecutionMode, type Check } from "@prisma/client";
+import NextLink from "next/link";
 
 export default function Checks() {
   const { project, hasTeamPermission } = useOrganizationTeamProject();
@@ -62,7 +59,6 @@ export default function Checks() {
       return { previousConfigs };
     },
   });
-  const toast = useToast();
 
   if (!project) return null;
 
@@ -81,12 +77,13 @@ export default function Checks() {
               context.previousConfigs
             );
           }
-          toast({
+          toaster.create({
             title: "Error updating check",
             description: "Please try again",
-            status: "error",
-            duration: 5000,
-            isClosable: true,
+            type: "error",
+            meta: {
+              closable: true,
+            },
           });
         },
         onSettled: () => {
@@ -112,22 +109,23 @@ export default function Checks() {
         : `${+(check.sample * 100).toFixed(2)}% of messages`;
 
     return (
-      <Card
+      <Card.Root
         width="full"
-        variant="filled"
+        variant="subtle"
         background="rgba(0,0,0,.05)"
         boxShadow="none"
         key={check.id}
       >
-        <CardBody width="full">
+        <Card.Body width="full">
           <HStack width="full" gap={6}>
             {hasTeamPermission(TeamRoleGroup.GUARDRAILS_MANAGE) && (
               <Switch
                 size="lg"
-                isChecked={check.enabled}
-                onChange={() => handleToggle(check.id, check.enabled)}
+                checked={check.enabled}
+                onCheckedChange={() => handleToggle(check.id, check.enabled)}
                 position="relative"
                 zIndex={1}
+                // @ts-ignore
                 variant="darkerTrack"
               />
             )}
@@ -156,16 +154,17 @@ export default function Checks() {
               </Text>
             </VStack>
             {hasTeamPermission(TeamRoleGroup.GUARDRAILS_MANAGE) && (
-              <LinkOverlay
-                as={NextLink}
-                href={`/${project.slug}/evaluations/${check.id}/edit`}
-              >
-                <ChevronRight />
+              <LinkOverlay asChild>
+                <NextLink
+                  href={`/${project.slug}/evaluations/${check.id}/edit`}
+                >
+                  <ChevronRight />
+                </NextLink>
               </LinkOverlay>
             )}
           </HStack>
-        </CardBody>
-      </Card>
+        </Card.Body>
+      </Card.Root>
     );
   };
 
@@ -187,14 +186,11 @@ export default function Checks() {
             </Text>
             <Spacer />
             {hasTeamPermission(TeamRoleGroup.GUARDRAILS_MANAGE) && (
-              <Button
-                colorPalette="orange"
-                as={NextLink}
-                href={`/${project.slug}/evaluations/new/choose`}
-                minWidth="fit-content"
-              >
-                + Add
-              </Button>
+              <Link asChild href={`/${project.slug}/evaluations/new/choose`}>
+                <Button colorPalette="orange" minWidth="fit-content">
+                  + Add
+                </Button>
+              </Link>
             )}
           </HStack>
           <VStack align="start" width="full" gap={4}>
@@ -205,15 +201,15 @@ export default function Checks() {
                 <Skeleton width="full" height="20px" />
               </VStack>
             ) : checks.isError ? (
-              <Alert status="error">
-                <AlertIcon />
-                An error has occurred
-              </Alert>
+              <Alert.Root>
+                <Alert.Indicator />
+                <Alert.Content>An error has occurred</Alert.Content>
+              </Alert.Root>
             ) : checks.data && checks.data.length > 0 ? (
               <>
                 {(evaluations?.length ?? 0) > 0 &&
                 (guardrails?.length ?? 0) > 0 ? (
-                  <Heading as="h2" size="lg" paddingTop={6}>
+                  <Heading as="h2" size="md" paddingTop={6}>
                     Guardrails
                   </Heading>
                 ) : (
@@ -223,17 +219,17 @@ export default function Checks() {
 
                 {(evaluations?.length ?? 0) > 0 &&
                   (guardrails?.length ?? 0) > 0 && (
-                    <Heading as="h2" size="lg" paddingTop={6}>
+                    <Heading as="h2" size="md" paddingTop={6}>
                       Evaluations
                     </Heading>
                   )}
                 {evaluations?.map(renderEvaluation)}
               </>
             ) : (
-              <Alert status="info">
-                <AlertIcon />
-                No evaluations configured
-              </Alert>
+              <Alert.Root>
+                <Alert.Indicator />
+                <Alert.Content>No evaluations configured</Alert.Content>
+              </Alert.Root>
             )}
           </VStack>
         </VStack>

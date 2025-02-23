@@ -4,12 +4,11 @@ import {
   GridItem,
   HStack,
   Heading,
-  Link,
   SimpleGrid,
   Text,
-  VStack,
   Alert,
 } from "@chakra-ui/react";
+import { Link } from "~/components/ui/link";
 import { BarChart2 } from "react-feather";
 import GraphsLayout from "~/components/GraphsLayout";
 import {
@@ -114,7 +113,7 @@ const creatChecks = (checks: any) => {
                 <Heading size="sm">{traceCheck?.name}</Heading>
               </HStack>
               {!check.enabled && (
-                <Text textColor="gray" fontSize="sm">
+                <Text color="gray" fontSize="sm">
                   (disabled)
                 </Text>
               )}
@@ -133,7 +132,7 @@ const creatChecks = (checks: any) => {
                 <Text fontWeight={300}>- {check.name}</Text>
               </HStack>
               {!check.enabled && (
-                <Text textColor="gray" fontSize="sm">
+                <Text color="gray" fontSize="sm">
                   (disabled)
                 </Text>
               )}
@@ -172,23 +171,17 @@ export default function Evaluations() {
             <Alert.Title>No Evaluations yet</Alert.Title>
             <Alert.Description>
               <Text as="span">
-                {
-                  "The evaluation results will be displayed here. Setup evaluations for your project to see the results. Click "
-                }
+                The evaluation results will be displayed here. Setup evaluations
+                for your project to see the results. Click{" "}
               </Text>
-              <Link
-                textDecoration="underline"
-                href={`/${project?.slug}/evaluations`}
-              >
-                here
-              </Link>
+              <Link href={`/${project?.slug}/evaluations`}>here</Link>
               <Text as="span"> to get started.</Text>
             </Alert.Description>
           </Alert.Content>
         </Alert.Root>
       )}
       <HStack alignItems="start" gap={4}>
-        <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width={"100%"}>
+        <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
           {checks.data ? creatChecks(checks.data) : null}
         </SimpleGrid>
         <Box padding={3}>
