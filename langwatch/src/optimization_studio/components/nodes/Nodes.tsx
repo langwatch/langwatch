@@ -2,16 +2,10 @@ import {
   Box,
   Button,
   Center,
-  forwardRef,
   HStack,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuList,
   Spacer,
   Spinner,
   Text,
-  Tooltip,
   VStack,
   type ButtonProps,
 } from "@chakra-ui/react";
@@ -23,7 +17,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import React, { useMemo, type Ref } from "react";
+import React, { forwardRef, useMemo, type Ref } from "react";
 import { useDragLayer } from "react-dnd";
 import {
   Check,
@@ -37,6 +31,8 @@ import {
 import { PulseLoader } from "react-spinners";
 import { useDebounceValue } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
+import { Menu } from "../../../components/ui/menu";
+import { Tooltip } from "../../../components/ui/tooltip";
 import { useComponentExecution } from "../../hooks/useComponentExecution";
 import { useWorkflowExecution } from "../../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
@@ -97,7 +93,8 @@ function NodeInputs({
           <TypeLabel type={input.type} />
           <Spacer />
           {input.optional &&
-            (!node || node.type !== "end" ||
+            (!node ||
+              node.type !== "end" ||
               (input.identifier !== "score" &&
                 input.identifier !== "passed")) && (
               <Text color="gray.400">(optional)</Text>
@@ -288,42 +285,39 @@ export const ComponentNode = forwardRef(function ComponentNode(
       }}
     >
       {props.selected && !["entry", "end"].includes(props.type) && (
-        <Menu placement="top-start" size="xs" autoSelect={false}>
-          <MenuButton
-            background="white"
-            position="absolute"
-            top="-26px"
-            right={1}
-            paddingX={1}
-            paddingY={1}
-            borderRadius={6}
-            minWidth="auto"
-            minHeight="auto"
-            boxShadow="sm"
-          >
-            <MoreHorizontal size={11} />
-          </MenuButton>
+        <Menu.Root positioning={{ placement: "top-start" }}>
+          <Menu.Trigger asChild>
+            <Button
+              background="white"
+              position="absolute"
+              top="-26px"
+              right={1}
+              paddingX={1}
+              paddingY={1}
+              borderRadius={6}
+              minWidth="auto"
+              minHeight="auto"
+              boxShadow="sm"
+            >
+              <MoreHorizontal size={11} />
+            </Button>
+          </Menu.Trigger>
           <NodeToolbar>
-            <MenuList>
-              <MenuItem
-                icon={<Copy size={14} />}
-                onClick={() => {
-                  duplicateNode(props.id);
-                }}
+            <Menu.Content>
+              <Menu.Item
+                value="duplicate"
+                onSelect={() => duplicateNode(props.id)}
               >
+                <Copy size={14} />
                 Duplicate
-              </MenuItem>
-              <MenuItem
-                icon={<Trash2 size={14} />}
-                onClick={() => {
-                  deleteNode(props.id);
-                }}
-              >
+              </Menu.Item>
+              <Menu.Item value="delete" onSelect={() => deleteNode(props.id)}>
+                <Trash2 size={14} />
                 Delete
-              </MenuItem>
-            </MenuList>
+              </Menu.Item>
+            </Menu.Content>
           </NodeToolbar>
-        </Menu>
+        </Menu.Root>
       )}
       <HStack gap={2} width="full">
         <ComponentIcon
@@ -429,9 +423,9 @@ export function ComponentExecutionButton({
   return (
     <>
       <Tooltip
-        label={shouldOpenExecutionResults ? "Execution results" : ""}
-        placement="top"
-        hasArrow
+        content={shouldOpenExecutionResults ? "Execution results" : ""}
+        positioning={{ placement: "top" }}
+        showArrow
       >
         <Center
           minWidth="24px"
@@ -514,33 +508,33 @@ export function ComponentExecutionButton({
           <Play size={iconSize} />
         </Button>
       ) : (
-        <Menu placement="top-start" size="xs" autoSelect={false}>
-          <MenuButton variant="ghost" size="xs" paddingX={2} {...props}>
-            <Play size={iconSize} />
-          </MenuButton>
+        <Menu.Root positioning={{ placement: "top-start" }}>
+          <Menu.Trigger asChild>
+            <Button variant="ghost" size="xs" paddingX={2} {...props}>
+              <Play size={iconSize} />
+            </Button>
+          </Menu.Trigger>
           <Wrapper>
-            <MenuList>
-              <MenuItem
-                icon={<Play size={14} />}
-                onClick={() => {
-                  node && startComponentExecution({ node });
-                }}
-                fontSize="13px"
+            <Menu.Content>
+              <Menu.Item
+                value="run-manual"
+                onSelect={() => node && startComponentExecution({ node })}
               >
+                <Play size={14} />
                 Run with manual input
-              </MenuItem>
-              <MenuItem
-                icon={<Play size={14} />}
-                onClick={() => {
-                  node && startWorkflowExecution({ untilNodeId: node.id });
-                }}
-                fontSize="13px"
+              </Menu.Item>
+              <Menu.Item
+                value="run-workflow"
+                onSelect={() =>
+                  node && startWorkflowExecution({ untilNodeId: node.id })
+                }
               >
+                <Play size={14} />
                 Run workflow until here
-              </MenuItem>
-            </MenuList>
+              </Menu.Item>
+            </Menu.Content>
           </Wrapper>
-        </Menu>
+        </Menu.Root>
       )}
     </>
   );

@@ -1,12 +1,10 @@
 import {
   Box,
-  FormControl,
-  FormHelperText,
-  FormLabel,
+  Field,
   HStack,
   Spacer,
   VStack,
-  type StackProps,
+  type SystemStyleObject,
 } from "@chakra-ui/react";
 import { type PropsWithChildren, type ReactNode } from "react";
 
@@ -15,9 +13,9 @@ export function HorizontalFormControl({
   helper,
   invalid,
   children,
-  align,
   minWidth,
   inputWidth,
+  align,
   ...props
 }: PropsWithChildren<{
   label: string | ReactNode;
@@ -25,12 +23,14 @@ export function HorizontalFormControl({
   invalid?: boolean;
   inputWidth?: string;
 }> &
-  StackProps) {
+  SystemStyleObject & {
+    align?: "start" | "end";
+  }) {
   return (
-    <FormControl
+    <Field.Root
       borderBottomWidth="1px"
       paddingY={5}
-      isInvalid={invalid}
+      invalid={invalid}
       _last={{ border: "none" }}
       {...props}
     >
@@ -40,14 +40,14 @@ export function HorizontalFormControl({
         align={align}
       >
         <VStack align="start" gap={1} width="full" minWidth={minWidth}>
-          <FormLabel margin={0}>{label}</FormLabel>
-          <FormHelperText margin={0} fontSize="13px">
+          <Field.Label margin={0}>{label}</Field.Label>
+          <Field.HelperText margin={0} fontSize="13px">
             {helper}
-          </FormHelperText>
+          </Field.HelperText>
         </VStack>
         <Spacer />
         <Box minWidth={["full", "full", inputWidth ?? "50%"]}>{children}</Box>
       </HStack>
-    </FormControl>
+    </Field.Root>
   );
 }

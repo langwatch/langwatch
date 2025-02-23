@@ -142,7 +142,7 @@ export default function MessagesOrIntegrationGuide() {
           </Grid>
         </VStack>
       </Container>
-      <NewWorkflowModal isOpen={isOpen} onClose={onClose} />
+      <NewWorkflowModal open={isOpen} onClose={onClose} />
     </DashboardLayout>
   );
 }
