@@ -144,7 +144,7 @@ export function PeriodSelector({
             <Calendar size={16} />
             <Text>{getDateRangeLabel()}</Text>
             <Box>
-              <ChevronDown width={12} />
+              <ChevronDown />
             </Box>
           </HStack>
         </Button>

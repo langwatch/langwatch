@@ -118,4 +118,10 @@ export const Menu = {
   Item: MenuItem,
   ItemText: MenuItemText,
   ItemCommand: MenuItemCommand,
+  ItemGroup: MenuItemGroup,
+  RadioItemGroup: MenuRadioItemGroup,
+  ContextTrigger: MenuContextTrigger,
+  Separator: MenuSeparator,
+  CheckboxItem: MenuCheckboxItem,
+  RadioItem: MenuRadioItem,
 };

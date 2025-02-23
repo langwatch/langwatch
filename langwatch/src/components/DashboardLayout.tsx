@@ -6,7 +6,6 @@ import {
   Button,
   HStack,
   Input,
-  Menu,
   Popover,
   Portal,
   Spacer,
@@ -65,6 +64,7 @@ import { useColorRawValue } from "./ui/color-mode";
 import { InputGroup } from "./ui/input-group";
 import { Tooltip } from "./ui/tooltip";
 import { Link } from "./ui/link";
+import { Menu } from "./ui/menu";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -309,7 +309,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
             <ProjectTechStackIcon project={project} />
             <Box>{project.name}</Box>
             <Box>
-              <ChevronDown width={14} />
+              <ChevronDown />
             </Box>
           </HStack>
         </Button>

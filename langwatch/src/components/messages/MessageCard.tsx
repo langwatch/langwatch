@@ -1,23 +1,18 @@
 import {
-  Alert,
-  AlertTitle,
+  Badge,
   Box,
   HStack,
   LinkOverlay,
-  Popover,
-  PopoverArrow,
-  PopoverBody,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTrigger,
-  Portal,
   Skeleton,
   Spacer,
-  Tag,
   Text,
-  Tooltip,
+  useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { Alert } from "@chakra-ui/react";
+import { Tag } from "@chakra-ui/react";
+import { Tooltip } from "../ui/tooltip";
+import { Popover } from "../ui/popover";
 import type { Annotation, Project } from "@prisma/client";
 import NextLink from "next/link";
 import numeral from "numeral";
@@ -116,7 +111,7 @@ export function MessageCard({
     const { openDrawer } = useDrawer();
 
     return (
-      <Tooltip label={`${annotations.length} Annotations`}>
+      <Tooltip content={`${annotations.length} Annotations`}>
         <Box
           right={2}
           top={2}
@@ -143,6 +138,8 @@ export function MessageCard({
       </Tooltip>
     );
   };
+
+  const evaluationsPopover = useDisclosure();
 
   return (
     <VStack alignItems="flex-start" gap={4} width="fill">
@@ -241,13 +238,15 @@ export function MessageCard({
               )}
             </Box>
             {trace.expected_output && (
-              <Alert status="warning" fontSize="13px">
-                <Box paddingRight={2}>
-                  <CornerDownRight size="16" />
-                </Box>
-                <AlertTitle>Expected Output:</AlertTitle>
-                <Text>{getSlicedExpectedOutput(trace)}</Text>
-              </Alert>
+              <Alert.Root status="warning" fontSize="13px">
+                <Alert.Content>
+                  <Box paddingRight={2}>
+                    <CornerDownRight size="16" />
+                  </Box>
+                  <Alert.Title>Expected Output:</Alert.Title>
+                  <Text>{getSlicedExpectedOutput(trace)}</Text>
+                </Alert.Content>
+              </Alert.Root>
             )}
           </VStack>
         )}
@@ -257,7 +256,7 @@ export function MessageCard({
         <VStack gap={4} alignItems="flex-start">
           <HStack gap={2}>
             {traceTopic && (
-              <Tag
+              <Badge
                 background={
                   getColorForString("colors", traceTopic.id).background
                 }
@@ -265,10 +264,10 @@ export function MessageCard({
                 fontSize="12px"
               >
                 {traceTopic.name}
-              </Tag>
+              </Badge>
             )}
             {traceSubtopic && (
-              <Tag
+              <Badge
                 background={
                   getColorForString("colors", traceSubtopic.id).background
                 }
@@ -276,17 +275,17 @@ export function MessageCard({
                 fontSize="12px"
               >
                 {traceSubtopic.name}
-              </Tag>
+              </Badge>
             )}
             {(trace.metadata.labels ?? []).map((label) => (
-              <Tag
+              <Badge
                 key={label}
                 background={getColorForString("colors", label).background}
                 color={getColorForString("colors", label).color}
                 fontSize="12px"
               >
                 {label}
-              </Tag>
+              </Badge>
             ))}
           </HStack>
           <HStack fontSize="12px" color="gray.400">
@@ -301,7 +300,7 @@ export function MessageCard({
               </>
             )}
             <Tooltip
-              label={new Date(trace.timestamps.started_at).toLocaleString()}
+              content={new Date(trace.timestamps.started_at).toLocaleString()}
             >
               <Text
                 borderBottomWidth="1px"
@@ -365,9 +364,9 @@ export function MessageCard({
         )}
         {!checksMap && <Skeleton width={100} height="1em" />}
         {checksMap && totalGuardrails > 0 && (
-          <Popover trigger="hover">
-            <PopoverTrigger>
-              <Tag
+          <Popover.Root>
+            <Popover.Trigger>
+              <Tag.Root
                 variant="outline"
                 boxShadow="#DEDEDE 0px 0px 0px 1px inset"
                 color={
@@ -382,59 +381,59 @@ export function MessageCard({
                 position="relative"
                 zIndex="popover"
               >
-                {allGuardrailsSkipped ? (
-                  <>
-                    <Box paddingRight={2}>
-                      <MinusCircle />
-                    </Box>
-                    Guardrails skipped
-                  </>
-                ) : guardrailsPasses == totalGuardrails ? (
-                  <>
-                    <Box paddingRight={2}>
-                      <CheckCircle />
-                    </Box>
-                    {guardrailsPasses}/{totalGuardrails} guardrails
-                  </>
-                ) : (
-                  <>
-                    <Box paddingRight={2}>
-                      <Shield />
-                    </Box>
-                    {totalGuardrails - guardrailsPasses}{" "}
-                    {pluralize(
-                      totalGuardrails - guardrailsPasses,
-                      "guardrail block",
-                      "guardrail blocks"
-                    )}
-                  </>
-                )}
-              </Tag>
-            </PopoverTrigger>
-            <Portal>
-              <Box zIndex="popover">
-                <PopoverContent zIndex={2} width="fit-content">
-                  <PopoverArrow />
-                  <PopoverHeader>Guardrails</PopoverHeader>
-                  <PopoverBody>
-                    <VStack align="start" gap={2}>
-                      {guardrails.map((evaluation) => (
-                        <CheckPassing
-                          key={evaluation.evaluation_id}
-                          check={evaluation}
-                        />
-                      ))}
-                    </VStack>
-                  </PopoverBody>
-                </PopoverContent>
-              </Box>
-            </Portal>
-          </Popover>
+                <Tag.Label>
+                  {allGuardrailsSkipped ? (
+                    <>
+                      <Box paddingRight={2}>
+                        <MinusCircle />
+                      </Box>
+                      Guardrails skipped
+                    </>
+                  ) : guardrailsPasses == totalGuardrails ? (
+                    <>
+                      <Box paddingRight={2}>
+                        <CheckCircle />
+                      </Box>
+                      {guardrailsPasses}/{totalGuardrails} guardrails
+                    </>
+                  ) : (
+                    <>
+                      <Box paddingRight={2}>
+                        <Shield />
+                      </Box>
+                      {totalGuardrails - guardrailsPasses}{" "}
+                      {pluralize(
+                        totalGuardrails - guardrailsPasses,
+                        "guardrail block",
+                        "guardrail blocks"
+                      )}
+                    </>
+                  )}
+                </Tag.Label>
+              </Tag.Root>
+            </Popover.Trigger>
+            <Popover.Content>
+              <Popover.Header>Guardrails</Popover.Header>
+              <Popover.Body>
+                <VStack align="start" gap={2}>
+                  {guardrails.map((evaluation) => (
+                    <CheckPassing
+                      key={evaluation.evaluation_id}
+                      check={evaluation}
+                    />
+                  ))}
+                </VStack>
+              </Popover.Body>
+            </Popover.Content>
+          </Popover.Root>
         )}
         {checksMap && totalEvaluations > 0 && (
-          <Popover trigger="hover">
-            <PopoverTrigger>
-              <Tag
+          <Popover.Root
+            open={evaluationsPopover.open}
+            onOpenChange={({ open }) => evaluationsPopover.setOpen(open)}
+          >
+            <Popover.Trigger>
+              <Tag.Root
                 variant="outline"
                 boxShadow="#DEDEDE 0px 0px 0px 1px inset"
                 color={
@@ -448,48 +447,49 @@ export function MessageCard({
                 paddingX={2}
                 position="relative"
                 zIndex="popover"
+                borderRadius="full"
+                onMouseEnter={evaluationsPopover.onOpen}
+                onMouseLeave={evaluationsPopover.onClose}
               >
-                <Box paddingRight={2}>
-                  {!evaluationsDone ? (
-                    <Clock />
-                  ) : allEvaluationsSkipped ? (
-                    <MinusCircle />
-                  ) : evaluationsPasses == totalEvaluations ? (
-                    <CheckCircle />
-                  ) : (
-                    <XCircle />
-                  )}
-                </Box>
-                {allEvaluationsSkipped
-                  ? "Evaluations skipped"
-                  : evaluationsDone && evaluationsPasses != totalEvaluations
-                  ? `${totalEvaluations - evaluationsPasses} ${
-                      totalEvaluations - evaluationsPasses == 1
-                        ? "evaluation failed"
-                        : "evaluations failed"
-                    }`
-                  : `${evaluationsPasses}/${totalEvaluations} evaluations`}
-              </Tag>
-            </PopoverTrigger>
-            <Portal>
-              <Box zIndex="popover">
-                <PopoverContent zIndex={2} width="fit-content">
-                  <PopoverArrow />
-                  <PopoverHeader>Evaluations</PopoverHeader>
-                  <PopoverBody>
-                    <VStack align="start" gap={2}>
-                      {evaluations.map((evaluation) => (
-                        <CheckPassing
-                          key={evaluation.evaluation_id}
-                          check={evaluation}
-                        />
-                      ))}
-                    </VStack>
-                  </PopoverBody>
-                </PopoverContent>
-              </Box>
-            </Portal>
-          </Popover>
+                <Tag.Label>
+                  <HStack gap={2}>
+                    {!evaluationsDone ? (
+                      <Clock />
+                    ) : allEvaluationsSkipped ? (
+                      <MinusCircle />
+                    ) : evaluationsPasses == totalEvaluations ? (
+                      <CheckCircle />
+                    ) : (
+                      <XCircle />
+                    )}
+                    {allEvaluationsSkipped
+                      ? "Evaluations skipped"
+                      : evaluationsDone && evaluationsPasses != totalEvaluations
+                      ? `${totalEvaluations - evaluationsPasses} ${
+                          totalEvaluations - evaluationsPasses == 1
+                            ? "evaluation failed"
+                            : "evaluations failed"
+                        }`
+                      : `${evaluationsPasses}/${totalEvaluations} evaluations`}
+                  </HStack>
+                </Tag.Label>
+              </Tag.Root>
+            </Popover.Trigger>
+            <Popover.Content width="500px">
+              <Popover.Arrow />
+              <Popover.Header>Evaluations</Popover.Header>
+              <Popover.Body>
+                <VStack align="start" gap={2}>
+                  {evaluations.map((evaluation) => (
+                    <CheckPassing
+                      key={evaluation.evaluation_id}
+                      check={evaluation}
+                    />
+                  ))}
+                </VStack>
+              </Popover.Body>
+            </Popover.Content>
+          </Popover.Root>
         )}
       </HStack>
     </VStack>
