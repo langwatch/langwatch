@@ -111,16 +111,19 @@ export function MessageCard({
     const { openDrawer } = useDrawer();
 
     return (
-      <Tooltip content={`${annotations.length} Annotations`}>
-        <Box
-          right={2}
-          top={2}
-          borderRadius="2xl"
-          borderWidth={1}
-          borderColor="gray.300"
+      <Tooltip content={`See more`}>
+        <Tag.Root
+          variant="outline"
+          boxShadow="#DEDEDE 0px 0px 0px 1px inset"
           paddingY={1}
           paddingX={2}
-          zIndex="99"
+          position="relative"
+          zIndex="popover"
+          borderRadius="full"
+          right={2}
+          top={2}
+          borderWidth={1}
+          borderColor="gray.300"
           onClick={() =>
             openDrawer("traceDetails", {
               traceId: trace.trace_id,
@@ -128,13 +131,16 @@ export function MessageCard({
             })
           }
         >
-          <HStack>
-            <Edit size="20px" />
-            <Text fontSize="sm">
-              {annotations.length} annotation{annotations.length > 1 ? "s" : ""}
-            </Text>
-          </HStack>
-        </Box>
+          <Tag.Label>
+            <HStack>
+              <Edit />
+              <Text>
+                {annotations.length} annotation
+                {annotations.length > 1 ? "s" : ""}
+              </Text>
+            </HStack>
+          </Tag.Label>
+        </Tag.Root>
       </Tooltip>
     );
   };

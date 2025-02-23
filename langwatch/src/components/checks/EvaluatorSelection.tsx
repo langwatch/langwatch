@@ -1,22 +1,17 @@
 import {
+  Badge,
   Box,
   Grid,
   GridItem,
   HStack,
   Heading,
-  Link,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
   Tabs,
   Tag,
   Text,
-  Tooltip,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
-import { Shield } from "react-feather";
+import NextLink from "next/link";
+import { Shield, Plus } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 import {
   AVAILABLE_EVALUATORS,
@@ -28,7 +23,9 @@ import { titleCase } from "../../utils/stringCasing";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 import { api } from "../../utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { Plus } from "react-feather";
+import { Link } from "../ui/link";
+import { Tooltip } from "../ui/tooltip";
+import { useRouter } from "next/router";
 
 type Category = EvaluatorDefinition<any>["category"];
 
@@ -153,200 +150,232 @@ export function EvaluatorSelection({
   }
 
   return (
-    <Tabs
+    <Tabs.Root
       colorPalette="orange"
-      index={categories.indexOf(tab)}
-      onChange={(index) => {
+      defaultValue={tab}
+      value={tab}
+      onValueChange={(change) => {
         void router.replace({
           pathname: router.pathname,
-          query: { ...router.query, tab: categories[index] },
+          query: { ...router.query, tab: change.value },
         });
       }}
     >
-      <TabList>
+      <Tabs.List>
         {Object.keys(availableEvaluatorsPerCategory).map((category) => (
-          <Tab key={category}>{titleCase(category)}</Tab>
+          <Tabs.Trigger key={category} value={category}>
+            {titleCase(category)}
+          </Tabs.Trigger>
         ))}
-      </TabList>
-      <TabPanels>
-        {Object.entries(availableEvaluatorsPerCategory).map(
-          ([category, evaluators]) => (
-            <TabPanel key={category} paddingX={0}>
-              <Grid templateColumns="repeat(3, 1fr)" gap={6}>
-                {evaluators.map(([key, evaluator]) => {
-                  const isDisabled =
-                    evaluator.missingEnvVars &&
-                    evaluator.missingEnvVars.length > 0;
+      </Tabs.List>
 
-                  return (
-                    <GridItem
-                      key={key}
-                      width="full"
-                      padding={6}
-                      borderRadius={6}
-                      boxShadow="0px 4px 10px 0px rgba(0, 0, 0, 0.06)"
-                      cursor={isDisabled ? "default" : "pointer"}
-                      role="button"
-                      _hover={
-                        isDisabled
-                          ? undefined
-                          : {
-                              background: "gray.200",
-                            }
-                      }
-                      onClick={() => {
-                        if (isDisabled) return;
-                        form.setValue("checkType", key as EvaluatorTypes);
-                        void router.push({
-                          pathname: router.pathname.replace("/choose", ""),
-                          query: router.query,
-                        });
-                      }}
-                      color={isDisabled ? "gray.400" : undefined}
-                      background={isDisabled ? "gray.50" : "white"}
-                    >
-                      <VStack align="start" gap={4} position="relative">
-                        {evaluator.isGuardrail && (
-                          <Tooltip label="This evaluator can be used as a guardrail">
-                            <Box
-                              position="absolute"
-                              right="-12px"
-                              top="-12px"
-                              background="blue.100"
-                              borderRadius="100%"
-                              padding="4px"
+      {Object.entries(availableEvaluatorsPerCategory).map(
+        ([category, evaluators]) => (
+          <Tabs.Content key={category} value={category} paddingX={0}>
+            <Grid templateColumns="repeat(3, 1fr)" gap={6}>
+              {evaluators.map(([key, evaluator]) => {
+                const isDisabled =
+                  evaluator.missingEnvVars &&
+                  evaluator.missingEnvVars.length > 0;
+
+                return (
+                  <GridItem
+                    key={key}
+                    width="full"
+                    padding={6}
+                    borderRadius={6}
+                    boxShadow="0px 4px 10px 0px rgba(0, 0, 0, 0.06)"
+                    cursor={isDisabled ? "default" : "pointer"}
+                    role="button"
+                    _hover={
+                      isDisabled
+                        ? undefined
+                        : {
+                            background: "gray.200",
+                          }
+                    }
+                    onClick={() => {
+                      if (isDisabled) return;
+                      form.setValue("checkType", key as EvaluatorTypes);
+                      void router.push({
+                        pathname: router.pathname.replace("/choose", ""),
+                        query: router.query,
+                      });
+                    }}
+                    color={isDisabled ? "gray.400" : undefined}
+                    background={isDisabled ? "gray.50" : "white"}
+                  >
+                    <VStack align="start" gap={4} position="relative">
+                      {evaluator.isGuardrail && (
+                        <Tooltip
+                          content="This evaluator can be used as a guardrail"
+                          positioning={{ placement: "top" }}
+                        >
+                          <Box
+                            position="absolute"
+                            right="-12px"
+                            top="-12px"
+                            background="blue.100"
+                            borderRadius="100%"
+                            padding="4px"
+                          >
+                            <Shield />
+                          </Box>
+                        </Tooltip>
+                      )}
+                      <HStack>
+                        {evaluator.beta && (
+                          <Tag.Root
+                            size="sm"
+                            colorPalette="pink"
+                            paddingX={2}
+                            fontSize="14px"
+                            marginLeft="-4px"
+                          >
+                            <Tag.Label>Beta</Tag.Label>
+                          </Tag.Root>
+                        )}
+                        <Heading as="h2" size="sm">
+                          {evaluatorTempNameMap[evaluator.name] ??
+                            evaluator.name}
+                        </Heading>
+                      </HStack>
+                      {evaluator.missingEnvVars &&
+                        evaluator.missingEnvVars.length > 0 && (
+                          <Tooltip
+                            content={evaluator.missingEnvVars.join(", ")}
+                            positioning={{ placement: "top" }}
+                          >
+                            <Tag.Root
+                              colorPalette="orange"
+                              borderRadius="8px"
+                              padding="4px 8px"
+                              lineHeight="1.5em"
                             >
-                              <Shield />
-                            </Box>
+                              <Tag.Label>
+                                Evaluator disabled, missing env vars
+                              </Tag.Label>
+                            </Tag.Root>
                           </Tooltip>
                         )}
-                        <HStack>
-                          {evaluator.beta && (
-                            <Tag
-                              size="sm"
-                              colorPalette="pink"
-                              paddingX={2}
-                              fontSize="14px"
-                              marginLeft="-4px"
-                            >
-                              Beta
-                            </Tag>
-                          )}
-                          <Heading as="h2" size="sm">
-                            {evaluatorTempNameMap[evaluator.name] ??
-                              evaluator.name}
-                          </Heading>
-                        </HStack>
-                        {evaluator.missingEnvVars &&
-                          evaluator.missingEnvVars.length > 0 && (
-                            <Tooltip
-                              label={evaluator.missingEnvVars.join(", ")}
-                            >
-                              <Tag
-                                colorPalette="orange"
-                                borderRadius="8px"
-                                padding="4px 8px"
-                                lineHeight="1.5em"
+                      <Text>
+                        {evaluator.description.replace(
+                          "Google DLP PII detects",
+                          "Detects"
+                        )}
+                      </Text>
+                      <HStack wrap="wrap">
+                        {evaluator.requiredFields.includes("contexts") && (
+                          <Link
+                            asChild
+                            href="https://docs.langwatch.ai/rags/rags-context-tracking"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <NextLink href="https://docs.langwatch.ai/rags/rags-context-tracking">
+                              <Tooltip
+                                content="Only messages with contexts can run this evaluation, click for more info"
+                                positioning={{ placement: "top" }}
                               >
-                                Evaluator disabled, missing env vars
-                              </Tag>
-                            </Tooltip>
-                          )}
-                        {/* <VStack align="start" gap={1}>
-                          {(evaluator.missingEnvVars ?? []).map((envVar) => (
-                            <Tag colorPalette="red" key={envVar} fontSize="12px" paddingX={2}>
-                              Missing {envVar}
-                            </Tag>
-                          ))}
-                        </VStack> */}
-                        <Text>
-                          {/* TODO: temporary change for Google DLP PII */}
-                          {evaluator.description.replace(
-                            "Google DLP PII detects",
-                            "Detects"
-                          )}
-                        </Text>
-                        <HStack wrap="wrap">
-                          {evaluator.requiredFields.includes("contexts") && (
-                            <Link
-                              href="https://docs.langwatch.ai/rags/rags-context-tracking"
-                              target="_blank"
-                            >
-                              <Tooltip label="Only messages with contexts can run this evaluation, click for more info">
-                                <Tag colorPalette="orange" whiteSpace="nowrap">
+                                <Badge
+                                  colorPalette="orange"
+                                  whiteSpace="nowrap"
+                                >
                                   Requires Contexts
-                                </Tag>
+                                </Badge>
                               </Tooltip>
-                            </Link>
-                          )}
-                          {evaluator.requiredFields.includes(
-                            "expected_output"
-                          ) && (
-                            <Link
-                              href="https://docs.langwatch.ai/docs/expected_output"
-                              target="_blank"
-                            >
-                              <Tooltip label="Only messages with expected outputs can run this evaluation, click for more info">
-                                <Tag
+                            </NextLink>
+                          </Link>
+                        )}
+                        {evaluator.requiredFields.includes(
+                          "expected_output"
+                        ) && (
+                          <Link
+                            asChild
+                            href="https://docs.langwatch.ai/docs/expected_output"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <NextLink href="https://docs.langwatch.ai/docs/expected_output">
+                              <Tooltip
+                                content="Only messages with expected outputs can run this evaluation, click for more info"
+                                positioning={{ placement: "top" }}
+                              >
+                                <Badge
+                                  colorPalette="blue"
                                   backgroundColor="blue.50"
                                   color="blue.700"
                                   whiteSpace="nowrap"
                                 >
                                   Requires Expected Output
-                                </Tag>
+                                </Badge>
                               </Tooltip>
-                            </Link>
-                          )}
-                          {evaluator.requiredFields.includes(
-                            "expected_contexts"
-                          ) && (
-                            <Tooltip label="Only messages with expected contexts can run this evaluation, click for more info">
-                              <Tag
-                                backgroundColor="purple.50"
-                                color="purple.700"
-                                whiteSpace="nowrap"
+                            </NextLink>
+                          </Link>
+                        )}
+                        {evaluator.requiredFields.includes(
+                          "expected_contexts"
+                        ) && (
+                          <Link
+                            asChild
+                            href="https://docs.langwatch.ai/docs/expected_contexts"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <NextLink href="https://docs.langwatch.ai/docs/expected_contexts">
+                              <Tooltip
+                                content="Only messages with expected contexts can run this evaluation, click for more info"
+                                positioning={{ placement: "top" }}
                               >
-                                Requires Expected Contexts
-                              </Tag>
-                            </Tooltip>
-                          )}
-                        </HStack>
-                      </VStack>
-                    </GridItem>
-                  );
-                })}
-
-                {category === "custom" && (
-                  <GridItem
-                    as={Link}
-                    href={`/${project?.slug}/workflows`}
-                    border="dashed"
-                    borderColor="gray.300"
-                    borderWidth={3}
-                    borderRadius={6}
-                    padding={6}
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                    minHeight="200px"
-                    _hover={{
-                      background: "gray.50",
-                      textDecoration: "none",
-                    }}
-                  >
-                    <VStack gap={3}>
-                      <Box p={3} borderRadius="full" bg="gray.100">
-                        <Plus size={24} color="gray" />
-                      </Box>
-                      <Text color="gray.600">Create Custom Evaluator</Text>
+                                <Badge
+                                  colorPalette="purple"
+                                  backgroundColor="purple.50"
+                                  color="purple.700"
+                                  whiteSpace="nowrap"
+                                >
+                                  Requires Expected Contexts
+                                </Badge>
+                              </Tooltip>
+                            </NextLink>
+                          </Link>
+                        )}
+                      </HStack>
                     </VStack>
                   </GridItem>
-                )}
-              </Grid>
-            </TabPanel>
-          )
-        )}
-      </TabPanels>
-    </Tabs>
+                );
+              })}
+
+              {category === "custom" && (
+                <GridItem
+                  as={Link}
+                  //@ts-ignore
+                  href={`/${project?.slug}/workflows`}
+                  border="dashed"
+                  borderColor="gray.300"
+                  borderWidth={3}
+                  borderRadius={6}
+                  padding={6}
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  minHeight="200px"
+                  _hover={{
+                    background: "gray.50",
+                    textDecoration: "none",
+                  }}
+                >
+                  <VStack gap={3}>
+                    <Box p={3} borderRadius="full" bg="gray.100">
+                      <Plus size={24} color="gray" />
+                    </Box>
+                    <Text color="gray.600">Create Custom Evaluator</Text>
+                  </VStack>
+                </GridItem>
+              )}
+            </Grid>
+          </Tabs.Content>
+        )
+      )}
+    </Tabs.Root>
   );
 }

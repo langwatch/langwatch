@@ -83,7 +83,7 @@ export function WorkflowPropertiesPanel() {
             <VStack align="flex-start">
               <HStack align="center">
                 <EmojiPickerModal
-                  isOpen={isOpen}
+                  open={isOpen}
                   onClose={onClose}
                   onChange={(emoji) => {
                     setWorkflow({ icon: emoji });

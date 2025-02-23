@@ -1,24 +1,16 @@
 import {
   Accordion,
-  AccordionButton,
-  AccordionIcon,
-  AccordionItem,
-  AccordionPanel,
+  AccordionItemIndicator,
   Alert,
-  AlertIcon,
   Box,
   Button,
   Card,
-  CardBody,
-  FormControl,
-  FormHelperText,
-  FormLabel,
+  Field,
   HStack,
   Input,
-  Select,
+  NativeSelect,
   Spacer,
   Text,
-  Tooltip,
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,7 +19,7 @@ import type { JsonArray } from "@prisma/client/runtime/library";
 import type { Edge, Node } from "@xyflow/react";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { ArrowRight, HelpCircle } from "react-feather";
+import { ArrowRight, ChevronDown, Edit2, HelpCircle } from "react-feather";
 import {
   Controller,
   FormProvider,
@@ -56,6 +48,7 @@ import type { CheckPreconditions } from "../../server/evaluations/types";
 import { checkPreconditionsSchema } from "../../server/evaluations/types.generated";
 import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
+import { Tooltip } from "../ui/tooltip";
 import DynamicZodForm from "./DynamicZodForm";
 import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
 import { EvaluatorSelection, evaluatorTempNameMap } from "./EvaluatorSelection";
@@ -78,14 +71,14 @@ interface CheckConfigFormProps {
   checkId?: string;
   defaultValues?: Partial<CheckConfigFormData>;
   onSubmit: (data: CheckConfigFormData) => Promise<void>;
-  isLoading: boolean;
+  loading: boolean;
 }
 
 export default function CheckConfigForm({
   checkId,
   defaultValues,
   onSubmit,
-  isLoading,
+  loading,
 }: CheckConfigFormProps) {
   const { project } = useOrganizationTeamProject();
   const isNameAvailable = api.checks.isNameAvailable.useMutation();
@@ -281,9 +274,10 @@ export default function CheckConfigForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkType, defaultValues?.checkType, defaultValues?.settings]);
 
-  if (!availableCustomEvaluators.data) {
-    return;
-  }
+  const accordionIndex = checkType?.startsWith("custom/") ? 0 : undefined;
+  const [accordionValue, setAccordionValue] = useState(
+    accordionIndex ? ["0"] : []
+  );
 
   const runOn = (
     <Text color="gray.500" fontStyle="italic">
@@ -294,8 +288,6 @@ export default function CheckConfigForm({
       {preconditions?.length > 0 && " matching the preconditions"}
     </Text>
   );
-
-  const accordionIndex = checkType?.startsWith("custom/") ? 0 : undefined;
 
   return (
     <FormProvider {...form}>
@@ -311,8 +303,8 @@ export default function CheckConfigForm({
           <EvaluatorSelection form={form} />
         ) : (
           <VStack gap={6} align="start" width="full">
-            <Card width="full">
-              <CardBody>
+            <Card.Root width="full">
+              <Card.Body>
                 <VStack gap={0}>
                   <HorizontalFormControl
                     label="Evaluation Type"
@@ -320,14 +312,15 @@ export default function CheckConfigForm({
                     invalid={!!errors.checkType}
                   >
                     <VStack align="start" width="full">
-                      <HStack gap={0}>
+                      <HStack gap={0} width="full">
                         <Text>
                           {evaluatorTempNameMap[
                             availableEvaluators[checkType].name
                           ] ?? availableEvaluators[checkType].name}
                         </Text>
                         <Button
-                          variant="plain"
+                          variant="ghost"
+                          size="xs"
                           onClick={() => {
                             void router.push({
                               pathname: router.pathname + "/choose",
@@ -336,22 +329,25 @@ export default function CheckConfigForm({
                           }}
                           marginLeft={4}
                           fontWeight="normal"
+                          color="gray.600"
                         >
-                          (change)
+                          <Edit2 />
                         </Button>
                       </HStack>
                       <Text fontSize="12px" color="gray.500">
                         {availableEvaluators[checkType].description}
                       </Text>
                       {checkType.startsWith("legacy/") && (
-                        <Alert status="warning" alignItems="start">
-                          <AlertIcon />
-                          <Text fontSize="13px">
-                            You are using a legacy evaluator version, please
-                            click the <b>change</b> button above to select a
-                            newer version or a replacement for this evaluator.
-                          </Text>
-                        </Alert>
+                        <Alert.Root status="warning">
+                          <Alert.Indicator />
+                          <Alert.Content>
+                            <Text fontSize="13px">
+                              You are using a legacy evaluator version, please
+                              click the <b>change</b> button above to select a
+                              newer version or a replacement for this evaluator.
+                            </Text>
+                          </Alert.Content>
+                        </Alert.Root>
                       )}
                     </VStack>
                   </HorizontalFormControl>
@@ -391,11 +387,11 @@ export default function CheckConfigForm({
                     />
                   )}
                 </VStack>
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
 
-            <Card width="full" padding={0}>
-              <CardBody padding={0}>
+            <Card.Root width="full" padding={0}>
+              <Card.Body padding={0}>
                 <VStack paddingX={4} gap={0}>
                   <HorizontalFormControl
                     label="Execution Mode"
@@ -404,19 +400,22 @@ export default function CheckConfigForm({
                     align="start"
                     _last={{ borderBottomWidth: "1px" }}
                   >
-                    <Select {...register("executionMode")} required>
-                      <option value={EvaluationExecutionMode.ON_MESSAGE}>
-                        When message arrives
-                      </option>
-                      {evaluatorDefinition?.isGuardrail && (
-                        <option value={EvaluationExecutionMode.AS_GUARDRAIL}>
-                          As a Guardrail
+                    <NativeSelect.Root>
+                      <NativeSelect.Field {...register("executionMode")}>
+                        <option value={EvaluationExecutionMode.ON_MESSAGE}>
+                          When message arrives
                         </option>
-                      )}
-                      <option value={EvaluationExecutionMode.MANUALLY}>
-                        Manually
-                      </option>
-                    </Select>
+                        {evaluatorDefinition?.isGuardrail && (
+                          <option value={EvaluationExecutionMode.AS_GUARDRAIL}>
+                            As a Guardrail
+                          </option>
+                        )}
+                        <option value={EvaluationExecutionMode.MANUALLY}>
+                          Manually
+                        </option>
+                      </NativeSelect.Field>
+                      <NativeSelect.Indicator />
+                    </NativeSelect.Root>
                   </HorizontalFormControl>
                   {executionMode !== EvaluationExecutionMode.ON_MESSAGE && (
                     <EvaluationManualIntegration
@@ -428,29 +427,32 @@ export default function CheckConfigForm({
                 </VStack>
 
                 {executionMode === EvaluationExecutionMode.ON_MESSAGE && (
-                  <Accordion
-                    defaultIndex={accordionIndex}
-                    allowToggle
-                    padding={0}
+                  <Accordion.Root
+                    value={accordionValue}
+                    onValueChange={({ value }) => {
+                      console.log("value", value);
+                      setAccordionValue(value);
+                    }}
+                    multiple
                   >
-                    <AccordionItem border="none">
-                      <AccordionButton paddingY={6}>
-                        <Box as="span" flex="1" textAlign="left">
-                          <FormControl>
-                            <VStack align="start" gap={1}>
-                              <FormLabel margin={0}>
-                                Execution Settings
-                              </FormLabel>
-                              <FormHelperText margin={0} fontSize="13px">
-                                Configure how and when this evaluation is
-                                executed when a new message arrives
-                              </FormHelperText>
-                            </VStack>
-                          </FormControl>
-                        </Box>
-                        <AccordionIcon />
-                      </AccordionButton>
-                      <AccordionPanel paddingTop={2}>
+                    <Accordion.Item value="0">
+                      <Accordion.ItemTrigger padding={4} paddingBottom={6}>
+                        <Field.Root>
+                          <VStack align="start" gap={1}>
+                            <Field.Label margin={0}>
+                              Execution Settings
+                            </Field.Label>
+                            <Field.HelperText margin={0} fontSize="13px">
+                              Configure how and when this evaluation is executed
+                              when a new message arrives
+                            </Field.HelperText>
+                          </VStack>
+                        </Field.Root>
+                        <Accordion.ItemIndicator>
+                          <ChevronDown />
+                        </Accordion.ItemIndicator>
+                      </Accordion.ItemTrigger>
+                      <Accordion.ItemContent paddingX={4}>
                         <HorizontalFormControl
                           label="Mappings"
                           helper="Map which fields from the trace will be used to run the evaluation"
@@ -523,7 +525,7 @@ export default function CheckConfigForm({
                                       field.onChange(+e.target.value)
                                     }
                                   />
-                                  <Tooltip label="You can use this to save costs on expensive checks if you have too many messages incomming. From 0.01 to run on 1% of the messages to 1.0 to run on 100% of the messages">
+                                  <Tooltip content="You can use this to save costs on expensive checks if you have too many messages incomming. From 0.01 to run on 1% of the messages to 1.0 to run on 100% of the messages">
                                     <HelpCircle width="14px" />
                                   </Tooltip>
                                 </HStack>
@@ -532,17 +534,17 @@ export default function CheckConfigForm({
                             )}
                           />
                         </HorizontalFormControl>
-                      </AccordionPanel>
-                    </AccordionItem>
-                  </Accordion>
+                      </Accordion.ItemContent>
+                    </Accordion.Item>
+                  </Accordion.Root>
                 )}
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
 
             <HStack width="full">
               <Spacer />
               <Tooltip
-                label={
+                content={
                   storeSettingsOnCode
                     ? 'You checked the "Store the settings on code" option, so the evaluation is configured directly on your codebase, saving is disabled'
                     : undefined
@@ -552,8 +554,8 @@ export default function CheckConfigForm({
                   colorPalette="orange"
                   type="submit"
                   minWidth="92px"
-                  isLoading={isLoading}
-                  isDisabled={storeSettingsOnCode}
+                  loading={loading}
+                  disabled={storeSettingsOnCode}
                 >
                   Save
                 </Button>
@@ -587,17 +589,19 @@ const MappingsFields = ({
           <>
             {requiredFields.map((field) => (
               <HStack width="full" key={field}>
-                <Select
-                  maxWidth="50%"
-                  defaultValue={defaultValues[field]}
-                  {...register(`customMapping.${field}`)}
-                >
-                  {mappingOptions.map(({ value, label }) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </Select>
+                <NativeSelect.Root maxWidth="50%">
+                  <NativeSelect.Field
+                    defaultValue={defaultValues[field]}
+                    {...register(`customMapping.${field}`)}
+                  >
+                    {mappingOptions.map(({ value, label }) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
                 <ArrowRight />
                 <Text>{field} (required)</Text>
               </HStack>
@@ -608,18 +612,20 @@ const MappingsFields = ({
           <>
             {optionalFields.map((field) => (
               <HStack width="full" key={field}>
-                <Select
-                  maxWidth="50%"
-                  defaultValue={defaultValues[field]}
-                  {...register(`customMapping.${field}`)}
-                >
-                  <option value="">(empty)</option>
-                  {mappingOptions.map(({ value, label }) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </Select>
+                <NativeSelect.Root maxWidth="50%">
+                  <NativeSelect.Field
+                    defaultValue={defaultValues[field]}
+                    {...register(`customMapping.${field}`)}
+                  >
+                    <option value="">(empty)</option>
+                    {mappingOptions.map(({ value, label }) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
                 <ArrowRight />
                 <Text>{field} (optional)</Text>
               </HStack>

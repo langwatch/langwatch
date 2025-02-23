@@ -1,15 +1,11 @@
 import {
   Button,
-  FormControl,
-  FormErrorMessage,
-  FormLabel,
+  Dialog,
+  Field,
   HStack,
   Input,
-  ModalBody,
-  ModalFooter,
   Textarea,
   useDisclosure,
-  useToast,
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
@@ -20,6 +16,7 @@ import { api } from "../../../utils/api";
 import type { Workflow } from "../../types/dsl";
 import { EmojiPickerModal } from "../properties/modals/EmojiPickerModal";
 import { trackEvent } from "../../../utils/tracking";
+import { toaster } from "../../../components/ui/toaster";
 
 type FormData = {
   name: string;
@@ -36,7 +33,6 @@ export const NewWorkflowForm = ({
 }) => {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
-  const toast = useToast();
   const emojiPicker = useDisclosure();
   const {
     register,
@@ -71,13 +67,15 @@ export const NewWorkflowForm = ({
           commitMessage: "Workflow creation",
         },
         {
-          onError: (error) => {
-            toast({
+          onError: () => {
+            toaster.create({
               title: "Error",
               description: "Failed to create workflow",
-              status: "error",
-              isClosable: true,
-              duration: 5000,
+              type: "error",
+              meta: {
+                closable: true,
+              },
+              placement: "top-end",
             });
           },
         }
@@ -109,18 +107,18 @@ export const NewWorkflowForm = ({
   return (
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     <form onSubmit={handleSubmit(onSubmit)}>
-      <ModalBody>
+      <Dialog.Body>
         <VStack gap={4} align="stretch">
-          <FormControl isInvalid={!!errors.name}>
+          <Field.Root invalid={!!errors.name}>
             <EmojiPickerModal
-              isOpen={emojiPicker.isOpen}
+              open={emojiPicker.open}
               onClose={emojiPicker.onClose}
               onChange={(emoji) => {
                 setValue("icon", emoji);
                 emojiPicker.onClose();
               }}
             />
-            <FormLabel>Name and Icon</FormLabel>
+            <Field.Label>Name and Icon</Field.Label>
             <HStack>
               <Button onClick={emojiPicker.onOpen}>{icon}</Button>
               <Input
@@ -131,27 +129,27 @@ export const NewWorkflowForm = ({
                 }}
               />
             </HStack>
-            <FormErrorMessage>{errors.name?.message}</FormErrorMessage>
-          </FormControl>
-          <FormControl isInvalid={!!errors.description}>
-            <FormLabel>Description</FormLabel>
+            <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
+          </Field.Root>
+          <Field.Root invalid={!!errors.description}>
+            <Field.Label>Description</Field.Label>
             <Textarea {...register("description")} />
-            <FormErrorMessage>{errors.description?.message}</FormErrorMessage>
-          </FormControl>
+            <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
+          </Field.Root>
         </VStack>
-      </ModalBody>
-      <ModalFooter>
+      </Dialog.Body>
+      <Dialog.Footer>
         <Button
           type="submit"
           colorPalette="blue"
-          isLoading={createWorkflowMutation.isLoading}
+          loading={createWorkflowMutation.isLoading}
           onClick={() => {
             void handleSubmit(onSubmit)();
           }}
         >
           Create Workflow
         </Button>
-      </ModalFooter>
+      </Dialog.Footer>
     </form>
   );
 };

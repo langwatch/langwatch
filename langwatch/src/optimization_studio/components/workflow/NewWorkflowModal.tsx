@@ -1,17 +1,6 @@
 import { useEffect, useState } from "react";
-import {
-  Button,
-  Divider,
-  Grid,
-  HStack,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalHeader,
-  ModalOverlay,
-  Text,
-} from "@chakra-ui/react";
+import { Button, Separator, Grid, HStack, Text } from "@chakra-ui/react";
+import { Dialog } from "../../../components/ui/dialog";
 import { WorkflowCard } from "./WorkflowCard";
 import { ChevronLeft, File } from "react-feather";
 import { NewWorkflowForm } from "./NewWorkflowForm";
@@ -21,26 +10,26 @@ import { TEMPLATES } from "../../templates/registry";
 type Step = { step: "select" } | { step: "create"; template: Workflow };
 
 export const NewWorkflowModal = ({
-  isOpen,
+  open,
   onClose,
 }: {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
 }) => {
   const [step, setStep] = useState<Step>({ step: "select" });
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!open) {
       setStep({ step: "select" });
     }
-  }, [isOpen]);
+  }, [open]);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="6xl">
-      <ModalOverlay />
-      <ModalContent paddingX={0}>
-        <ModalHeader>
-          <HStack>
+    <Dialog.Root open={open} onOpenChange={onClose}>
+      <Dialog.Backdrop />
+      <Dialog.Content width="800px" paddingX={0}>
+        <Dialog.Header>
+          <HStack gap={2}>
             {step.step === "create" && (
               <Button
                 variant="ghost"
@@ -56,11 +45,11 @@ export const NewWorkflowModal = ({
             )}
             <Text>Create new workflow</Text>
           </HStack>
-        </ModalHeader>
-        <Divider />
-        <ModalCloseButton />
+        </Dialog.Header>
+        <Separator />
+        <Dialog.CloseTrigger />
         {step.step === "select" ? (
-          <ModalBody background="gray.200" paddingY={6} marginBottom={6}>
+          <Dialog.Body background="gray.200" paddingY={6} marginBottom={6}>
             <Grid
               width="full"
               templateColumns="repeat(auto-fill, minmax(260px, 1fr))"
@@ -95,11 +84,11 @@ export const NewWorkflowModal = ({
                 />
               ))}
             </Grid>
-          </ModalBody>
+          </Dialog.Body>
         ) : (
           <NewWorkflowForm onClose={onClose} template={step.template} />
         )}
-      </ModalContent>
-    </Modal>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 };

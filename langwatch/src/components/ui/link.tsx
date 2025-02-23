@@ -1,7 +1,4 @@
-import {
-  Link as ChakraLink,
-  Link as ChakraLinkOverlay,
-} from "@chakra-ui/react";
+import { Link as ChakraLink } from "@chakra-ui/react";
 import NextLink from "next/link";
 import { type ComponentProps } from "react";
 

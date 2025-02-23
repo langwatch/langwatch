@@ -1,4 +1,4 @@
-import { Container, Heading, VStack, useToast } from "@chakra-ui/react";
+import { Container, Heading, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import CheckConfigForm, {
   type CheckConfigFormData,
@@ -6,11 +6,11 @@ import CheckConfigForm, {
 import { DashboardLayout } from "../../../components/DashboardLayout";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
+import { toaster } from "../../../components/ui/toaster";
 
 export default function NewTraceCheckConfig() {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
-  const toast = useToast();
   const createCheck = api.checks.create.useMutation();
 
   const onSubmit = async (data: CheckConfigFormData) => {
@@ -22,20 +22,24 @@ export default function NewTraceCheckConfig() {
         checkType: data.checkType,
         projectId: project.id,
       });
-      toast({
+      toaster.create({
         title: "Check created successfully",
-        status: "success",
+        type: "success",
         duration: 5000,
-        isClosable: true,
+        meta: {
+          closable: true,
+        },
       });
       await router.push(`/${project.slug}/evaluations`);
     } catch (error) {
-      toast({
+      toaster.create({
         title: "Failed to create check",
         description: "Please try again",
-        status: "error",
+        type: "error",
         duration: 5000,
-        isClosable: true,
+        meta: {
+          closable: true,
+        },
       });
     }
   };
@@ -50,7 +54,7 @@ export default function NewTraceCheckConfig() {
           <CheckConfigForm
             onSubmit={onSubmit}
             defaultValues={{ sample: 1.0 }}
-            isLoading={createCheck.isLoading}
+            loading={createCheck.isLoading}
           />
         </VStack>
       </Container>

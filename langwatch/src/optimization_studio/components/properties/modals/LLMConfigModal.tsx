@@ -25,11 +25,11 @@ import { AddModelProviderKey } from "../../AddModelProviderKey";
 
 export function LLMModelDisplay({
   model,
-  fontSize = 14,
+  fontSize = "14px",
   showVersion = true,
 }: {
   model: string;
-  fontSize?: number;
+  fontSize?: string;
   showVersion?: boolean;
 }) {
   const { modelOption } = useModelSelectionOptions(

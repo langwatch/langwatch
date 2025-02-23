@@ -20,6 +20,7 @@ import { useRouter } from "next/router";
 import NProgress from "nprogress";
 import { useEffect, useState } from "react";
 import { dependencies } from "../injection/dependencies.client";
+import { Toaster } from "../components/ui/toaster";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -432,6 +433,17 @@ export const system = createSystem(defaultConfig, {
           },
         },
       }),
+      accordion: defineSlotRecipe({
+        slots: ["itemTrigger"],
+        base: {
+          itemTrigger: {
+            cursor: "pointer",
+            _hover: {
+              bg: "gray.50",
+            },
+          },
+        },
+      }),
     },
   },
 });
@@ -523,6 +535,7 @@ const LangWatch: AppType<{
           <title>LangWatch</title>
         </Head>
         <Component {...pageProps} />
+        <Toaster />
 
         {dependencies.ExtraFooterComponents && (
           <dependencies.ExtraFooterComponents />

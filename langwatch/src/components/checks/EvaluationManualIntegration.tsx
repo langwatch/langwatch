@@ -1,19 +1,15 @@
 import {
   Box,
-  Checkbox,
   HStack,
   Heading,
-  Link,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
   Tag,
   Text,
-  Tooltip,
   VStack,
+  Tabs,
 } from "@chakra-ui/react";
+import { Checkbox } from "../ui/checkbox";
+import { Link } from "../ui/link";
+import { Tooltip } from "../ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AVAILABLE_EVALUATORS } from "../../server/evaluations/evaluators.generated";
 import { api } from "../../utils/api";
@@ -276,13 +272,15 @@ ${
         </Text>
         {evaluatorDefinition.requiredFields
           .map((field) => (
-            <Tag key={field} colorPalette="blue">
-              {field} (required)
-            </Tag>
+            <Tag.Root key={field} colorPalette="blue">
+              <Tag.Label>{field} (required)</Tag.Label>
+            </Tag.Root>
           ))
           .concat(
             evaluatorDefinition.optionalFields.map((field) => (
-              <Tag key={field}>{field} (optional)</Tag>
+              <Tag.Root key={field}>
+                <Tag.Label>{field} (optional)</Tag.Label>
+              </Tag.Root>
             ))
           )}
       </HStack>
@@ -295,33 +293,37 @@ ${
         <Checkbox {...form.register("storeSettingsOnCode")}>
           Store settings on code
         </Checkbox>
-        <Tooltip label="Store the settings on the code to keep it versioned on your side instead of on LangWatch dashboard.">
-          <Info size={16} />
+        <Tooltip
+          content="Store the settings on the code to keep it versioned on your side instead of on LangWatch dashboard."
+          positioning={{ placement: "top" }}
+        >
+          <Box>
+            <Info size={16} />
+          </Box>
         </Tooltip>
       </HStack>
-      <Tabs width="full">
-        <TabList marginBottom={4}>
-          <Tab>Python</Tab>
-          <Tab>Python (Async)</Tab>
-          <Tab>TypeScript</Tab>
-          <Tab>Curl</Tab>
-        </TabList>
+      <Tabs.Root defaultValue="python" width="full" colorPalette="orange">
+        <Tabs.List marginBottom={4}>
+          <Tabs.Trigger value="python">Python</Tabs.Trigger>
+          <Tabs.Trigger value="python-async">Python (Async)</Tabs.Trigger>
+          <Tabs.Trigger value="typescript">TypeScript</Tabs.Trigger>
+          <Tabs.Trigger value="curl">Curl</Tabs.Trigger>
+        </Tabs.List>
 
-        <TabPanels>
-          <TabPanel padding={0}>
-            <PythonInstructions async={false} />
-          </TabPanel>
-          <TabPanel padding={0}>
-            <PythonInstructions async={true} />
-          </TabPanel>
-          <TabPanel padding={0}>
-            <TypeScriptInstructions />
-          </TabPanel>
-          <TabPanel padding={0}>
-            <VStack align="start" width="full" gap={3}>
-              <Box className="markdown" width="full">
-                <RenderCode
-                  code={`# Set your API key and endpoint URL
+        <Tabs.Content value="python" padding={0}>
+          <PythonInstructions async={false} />
+        </Tabs.Content>
+        <Tabs.Content value="python-async" padding={0}>
+          <PythonInstructions async={true} />
+        </Tabs.Content>
+        <Tabs.Content value="typescript" padding={0}>
+          <TypeScriptInstructions />
+        </Tabs.Content>
+        <Tabs.Content value="curl" padding={0}>
+          <VStack align="start" width="full" gap={3}>
+            <Box className="markdown" width="full">
+              <RenderCode
+                code={`# Set your API key and endpoint URL
 API_KEY="${projectAPIKey.data?.apiKey ?? "your_langwatch_api_key"}"
 
 # Use curl to send the POST request, e.g.:
@@ -343,29 +345,28 @@ curl -X POST "${langwatchEndpoint()}/api/evaluations/${checkSlug}/evaluate" \\
   }${isGuardrail ? `,\n  "as_guardrail": true` : ""}${settingsParamsCurl}
 }
 EOF`}
-                  language="bash"
-                />
-              </Box>
-              <Text>Response:</Text>
-              <Box className="markdown" width="full">
-                <RenderCode
-                  code={JSON.stringify(
-                    {
-                      status: "processed",
-                      passed: true,
-                      score: 1,
-                      details: "possible explanation",
-                    },
-                    null,
-                    2
-                  )}
-                  language="json"
-                />
-              </Box>
-            </VStack>
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
+                language="bash"
+              />
+            </Box>
+            <Text>Response:</Text>
+            <Box className="markdown" width="full">
+              <RenderCode
+                code={JSON.stringify(
+                  {
+                    status: "processed",
+                    passed: true,
+                    score: 1,
+                    details: "possible explanation",
+                  },
+                  null,
+                  2
+                )}
+                language="json"
+              />
+            </Box>
+          </VStack>
+        </Tabs.Content>
+      </Tabs.Root>
     </VStack>
   );
 }
