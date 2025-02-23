@@ -56,11 +56,11 @@ export function ToggleTableView() {
 
   const sliderOnLeft = {
     left: "3px",
-    width: "118px",
+    width: "116px",
   };
   const sliderOnRight = {
-    left: "120px",
-    width: "128px",
+    left: "118px",
+    width: "124px",
   };
 
   const sliderProps =
@@ -77,6 +77,7 @@ export function ToggleTableView() {
       borderColor="gray.350"
       gap={0}
       position="relative"
+      marginRight={2}
     >
       <Box
         background="gray.100"

@@ -60,14 +60,16 @@ import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
 import { LuChevronsUpDown } from "react-icons/lu";
 import { OverflownTextWithTooltip } from "../OverflownText";
+import {
+  MessagesNavigationFooter,
+  useMessagesNavigationFooter,
+} from "./MessagesNavigationFooter";
 
 export function MessagesTable() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
-  const [totalHits, setTotalHits] = useState<number>(0);
-  const [pageOffset, setPageOffset] = useState<number>(0);
-  const [pageSize, setPageSize] = useState<number>(25);
+
   const { filterParams, queryOpts } = useFilterParams();
   const [selectedTraceIds, setSelectedTraceIds] = useState<string[]>([]);
 
@@ -76,18 +78,22 @@ export function MessagesTable() {
     setPeriod,
   } = usePeriodSelector();
 
+  const navigationFooter = useMessagesNavigationFooter();
+
   const traceGroups = api.traces.getAllForProject.useQuery(
     {
       ...filterParams,
       query: getSingleQueryParam(router.query.query),
       groupBy: "none",
-      pageOffset: pageOffset,
-      pageSize: pageSize,
+      pageOffset: navigationFooter.pageOffset,
+      pageSize: navigationFooter.pageSize,
       sortBy: getSingleQueryParam(router.query.sortBy),
       sortDirection: getSingleQueryParam(router.query.orderBy),
     },
     queryOpts
   );
+
+  navigationFooter.useUpdateTotalHits(traceGroups);
 
   const topics = api.topics.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -695,33 +701,6 @@ export function MessagesTable() {
         )
   );
 
-  const nextPage = () => {
-    setPageOffset(pageOffset + pageSize);
-  };
-
-  const prevPage = () => {
-    if (pageOffset > 0) {
-      setPageOffset(pageOffset - pageSize);
-    }
-  };
-
-  useEffect(() => {
-    setPageOffset(0);
-  }, [router.query.query]);
-
-  const changePageSize = (size: number) => {
-    setPageSize(size);
-    setPageOffset(0);
-  };
-
-  useEffect(() => {
-    if (traceGroups.isFetched) {
-      const totalHits: number = traceGroups.data?.totalHits ?? 0;
-
-      setTotalHits(totalHits);
-    }
-  }, [traceGroups.data?.totalHits, traceGroups.isFetched]);
-
   const isFirstRender = useRef(true);
 
   const sortBy = (columnKey: string) => {
@@ -820,8 +799,8 @@ export function MessagesTable() {
       ...filterParams,
       query: getSingleQueryParam(router.query.query),
       groupBy: "none",
-      pageOffset: currentOffset,
-      pageSize: batchSize,
+      pageOffset: navigationFooter.pageOffset,
+      pageSize: navigationFooter.pageSize,
       sortBy: getSingleQueryParam(router.query.sortBy),
       sortDirection: getSingleQueryParam(router.query.orderBy),
       includeContexts: checkedHeaderColumnsEntries.some(
@@ -1012,7 +991,11 @@ export function MessagesTable() {
           <Spacer />
           <HStack gap={1} marginBottom="-8px">
             <ToggleTableView />
-            <Tooltip content={totalHits >= 10_000 ? "Up to 10.000 items" : ""}>
+            <Tooltip
+              content={
+                navigationFooter.totalHits >= 10_000 ? "Up to 10.000 items" : ""
+              }
+            >
               <Button
                 colorPalette="black"
                 variant={downloadTraces.isLoading ? "outline" : "ghost"}
@@ -1034,7 +1017,7 @@ export function MessagesTable() {
                     <List size={16} />
                     <Text>Columns</Text>
                     <Box>
-                      <ChevronDown width={14} />
+                      <ChevronDown />
                     </Box>
                   </HStack>
                 </Button>
@@ -1220,62 +1203,7 @@ export function MessagesTable() {
                   </Table.ScrollArea>
                 </Card.Body>
               </Card.Root>
-              <HStack padding={6} gap={2}>
-                <Field.Root>
-                  <HStack gap={3}>
-                    <Field.Label flexShrink={0}>Items per page </Field.Label>
-
-                    <NativeSelect.Root size="sm">
-                      <NativeSelect.Field
-                        defaultValue="25"
-                        onChange={(e) =>
-                          changePageSize(parseInt(e.target.value))
-                        }
-                        borderColor="black"
-                        borderRadius="lg"
-                      >
-                        <option value="10">10</option>
-                        <option value="25">25</option>
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                        <option value="250">250</option>
-                      </NativeSelect.Field>
-                      <NativeSelect.Indicator />
-                    </NativeSelect.Root>
-                  </HStack>
-                </Field.Root>
-
-                <HStack gap={3}>
-                  <Text flexShrink={0}>
-                    {" "}
-                    {`${pageOffset + 1}`} -{" "}
-                    {`${
-                      pageOffset + pageSize > totalHits
-                        ? totalHits
-                        : pageOffset + pageSize
-                    }`}{" "}
-                    of {`${totalHits}`} items
-                  </Text>
-                  <HStack gap={0}>
-                    <Button
-                      variant="ghost"
-                      padding={0}
-                      onClick={prevPage}
-                      disabled={pageOffset === 0}
-                    >
-                      <ChevronLeft />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      padding={0}
-                      disabled={pageOffset + pageSize >= totalHits}
-                      onClick={nextPage}
-                    >
-                      <ChevronRight />
-                    </Button>
-                  </HStack>
-                </HStack>
-              </HStack>
+              <MessagesNavigationFooter {...navigationFooter} />
             </VStack>
           </Box>
 

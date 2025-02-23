@@ -239,6 +239,9 @@ export const system = createSystem(defaultConfig, {
             },
           },
         },
+        defaultVariants: {
+          size: "sm",
+        },
       }),
       drawer: defineRecipe({
         variants: {
@@ -266,6 +269,15 @@ export const system = createSystem(defaultConfig, {
       card: defineSlotRecipe({
         slots: ["root"],
         variants: {
+          variant: {
+            elevated: {
+              root: {
+                border: "1px solid",
+                borderColor: "gray.300",
+                boxShadow: "0px 4px 10px 0px rgba(0, 0, 0, 0.06)",
+              },
+            },
+          },
           size: {
             md: {
               root: {

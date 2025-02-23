@@ -170,7 +170,7 @@ function FieldsFilter({
                   <Spacer />
                 </>
               )}
-              <ChevronDown width={12} style={{ minWidth: "12px" }} />
+              <ChevronDown />
             </HStack>
           </Button>
         </Popover.Trigger>
