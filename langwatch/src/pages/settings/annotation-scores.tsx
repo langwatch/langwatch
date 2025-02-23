@@ -37,7 +37,7 @@ const AnnotationScorePage = () => {
   const { project } = useOrganizationTeamProject();
   const toast = useToast();
 
-  const { openDrawer, isDrawerOpen } = useDrawer();
+  const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
 
   const getAllAnnotationScores = api.annotationScore.getAll.useQuery(
     {

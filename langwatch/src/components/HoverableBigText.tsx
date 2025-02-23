@@ -112,8 +112,9 @@ export function HoverableBigText({
                 width="calc(100% + 16px)"
                 marginLeft="-8px"
                 marginTop="-4px"
+                color="yellow.400"
               >
-                click anywhere to enlarge
+                click to expand
               </Text>
             )}
             <Box whiteSpace="pre-wrap">
