@@ -37,7 +37,7 @@ import { Slider } from "../ui/slider";
 
 export function FieldsFilters() {
   const { nonEmptyFilters } = useFilterParams();
-  const { openDrawer, isDrawerOpen } = useDrawer();
+  const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
   const { hasTeamPermission } = useOrganizationTeamProject();
 
   const isEditMode = isDrawerOpen("editTriggerFilter");

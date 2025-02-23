@@ -1,4 +1,8 @@
-import { Checkbox as ChakraCheckbox } from "@chakra-ui/react";
+import {
+  Checkbox as ChakraCheckbox,
+  CheckboxGroup as ChakraCheckboxGroup,
+  type CheckboxGroupProps,
+} from "@chakra-ui/react";
 import * as React from "react";
 
 export interface CheckboxProps extends ChakraCheckbox.RootProps {
@@ -26,5 +30,19 @@ export const Checkbox = React.forwardRef<
         <ChakraCheckbox.Label>{children}</ChakraCheckbox.Label>
       )}
     </ChakraCheckbox.Root>
+  );
+});
+
+export const CheckboxGroup = React.forwardRef<
+  HTMLDivElement,
+  Omit<CheckboxGroupProps, "onChange"> & {
+    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  }
+>((props, ref) => {
+  const { children, ...rest } = props;
+  return (
+    <ChakraCheckboxGroup ref={ref} {...(rest as any)}>
+      {children}
+    </ChakraCheckboxGroup>
   );
 });

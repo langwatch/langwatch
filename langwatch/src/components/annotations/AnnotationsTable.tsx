@@ -61,7 +61,7 @@ export const AnnotationsTable = ({
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const { scoreOptions } = useAnnotationQueues();
-  const { openDrawer, isDrawerOpen } = useDrawer();
+  const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
 
   const openAnnotationQueue = (queueItemId: string) => {
     void router.push(

@@ -3,32 +3,21 @@ import {
   Box,
   Button,
   Card,
-  CardBody,
-  Checkbox,
-  CheckboxGroup,
-  Divider,
+  Fieldset,
   HStack,
   Input,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuList,
-  Popover,
-  PopoverArrow,
-  PopoverBody,
-  PopoverCloseButton,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTrigger,
-  Radio,
-  RadioGroup,
+  Separator,
   Skeleton,
   Spacer,
   Text,
-  VStack,
   useDisclosure,
-  useToast,
+  VStack,
 } from "@chakra-ui/react";
+
+import { Menu } from "../ui/menu";
+import { Popover } from "../ui/popover";
+import { Checkbox, CheckboxGroup } from "../ui/checkbox";
+import { Radio, RadioGroup } from "../ui/radio";
 
 import { ChevronDown, MoreVertical, Trash2 } from "react-feather";
 
@@ -46,6 +35,7 @@ import { api } from "~/utils/api";
 import { useSession } from "next-auth/react";
 import { useAnnotationCommentStore } from "~/hooks/useAnnotationCommentStore";
 import { ScoreReasonModal } from "../ScoreReasonModal";
+import { toaster } from "../ui/toaster";
 
 type Annotation = {
   isThumbsUp?: string | null;
@@ -61,7 +51,6 @@ export function AnnotationComment({ key = "" }: { key: string }) {
   const queryClient = api.useContext();
 
   const session = useSession();
-  const toast = useToast();
 
   const createAnnotation = api.annotation.create.useMutation();
   const deleteAnnotation = api.annotation.deleteById.useMutation();
@@ -136,13 +125,14 @@ export function AnnotationComment({ key = "" }: { key: string }) {
         },
         {
           onSuccess: () => {
-            toast({
+            toaster.create({
               title: "Annotation Updated",
               description: `You have successfully updated the annotation`,
-              status: "success",
-              duration: 5000,
-              isClosable: true,
-              position: "top-right",
+              type: "success",
+              meta: {
+                closable: true,
+              },
+              placement: "top-end",
             });
 
             reset();
@@ -152,13 +142,14 @@ export function AnnotationComment({ key = "" }: { key: string }) {
             void queryClient.annotation.getAll.invalidate();
           },
           onError: () => {
-            toast({
+            toaster.create({
               title: "Error",
               description: "Error updating annotation",
-              status: "error",
-              duration: 5000,
-              isClosable: true,
-              position: "top-right",
+              type: "error",
+              meta: {
+                closable: true,
+              },
+              placement: "top-end",
             });
           },
         }
@@ -173,13 +164,14 @@ export function AnnotationComment({ key = "" }: { key: string }) {
         },
         {
           onSuccess: () => {
-            toast({
+            toaster.create({
               title: "Annotation Created",
               description: `You have successfully created an annotation`,
-              status: "success",
-              duration: 5000,
-              isClosable: true,
-              position: "top-right",
+              type: "success",
+              meta: {
+                closable: true,
+              },
+              placement: "top-end",
             });
 
             reset();
@@ -187,13 +179,14 @@ export function AnnotationComment({ key = "" }: { key: string }) {
             void queryClient.annotation.getByTraceId.invalidate();
           },
           onError: () => {
-            toast({
+            toaster.create({
               title: "Error",
               description: "Error creating annotation",
-              status: "error",
-              duration: 5000,
-              isClosable: true,
-              position: "top-right",
+              type: "error",
+              meta: {
+                closable: true,
+              },
+              placement: "top-end",
             });
           },
         }
@@ -209,13 +202,14 @@ export function AnnotationComment({ key = "" }: { key: string }) {
       },
       {
         onSuccess: () => {
-          toast({
+          toaster.create({
             title: "Annotation Deleted",
             description: `You have successfully deleted the annotation`,
-            status: "success",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            type: "success",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
           void queryClient.annotation.getByTraceId.invalidate();
           commentState.resetComment();
@@ -239,13 +233,15 @@ export function AnnotationComment({ key = "" }: { key: string }) {
 
   return (
     <Box width="full" onClick={(e) => e.stopPropagation()} key={key}>
-      <Card>
-        <CardBody>
+      <Card.Root>
+        <Card.Body>
           {getAnnotation.isLoading ? (
             <VStack align="start" gap={3} width="full">
               <HStack>
                 <Skeleton>
-                  <Avatar size="sm" />
+                  <Avatar.Root size="sm">
+                    <Avatar.Fallback name={session.data?.user.name ?? ""} />
+                  </Avatar.Root>
                 </Skeleton>
                 <Skeleton height="20px" width="120px" />
               </HStack>
@@ -265,28 +261,34 @@ export function AnnotationComment({ key = "" }: { key: string }) {
             <form onSubmit={handleSubmit(onSubmit)}>
               <VStack align="start" gap={3}>
                 <HStack width="full">
-                  <Avatar name={session.data?.user.name ?? ""} size="sm" />
+                  <Avatar.Root size="sm">
+                    <Avatar.Fallback name={session.data?.user.name ?? ""} />
+                  </Avatar.Root>
                   <Text>{session.data?.user.name}</Text>
                   <Spacer />
 
                   {action === "edit" && (
-                    <Menu>
-                      <MenuButton as={Button} size="xs" variant="outline">
-                        <MoreVertical size={16} />
-                      </MenuButton>
-                      <MenuList>
-                        <MenuItem
-                          icon={<Trash2 size={16} />}
+                    <Menu.Root>
+                      <Menu.Trigger asChild>
+                        <Button size="xs" variant="outline">
+                          <MoreVertical size={16} />
+                        </Button>
+                      </Menu.Trigger>
+                      <Menu.Content>
+                        <Menu.Item
+                          value="delete"
                           onClick={() => handleDelete()}
                         >
+                          <Trash2 size={16} />
                           Delete
-                        </MenuItem>
-                      </MenuList>
-                    </Menu>
+                        </Menu.Item>
+                      </Menu.Content>
+                    </Menu.Root>
                   )}
                 </HStack>
                 <Input
                   {...register("comment")}
+                  autoFocus
                   placeholder={
                     action === "new" ? "Leave your comment here" : ""
                   }
@@ -329,7 +331,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                     type="submit"
                     minWidth="fit-content"
                     size="sm"
-                    isLoading={
+                    loading={
                       createAnnotation.isLoading || updateAnnotation.isLoading
                     }
                   >
@@ -339,7 +341,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
 
                 {getAnnotationScoring.data?.length === 0 && (
                   <>
-                    <Divider />
+                    <Separator />
                     <Text>
                       Scoring metrics are currently disabled. Enable them to add
                       more data to your annotations.
@@ -358,12 +360,12 @@ export function AnnotationComment({ key = "" }: { key: string }) {
               </VStack>
             </form>
           )}
-        </CardBody>
-      </Card>
+        </Card.Body>
+      </Card.Root>
 
       <ScoreReasonModal
         reason={selectedReason}
-        isOpen={scoreReasonModal.isOpen}
+        open={scoreReasonModal.open}
         onClose={() => {
           scoreReasonModal.onClose();
           setSelectedScoreTypeId(null);
@@ -419,83 +421,77 @@ const ScoreBlock = ({
 
   return (
     <>
-      <Popover key={scoreType.id}>
-        <PopoverTrigger>
-          <Button
-            size="xs"
-            variant="outline"
-            rightIcon={<ChevronDown size={16} />}
-          >
+      <Popover.Root>
+        <Popover.Trigger asChild>
+          <Button size="xs" variant="outline">
             {scoreValue
               ? Array.isArray(scoreValue)
                 ? scoreValue.join(", ")
                 : scoreValue.toString()
               : scoreType.name}
+            <ChevronDown size={16} />
           </Button>
-        </PopoverTrigger>
-        <PopoverContent>
-          <PopoverArrow />
-          <PopoverCloseButton />
-          <PopoverHeader>{scoreType.description}</PopoverHeader>
-          <PopoverBody>
+        </Popover.Trigger>
+        <Popover.Content>
+          <Popover.Arrow />
+          <Popover.CloseTrigger />
+          <Popover.Header>{scoreType.description}</Popover.Header>
+          <Popover.Body>
             {scoreType?.dataType === "CHECKBOX" ? (
-              <CheckboxGroup
-                key={scoreType.id}
-                value={[...(tempValue ? [tempValue].flat() : [])]}
-                onChange={(values) => {
-                  setTempValue(values.map(String));
-                }}
-              >
-                <VStack align="start" gap={2}>
-                  {scoreType.options.map((option, index) => {
-                    return (
+              <Fieldset.Root>
+                <CheckboxGroup
+                  value={[...(tempValue ? [tempValue].flat() : [])]}
+                  onValueChange={(value) => {
+                    setTempValue(value);
+                  }}
+                >
+                  <VStack align="start" gap={2}>
+                    {scoreType.options.map((option, index) => (
                       <Checkbox value={option.value.toString()} key={index}>
                         {option.label}
                       </Checkbox>
-                    );
-                  })}
-                  <ReasonButtons
-                    scoreTypeId={scoreType.id}
-                    onReasonClick={onReasonClick}
-                    setValue={setValue}
-                    watch={watch}
-                    tempValue={tempValue ?? ""}
-                    setTempValue={setTempValue}
-                  />
-                </VStack>
-              </CheckboxGroup>
+                    ))}
+                    <ReasonButtons
+                      scoreTypeId={scoreType.id}
+                      onReasonClick={onReasonClick}
+                      setValue={setValue}
+                      watch={watch}
+                      tempValue={tempValue ?? ""}
+                      setTempValue={setTempValue}
+                    />
+                  </VStack>
+                </CheckboxGroup>
+              </Fieldset.Root>
             ) : (
-              <RadioGroup
-                key={scoreType.id}
-                value={tempValue?.toString() ?? ""}
-                padding={0}
-                defaultValue={defaultRadioValue}
-                onChange={(value) => {
-                  setTempValue(value);
-                }}
-              >
-                <VStack align="start" gap={2}>
-                  {scoreType.options.map((option) => {
-                    return (
+              <Fieldset.Root>
+                <RadioGroup
+                  value={tempValue?.toString() ?? ""}
+                  defaultValue={defaultRadioValue}
+                  onValueChange={(change) => {
+                    setTempValue(change.value);
+                  }}
+                >
+                  <VStack align="start" gap={2}>
+                    {scoreType.options.map((option) => (
                       <Radio value={option.value.toString()} key={option.value}>
                         {option.label}
                       </Radio>
-                    );
-                  })}
-                  <ReasonButtons
-                    scoreTypeId={scoreType.id}
-                    onReasonClick={onReasonClick}
-                    setValue={setValue}
-                    watch={watch}
-                    tempValue={tempValue ?? ""}
-                    setTempValue={setTempValue}
-                  />
-                </VStack>
-              </RadioGroup>
+                    ))}
+                    <ReasonButtons
+                      scoreTypeId={scoreType.id}
+                      onReasonClick={onReasonClick}
+                      setValue={setValue}
+                      watch={watch}
+                      tempValue={tempValue ?? ""}
+                      setTempValue={setTempValue}
+                    />
+                  </VStack>
+                </RadioGroup>
+              </Fieldset.Root>
             )}
-          </PopoverBody>
-        </PopoverContent>
-      </Popover>
+          </Popover.Body>
+        </Popover.Content>
+      </Popover.Root>
     </>
   );
 };
@@ -540,7 +536,7 @@ const ReasonButtons = ({
           setValue(`scoreOptions.${scoreTypeId}.value`, tempValue);
         }}
         colorPalette="blue"
-        isDisabled={!tempValue}
+        disabled={!tempValue}
       >
         Apply
       </Button>

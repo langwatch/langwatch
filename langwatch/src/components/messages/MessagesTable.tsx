@@ -301,6 +301,7 @@ export function MessagesTable() {
                 : "0 0 0 rgba(0, 0, 0, 0)"
             }
             paddingX={4}
+            background="white"
           >
             <HStack>
               <Checkbox
@@ -367,10 +368,14 @@ export function MessagesTable() {
             })
           }
         >
-          <Tooltip content={trace.input?.value ?? ""}>
-            <Text lineClamp={1} wordBreak="break-all" display="block">
+          <Tooltip
+            content={
+              <Box whiteSpace="pre-wrap">{trace.input?.value ?? ""}</Box>
+            }
+          >
+            <Box lineClamp={1} display="block">
               {trace.input?.value ? trace.input?.value : "<empty>"}
-            </Text>
+            </Box>
           </Tooltip>
         </Table.Cell>
       ),
@@ -390,9 +395,9 @@ export function MessagesTable() {
               })
             }
           >
-            <Box lineClamp={1} maxWidth="300px" display="block" color="red.400">
+            <OverflownTextWithTooltip color="red.400">
               {trace.error.message}
-            </Box>
+            </OverflownTextWithTooltip>
           </Table.Cell>
         ) : (
           <Table.Cell
@@ -405,13 +410,15 @@ export function MessagesTable() {
           >
             <Tooltip
               content={
-                trace.output?.value
-                  ? trace.output?.value
-                  : trace.lastGuardrail
-                  ? [trace.lastGuardrail.name, trace.lastGuardrail.details]
-                      .filter((x) => x)
-                      .join(": ")
-                  : undefined
+                <Box whiteSpace="pre-wrap">
+                  {trace.output?.value
+                    ? trace.output?.value
+                    : trace.lastGuardrail
+                    ? [trace.lastGuardrail.name, trace.lastGuardrail.details]
+                        .filter((x) => x)
+                        .join(": ")
+                    : undefined}
+                </Box>
               }
             >
               {trace.lastGuardrail ? (
@@ -992,6 +999,7 @@ export function MessagesTable() {
           <HStack gap={1} marginBottom="-8px">
             <ToggleTableView />
             <Tooltip
+              disabled={navigationFooter.totalHits < 10_000}
               content={
                 navigationFooter.totalHits >= 10_000 ? "Up to 10.000 items" : ""
               }
@@ -1115,6 +1123,8 @@ export function MessagesTable() {
                                 key={index}
                                 paddingX={4}
                                 paddingY={4}
+                                background="white"
+                                borderRadius="4px 0 0 0"
                                 {...(columnKey === "checked"
                                   ? {
                                       position: "sticky",

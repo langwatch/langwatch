@@ -2,26 +2,23 @@ import {
   Avatar,
   Box,
   Card,
-  CardBody,
   HStack,
+  Separator,
   Spacer,
-  StackDivider,
   Text,
-  Tooltip,
   VStack,
 } from "@chakra-ui/react";
 import { Edit, MessageCircle, ThumbsDown, ThumbsUp } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
-
+import { Tooltip } from "~/components/ui/tooltip";
 import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
 import { AnnotationComment } from "./annotations/AnnotationComment";
 
 export const Annotations = ({ traceId }: { traceId: string }) => {
   const { data } = useRequiredSession();
   const { project, isPublicRoute } = useOrganizationTeamProject();
-
   const commentState = useAnnotationCommentStore();
 
   const annotations = api.annotation.getByTraceId.useQuery(
@@ -44,7 +41,7 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
   );
 
   return (
-    <VStack gap={3} align="start">
+    <VStack gap={3} align="start" paddingY={4}>
       {annotations.data?.map((annotation) => {
         const isCurrentUser = data?.user?.id === annotation.user?.id;
 
@@ -56,15 +53,14 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
         }
 
         return (
-          <Card
-            backgroundColor={"gray.100"}
+          <Card.Root
+            backgroundColor="gray.200"
+            border="none"
             width={"full"}
-            shadow={"md"}
             onClick={
               isCurrentUser
                 ? (e) => {
                     e.stopPropagation();
-
                     commentState.setCommentState?.({
                       traceId: traceId,
                       action: "edit",
@@ -76,10 +72,14 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
             cursor={isCurrentUser ? "pointer" : "default"}
             key={annotation.id}
           >
-            <CardBody>
+            <Card.Body>
               <VStack align="start" gap={3}>
                 <HStack width="full" align={"top"}>
-                  <Avatar size="sm" name={annotation.user?.name ?? undefined} />
+                  <Avatar.Root size="sm" background="gray.400" color="white">
+                    <Avatar.Fallback
+                      name={annotation.user?.name ?? undefined}
+                    />
+                  </Avatar.Root>
                   <VStack align="start" gap={0}>
                     <Text fontWeight="bold" fontSize="sm">
                       {annotation.user?.name ?? (
@@ -107,7 +107,11 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                   </VStack>
                   <Spacer />
                   {isCurrentUser && (
-                    <Tooltip label="Edit Annotation" placement="top" hasArrow>
+                    <Tooltip
+                      content="Edit Annotation"
+                      positioning={{ placement: "top" }}
+                      showArrow
+                    >
                       <Edit size={"18px"} />
                     </Tooltip>
                   )}
@@ -118,12 +122,7 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                 ) : annotation.isThumbsUp === false ? (
                   <ThumbsDown size={"20px"} />
                 ) : null}
-                <HStack
-                  align="start"
-                  gap={2}
-                  wrap="wrap"
-                  divider={<StackDivider borderColor="gray.400" />}
-                >
+                <HStack align="start" gap={2} wrap="wrap" divideY="1px">
                   {annotation.scoreOptions &&
                     typeof annotation.scoreOptions === "object" &&
                     Object.entries(annotation.scoreOptions).map(
@@ -155,7 +154,7 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                                       </Text>
                                       {scoreOption.reason && (
                                         <Tooltip
-                                          label={
+                                          content={
                                             typeof scoreOption.reason ===
                                             "object"
                                               ? JSON.stringify(
@@ -177,8 +176,8 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                     )}
                 </HStack>
               </VStack>
-            </CardBody>
-          </Card>
+            </Card.Body>
+          </Card.Root>
         );
       })}
       {commentState.action === "new" && commentState.traceId === traceId && (

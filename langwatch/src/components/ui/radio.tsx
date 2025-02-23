@@ -12,7 +12,7 @@ export const Radio = React.forwardRef<HTMLInputElement, RadioProps>(
     return (
       <ChakraRadioGroup.Item ref={rootRef} {...rest}>
         <ChakraRadioGroup.ItemHiddenInput ref={ref} {...inputProps} />
-        <ChakraRadioGroup.ItemIndicator />
+        <ChakraRadioGroup.ItemIndicator cursor="pointer" />
         {children && (
           <ChakraRadioGroup.ItemText>{children}</ChakraRadioGroup.ItemText>
         )}
@@ -24,12 +24,12 @@ export const Radio = React.forwardRef<HTMLInputElement, RadioProps>(
 export const RadioGroup = React.forwardRef<
   HTMLDivElement,
   Omit<ChakraRadioGroup.RootProps, "onChange"> & {
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   }
 >((props, ref) => {
   const { children, ...rest } = props;
   return (
-    <ChakraRadioGroup.Root ref={ref} {...rest}>
+    <ChakraRadioGroup.Root ref={ref} {...rest} colorPalette={rest.colorPalette ?? "blue"}>
       {children}
     </ChakraRadioGroup.Root>
   );
