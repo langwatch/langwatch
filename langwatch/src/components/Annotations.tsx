@@ -16,7 +16,13 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
 import { AnnotationComment } from "./annotations/AnnotationComment";
 
-export const Annotations = ({ traceId }: { traceId: string }) => {
+export const Annotations = ({
+  traceId,
+  setHover,
+}: {
+  traceId: string;
+  setHover: (hover: boolean) => void;
+}) => {
   const { data } = useRequiredSession();
   const { project, isPublicRoute } = useOrganizationTeamProject();
   const commentState = useAnnotationCommentStore();
@@ -49,7 +55,15 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
           commentState.annotationId === annotation.id &&
           commentState.action === "edit"
         ) {
-          return <AnnotationComment key={annotation.id} />;
+          return (
+            <Box
+              onMouseEnter={() => setHover(true)}
+              onMouseMove={() => setHover(true)}
+              onMouseLeave={() => setHover(false)}
+            >
+              <AnnotationComment key={annotation.id} />
+            </Box>
+          );
         }
 
         return (
@@ -69,6 +83,9 @@ export const Annotations = ({ traceId }: { traceId: string }) => {
                   }
                 : undefined
             }
+            onMouseEnter={() => setHover(true)}
+            onMouseMove={() => setHover(true)}
+            onMouseLeave={() => setHover(false)}
             cursor={isCurrentUser ? "pointer" : "default"}
             key={annotation.id}
           >

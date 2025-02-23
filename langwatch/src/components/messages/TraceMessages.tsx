@@ -65,9 +65,6 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
         borderY={highlighted ? "1px solid" : "none"}
         borderColor={highlighted ? "blue.500" : "white"}
         background={highlighted ? "blue.50" : "none"}
-        onMouseEnter={() => setHover(true)}
-        onMouseMove={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
         position="relative"
         cursor="pointer"
         onClick={() => {
@@ -125,6 +122,9 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                   index === "last" || index === "only" ? "1px solid" : "none"
                 }
                 borderColor="gray.200"
+                onMouseEnter={() => setHover(true)}
+                onMouseMove={() => setHover(true)}
+                onMouseLeave={() => setHover(false)}
               >
                 {hover && (
                   <MessageHoverActions trace={trace} {...translationState} />
@@ -223,7 +223,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                 });
               }}
             >
-              <Annotations traceId={trace.trace_id} />
+              <Annotations traceId={trace.trace_id} setHover={setHover} />
             </GridItem>
           </Grid>
         </Container>
