@@ -175,7 +175,7 @@ export default function Members() {
       case "SEND_SLACK_MESSAGE":
         return (
           <Tooltip
-            label={(actionParams as { slackWebhook: string }).slackWebhook}
+            content={(actionParams as { slackWebhook: string }).slackWebhook}
           >
             <Text lineClamp={1} display="block">
               Webhook

@@ -787,7 +787,7 @@ export function MessagesTable() {
     }
   }, [traceGroups, traceCheckColumnsAvailable, localStorageHeaderColumns]);
 
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { open, onOpen, onClose } = useDisclosure();
   const checkedHeaderColumnsEntries = Object.entries(
     selectedHeaderColumns
   ).filter(([_, { enabled }]) => enabled);
@@ -1016,7 +1016,7 @@ export function MessagesTable() {
               </Button>
             </Tooltip>
             <Popover.Root
-              open={isOpen}
+              open={open}
               onOpenChange={(open) => (open ? onOpen() : onClose())}
             >
               <Popover.Trigger asChild>

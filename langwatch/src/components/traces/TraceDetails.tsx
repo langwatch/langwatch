@@ -1,64 +1,41 @@
-import { Link } from "../ui/link";
 import {
-  Avatar,
-  Box,
   Button,
-  Drawer,
-  DrawerCloseButton,
-  Heading,
+  Dialog,
   HStack,
-  Popover,
-  PopoverArrow,
-  PopoverBody,
-  PopoverCloseButton,
-  PopoverContent,
-  PopoverTrigger,
   Spacer,
-  Tab,
-  Table,
-  TabList,
-  TabPanel,
-  TabPanels,
   Tabs,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
   useDisclosure,
-  useToast,
   VStack,
 } from "@chakra-ui/react";
-import { type Project, type PublicShare } from "@prisma/client";
+import { type PublicShare } from "@prisma/client";
 import { useRouter } from "next/router";
 import qs from "qs";
 import { useCallback, useEffect, useState } from "react";
-import { Maximize2, Minimize2, Plus, Users } from "react-feather";
-import type { ElasticSearchEvaluation } from "~/server/tracer/types";
+import { Maximize2, Minimize2 } from "react-feather";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
-import { Conversation } from "../../pages/[project]/messages/[trace]/index";
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
-import { formatTimeAgo } from "../../utils/formatTimeAgo";
-import { evaluationPassed } from "../checks/EvaluationStatus";
 import { useDrawer } from "../CurrentDrawer";
-import { EvaluationStatusItem } from "./EvaluationStatusItem";
+import { Conversation } from "../messages/Conversation";
+import { Link } from "../ui/link";
+import { Popover } from "../ui/popover";
+import { toaster } from "../ui/toaster";
 import { ShareButton } from "./ShareButton";
 import { SpanTree } from "./SpanTree";
 import { TraceSummary } from "./Summary";
 
-import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
-
-interface TraceEval {
-  project?: Project;
-  traceId: string;
-  evaluations?: ElasticSearchEvaluation[];
-}
+import { AddParticipants } from "./AddParticipants";
+import {
+  Blocked,
+  Evaluations,
+  EvaluationsCount,
+  Guardrails,
+} from "./Evaluations";
+import { Events } from "./Events";
 
 export function TraceDetails(props: {
   traceId: string;
@@ -191,7 +168,6 @@ export function TraceDetails(props: {
 
   const queueItem = api.annotation.createQueueItem.useMutation();
 
-  const toast = useToast();
   const popover = useDisclosure();
 
   const sendToQueue = () => {
@@ -204,7 +180,7 @@ export function TraceDetails(props: {
       {
         onSuccess: () => {
           popover.onClose();
-          toast({
+          toaster.create({
             title: "Trace added to annotation queue",
             description: (
               <>
@@ -216,9 +192,11 @@ export function TraceDetails(props: {
                 </Link>
               </>
             ),
-            status: "success",
-            isClosable: true,
-            position: "top-right",
+            type: "success",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
         },
       }
@@ -238,13 +216,7 @@ export function TraceDetails(props: {
   const commentState = useAnnotationCommentStore();
 
   return (
-    <VStack
-      align="start"
-      width="full"
-      height="full"
-      background="white"
-      gap={0}
-    >
+    <VStack align="start" width="full" height="full" background="white" gap={0}>
       <VStack
         width="full"
         gap={0}
@@ -261,8 +233,7 @@ export function TraceDetails(props: {
               ) : (
                 <Minimize2 onClick={props.onToggleView} cursor={"pointer"} />
               )}
-
-              <DrawerCloseButton zIndex={1} />
+              <Dialog.CloseTrigger />
             </HStack>
           </>
         )}
@@ -294,20 +265,19 @@ export function TraceDetails(props: {
             )}
             {hasTeamPermission(TeamRoleGroup.ANNOTATIONS_MANAGE) && (
               <>
-                <Popover
-                  isOpen={popover.isOpen}
-                  onOpen={popover.onOpen}
-                  onClose={popover.onClose}
+                <Popover.Root
+                  open={popover.open}
+                  onOpenChange={({ open }) => popover.setOpen(open)}
                 >
-                  <PopoverTrigger>
+                  <Popover.Trigger>
                     <Button colorPalette="black" variant="outline">
                       Annotation Queue
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent zIndex="2222">
-                    <PopoverArrow />
-                    <PopoverCloseButton />
-                    <PopoverBody>
+                  </Popover.Trigger>
+                  <Popover.Content zIndex={2222}>
+                    <Popover.Arrow />
+                    <Popover.CloseTrigger />
+                    <Popover.Body>
                       <AddParticipants
                         options={options}
                         annotators={annotators}
@@ -316,9 +286,9 @@ export function TraceDetails(props: {
                         sendToQueue={sendToQueue}
                         isLoading={queueItem.isLoading}
                       />
-                    </PopoverBody>
-                  </PopoverContent>
-                </Popover>
+                    </Popover.Body>
+                  </Popover.Content>
+                </Popover.Root>
               </>
             )}
             {hasTeamPermission(TeamRoleGroup.DATASETS_MANAGE) && (
@@ -341,30 +311,33 @@ export function TraceDetails(props: {
             )}
           </HStack>
         </HStack>
-        <Tabs width="full" index={tabIndex} onChange={setTabIndex}>
-          <TabList paddingX={6}>
-            {canViewMessages && <Tab>Messages</Tab>}
-            <Tab>Trace Details</Tab>
+        <Tabs.Root
+          width="full"
+          value={String(tabIndex)}
+          onValueChange={(val) => setTabIndex(Number(val))}
+        >
+          <Tabs.List>
+            {canViewMessages && <Tabs.Trigger value="0">Messages</Tabs.Trigger>}
+            <Tabs.Trigger value="1">Trace Details</Tabs.Trigger>
             {anyGuardrails && (
-              <Tab>
+              <Tabs.Trigger value="2">
                 Guardrails{" "}
                 <Blocked
                   project={project}
                   traceId={props.traceId}
                   evaluations={evaluations.data}
                 />
-              </Tab>
+              </Tabs.Trigger>
             )}
-            <Tab>
+            <Tabs.Trigger value="3">
               Evaluations{" "}
               <EvaluationsCount
                 project={project}
                 traceId={props.traceId}
                 evaluations={evaluations.data}
               />
-            </Tab>
-
-            <Tab>
+            </Tabs.Trigger>
+            <Tabs.Trigger value="4">
               Events{" "}
               {trace.data?.events && trace.data.events.length > 0 && (
                 <Text
@@ -378,29 +351,26 @@ export function TraceDetails(props: {
                   {trace.data.events.length}
                 </Text>
               )}
-            </Tab>
-          </TabList>
-        </Tabs>
-      </VStack>
-      <Tabs width="full" index={tabIndex} onChange={setTabIndex}>
-        <TabPanels>
+            </Tabs.Trigger>
+            <Tabs.Indicator />
+          </Tabs.List>
           {canViewMessages && (
-            <TabPanel paddingX={0} padding={0} paddingTop={2}>
+            <Tabs.Content value="0" paddingX={0} padding={0} paddingTop={2}>
               {tabIndex === indexes.messages && (
                 <Conversation threadId={threadId} traceId={props.traceId} />
               )}
-            </TabPanel>
+            </Tabs.Content>
           )}
-          <TabPanel paddingX={6} paddingY={0}>
+          <Tabs.Content value="1" paddingX={6} paddingY={0}>
             {tabIndex === indexes.traceDetails && (
               <>
                 <TraceSummary traceId={props.traceId} />
                 <SpanTree traceId={props.traceId} />
               </>
             )}
-          </TabPanel>
+          </Tabs.Content>
           {anyGuardrails && (
-            <TabPanel paddingX={6} paddingY={4}>
+            <Tabs.Content value="2" paddingX={6} paddingY={4}>
               {tabIndex === indexes.guardrails && (
                 <Guardrails
                   project={project}
@@ -408,9 +378,9 @@ export function TraceDetails(props: {
                   evaluations={evaluations.data}
                 />
               )}
-            </TabPanel>
+            </Tabs.Content>
           )}
-          <TabPanel paddingX={6} paddingY={4}>
+          <Tabs.Content value="3" paddingX={6} paddingY={4}>
             {tabIndex === indexes.evaluations && (
               <Evaluations
                 project={project}
@@ -419,400 +389,22 @@ export function TraceDetails(props: {
                 anyGuardrails={anyGuardrails}
               />
             )}
-          </TabPanel>
-
-          <TabPanel paddingX={6} paddingY={4}>
+          </Tabs.Content>
+          <Tabs.Content value="4" paddingX={6} paddingY={4}>
             {tabIndex === indexes.events && <Events traceId={props.traceId} />}
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
-
-      <Drawer
-        isOpen={queueDrawerOpen.isOpen}
-        placement="right"
-        size={"lg"}
-        onClose={queueDrawerOpen.onClose}
-        onOverlayClick={queueDrawerOpen.onClose}
-      >
-        <AddAnnotationQueueDrawer
-          onClose={queueDrawerOpen.onClose}
-          onOverlayClick={queueDrawerOpen.onClose}
-        />
-      </Drawer>
-    </VStack>
-  );
-}
-
-const AddParticipants = ({
-  options,
-  annotators,
-  setAnnotators,
-  queueDrawerOpen,
-  sendToQueue,
-  isLoading,
-}: {
-  options: any[];
-  annotators: any[];
-  setAnnotators: any;
-  queueDrawerOpen: any;
-  sendToQueue: () => void;
-  isLoading: boolean;
-}) => {
-  return (
-    <>
-      <VStack width="full" align="start">
-        <Text>Send to:</Text>
-        <Box
-          border="1px solid lightgray"
-          borderRadius={5}
-          paddingX={1}
-          minWidth="300px"
-        >
-          <MultiSelect
-            options={options}
-            onChange={(newValue) => {
-              setAnnotators(
-                newValue.map((v) => ({
-                  id: v.value,
-                  name: v.label,
-                }))
-              );
-            }}
-            value={annotators.map((p) => ({
-              value: p.id,
-              label: p.name ?? "",
-            }))}
-            isMulti
-            closeMenuOnSelect={false}
-            selectedOptionStyle="check"
-            hideSelectedOptions={true}
-            useBasicStyles
-            variant="plain"
-            placeholder="Add Participants"
-            components={{
-              Menu: ({ children, ...props }) => (
-                <chakraComponents.Menu
-                  {...props}
-                  innerProps={{
-                    ...props.innerProps,
-                    style: { width: "300px" },
-                  }}
-                >
-                  {children}
-                </chakraComponents.Menu>
-              ),
-              Option: ({ children, ...props }) => (
-                <chakraComponents.Option {...props}>
-                  <VStack align="start">
-                    <HStack>
-                      {props.data.value.startsWith("user-") ? (
-                        <Avatar
-                          name={props.data.label}
-                          color="white"
-                          size="xs"
-                        />
-                      ) : (
-                        <Box padding={1}>
-                          <Users size={18} />
-                        </Box>
-                      )}
-                      <Text>{children}</Text>
-                    </HStack>
-                  </VStack>
-                </chakraComponents.Option>
-              ),
-              MultiValueLabel: ({ children, ...props }) => (
-                <chakraComponents.MultiValueLabel {...props}>
-                  <VStack align="start" padding={1} paddingX={0}>
-                    <HStack>
-                      {props.data.value.startsWith("user-") ? (
-                        <Avatar
-                          name={props.data.label}
-                          color="white"
-                          size="xs"
-                        />
-                      ) : (
-                        <Box padding={1}>
-                          <Users size={18} />
-                        </Box>
-                      )}
-                      <Text>{children}</Text>
-                    </HStack>
-                  </VStack>
-                </chakraComponents.MultiValueLabel>
-              ),
-              MenuList: (props) => (
-                <chakraComponents.MenuList {...props} maxHeight={300}>
-                  <Box
-                    maxH="250px"
-                    overflowY="auto"
-                    css={{
-                      "&::-webkit-scrollbar": {
-                        display: "none",
-                      },
-                      msOverflowStyle: "none", // IE and Edge
-                      scrollbarWidth: "none", // Firefox
-                    }}
-                  >
-                    {props.children}
-                  </Box>
-                  <Box
-                    p={2}
-                    position="sticky"
-                    bottom={0}
-                    bg="white"
-                    borderTop="1px solid"
-                    borderColor="gray.100"
-                  >
-                    <Button
-                      width="100%"
-                      colorPalette="blue"
-                      onClick={queueDrawerOpen.onOpen}
-                      leftIcon={<Plus />}
-                      variant="outline"
-                      size="sm"
-                    >
-                      Add New Queue
-                    </Button>
-                  </Box>
-                </chakraComponents.MenuList>
-              ),
-            }}
-          />
-        </Box>
-        <Spacer />
-        <HStack width="full">
-          <Spacer />
-          <Button
-            colorPalette="orange"
-            size="sm"
-            onClick={sendToQueue}
-            isLoading={isLoading}
-          >
-            Send
-          </Button>
-        </HStack>
+          </Tabs.Content>
+        </Tabs.Root>
       </VStack>
-    </>
-  );
-};
-function Events({ traceId }: { traceId: string }) {
-  const { trace } = useTraceDetailsState(traceId);
 
-  return trace.data && (trace.data?.events ?? []).length == 0 ? (
-    <Text>
-      No events found.{" "}
-      <Link
-        href="https://docs.langwatch.ai/user-events/custom"
-        target="_blank"
-        textDecoration="underline"
-      >
-        Get started with events
-      </Link>
-      .
-    </Text>
-  ) : (
-    <VStack align="start">
-      {trace.data?.events?.map((event) => (
-        <VStack
-          key={event.event_id}
-          backgroundColor={"gray.100"}
-          width={"full"}
-          padding={6}
-          borderRadius={"lg"}
-          align="start"
-          gap={4}
-        >
-          <HStack width="full">
-            <Heading size="md">{event.event_type}</Heading>
-            <Spacer />
-            {event.timestamps.started_at && (
-              <Tooltip
-                label={new Date(event.timestamps.started_at).toLocaleString()}
-              >
-                <Text color="gray.400" borderBottom="1px dashed">
-                  {formatTimeAgo(event.timestamps.started_at)}
-                </Text>
-              </Tooltip>
-            )}
-          </HStack>
-          <Box
-            borderRadius="6px"
-            border="1px solid"
-            borderColor="gray.400"
-            width="full"
-          >
-            <Table
-              size="sm"
-              background="white"
-              borderRadius="6px"
-              border="none"
-            >
-              <Thead>
-                <Tr>
-                  <Th width="50%">Metric</Th>
-                  <Th width="50%">Value</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {Object.entries(event.metrics ?? {}).map(([key, value]) => (
-                  <Tr key={key}>
-                    <Td>{key}</Td>
-                    <Td>{value}</Td>
-                  </Tr>
-                ))}
-              </Tbody>
-              <Thead>
-                <Tr>
-                  <Th>Event Detail</Th>
-                  <Th>Value</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {Object.entries(event.event_details ?? {}).map(
-                  ([key, value]) => (
-                    <Tr key={key}>
-                      <Td>{key}</Td>
-                      <Td>{value}</Td>
-                    </Tr>
-                  )
-                )}
-              </Tbody>
-            </Table>
-          </Box>
-        </VStack>
-      ))}
+      <Dialog.Root open={queueDrawerOpen.open} placement="bottom">
+        <Dialog.Backdrop />
+        <Dialog.Content>
+          <AddAnnotationQueueDrawer
+            onClose={queueDrawerOpen.onClose}
+            onOverlayClick={queueDrawerOpen.onClose}
+          />
+        </Dialog.Content>
+      </Dialog.Root>
     </VStack>
   );
 }
-
-function Evaluations(trace: TraceEval & { anyGuardrails: boolean }) {
-  const evaluations = trace.evaluations?.filter((x) => !x.is_guardrail);
-  const totalChecks = evaluations?.length;
-  if (!totalChecks)
-    return (
-      <Text>
-        No evaluations ran for this message.{" "}
-        {trace.anyGuardrails ? (
-          "Evaluations are skipped if guardrails completely blocked the message."
-        ) : (
-          <>
-            Setup evaluations{" "}
-            <Link
-              href={`/${trace.project?.slug}/evaluations`}
-              textDecoration="underline"
-            >
-              here
-            </Link>
-            .
-          </>
-        )}
-      </Text>
-    );
-  return (
-    <VStack align="start" gap={2}>
-      <>
-        {evaluations?.map((evaluation) => (
-          <EvaluationStatusItem
-            key={evaluation.evaluation_id}
-            check={evaluation}
-          />
-        ))}
-      </>
-    </VStack>
-  );
-}
-
-const Guardrails = (trace: TraceEval) => {
-  const guardrails = trace.evaluations?.filter((x) => x.is_guardrail);
-  const totalChecks = guardrails?.length;
-  if (!totalChecks)
-    return (
-      <Text>
-        No guardrails ran for this message. Setup guardrails{" "}
-        <Link
-          href={`/${trace.project?.slug}/evaluations`}
-          textDecoration="underline"
-        >
-          here
-        </Link>
-        .
-      </Text>
-    );
-  return (
-    <VStack align="start" gap={2}>
-      <>
-        {guardrails?.map((evaluation) => (
-          <EvaluationStatusItem
-            key={evaluation.evaluation_id}
-            check={evaluation}
-          />
-        ))}
-      </>
-    </VStack>
-  );
-};
-
-const EvaluationsCount = (trace: TraceEval) => {
-  const totalErrors =
-    trace.evaluations?.filter(
-      (check) => check.status === "error" || evaluationPassed(check) === false
-    ).length ?? 0;
-
-  if (totalErrors > 0) {
-    return (
-      <Text
-        marginLeft={3}
-        borderRadius={"md"}
-        paddingX={2}
-        backgroundColor={"red.500"}
-        color={"white"}
-        fontSize={"sm"}
-      >
-        {totalErrors} failed
-      </Text>
-    );
-  }
-
-  const totalProcessed =
-    trace.evaluations?.filter((check) => check.status === "processed").length ??
-    0;
-  const total = trace.evaluations?.length ?? 0;
-
-  if (total === 0) return null;
-
-  return (
-    <Text
-      marginLeft={3}
-      borderRadius={"md"}
-      paddingX={2}
-      backgroundColor={totalProcessed > 0 ? "green.500" : "yellow.500"}
-      color={"white"}
-      fontSize={"sm"}
-    >
-      {totalProcessed > 0 ? totalProcessed : total}
-    </Text>
-  );
-};
-
-const Blocked = (trace: TraceEval) => {
-  const totalBlocked = trace
-    ? trace.evaluations?.filter(
-        (check) => check.is_guardrail && check.passed === false
-      ).length
-    : 0;
-
-  if (totalBlocked === 0 || !totalBlocked) return null;
-
-  return (
-    <Text
-      marginLeft={3}
-      borderRadius={"md"}
-      paddingX={2}
-      backgroundColor={"blue.100"}
-      fontSize={"sm"}
-    >
-      {totalBlocked} blocked
-    </Text>
-  );
-};

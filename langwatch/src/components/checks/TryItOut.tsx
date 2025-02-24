@@ -447,7 +447,7 @@ export function TryItOut({
                             }
                           >
                             <Tooltip
-                              label={
+                              content={
                                 livePassesPreconditions
                                   ? trace.input?.value ?? ""
                                   : undefined
@@ -492,7 +492,7 @@ export function TryItOut({
                               }
                             >
                               <Tooltip
-                                label={
+                                content={
                                   livePassesPreconditions
                                     ? trace.output?.value
                                     : undefined

@@ -138,7 +138,7 @@ export function BatchEvaluationV2EvaluationSummary({
             Mean Duration
           </HoverableBigText>
           <Tooltip
-            label={
+            content={
               <VStack align="start" gap={0}>
                 <Text>
                   Prediction mean duration:{" "}

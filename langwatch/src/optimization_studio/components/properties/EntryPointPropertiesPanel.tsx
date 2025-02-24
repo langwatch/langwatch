@@ -176,7 +176,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
           <HStack width="full" paddingBottom={2}>
             <PropertySectionTitle>Optimization/Test Split</PropertySectionTitle>
             <Tooltip
-              label={`During optimization, a bigger part of the dataset is used for optimization and a smaller part for testing, this guarantees that the test set is not leaked into the optimization, preventing the LLM to "cheat" it's way into a better score.`}
+              content={`During optimization, a bigger part of the dataset is used for optimization and a smaller part for testing, this guarantees that the test set is not leaked into the optimization, preventing the LLM to "cheat" it's way into a better score.`}
             >
               <Box paddingTop={1}>
                 <Info size={14} />
@@ -285,7 +285,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
                 Shuffle Seed
               </Text>
               <Tooltip
-                label={`For making sure the original dataset order does not affect performance, a seed is used to shuffle it before the split. Use -1 if you want to disable shuffling.`}
+                content={`For making sure the original dataset order does not affect performance, a seed is used to shuffle it before the split. Use -1 if you want to disable shuffling.`}
               >
                 <Box paddingTop={1}>
                   <Info size={14} />
