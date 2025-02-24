@@ -352,7 +352,7 @@ export function TriggerDrawer() {
                     )}
                   </VStack>
                   <Tooltip
-                    label="Add a SendGrid API key or AWS SES credentials(Only if you are using AWS SES) to your environment variables to enable email functionality."
+                    content="Add a SendGrid API key or AWS SES credentials(Only if you are using AWS SES) to your environment variables to enable email functionality."
                     hasArrow
                     placement="top"
                     isDisabled={hasEmailProvider}

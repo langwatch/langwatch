@@ -385,7 +385,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                                     <Td> {check.name}</Td>
                                     <Td>
                                       <Tooltip
-                                        label={
+                                        content={
                                           (
                                             (check.parameters as JsonObject)
                                               ?.prompt ?? check.description
@@ -490,7 +490,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                                     <Td> {check.name}</Td>
                                     <Td>
                                       <Tooltip
-                                        label={
+                                        content={
                                           (
                                             (check.parameters as JsonObject)
                                               ?.prompt ?? check.description

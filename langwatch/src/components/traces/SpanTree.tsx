@@ -1,12 +1,4 @@
-import {
-  Alert,
-  AlertIcon,
-  Box,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import { useEffect, useState } from "react";
@@ -15,20 +7,18 @@ import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import type { ElasticSearchSpan } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import {
+  CheckStatusIcon,
+  evaluationStatusColor,
+} from "../checks/EvaluationStatus";
+import { HoverableBigText } from "../HoverableBigText";
+import { IconWrapper } from "../IconWrapper";
+import { formatEvaluationSingleValue } from "./EvaluationStatusItem";
+import {
   getEvaluationResult,
   SpanDetails,
   SpanDuration,
   SpanTypeTag,
 } from "./SpanDetails";
-import {
-  evaluationStatusColor,
-  CheckStatusIcon,
-} from "../checks/EvaluationStatus";
-import { IconWrapper } from "../IconWrapper";
-import {
-  formatEvaluationSingleValue,
-} from "./EvaluationStatusItem";
-import { HoverableBigText } from "../HoverableBigText";
 
 type SpanWithChildren = ElasticSearchSpan & { children: SpanWithChildren[] };
 
@@ -341,10 +331,14 @@ export function SpanTree(props: SpanTreeProps) {
           {project && span && <SpanDetails project={project} span={span} />}
         </HStack>
       ) : spans.isError ? (
-        <Alert status="error">
-          <AlertIcon />
-          An error has occurred trying to load the trace spans
-        </Alert>
+        <Alert.Root status="error">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description>
+              An error has occurred trying to load the trace spans
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
       ) : null}
     </VStack>
   );

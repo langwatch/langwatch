@@ -5,9 +5,9 @@ import {
   Heading,
   Spacer,
   Text,
-  Tooltip,
   VStack,
   Tag,
+  Badge,
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import { Clock, Settings } from "react-feather";
@@ -25,6 +25,7 @@ import {
   evaluationStatusColor,
   evaluationPassed,
 } from "../checks/EvaluationStatus";
+import { Tooltip } from "../ui/tooltip";
 
 export function SpanDetails({
   project,
@@ -252,12 +253,7 @@ export function SpanDetails({
       ) : (
         span.output !== undefined &&
         span.output !== null && (
-          <VStack
-            alignItems="flex-start"
-            gap={2}
-            paddingTop={4}
-            width="full"
-          >
+          <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
             <Box
               fontSize="13px"
               color="gray.400"
@@ -306,7 +302,7 @@ export const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
     evaluationResult && evaluationPassed(evaluationResult);
 
   return (
-    <Tag
+    <Badge
       colorPalette={
         span.error
           ? "red"
@@ -341,7 +337,7 @@ export const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
       fontSize="13px"
     >
       {span.type.toUpperCase()}
-    </Tag>
+    </Badge>
   );
 };
 
@@ -367,7 +363,7 @@ export const SpanDuration = ({
 
   return (
     <Tooltip
-      label={
+      content={
         <>
           Started at: {new Date(startedAt).toLocaleString()}
           <br />

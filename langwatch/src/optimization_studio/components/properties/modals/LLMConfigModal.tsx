@@ -125,7 +125,7 @@ export function LLMConfigField({
         <LLMModelDisplay model={model} />
         {allowDefault && llmConfig != undefined ? (
           <Tooltip
-            label="Overriding default LLM, click to reset"
+            content="Overriding default LLM, click to reset"
             placement="top"
             hasArrow
           >

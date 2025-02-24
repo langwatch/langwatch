@@ -220,7 +220,7 @@ export default function ProjectOnboarding() {
           {createProject.error && <p>Something went wrong!</p>}
           <HStack width="full">
             <Tooltip
-              label={
+              content={
                 usage.data &&
                 usage.data.projectsCount >= usage.data.activePlan.maxProjects
                   ? "You reached the limit of max new projects, upgrade your plan to add more projects"

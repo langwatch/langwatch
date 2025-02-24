@@ -198,7 +198,7 @@ export const TeamForm = ({
                               )}
                             />
                             <Tooltip
-                              label={
+                              content={
                                 <>
                                   <Text>
                                     Those are existing members of your

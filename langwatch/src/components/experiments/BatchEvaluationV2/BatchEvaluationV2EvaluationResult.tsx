@@ -110,7 +110,7 @@ const evaluationResultsTableRow = (
       render: () => (
         <Td>
           <Tooltip
-            label={
+            content={
               <VStack align="start" gap={0}>
                 <Text>Prediction cost: {datasetEntry?.cost ?? "-"}</Text>
                 <Text>Evaluation cost: {evaluationsCost ?? "-"}</Text>
@@ -135,7 +135,7 @@ const evaluationResultsTableRow = (
       render: () => (
         <Td>
           <Tooltip
-            label={
+            content={
               <VStack align="start" gap={0}>
                 <Text>
                   Prediction duration:{" "}

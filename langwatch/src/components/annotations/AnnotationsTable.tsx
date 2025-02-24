@@ -336,7 +336,7 @@ export const AnnotationsTable = ({
                           >
                             <Td>
                               <Tooltip
-                                label={
+                                content={
                                   <VStack align="start" gap={0}>
                                     {item.createdByUser && (
                                       <Text marginBottom={2}>
