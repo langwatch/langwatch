@@ -20,7 +20,7 @@ const cspHeader = `
     upgrade-insecure-requests;
     connect-src 'self' https://data.eu.pendo.io wss://client.relay.crisp.chat;
     worker-src 'self' blob:;
-    frame-src 'self' https://www.youtube.com;
+    frame-src 'self' https://www.youtube.com https://get.langwatch.ai;
 `;
 
 /**

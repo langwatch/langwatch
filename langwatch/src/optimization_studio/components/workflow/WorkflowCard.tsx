@@ -1,17 +1,13 @@
 import {
   Button,
-  Divider,
+  Separator,
   Heading,
   HStack,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuList,
   Spacer,
   Text,
-  useToast,
   VStack,
 } from "@chakra-ui/react";
+import { Menu } from "../../../components/ui/menu";
 import { WorkflowIcon } from "../ColorfulBlockIcons";
 import { MoreVertical } from "react-feather";
 import { api } from "../../../utils/api";
@@ -21,6 +17,7 @@ import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../../server/api/root";
+import { toaster } from "../../../components/ui/toaster";
 
 export function WorkflowCardBase(props: React.ComponentProps<typeof VStack>) {
   return (
@@ -67,7 +64,6 @@ export function WorkflowCard({
 } & React.ComponentProps<typeof WorkflowCardBase>) {
   const { project } = useOrganizationTeamProject();
   const archiveWorkflow = api.workflow.archive.useMutation();
-  const toast = useToast();
 
   const onArchiveWorkflow = useCallback(() => {
     if (!workflowId || !project) return;
@@ -77,7 +73,7 @@ export function WorkflowCard({
       {
         onSuccess: () => {
           void query?.refetch();
-          toast({
+          toaster.create({
             title: `Workflow ${name} deleted`,
             description: (
               <HStack>
@@ -86,7 +82,7 @@ export function WorkflowCard({
                   variant="plain"
                   textDecoration="underline"
                   onClick={() => {
-                    toast.close(`delete-workflow-${workflowId}`);
+                    toaster.remove(`delete-workflow-${workflowId}`);
                     setTimeout(() => {
                       void query?.refetch();
                     }, 1000);
@@ -99,13 +95,14 @@ export function WorkflowCard({
                       {
                         onSuccess: () => {
                           void query?.refetch();
-                          toast({
+                          toaster.create({
                             title: "Workflow restored",
                             description: "The workflow has been restored.",
-                            status: "success",
-                            duration: 5000,
-                            isClosable: true,
-                            position: "top-right",
+                            type: "success",
+                            meta: {
+                              closable: true,
+                            },
+                            placement: "top-end",
                           });
                         },
                       }
@@ -117,22 +114,23 @@ export function WorkflowCard({
               </HStack>
             ),
             id: `delete-workflow-${workflowId}`,
-            status: "success",
-            duration: 10_000,
-            isClosable: true,
-            position: "top-right",
+            type: "success",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
         },
         onError: () => {
-          toast({
+          toaster.create({
             title: "Error deleting workflow",
             description: "Please try again later.",
-            status: "error",
+            type: "error",
           });
         },
       }
     );
-  }, [archiveWorkflow, name, project, query, toast, workflowId]);
+  }, [archiveWorkflow, name, project, query, workflowId]);
 
   return (
     <WorkflowCardBase paddingX={0} {...props}>
@@ -143,19 +141,23 @@ export function WorkflowCard({
         </Heading>
         <Spacer />
         {workflowId && (
-          <Menu>
-            <MenuButton className="js-inner-menu">
+          <Menu.Root>
+            <Menu.Trigger className="js-inner-menu">
               <MoreVertical size={24} />
-            </MenuButton>
-            <MenuList className="js-inner-menu">
-              <MenuItem color="red.500" onClick={onArchiveWorkflow}>
+            </Menu.Trigger>
+            <Menu.Content className="js-inner-menu">
+              <Menu.Item
+                value="delete"
+                color="red.500"
+                onClick={onArchiveWorkflow}
+              >
                 Delete
-              </MenuItem>
-            </MenuList>
-          </Menu>
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Root>
         )}
       </HStack>
-      <Divider />
+      <Separator />
       {description && (
         <Text paddingX={4} color="gray.600" fontSize="14px">
           {description}

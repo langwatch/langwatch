@@ -166,6 +166,27 @@ export const system = createSystem(defaultConfig, {
           900: { value: "#521B41" },
         },
       },
+      // TODO: those are not working, we need to manually override cursors below
+      cursor: {
+        button: {
+          value: "pointer",
+        },
+        menuitem: {
+          value: "pointer",
+        },
+        checkbox: {
+          value: "pointer",
+        },
+        radio: {
+          value: "pointer",
+        },
+        slider: {
+          value: "pointer",
+        },
+        switch: {
+          value: "pointer",
+        },
+      },
     },
     semanticTokens: {
       colors: {
@@ -440,6 +461,16 @@ export const system = createSystem(defaultConfig, {
             cursor: "pointer",
             _hover: {
               bg: "gray.50",
+            },
+          },
+        },
+      }),
+      dialog: defineSlotRecipe({
+        slots: ["content"],
+        variants: {
+          size: {
+            "6xl": {
+              content: { maxWidth: "6xl" },
             },
           },
         },

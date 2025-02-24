@@ -10,7 +10,6 @@ import {
   Text,
   useDisclosure,
   VStack,
-  Tooltip,
 } from "@chakra-ui/react";
 import { Lock, Plus } from "react-feather";
 import { DashboardLayout } from "../../components/DashboardLayout";
@@ -21,15 +20,16 @@ import {
   WorkflowCard,
   WorkflowCardBase,
 } from "../../optimization_studio/components/workflow/WorkflowCard";
+import { Tooltip } from "../../components/ui/tooltip";
 
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
 
-export default function MessagesOrIntegrationGuide() {
+export default function Workflows() {
   const { project, isOrganizationFeatureEnabled, organization } =
     useOrganizationTeamProject();
 
-  const { isOpen, onClose, onOpen } = useDisclosure();
+  const { open, onClose, onOpen } = useDisclosure();
 
   const workflows = api.workflow.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -67,7 +67,7 @@ export default function MessagesOrIntegrationGuide() {
           >
             {!canCreateWorkflow ? (
               <WorkflowCardBase opacity={0.5}>
-                <Tooltip label="You reached the limit of max workflows, click to upgrade your plan to add more workflows">
+                <Tooltip content="You reached the limit of max workflows, click to upgrade your plan to add more workflows">
                   <Center width="full" height="full">
                     <Link
                       href={`/settings/subscription`}
@@ -117,32 +117,36 @@ export default function MessagesOrIntegrationGuide() {
                 <Skeleton key={index} height="200px" />
               ))}
             {workflows.data?.map((workflow) => (
-              <WorkflowCard
-                as={Link}
+              <Link
                 href={`/${project?.slug}/studio/${workflow.id}`}
                 key={workflow.id}
-                workflowId={workflow.id}
-                query={workflows}
-                name={workflow.name}
-                icon={workflow.icon}
-                description={workflow.description}
-                onClick={(e) => {
-                  let target = e.target as HTMLElement;
-                  while (target.parentElement) {
-                    if (target.classList.contains("js-inner-menu")) {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      return false;
+                display="block"
+                asChild
+              >
+                <WorkflowCard
+                  workflowId={workflow.id}
+                  query={workflows}
+                  name={workflow.name}
+                  icon={workflow.icon}
+                  description={workflow.description}
+                  onClick={(e) => {
+                    let target = e.target as HTMLElement;
+                    while (target.parentElement) {
+                      if (target.classList.contains("js-inner-menu")) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        return false;
+                      }
+                      target = target.parentElement;
                     }
-                    target = target.parentElement;
-                  }
-                }}
-              />
+                  }}
+                />
+              </Link>
             ))}
           </Grid>
         </VStack>
       </Container>
-      <NewWorkflowModal open={isOpen} onClose={onClose} />
+      <NewWorkflowModal open={open} onClose={onClose} />
     </DashboardLayout>
   );
 }
