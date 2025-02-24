@@ -9,10 +9,21 @@ import {
   createToaster,
 } from "@chakra-ui/react";
 
-export const toaster = createToaster({
-  placement: "top-right",
+const toaster_ = createToaster({
+  placement: "top-end",
   pauseOnPageIdle: true,
 });
+
+// Workaround for https://github.com/chakra-ui/chakra-ui/issues/9490#issuecomment-2601014577
+export const toaster = {
+  ...toaster_,
+  create: (args: Parameters<typeof toaster_.create>[0]) => {
+    return toaster_.create({
+      ...args,
+      placement: "top-end",
+    });
+  },
+};
 
 export const Toaster = () => {
   return (

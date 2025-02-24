@@ -1,12 +1,11 @@
-import { DragHandleIcon } from "@chakra-ui/icons";
 import {
   Box,
   Button,
   HStack,
+  Icon,
   Link,
   Spacer,
   Text,
-  Tooltip,
   VStack,
 } from "@chakra-ui/react";
 import { useReactFlow, type Node, type XYPosition } from "@xyflow/react";
@@ -14,6 +13,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useDrag, useDragLayer } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
 import { BookOpen, Box as BoxIcon, ChevronsLeft, GitHub } from "react-feather";
+import { LuGripVertical } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { HoverableBigText } from "../../components/HoverableBigText";
@@ -39,6 +39,7 @@ import {
 import { ComponentIcon } from "./ColorfulBlockIcons";
 import { NodeComponents } from "./nodes";
 import { PromptingTechniqueDraggingNode } from "./nodes/PromptingTechniqueNode";
+import { Tooltip } from "../../components/ui/tooltip";
 
 export function NodeSelectionPanelButton({
   isOpen,
@@ -246,21 +247,21 @@ export const NodeSelectionPanel = ({
           gap={4}
           background="white"
         >
-          <Tooltip hasArrow gutter={16} label="Star us on GitHub">
+          <Tooltip showArrow gutter={16} content="Star us on GitHub">
             <Link href="https://github.com/langwatch/langwatch" target="_blank">
               <IconWrapper width="20px" height="20px">
                 <GitHub />
               </IconWrapper>
             </Link>
           </Tooltip>
-          <Tooltip hasArrow gutter={16} label="Join our community">
+          <Tooltip showArrow gutter={16} content="Join our community">
             <Link href="https://discord.gg/kT4PhDS2gH" target="_blank">
               <IconWrapper width="20px" height="20px">
                 <DiscordOutlineIcon />
               </IconWrapper>
             </Link>
           </Tooltip>
-          <Tooltip hasArrow gutter={16} label="Documentation">
+          <Tooltip showArrow gutter={16} content="Documentation">
             <Link
               href="https://docs.langwatch.ai/optimization-studio/llm-nodes"
               target="_blank"
@@ -399,10 +400,10 @@ export const NodeDraggable = (props: {
   return (
     <>
       <Tooltip
-        hasArrow
+        showArrow
         gutter={16}
         placement="right"
-        label={
+        content={
           props.disableDrag
             ? "You cannot add the same component as your workflow"
             : props.component.description ?? ""
@@ -428,7 +429,9 @@ export const NodeDraggable = (props: {
               {props.component.name}
             </HoverableBigText>
             <Spacer />
-            <DragHandleIcon width="14px" height="14px" color="gray.350" />
+            <Icon width="14px" height="14px" color="gray.350">
+              <LuGripVertical />
+            </Icon>
           </HStack>
         </Box>
       </Tooltip>
