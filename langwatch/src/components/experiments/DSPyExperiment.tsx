@@ -1256,7 +1256,7 @@ export function DSPyRunsScoresChart({
             }}
           />
           <Tooltip
-            labelFormatter={(value) => `Step ${value}`}
+            contentFormatter={(value) => `Step ${value}`}
             formatter={(value, name, props) => {
               const label = props.payload[`${name}_label`];
               const version = props.payload[`${name}_version`];
