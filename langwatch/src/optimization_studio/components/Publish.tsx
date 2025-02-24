@@ -7,17 +7,12 @@ import {
   HStack,
   Link,
   Menu,
-  MenuButton,
-  MenuDivider,
   MenuItem,
-  MenuList,
-  Modal,
   ModalBody,
   ModalCloseButton,
   ModalContent,
   ModalFooter,
   ModalHeader,
-  ModalOverlay,
   Skeleton,
   Spacer,
   Spinner,
@@ -26,7 +21,7 @@ import {
   useDisclosure,
   useToast,
   VStack,
-  type MenuItemProps,
+  type MenuItemProps
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useCallback, useState } from "react";
@@ -49,9 +44,11 @@ import type { Workflow } from "../types/dsl";
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
 
+import { Separator } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { type Edge } from "@xyflow/react";
 import { useForm } from "react-hook-form";
+import { Dialog } from "~/components/ui";
 import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
 import { trackEvent } from "../../utils/tracking";
 import { checkIsEvaluator, getEntryInputs } from "../utils/nodeUtils";
@@ -63,48 +60,46 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
 
   return (
     <>
-      <Menu>
-        {({ isOpen }) => (
-          <>
-            <MenuButton
-              isActive={isOpen}
-              isDisabled={isDisabled}
-              as={Button}
-              size="sm"
-              rightIcon={<ChevronDownIcon />}
-              colorPalette="blue"
-            >
-              Publish
-            </MenuButton>
-            <MenuList zIndex={101}>
-              {isOpen && project && (
-                <PublishMenu
-                  project={project}
-                  onTogglePublish={publishModal.onToggle}
-                  onToggleApi={apiModal.onToggle}
-                />
-              )}
-            </MenuList>
-          </>
-        )}
-      </Menu>
-      <Modal
-        isOpen={publishModal.isOpen}
-        onClose={publishModal.onClose}
-        size={"xl"}
-      >
-        <ModalOverlay />
-        {publishModal.isOpen && (
-          <PublishModalContent
-            onClose={publishModal.onClose}
-            onApiToggle={apiModal.onToggle}
-          />
-        )}
-      </Modal>
-      <Modal isOpen={apiModal.isOpen} onClose={apiModal.onClose} size={"2xl"}>
-        <ModalOverlay />
-        {apiModal.isOpen && <ApiModalContent />}
-      </Modal>
+      <Menu.Root>
+        <Menu.Trigger asChild>
+          <Button
+            disabled={isDisabled}
+            size="sm"
+            rightIcon={<ChevronDownIcon />}
+            colorPalette="blue"
+          >
+            Publish
+          </Button>
+        </Menu.Trigger>
+        <Menu.Content>
+          {project && (
+            <PublishMenu
+              project={project}
+              onTogglePublish={publishModal.onToggle}
+              onToggleApi={apiModal.onToggle}
+            />
+          )}
+        </Menu.Content>
+      </Menu.Root>
+
+      <Dialog.Root open={publishModal.isOpen} onOpenChange={publishModal.onClose}>
+        <Dialog.Backdrop />
+        <Dialog.Content size="xl">
+          {publishModal.isOpen && (
+            <PublishModalContent
+              onClose={publishModal.onClose}
+              onApiToggle={apiModal.onToggle}
+            />
+          )}
+        </Dialog.Content>
+      </Dialog.Root>
+
+      <Dialog.Root open={apiModal.isOpen} onOpenChange={apiModal.onClose}>
+        <Dialog.Backdrop />
+        <Dialog.Content size="2xl">
+          {apiModal.isOpen && <ApiModalContent />}
+        </Dialog.Content>
+      </Dialog.Root>
     </>
   );
 }
@@ -285,7 +280,7 @@ function PublishMenu({
             <SmallLabel color="gray.600">Published Version</SmallLabel>
             <Text fontSize="xs">{publishedWorkflow.data?.version}</Text>
           </HStack>
-          <MenuDivider />
+          <Separator />
         </>
       )}
       <SubscriptionMenuItem
@@ -532,9 +527,11 @@ function PublishModalContent({
       borderTop="5px solid"
       borderColor="green.400"
     >
-      <ModalHeader fontWeight={600}>Publish Workflow</ModalHeader>
-      <ModalCloseButton />
-      <ModalBody>
+      <Dialog.Header>
+        <Dialog.Title fontWeight={600}>Publish Workflow</Dialog.Title>
+      </Dialog.Header>
+      <Dialog.CloseTrigger />
+      <Dialog.Body>
         <VStack align="start" width="full" gap={10}>
           <Text fontSize="15px" color="black">
             Publish your workflow to make it available via API, as a component
@@ -549,8 +546,8 @@ function PublishModalContent({
             />
           )}
         </VStack>
-      </ModalBody>
-      <ModalFooter borderTop="1px solid" borderColor="gray.200" marginTop={4}>
+      </Dialog.Body>
+      <Dialog.Footer borderTop="1px solid" borderColor="gray.200" marginTop={4}>
         <VStack align="start" width="full" gap={3}>
           {hasProvidersWithoutCustomKeys && (
             <AddModelProviderKey
@@ -618,7 +615,7 @@ function PublishModalContent({
             </VStack>
           )}
         </VStack>
-      </ModalFooter>
+      </Dialog.Footer>
     </ModalContent>
   );
 }
@@ -663,9 +660,11 @@ export const ApiModalContent = () => {
   );
   return (
     <ModalContent>
-      <ModalHeader>Workflow API</ModalHeader>
-      <ModalCloseButton />
-      <ModalBody>
+      <Dialog.Header>
+        <Dialog.Title>Workflow API</Dialog.Title>
+      </Dialog.Header>
+      <Dialog.CloseTrigger />
+      <Dialog.Body>
         <Text paddingBottom={8}>
           Incorporate the following JSON payload within the body of your HTTP
           POST request to get the workflow result.
@@ -708,8 +707,8 @@ EOF`}
           </Link>
           .
         </Text>
-      </ModalBody>
-      <ModalFooter></ModalFooter>
+      </Dialog.Body>
+      <Dialog.Footer />
     </ModalContent>
   );
 };

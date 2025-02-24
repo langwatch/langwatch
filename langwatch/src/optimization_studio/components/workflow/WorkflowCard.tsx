@@ -78,8 +78,9 @@ export function WorkflowCard({
             description: (
               <HStack>
                 <Button
-                  colorPalette="white"
-                  variant="plain"
+                  unstyled
+                  color="white"
+                  cursor="pointer"
                   textDecoration="underline"
                   onClick={() => {
                     toaster.remove(`delete-workflow-${workflowId}`);

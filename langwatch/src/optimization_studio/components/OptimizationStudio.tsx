@@ -21,7 +21,7 @@ import {
 import { DndProvider, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
-import { Link } from "../ui/link";
+import { Link } from "../../components/ui/link";
 import "@xyflow/react/dist/style.css";
 import Head from "next/head";
 import { useEffect, useMemo, useRef, useState } from "react";
