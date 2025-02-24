@@ -308,7 +308,7 @@ function MembersList({
           <Spacer />
           {!activePlan.overrideAddingLimitations &&
           organization.members.length >= activePlan.maxMembers ? (
-            <Tooltip label="Upgrade your plan to add more members">
+            <Tooltip content="Upgrade your plan to add more members">
               <Button size="sm" colorPalette="orange" isDisabled={true}>
                 <HStack gap={2}>
                   <Lock size={20} />

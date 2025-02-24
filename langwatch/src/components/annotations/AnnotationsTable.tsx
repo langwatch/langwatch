@@ -132,7 +132,7 @@ export const AnnotationsTable = ({
                       <Tag>{annotation.scoreOptions?.[id]?.value}</Tag>
                     )}
                     {annotation.scoreOptions?.[id]?.reason && (
-                      <Tooltip label={annotation.scoreOptions[id]?.reason}>
+                      <Tooltip content={annotation.scoreOptions[id]?.reason}>
                         <MessageCircle width={16} height={16} />
                       </Tooltip>
                     )}
@@ -428,7 +428,7 @@ export const AnnotationsTable = ({
                             )}
 
                             <Td>
-                              <Tooltip label={item.trace?.input?.value}>
+                              <Tooltip content={item.trace?.input?.value}>
                                 <Text
                                   lineClamp={2}
                                   maxWidth="350px"
@@ -441,7 +441,7 @@ export const AnnotationsTable = ({
                               </Tooltip>
                             </Td>
                             <Td>
-                              <Tooltip label={item.trace?.output?.value}>
+                              <Tooltip content={item.trace?.output?.value}>
                                 <Text
                                   lineClamp={2}
                                   maxWidth="350px"

@@ -37,7 +37,7 @@ export function TraceToPlaygroundLink({
   }).toString()}`;
 
   return (
-    <Tooltip label={tooltipLabel} hasArrow placement="right" gutter={16}>
+    <Tooltip content={tooltipLabel} hasArrow placement="right" gutter={16}>
       <Link
         as={Button}
         href={linkHref}

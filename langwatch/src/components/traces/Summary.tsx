@@ -41,7 +41,7 @@ const SummaryItem = ({
       <HStack>
         <b>{label}</b>
         {tooltip && (
-          <Tooltip label={tooltip}>
+          <Tooltip content={tooltip}>
             <HelpCircle width="14px" />
           </Tooltip>
         )}

@@ -100,7 +100,7 @@ function ProjectsList({
                               </HStack>
                             </Button>
                           ) : (
-                            <Tooltip label="You reached the limit of max new projects, click to upgrade your plan to add more projects">
+                            <Tooltip content="You reached the limit of max new projects, click to upgrade your plan to add more projects">
                               <Link
                                 href={`/settings/subscription`}
                                 _hover={{

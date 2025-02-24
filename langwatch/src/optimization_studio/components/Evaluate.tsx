@@ -1,21 +1,14 @@
 import {
   Button,
   HStack,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
   Skeleton,
   Spacer,
   Text,
-  Tooltip,
   useDisclosure,
-  useToast,
   VStack,
 } from "@chakra-ui/react";
+import { Dialog } from "../../components/ui/dialog";
+import { Tooltip } from "../../components/ui/tooltip";
 
 import type { Node } from "@xyflow/react";
 import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
@@ -39,9 +32,10 @@ import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
 import { trainTestSplit } from "../utils/datasetUtils";
 import { trackEvent } from "../../utils/tracking";
+import { toaster } from "../../components/ui/toaster";
 
 export function Evaluate() {
-  const { isOpen, onToggle, onClose } = useDisclosure();
+  const { open, onToggle, onClose } = useDisclosure();
 
   const { project } = useOrganizationTeamProject();
 
@@ -61,7 +55,7 @@ export function Evaluate() {
 
   return (
     <>
-      <Tooltip label={isRunning ? "Evaluation is running" : ""}>
+      <Tooltip content={isRunning ? "Evaluation is running" : ""}>
         <Button
           variant="outline"
           size="sm"
@@ -69,16 +63,16 @@ export function Evaluate() {
             trackEvent("evaluate_click", { project_id: project?.id });
             onToggle();
           }}
-          leftIcon={<CheckSquare size={16} />}
-          isDisabled={isRunning}
+          disabled={isRunning}
         >
-          Evaluate
+          <CheckSquare size={16} /> Evaluate
         </Button>
       </Tooltip>
-      <Modal isOpen={isOpen} onClose={onClose}>
-        <ModalOverlay />
-        {isOpen && <EvaluateModalContent form={form} onClose={onClose} />}
-      </Modal>
+      <Dialog.Root open={open} onOpenChange={onClose}>
+        <Dialog.Content>
+          {open && <EvaluateModalContent form={form} onClose={onClose} />}
+        </Dialog.Content>
+      </Dialog.Root>
     </>
   );
 }
@@ -204,7 +198,6 @@ export function EvaluateModalContent({
       allowSaveIfAutoSaveIsCurrentButNotLatest: false,
     });
 
-  const toast = useToast();
   const commitVersion = api.workflow.commitVersion.useMutation();
   const { startEvaluationExecution } = useEvaluationExecution();
 
@@ -265,24 +258,24 @@ export function EvaluateModalContent({
           });
           versionId = versionResponse.id;
         } catch (error) {
-          toast({
+          toaster.create({
             title: "Error saving version",
-            status: "error",
+            type: "error",
             duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            meta: { closable: true },
+            placement: "top-end",
           });
           throw error;
         }
       }
 
       if (!versionId) {
-        toast({
+        toaster.create({
           title: "Version ID not found for evaluation",
-          status: "error",
+          type: "error",
           duration: 5000,
-          isClosable: true,
-          position: "top-right",
+          meta: { closable: true },
+          placement: "top-end",
         });
         return;
       }
@@ -302,7 +295,6 @@ export function EvaluateModalContent({
       getWorkflow,
       project,
       startEvaluationExecution,
-      toast,
       versionToBeEvaluated.id,
       versions,
       workflowId,
@@ -317,17 +309,19 @@ export function EvaluateModalContent({
 
   if (!versions.data) {
     return (
-      <ModalContent borderTop="5px solid" borderColor="green.400">
-        <ModalHeader fontWeight={600}>Evaluate Workflow</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
+      <Dialog.Content borderTop="5px solid" borderTopColor="green.400">
+        <Dialog.Header>
+          <Dialog.Title fontWeight={600}>Evaluate Workflow</Dialog.Title>
+          <Dialog.CloseTrigger />
+        </Dialog.Header>
+        <Dialog.Body>
           <VStack align="start" width="full">
             <Skeleton width="full" height="20px" />
             <Skeleton width="full" height="20px" />
           </VStack>
-        </ModalBody>
-        <ModalFooter />
-      </ModalContent>
+        </Dialog.Body>
+        <Dialog.Footer />
+      </Dialog.Content>
     );
   }
 
@@ -338,16 +332,18 @@ export function EvaluateModalContent({
     : false;
 
   return (
-    <ModalContent
+    <Dialog.Content
       as="form"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onSubmit={form.handleSubmit(onSubmit)}
       borderTop="5px solid"
-      borderColor="green.400"
+      borderTopColor="green.400"
     >
-      <ModalHeader fontWeight={600}>Evaluate Workflow</ModalHeader>
-      <ModalCloseButton />
-      <ModalBody>
+      <Dialog.Header>
+        <Dialog.Title fontWeight={600}>Evaluate Workflow</Dialog.Title>
+        <Dialog.CloseTrigger />
+      </Dialog.Header>
+      <Dialog.Body>
         <VStack align="start" width="full" gap={4}>
           <VStack align="start" width="full">
             <VersionToBeUsed
@@ -374,8 +370,8 @@ export function EvaluateModalContent({
             />
           </VStack>
         </VStack>
-      </ModalBody>
-      <ModalFooter borderTop="1px solid" borderColor="gray.200" marginTop={4}>
+      </Dialog.Body>
+      <Dialog.Footer borderTop="1px solid" borderColor="gray.200" marginTop={4}>
         <VStack align="start" width="full" gap={3}>
           {hasProvidersWithoutCustomKeys && (
             <AddModelProviderKey
@@ -386,24 +382,24 @@ export function EvaluateModalContent({
           <HStack width="full">
             <Text fontWeight={500}>{estimatedTotal} entries</Text>
             <Spacer />
-            <Tooltip label={isDisabled}>
+            <Tooltip content={isDisabled}>
               <Button
                 variant="outline"
                 type="submit"
-                leftIcon={<CheckSquare size={16} />}
-                isLoading={
+                disabled={!!isDisabled}
+                loading={
                   commitVersion.isLoading ||
                   evaluationState?.status === "waiting"
                 }
-                isDisabled={!!isDisabled}
               >
+                <CheckSquare size={16} />
                 {canSaveNewVersion ? "Save & Run Evaluation" : "Run Evaluation"}
               </Button>
             </Tooltip>
           </HStack>
         </VStack>
-      </ModalFooter>
-    </ModalContent>
+      </Dialog.Footer>
+    </Dialog.Content>
   );
 }
 
@@ -420,7 +416,6 @@ const DatasetSplitSelect = ({
       options={options}
       hideSelectedOptions={false}
       isSearchable={false}
-      useBasicStyles
       chakraStyles={{
         container: (base) => ({
           ...base,

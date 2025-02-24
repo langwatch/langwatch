@@ -317,7 +317,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
       <VStack width="full" align="start">
         <HStack width="full">
           <PropertySectionTitle>Manual Test Entry</PropertySectionTitle>
-          <Tooltip label="When manually running the full workflow, a single entry from the dataset will be used, choose which one to pick.">
+          <Tooltip content="When manually running the full workflow, a single entry from the dataset will be used, choose which one to pick.">
             <Box paddingTop={1}>
               <Info size={14} />
             </Box>

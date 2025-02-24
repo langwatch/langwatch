@@ -3,7 +3,7 @@ import NextLink from "next/link";
 import { type ComponentProps } from "react";
 
 type LinkProps = {
-  href: string;
+  href: string | undefined;
   isExternal?: boolean;
 } & Omit<ComponentProps<typeof ChakraLink>, "as" | "href">;
 
@@ -23,7 +23,7 @@ export const Link = ({ href, isExternal, children, ...props }: LinkProps) => {
 
   return (
     <ChakraLink asChild {...props}>
-      <NextLink href={href}>{children}</NextLink>
+      <NextLink href={href ?? ""}>{children}</NextLink>
     </ChakraLink>
   );
 };

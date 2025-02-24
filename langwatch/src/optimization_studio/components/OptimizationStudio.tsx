@@ -5,8 +5,6 @@ import {
   Flex,
   HStack,
   Text,
-  Tooltip,
-  useTheme,
   VStack,
 } from "@chakra-ui/react";
 import {
@@ -59,6 +57,8 @@ import { Publish } from "./Publish";
 import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
 import { setRecentMenuLinkClick } from "../../components/DashboardLayout";
+import { useColorRawValue } from "../../components/ui/color-mode";
+import { Tooltip } from "../../components/ui/tooltip";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {
   const [_, drop] = useDrop(() => ({
@@ -390,9 +390,8 @@ export default function OptimizationStudio() {
 }
 
 function ReactFlowBackground() {
-  const theme = useTheme();
-  const gray100 = theme.colors.gray["100"];
-  const gray300 = theme.colors.gray["300"];
+  const gray100 = useColorRawValue("gray.100");
+  const gray300 = useColorRawValue("gray.300");
 
   return (
     <Background
@@ -410,11 +409,10 @@ function StatusCircle({
   tooltip,
 }: {
   status: string;
-  // For some misterious weird bug, we cannot wrap <StatusCircle /> in a <Tooltip />, the tooltip doesn't work, so we need to use it inside and pass the tooltip label as a prop.
   tooltip?: string | React.ReactNode;
 }) {
   return (
-    <Tooltip label={tooltip}>
+    <Tooltip content={tooltip}>
       <Box
         minWidth="12px"
         maxWidth="12px"

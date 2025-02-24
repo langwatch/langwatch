@@ -34,7 +34,7 @@ export function SpanDetails({
   span: ElasticSearchSpan;
 }) {
   const estimatedCost = (
-    <Tooltip label="When `metrics.completion_tokens` and `metrics.prompt_tokens` are not available, they are estimated based on input, output and the model for calculating costs.">
+    <Tooltip content="When `metrics.completion_tokens` and `metrics.prompt_tokens` are not available, they are estimated based on input, output and the model for calculating costs.">
       <Text as="span" color="gray.400" borderBottom="1px dotted">
         {" (estimated)"}
       </Text>
@@ -121,7 +121,7 @@ export function SpanDetails({
               <b>Cost:</b> {numeral(span.metrics.cost).format("$0.00000a")}
               {span.metrics?.tokens_estimated && estimatedCost}
             </Text>
-            <Tooltip label="Edit model costs">
+            <Tooltip content="Edit model costs">
               <Link target="_blank" href={`/settings/model-costs`}>
                 <Settings size={14} />
               </Link>

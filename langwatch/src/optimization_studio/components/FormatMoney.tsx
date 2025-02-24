@@ -17,7 +17,7 @@ export const FormatMoney = ({
   const formatted = formatMoney({ amount, currency }, format);
 
   return (
-    <Tooltip label={tooltip ?? (formatted.startsWith("<") ? amount : "")}>
+    <Tooltip content={tooltip ?? (formatted.startsWith("<") ? amount : "")}>
       {formatted}
     </Tooltip>
   );
