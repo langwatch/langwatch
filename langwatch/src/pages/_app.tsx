@@ -469,6 +469,9 @@ export const system = createSystem(defaultConfig, {
         slots: ["content"],
         variants: {
           size: {
+            "5xl": {
+              content: { maxWidth: "5xl" },
+            },
             "6xl": {
               content: { maxWidth: "6xl" },
             },

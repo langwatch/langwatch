@@ -185,7 +185,7 @@ const evaluationResultsTableRow = (
                         key={`evaluation-entry-${column}`}
                         background="red.200"
                       >
-                        <Tooltip label={datasetEntry.error}>
+                        <Tooltip content={datasetEntry.error}>
                           <Box lineClamp={1}>Error</Box>
                         </Tooltip>
                       </Td>
@@ -215,7 +215,7 @@ const evaluationResultsTableRow = (
                           key={`evaluation-result-${column}`}
                           background="red.200"
                         >
-                          <Tooltip label={evaluation.details}>
+                          <Tooltip content={evaluation.details}>
                             <Box lineClamp={1}>Error</Box>
                           </Tooltip>
                         </Td>
@@ -231,7 +231,7 @@ const evaluationResultsTableRow = (
                           key={`evaluation-result-${column}`}
                           background="yellow.100"
                         >
-                          <Tooltip label={evaluation.details}>
+                          <Tooltip content={evaluation.details}>
                             <Box lineClamp={1}>Skipped</Box>
                           </Tooltip>
                         </Td>
@@ -487,7 +487,7 @@ export function BatchEvaluationV2EvaluationResult({
                 <HStack>
                   <Text>Predicted</Text>
                   {workflowId && (
-                    <Tooltip label="Values plugged in the End node will show up here">
+                    <Tooltip content="Values plugged in the End node will show up here">
                       <Info size={14} />
                     </Tooltip>
                   )}

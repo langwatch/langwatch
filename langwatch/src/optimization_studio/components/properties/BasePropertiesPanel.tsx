@@ -436,7 +436,7 @@ export function FieldsForm({
                   </Text>
                 )}
                 {field.desc && (
-                  <Tooltip label={field.desc}>
+                  <Tooltip content={field.desc}>
                     <Info size={14} />
                   </Tooltip>
                 )}
@@ -479,7 +479,7 @@ export function PropertySectionTitle({
     <HStack paddingLeft={2}>
       <NodeSectionTitle fontSize="12px">{children}</NodeSectionTitle>
       {tooltip && (
-        <Tooltip label={tooltip}>
+        <Tooltip content={tooltip}>
           <Box marginBottom="-2px">
             <Info size={14} />
           </Box>

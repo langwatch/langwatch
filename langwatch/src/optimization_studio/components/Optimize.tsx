@@ -1,25 +1,16 @@
 import {
-  Alert,
-  AlertIcon,
   Box,
   Button,
   HStack,
   Input,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
   Skeleton,
   Spacer,
   Text,
-  Tooltip,
   useDisclosure,
-  useToast,
   VStack,
 } from "@chakra-ui/react";
+import { Alert } from "@chakra-ui/react";
+import { Dialog } from "@chakra-ui/react";
 
 import type { Node } from "@xyflow/react";
 import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
@@ -46,6 +37,8 @@ import { useVersionState, VersionToBeUsed } from "./History";
 import { LLMConfigField } from "./properties/modals/LLMConfigModal";
 import { checkIsEvaluator } from "../utils/nodeUtils";
 import { trackEvent } from "../../utils/tracking";
+import { Tooltip } from "../../components/ui/tooltip";
+import { toaster } from "../../components/ui/toaster";
 
 const optimizerOptions: {
   label: string;
@@ -58,7 +51,7 @@ const optimizerOptions: {
 }));
 
 export function Optimize() {
-  const { isOpen, onToggle, onClose } = useDisclosure();
+  const { open, onToggle, onClose } = useDisclosure();
 
   const { project } = useOrganizationTeamProject();
   const { optimizationState } = useWorkflowStore(({ state }) => ({
@@ -78,7 +71,7 @@ export function Optimize() {
 
   return (
     <>
-      <Tooltip label={isRunning ? "Optimization is running" : ""}>
+      <Tooltip content={isRunning ? "Optimization is running" : ""}>
         <Button
           colorPalette="green"
           size="sm"
@@ -86,16 +79,16 @@ export function Optimize() {
             trackEvent("optimize_click", { project_id: project?.id });
             onToggle();
           }}
-          leftIcon={<TrendingUp size={16} />}
-          isDisabled={isRunning}
+          disabled={isRunning}
         >
+          <TrendingUp size={16} />
           Optimize
         </Button>
       </Tooltip>
-      <Modal isOpen={isOpen} onClose={onClose} size="xl">
-        <ModalOverlay />
-        {isOpen && <OptimizeModalContent form={form} onClose={onClose} />}
-      </Modal>
+      <Dialog.Root open={open} onOpenChange={onClose}>
+        <Dialog.Backdrop />
+        {open && <OptimizeModalContent form={form} onClose={onClose} />}
+      </Dialog.Root>
     </>
   );
 }
@@ -192,7 +185,6 @@ export function OptimizeModalContent({
       allowSaveIfAutoSaveIsCurrentButNotLatest: false,
     });
 
-  const toast = useToast();
   const commitVersion = api.workflow.commitVersion.useMutation();
   const { startOptimizationExecution } = useOptimizationExecution();
 
@@ -248,25 +240,29 @@ export function OptimizeModalContent({
             },
           });
           versionId = versionResponse.id;
+          toaster.create({
+            title: "Version saved",
+            description: "New version has been saved successfully",
+            type: "success",
+            placement: "top-end",
+          });
         } catch (error) {
-          toast({
-            title: "Error saving version",
-            status: "error",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+          toaster.create({
+            title: "Error",
+            description: "Failed to save version",
+            type: "error",
+            placement: "top-end",
           });
           throw error;
         }
       }
 
       if (!versionId) {
-        toast({
+        toaster.create({
           title: "Version ID not found for optimization",
-          status: "error",
-          duration: 5000,
-          isClosable: true,
-          position: "top-right",
+          description: "Failed to find version ID for optimization",
+          type: "error",
+          placement: "top-end",
         });
         return;
       }
@@ -286,7 +282,6 @@ export function OptimizeModalContent({
       getWorkflow,
       project,
       startOptimizationExecution,
-      toast,
       train.length,
       versionToBeEvaluated.id,
       versions,
@@ -309,17 +304,17 @@ export function OptimizeModalContent({
 
   if (!versions.data) {
     return (
-      <ModalContent borderTop="5px solid" borderColor="green.400">
-        <ModalHeader fontWeight={600}>Optimize Workflow</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
+      <Dialog.Content borderTop="5px solid" borderColor="green.400">
+        <Dialog.Header fontWeight={600}>Optimize Workflow</Dialog.Header>
+        <Dialog.CloseTrigger />
+        <Dialog.Body>
           <VStack align="start" width="full">
             <Skeleton width="full" height="20px" />
             <Skeleton width="full" height="20px" />
           </VStack>
-        </ModalBody>
-        <ModalFooter />
-      </ModalContent>
+        </Dialog.Body>
+        <Dialog.Footer />
+      </Dialog.Content>
     );
   }
 
@@ -336,16 +331,16 @@ export function OptimizeModalContent({
   const llmConfig = form.watch("params.llm");
 
   return (
-    <ModalContent
+    <Dialog.Content
       as="form"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onSubmit={form.handleSubmit(onSubmit)}
       borderTop="5px solid"
       borderColor="green.400"
     >
-      <ModalHeader fontWeight={600}>Optimize Workflow</ModalHeader>
-      <ModalCloseButton />
-      <ModalBody display="flex" flexDirection="column" gap={4}>
+      <Dialog.Header fontWeight={600}>Optimize Workflow</Dialog.Header>
+      <Dialog.CloseTrigger />
+      <Dialog.Body display="flex" flexDirection="column" gap={4}>
         <VStack align="start" width="full" gap={4}>
           <VStack align="start" width="full">
             <VersionToBeUsed
@@ -375,7 +370,7 @@ export function OptimizeModalContent({
             <VStack align="start" width="full" gap={2}>
               <HStack>
                 <SmallLabel color="gray.600">Teacher LLM</SmallLabel>
-                <Tooltip label="The LLM that will be used to generate the prompts and/or demonstrations. You can, for example, use a more powerful LLM to teach a smaller one.">
+                <Tooltip content="The LLM that will be used to generate the prompts and/or demonstrations. You can, for example, use a more powerful LLM to teach a smaller one.">
                   <Info size={16} />
                 </Tooltip>
               </HStack>
@@ -410,7 +405,7 @@ export function OptimizeModalContent({
                 <SmallLabel color="gray.600">
                   Number of Candidate Prompts
                 </SmallLabel>
-                <Tooltip label="Each candidate and demonstrations combination will be evaluated against the optimization set.">
+                <Tooltip content="Each candidate and demonstrations combination will be evaluated against the optimization set.">
                   <Info size={16} />
                 </Tooltip>
               </HStack>
@@ -428,7 +423,7 @@ export function OptimizeModalContent({
             <VStack align="start" width="full" gap={2}>
               <HStack>
                 <SmallLabel color="gray.600">Max Bootstrapped Demos</SmallLabel>
-                <Tooltip label="Maximum number of few shot demonstrations generated on the fly by the optimizer">
+                <Tooltip content="Maximum number of few shot demonstrations generated on the fly by the optimizer">
                   <Info size={16} />
                 </Tooltip>
               </HStack>
@@ -444,7 +439,7 @@ export function OptimizeModalContent({
             <VStack align="start" width="full" gap={2}>
               <HStack>
                 <SmallLabel color="gray.600">Max Labeled Demos</SmallLabel>
-                <Tooltip label="Maximum number of few shot demonstrations coming from the original dataset. Caveat: the output field of the LLM node must have exactly the same name as the dataset column.">
+                <Tooltip content="Maximum number of few shot demonstrations coming from the original dataset. Caveat: the output field of the LLM node must have exactly the same name as the dataset column.">
                   <Info size={16} />
                 </Tooltip>
               </HStack>
@@ -468,23 +463,25 @@ export function OptimizeModalContent({
             />
           </VStack>
         )} */}
-      </ModalBody>
-      <ModalFooter borderTop="1px solid" borderColor="gray.200" marginTop={4}>
-        <VStack align="start" width="full" gap={3}>
-          {hasProvidersWithoutCustomKeys ? (
-            <AddModelProviderKey
-              runWhat="run optimizations"
-              nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
-            />
-          ) : !hasEvaluator ? (
-            <Alert status="warning">
-              <AlertIcon />
+        {hasProvidersWithoutCustomKeys ? (
+          <AddModelProviderKey
+            runWhat="run optimizations"
+            nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
+          />
+        ) : !hasEvaluator ? (
+          <Alert.Root status="warning">
+            <Alert.Indicator />
+            <Alert.Content>
               <Text>
                 You need at least one evaluator node in your workflow to be able
                 to run optimizations
               </Text>
-            </Alert>
-          ) : null}
+            </Alert.Content>
+          </Alert.Root>
+        ) : null}
+      </Dialog.Body>
+      <Dialog.Footer borderTop="1px solid" borderColor="gray.200" marginTop={4}>
+        <VStack align="start" width="full" gap={3}>
           <HStack width="full">
             <VStack align="start" gap={0}>
               <Text fontWeight={500}>
@@ -492,17 +489,17 @@ export function OptimizeModalContent({
               </Text>
             </VStack>
             <Spacer />
-            <Tooltip label={isDisabled}>
+            <Tooltip content={isDisabled}>
               <Button
                 variant="outline"
                 type="submit"
-                leftIcon={<CheckSquare size={16} />}
-                isLoading={
+                loading={
                   commitVersion.isLoading ||
                   optimizationState?.status === "waiting"
                 }
-                isDisabled={!!isDisabled}
+                disabled={!!isDisabled}
               >
+                <CheckSquare size={16} />
                 {canSaveNewVersion
                   ? "Save & Run Optimization"
                   : "Run Optimization"}
@@ -510,8 +507,8 @@ export function OptimizeModalContent({
             </Tooltip>
           </HStack>
         </VStack>
-      </ModalFooter>
-    </ModalContent>
+      </Dialog.Footer>
+    </Dialog.Content>
   );
 }
 
@@ -527,7 +524,6 @@ const OptimizerSelect = ({
       options={optimizerOptions}
       hideSelectedOptions={false}
       isSearchable={false}
-      useBasicStyles
       chakraStyles={{
         container: (base) => ({
           ...base,

@@ -409,7 +409,7 @@ export function BatchEvaluationV2RunList({
                       .map((evaluation, index) => (
                         <>
                           {index > 0 && <Text>·</Text>}
-                          <Tooltip label={evaluation.name}>
+                          <Tooltip content={evaluation.name}>
                             <Text>
                               {formatEvaluationSummary(evaluation, true)}
                             </Text>

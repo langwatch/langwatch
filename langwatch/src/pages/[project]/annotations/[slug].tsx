@@ -54,7 +54,7 @@ export default function Annotations() {
           <Text fontSize="sm">Members: </Text>
           {queueMembers?.map((member) => {
             return (
-              <Tooltip label={member.name}>
+              <Tooltip content={member.name}>
                 <Avatar name={member.name ?? ""} size="xs" />
               </Tooltip>
             );

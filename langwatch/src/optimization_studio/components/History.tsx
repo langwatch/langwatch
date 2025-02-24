@@ -1,27 +1,17 @@
 import {
-  Avatar,
   Box,
   Button,
-  Divider,
-  FormControl,
+  Field,
   HStack,
   Input,
-  Popover,
-  PopoverArrow,
-  PopoverBody,
-  PopoverCloseButton,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTrigger,
-  Portal,
+  Separator,
   Tag,
   Text,
-  Tooltip,
-  useDisclosure,
-  useToast,
   VStack,
   type BoxProps,
+  useDisclosure,
 } from "@chakra-ui/react";
+import { Avatar } from "@chakra-ui/react";
 
 import { useCallback, useEffect, useMemo } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
@@ -34,23 +24,29 @@ import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import isDeepEqual from "fast-deep-equal";
 import type { Workflow } from "../types/dsl";
 import type { Project } from "@prisma/client";
+import { toaster } from "../../components/ui/toaster";
+import { Tooltip } from "../../components/ui/tooltip";
+import { Popover } from "../../components/ui/popover";
 
 export function History() {
-  const { isOpen, onToggle, onClose } = useDisclosure();
+  const { open, onToggle, onClose } = useDisclosure();
 
   return (
-    <Popover isOpen={isOpen} onClose={onClose} closeOnBlur={false}>
-      <PopoverTrigger>
+    <Popover.Root
+      open={open}
+      onOpenChange={onClose}
+      closeOnInteractOutside={false}
+    >
+      <Popover.Trigger>
         <Button variant="ghost" color="gray.500" size="xs" onClick={onToggle}>
           <HistoryIcon size={16} />
         </Button>
-      </PopoverTrigger>
-      <Portal>
-        <Box zIndex="popover" position="relative">
-          {isOpen && <HistoryPopover onClose={onClose} />}
-        </Box>
-      </Portal>
-    </Popover>
+      </Popover.Trigger>
+      {/* TODO: do we need a portal here? */}
+      <Box zIndex="popover" position="relative">
+        {open && <HistoryPopover onClose={onClose} />}
+      </Box>
+    </Popover.Root>
   );
 }
 
@@ -88,8 +84,6 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
   const commitVersion = api.workflow.commitVersion.useMutation();
   const restoreVersion = api.workflow.restoreVersion.useMutation();
 
-  const toast = useToast();
-
   const onSubmit = ({
     version,
     commitMessage,
@@ -111,12 +105,12 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
       },
       {
         onSuccess: () => {
-          toast({
+          toaster.create({
             title: `Saved version ${version}`,
-            status: "success",
+            type: "success",
             duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            meta: { closable: true },
+            placement: "top-end",
           });
           setWorkflow({
             version,
@@ -124,12 +118,12 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
           void versions.refetch();
         },
         onError: () => {
-          toast({
+          toaster.create({
             title: "Error saving version",
-            status: "error",
+            type: "error",
             duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            meta: { closable: true },
+            placement: "top-end",
           });
         },
       }
@@ -173,11 +167,11 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
   );
 
   return (
-    <PopoverContent width="500px">
-      <PopoverArrow />
-      <PopoverHeader fontWeight={600}>Workflow Versions</PopoverHeader>
-      <PopoverCloseButton />
-      <PopoverBody padding={0}>
+    <Popover.Content width="500px">
+      <Popover.Arrow />
+      <Popover.Header fontWeight={600}>Workflow Versions</Popover.Header>
+      <Popover.CloseTrigger />
+      <Popover.Body padding={0}>
         <form
           // eslint-disable-next-line @typescript-eslint/no-misused-promises
           onSubmit={form.handleSubmit(onSubmit)}
@@ -189,21 +183,24 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
               nextVersion={nextVersion}
               canSaveNewVersion={canSaveNewVersion}
             />
-            <Tooltip label={!canSaveNewVersion ? "No changes to save" : ""}>
+            <Tooltip
+              content={!canSaveNewVersion ? "No changes to save" : ""}
+              positioning={{ placement: "top" }}
+            >
               <Button
                 type="submit"
                 alignSelf="end"
                 colorPalette="orange"
                 size="sm"
-                isLoading={commitVersion.isLoading}
-                isDisabled={!canSaveNewVersion}
+                loading={commitVersion.isLoading}
+                disabled={!canSaveNewVersion}
               >
                 Save new version
               </Button>
             </Tooltip>
           </VStack>
         </form>
-        <Divider borderBottomWidth="2px" />
+        <Separator borderBottomWidth="2px" />
         <VStack
           align="start"
           width="full"
@@ -221,7 +218,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
               align="start"
               paddingBottom={2}
             >
-              <Divider marginBottom={2} />
+              <Separator marginBottom={2} />
               <HStack width="full" gap={3}>
                 <VersionBox version={version} minWidth="48px" />
                 <VStack align="start" width="full" gap={1}>
@@ -230,23 +227,25 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                       {version.commitMessage}
                     </Text>
                     {version.isCurrentVersion && (
-                      <Tag colorPalette="green" size="sm" paddingX={2}>
-                        current
-                      </Tag>
+                      <Tag.Root colorPalette="green" size="sm" paddingX={2}>
+                        <Tag.Label>current</Tag.Label>
+                      </Tag.Root>
                     )}
                   </HStack>
                   <HStack>
-                    <Avatar
-                      name={version.author?.name ?? ""}
-                      backgroundColor={"orange.400"}
-                      color="white"
-                      size="2xs"
-                    />
+                    <Avatar.Root size="2xs">
+                      <Avatar.Fallback
+                        name={version.author?.name ?? ""}
+                        backgroundColor="orange.400"
+                        color="white"
+                      />
+                    </Avatar.Root>
                     <Text fontSize="12px">
                       {version.author?.name}
                       {" · "}
                       <Tooltip
-                        label={new Date(version.updatedAt).toLocaleString()}
+                        content={new Date(version.updatedAt).toLocaleString()}
+                        positioning={{ placement: "top" }}
                       >
                         {formatTimeAgo(version.updatedAt.getTime())}
                       </Tooltip>
@@ -254,11 +253,14 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                   </HStack>
                 </VStack>
                 {!version.isCurrentVersion && (
-                  <Tooltip label="Restore this version">
+                  <Tooltip
+                    content="Restore this version"
+                    positioning={{ placement: "top" }}
+                  >
                     <Button
                       variant="ghost"
                       onClick={() => void onRestore(version.id)}
-                      isLoading={restoreVersion.isLoading}
+                      loading={restoreVersion.isLoading}
                     >
                       <HistoryIcon size={24} />
                     </Button>
@@ -268,8 +270,8 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
             </VStack>
           ))}
         </VStack>
-      </PopoverBody>
-    </PopoverContent>
+      </Popover.Body>
+    </Popover.Content>
   );
 }
 
@@ -438,12 +440,11 @@ export function NewVersionFields({
 }) {
   return (
     <HStack width="full">
-      <FormControl
-        width="fit-content"
-        isInvalid={!!form.formState.errors.version}
-      >
+      <Field.Root width="fit-content" invalid={!!form.formState.errors.version}>
         <VStack align="start">
-          <SmallLabel color="gray.600">Version</SmallLabel>
+          <Field.Label as={SmallLabel} color="gray.600">
+            Version
+          </Field.Label>
           <Input
             {...form.register("version", {
               required: true,
@@ -452,26 +453,25 @@ export function NewVersionFields({
             placeholder={nextVersion}
             maxWidth="90px"
             pattern="\d+\.\d+"
-            isDisabled={!canSaveNewVersion}
+            disabled={!canSaveNewVersion}
           />
         </VStack>
-      </FormControl>
-      <FormControl
-        width="full"
-        isInvalid={!!form.formState.errors.commitMessage}
-      >
+      </Field.Root>
+      <Field.Root width="full" invalid={!!form.formState.errors.commitMessage}>
         <VStack align="start" width="full">
-          <SmallLabel color="gray.600">Description</SmallLabel>
+          <Field.Label as={SmallLabel} color="gray.600">
+            Description
+          </Field.Label>
           <Input
             {...form.register("commitMessage", {
               required: true,
             })}
             placeholder="What changes have you made?"
             width="full"
-            isDisabled={!canSaveNewVersion}
+            disabled={!canSaveNewVersion}
           />
         </VStack>
-      </FormControl>
+      </Field.Root>
     </HStack>
   );
 }

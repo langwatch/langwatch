@@ -287,7 +287,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                                         </Td>
                                         <Td> {check[1].name}</Td>
                                         <Td>
-                                          <Tooltip label={description}>
+                                          <Tooltip content={description}>
                                             <Text
                                               lineClamp={2}
                                               display="block"

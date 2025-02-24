@@ -68,7 +68,7 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
                   </Text>
                 )}
               </PropertySectionTitle>
-              <Tooltip label="Few-shot examples to guide the LLM to generate the correct output.">
+              <Tooltip content="Few-shot examples to guide the LLM to generate the correct output.">
                 <Box paddingTop={1}>
                   <Info size={14} />
                 </Box>

@@ -1,6 +1,6 @@
-import { forwardRef, HStack } from "@chakra-ui/react";
+import { HStack } from "@chakra-ui/react";
 import { type Node, type NodeProps } from "@xyflow/react";
-import type { Ref } from "react";
+import { forwardRef, type Ref } from "react";
 import type { LLMConfig, Signature } from "../../types/dsl";
 import { LLMModelDisplay } from "../properties/modals/LLMConfigModal";
 import { ComponentNode, NodeSectionTitle } from "./Nodes";

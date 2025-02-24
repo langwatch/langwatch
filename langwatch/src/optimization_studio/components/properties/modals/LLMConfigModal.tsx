@@ -181,7 +181,7 @@ export function LLMConfigModal({
             mode="chat"
             size="full"
           />
-          <Tooltip label="Configure available models" placement="top" hasArrow>
+          <Tooltip content="Configure available models" placement="top" hasArrow>
             <Button
               as={Link}
               size="sm"

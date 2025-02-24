@@ -417,7 +417,7 @@ export default function BatchEvaluation({
                             return (
                               <Tr key={i}>
                                 <Td>
-                                  <Tooltip label={input}>
+                                  <Tooltip content={input}>
                                     <Text
                                       lineClamp={2}
                                       display="block"
@@ -428,7 +428,7 @@ export default function BatchEvaluation({
                                   </Tooltip>
                                 </Td>
                                 <Td>
-                                  <Tooltip label={output}>
+                                  <Tooltip content={output}>
                                     <Text
                                       lineClamp={2}
                                       display="block"
@@ -440,7 +440,7 @@ export default function BatchEvaluation({
                                 </Td>
                                 {hasExpectedOutput && (
                                   <Td>
-                                    <Tooltip label={expected_output}>
+                                    <Tooltip content={expected_output}>
                                       <Text
                                         lineClamp={2}
                                         display="block"
@@ -498,7 +498,7 @@ export default function BatchEvaluation({
                                         : undefined
                                     }
                                   >
-                                    <Tooltip label={evaluation.details}>
+                                    <Tooltip content={evaluation.details}>
                                       <Text
                                         lineClamp={1}
                                         wordBreak="break-all"
