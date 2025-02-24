@@ -23,7 +23,10 @@
     "paths": {
       "~/*": ["./src/*"],
       "@trpc-internal/parser": ["node_modules/@trpc/server/dist/core/parser"],
-      "@trpc-internal/utils": ["node_modules/@trpc/server/dist/core/internals/utils"]
+      "@trpc-internal/utils": [
+        "node_modules/@trpc/server/dist/core/internals/utils"
+      ],
+      "zod/lib/helpers/errorUtil": ["node_modules/zod/lib/helpers/errorUtil"]
     },
     "plugins": [
       {
