@@ -109,7 +109,13 @@ export const MenuSeparator = ChakraMenu.Separator;
 export const MenuItem = ChakraMenu.Item;
 export const MenuItemText = ChakraMenu.ItemText;
 export const MenuItemCommand = ChakraMenu.ItemCommand;
-export const MenuTrigger = ChakraMenu.Trigger;
+
+export const MenuTrigger = React.forwardRef<
+  HTMLButtonElement,
+  ChakraMenu.TriggerProps
+>(function MenuTrigger(props, ref) {
+  return <ChakraMenu.Trigger ref={ref} cursor="pointer" {...props} />;
+});
 
 export const Menu = {
   Root: MenuRoot,

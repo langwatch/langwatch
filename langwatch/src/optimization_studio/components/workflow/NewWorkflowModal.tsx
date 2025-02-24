@@ -25,9 +25,9 @@ export const NewWorkflowModal = ({
   }, [open]);
 
   return (
-    <Dialog.Root open={open} onOpenChange={onClose}>
+    <Dialog.Root open={open} onOpenChange={onClose} size="6xl">
       <Dialog.Backdrop />
-      <Dialog.Content width="800px" paddingX={0}>
+      <Dialog.Content paddingX={0}>
         <Dialog.Header>
           <HStack gap={2}>
             {step.step === "create" && (
