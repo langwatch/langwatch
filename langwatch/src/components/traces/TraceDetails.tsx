@@ -1,6 +1,6 @@
 import {
   Button,
-  Drawer,
+  FocusTrap,
   HStack,
   Spacer,
   Tabs,
@@ -11,7 +11,7 @@ import {
 import { type PublicShare } from "@prisma/client";
 import { useRouter } from "next/router";
 import qs from "qs";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Maximize2, Minimize2 } from "react-feather";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
@@ -36,6 +36,7 @@ import {
   Guardrails,
 } from "./Evaluations";
 import { Events } from "./Events";
+import { Drawer } from "../ui/drawer";
 
 export function TraceDetails(props: {
   traceId: string;
@@ -260,16 +261,13 @@ export function TraceDetails(props: {
             )}
             {hasTeamPermission(TeamRoleGroup.ANNOTATIONS_MANAGE) && (
               <>
-                <Popover.Root
-                  open={popover.open}
-                  onOpenChange={({ open }) => popover.setOpen(open)}
-                >
-                  <Popover.Trigger>
+                <Popover.Root modal>
+                  <Popover.Trigger asChild>
                     <Button colorPalette="black" variant="outline">
                       Annotation Queue
                     </Button>
                   </Popover.Trigger>
-                  <Popover.Content zIndex={2222}>
+                  <Popover.Content display={queueDrawerOpen.open ? "none" : "block"}>
                     <Popover.Arrow />
                     <Popover.CloseTrigger />
                     <Popover.Body>
