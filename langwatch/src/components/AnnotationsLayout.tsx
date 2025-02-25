@@ -1,4 +1,4 @@
-import { Avatar, Divider, HStack, Text, VStack } from "@chakra-ui/react";
+import { Avatar, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { type PropsWithChildren } from "react";
 import { Check, Edit, Inbox, Plus, Users } from "react-feather";
@@ -32,14 +32,15 @@ export default function AnnotationsLayout({
     inbox: <Inbox width={20} height={20} />,
     queues: <Users width={20} height={20} />,
     myQueues: (
-      <Avatar name={user?.name ?? ""} width={5} height={5} size="2xs" />
+      <Avatar.Root width={5} height={5} size="2xs">
+        <Avatar.Fallback name={user?.name ?? ""} />
+      </Avatar.Root>
     ),
     all: <Edit width={20} height={20} />,
     done: <Check width={20} height={20} />,
   };
 
   const router = useRouter();
-  const id = router.query.id;
   const { openDrawer } = useDrawer();
 
   return (
@@ -108,7 +109,7 @@ export default function AnnotationsLayout({
           >
             All
           </MenuLink>
-          <Divider />
+          <Separator />
           <HStack width="full" justify="space-between" paddingRight={3}>
             <Text fontSize="sm" fontWeight="500" paddingX={4} paddingY={2}>
               My Queues

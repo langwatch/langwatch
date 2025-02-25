@@ -3,9 +3,9 @@ import {
   Button,
   HStack,
   Input,
-  Select,
+  NativeSelect,
   Text,
-  VStack
+  VStack,
 } from "@chakra-ui/react";
 import { X } from "react-feather";
 import { useFormContext } from "react-hook-form";
@@ -129,27 +129,31 @@ export const PreconditionsField = ({
               </Button>
               <SmallLabel>{index == 0 ? "When" : "and"}</SmallLabel>
               <HStack gap={4}>
-                <Select
-                  {...control.register(`preconditions.${index}.field`)}
-                  minWidth="fit-content"
-                >
-                  {Object.entries(fieldOptions).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </Select>
-                <Select
-                  {...control.register(`preconditions.${index}.rule`)}
-                  minWidth="fit-content"
-                >
-                  {Object.entries(ruleOptions)
-                    .map(([value, label]) => (
+                <NativeSelect.Root minWidth="fit-content">
+                  <NativeSelect.Field
+                    {...control.register(`preconditions.${index}.field`)}
+                  >
+                    {Object.entries(fieldOptions).map(([value, label]) => (
                       <option key={value} value={value}>
                         {label}
                       </option>
                     ))}
-                </Select>
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+
+                <NativeSelect.Root minWidth="fit-content">
+                  <NativeSelect.Field
+                    {...control.register(`preconditions.${index}.rule`)}
+                  >
+                    {Object.entries(ruleOptions).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
               </HStack>
               <HStack width="full">
                 {preconditions[index]?.rule.includes("regex") && (

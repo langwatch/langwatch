@@ -1,7 +1,7 @@
 import {
   Card,
   CardBody,
-  FormErrorMessage,
+  Field,
   HStack,
   Heading,
   Input,
@@ -143,7 +143,7 @@ function SettingsForm({
                           },
                         })}
                       />
-                      <FormErrorMessage>Name is required</FormErrorMessage>
+                      <Field.ErrorText>Name is required</Field.ErrorText>
                     </>
                   ) : (
                     <Text>{organization.name}</Text>
@@ -305,7 +305,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   },
                 })}
               />
-              <FormErrorMessage>Name is required</FormErrorMessage>
+              <Field.ErrorText>Name is required</Field.ErrorText>
             </HorizontalFormControl>
             <HorizontalFormControl
               label="Tech Stack"

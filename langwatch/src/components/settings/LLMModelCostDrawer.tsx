@@ -5,7 +5,7 @@ import {
   DrawerCloseButton,
   DrawerContent,
   DrawerHeader,
-  FormErrorMessage,
+  Field,
   HStack,
   Input,
   InputGroup,
@@ -168,7 +168,7 @@ function LLMModelCostForm({
           invalid={!!errors.model}
         >
           <Input required {...register("model")} />
-          <FormErrorMessage>{errors.model?.message}</FormErrorMessage>
+          <Field.ErrorText>{errors.model?.message}</Field.ErrorText>
         </HorizontalFormControl>
         <HorizontalFormControl
           label="Regex"
@@ -191,7 +191,7 @@ function LLMModelCostForm({
               /
             </InputRightAddon>
           </InputGroup>
-          <FormErrorMessage>{errors.regex?.message}</FormErrorMessage>
+          <Field.ErrorText>{errors.regex?.message}</Field.ErrorText>
         </HorizontalFormControl>
         <HorizontalFormControl
           label="Input Cost Per Token"
@@ -209,9 +209,9 @@ function LLMModelCostForm({
               })}
             />
           </InputGroup>
-          <FormErrorMessage>
+          <Field.ErrorText>
             {errors.inputCostPerToken?.message}
-          </FormErrorMessage>
+          </Field.ErrorText>
         </HorizontalFormControl>
         <HorizontalFormControl
           label="Output Cost Per Token"
@@ -229,9 +229,9 @@ function LLMModelCostForm({
               })}
             />
           </InputGroup>
-          <FormErrorMessage>
+          <Field.ErrorText>
             {errors.outputCostPerToken?.message}
-          </FormErrorMessage>
+          </Field.ErrorText>
         </HorizontalFormControl>
         <Button
           marginTop={4}

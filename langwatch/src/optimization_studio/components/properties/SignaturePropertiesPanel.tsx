@@ -5,13 +5,13 @@ import {
   Spacer,
   Text,
   Textarea,
-  Tooltip,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { Edit2, Info, X } from "react-feather";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
+import { Tooltip } from "../../../components/ui/tooltip";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type {
@@ -42,7 +42,7 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
     ? Object.fromEntries(node.data.parameters.map((p) => [p.identifier, p]))
     : {};
 
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { open, onOpen, onClose } = useDisclosure();
   const {
     rows: demonstrationRows,
     columns: demonstrationColumns,
@@ -78,11 +78,11 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
                 size="xs"
                 variant="ghost"
                 marginBottom={-1}
-                leftIcon={<Edit2 size={14} />}
                 onClick={() => {
                   onOpen();
                 }}
               >
+                <Edit2 size={14} />
                 <Text>Edit</Text>
               </Button>
             </HStack>
@@ -91,11 +91,7 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
               columns={demonstrationColumns}
               minHeight={`${36 + 29 * (demonstrationRows?.length ?? 0)}px`}
             />
-            <DemonstrationsModal
-              isOpen={isOpen}
-              onClose={onClose}
-              node={node}
-            />
+            <DemonstrationsModal open={open} onClose={onClose} node={node} />
           </VStack>
         </>
       }

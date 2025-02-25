@@ -19,7 +19,6 @@ import { api } from "~/utils/api";
 import { HoverableBigText } from "../../components/HoverableBigText";
 import { IconWrapper } from "../../components/IconWrapper";
 import { DiscordOutlineIcon } from "../../components/icons/DiscordOutline";
-import { usePublicEnv } from "../../hooks/usePublicEnv";
 import {
   updateCodeClassName,
   useWorkflowStore,
@@ -82,7 +81,6 @@ export const NodeSelectionPanel = ({
 
   const workflow = getWorkflow();
   const { project } = useOrganizationTeamProject();
-  const publicEnv = usePublicEnv();
 
   const { data: components } = api.optimization.getComponents.useQuery(
     {
@@ -247,21 +245,21 @@ export const NodeSelectionPanel = ({
           gap={4}
           background="white"
         >
-          <Tooltip showArrow gutter={16} content="Star us on GitHub">
+          <Tooltip showArrow content="Star us on GitHub">
             <Link href="https://github.com/langwatch/langwatch" target="_blank">
               <IconWrapper width="20px" height="20px">
                 <GitHub />
               </IconWrapper>
             </Link>
           </Tooltip>
-          <Tooltip showArrow gutter={16} content="Join our community">
+          <Tooltip showArrow content="Join our community">
             <Link href="https://discord.gg/kT4PhDS2gH" target="_blank">
               <IconWrapper width="20px" height="20px">
                 <DiscordOutlineIcon />
               </IconWrapper>
             </Link>
           </Tooltip>
-          <Tooltip showArrow gutter={16} content="Documentation">
+          <Tooltip showArrow content="Documentation">
             <Link
               href="https://docs.langwatch.ai/optimization-studio/llm-nodes"
               target="_blank"
@@ -401,8 +399,7 @@ export const NodeDraggable = (props: {
     <>
       <Tooltip
         showArrow
-        gutter={16}
-        placement="right"
+        positioning={{ gutter: 16, placement: "right" }}
         content={
           props.disableDrag
             ? "You cannot add the same component as your workflow"
@@ -429,7 +426,7 @@ export const NodeDraggable = (props: {
               {props.component.name}
             </HoverableBigText>
             <Spacer />
-            <Icon width="14px" height="14px" color="gray.350">
+            <Icon width="18px" height="18px" color="gray.350">
               <LuGripVertical />
             </Icon>
           </HStack>

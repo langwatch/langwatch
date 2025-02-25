@@ -77,7 +77,6 @@ export function FieldsFilters() {
             <Button
               colorPalette="orange"
               onClick={() => openDrawer("trigger", undefined)}
-              size="xs"
               disabled={!hasAnyFilters}
             >
               Add Trigger
@@ -124,6 +123,7 @@ function FieldsFilter({
         <Popover.Trigger asChild>
           <Button
             variant="outline"
+            size="md"
             width="100%"
             background="white"
             fontWeight="normal"
@@ -176,22 +176,22 @@ function FieldsFilter({
         </Popover.Trigger>
         <Popover.Content>
           <Popover.Header paddingY={1} paddingX={1}>
-              <InputGroup
+            <InputGroup
+              width="full"
+              startElement={<Search width={16} color={gray400} />}
+            >
+              <Input
                 width="full"
-                startElement={<Search width={16} color={gray400} />}
-              >
-                <Input
-                  width="full"
-                  placeholder="Search..."
-                  border="none"
-                  ref={searchRef}
-                  _focusVisible={{ boxShadow: "none" }}
-                  onChange={(e) => {
-                    setQuery(e.target.value);
-                  }}
-                />
-              </InputGroup>
-            </Popover.Header>
+                placeholder="Search..."
+                border="none"
+                ref={searchRef}
+                _focusVisible={{ boxShadow: "none" }}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                }}
+              />
+            </InputGroup>
+          </Popover.Header>
           <Popover.Body paddingY={1} paddingX={4}>
             {open && (
               <NestedListSelection

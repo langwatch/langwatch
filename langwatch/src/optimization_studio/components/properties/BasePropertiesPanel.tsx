@@ -2,17 +2,15 @@ import {
   Box,
   Button,
   Center,
-  FormControl,
-  FormErrorMessage,
   HStack,
   Input,
-  Select,
+  NativeSelect,
   Spacer,
   Text,
-  Tooltip,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { Field } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
 import React, { useEffect, useState } from "react";
 import {
@@ -33,7 +31,7 @@ import { camelCaseToTitleCase } from "../../../utils/stringCasing";
 import type {
   Component,
   ComponentType,
-  Field,
+  Field as FieldType,
   LLMConfig,
   Workflow,
 } from "../../types/dsl";
@@ -50,6 +48,7 @@ import {
 import { LLMConfigField } from "./modals/LLMConfigModal";
 import { RenderCode } from "../../../components/code/RenderCode";
 import { CodeEditorModal } from "../code/CodeEditorModal";
+import { Tooltip } from "../../../components/ui/tooltip";
 
 export function PropertyField({
   title,
@@ -69,7 +68,7 @@ export function PropertyField({
 }
 
 type FieldArrayForm = {
-  fields: Field[];
+  fields: FieldType[];
 };
 
 export function FieldsDefinition({
@@ -159,7 +158,7 @@ export function FieldsDefinition({
           },
           validate: (value) => {
             const identifiers = control._formValues.fields.map(
-              (f: Field) => f.identifier
+              (f: FieldType) => f.identifier
             );
             return (
               identifiers.filter((id: string) => id === value).length === 1 ||
@@ -169,9 +168,9 @@ export function FieldsDefinition({
         });
 
         return (
-          <FormControl
+          <Field.Root
             key={field_.id}
-            isInvalid={!!errors.fields?.[index]?.identifier}
+            invalid={!!errors.fields?.[index]?.identifier}
           >
             <HStack width="full">
               <HStack
@@ -223,30 +222,24 @@ export function FieldsDefinition({
                       <Box color="gray.600">
                         <ChevronDown size={14} />
                       </Box>
-                      <Select
-                        {...control.register(`fields.${index}.type`)}
-                        opacity={0}
-                        position="absolute"
-                        top={0}
-                        left={0}
-                        width="100%"
-                        height="32px"
-                        icon={<></>}
-                      >
-                        <option value="str">str</option>
-                        {field === "inputs" && (
-                          <option value="image">image</option>
-                        )}
-                        <option value="float">float</option>
-
-                        <option value="bool">bool</option>
-                        {/* <option value="int">int</option>
-                        <option value="list[str]">list[str]</option>
-                        <option value="list[float]">list[float]</option>
-                        <option value="list[int]">list[int]</option>
-                        <option value="list[bool]">list[bool]</option>
-                        <option value="dict">dict</option> */}
-                      </Select>
+                      <NativeSelect.Root>
+                        <NativeSelect.Field
+                          {...control.register(`fields.${index}.type`)}
+                          opacity={0}
+                          position="absolute"
+                          top={0}
+                          left={0}
+                          width="100%"
+                          height="32px"
+                        >
+                          <option value="str">str</option>
+                          {field === "inputs" && (
+                            <option value="image">image</option>
+                          )}
+                          <option value="float">float</option>
+                          <option value="bool">bool</option>
+                        </NativeSelect.Field>
+                      </NativeSelect.Root>
                     </>
                   ) : null}
                 </HStack>
@@ -260,16 +253,16 @@ export function FieldsDefinition({
                     remove(index);
                     void handleSubmit(onSubmit)();
                   }}
-                  isDisabled={fields.length === 1}
+                  disabled={fields.length === 1}
                 >
                   <Trash2 size={18} />
                 </Button>
               ) : null}
             </HStack>
-            <FormErrorMessage>
+            <Field.ErrorText>
               {errors.fields?.[index]?.identifier?.message}
-            </FormErrorMessage>
-          </FormControl>
+            </Field.ErrorText>
+          </Field.Root>
         );
       })}
     </VStack>
@@ -413,7 +406,7 @@ export function FieldsForm({
                     value: code,
                   });
                 }}
-                isOpen={codeEditorModal.isOpen}
+                open={codeEditorModal.open}
                 onClose={codeEditorModal.onClose}
               />
             </Box>
@@ -421,9 +414,9 @@ export function FieldsForm({
         }
 
         return (
-          <FormControl
+          <Field.Root
             key={field.id}
-            isInvalid={!!errors.fields?.[index]?.identifier}
+            invalid={!!errors.fields?.[index]?.identifier}
           >
             <VStack align="start" gap={3} width="full">
               <HStack width="full">
@@ -457,11 +450,11 @@ export function FieldsForm({
                   />
                 )}
               </HStack>
-              <FormErrorMessage>
+              <Field.ErrorText>
                 {errors.fields?.[index]?.identifier?.message}
-              </FormErrorMessage>
+              </Field.ErrorText>
             </VStack>
-          </FormControl>
+          </Field.Root>
         );
       })}
     </VStack>

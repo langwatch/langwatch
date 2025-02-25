@@ -5,13 +5,11 @@ import type { StudioClientEvent } from "../types/events";
 import type { Node } from "@xyflow/react";
 import type { BaseComponent, Component, Field } from "../types/dsl";
 import { nanoid } from "nanoid";
-import { useToast } from "@chakra-ui/react";
+import { toaster } from "../../components/ui/toaster";
 import { useAlertOnComponent } from "./useAlertOnComponent";
 
 export const useComponentExecution = () => {
   const { sendMessage, socketStatus } = useSocketClient();
-
-  const toast = useToast();
 
   const [triggerTimeout, setTriggerTimeout] = useState<{
     component_id: string;
@@ -56,16 +54,18 @@ export const useComponentExecution = () => {
 
   const socketAvailable = useCallback(() => {
     if (socketStatus !== "connected") {
-      toast({
+      toaster.create({
         title: "Studio is not connected",
-        status: "error",
-        duration: 5000,
-        isClosable: true,
+        type: "error",
+        meta: {
+          closable: true,
+        },
+        placement: "top-end",
       });
       return false;
     }
     return true;
-  }, [socketStatus, toast]);
+  }, [socketStatus]);
 
   const startComponentExecution = useCallback(
     ({

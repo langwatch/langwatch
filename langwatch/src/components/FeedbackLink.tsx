@@ -1,57 +1,41 @@
-import {
-  Button,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalHeader,
-  ModalOverlay,
-  Text,
-  VStack,
-  useDisclosure,
-} from "@chakra-ui/react";
-import NextLink from "next/link";
+import { Button, useDisclosure, VStack, Text } from "@chakra-ui/react";
 import { Discord } from "./icons/Discord";
 import { GitHub } from "./icons/GitHub";
+import { Link } from "../components/ui/link";
+import { Dialog } from "../components/ui/dialog";
 
 export function FeedbackLink() {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { open, onOpen, setOpen } = useDisclosure();
 
   return (
     <>
-      <Modal isOpen={isOpen} onClose={onClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Feedback on LangWatch</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
+      <Dialog.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
+        <Dialog.Backdrop />
+        <Dialog.Content>
+          <Dialog.Header>
+            <Dialog.Title>Feedback on LangWatch</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.CloseTrigger />
+          <Dialog.Body>
             <VStack align="start" paddingBottom={4}>
               <Text paddingBottom={4}>
                 Join our Discord community or open a Github Issue for any
                 issues, questions or ideas.
               </Text>
-              <NextLink
-                href="https://discord.gg/kT4PhDS2gH"
-                target="_blank"
-                passHref
-              >
-                <Button as="span" variant="plain" leftIcon={<Discord />}>
-                  Discord
+              <Link href="https://discord.gg/kT4PhDS2gH" isExternal>
+                <Button variant="plain">
+                  <Discord /> Discord
                 </Button>
-              </NextLink>
-              <NextLink
-                href="https://github.com/langwatch/langwatch"
-                target="_blank"
-                passHref
-              >
-                <Button as="span" variant="plain" leftIcon={<GitHub />}>
-                  Github
+              </Link>
+              <Link href="https://github.com/langwatch/langwatch" isExternal>
+                <Button variant="plain">
+                  <GitHub /> Github
                 </Button>
-              </NextLink>
+              </Link>
             </VStack>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
+          </Dialog.Body>
+        </Dialog.Content>
+      </Dialog.Root>
       <Button
         variant="plain"
         onClick={onOpen}

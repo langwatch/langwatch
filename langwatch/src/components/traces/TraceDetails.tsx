@@ -1,6 +1,6 @@
 import {
   Button,
-  Dialog,
+  Drawer,
   HStack,
   Spacer,
   Tabs,
@@ -114,25 +114,20 @@ export function TraceDetails(props: {
 
   const anyGuardrails = !!evaluations.data?.some((x) => x.is_guardrail);
 
-  const indexes = Object.fromEntries(
-    [
-      ...(canViewMessages ? ["messages"] : []),
-      "traceDetails",
-      ...(anyGuardrails ? ["guardrails"] : []),
-      "evaluations",
-      "events",
-    ].map((tab, index) => [tab, index])
-  );
-  const tabByIndex = Object.keys(indexes);
+  const availableTabs = [
+    ...(canViewMessages ? ["messages"] : []),
+    "traceDetails",
+    ...(anyGuardrails ? ["guardrails"] : []),
+    "evaluations",
+    "events",
+  ];
 
-  const defaultTabIndex = props.selectedTab ? indexes[props.selectedTab] : 0;
+  const [selectedTab, setSelectedTab_] = useState(availableTabs[0]);
 
-  const [tabIndex, setTabIndex_] = useState(defaultTabIndex);
-
-  const setTabIndex = useCallback(
-    (tabIndex: number) => {
-      setTabIndex_(tabIndex);
-      if (router.query["drawer.selectedTab"] == tabByIndex[tabIndex]) {
+  const setSelectedTab = useCallback(
+    (tab: string) => {
+      setSelectedTab_(tab);
+      if (router.query["drawer.selectedTab"] == tab) {
         return;
       }
       void router.replace(
@@ -145,7 +140,7 @@ export function TraceDetails(props: {
                 )
               ),
               drawer: {
-                selectedTab: tabByIndex[tabIndex],
+                selectedTab: tab,
               },
             },
             { allowDots: true }
@@ -153,12 +148,12 @@ export function TraceDetails(props: {
       );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tabIndex]
+    [selectedTab]
   );
 
   useEffect(() => {
     if (props.selectedTab) {
-      setTabIndex_((tabIndex) => indexes[props.selectedTab!] ?? tabIndex);
+      setSelectedTab_(props.selectedTab);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.selectedTab]);
@@ -220,7 +215,7 @@ export function TraceDetails(props: {
       <VStack
         width="full"
         gap={0}
-        position="sticky"
+        // position="sticky"
         top={0}
         zIndex={2}
         background="white"
@@ -233,7 +228,7 @@ export function TraceDetails(props: {
               ) : (
                 <Minimize2 onClick={props.onToggleView} cursor={"pointer"} />
               )}
-              <Dialog.CloseTrigger />
+              <Drawer.CloseTrigger />
             </HStack>
           </>
         )}
@@ -256,7 +251,7 @@ export function TraceDetails(props: {
                   if (!canViewMessages) {
                     closeDrawer();
                   } else {
-                    setTabIndex(indexes.messages ?? 0);
+                    setSelectedTab("messages");
                   }
                 }}
               >
@@ -313,14 +308,17 @@ export function TraceDetails(props: {
         </HStack>
         <Tabs.Root
           width="full"
-          value={String(tabIndex)}
-          onValueChange={(val) => setTabIndex(Number(val))}
+          value={selectedTab}
+          onValueChange={(change) => setSelectedTab(change.value)}
+          colorPalette="blue"
         >
-          <Tabs.List>
-            {canViewMessages && <Tabs.Trigger value="0">Messages</Tabs.Trigger>}
-            <Tabs.Trigger value="1">Trace Details</Tabs.Trigger>
+          <Tabs.List paddingLeft={6}>
+            {canViewMessages && (
+              <Tabs.Trigger value="messages">Messages</Tabs.Trigger>
+            )}
+            <Tabs.Trigger value="traceDetails">Trace Details</Tabs.Trigger>
             {anyGuardrails && (
-              <Tabs.Trigger value="2">
+              <Tabs.Trigger value="guardrails">
                 Guardrails{" "}
                 <Blocked
                   project={project}
@@ -329,7 +327,7 @@ export function TraceDetails(props: {
                 />
               </Tabs.Trigger>
             )}
-            <Tabs.Trigger value="3">
+            <Tabs.Trigger value="evaluations">
               Evaluations{" "}
               <EvaluationsCount
                 project={project}
@@ -337,7 +335,7 @@ export function TraceDetails(props: {
                 evaluations={evaluations.data}
               />
             </Tabs.Trigger>
-            <Tabs.Trigger value="4">
+            <Tabs.Trigger value="events">
               Events{" "}
               {trace.data?.events && trace.data.events.length > 0 && (
                 <Text
@@ -352,17 +350,21 @@ export function TraceDetails(props: {
                 </Text>
               )}
             </Tabs.Trigger>
-            <Tabs.Indicator />
           </Tabs.List>
           {canViewMessages && (
-            <Tabs.Content value="0" paddingX={0} padding={0} paddingTop={2}>
-              {tabIndex === indexes.messages && (
+            <Tabs.Content
+              value="messages"
+              paddingX={0}
+              padding={0}
+              paddingTop={2}
+            >
+              {selectedTab === "messages" && (
                 <Conversation threadId={threadId} traceId={props.traceId} />
               )}
             </Tabs.Content>
           )}
-          <Tabs.Content value="1" paddingX={6} paddingY={0}>
-            {tabIndex === indexes.traceDetails && (
+          <Tabs.Content value="traceDetails" paddingX={6} paddingY={0}>
+            {selectedTab === "traceDetails" && (
               <>
                 <TraceSummary traceId={props.traceId} />
                 <SpanTree traceId={props.traceId} />
@@ -370,8 +372,8 @@ export function TraceDetails(props: {
             )}
           </Tabs.Content>
           {anyGuardrails && (
-            <Tabs.Content value="2" paddingX={6} paddingY={4}>
-              {tabIndex === indexes.guardrails && (
+            <Tabs.Content value="guardrails" paddingX={6} paddingY={4}>
+              {selectedTab === "guardrails" && (
                 <Guardrails
                   project={project}
                   traceId={props.traceId ?? ""}
@@ -380,8 +382,8 @@ export function TraceDetails(props: {
               )}
             </Tabs.Content>
           )}
-          <Tabs.Content value="3" paddingX={6} paddingY={4}>
-            {tabIndex === indexes.evaluations && (
+          <Tabs.Content value="evaluations" paddingX={6} paddingY={4}>
+            {selectedTab === "evaluations" && (
               <Evaluations
                 project={project}
                 traceId={props.traceId ?? ""}
@@ -390,21 +392,17 @@ export function TraceDetails(props: {
               />
             )}
           </Tabs.Content>
-          <Tabs.Content value="4" paddingX={6} paddingY={4}>
-            {tabIndex === indexes.events && <Events traceId={props.traceId} />}
+          <Tabs.Content value="events" paddingX={6} paddingY={4}>
+            {selectedTab === "events" && <Events traceId={props.traceId} />}
           </Tabs.Content>
         </Tabs.Root>
       </VStack>
 
-      <Dialog.Root open={queueDrawerOpen.open} placement="bottom">
-        <Dialog.Backdrop />
-        <Dialog.Content>
-          <AddAnnotationQueueDrawer
-            onClose={queueDrawerOpen.onClose}
-            onOverlayClick={queueDrawerOpen.onClose}
-          />
-        </Dialog.Content>
-      </Dialog.Root>
+      <AddAnnotationQueueDrawer
+        open={queueDrawerOpen.open}
+        onClose={queueDrawerOpen.onClose}
+        onOverlayClick={queueDrawerOpen.onClose}
+      />
     </VStack>
   );
 }

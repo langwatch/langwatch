@@ -1,28 +1,18 @@
-import {
-  Button,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalHeader,
-  ModalOverlay,
-  Spinner,
-} from "@chakra-ui/react";
 import { type Node, type NodeProps } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft } from "react-feather";
+import { Dialog } from "../../components/ui/dialog";
 import type { DatasetColumns } from "../../server/datasets/types";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Component, NodeDataset, Signature } from "../types/dsl";
-import { EditDataset } from "./datasets/EditDataset";
 import { fieldsToDatasetColumns } from "../utils/datasetUtils";
+import { EditDataset } from "./datasets/EditDataset";
 
 export function DemonstrationsModal({
-  isOpen,
+  open,
   onClose,
   node,
 }: {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
   node: NodeProps<Node<Component>> | Node<Component>;
 }) {
@@ -61,10 +51,10 @@ export function DemonstrationsModal({
       } as NodeDataset["inline"],
     };
 
-    setEditingDataset(isOpen ? demonstrations : undefined);
-    setRendered(isOpen);
+    setEditingDataset(open ? demonstrations : undefined);
+    setRendered(open);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [open]);
 
   const { setNodeParameter } = useWorkflowStore(({ setNodeParameter }) => ({
     setNodeParameter,
@@ -81,13 +71,14 @@ export function DemonstrationsModal({
         onClose();
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [node.data, node.id, setNodeParameter, onClose]
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="full">
-      <ModalOverlay />
-      <ModalContent
+    <Dialog.Root open={open} onOpenChange={({open}) => !open && onClose()}>
+      <Dialog.Backdrop />
+      <Dialog.Content
         marginX="32px"
         marginTop="32px"
         width="calc(100vw - 64px)"
@@ -96,12 +87,12 @@ export function DemonstrationsModal({
         borderRadius="8px"
         overflowY="auto"
       >
-        <ModalCloseButton zIndex={10} />
+        <Dialog.CloseTrigger zIndex={10} />
         {rendered ? (
           <>
-            <ModalHeader></ModalHeader>
-            <ModalBody paddingBottom="32px">
-              {isOpen && editingDataset && (
+            <Dialog.Header></Dialog.Header>
+            <Dialog.Body paddingBottom="32px">
+              {open && editingDataset && (
                 <EditDataset
                   editingDataset={editingDataset}
                   setEditingDataset={setEditingDataset}
@@ -113,10 +104,10 @@ export function DemonstrationsModal({
                   loadingOverlayComponent={null}
                 />
               )}
-            </ModalBody>
+            </Dialog.Body>
           </>
         ) : null}
-      </ModalContent>
-    </Modal>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }

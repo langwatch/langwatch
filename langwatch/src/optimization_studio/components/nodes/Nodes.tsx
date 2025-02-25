@@ -166,12 +166,12 @@ export function NodeSectionTitle({
   fontSize,
   children,
 }: {
-  fontSize?: number;
+  fontSize?: string;
   children: React.ReactNode;
 }) {
   return (
     <Text
-      fontSize={fontSize ?? 9}
+      fontSize={fontSize ?? "9px"}
       textTransform="uppercase"
       color="gray.500"
       fontWeight="bold"
@@ -352,7 +352,6 @@ export const ComponentNode = forwardRef(function ComponentNode(
               <LLMModelDisplay
                 model={(llmParam?.value as LLMConfig).model}
                 fontSize="11px"
-                showVersion={false}
               />
             </HStack>
           </React.Fragment>

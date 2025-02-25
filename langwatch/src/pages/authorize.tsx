@@ -1,13 +1,11 @@
 import {
-  Card,
-  CardBody,
-  CardHeader,
   Container,
   HStack,
   Heading,
   Spacer,
   Text,
   VStack,
+  Card,
 } from "@chakra-ui/react";
 import { CopyInput } from "../components/CopyInput";
 import {
@@ -23,8 +21,8 @@ export default function Authorize() {
   return (
     <DashboardLayout>
       <Container paddingTop="200px">
-        <Card>
-          <CardHeader>
+        <Card.Root>
+          <Card.Header>
             <HStack width="full" align="center">
               <Heading as="h1" size="md">
                 Authorize
@@ -37,8 +35,8 @@ export default function Authorize() {
                 />
               )}
             </HStack>
-          </CardHeader>
-          <CardBody>
+          </Card.Header>
+          <Card.Body>
             <VStack gap={6}>
               <Text>
                 Copy your LangWatch API key below and paste it into your command
@@ -46,8 +44,8 @@ export default function Authorize() {
               </Text>
               <APIKeyCopyInput />
             </VStack>
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
       </Container>
     </DashboardLayout>
   );

@@ -1,7 +1,7 @@
 import {
   Box,
   Button,
-  FormErrorMessage,
+  Field,
   Heading,
   HStack,
   Textarea,
@@ -148,9 +148,9 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
                     : input.type
                 }
               />
-              <FormErrorMessage>
+              <Field.ErrorText>
                 {errors[input.identifier]?.message}
-              </FormErrorMessage>
+              </Field.ErrorText>
             </HorizontalFormControl>
           ))}
           <HStack width="full" justify="end">

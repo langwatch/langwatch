@@ -4,7 +4,7 @@ import {
   Checkbox,
   Divider,
   FormControl,
-  FormErrorMessage,
+  Field,
   FormLabel,
   HStack,
   Heading,
@@ -283,9 +283,9 @@ export default function OrganizationOnboarding() {
               <FormControl isInvalid={!!errors?.organizationName}>
                 <FormLabel>Organization Name</FormLabel>
                 <Input {...register("organizationName", { required: true })} />
-                <FormErrorMessage>
+                <Field.ErrorText>
                   Organization name is required
-                </FormErrorMessage>
+                </Field.ErrorText>
               </FormControl>
               <FormControl>
                 <FormLabel>Phone Number</FormLabel>
@@ -342,7 +342,7 @@ export default function OrganizationOnboarding() {
                       ))}
                     </HStack>
                   </RadioGroup>
-                  <FormErrorMessage>{errors.usage?.message}</FormErrorMessage>
+                  <Field.ErrorText>{errors.usage?.message}</Field.ErrorText>
                 </FormControl>
               )}
               {isSaaS && (
@@ -368,9 +368,9 @@ export default function OrganizationOnboarding() {
                       )}
                     </HStack>
                   </RadioGroup>
-                  <FormErrorMessage>
+                  <Field.ErrorText>
                     {errors.solution?.message}
-                  </FormErrorMessage>
+                  </Field.ErrorText>
                 </FormControl>
               )}
               <FormControl marginTop={4} isInvalid={!!errors?.terms}>
@@ -389,7 +389,7 @@ export default function OrganizationOnboarding() {
                     </Link>
                   </Text>
                 </Checkbox>
-                <FormErrorMessage>Please agree to terms</FormErrorMessage>
+                <Field.ErrorText>Please agree to terms</Field.ErrorText>
               </FormControl>
 
               {utmCampaign && (
@@ -461,9 +461,9 @@ export default function OrganizationOnboarding() {
                     </HStack>
                   </Box>
                 </RadioGroup>
-                <FormErrorMessage>
+                <Field.ErrorText>
                   {errors.companyType?.message}
-                </FormErrorMessage>
+                </Field.ErrorText>
               </FormControl>
               <FormControl isInvalid={!!errors.companySize}>
                 <FormLabel>Company size?</FormLabel>
@@ -489,9 +489,9 @@ export default function OrganizationOnboarding() {
                     </HStack>
                   </Box>
                 </RadioGroup>
-                <FormErrorMessage>
+                <Field.ErrorText>
                   {errors.companySize?.message}
-                </FormErrorMessage>
+                </Field.ErrorText>
               </FormControl>
               <Divider />
               <HStack width="full">
@@ -559,9 +559,9 @@ export default function OrganizationOnboarding() {
                     </HStack>
                   </Box>
                 </RadioGroup>
-                <FormErrorMessage>
+                <Field.ErrorText>
                   {errors.projectType?.message}
-                </FormErrorMessage>
+                </Field.ErrorText>
               </FormControl>
               <FormControl isInvalid={!!errors.howDidYouHearAboutUs}>
                 <FormLabel>How did you hear about us?</FormLabel>
@@ -605,9 +605,9 @@ export default function OrganizationOnboarding() {
                     </HStack>
                   </Box>
                 </RadioGroup>
-                <FormErrorMessage>
+                <Field.ErrorText>
                   {errors.howDidYouHearAboutUs?.message}
-                </FormErrorMessage>
+                </Field.ErrorText>
               </FormControl>
               <Divider />
               <HStack width="full">

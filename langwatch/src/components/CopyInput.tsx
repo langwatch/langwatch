@@ -1,21 +1,15 @@
-import {
-  Input,
-  InputGroup,
-  InputRightElement,
-  useToast,
-  type InputGroupProps,
-} from "@chakra-ui/react";
+import { Input } from "@chakra-ui/react";
 import { Copy } from "react-feather";
+import { toaster } from "../components/ui/toaster";
+import { InputGroup, type InputGroupProps } from "./ui/input-group";
 
 export function CopyInput(
   props: {
     value: string;
     label: string;
     onClick?: () => void;
-  } & InputGroupProps
+  } & Omit<InputGroupProps, "children">
 ) {
-  const toast = useToast();
-
   return (
     <InputGroup
       {...props}
@@ -26,38 +20,42 @@ export function CopyInput(
         }
 
         if (!navigator.clipboard) {
-          toast({
+          toaster.create({
             title: `Your browser does not support clipboard access, please copy the ${props.label} manually`,
-            status: "error",
+            type: "error",
             duration: 2000,
-            isClosable: true,
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
           return;
         }
 
         void (async () => {
           await navigator.clipboard.writeText(props.value);
-          toast({
+          toaster.create({
             title: `${props.label} copied to your clipboard`,
-            status: "success",
+            type: "success",
             duration: 2000,
-            isClosable: true,
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
         })();
       }}
+      endElement={<Copy />}
     >
       <Input
         cursor="pointer"
         type="text"
         value={props.value}
-        isReadOnly
+        readOnly
         _hover={{
           backgroundColor: "gray.50",
         }}
       />
-      <InputRightElement>
-        <Copy />
-      </InputRightElement>
     </InputGroup>
   );
 }

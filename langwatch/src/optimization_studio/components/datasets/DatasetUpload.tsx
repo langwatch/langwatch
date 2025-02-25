@@ -83,7 +83,7 @@ export function DatasetUpload({
       </VStack>
       <AddOrEditDatasetDrawer
         datasetToSave={uploadedDataset}
-        isOpen={addDatasetDrawer.isOpen}
+        open={addDatasetDrawer.open}
         onClose={() => {
           addDatasetDrawer.onClose();
         }}

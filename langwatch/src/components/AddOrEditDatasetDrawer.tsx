@@ -1,21 +1,16 @@
 import {
   Box,
   Button,
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  DrawerHeader,
-  FormErrorMessage,
-  FormHelperText,
+  Field,
   HStack,
   Heading,
   Input,
-  Select,
+  NativeSelect,
   Text,
   VStack,
-  useToast,
 } from "@chakra-ui/react";
+import { Dialog } from "../components/ui/dialog";
+import { toaster } from "../components/ui/toaster";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCallback, useEffect } from "react";
 import { Trash2 } from "react-feather";
@@ -40,7 +35,7 @@ interface AddDatasetDrawerProps {
     datasetId?: string;
     datasetRecords?: InMemoryDataset["datasetRecords"];
   };
-  isOpen?: boolean;
+  open?: boolean;
   onClose?: () => void;
   onSuccess: (dataset: {
     datasetId: string;
@@ -61,11 +56,10 @@ type FormValues = {
 
 export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const toast = useToast();
   const upsertDataset = api.dataset.upsert.useMutation();
   const { closeDrawer } = useDrawer();
   const onClose = props.onClose ?? closeDrawer;
-  const isOpen = props.isOpen ?? true;
+  const isOpen = props.open ?? true;
 
   const initialColumns: ColumnType[] = [
     { name: "trace_id", type: "string" },
@@ -151,7 +145,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!props.isOpen]);
+  }, [!!props.open]);
 
   const onSubmit = (data: DatasetRecordForm) => {
     upsertDataset.mutate(
@@ -176,7 +170,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
             name: data.name,
             columnTypes: data.columnTypes as DatasetColumns,
           });
-          toast({
+          toaster.create({
             title: props.datasetToSave?.datasetId
               ? "Dataset Updated"
               : props.datasetToSave
@@ -185,24 +179,26 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
             description: props.datasetToSave?.datasetId
               ? `Successfully updated ${data.name} dataset`
               : `Successfully created ${data.name} dataset`,
-            status: "success",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            type: "success",
+            placement: "top-end",
+            meta: {
+              closable: true,
+            },
           });
           reset();
           onClose();
         },
         onError: (error) => {
-          toast({
+          toaster.create({
             title: props.datasetToSave?.datasetId
               ? "Error updating dataset"
               : "Error creating dataset",
             description: error.message,
-            status: "error",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            type: "error",
+            placement: "top-end",
+            meta: {
+              closable: true,
+            },
           });
         },
       }
@@ -228,12 +224,14 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   );
 
   return (
-    <Drawer isOpen={isOpen} placement="right" size={"xl"} onClose={onClose}>
-      <DrawerContent>
-        <DrawerHeader>
-          <HStack>
-            <DrawerCloseButton />
-          </HStack>
+    <Dialog.Root
+      open={isOpen}
+      onOpenChange={({ open }) => !open && onClose()}
+      size="xl"
+    >
+      <Dialog.Content>
+        <Dialog.CloseTrigger />
+        <Dialog.Header>
           <HStack>
             <Text paddingTop={5} fontSize="2xl">
               {props.datasetToSave?.datasetId
@@ -243,8 +241,8 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                 : "New Dataset"}
             </Text>
           </HStack>
-        </DrawerHeader>
-        <DrawerBody>
+        </Dialog.Header>
+        <Dialog.Body>
           {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
           <form onSubmit={handleSubmit(onSubmit)}>
             <HorizontalFormControl
@@ -254,8 +252,8 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               invalid={!!errors.name}
             >
               <Input {...register("name")} />
-              {slug && <FormHelperText>slug: {slug}</FormHelperText>}
-              <FormErrorMessage>{errors.name?.message}</FormErrorMessage>
+              {slug && <Field.HelperText>slug: {slug}</Field.HelperText>}
+              <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
             </HorizontalFormControl>
 
             <HorizontalFormControl
@@ -266,33 +264,38 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               <VStack align="start">
                 <VStack align="start" width="full">
                   {fields.map((field, index) => (
-                    <HStack key={field.id} width="full">
+                    <HStack key={field.id} width="full" gap={2}>
                       <Input
                         {...register(`columnTypes.${index}.name`, {
                           required: "Column name cannot be empty",
                         })}
                         placeholder="Column name"
                       />
-                      <Select {...register(`columnTypes.${index}.type`)}>
-                        <option value="string">string</option>
-                        <option value="number">number</option>
-                        <option value="boolean">boolean</option>
-                        <option value="date">date</option>
-                        <option value="list">list</option>
-                        <option value="json">json</option>
-                        <option value="chat_messages">
-                          json chat messages (OpenAI format)
-                        </option>
-                        <option value="spans">json spans</option>
-                      </Select>
+                      <NativeSelect.Root>
+                        <NativeSelect.Field
+                          {...register(`columnTypes.${index}.type`)}
+                        >
+                          <option value="string">string</option>
+                          <option value="number">number</option>
+                          <option value="boolean">boolean</option>
+                          <option value="date">date</option>
+                          <option value="list">list</option>
+                          <option value="json">json</option>
+                          <option value="chat_messages">
+                            json chat messages (OpenAI format)
+                          </option>
+                          <option value="spans">json spans</option>
+                        </NativeSelect.Field>
+                        <NativeSelect.Indicator />
+                      </NativeSelect.Root>
                       <Button size="sm" onClick={() => remove(index)}>
                         <Trash2 size={32} />
                       </Button>
                     </HStack>
                   ))}
-                  <FormErrorMessage>
+                  <Field.ErrorText>
                     {errors.columnTypes?.message}
-                  </FormErrorMessage>
+                  </Field.ErrorText>
                   <Button onClick={() => append({ name: "", type: "string" })}>
                     Add Column
                   </Button>
@@ -301,9 +304,9 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
             </HorizontalFormControl>
             {props.datasetToSave?.datasetRecords && (
               <VStack align="start" gap={4} paddingY={6}>
-                <HStack>
+                <HStack gap={2}>
                   <Heading size="md">Preview</Heading>
-                  <Text size="13px" color="gray.500">
+                  <Text fontSize="13px" color="gray.500">
                     {props.datasetToSave.datasetRecords.length} rows,{" "}
                     {columnTypes.length} columns
                   </Text>
@@ -325,14 +328,14 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               colorPalette="blue"
               type="submit"
               minWidth="fit-content"
-              isLoading={upsertDataset.isLoading}
+              loading={upsertDataset.isLoading}
             >
               {props.datasetToSave ? "Save" : "Create Dataset"}
             </Button>
           </form>
-        </DrawerBody>
-      </DrawerContent>
-    </Drawer>
+        </Dialog.Body>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }
 

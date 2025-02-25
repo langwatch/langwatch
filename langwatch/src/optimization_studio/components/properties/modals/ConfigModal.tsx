@@ -1,26 +1,26 @@
-import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "../../../../components/ui/popover";
 import { useState, useEffect } from "react";
 import { X } from "react-feather";
 
 export function ConfigModal({
-  isOpen,
+  open,
   onClose,
   title,
   unstyled = false,
   children,
 }: {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
   title: string;
   unstyled?: boolean;
   children: React.ReactNode;
 }) {
-  const [localIsOpen, setLocalIsOpen] = useState(isOpen);
+  const [localIsOpen, setLocalIsOpen] = useState(open);
 
   useEffect(() => {
-    setLocalIsOpen(isOpen);
-  }, [isOpen]);
+    setLocalIsOpen(open);
+  }, [open]);
 
   if (!localIsOpen) {
     return null;

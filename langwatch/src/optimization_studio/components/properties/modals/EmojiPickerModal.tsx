@@ -15,7 +15,7 @@ export function EmojiPickerModal({
   onChange: (emoji: string) => void;
 }) {
   return (
-    <ConfigModal isOpen={open} onClose={onClose} title="Workflow Icon" unstyled>
+    <ConfigModal open={open} onClose={onClose} title="Workflow Icon" unstyled>
       <PopoverContent marginRight={4}>
         <EmojiPicker
           emojiStyle={EmojiStyle.NATIVE}

@@ -3,7 +3,7 @@ import {
   Button,
   Card,
   CardBody,
-  FormErrorMessage,
+  Field,
   HStack,
   Heading,
   Input,
@@ -531,10 +531,10 @@ function MembersList({
                             required: "Email is required",
                           })}
                         />
-                        <FormErrorMessage>
+                        <Field.ErrorText>
                           {errors.invites?.[index]?.email &&
                             "Email is required"}
-                        </FormErrorMessage>
+                        </Field.ErrorText>
                       </Td>
                       <Td width="24%" paddingLeft={0} paddingY={2}>
                         <Controller
@@ -600,9 +600,9 @@ function MembersList({
                             />
                           )}
                         />
-                        <FormErrorMessage>
+                        <Field.ErrorText>
                           {errors.invites?.[index]?.role && "Role is required"}
-                        </FormErrorMessage>
+                        </Field.ErrorText>
                       </Td>
                       <Td width="35%" paddingLeft={0} paddingY={2}>
                         <Controller

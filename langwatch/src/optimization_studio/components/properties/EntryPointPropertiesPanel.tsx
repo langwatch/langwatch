@@ -3,13 +3,13 @@ import {
   Button,
   HStack,
   Input,
-  Select,
+  NativeSelect,
   Spacer,
   Text,
-  Tooltip,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { Tooltip } from "../../../components/ui/tooltip";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
@@ -25,9 +25,10 @@ import {
   BasePropertiesPanel,
   PropertySectionTitle,
 } from "./BasePropertiesPanel";
+import { Field } from "@chakra-ui/react";
 
 export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { open, onOpen, onClose } = useDisclosure();
   const [editingDataset, setEditingDataset] = useState<
     Entry["dataset"] | undefined
   >();
@@ -101,6 +102,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
         },
       });
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
@@ -111,7 +113,8 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
   const seed = form.watch("seed");
 
   useEffect(() => {
-    form.handleSubmit(onSubmit)();
+    void form.handleSubmit(onSubmit)();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unit, train_size, test_size, seed]);
 
   return (
@@ -143,12 +146,12 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
             size="xs"
             variant="ghost"
             marginBottom={-1}
-            leftIcon={<Folder size={14} />}
             onClick={() => {
               setEditingDataset(undefined);
               onOpen();
             }}
           >
+            <Folder size={14} />
             <Text>Choose...</Text>
           </Button>
         </HStack>
@@ -159,24 +162,25 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
             type: "string",
           }))}
           onClick={() => {
-            setEditingDataset((node.data as Entry).dataset);
+            setEditingDataset(node.data.dataset);
             onOpen();
           }}
           minHeight={`${36 + 29 * (rows?.length ?? 0)}px`}
         />
       </VStack>
       <DatasetModal
-        isOpen={isOpen}
+        open={open}
         onClose={onClose}
         node={node}
         editingDataset={editingDataset}
       />
       <HStack width="full">
         <VStack width="full" align="start">
-          <HStack width="full" paddingBottom={2}>
+          <HStack width="full" gap={2} paddingBottom={2}>
             <PropertySectionTitle>Optimization/Test Split</PropertySectionTitle>
             <Tooltip
-              content={`During optimization, a bigger part of the dataset is used for optimization and a smaller part for testing, this guarantees that the test set is not leaked into the optimization, preventing the LLM to "cheat" it's way into a better score.`}
+              content="During optimization, a bigger part of the dataset is used for optimization and a smaller part for testing, this guarantees that the test set is not leaked into the optimization, preventing the LLM to 'cheat' it's way into a better score."
+              positioning={{ placement: "top" }}
             >
               <Box paddingTop={1}>
                 <Info size={14} />
@@ -195,21 +199,28 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
               </Text>
             </HStack>
             <HStack width="full">
-              <Input
-                {...form.register("train_size", { valueAsNumber: true })}
-                type="number"
-                required
-                min={0}
-                max={unit === "percent" ? 100 : undefined}
-                step={1}
+              <Field.Root
                 width="45%"
-                size="sm"
-                paddingRight={1}
-              />
-              <Select width="55%" size="sm" {...unitField}>
-                <option value="percent">%</option>
-                <option value="entries">entries</option>
-              </Select>
+                invalid={!!form.formState.errors.train_size}
+              >
+                <Input
+                  {...form.register("train_size", { valueAsNumber: true })}
+                  type="number"
+                  required
+                  min={0}
+                  max={unit === "percent" ? 100 : undefined}
+                  step={1}
+                  size="sm"
+                  paddingRight={1}
+                />
+              </Field.Root>
+              <NativeSelect.Root width="55%" size="sm">
+                <NativeSelect.Field {...unitField}>
+                  <option value="percent">%</option>
+                  <option value="entries">entries</option>
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
             </HStack>
           </HStack>
           {form.formState.errors.train_size && (
@@ -235,32 +246,36 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
               </Text>
             </HStack>
             <HStack width="full">
-              <Input
-                {...form.register("test_size", { valueAsNumber: true })}
-                type="number"
-                required
-                min={0}
-                max={unit === "percent" ? 100 : undefined}
-                step={1}
+              <Field.Root
                 width="45%"
-                size="sm"
-                paddingRight={1}
-              />
-
-              <Select
-                width="55%"
-                size="sm"
-                value={unit}
-                onChange={(e) => {
-                  form.setValue(
-                    "unit",
-                    e.target.value as "percent" | "entries"
-                  );
-                }}
+                invalid={!!form.formState.errors.test_size}
               >
-                <option value="percent">%</option>
-                <option value="entries">entries</option>
-              </Select>
+                <Input
+                  {...form.register("test_size", { valueAsNumber: true })}
+                  type="number"
+                  required
+                  min={0}
+                  max={unit === "percent" ? 100 : undefined}
+                  step={1}
+                  size="sm"
+                  paddingRight={1}
+                />
+              </Field.Root>
+              <NativeSelect.Root width="55%" size="sm">
+                <NativeSelect.Field
+                  value={unit}
+                  onChange={(e) => {
+                    form.setValue(
+                      "unit",
+                      e.target.value as "percent" | "entries"
+                    );
+                  }}
+                >
+                  <option value="percent">%</option>
+                  <option value="entries">entries</option>
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
             </HStack>
           </HStack>
           {form.formState.errors.test_size && (
@@ -274,7 +289,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
               {form.formState.errors.test_size.message}
             </Text>
           )}
-          <HStack width="full" gap={4}>
+          <HStack width="full">
             <HStack width="full">
               <Text
                 fontSize="13px"
@@ -284,22 +299,22 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
               >
                 Shuffle Seed
               </Text>
-              <Tooltip
-                content={`For making sure the original dataset order does not affect performance, a seed is used to shuffle it before the split. Use -1 if you want to disable shuffling.`}
-              >
+              <Tooltip content="For making sure the original dataset order does not affect performance, a seed is used to shuffle it before the split. Use -1 if you want to disable shuffling.">
                 <Box paddingTop={1}>
                   <Info size={14} />
                 </Box>
               </Tooltip>
             </HStack>
-            <Input
-              {...form.register("seed", { valueAsNumber: true })}
-              type="number"
-              size="sm"
-              required
-              value={(node.data as Entry).seed ?? "42"}
-              min={-1}
-            />
+            <Field.Root invalid={!!form.formState.errors.seed}>
+              <Input
+                {...form.register("seed", { valueAsNumber: true })}
+                type="number"
+                size="sm"
+                required
+                value={node.data.seed ?? "42"}
+                min={-1}
+              />
+            </Field.Root>
           </HStack>
           {form.formState.errors.seed && (
             <Text
@@ -323,23 +338,26 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
             </Box>
           </Tooltip>
         </HStack>
-        <Select
-          value={(node.data as Entry).entry_selection}
-          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-            const entrySelection = e.target.value as Entry["entry_selection"];
-            setNode({
-              id: node.id,
-              data: {
-                ...node.data,
-                entry_selection: entrySelection,
-              },
-            });
-          }}
-        >
-          <option value="first">First</option>
-          <option value="last">Last</option>
-          <option value="random">Random</option>
-        </Select>
+        <NativeSelect.Root>
+          <NativeSelect.Field
+            value={node.data.entry_selection}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+              const entrySelection = e.target.value as Entry["entry_selection"];
+              setNode({
+                id: node.id,
+                data: {
+                  ...node.data,
+                  entry_selection: entrySelection,
+                },
+              });
+            }}
+          >
+            <option value="first">First</option>
+            <option value="last">Last</option>
+            <option value="random">Random</option>
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
       </VStack>
     </BasePropertiesPanel>
   );

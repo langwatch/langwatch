@@ -1,5 +1,5 @@
 import {
-  FormErrorMessage,
+  Field,
   HStack,
   Spinner,
   Text,
@@ -105,7 +105,7 @@ export const TeamUserRoleField = ({
           </HStack>
         )}
       />
-      <FormErrorMessage>{errors.role && "Role is required"}</FormErrorMessage>
+      <Field.ErrorText>{errors.role && "Role is required"}</Field.ErrorText>
     </VStack>
   );
 };
