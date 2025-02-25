@@ -66,7 +66,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
       children: span.children.slice(0, span.children.length - 1),
     }) + Math.min(span.children.length, 1);
 
-  const lineHeight = `calc(100% - ${childrenInTheMiddleCount * 80}px - 14px)`;
+  const lineHeight = `calc(100% - ${childrenInTheMiddleCount * 76}px - 14px)`;
 
   const evaluationResult =
     span.type === "evaluation" ? getEvaluationResult(span) : undefined;
@@ -100,8 +100,8 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
                 borderBottomWidth: "1px",
                 borderBottomLeftRadius: "6px",
                 position: "absolute",
-                top: "-19px",
-                left: "-7px",
+                top: "-20px",
+                left: "-8px",
                 transform: "translateX(-100%)",
               }
             : undefined

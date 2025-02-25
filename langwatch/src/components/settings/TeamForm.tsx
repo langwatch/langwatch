@@ -5,7 +5,7 @@ import {
   Button,
   Card,
   CardBody,
-  FormErrorMessage,
+  Field,
   HStack,
   Heading,
   Input,
@@ -121,7 +121,7 @@ export const TeamForm = ({
                     },
                   })}
                 />
-                <FormErrorMessage>Name is required</FormErrorMessage>
+                <Field.ErrorText>Name is required</Field.ErrorText>
               </HorizontalFormControl>
               {team && (
                 <HorizontalFormControl

@@ -1,69 +1,65 @@
 import {
+  Alert,
   Box,
   Button,
-  FormControl,
-  FormLabel,
-  HStack,
+  Field,
   Heading,
+  HStack,
   Input,
+  NativeSelect,
+  RadioGroup,
   Text,
   VStack,
-  useRadio,
-  type UseRadioProps,
-  Select,
-  Alert,
-  AlertIcon,
-  Tooltip,
-  Link,
 } from "@chakra-ui/react";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
-import { useEffect, type PropsWithChildren } from "react";
+import { forwardRef, useEffect } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { SetupLayout } from "~/components/SetupLayout";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import {
   TechStackSelector,
   type ProjectFormData,
 } from "~/components/TechStack";
+import { Link } from "~/components/ui/link";
+import { Tooltip } from "~/components/ui/tooltip";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import { api } from "../../../utils/api";
 import { trackEvent } from "../../../utils/tracking";
 
-export function RadioCard(props: UseRadioProps & PropsWithChildren) {
-  const { getInputProps, getRadioProps } = useRadio(props);
+type RadioCardProps = {
+  value: string;
+  children: React.ReactNode;
+};
 
-  const input = getInputProps();
-  const checkbox = getRadioProps();
+export const RadioCard = forwardRef<HTMLInputElement, RadioCardProps>(
+  function RadioCard(props, ref) {
+    const { children, value } = props;
 
-  return (
-    <Box height="auto" as="label">
-      <input {...input} />
-      <Box
-        {...checkbox}
-        cursor="pointer"
-        // borderWidth="1px"
-        borderRadius="md"
-        // boxShadow="md"
-        _hover={{
-          backgroundColor: "gray.50",
-        }}
-        _checked={{
-          // borderColor: "orange.600",
-          backgroundColor: "gray.50",
-          // borderWidth: "2px"
-        }}
-        px={5}
-        py={3}
-        height="full"
-        display="flex"
-        alignItems="center"
-      >
-        {props.children}
-      </Box>
-    </Box>
-  );
-}
+    return (
+      <RadioGroup.Item value={value}>
+        <RadioGroup.ItemHiddenInput ref={ref} />
+        <Box
+          cursor="pointer"
+          borderRadius="md"
+          _hover={{
+            backgroundColor: "gray.50",
+          }}
+          _checked={{
+            backgroundColor: "gray.50",
+          }}
+          px={5}
+          py={3}
+          height="full"
+          display="flex"
+          alignItems="center"
+        >
+          {children}
+        </Box>
+      </RadioGroup.Item>
+    );
+  }
+);
 
 export default function ProjectOnboarding() {
   useRequiredSession();
@@ -158,29 +154,31 @@ export default function ProjectOnboarding() {
           {usage.data &&
             usage.data.projectsCount >= usage.data.activePlan.maxProjects &&
             !usage.data.activePlan.overrideAddingLimitations && (
-              <Alert status="warning">
-                <AlertIcon />
-                <Text>
-                  You have reached the maximum number of projects allowed by
-                  your plan. Please{" "}
-                  <Link
-                    href={`/settings/subscription`}
-                    textDecoration="underline"
-                    _hover={{
-                      textDecoration: "none",
-                    }}
-                    onClick={() => {
-                      trackEvent("subscription_hook_click", {
-                        project_id: project?.id,
-                        hook: "new_project_limit_reached",
-                      });
-                    }}
-                  >
-                    upgrade your plan
-                  </Link>{" "}
-                  to create more projects.
-                </Text>
-              </Alert>
+              <Alert.Root>
+                <Alert.Indicator />
+                <Alert.Content>
+                  <Text>
+                    You have reached the maximum number of projects allowed by
+                    your plan. Please{" "}
+                    <Link
+                      href={`/settings/subscription`}
+                      textDecoration="underline"
+                      _hover={{
+                        textDecoration: "none",
+                      }}
+                      onClick={() => {
+                        trackEvent("subscription_hook_click", {
+                          project_id: project?.id,
+                          hook: "new_project_limit_reached",
+                        });
+                      }}
+                    >
+                      upgrade your plan
+                    </Link>{" "}
+                    to create more projects.
+                  </Text>
+                </Alert.Content>
+              </Alert.Root>
             )}
           <Text paddingBottom={4} fontSize="14px">
             You can set up separate projects for each service or LLM feature of
@@ -188,31 +186,36 @@ export default function ProjectOnboarding() {
             that Content Generation feature).
             <br />
           </Text>
-          <FormControl>
-            <FormLabel>Project Name</FormLabel>
+          <Field.Root>
+            <Field.Label>Project Name</Field.Label>
             <Input {...form.register("name", { required: true })} />
-          </FormControl>
+          </Field.Root>
           {teams.data &&
             teams.data.some((team) => team.projects.length > 0) && (
               <>
-                <FormControl>
-                  <FormLabel>Team</FormLabel>
-                  <Select {...form.register("teamId", { required: true })}>
-                    {teams.data?.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                    <option value="NEW">(+) Create new team</option>
-                  </Select>
-                </FormControl>
+                <Field.Root>
+                  <Field.Label>Team</Field.Label>
+                  <NativeSelect.Root>
+                    <NativeSelect.Field
+                      {...form.register("teamId", { required: true })}
+                    >
+                      {teams.data?.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name}
+                        </option>
+                      ))}
+                      <option value="NEW">(+) Create new team</option>
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                </Field.Root>
                 {teamId == "NEW" && (
-                  <FormControl>
-                    <FormLabel>New Team Name</FormLabel>
+                  <Field.Root>
+                    <Field.Label>New Team Name</Field.Label>
                     <Input
                       {...form.register("newTeamName", { required: true })}
                     />
-                  </FormControl>
+                  </Field.Root>
                 )}
               </>
             )}
@@ -226,11 +229,12 @@ export default function ProjectOnboarding() {
                   ? "You reached the limit of max new projects, upgrade your plan to add more projects"
                   : ""
               }
+              positioning={{ placement: "top" }}
             >
               <Button
                 colorPalette="orange"
                 type="submit"
-                isDisabled={
+                disabled={
                   createProject.isLoading ||
                   (usage.data &&
                     usage.data.projectsCount >=

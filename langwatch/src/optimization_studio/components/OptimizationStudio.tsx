@@ -19,7 +19,6 @@ import {
 import { DndProvider, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
-import { Link } from "../../components/ui/link";
 import "@xyflow/react/dist/style.css";
 import Head from "next/head";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -32,7 +31,11 @@ import {
 } from "react-resizable-panels";
 import { useShallow } from "zustand/react/shallow";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
+import { setRecentMenuLinkClick } from "../../components/DashboardLayout";
 import { LogoIcon } from "../../components/icons/LogoIcon";
+import { useColorRawValue } from "../../components/ui/color-mode";
+import { Link } from "../../components/ui/link";
+import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { titleCase } from "../../utils/stringCasing";
 import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
@@ -56,9 +59,6 @@ import { PropertiesPanel } from "./properties/PropertiesPanel";
 import { Publish } from "./Publish";
 import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
-import { setRecentMenuLinkClick } from "../../components/DashboardLayout";
-import { useColorRawValue } from "../../components/ui/color-mode";
-import { Tooltip } from "../../components/ui/tooltip";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {
   const [_, drop] = useDrop(() => ({

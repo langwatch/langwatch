@@ -120,7 +120,7 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
           </HStack>
         )}
         {raw || forceRaw ? (
-          <Text fontFamily="mono" fontSize="14px">
+          <Text fontFamily="mono" fontSize="13px">
             {JSON.stringify(json, null, 2)}
           </Text>
         ) : (
@@ -131,6 +131,7 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
             displayObjectSize={false}
             enableClipboard={false}
             collapseStringsAfterLength={1000}
+            style={{ fontSize: "13px" }}
             //@ts-ignore
             displayArrayKey={false}
             {...propsWithoutValue}
@@ -178,12 +179,13 @@ function TinyButton(props: ButtonProps) {
       fontSize="10px"
       fontFamily="mono"
       padding={1}
-      height="auto"
+      height="22px"
       width="auto"
       minWidth="0"
       borderRadius="0"
       border="1px solid"
       borderColor="gray.300"
+      colorPalette="gray"
       {...props}
     />
   );

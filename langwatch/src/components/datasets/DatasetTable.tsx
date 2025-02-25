@@ -659,7 +659,7 @@ export function DatasetTable({
             datasetRecords: datasetId ? undefined : parentRowData,
             columnTypes,
           }}
-          isOpen={editDataset.open}
+          open={editDataset.open}
           onClose={editDataset.onClose}
           onSuccess={(updatedDataset) => {
             if (dataset?.datasetRecords) {

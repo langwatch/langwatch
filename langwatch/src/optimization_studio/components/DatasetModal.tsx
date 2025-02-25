@@ -1,17 +1,4 @@
-import {
-  Button,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalHeader,
-  ModalOverlay,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
-} from "@chakra-ui/react";
+import { Button, Tabs } from "@chakra-ui/react";
 import {
   useUpdateNodeInternals,
   type Node,
@@ -20,6 +7,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "react-feather";
 import { useDrawer } from "../../components/CurrentDrawer";
+import { Dialog } from "../../components/ui/dialog";
 import type { DatasetColumns } from "../../server/datasets/types";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Component, Entry } from "../types/dsl";
@@ -32,12 +20,12 @@ import { DatasetUpload } from "./datasets/DatasetUpload";
 import { EditDataset } from "./datasets/EditDataset";
 
 export function DatasetModal({
-  isOpen,
+  open,
   onClose: onClose_,
   node,
   editingDataset: editingDataset_ = undefined,
 }: {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
   node: NodeProps<Node<Component>> | Node<Component>;
   editingDataset?: Entry["dataset"];
@@ -48,10 +36,10 @@ export function DatasetModal({
 
   const [rendered, setRendered] = useState(false);
   useEffect(() => {
-    setEditingDataset(isOpen ? editingDataset_ : undefined);
-    setRendered(isOpen);
+    setEditingDataset(open ? editingDataset_ : undefined);
+    setRendered(open);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [open]);
 
   const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
 
@@ -135,68 +123,67 @@ export function DatasetModal({
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="full">
-      <ModalOverlay />
-      <ModalContent
-        marginX="32px"
-        marginTop="32px"
-        width="calc(100vw - 64px)"
-        minHeight="0"
-        height="calc(100vh - 64px)"
-        borderRadius="8px"
-        overflowY="auto"
+    <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()}>
+      <Dialog.Backdrop />
+      <Dialog.Content
+        css={{
+          marginX: "32px",
+          marginTop: "32px",
+          width: "calc(100vw - 64px)",
+          minHeight: "0",
+          height: "calc(100vh - 64px)",
+          borderRadius: "8px",
+          overflowY: "auto",
+        }}
       >
-        <ModalCloseButton zIndex={10} />
+        <Dialog.CloseTrigger zIndex={10} />
         {rendered && editingDataset ? (
           <>
-            <ModalHeader>
+            <Dialog.Header>
               <Button
                 fontSize="14px"
                 fontWeight="bold"
                 color="gray.500"
                 variant="plain"
-                leftIcon={<ArrowLeft size={16} />}
                 onClick={() => setEditingDataset(undefined)}
               >
-                Datasets
+                <ArrowLeft size={16} /> Datasets
               </Button>
-            </ModalHeader>
-            <ModalBody paddingBottom="32px">
-              {isOpen && (
+            </Dialog.Header>
+            <Dialog.Body paddingBottom="32px">
+              {open && (
                 <EditDataset
                   editingDataset={editingDataset}
                   setEditingDataset={setEditingDataset}
                   setSelectedDataset={setSelectedDataset}
                 />
               )}
-            </ModalBody>
+            </Dialog.Body>
           </>
         ) : rendered ? (
           <>
-            <Tabs>
-              <ModalHeader>
-                <TabList>
-                  <Tab>Datasets</Tab>
-                  <Tab>Upload</Tab>
-                </TabList>
-              </ModalHeader>
-              <ModalBody paddingBottom="32px">
-                <TabPanels>
-                  <TabPanel>
-                    <DatasetSelection
-                      node={node}
-                      setIsEditing={setEditingDataset}
-                    />
-                  </TabPanel>
-                  <TabPanel>
-                    <DatasetUpload setIsEditing={setEditingDataset} />
-                  </TabPanel>
-                </TabPanels>
-              </ModalBody>
-            </Tabs>
+            <Tabs.Root defaultValue="datasets">
+              <Dialog.Header>
+                <Tabs.List>
+                  <Tabs.Trigger value="datasets">Datasets</Tabs.Trigger>
+                  <Tabs.Trigger value="upload">Upload</Tabs.Trigger>
+                </Tabs.List>
+              </Dialog.Header>
+              <Dialog.Body paddingBottom="32px">
+                <Tabs.Content value="datasets">
+                  <DatasetSelection
+                    node={node}
+                    setIsEditing={setEditingDataset}
+                  />
+                </Tabs.Content>
+                <Tabs.Content value="upload">
+                  <DatasetUpload setIsEditing={setEditingDataset} />
+                </Tabs.Content>
+              </Dialog.Body>
+            </Tabs.Root>
           </>
         ) : null}
-      </ModalContent>
-    </Modal>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }

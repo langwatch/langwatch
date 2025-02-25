@@ -1,7 +1,7 @@
 import { BaseEdge, type EdgeProps, getBezierPath } from "@xyflow/react";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { selectionColor } from "./nodes/Nodes";
-import { useTheme } from "@chakra-ui/react";
+import { useColorRawValue } from "../../components/ui/color-mode";
 
 export default function DefaultEdge(props: EdgeProps) {
   const { hoveredNodeId, nodes } = useWorkflowStore(
@@ -19,11 +19,12 @@ export default function DefaultEdge(props: EdgeProps) {
       (node) =>
         node.selected && (node.id === props.source || node.id === props.target)
     );
-  const highlighted = !!props.selected || isConnectionHovered || isConnectionSelected;
+  const highlighted =
+    !!props.selected || isConnectionHovered || isConnectionSelected;
 
   const [edgePath] = getBezierPath(props);
 
-  const theme = useTheme();
+  const gray350 = useColorRawValue("gray.350");
 
   return (
     <>
@@ -31,7 +32,7 @@ export default function DefaultEdge(props: EdgeProps) {
         path={edgePath}
         markerEnd={props.markerEnd}
         style={{
-          stroke: highlighted ? selectionColor : theme.colors.gray[350],
+          stroke: highlighted ? selectionColor : gray350,
           strokeWidth: highlighted ? 1.5 : 2,
         }}
       />

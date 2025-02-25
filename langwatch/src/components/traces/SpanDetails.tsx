@@ -1,31 +1,30 @@
-import { Link } from "../ui/link";
 import {
+  Badge,
   Box,
   HStack,
   Heading,
   Spacer,
   Text,
   VStack,
-  Tag,
-  Badge,
 } from "@chakra-ui/react";
+import type { Project } from "@prisma/client";
 import numeral from "numeral";
 import { Clock, Settings } from "react-feather";
-import { TraceToPlaygroundLink } from "../TraceToPlaygroundLink";
-import { RenderInputOutput } from "./RenderInputOutput";
 import type {
   ElasticSearchSpan,
   ErrorCapture,
   EvaluationResult,
 } from "../../server/tracer/types";
-import type { Project } from "@prisma/client";
-import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { durationColor } from "../../utils/durationColor";
+import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import {
-  evaluationStatusColor,
   evaluationPassed,
+  evaluationStatusColor,
 } from "../checks/EvaluationStatus";
+import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
+import { RenderInputOutput } from "./RenderInputOutput";
+import { OverflownTextWithTooltip } from "../OverflownText";
 
 export function SpanDetails({
   project,
@@ -46,21 +45,12 @@ export function SpanDetails({
     <VStack flexGrow={1} gap={3} align="start">
       <HStack width="full">
         <SpanTypeTag span={span} />
-        <Heading as="h2" fontSize="22px">
-          {span.name ?? span.model}
+        <Heading as="h2" fontSize="22px" asChild>
+          <OverflownTextWithTooltip lineClamp={1} wordBreak="break-word">
+            {span.name ?? span.model}
+          </OverflownTextWithTooltip>
         </Heading>
         <Spacer />
-        {project &&
-          span.type === "llm" &&
-          span.input?.type === "chat_messages" && (
-            <TraceToPlaygroundLink
-              projectSlug={project.slug}
-              traceId={span.trace_id}
-              spanId={span.span_id}
-              tooltipLabel="Try different prompts and models for this LLM call on the playground"
-              buttonLabel="Try in Playground"
-            />
-          )}
       </HStack>
       <VStack align="start" color="gray.500">
         <HStack>
@@ -334,7 +324,7 @@ export const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
             }[span.type]
       }
       backgroundColor={evaluationPassed_ === true ? "#ccf6c6" : undefined}
-      fontSize="13px"
+      fontSize="12px"
     >
       {span.type.toUpperCase()}
     </Badge>

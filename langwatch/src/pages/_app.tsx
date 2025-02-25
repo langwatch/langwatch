@@ -200,6 +200,14 @@ export const system = createSystem(defaultConfig, {
           solid: { value: "#ED8926" },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
+        green: {
+          solid: { value: "{colors.green.500}" },
+          focusRing: { value: "rgb(49, 130, 206)" },
+        },
+        blue: {
+          solid: { value: "{colors.blue.500}" },
+          focusRing: { value: "rgb(49, 130, 206)" },
+        },
       },
     },
     recipes: {
@@ -233,15 +241,21 @@ export const system = createSystem(defaultConfig, {
           },
           size: {
             xs: {
+              h: "6",
+              minW: "6",
+              textStyle: "xs",
+              px: "1.5",
+              gap: "1",
               _icon: {
-                flexShrink: 1,
+                flexShrink: 0,
                 width: "auto",
                 height: "auto",
-                maxWidth: "12px",
-                maxHeight: "12px",
               },
             },
             sm: {
+              h: "8",
+              minW: "8",
+              px: "2.5",
               _icon: {
                 flexShrink: 1,
                 width: "auto",
@@ -277,6 +291,21 @@ export const system = createSystem(defaultConfig, {
       separator: defineRecipe({
         base: {
           width: "full",
+        },
+      }),
+      input: defineRecipe({
+        base: {
+          borderRadius: "l1",
+        },
+        variants: {
+          size: {
+            xs: {
+              "--input-height": "sizes.7",
+            },
+            sm: {
+              "--input-height": "sizes.8",
+            },
+          },
         },
       }),
     },

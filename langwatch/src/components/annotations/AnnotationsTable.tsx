@@ -1,38 +1,27 @@
 import {
   Avatar,
+  Badge,
   Box,
   Button,
   Heading,
   HStack,
-  Link,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuList,
-  Radio,
-  RadioGroup,
+  Separator,
   Skeleton,
   Spacer,
-  StackDivider,
   Table,
-  TableContainer,
-  Tag,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
   VStack,
-  Stack,
 } from "@chakra-ui/react";
 
+import { Link } from "../../components/ui/link";
+import { Menu } from "../../components/ui/menu";
+import { Radio, RadioGroup } from "../../components/ui/radio";
+import { Tooltip } from "../../components/ui/tooltip";
+
 import { useRouter } from "next/router";
-import { Edit, MessageCircle, MoreVertical } from "react-feather";
+import { ChevronsDown, Edit, MessageCircle, MoreVertical } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
-import { ChevronDownIcon } from "@chakra-ui/icons";
 import type { Annotation } from "@prisma/client";
 import { useState } from "react";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
@@ -109,13 +98,8 @@ export const AnnotationsTable = ({
   ) => {
     if (scoreOptionsIDArray.length > 0 && annotations.length > 0) {
       return scoreOptionsIDArray.map((id) => (
-        <Td key={id} minWidth={200}>
-          <VStack
-            divider={<StackDivider color="red" />}
-            width="full"
-            align="start"
-            gap={2}
-          >
+        <Table.Cell key={id} minWidth={200}>
+          <VStack divideX="1px" width="full" align="start" gap={2}>
             {annotations.map((annotation) =>
               annotation.scoreOptions?.[id]?.value ? (
                 <>
@@ -124,12 +108,12 @@ export const AnnotationsTable = ({
                       <HStack gap={1} wrap="wrap">
                         {(annotation.scoreOptions?.[id]?.value as string[]).map(
                           (val, index) => (
-                            <Tag key={index}>{val}</Tag>
+                            <Badge key={index}>{val}</Badge>
                           )
                         )}
                       </HStack>
                     ) : (
-                      <Tag>{annotation.scoreOptions?.[id]?.value}</Tag>
+                      <Badge>{annotation.scoreOptions?.[id]?.value}</Badge>
                     )}
                     {annotation.scoreOptions?.[id]?.reason && (
                       <Tooltip content={annotation.scoreOptions[id]?.reason}>
@@ -141,13 +125,15 @@ export const AnnotationsTable = ({
               ) : null
             )}
           </VStack>
-        </Td>
+        </Table.Cell>
       ));
     } else {
       if (scoreOptionsIDArray.length > 0) {
-        return scoreOptionsIDArray.map((_, i) => <Td key={i}></Td>);
+        return scoreOptionsIDArray.map((_, i) => (
+          <Table.Cell key={i}></Table.Cell>
+        ));
       }
-      return <Td></Td>;
+      return <Table.Cell></Table.Cell>;
     }
   };
 
@@ -178,34 +164,31 @@ export const AnnotationsTable = ({
           <Skeleton height="32px" width="100px" />
         </HStack>
         <Box flex={1} width="full" overflowX="auto">
-          {/* <CardBody padding={0}> */}
-          <TableContainer width="full">
-            <Table variant="simple">
-              <Thead>
-                <Tr>
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <Th key={i}>
-                      <Skeleton height="20px" width="100px" />
-                    </Th>
-                  ))}
-                </Tr>
-              </Thead>
-              <Tbody>
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <Tr key={i}>
-                    {Array.from({ length: 6 }).map((_, j) => (
-                      <Td key={j}>
-                        <Skeleton
-                          height="20px"
-                          width={j === 2 || j === 3 ? "200px" : "100px"}
-                        />
-                      </Td>
-                    ))}
-                  </Tr>
+          <Table.Root variant="line" width="full">
+            <Table.Header>
+              <Table.Row>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Table.ColumnHeader key={i}>
+                    <Skeleton height="20px" width="100px" />
+                  </Table.ColumnHeader>
                 ))}
-              </Tbody>
-            </Table>
-          </TableContainer>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Table.Row key={i}>
+                  {Array.from({ length: 6 }).map((_, j) => (
+                    <Table.Cell key={j}>
+                      <Skeleton
+                        height="20px"
+                        width={j === 2 || j === 3 ? "200px" : "100px"}
+                      />
+                    </Table.Cell>
+                  ))}
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table.Root>
         </Box>
       </VStack>
     );
@@ -227,18 +210,18 @@ export const AnnotationsTable = ({
           )}
           <Spacer />
           {!isDone && (
-            <Menu>
-              <MenuButton
-                as={Button}
-                rightIcon={<ChevronDownIcon />}
-                variant="outline"
-              >
-                Status
-              </MenuButton>
-              <MenuList>
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <Button variant="outline">
+                  Status <ChevronsDown />
+                </Button>
+              </Menu.Trigger>
+              <Menu.Content>
                 <RadioGroup
                   defaultValue="pending"
-                  onChange={(value) => setSelectedAnnotations([value])}
+                  onValueChange={(change) =>
+                    setSelectedAnnotations([change.value])
+                  }
                 >
                   <VStack align="start" padding={2}>
                     <Radio value="pending">Pending</Radio>
@@ -246,23 +229,22 @@ export const AnnotationsTable = ({
                     <Radio value="completed">Completed</Radio>
                   </VStack>
                 </RadioGroup>
-              </MenuList>
-            </Menu>
+              </Menu.Content>
+            </Menu.Root>
           )}
           {queueId && (
-            <Menu>
-              <MenuButton as={Button} variant={"outline"} minWidth={0}>
-                <MoreVertical size={16} />
-              </MenuButton>
-              <MenuList>
-                <MenuItem
-                  icon={<Edit size={16} />}
-                  onClick={() => handleEditQueue()}
-                >
-                  Edit queue
-                </MenuItem>
-              </MenuList>
-            </Menu>
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <Button variant="outline" minWidth={0}>
+                  <MoreVertical size={16} />
+                </Button>
+              </Menu.Trigger>
+              <Menu.Content>
+                <Menu.Item value="edit" onClick={() => handleEditQueue()}>
+                  <Edit size={16} /> Edit queue
+                </Menu.Item>
+              </Menu.Content>
+            </Menu.Root>
           )}
         </HStack>
         <HStack align="start" gap={6} width="full">
@@ -279,7 +261,7 @@ export const AnnotationsTable = ({
                     To get started with annotations, please visit our{" "}
                     <Link
                       href="https://docs.langwatch.ai/features/annotations"
-                      target="_blank"
+                      isExternal
                       color="orange.400"
                     >
                       documentation
@@ -290,38 +272,42 @@ export const AnnotationsTable = ({
                 icon={<Edit />}
               />
             ) : (
-              <TableContainer width="full" maxWidth="100%">
-                <Table variant="simple">
-                  <Thead>
-                    <Tr>
-                      <Th></Th>
-                      {!isDone && <Th>Date created</Th>}
-                      <Th>Input</Th>
-                      <Th>Output</Th>
-                      <Th>Comments</Th>
+              <Box width="full" maxWidth="100%" overflowX="auto">
+                <Table.Root variant="line">
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeader></Table.ColumnHeader>
+                      {!isDone && (
+                        <Table.ColumnHeader>Date created</Table.ColumnHeader>
+                      )}
+                      <Table.ColumnHeader>Input</Table.ColumnHeader>
+                      <Table.ColumnHeader>Output</Table.ColumnHeader>
+                      <Table.ColumnHeader>Comments</Table.ColumnHeader>
                       {scoreOptions.data &&
                         scoreOptions.data.length > 0 &&
                         scoreOptions.data?.map((key) => (
-                          <Th key={key.id}>{key.name}</Th>
+                          <Table.ColumnHeader key={key.id}>
+                            {key.name}
+                          </Table.ColumnHeader>
                         ))}
-                      <Th>Trace Date</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
+                      <Table.ColumnHeader>Trace Date</Table.ColumnHeader>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
                     {queuesLoading ? (
                       Array.from({ length: 3 }).map((_, i) => (
-                        <Tr key={i}>
+                        <Table.Row key={i}>
                           {Array.from({ length: 4 }).map((_, i) => (
-                            <Td key={i}>
+                            <Table.Cell key={i}>
                               <Skeleton height="20px" />
-                            </Td>
+                            </Table.Cell>
                           ))}
-                        </Tr>
+                        </Table.Row>
                       ))
                     ) : queueItemsFiltered.length > 0 ? (
                       queueItemsFiltered.map((item) => {
                         return (
-                          <Tr
+                          <Table.Row
                             cursor="pointer"
                             key={item.id}
                             onClick={() =>
@@ -334,7 +320,7 @@ export const AnnotationsTable = ({
                             backgroundColor={item.doneAt ? "gray.50" : "white"}
                             padding={2}
                           >
-                            <Td>
+                            <Table.Cell>
                               <Tooltip
                                 content={
                                   <VStack align="start" gap={0}>
@@ -397,23 +383,26 @@ export const AnnotationsTable = ({
                                         })
                                     >),
                                   ].map((item) => (
-                                    <Avatar
+                                    <Avatar.Root
                                       key={item.user.name}
                                       size="sm"
-                                      name={item.user.name ?? ""}
                                       css={{
                                         border: "2px solid white",
                                         "&:not(:first-of-type)": {
                                           marginLeft: "-20px",
                                         },
                                       }}
-                                    />
+                                    >
+                                      <Avatar.Fallback
+                                        name={item.user.name ?? ""}
+                                      />
+                                    </Avatar.Root>
                                   ))}
                                 </HStack>
                               </Tooltip>
-                            </Td>
+                            </Table.Cell>
                             {!isDone && (
-                              <Td>
+                              <Table.Cell>
                                 <Text>
                                   {item.createdAt
                                     ? `${item.createdAt.getDate()}/${item.createdAt.toLocaleDateString(
@@ -424,10 +413,10 @@ export const AnnotationsTable = ({
                                       )}`
                                     : "-"}
                                 </Text>
-                              </Td>
+                              </Table.Cell>
                             )}
 
-                            <Td>
+                            <Table.Cell>
                               <Tooltip content={item.trace?.input?.value}>
                                 <Text
                                   lineClamp={2}
@@ -439,8 +428,8 @@ export const AnnotationsTable = ({
                                   {item.trace?.input?.value ?? "<empty>"}
                                 </Text>
                               </Tooltip>
-                            </Td>
-                            <Td>
+                            </Table.Cell>
+                            <Table.Cell>
                               <Tooltip content={item.trace?.output?.value}>
                                 <Text
                                   lineClamp={2}
@@ -452,13 +441,9 @@ export const AnnotationsTable = ({
                                   {item.trace?.output?.value ?? "<empty>"}
                                 </Text>
                               </Tooltip>
-                            </Td>
-                            <Td>
-                              <VStack
-                                align="start"
-                                gap={2}
-                                divider={<StackDivider color="red" />}
-                              >
+                            </Table.Cell>
+                            <Table.Cell>
+                              <VStack align="start" gap={2} divideX="1px">
                                 {item.annotations.map(
                                   (annotation: Annotation) =>
                                     annotation.comment ? (
@@ -476,33 +461,33 @@ export const AnnotationsTable = ({
                                     ) : null
                                 )}
                               </VStack>
-                            </Td>
+                            </Table.Cell>
                             {scoreOptions.data &&
                               scoreOptions.data.length > 0 &&
                               annotationScoreValues(
                                 item.annotations,
                                 scoreOptionsIDArray
                               )}
-                            <Td>
+                            <Table.Cell>
                               {new Date(
                                 item.trace?.timestamps.started_at ?? ""
                               ).toLocaleDateString()}
-                            </Td>
-                          </Tr>
+                            </Table.Cell>
+                          </Table.Row>
                         );
                       })
                     ) : (
-                      <Tr>
-                        <Td colSpan={5}>
+                      <Table.Row>
+                        <Table.Cell colSpan={5}>
                           <Text>
                             No annotations found for selected filters.
                           </Text>
-                        </Td>
-                      </Tr>
+                        </Table.Cell>
+                      </Table.Row>
                     )}
-                  </Tbody>
-                </Table>
-              </TableContainer>
+                  </Table.Body>
+                </Table.Root>
+              </Box>
             )}
           </Box>
         </HStack>

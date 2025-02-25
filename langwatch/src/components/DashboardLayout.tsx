@@ -5,8 +5,8 @@ import {
   Box,
   Button,
   HStack,
+  Icon,
   Input,
-  Popover,
   Portal,
   Spacer,
   Text,
@@ -65,6 +65,7 @@ import { InputGroup } from "./ui/input-group";
 import { Tooltip } from "./ui/tooltip";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
+import { Popover } from "./ui/popover";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -337,31 +338,27 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                       }
                     >
                       {projectGroup.projects.map((project) => (
-                        <Link
-                          key={project.id}
-                          href={
-                            currentRoute?.path.includes("[project]")
-                              ? currentRoute.path
-                                  .replace("[project]", project.slug)
-                                  .replace(/\[.*?\]/g, "")
-                                  .replace(/\/\/+/g, "/")
-                              : `/${project.slug}?return_to=${window.location.pathname}`
-                          }
-                          _hover={{
-                            textDecoration: "none",
-                          }}
-                        >
-                          <Menu.Item
-                            icon={
-                              <HStack width="26px" justify="center">
-                                <ProjectTechStackIcon project={project} />
-                              </HStack>
+                        <Menu.Item value={project.name} fontSize="14px" asChild>
+                          <Link
+                            key={project.id}
+                            href={
+                              currentRoute?.path.includes("[project]")
+                                ? currentRoute.path
+                                    .replace("[project]", project.slug)
+                                    .replace(/\[.*?\]/g, "")
+                                    .replace(/\/\/+/g, "/")
+                                : `/${project.slug}?return_to=${window.location.pathname}`
                             }
-                            fontSize="14px"
+                            _hover={{
+                              textDecoration: "none",
+                            }}
                           >
+                            <HStack width="26px" justify="center">
+                              <ProjectTechStackIcon project={project} />
+                            </HStack>{" "}
                             {project.name}
-                          </Menu.Item>
-                        </Link>
+                          </Link>
+                        </Menu.Item>
                       ))}
                       <AddProjectButton
                         team={projectGroup.team}
@@ -403,7 +400,8 @@ export const AddProjectButton = ({
         textDecoration: "none",
       }}
     >
-      <Menu.Item icon={<Plus />} fontSize="14px">
+      <Menu.Item value={`new-project-${team.slug}`} fontSize="14px">
+        <Plus />
         New Project
       </Menu.Item>
     </Link>
@@ -422,13 +420,14 @@ export const AddProjectButton = ({
         }}
       >
         <Menu.Item
-          icon={<Lock />}
+          value={`new-project-${team.slug}`}
           fontSize="14px"
           color="gray.400"
           _hover={{
             backgroundColor: "transparent",
           }}
         >
+          <Lock />
           New Project
         </Menu.Item>
       </Link>
@@ -902,19 +901,23 @@ export const DashboardLayout = ({
           <HStack gap={6} flex={1}>
             <Spacer />
             <HStack gap={4}>
-              {integrationsLeft ? (
-                <Popover.Root placement="bottom-end">
+              {integrationsLeft || 1 ? (
+                <Popover.Root positioning={{ placement: "bottom-end" }}>
                   <Popover.Trigger>
                     <Button position="relative" variant="ghost">
-                      <ChecklistIcon />
+                      <ChecklistIcon
+                        style={{ maxWidth: "24px", maxHeight: "24px" }}
+                      />
                       <Badge
                         position="absolute"
-                        bottom="2px"
-                        right="2px"
-                        size="sm"
+                        bottom="-4px"
+                        right="-2px"
+                        size="xs"
                         color="white"
                         backgroundColor="green.500"
                         borderRadius="full"
+                        fontSize="12px"
+                        fontWeight="600"
                       >
                         {integrationsLeft}
                       </Badge>
@@ -956,6 +959,7 @@ export const DashboardLayout = ({
                         title={`${session.user.name} (${session.user.email})`}
                       >
                         <Menu.Item
+                          value="logout"
                           onClick={() =>
                             void signOut({
                               callbackUrl: window.location.origin,
@@ -985,7 +989,7 @@ export const DashboardLayout = ({
               <Spacer />
             </HStack>
           )}
-        {/* <CurrentDrawer /> */}
+        <CurrentDrawer />
         {children}
       </VStack>
     </HStack>

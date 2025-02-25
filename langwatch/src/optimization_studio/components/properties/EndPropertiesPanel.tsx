@@ -1,4 +1,4 @@
-import { Alert, AlertIcon, Text } from "@chakra-ui/react";
+import { Alert, Text } from "@chakra-ui/react";
 import { type Node } from "@xyflow/react";
 import { useState } from "react";
 import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
@@ -48,13 +48,15 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
             (input.identifier === "score" && input.type === "float") ||
             (input.identifier === "passed" && input.type === "bool")
         ) && (
-          <Alert status="warning">
-            <AlertIcon />
-            <Text>
-              Results must include either a <b>score</b> or a <b>passed</b>{" "}
-              field.
-            </Text>
-          </Alert>
+          <Alert.Root>
+            <Alert.Indicator />
+            <Alert.Content>
+              <Text>
+                Results must include either a <b>score</b> or a <b>passed</b>{" "}
+                field.
+              </Text>
+            </Alert.Content>
+          </Alert.Root>
         )}
     </BasePropertiesPanel>
   );

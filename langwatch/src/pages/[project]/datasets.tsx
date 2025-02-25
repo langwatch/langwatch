@@ -286,7 +286,7 @@ export default function Datasets() {
         </Card>
       </Container>
       <AddOrEditDatasetDrawer
-        isOpen={addEditDatasetDrawer.isOpen}
+        open={addEditDatasetDrawer.isOpen}
         onClose={() => {
           setEditDataset(undefined);
           addEditDatasetDrawer.onClose();

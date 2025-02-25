@@ -1,11 +1,5 @@
 import {
-  Modal,
-  ModalOverlay,
-  ModalHeader,
-  ModalContent,
-  ModalBody,
-  ModalCloseButton,
-  ModalFooter,
+  Dialog,
   Button,
 } from "@chakra-ui/react";
 
@@ -24,19 +18,19 @@ import { useCallback, useEffect, useState } from "react";
 export function CodeEditorModal({
   code,
   setCode,
-  isOpen,
+  open,
   onClose,
 }: {
   code: string;
   setCode: (code: string) => void;
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
 }) {
   const [localCode, setLocalCode] = useState(code);
 
   useEffect(() => {
     setLocalCode(code);
-  }, [code, isOpen]);
+  }, [code, open]);
 
   const handleSave = useCallback(() => {
     setCode(localCode);
@@ -60,34 +54,36 @@ export function CodeEditorModal({
       }
     };
 
-    if (isOpen) {
+    if (open) {
       window.addEventListener("keydown", handleKeyDown);
       return () => window.removeEventListener("keydown", handleKeyDown);
     }
-  }, [handleSave, isOpen, localCode]);
+  }, [handleSave, open, localCode]);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose_}>
-      <ModalOverlay />
-      <ModalContent
+    <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose_()}>
+      <Dialog.Backdrop />
+      <Dialog.Content
         margin="64px"
         minWidth="calc(100vw - 128px)"
         height="calc(100vh - 128px)"
         background="#272822"
         color="white"
       >
-        <ModalHeader>Edit Code</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody padding="0">
-          {isOpen && (
+        <Dialog.Header>
+          <Dialog.Title>Edit Code</Dialog.Title>
+          <Dialog.CloseTrigger />
+        </Dialog.Header>
+        <Dialog.Body padding="0">
+          {open && (
             <CodeEditor
               code={localCode}
               setCode={setLocalCode}
               onClose={onClose_}
             />
           )}
-        </ModalBody>
-        <ModalFooter>
+        </Dialog.Body>
+        <Dialog.Footer>
           <Button
             onClick={handleSave}
             variant="outline"
@@ -96,9 +92,9 @@ export function CodeEditorModal({
           >
             Save
           </Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }
 

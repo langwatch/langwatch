@@ -7,7 +7,7 @@ import {
   CardBody,
   Checkbox,
   FormControl,
-  FormErrorMessage,
+  Field,
   Grid,
   GridItem,
   HStack,
@@ -430,9 +430,9 @@ function ModelProviderForm({
                       </React.Fragment>
                     ))}
                   </Grid>
-                  <FormErrorMessage>
+                  <Field.ErrorText>
                     {formState.errors.customKeys?.root?.message}
-                  </FormErrorMessage>
+                  </Field.ErrorText>
                 </FormControl>
 
                 <VStack width="full" gap={4}>

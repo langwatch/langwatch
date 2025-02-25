@@ -3,13 +3,13 @@ import {
   Box,
   Button,
   HStack,
-  Menu,
   Skeleton,
   Spacer,
   Spinner,
   Text,
   useDisclosure,
   VStack,
+  type MenuItemProps,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useCallback, useState } from "react";
@@ -35,15 +35,16 @@ import { useVersionState, VersionToBeUsed } from "./History";
 import { Separator } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { type Edge } from "@xyflow/react";
+import { ChevronDown } from "react-feather";
 import { useForm } from "react-hook-form";
-import { Dialog } from "../../components/ui/dialog";
 import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
+import { Dialog } from "../../components/ui/dialog";
+import { Link } from "../../components/ui/link";
+import { Menu } from "../../components/ui/menu";
+import { toaster } from "../../components/ui/toaster";
+import { Tooltip } from "../../components/ui/tooltip";
 import { trackEvent } from "../../utils/tracking";
 import { checkIsEvaluator, getEntryInputs } from "../utils/nodeUtils";
-import { ChevronDown } from "react-feather";
-import { Tooltip } from "../../components/ui/tooltip";
-import { Link } from "../../components/ui/link";
-import { toaster } from "../../components/ui/toaster";
 
 export function Publish({ isDisabled }: { isDisabled: boolean }) {
   const publishModal = useDisclosure();
@@ -241,7 +242,7 @@ function PublishMenu({
     : undefined;
 
   const SubscriptionMenuItem = (
-    props: Menu.ItemProps & { tooltip?: string }
+    props: MenuItemProps & { tooltip?: string }
   ) => {
     if (!planAllowsToPublish) {
       return (

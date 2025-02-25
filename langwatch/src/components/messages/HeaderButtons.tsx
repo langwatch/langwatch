@@ -56,11 +56,11 @@ export function ToggleTableView() {
 
   const sliderOnLeft = {
     left: "3px",
-    width: "116px",
+    width: "108px",
   };
   const sliderOnRight = {
-    left: "118px",
-    width: "124px",
+    left: "116px",
+    width: "118px",
   };
 
   const sliderProps =
@@ -75,7 +75,7 @@ export function ToggleTableView() {
       borderRadius="6px"
       border="1px solid"
       borderColor="gray.350"
-      gap={0}
+      gap={2}
       position="relative"
       marginRight={2}
     >
@@ -144,7 +144,7 @@ export function ToggleAnalytics() {
           );
         }}
       >
-        <TrendingUp size="16" />
+        <TrendingUp />
       </Button>
     </Tooltip>
   );

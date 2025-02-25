@@ -1,8 +1,5 @@
 import {
   Alert,
-  AlertDescription,
-  AlertIcon,
-  AlertTitle,
   Button,
   HStack,
   Progress,
@@ -99,8 +96,7 @@ export function BaseProgressToast({
   onCancel: () => void;
 }) {
   return (
-    <Alert
-      status="info"
+    <Alert.Root
       position="absolute"
       bottom="3"
       right="3"
@@ -116,11 +112,11 @@ export function BaseProgressToast({
       <VStack align="start" gap={1}>
         <VStack align="start" gap={1} paddingY={2} paddingX={3}>
           <HStack gap={0}>
-            <AlertIcon />
-            <AlertTitle>Please wait...</AlertTitle>
+            <Alert.Indicator />
+            <Alert.Title>Please wait...</Alert.Title>
           </HStack>
           <HStack minWidth="300px">
-            <AlertDescription fontSize="14px">{description}</AlertDescription>
+            <Alert.Description fontSize="14px">{description}</Alert.Description>
             <Spacer />
             <Button
               size="sm"
@@ -135,7 +131,7 @@ export function BaseProgressToast({
         </VStack>
         {progress}
       </VStack>
-    </Alert>
+    </Alert.Root>
   );
 }
 
@@ -148,15 +144,18 @@ export function OptimizationProgressBar({
 
   return (
     <HStack width="full" gap={4}>
-      <Progress
+      <Progress.Root
         size={size}
         width="full"
         colorPalette="blue"
-        isIndeterminate={isIndeterminate}
-        isAnimated
-        borderRadius="sm"
-        hasStripe
-      />
+        value={undefined}
+      >
+        <Progress.Track>
+          <Progress.Range
+            animation={isIndeterminate ? "progress-indeterminate" : undefined}
+          />
+        </Progress.Track>
+      </Progress.Root>
     </HStack>
   );
 }

@@ -1,4 +1,4 @@
-import { Button, FormErrorMessage, Select } from "@chakra-ui/react";
+import { Button, Field, Select } from "@chakra-ui/react";
 import { type Dataset } from "@prisma/client";
 import {
   type UseFormRegister,
@@ -50,9 +50,9 @@ export function DatasetSelector<T extends { datasetId: string }>({
         ))}
       </Select>
       {errors.datasetId && (
-        <FormErrorMessage>
+        <Field.ErrorText>
           {errors.datasetId.message as ReactNode}
-        </FormErrorMessage>
+        </Field.ErrorText>
       )}
       <Button
         colorPalette="blue"

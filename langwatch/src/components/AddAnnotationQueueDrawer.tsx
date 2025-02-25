@@ -2,14 +2,7 @@ import {
   Avatar,
   Box,
   Button,
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  DrawerHeader,
-  FormControl,
-  FormHelperText,
-  FormLabel,
+  Field,
   HStack,
   Input,
   Spacer,
@@ -17,32 +10,32 @@ import {
   Textarea,
   VStack,
   useDisclosure,
-  useToast,
 } from "@chakra-ui/react";
+import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { useState } from "react";
 import { Plus } from "react-feather";
 import { useForm } from "react-hook-form";
 import slugify from "slugify";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { Drawer } from "../components/ui/drawer";
+import { toaster } from "../components/ui/toaster";
+import { AddAnnotationScoreDrawer } from "./AddAnnotationScoreDrawer";
 import { useDrawer } from "./CurrentDrawer";
 import { FullWidthFormControl } from "./FullWidthFormControl";
 
-import { AddAnnotationScoreDrawer } from "./AddAnnotationScoreDrawer";
-
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
-
 export const AddAnnotationQueueDrawer = ({
+  open = true,
   onClose,
   onOverlayClick,
   queueId,
 }: {
+  open?: boolean;
   onClose?: () => void;
   onOverlayClick?: () => void;
   queueId?: string;
 }) => {
   const { project, organization } = useOrganizationTeamProject();
-  const toast = useToast();
   const createOrUpdateQueue = api.annotation.createOrUpdateQueue.useMutation();
 
   const queue = api.annotation.getQueueBySlugOrId.useQuery(
@@ -92,7 +85,10 @@ export const AddAnnotationQueueDrawer = ({
     formState: { errors },
     reset,
     watch,
-  } = useForm({
+  } = useForm<{
+    name: string;
+    description?: string | null;
+  }>({
     defaultValues: {
       name: queue.data?.name ?? "",
       description: queue.data?.description ?? "",
@@ -124,10 +120,10 @@ export const AddAnnotationQueueDrawer = ({
 
   const onSubmit = (data: FormData) => {
     if (participants.length === 0 || scoreTypes.length === 0) {
-      toast({
+      toaster.create({
         title: "Error",
         description: "Please select at least one participant and score type",
-        status: "error",
+        type: "error",
       });
       return;
     }
@@ -144,27 +140,29 @@ export const AddAnnotationQueueDrawer = ({
         onSuccess: (data) => {
           void queryClient.annotation.getQueues.invalidate();
           void queryClient.annotation.getQueueBySlugOrId.invalidate();
-          toast({
+          toaster.create({
             title: `Annotation Queue ${queueId ? "Updated" : "Created"}`,
             description: `Successfully ${queueId ? "updated" : "created"} ${
               data.name
             } annotation queue`,
-            status: "success",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            type: "success",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
           handleClose();
           reset();
         },
         onError: (error) => {
-          toast({
+          toaster.create({
             title: "Error creating annotation score",
             description: error.message,
-            status: "error",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            type: "error",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
         },
       }
@@ -181,25 +179,25 @@ export const AddAnnotationQueueDrawer = ({
 
   return (
     <>
-      <Drawer
-        isOpen={true}
-        placement="right"
-        size={"lg"}
-        onClose={handleClose}
-        onOverlayClick={handleClose}
+      <Drawer.Root
+        open={open}
+        placement="end"
+        size="lg"
+        onOpenChange={handleClose}
       >
-        <DrawerContent>
-          <DrawerHeader>
+        <Drawer.Backdrop />
+        <Drawer.Content>
+          <Drawer.Header>
             <HStack>
-              <DrawerCloseButton />
+              <Drawer.CloseTrigger />
             </HStack>
             <HStack>
               <Text paddingTop={5} fontSize="2xl">
                 Create Annotation Queue
               </Text>
             </HStack>
-          </DrawerHeader>
-          <DrawerBody>
+          </Drawer.Header>
+          <Drawer.Body>
             {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
             <form onSubmit={handleSubmit(onSubmit)}>
               <VStack align="start">
@@ -230,8 +228,6 @@ export const AddAnnotationQueueDrawer = ({
                     closeMenuOnSelect={false}
                     selectedOptionStyle="check"
                     hideSelectedOptions={true}
-                    useBasicStyles
-                    variant="plain"
                     placeholder="Add Participants"
                     components={{
                       Menu: ({ children, ...props }) => (
@@ -249,11 +245,12 @@ export const AddAnnotationQueueDrawer = ({
                         <chakraComponents.Option {...props}>
                           <VStack align="start">
                             <HStack>
-                              <Avatar
-                                name={props.data.label}
-                                color="white"
-                                size="xs"
-                              />
+                              <Avatar.Root size="xs">
+                                <Avatar.Fallback
+                                  name={props.data.label}
+                                  color="white"
+                                />
+                              </Avatar.Root>
                               <Text>{children}</Text>
                             </HStack>
                           </VStack>
@@ -263,11 +260,12 @@ export const AddAnnotationQueueDrawer = ({
                         <chakraComponents.MultiValueLabel {...props}>
                           <VStack align="start" padding={1} paddingX={0}>
                             <HStack>
-                              <Avatar
-                                name={props.data.label}
-                                color="white"
-                                size="xs"
-                              />
+                              <Avatar.Root size="xs">
+                                <Avatar.Fallback
+                                  name={props.data.label}
+                                  color="white"
+                                />
+                              </Avatar.Root>
                               <Text>{children}</Text>
                             </HStack>
                           </VStack>
@@ -280,26 +278,26 @@ export const AddAnnotationQueueDrawer = ({
                 <FullWidthFormControl
                   label="Name Annotation Queue"
                   helper="Give it a name to identify this annotation queue"
-                  isInvalid={!!errors.name}
+                  invalid={!!errors.name}
                 >
                   <Input {...register("name")} required />
-                  {slug && <FormHelperText>slug: {slug}</FormHelperText>}
+                  {slug && <Field.HelperText>slug: {slug}</Field.HelperText>}
                 </FullWidthFormControl>
 
                 <FullWidthFormControl
                   label="Description"
                   helper="Provide a description of the annotation"
-                  isInvalid={!!errors.description}
+                  invalid={!!errors.description}
                 >
                   <Textarea {...register("description")} required />
                 </FullWidthFormControl>
 
-                <FormControl>
+                <Field.Root>
                   <VStack align="start" gap={1}>
-                    <FormLabel margin={0}>Score Type</FormLabel>
-                    <FormHelperText margin={0}>
+                    <Field.Label margin={0}>Score Type</Field.Label>
+                    <Field.HelperText margin={0}>
                       Select the score type for this annotation queue
-                    </FormHelperText>
+                    </Field.HelperText>
                     <Box
                       border="1px solid lightgray"
                       borderRadius={5}
@@ -328,8 +326,6 @@ export const AddAnnotationQueueDrawer = ({
                         closeMenuOnSelect={false}
                         selectedOptionStyle="check"
                         hideSelectedOptions={true}
-                        useBasicStyles
-                        variant="plain"
                         placeholder="Add Score Type"
                         components={{
                           Menu: ({ children, ...props }) => (
@@ -382,11 +378,10 @@ export const AddAnnotationQueueDrawer = ({
                                   width="100%"
                                   colorPalette="blue"
                                   onClick={scoreTypeDrawerOpen.onOpen}
-                                  leftIcon={<Plus />}
                                   variant="outline"
                                   size="sm"
                                 >
-                                  Add New
+                                  <Plus /> Add New
                                 </Button>
                               </Box>
                             </chakraComponents.MenuList>
@@ -395,7 +390,7 @@ export const AddAnnotationQueueDrawer = ({
                       />
                     </Box>
                   </VStack>
-                </FormControl>
+                </Field.Root>
                 <HStack width="full">
                   <Spacer />
                   <Button
@@ -408,21 +403,23 @@ export const AddAnnotationQueueDrawer = ({
                 </HStack>
               </VStack>
             </form>
-          </DrawerBody>
-        </DrawerContent>
-      </Drawer>
-      <Drawer
-        isOpen={scoreTypeDrawerOpen.isOpen}
-        placement="right"
-        size={"lg"}
-        onClose={scoreTypeDrawerOpen.onClose}
-        onOverlayClick={scoreTypeDrawerOpen.onClose}
+          </Drawer.Body>
+        </Drawer.Content>
+      </Drawer.Root>
+      <Drawer.Root
+        open={scoreTypeDrawerOpen.open}
+        placement="end"
+        size="lg"
+        onOpenChange={({ open }) => scoreTypeDrawerOpen.setOpen(open)}
       >
-        <AddAnnotationScoreDrawer
-          onClose={scoreTypeDrawerOpen.onClose}
-          onOverlayClick={scoreTypeDrawerOpen.onClose}
-        />
-      </Drawer>
+        <Drawer.Backdrop />
+        <Drawer.Content>
+          <AddAnnotationScoreDrawer
+            onClose={scoreTypeDrawerOpen.onClose}
+            onOverlayClick={scoreTypeDrawerOpen.onClose}
+          />
+        </Drawer.Content>
+      </Drawer.Root>
     </>
   );
 };

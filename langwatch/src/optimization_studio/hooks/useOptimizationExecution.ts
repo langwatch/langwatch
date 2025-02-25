@@ -1,15 +1,13 @@
-import { useToast } from "@chakra-ui/react";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import type { StudioClientEvent } from "../types/events";
 import { useSocketClient } from "./useSocketClient";
 import { useWorkflowStore } from "./useWorkflowStore";
 import type { OPTIMIZERS } from "../types/optimizers";
+import { toaster } from "~/components/ui/toaster";
 
 export const useOptimizationExecution = () => {
   const { sendMessage, socketStatus } = useSocketClient();
-
-  const toast = useToast();
 
   const [triggerTimeout, setTriggerTimeout] = useState<{
     run_id: string;
@@ -25,16 +23,18 @@ export const useOptimizationExecution = () => {
 
   const socketAvailable = useCallback(() => {
     if (socketStatus !== "connected") {
-      toast({
+      toaster.create({
         title: "Studio is not connected",
-        status: "error",
+        type: "error",
         duration: 5000,
-        isClosable: true,
+        meta: {
+          closable: true,
+        },
       });
       return false;
     }
     return true;
-  }, [socketStatus, toast]);
+  }, [socketStatus]);
 
   useEffect(() => {
     const workflow = getWorkflow();
@@ -48,18 +48,20 @@ export const useOptimizationExecution = () => {
         error: "Timeout",
         timestamps: { finished_at: Date.now() },
       });
-      toast({
+      toaster.create({
         title: `Timeout ${
           triggerTimeout.timeout_on_status === "waiting"
             ? "starting"
             : "stopping"
         } optimization execution`,
-        status: "error",
+        type: "error",
         duration: 5000,
-        isClosable: true,
+        meta: {
+          closable: true,
+        },
       });
     }
-  }, [triggerTimeout, setOptimizationState, getWorkflow, toast]);
+  }, [triggerTimeout, setOptimizationState, getWorkflow]);
 
   const startOptimizationExecution = useCallback(
     ({

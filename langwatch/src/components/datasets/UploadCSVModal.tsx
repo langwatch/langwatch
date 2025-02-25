@@ -135,7 +135,7 @@ export function UploadCSVModal({
       </Modal>
       <AddOrEditDatasetDrawer
         datasetToSave={uploadedDataset}
-        isOpen={addDatasetDrawer.isOpen}
+        open={addDatasetDrawer.isOpen}
         onClose={() => {
           addDatasetDrawer.onClose();
           onClose();
