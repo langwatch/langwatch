@@ -140,7 +140,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                   paddingTop="20px"
                 >
                   <Text paddingY="6px" marginBottom="38px">
-                    <Markdown className="markdown markdown-conversation-history">
+                    <Markdown className="markdown">
                       {translationState.translatedTextInput &&
                       translationState.translationActive
                         ? translationState.translatedTextInput
@@ -179,7 +179,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                       isPythonRepr(trace.output.value)) ? (
                     <MessageCardJsonOutput value={trace.output.value} />
                   ) : trace.output?.value ? (
-                    <Markdown className="markdown markdown-conversation-history">
+                    <Markdown className="markdown">
                       {translationState.translatedTextOutput &&
                       translationState.translationActive
                         ? translationState.translatedTextOutput
