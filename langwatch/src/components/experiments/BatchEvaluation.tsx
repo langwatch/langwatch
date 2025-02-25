@@ -1,23 +1,15 @@
-import { DownloadIcon } from "@chakra-ui/icons";
 import {
   Box,
   Button,
   Card,
-  CardBody,
   Container,
   HStack,
   Heading,
+  Icon,
   Skeleton,
   Spacer,
   Table,
-  TableContainer,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
   VStack,
 } from "@chakra-ui/react";
 import type { BatchEvaluation, Experiment, Project } from "@prisma/client";
@@ -25,7 +17,9 @@ import type { JsonObject } from "@prisma/client/runtime/library";
 import numeral from "numeral";
 import Parse from "papaparse";
 import { api } from "~/utils/api";
+import { Tooltip } from "../../components/ui/tooltip";
 import { formatMoney } from "../../utils/formatMoney";
+import { Download } from "react-feather";
 
 export default function BatchEvaluation({
   project,
@@ -219,7 +213,10 @@ export default function BatchEvaluation({
             variant="ghost"
             onClick={() => evaluations.data && downloadCSV()}
           >
-            Download Results CSV <DownloadIcon marginLeft={2} />
+            Download Results CSV{" "}
+            <Icon marginLeft={2}>
+              <Download />
+            </Icon>
           </Button>
         </HStack>
       </Container>
@@ -233,14 +230,9 @@ export default function BatchEvaluation({
       >
         {Object.entries(averageScoresPerEvaluation).map(
           ([evaluation, score]) => (
-            <Card key={evaluation}>
-              <CardBody>
-                <VStack
-                  align="start"
-                  justify="center"
-                  height="full"
-                  gap={2}
-                >
+            <Card.Root key={evaluation}>
+              <Card.Body>
+                <VStack align="start" justify="center" height="full" gap={2}>
                   <Text color="gray.700" fontSize="15px" fontWeight="500">
                     {evaluation}
                   </Text>
@@ -303,12 +295,12 @@ export default function BatchEvaluation({
                     )}
                   </HStack>
                 </VStack>
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           )
         )}
-        <Card>
-          <CardBody>
+        <Card.Root>
+          <Card.Body>
             <VStack align="start" justify="center" height="full" gap={2}>
               <Text color="gray.700" fontSize="15px" fontWeight="500">
                 Evaluations Cost
@@ -319,10 +311,10 @@ export default function BatchEvaluation({
                   : "-"}
               </Text>
             </VStack>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
+          </Card.Body>
+        </Card.Root>
+        <Card.Root>
+          <Card.Body>
             <VStack align="start" justify="center" height="full" gap={2}>
               <Text color="gray.700" fontSize="15px" fontWeight="500">
                 Runtime
@@ -331,8 +323,8 @@ export default function BatchEvaluation({
                 {runtime ? numeral(runtime / 1000).format("00:00:00") : "-"}
               </Text>
             </VStack>
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
       </HStack>
       <Box
         width="full"
@@ -344,21 +336,25 @@ export default function BatchEvaluation({
       >
         <VStack align="start" minWidth="0">
           {evaluations.isLoading ? (
-            <TableContainer>
-              <Table variant="simple">
-                <Tbody>
+            <Box>
+              <Table.Root
+                variant="line"
+                borderWidth="1px"
+                borderColor="gray.200"
+              >
+                <Table.Body>
                   {Array.from({ length: 3 }).map((_, i) => (
-                    <Tr key={i}>
+                    <Table.Row key={i}>
                       {Array.from({ length: 4 }).map((_, i) => (
-                        <Td key={i}>
+                        <Table.Cell key={i}>
                           <Skeleton height="20px" />
-                        </Td>
+                        </Table.Cell>
                       ))}
-                    </Tr>
+                    </Table.Row>
                   ))}
-                </Tbody>
-              </Table>
-            </TableContainer>
+                </Table.Body>
+              </Table.Root>
+            </Box>
           ) : evaluations.data && evaluations.data.length == 0 ? (
             <Text>No data found</Text>
           ) : (
@@ -382,29 +378,38 @@ export default function BatchEvaluation({
                     <Heading as={"h2"} size="md">
                       {evaluationKey}
                     </Heading>
-                    <TableContainer>
-                      <Table
-                        variant="simple"
-                        border="1px solid"
+                    <Box>
+                      <Table.Root
+                        variant="line"
+                        borderWidth="1px"
                         borderColor="gray.200"
                       >
-                        <Thead>
-                          <Tr>
-                            <Th>Input</Th>
-                            <Th>Output</Th>
-                            {hasExpectedOutput && <Th>Expected Output</Th>}
-                            <Th>Status</Th>
-                            <Th minWidth={120} textAlign="center">
+                        <Table.Header>
+                          <Table.Row>
+                            <Table.ColumnHeader>Input</Table.ColumnHeader>
+                            <Table.ColumnHeader>Output</Table.ColumnHeader>
+                            {hasExpectedOutput && (
+                              <Table.ColumnHeader>
+                                Expected Output
+                              </Table.ColumnHeader>
+                            )}
+                            <Table.ColumnHeader>Status</Table.ColumnHeader>
+                            <Table.ColumnHeader
+                              minWidth={120}
+                              textAlign="center"
+                            >
                               {passedOrScoreMetric[evaluationKey] === "score"
                                 ? "Score"
                                 : "Passed"}
-                            </Th>
-                            {hasDetails && <Th>Details</Th>}
-                            <Th>Cost</Th>
-                            <Th>Created</Th>
-                          </Tr>
-                        </Thead>
-                        <Tbody>
+                            </Table.ColumnHeader>
+                            {hasDetails && (
+                              <Table.ColumnHeader>Details</Table.ColumnHeader>
+                            )}
+                            <Table.ColumnHeader>Cost</Table.ColumnHeader>
+                            <Table.ColumnHeader>Created</Table.ColumnHeader>
+                          </Table.Row>
+                        </Table.Header>
+                        <Table.Body>
                           {evaluations.all.map((evaluation, i) => {
                             const input = ((evaluation?.data as JsonObject)
                               ?.input ?? "") as string;
@@ -415,8 +420,8 @@ export default function BatchEvaluation({
                             )?.expected_output ?? "") as string;
 
                             return (
-                              <Tr key={i}>
-                                <Td>
+                              <Table.Row key={i}>
+                                <Table.Cell>
                                   <Tooltip content={input}>
                                     <Text
                                       lineClamp={2}
@@ -426,8 +431,8 @@ export default function BatchEvaluation({
                                       {input}
                                     </Text>
                                   </Tooltip>
-                                </Td>
-                                <Td>
+                                </Table.Cell>
+                                <Table.Cell>
                                   <Tooltip content={output}>
                                     <Text
                                       lineClamp={2}
@@ -437,9 +442,9 @@ export default function BatchEvaluation({
                                       {output}
                                     </Text>
                                   </Tooltip>
-                                </Td>
+                                </Table.Cell>
                                 {hasExpectedOutput && (
-                                  <Td>
+                                  <Table.Cell>
                                     <Tooltip content={expected_output}>
                                       <Text
                                         lineClamp={2}
@@ -449,9 +454,9 @@ export default function BatchEvaluation({
                                         {expected_output}
                                       </Text>
                                     </Tooltip>
-                                  </Td>
+                                  </Table.Cell>
                                 )}
-                                <Td
+                                <Table.Cell
                                   color={
                                     evaluation.status === "skipped"
                                       ? "yellow.700"
@@ -461,9 +466,9 @@ export default function BatchEvaluation({
                                   }
                                 >
                                   {evaluation.status}
-                                </Td>
+                                </Table.Cell>
                                 {evaluation.status === "processed" ? (
-                                  <Td
+                                  <Table.Cell
                                     textAlign="center"
                                     fontWeight="500"
                                     color={
@@ -483,12 +488,12 @@ export default function BatchEvaluation({
                                       : evaluation.passed
                                       ? "True"
                                       : "False"}
-                                  </Td>
+                                  </Table.Cell>
                                 ) : (
-                                  <Td textAlign="center">-</Td>
+                                  <Table.Cell textAlign="center">-</Table.Cell>
                                 )}
                                 {hasDetails && (
-                                  <Td
+                                  <Table.Cell
                                     maxWidth={300}
                                     color={
                                       evaluation.status === "skipped"
@@ -507,27 +512,27 @@ export default function BatchEvaluation({
                                         {evaluation.details}
                                       </Text>
                                     </Tooltip>
-                                  </Td>
+                                  </Table.Cell>
                                 )}
-                                <Td>
+                                <Table.Cell>
                                   {evaluation.cost
                                     ? formatMoney({
                                         amount: evaluation.cost,
                                         currency: "USD",
                                       })
                                     : "-"}
-                                </Td>
-                                <Td>
+                                </Table.Cell>
+                                <Table.Cell>
                                   {new Date(
                                     evaluation.createdAt
                                   ).toLocaleString()}
-                                </Td>
-                              </Tr>
+                                </Table.Cell>
+                              </Table.Row>
                             );
                           })}
-                        </Tbody>
-                      </Table>
-                    </TableContainer>
+                        </Table.Body>
+                      </Table.Root>
+                    </Box>
                   </VStack>
                 );
               }

@@ -38,6 +38,10 @@ export function useColorMode(): UseColorModeReturn {
 }
 
 export function getComputedCSSVariableValue(variable: string) {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
   let value = getComputedStyle(document.documentElement).getPropertyValue(
     variable
   );

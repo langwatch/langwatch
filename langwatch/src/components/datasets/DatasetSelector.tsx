@@ -1,4 +1,4 @@
-import { Button, Field, Select } from "@chakra-ui/react";
+import { Button, Field, NativeSelect } from "@chakra-ui/react";
 import { type Dataset } from "@prisma/client";
 import {
   type UseFormRegister,
@@ -33,22 +33,25 @@ export function DatasetSelector<T extends { datasetId: string }>({
       helper="Add to an existing dataset or create a new one"
       invalid={!!errors.datasetId}
     >
-      <Select
-        {...register("datasetId" as Path<T>, {
-          required: "Dataset is required",
-        })}
-      >
-        <option value="">Select Dataset</option>
-        {datasets?.map((dataset, index) => (
-          <option
-            key={index}
-            value={dataset.id}
-            selected={dataset.id === localStorageDatasetId}
-          >
-            {dataset.name}
-          </option>
-        ))}
-      </Select>
+      <NativeSelect.Root>
+        <NativeSelect.Field
+          {...register("datasetId" as Path<T>, {
+            required: "Dataset is required",
+          })}
+        >
+          <option value="">Select Dataset</option>
+          {datasets?.map((dataset, index) => (
+            <option
+              key={index}
+              value={dataset.id}
+              selected={dataset.id === localStorageDatasetId}
+            >
+              {dataset.name}
+            </option>
+          ))}
+        </NativeSelect.Field>
+        <NativeSelect.Indicator />
+      </NativeSelect.Root>
       {errors.datasetId && (
         <Field.ErrorText>
           {errors.datasetId.message as ReactNode}

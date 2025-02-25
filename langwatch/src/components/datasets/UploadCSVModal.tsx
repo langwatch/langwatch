@@ -1,13 +1,6 @@
 import {
   Box,
   Button,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
   Spacer,
   Text,
   useDisclosure,
@@ -22,6 +15,7 @@ import { formatFileSize, useCSVReader } from "react-papaparse";
 import type { InMemoryDataset } from "./DatasetTable";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
 import { useDrawer } from "../CurrentDrawer";
+import { Dialog } from "../../components/ui/dialog";
 
 export const MAX_ROWS_LIMIT = 10_000;
 
@@ -62,12 +56,17 @@ export function UploadCSVModal({
 
   return (
     <>
-      <Modal isOpen={localIsOpen} onClose={onClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Upload CSV</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
+      <Dialog.Root
+        open={localIsOpen}
+        onOpenChange={({ open }) => !open && onClose()}
+      >
+        <Dialog.Backdrop />
+        <Dialog.Content>
+          <Dialog.Header>
+            <Dialog.Title>Upload CSV</Dialog.Title>
+            <Dialog.CloseTrigger />
+          </Dialog.Header>
+          <Dialog.Body>
             <CSVReaderComponent
               onUploadAccepted={({ data, acceptedFile }) => {
                 const columns: DatasetColumns = (data[0] ?? []).map(
@@ -104,9 +103,9 @@ export function UploadCSVModal({
                   rows or contact support.
                 </Text>
               )}
-          </ModalBody>
+          </Dialog.Body>
 
-          <ModalFooter>
+          <Dialog.Footer>
             {onCreateFromScratch && (
               <Button
                 variant="plain"
@@ -121,7 +120,7 @@ export function UploadCSVModal({
             <Spacer />
             <Button
               colorPalette="blue"
-              isDisabled={
+              disabled={
                 !uploadedDataset ||
                 uploadedDataset.datasetRecords.length === 0 ||
                 uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT
@@ -130,12 +129,12 @@ export function UploadCSVModal({
             >
               Upload
             </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog.Root>
       <AddOrEditDatasetDrawer
         datasetToSave={uploadedDataset}
-        open={addDatasetDrawer.isOpen}
+        open={addDatasetDrawer.open}
         onClose={() => {
           addDatasetDrawer.onClose();
           onClose();

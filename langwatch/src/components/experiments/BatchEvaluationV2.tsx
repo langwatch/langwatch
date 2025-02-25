@@ -1,18 +1,14 @@
 import {
   Alert,
-  AlertIcon,
   Box,
   Button,
   Card,
-  CardBody,
-  CardHeader,
   HStack,
   Heading,
   Skeleton,
   Spacer,
   Spinner,
   Text,
-  Tooltip,
   VStack,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
@@ -22,6 +18,8 @@ import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, ExternalLink } from "react-feather";
+import { Link } from "../../components/ui/link";
+import { Tooltip } from "../../components/ui/tooltip";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { VersionBox } from "../../optimization_studio/components/History";
 import type { AppRouter } from "../../server/api/root";
@@ -80,13 +78,7 @@ export function BatchEvaluationV2({
         justify="space-between"
         minWidth="0"
       >
-        <VStack
-          align="start"
-          width="full"
-          height="full"
-          gap={8}
-          padding={6}
-        >
+        <VStack align="start" width="full" height="full" gap={8} padding={6}>
           <HStack width="full" align="end" gap={4}>
             <Heading as="h1" size="lg">
               {experiment.name ?? experiment.slug}
@@ -95,26 +87,27 @@ export function BatchEvaluationV2({
             <Button
               size="sm"
               colorPalette="blue"
-              leftIcon={<Download size={16} />}
               onClick={() => void downloadCSV()}
               disabled={!isDownloadCSVEnabled}
               marginBottom="-6px"
             >
-              Export to CSV
+              <Download size={16} /> Export to CSV
             </Button>
             {experiment.workflowId && (
-              <Button
-                as={"a"}
-                size="sm"
+              <Link
                 target="_blank"
                 href={`/${project.slug}/studio/${experiment.workflowId}`}
-                leftIcon={<ExternalLink size={16} />}
-                textDecoration="none"
-                marginBottom="-6px"
-                colorPalette="orange"
+                asChild
               >
-                Open Workflow
-              </Button>
+                <Button
+                  size="sm"
+                  textDecoration="none"
+                  marginBottom="-6px"
+                  colorPalette="orange"
+                >
+                  <ExternalLink size={16} /> Open Workflow
+                </Button>
+              </Link>
             )}
           </HStack>
           {batchEvaluationRuns.isLoading ||
@@ -122,30 +115,30 @@ export function BatchEvaluationV2({
             batchEvaluationRuns.error.data?.httpStatus == 404) ? (
             <Skeleton width="100%" height="30px" />
           ) : batchEvaluationRuns.error ? (
-            <Alert status="error">
-              <AlertIcon />
+            <Alert.Root status="error">
+              <Alert.Indicator />
               Error loading experiment runs
-            </Alert>
+            </Alert.Root>
           ) : batchEvaluationRuns.data?.runs.length === 0 ? (
             <Text>Waiting for results...</Text>
           ) : (
             <>
-              <Card width="100%">
-                <CardHeader>
+              <Card.Root width="100%">
+                <Card.Header>
                   <Heading as="h2" size="md">
                     {selectedRun?.workflow_version?.commitMessage ??
                       "Evaluation Results"}
                   </Heading>
-                </CardHeader>
-                <CardBody paddingTop={0}>
+                </Card.Header>
+                <Card.Body paddingTop={0}>
                   <BatchEvaluationV2EvaluationResults
                     project={project}
                     experiment={experiment}
                     runId={selectedRun?.run_id}
                     isFinished={isFinished}
                   />
-                </CardBody>
-              </Card>
+                </Card.Body>
+              </Card.Root>
             </>
           )}
         </VStack>
@@ -303,10 +296,10 @@ export function BatchEvaluationV2RunList({
           ))}
         </>
       ) : batchEvaluationRuns.error ? (
-        <Alert status="error">
-          <AlertIcon />
+        <Alert.Root status="error">
+          <Alert.Indicator />
           Error loading experiment runs
-        </Alert>
+        </Alert.Root>
       ) : batchEvaluationRuns.data?.runs.length === 0 ? (
         <Text paddingX={6} paddingY={4}>
           Waiting for runs...
@@ -409,7 +402,10 @@ export function BatchEvaluationV2RunList({
                       .map((evaluation, index) => (
                         <>
                           {index > 0 && <Text>·</Text>}
-                          <Tooltip content={evaluation.name}>
+                          <Tooltip
+                            content={evaluation.name}
+                            positioning={{ placement: "top" }}
+                          >
                             <Text>
                               {formatEvaluationSummary(evaluation, true)}
                             </Text>
