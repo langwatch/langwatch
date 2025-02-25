@@ -1,13 +1,12 @@
 import {
   Avatar,
-  Box,
   Container,
   Heading,
   HStack,
   Text,
-  Tooltip,
   VStack,
 } from "@chakra-ui/react";
+import { Tooltip } from "~/components/ui/tooltip";
 
 import { useRouter } from "next/router";
 
@@ -25,7 +24,7 @@ export default function Annotations() {
 
   const queue = api.annotation.getQueueBySlugOrId.useQuery(
     {
-      projectId: project?.id as string,
+      projectId: project?.id ?? "",
       slug: slug as string,
     },
     { enabled: !!project?.id }
@@ -54,8 +53,10 @@ export default function Annotations() {
           <Text fontSize="sm">Members: </Text>
           {queueMembers?.map((member) => {
             return (
-              <Tooltip content={member.name}>
-                <Avatar name={member.name ?? ""} size="xs" />
+              <Tooltip key={member.id} content={member.name}>
+                <Avatar.Root size="xs">
+                  <Avatar.Fallback name={member.name ?? ""} />
+                </Avatar.Root>
               </Tooltip>
             );
           })}
@@ -78,7 +79,7 @@ export default function Annotations() {
           noDataTitle="No queued annotations for this queue"
           noDataDescription="Add a message to this queue to get started."
           tableHeader={<QueueHeader />}
-          queueId={queue.data?.id as string}
+          queueId={queue.data?.id ?? ""}
         />
       </Container>
     </AnnotationsLayout>

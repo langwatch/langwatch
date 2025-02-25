@@ -71,7 +71,7 @@ export function DatasetUpload({
           )}
         <Button
           colorPalette="blue"
-          isDisabled={
+          disabled={
             !uploadedDataset ||
             uploadedDataset.datasetRecords.length === 0 ||
             uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT

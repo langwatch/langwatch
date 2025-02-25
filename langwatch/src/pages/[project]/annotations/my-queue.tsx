@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Image,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Spacer, Text, VStack, HStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { DashboardLayout } from "../../../components/DashboardLayout";
 
@@ -16,9 +8,9 @@ import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { Conversation } from "../messages/[trace]/index";
 import { useMemo } from "react";
 import { TasksDone } from "../../../components/icons/TasksDone";
+import { Conversation } from "../../../components/messages/Conversation";
 
 export default function TraceAnnotations() {
   const router = useRouter();
@@ -129,14 +121,16 @@ const AnnotationQueuePicker = ({
         projectId: project?.id ?? "",
       },
       {
-        onSuccess: async () => {
-          await refetchQueueItems();
-          const nextItem = queueItems[currentQueueItemIndex + 1];
-          if (nextItem) {
-            navigateToQueue(nextItem.id);
-          } else {
-            await router.replace(`/${project?.slug}/annotations/my-queue`);
-          }
+        onSuccess: () => {
+          void (async () => {
+            await refetchQueueItems();
+            const nextItem = queueItems[currentQueueItemIndex + 1];
+            if (nextItem) {
+              navigateToQueue(nextItem.id);
+            } else {
+              await router.replace(`/${project?.slug}/annotations/my-queue`);
+            }
+          });
         },
       }
     );
@@ -149,7 +143,7 @@ const AnnotationQueuePicker = ({
           <HStack gap={2}>
             <Button
               variant="outline"
-              isDisabled={currentQueueItemIndex === 0}
+              disabled={currentQueueItemIndex === 0}
               onClick={() => {
                 const previousItem = queueItems[currentQueueItemIndex - 1];
                 if (previousItem) {
@@ -161,7 +155,7 @@ const AnnotationQueuePicker = ({
             </Button>
             <Button
               variant="outline"
-              isDisabled={currentQueueItemIndex === queueItems.length - 1}
+              disabled={currentQueueItemIndex === queueItems.length - 1}
               onClick={() => {
                 const nextItem = queueItems[currentQueueItemIndex + 1];
                 if (nextItem) {
@@ -176,16 +170,15 @@ const AnnotationQueuePicker = ({
             {currentQueueItemIndex + 1} of {queueItems.length}
           </Text>
           <Button
-            rightIcon={<Check />}
             colorPalette="blue"
-            isDisabled={
+            disabled={
               currentQueueItem.doneAt !== null || markQueueItemDone.isLoading
             }
             onClick={() => {
-              markQueueItemDoneMoveToNext();
+              void markQueueItemDoneMoveToNext();
             }}
           >
-            Done
+            <Check /> Done
           </Button>
         </HStack>
       </VStack>

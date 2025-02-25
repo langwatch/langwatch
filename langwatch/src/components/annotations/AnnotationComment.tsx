@@ -36,6 +36,7 @@ import { useSession } from "next-auth/react";
 import { useAnnotationCommentStore } from "~/hooks/useAnnotationCommentStore";
 import { ScoreReasonModal } from "../ScoreReasonModal";
 import { toaster } from "../ui/toaster";
+import { RandomColorAvatar } from "../RandomColorAvatar";
 
 type Annotation = {
   isThumbsUp?: string | null;
@@ -239,9 +240,10 @@ export function AnnotationComment({ key = "" }: { key: string }) {
             <VStack align="start" gap={3} width="full">
               <HStack>
                 <Skeleton>
-                  <Avatar.Root size="sm">
-                    <Avatar.Fallback name={session.data?.user.name ?? ""} />
-                  </Avatar.Root>
+                  <RandomColorAvatar
+                    size="sm"
+                    name={session.data?.user.name ?? ""}
+                  />
                 </Skeleton>
                 <Skeleton height="20px" width="120px" />
               </HStack>

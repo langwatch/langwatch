@@ -1,12 +1,5 @@
 import { Link } from "../../components/ui/link";
-import {
-  Card,
-  CardBody,
-  HStack,
-  Heading,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Card, Heading, Text, VStack, HStack } from "@chakra-ui/react";
 import SettingsLayout from "../../components/SettingsLayout";
 import { dependencies } from "../../injection/dependencies.client";
 
@@ -30,8 +23,8 @@ export default function Subscription() {
             Change Subscription
           </Heading>
         </HStack>
-        <Card width="full">
-          <CardBody width="full">
+        <Card.Root width="full">
+          <Card.Body width="full">
             <VStack
               width="full"
               gap={4}
@@ -43,13 +36,13 @@ export default function Subscription() {
                 This is the self-hosted open-source version of LangWatch and all
                 the costs and maintenance are managed by yourself. If you want
                 to use the cloud version, please visit{" "}
-                <Link href="https://langwatch.ai" textDecoration="underline">
+                <Link href="https://langwatch.ai" isExternal>
                   langwatch.ai
                 </Link>
               </Text>
             </VStack>
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
       </VStack>
     </SettingsLayout>
   );

@@ -104,8 +104,8 @@ export const ProjectIntegration = () => {
                         })
                       }
                     >
-                      <HStack align="center" fontSize="18px" gap={2}>
-                        <IconWrapper width="36px" height="36px">
+                      <HStack align="center" gap={2}>
+                        <IconWrapper width="24px" height="24px">
                           {techStackLanguageOptions.python.icon}
                         </IconWrapper>
                         <Text>
@@ -125,8 +125,8 @@ export const ProjectIntegration = () => {
                         })
                       }
                     >
-                      <HStack align="center" fontSize="18px" gap={2}>
-                        <IconWrapper width="36px" height="36px">
+                      <HStack align="center" gap={2}>
+                        <IconWrapper width="24px" height="24px">
                           {techStackLanguageOptions.typescript.icon}
                         </IconWrapper>
                         <Text>
@@ -146,8 +146,8 @@ export const ProjectIntegration = () => {
                         })
                       }
                     >
-                      <HStack align="center" fontSize="18px" gap={2}>
-                        <IconWrapper width="36px" height="36px">
+                      <HStack align="center" gap={2}>
+                        <IconWrapper width="24px" height="24px">
                           {techStackLanguageOptions.other.icon}
                         </IconWrapper>
                         <Text>Custom REST Integration Guide</Text>

@@ -1,37 +1,25 @@
 import {
+  Badge,
   Button,
   Card,
-  CardBody,
   Container,
   HStack,
   Heading,
-  Link,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuList,
   Skeleton,
   Spacer,
   Table,
-  TableContainer,
-  Tag,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
-  Tr,
   useDisclosure,
-  useToast,
 } from "@chakra-ui/react";
 
-import { DeleteIcon, EditIcon } from "@chakra-ui/icons";
 import { useRouter } from "next/router";
 import {
   MoreVertical,
   Play,
   Upload,
   Table as TableIcon,
+  Edit,
+  Trash2,
 } from "react-feather";
 import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
 import { useDrawer } from "../../components/CurrentDrawer";
@@ -42,6 +30,9 @@ import type { DatasetColumns } from "../../server/datasets/types";
 import { UploadCSVModal } from "../../components/datasets/UploadCSVModal";
 import { useState } from "react";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { Link } from "../../components/ui/link";
+import { Menu } from "../../components/ui/menu";
+import { toaster } from "../../components/ui/toaster";
 
 export default function Datasets() {
   const addEditDatasetDrawer = useDisclosure();
@@ -49,7 +40,6 @@ export default function Datasets() {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const { openDrawer } = useDrawer();
-  const toast = useToast();
 
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -72,7 +62,7 @@ export default function Datasets() {
       {
         onSuccess: () => {
           void datasets.refetch();
-          toast({
+          toaster.create({
             title: `Dataset ${name} deleted`,
             description: (
               <HStack>
@@ -81,7 +71,7 @@ export default function Datasets() {
                   variant="plain"
                   textDecoration="underline"
                   onClick={() => {
-                    toast.close(`delete-dataset-${id}`);
+                    toaster.dismiss(`delete-dataset-${id}`);
                     datasetDelete.mutate(
                       {
                         projectId: project?.id ?? "",
@@ -91,13 +81,14 @@ export default function Datasets() {
                       {
                         onSuccess: () => {
                           void datasets.refetch();
-                          toast({
+                          toaster.create({
                             title: "Dataset restored",
                             description: "The dataset has been restored.",
-                            status: "success",
-                            duration: 5000,
-                            isClosable: true,
-                            position: "top-right",
+                            type: "success",
+                            meta: {
+                              closable: true,
+                            },
+                            placement: "top-end",
                           });
                           addEditDatasetDrawer.onClose();
                         },
@@ -110,21 +101,25 @@ export default function Datasets() {
               </HStack>
             ),
             id: `delete-dataset-${id}`,
-            status: "success",
+            type: "success",
             duration: 10_000,
-            isClosable: true,
-            position: "top-right",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
         },
         onError: () => {
-          toast({
+          toaster.create({
             title: "Failed to delete dataset",
             description:
               "There was an error deleting the dataset. Please try again.",
-            status: "error",
+            type: "error",
             duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
         },
       }
@@ -154,21 +149,20 @@ export default function Datasets() {
               });
             }}
             minWidth="fit-content"
-            leftIcon={<Play height={16} />}
           >
-            Batch Evaluation
+            <Play height={16} /> Batch Evaluation
           </Button>
           <Button
             colorPalette="blue"
             onClick={() => uploadCSVModal.onOpen()}
             minWidth="fit-content"
-            leftIcon={<Upload height={17} width={17} strokeWidth={2.5} />}
           >
-            Upload or Create Dataset
+            <Upload height={17} width={17} strokeWidth={2.5} /> Upload or Create
+            Dataset
           </Button>
         </HStack>
-        <Card>
-          <CardBody>
+        <Card.Root>
+          <Card.Body>
             {datasets.data && datasets.data.length == 0 ? (
               <NoDataInfoBlock
                 title="No datasets yet"
@@ -179,7 +173,7 @@ export default function Datasets() {
                     <Link
                       color="orange.400"
                       href="https://docs.langwatch.ai/features/datasets"
-                      target="_blank"
+                      isExternal
                     >
                       documentation
                     </Link>
@@ -189,104 +183,106 @@ export default function Datasets() {
                 icon={<TableIcon />}
               />
             ) : (
-              <TableContainer>
-                <Table variant="simple">
-                  <Thead>
-                    <Tr>
-                      <Th>Name</Th>
-                      <Th>Columns</Th>
-                      <Th>Entries</Th>
-                      <Th width={240}>Last Update</Th>
-                      <Th width={20}></Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {datasets.isLoading
-                      ? Array.from({ length: 3 }).map((_, i) => (
-                          <Tr key={i}>
-                            {Array.from({ length: 4 }).map((_, i) => (
-                              <Td key={i}>
-                                <Skeleton height="20px" />
-                              </Td>
-                            ))}
-                          </Tr>
-                        ))
-                      : datasets.data
-                      ? datasets.data?.map((dataset) => (
-                          <Tr
-                            cursor="pointer"
-                            onClick={() => goToDataset(dataset.id)}
-                            key={dataset.id}
-                          >
-                            <Td>{dataset.name}</Td>
-                            <Td maxWidth="250px">
-                              <HStack wrap="wrap">
-                                {(
-                                  (dataset.columnTypes as DatasetColumns) ?? []
-                                ).map(({ name }) => (
-                                  <Tag size="sm" key={name}>
-                                    {name}
-                                  </Tag>
-                                ))}
-                              </HStack>
-                            </Td>
-                            <Td>{dataset._count.datasetRecords ?? 0}</Td>
-                            <Td>
-                              {new Date(dataset.createdAt).toLocaleString()}
-                            </Td>
-                            <Td>
-                              <Menu>
-                                <MenuButton
-                                  as={Button}
+              <Table.Root variant="line">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Name</Table.ColumnHeader>
+                    <Table.ColumnHeader>Columns</Table.ColumnHeader>
+                    <Table.ColumnHeader>Entries</Table.ColumnHeader>
+                    <Table.ColumnHeader width={240}>
+                      Last Update
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width={20}></Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {datasets.isLoading
+                    ? Array.from({ length: 3 }).map((_, i) => (
+                        <Table.Row key={i}>
+                          {Array.from({ length: 4 }).map((_, i) => (
+                            <Table.Cell key={i}>
+                              <Skeleton height="20px" />
+                            </Table.Cell>
+                          ))}
+                        </Table.Row>
+                      ))
+                    : datasets.data
+                    ? datasets.data?.map((dataset) => (
+                        <Table.Row
+                          cursor="pointer"
+                          onClick={() => goToDataset(dataset.id)}
+                          key={dataset.id}
+                        >
+                          <Table.Cell>{dataset.name}</Table.Cell>
+                          <Table.Cell maxWidth="250px">
+                            <HStack wrap="wrap">
+                              {(
+                                (dataset.columnTypes as DatasetColumns) ?? []
+                              ).map(({ name }) => (
+                                <Badge size="sm" key={name}>
+                                  {name}
+                                </Badge>
+                              ))}
+                            </HStack>
+                          </Table.Cell>
+                          <Table.Cell>
+                            {dataset._count.datasetRecords ?? 0}
+                          </Table.Cell>
+                          <Table.Cell>
+                            {new Date(dataset.createdAt).toLocaleString()}
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Menu.Root>
+                              <Menu.Trigger asChild>
+                                <Button
                                   variant={"ghost"}
                                   onClick={(event) => {
                                     event.stopPropagation();
                                   }}
                                 >
                                   <MoreVertical />
-                                </MenuButton>
-                                <MenuList>
-                                  <MenuItem
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      setEditDataset({
-                                        datasetId: dataset.id,
-                                        name: dataset.name,
-                                        columnTypes:
-                                          dataset.columnTypes as DatasetColumns,
-                                      });
-                                      addEditDatasetDrawer.onOpen();
-                                    }}
-                                    icon={<EditIcon />}
-                                  >
-                                    Edit dataset
-                                  </MenuItem>
-                                  <MenuItem
-                                    color="red.600"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-
-                                      deleteDataset(dataset.id, dataset.name);
-                                    }}
-                                    icon={<DeleteIcon />}
-                                  >
-                                    Delete dataset
-                                  </MenuItem>
-                                </MenuList>
-                              </Menu>
-                            </Td>
-                          </Tr>
-                        ))
-                      : null}
-                  </Tbody>
-                </Table>
-              </TableContainer>
+                                </Button>
+                              </Menu.Trigger>
+                              <Menu.Content>
+                                <Menu.Item
+                                  value="edit"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setEditDataset({
+                                      datasetId: dataset.id,
+                                      name: dataset.name,
+                                      columnTypes:
+                                        dataset.columnTypes as DatasetColumns,
+                                    });
+                                    addEditDatasetDrawer.onOpen();
+                                  }}
+                                >
+                                  <Edit size={16} /> Edit dataset
+                                </Menu.Item>
+                                <Menu.Item
+                                  value="delete"
+                                  color="red.600"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    deleteDataset(dataset.id, dataset.name);
+                                  }}
+                                >
+                                  <Trash2 size={16} /> Delete dataset
+                                </Menu.Item>
+                              </Menu.Content>
+                            </Menu.Root>
+                          </Table.Cell>
+                        </Table.Row>
+                      ))
+                    : null}
+                </Table.Body>
+              </Table.Root>
             )}
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
       </Container>
       <AddOrEditDatasetDrawer
-        open={addEditDatasetDrawer.isOpen}
+        open={addEditDatasetDrawer.open}
         onClose={() => {
           setEditDataset(undefined);
           addEditDatasetDrawer.onClose();
@@ -299,7 +295,7 @@ export default function Datasets() {
         }}
       />
       <UploadCSVModal
-        isOpen={uploadCSVModal.isOpen}
+        isOpen={uploadCSVModal.open}
         onClose={uploadCSVModal.onClose}
         onSuccess={() => {
           void datasets.refetch();

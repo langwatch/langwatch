@@ -13,6 +13,7 @@ export function CopyInput(
   return (
     <InputGroup
       {...props}
+      width="full"
       cursor="pointer"
       onClick={() => {
         if (props.onClick) {

@@ -27,6 +27,7 @@ import { useState } from "react";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "../CurrentDrawer";
 import { NoDataInfoBlock } from "../NoDataInfoBlock";
+import { RandomColorAvatar } from "../RandomColorAvatar";
 
 export const AnnotationsTable = ({
   allQueueItems,
@@ -383,20 +384,16 @@ export const AnnotationsTable = ({
                                         })
                                     >),
                                   ].map((item) => (
-                                    <Avatar.Root
-                                      key={item.user.name}
-                                      size="sm"
+                                    <RandomColorAvatar
+                                      size="2xs"
+                                      name={item.user.name ?? ""}
                                       css={{
                                         border: "2px solid white",
                                         "&:not(:first-of-type)": {
                                           marginLeft: "-20px",
                                         },
                                       }}
-                                    >
-                                      <Avatar.Fallback
-                                        name={item.user.name ?? ""}
-                                      />
-                                    </Avatar.Root>
+                                    />
                                   ))}
                                 </HStack>
                               </Tooltip>

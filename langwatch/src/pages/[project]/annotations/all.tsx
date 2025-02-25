@@ -1,4 +1,3 @@
-import { DownloadIcon } from "@chakra-ui/icons";
 import { Button, Container, HStack, Heading, Spacer } from "@chakra-ui/react";
 import Parse from "papaparse";
 
@@ -16,6 +15,7 @@ import type { Trace } from "~/server/tracer/types";
 import { api } from "~/utils/api";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import type { AppRouter } from "~/server/api/root";
+import { Download } from "react-feather";
 
 export default function Annotations() {
   const { project } = useOrganizationTeamProject();
@@ -83,8 +83,9 @@ export default function Annotations() {
       refetchOnWindowFocus: false,
     }
   );
-  interface GroupedAnnotations {
-    [key: string]: {
+  type GroupedAnnotations = Record<
+    string,
+    {
       traceId: string;
       trace?: Trace;
       annotations: Array<{
@@ -96,8 +97,8 @@ export default function Annotations() {
         createdAt: Date;
         user: User;
       }>;
-    };
-  }
+    }
+  >;
 
   const groupByTraceId = (dataArray: Annotation[]) => {
     return Object.values(
@@ -181,7 +182,7 @@ export default function Annotations() {
         variant="ghost"
         onClick={() => downloadCSV()}
       >
-        Export all <DownloadIcon marginLeft={2} />
+        Export all <Download style={{ marginLeft: "8px" }} />
       </Button>
       <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
     </HStack>

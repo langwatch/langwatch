@@ -8,6 +8,7 @@ import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { useDrawer } from "./CurrentDrawer";
+import { RandomColorAvatar } from "./RandomColorAvatar";
 
 export default function AnnotationsLayout({
   children,
@@ -32,9 +33,12 @@ export default function AnnotationsLayout({
     inbox: <Inbox width={20} height={20} />,
     queues: <Users width={20} height={20} />,
     myQueues: (
-      <Avatar.Root width={5} height={5} size="2xs">
-        <Avatar.Fallback name={user?.name ?? ""} />
-      </Avatar.Root>
+      <RandomColorAvatar
+        size="2xs"
+        width={5}
+        height={5}
+        name={user?.name ?? ""}
+      />
     ),
     all: <Edit width={20} height={20} />,
     done: <Check width={20} height={20} />,

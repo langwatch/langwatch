@@ -1,43 +1,24 @@
-import { DeleteIcon } from "@chakra-ui/icons";
 import {
   Button,
   Card,
-  CardBody,
   Field,
   HStack,
   Heading,
   Input,
   LinkBox,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuList,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
   Spacer,
   Spinner,
   Table,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
   VStack,
   useDisclosure,
-  useToast,
 } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
 import { CopyInput } from "../../components/CopyInput";
 
+import { useState } from "react";
 import {
   Controller,
   useFieldArray,
@@ -45,6 +26,10 @@ import {
   type SubmitHandler,
 } from "react-hook-form";
 import SettingsLayout from "../../components/SettingsLayout";
+import { Dialog } from "../../components/ui/dialog";
+import { Menu } from "../../components/ui/menu";
+import { toaster } from "../../components/ui/toaster";
+import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type {
   OrganizationWithMembersAndTheirTeams,
@@ -52,8 +37,6 @@ import type {
 } from "../../server/api/routers/organization";
 import { type PlanInfo } from "../../server/subscriptionHandler";
 import { api } from "../../utils/api";
-import { useState } from "react";
-import { useRouter } from "next/router";
 
 type Option = { label: string; value: string; description?: string };
 
@@ -114,13 +97,13 @@ function MembersList({
   const queryClient = api.useContext();
 
   const {
-    isOpen: isAddMembersOpen,
+    open: isAddMembersOpen,
     onOpen: onAddMembersOpen,
     onClose: onAddMembersClose,
   } = useDisclosure();
 
   const {
-    isOpen: isInviteLinkOpen,
+    open: isInviteLinkOpen,
     onOpen: onInviteLinkOpen,
     onClose: onInviteLinkClose,
   } = useDisclosure();
@@ -150,8 +133,6 @@ function MembersList({
   const createInvitesMutation = api.organization.createInvites.useMutation();
   const deleteMemberMutation = api.organization.deleteMember.useMutation();
   const deleteInviteMutation = api.organization.deleteInvite.useMutation();
-  const toast = useToast();
-  const router = useRouter();
 
   const [selectedInvites, setSelectedInvites] = useState<
     { inviteCode: string; email: string }[]
@@ -196,13 +177,15 @@ function MembersList({
               ? "All invites have been created."
               : "All invites have been sent.";
 
-          toast({
+          toaster.create({
             title: title,
             description: description,
-            status: "success",
+            type: "success",
             duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
           onAddMembersClose();
           resetForm();
@@ -212,13 +195,15 @@ function MembersList({
           }
         },
         onError: () => {
-          toast({
+          toaster.create({
             title: "Sorry, something went wrong",
             description: "Please try that again",
-            status: "error",
+            type: "error",
             duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
         },
       }
@@ -237,25 +222,29 @@ function MembersList({
       },
       {
         onSuccess: () => {
-          toast({
+          toaster.create({
             title: "Member removed successfully",
             description: "The member has been removed from the organization.",
-            status: "success",
+            type: "success",
             duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
           // how to refect this organizationWithMembers
           void queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate();
         },
         onError: () => {
-          toast({
+          toaster.create({
             title: "Sorry, something went wrong",
             description: "Please try that again",
-            status: "error",
+            type: "error",
             duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
         },
       }
@@ -277,13 +266,15 @@ function MembersList({
       { inviteId, organizationId: organization.id },
       {
         onSuccess: () => {
-          toast({
+          toaster.create({
             title: "Invite deleted successfully",
             description: "The invite has been deleted.",
-            status: "success",
+            type: "success",
             duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
           void pendingInvites.refetch();
         },
@@ -308,8 +299,11 @@ function MembersList({
           <Spacer />
           {!activePlan.overrideAddingLimitations &&
           organization.members.length >= activePlan.maxMembers ? (
-            <Tooltip content="Upgrade your plan to add more members">
-              <Button size="sm" colorPalette="orange" isDisabled={true}>
+            <Tooltip
+              content="Upgrade your plan to add more members"
+              positioning={{ placement: "top" }}
+            >
+              <Button size="sm" colorPalette="orange" disabled={true}>
                 <HStack gap={2}>
                   <Lock size={20} />
                   <Text>Add members</Text>
@@ -329,25 +323,25 @@ function MembersList({
             </Button>
           )}
         </HStack>
-        <Card width="full">
-          <CardBody width="full" paddingY={0} paddingX={0}>
-            <Table variant="simple" width="full">
-              <Thead>
-                <Tr>
-                  <Th>Name</Th>
-                  <Th>Email</Th>
-                  <Th>Role</Th>
-                  <Th>Teams</Th>
-                  <Th>Actions</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
+        <Card.Root width="full">
+          <Card.Body width="full" paddingY={0} paddingX={0}>
+            <Table.Root variant="line" width="full">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Name</Table.ColumnHeader>
+                  <Table.ColumnHeader>Email</Table.ColumnHeader>
+                  <Table.ColumnHeader>Role</Table.ColumnHeader>
+                  <Table.ColumnHeader>Teams</Table.ColumnHeader>
+                  <Table.ColumnHeader>Actions</Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
                 {organization.members.map((member) => (
-                  <LinkBox as="tr" key={member.userId}>
-                    <Td>{member.user.name}</Td>
-                    <Td>{member.user.email}</Td>
-                    <Td>{member.role}</Td>
-                    <Td>
+                  <LinkBox as={Table.Row} key={member.userId}>
+                    <Table.Cell>{member.user.name}</Table.Cell>
+                    <Table.Cell>{member.user.email}</Table.Cell>
+                    <Table.Cell>{member.role}</Table.Cell>
+                    <Table.Cell>
                       {member.user.teamMemberships
                         .flatMap((tmember) => tmember.team)
                         .filter(
@@ -355,35 +349,37 @@ function MembersList({
                         )
                         .map((tmember) => tmember.name)
                         .join(", ")}
-                    </Td>
-                    <Td>
-                      <Menu>
-                        <MenuButton
-                          as={Button}
-                          variant={"ghost"}
-                          // isLoading={
-                          //   deleteGraphs.isLoading &&
-                          //   deleteGraphs.variables?.id === graph.id
-                          // }
-                        >
-                          <MoreVertical />
-                        </MenuButton>
-                        <MenuList>
-                          <MenuItem
-                            color="red.600"
-                            isDisabled={organization.members.length === 1}
-                            onClick={() => deleteMember(member.userId)}
-                            icon={<DeleteIcon />}
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Menu.Root>
+                        <Menu.Trigger asChild>
+                          <Button
+                            variant={"ghost"}
+                            // loading={
+                            //   deleteGraphs.isLoading &&
+                            //   deleteGraphs.variables?.id === graph.id
+                            // }
                           >
+                            <MoreVertical />
+                          </Button>
+                        </Menu.Trigger>
+                        <Menu.Content>
+                          <Menu.Item
+                            value="remove"
+                            color="red.600"
+                            disabled={organization.members.length === 1}
+                            onClick={() => deleteMember(member.userId)}
+                          >
+                            <Trash size={14} style={{ marginRight: "8px" }} />
                             Remove Member
-                          </MenuItem>
-                        </MenuList>
-                      </Menu>
-                    </Td>
+                          </Menu.Item>
+                        </Menu.Content>
+                      </Menu.Root>
+                    </Table.Cell>
                   </LinkBox>
                 ))}
-              </Tbody>
-            </Table>
+              </Table.Body>
+            </Table.Root>
 
             {pendingInvites.data && pendingInvites.data.length > 0 && (
               <>
@@ -391,21 +387,21 @@ function MembersList({
                   Pending Invites
                 </Heading>
 
-                <Table>
-                  <Thead>
-                    <Tr>
-                      <Th>Email</Th>
-                      <Th>Role</Th>
-                      <Th>Teams</Th>
-                      <Th>Actions</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
+                <Table.Root>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeader>Email</Table.ColumnHeader>
+                      <Table.ColumnHeader>Role</Table.ColumnHeader>
+                      <Table.ColumnHeader>Teams</Table.ColumnHeader>
+                      <Table.ColumnHeader>Actions</Table.ColumnHeader>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
                     {pendingInvites.data?.map((invite) => (
-                      <Tr key={invite.id}>
-                        <Td>{invite.email}</Td>
-                        <Td>{invite.role}</Td>
-                        <Td>
+                      <Table.Row key={invite.id}>
+                        <Table.Cell>{invite.email}</Table.Cell>
+                        <Table.Cell>{invite.role}</Table.Cell>
+                        <Table.Cell>
                           {invite.teamIds
                             .split(",")
                             .map(
@@ -413,26 +409,34 @@ function MembersList({
                                 teams.find((team) => team.id == teamId)?.name
                             )
                             .join(", ")}
-                        </Td>
-                        <Td>
-                          <Menu>
-                            <MenuButton as={Button} variant={"ghost"}>
-                              {deleteInviteMutation.isLoading &&
-                              invite.id ===
-                                deleteInviteMutation.variables?.inviteId ? (
-                                <Spinner size="sm" />
-                              ) : (
-                                <MoreVertical />
-                              )}
-                            </MenuButton>
-                            <MenuList>
-                              <MenuItem
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Menu.Root>
+                            <Menu.Trigger asChild>
+                              <Button variant={"ghost"}>
+                                {deleteInviteMutation.isLoading &&
+                                invite.id ===
+                                  deleteInviteMutation.variables?.inviteId ? (
+                                  <Spinner size="sm" />
+                                ) : (
+                                  <MoreVertical />
+                                )}
+                              </Button>
+                            </Menu.Trigger>
+                            <Menu.Content>
+                              <Menu.Item
+                                value="delete"
                                 color="red.600"
                                 onClick={() => deleteInvite(invite.id)}
                               >
+                                <Trash
+                                  size={14}
+                                  style={{ marginRight: "8px" }}
+                                />
                                 Delete
-                              </MenuItem>
-                              <MenuItem
+                              </Menu.Item>
+                              <Menu.Item
+                                value="view"
                                 onClick={() =>
                                   viewInviteLink(
                                     invite.inviteCode,
@@ -440,32 +444,43 @@ function MembersList({
                                   )
                                 }
                               >
+                                <Mail
+                                  size={14}
+                                  style={{ marginRight: "8px" }}
+                                />
                                 View Invite Link
-                              </MenuItem>
-                            </MenuList>
-                          </Menu>
-                        </Td>
-                      </Tr>
+                              </Menu.Item>
+                            </Menu.Content>
+                          </Menu.Root>
+                        </Table.Cell>
+                      </Table.Row>
                     ))}
-                  </Tbody>
-                </Table>
+                  </Table.Body>
+                </Table.Root>
               </>
             )}
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
       </VStack>
 
-      <Modal isOpen={isInviteLinkOpen} onClose={onInviteModalClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>
-            <HStack>
-              <Mail />
-              <Text>Invite Link</Text>
-            </HStack>
-          </ModalHeader>
-          <ModalCloseButton />
-          <ModalBody paddingBottom={6}>
+      <Dialog.Root
+        open={isInviteLinkOpen}
+        onOpenChange={({ open }) =>
+          open ? onInviteLinkOpen() : onInviteModalClose()
+        }
+      >
+        <Dialog.Backdrop />
+        <Dialog.Content>
+          <Dialog.Header>
+            <Dialog.Title>
+              <HStack>
+                <Mail />
+                <Text>Invite Link</Text>
+              </HStack>
+            </Dialog.Title>
+          </Dialog.Header>
+          <Dialog.CloseTrigger />
+          <Dialog.Body paddingBottom={6}>
             <VStack align="start" gap={4}>
               <Text>
                 Send the link below to the users you want to invite to join the
@@ -490,41 +505,52 @@ function MembersList({
                 ))}
               </VStack>
             </VStack>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
+          </Dialog.Body>
+        </Dialog.Content>
+      </Dialog.Root>
 
-      <Modal isOpen={isAddMembersOpen} onClose={onAddMembersClose}>
-        <ModalOverlay />
-        <ModalContent width="100%" maxWidth="1024px">
-          <ModalHeader>Add members</ModalHeader>
-          <ModalCloseButton />
+      <Dialog.Root
+        open={isAddMembersOpen}
+        onOpenChange={({ open }) =>
+          open ? onAddMembersOpen() : onAddMembersClose()
+        }
+      >
+        <Dialog.Backdrop />
+        <Dialog.Content width="100%" maxWidth="1024px">
+          <Dialog.Header>
+            <Dialog.Title>Add members</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.CloseTrigger />
           <form
             onSubmit={(e) => {
               e.preventDefault();
               void handleSubmit(onSubmit)(e);
             }}
           >
-            <ModalBody>
-              <Table variant="simple" width="100%">
-                <Thead>
-                  <Tr>
-                    <Th paddingLeft={0} paddingTop={0}>
+            <Dialog.Body>
+              <Table.Root variant="line" width="100%">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
                       Email
-                    </Th>
-                    <Th paddingLeft={0} paddingTop={0}>
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
                       Role
-                    </Th>
-                    <Th paddingLeft={0} paddingTop={0}>
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
                       Teams
-                    </Th>
-                    <Th paddingLeft={0} paddingRight={0} paddingTop={0}></Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader
+                      paddingLeft={0}
+                      paddingRight={0}
+                      paddingTop={0}
+                    ></Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
                   {fields.map((field, index) => (
-                    <Tr key={field.id}>
-                      <Td paddingLeft={0} paddingY={2}>
+                    <Table.Row key={field.id}>
+                      <Table.Cell paddingLeft={0} paddingY={2}>
                         <Input
                           placeholder="Enter email address"
                           {...register(`invites.${index}.email`, {
@@ -535,8 +561,8 @@ function MembersList({
                           {errors.invites?.[index]?.email &&
                             "Email is required"}
                         </Field.ErrorText>
-                      </Td>
-                      <Td width="24%" paddingLeft={0} paddingY={2}>
+                      </Table.Cell>
+                      <Table.Cell width="24%" paddingLeft={0} paddingY={2}>
                         <Controller
                           control={control}
                           name={`invites.${index}.role`}
@@ -566,7 +592,6 @@ function MembersList({
                               ]}
                               hideSelectedOptions={false}
                               isSearchable={false}
-                              useBasicStyles
                               components={{
                                 Menu: ({ children, ...props }) => (
                                   <chakraComponents.Menu
@@ -603,8 +628,8 @@ function MembersList({
                         <Field.ErrorText>
                           {errors.invites?.[index]?.role && "Role is required"}
                         </Field.ErrorText>
-                      </Td>
-                      <Td width="35%" paddingLeft={0} paddingY={2}>
+                      </Table.Cell>
+                      <Table.Cell width="35%" paddingLeft={0} paddingY={2}>
                         <Controller
                           control={control}
                           name={`invites.${index}.teamOptions`}
@@ -617,13 +642,11 @@ function MembersList({
                               closeMenuOnSelect={false}
                               selectedOptionStyle="check"
                               hideSelectedOptions={false}
-                              useBasicStyles
-                              variant="plain"
                             />
                           )}
                         />
-                      </Td>
-                      <Td paddingLeft={0} paddingRight={0} paddingY={2}>
+                      </Table.Cell>
+                      <Table.Cell paddingLeft={0} paddingRight={0} paddingY={2}>
                         <Button
                           type="button"
                           colorPalette="red"
@@ -631,22 +654,22 @@ function MembersList({
                         >
                           <Trash size={18} />
                         </Button>
-                      </Td>
-                    </Tr>
+                      </Table.Cell>
+                    </Table.Row>
                   ))}
-                </Tbody>
-              </Table>
+                </Table.Body>
+              </Table.Root>
               <Button type="button" onClick={onAddField} marginTop={2}>
                 + Add Another
               </Button>
-            </ModalBody>
-            <ModalFooter>
+            </Dialog.Body>
+            <Dialog.Footer>
               <Button
                 colorPalette={
                   createInvitesMutation.isLoading ? "gray" : "orange"
                 }
                 type="submit"
-                disabled={!!createInvitesMutation.isLoading}
+                disabled={createInvitesMutation.isLoading}
               >
                 <HStack>
                   {createInvitesMutation.isLoading ? (
@@ -657,10 +680,10 @@ function MembersList({
                   <Text>Send invites</Text>
                 </HStack>
               </Button>
-            </ModalFooter>
+            </Dialog.Footer>
           </form>
-        </ModalContent>
-      </Modal>
+        </Dialog.Content>
+      </Dialog.Root>
     </SettingsLayout>
   );
 }

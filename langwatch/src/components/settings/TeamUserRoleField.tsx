@@ -1,20 +1,10 @@
-import {
-  Field,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-  useToast,
-} from "@chakra-ui/react";
+import { Field, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { TeamUserRole } from "@prisma/client";
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
-import {
-  Controller,
-  useForm,
-  type SubmitHandler,
-} from "react-hook-form";
+import { Controller, useForm, type SubmitHandler } from "react-hook-form";
 import type { TeamMemberWithUser } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
+import { toaster } from "../../components/ui/toaster";
 
 export const teamRolesOptions: {
   [K in TeamUserRole]: { label: string; value: K; description: string };
@@ -59,7 +49,6 @@ export const TeamUserRoleField = ({
 
   const updateTeamMemberRoleMutation =
     api.organization.updateTeamMemberRole.useMutation();
-  const toast = useToast();
 
   const onSubmit: SubmitHandler<TeamUserRoleForm> = (data) => {
     updateTeamMemberRoleMutation.mutate(
@@ -70,13 +59,14 @@ export const TeamUserRoleField = ({
       },
       {
         onError: () => {
-          toast({
+          toaster.create({
             title: "Failed to update user role",
             description: "Please try that again",
-            status: "error",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            type: "error",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
           resetForm();
         },
