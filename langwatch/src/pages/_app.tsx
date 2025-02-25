@@ -186,6 +186,9 @@ export const system = createSystem(defaultConfig, {
         switch: {
           value: "pointer",
         },
+        option: {
+          value: "pointer",
+        },
       },
     },
     semanticTokens: {
@@ -504,6 +507,14 @@ export const system = createSystem(defaultConfig, {
             "6xl": {
               content: { maxWidth: "6xl" },
             },
+          },
+        },
+      }),
+      select: defineSlotRecipe({
+        slots: ["trigger"],
+        base: {
+          trigger: {
+            cursor: "pointer",
           },
         },
       }),

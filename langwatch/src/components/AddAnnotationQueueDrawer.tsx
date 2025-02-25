@@ -23,6 +23,7 @@ import { toaster } from "../components/ui/toaster";
 import { AddAnnotationScoreDrawer } from "./AddAnnotationScoreDrawer";
 import { useDrawer } from "./CurrentDrawer";
 import { FullWidthFormControl } from "./FullWidthFormControl";
+import { getColorForString } from "../utils/rotatingColors";
 
 export const AddAnnotationQueueDrawer = ({
   open = true,
@@ -201,79 +202,80 @@ export const AddAnnotationQueueDrawer = ({
             {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
             <form onSubmit={handleSubmit(onSubmit)}>
               <VStack align="start">
-                <Box
-                  border="1px solid lightgray"
-                  borderRadius={5}
-                  paddingX={1}
-                  minWidth="300px"
-                >
-                  <MultiSelect
-                    options={users.data?.members.map((member) => ({
-                      label: member.user.name ?? "",
-                      value: member.user.id,
-                    }))}
-                    onChange={(newValue) => {
-                      setParticipants(
-                        newValue.map((v) => ({
-                          id: v.value,
-                          name: v.label,
-                        }))
-                      );
-                    }}
-                    value={participants.map((p) => ({
-                      value: p.id,
-                      label: p.name ?? "",
-                    }))}
-                    isMulti
-                    closeMenuOnSelect={false}
-                    selectedOptionStyle="check"
-                    hideSelectedOptions={true}
-                    placeholder="Add Participants"
-                    components={{
-                      Menu: ({ children, ...props }) => (
-                        <chakraComponents.Menu
-                          {...props}
-                          innerProps={{
-                            ...props.innerProps,
-                            style: { width: "300px" },
-                          }}
-                        >
-                          {children}
-                        </chakraComponents.Menu>
-                      ),
-                      Option: ({ children, ...props }) => (
-                        <chakraComponents.Option {...props}>
-                          <VStack align="start">
-                            <HStack>
-                              <Avatar.Root size="xs">
-                                <Avatar.Fallback
-                                  name={props.data.label}
-                                  color="white"
-                                />
-                              </Avatar.Root>
-                              <Text>{children}</Text>
-                            </HStack>
-                          </VStack>
-                        </chakraComponents.Option>
-                      ),
-                      MultiValueLabel: ({ children, ...props }) => (
-                        <chakraComponents.MultiValueLabel {...props}>
-                          <VStack align="start" padding={1} paddingX={0}>
-                            <HStack>
-                              <Avatar.Root size="xs">
-                                <Avatar.Fallback
-                                  name={props.data.label}
-                                  color="white"
-                                />
-                              </Avatar.Root>
-                              <Text>{children}</Text>
-                            </HStack>
-                          </VStack>
-                        </chakraComponents.MultiValueLabel>
-                      ),
-                    }}
-                  />
-                </Box>
+                <MultiSelect
+                  options={users.data?.members.map((member) => ({
+                    label: member.user.name ?? "",
+                    value: member.user.id,
+                  }))}
+                  onChange={(newValue) => {
+                    setParticipants(
+                      newValue.map((v) => ({
+                        id: v.value,
+                        name: v.label,
+                      }))
+                    );
+                  }}
+                  value={participants.map((p) => ({
+                    value: p.id,
+                    label: p.name ?? "",
+                  }))}
+                  isMulti
+                  closeMenuOnSelect={false}
+                  selectedOptionStyle="check"
+                  hideSelectedOptions={true}
+                  placeholder="Add Participants"
+                  components={{
+                    Menu: ({ children, ...props }) => (
+                      <chakraComponents.Menu
+                        {...props}
+                        innerProps={{
+                          ...props.innerProps,
+                          style: { width: "300px" },
+                        }}
+                      >
+                        {children}
+                      </chakraComponents.Menu>
+                    ),
+                    Option: ({ children, ...props }) => (
+                      <chakraComponents.Option {...props}>
+                        <VStack align="start">
+                          <HStack>
+                            <Avatar.Root
+                              size="2xs"
+                              color="white"
+                              background={
+                                getColorForString("colors", props.data.label)
+                                  .color
+                              }
+                            >
+                              <Avatar.Fallback name={props.data.label} />
+                            </Avatar.Root>
+                            <Text>{children}</Text>
+                          </HStack>
+                        </VStack>
+                      </chakraComponents.Option>
+                    ),
+                    MultiValueLabel: ({ children, ...props }) => (
+                      <chakraComponents.MultiValueLabel {...props}>
+                        <VStack align="start" padding={1} paddingX={0}>
+                          <HStack>
+                            <Avatar.Root
+                              size="2xs"
+                              color="white"
+                              background={
+                                getColorForString("colors", props.data.label)
+                                  .color
+                              }
+                            >
+                              <Avatar.Fallback name={props.data.label} />
+                            </Avatar.Root>
+                            <Text>{children}</Text>
+                          </HStack>
+                        </VStack>
+                      </chakraComponents.MultiValueLabel>
+                    ),
+                  }}
+                />
 
                 <FullWidthFormControl
                   label="Name Annotation Queue"
@@ -298,97 +300,87 @@ export const AddAnnotationQueueDrawer = ({
                     <Field.HelperText margin={0}>
                       Select the score type for this annotation queue
                     </Field.HelperText>
-                    <Box
-                      border="1px solid lightgray"
-                      borderRadius={5}
-                      paddingX={1}
-                      minWidth="300px"
-                      marginTop={3}
-                    >
-                      <MultiSelect
-                        options={annotationScores.data?.map((score) => ({
-                          label: score.name,
-                          value: score.id,
-                        }))}
-                        onChange={(newValue) => {
-                          setScoreTypes(
-                            newValue.map((v) => ({
-                              id: v.value,
-                              name: v.label,
-                            }))
-                          );
-                        }}
-                        value={scoreTypes.map((v) => ({
-                          value: v.id,
-                          label: v.name ?? "",
-                        }))}
-                        isMulti
-                        closeMenuOnSelect={false}
-                        selectedOptionStyle="check"
-                        hideSelectedOptions={true}
-                        placeholder="Add Score Type"
-                        components={{
-                          Menu: ({ children, ...props }) => (
-                            <chakraComponents.Menu
-                              {...props}
-                              innerProps={{
-                                ...props.innerProps,
-                                style: { width: "300px" },
+
+                    <MultiSelect
+                      options={annotationScores.data?.map((score) => ({
+                        label: score.name,
+                        value: score.id,
+                      }))}
+                      onChange={(newValue) => {
+                        setScoreTypes(
+                          newValue.map((v) => ({
+                            id: v.value,
+                            name: v.label,
+                          }))
+                        );
+                      }}
+                      value={scoreTypes.map((v) => ({
+                        value: v.id,
+                        label: v.name ?? "",
+                      }))}
+                      isMulti
+                      closeMenuOnSelect={false}
+                      selectedOptionStyle="check"
+                      hideSelectedOptions={true}
+                      placeholder="Add Score Type"
+                      components={{
+                        Menu: ({ children, ...props }) => (
+                          <chakraComponents.Menu
+                            {...props}
+                            innerProps={{
+                              ...props.innerProps,
+                              style: { width: "300px" },
+                            }}
+                          >
+                            {children}
+                          </chakraComponents.Menu>
+                        ),
+                        MultiValueLabel: ({ children, ...props }) => (
+                          <chakraComponents.MultiValueLabel {...props}>
+                            <VStack align="start" padding={1} paddingX={0}>
+                              <HStack>
+                                <Text>{props.data.label}</Text>
+                              </HStack>
+                            </VStack>
+                          </chakraComponents.MultiValueLabel>
+                        ),
+                        MenuList: (props) => (
+                          <chakraComponents.MenuList {...props} maxHeight={300}>
+                            <Box
+                              maxH="250px"
+                              overflowY="auto"
+                              css={{
+                                "&::-webkit-scrollbar": {
+                                  display: "none",
+                                },
+                                msOverflowStyle: "none", // IE and Edge
+                                scrollbarWidth: "none", // Firefox
                               }}
                             >
-                              {children}
-                            </chakraComponents.Menu>
-                          ),
-                          MultiValueLabel: ({ children, ...props }) => (
-                            <chakraComponents.MultiValueLabel {...props}>
-                              <VStack align="start" padding={1} paddingX={0}>
-                                <HStack>
-                                  <Text>{props.data.label}</Text>
-                                </HStack>
-                              </VStack>
-                            </chakraComponents.MultiValueLabel>
-                          ),
-                          MenuList: (props) => (
-                            <chakraComponents.MenuList
-                              {...props}
-                              maxHeight={300}
+                              {props.children}
+                            </Box>
+                            <Box
+                              p={2}
+                              position="sticky"
+                              bottom={0}
+                              bg="white"
+                              borderTop="1px solid"
+                              borderColor="gray.100"
                             >
-                              <Box
-                                maxH="250px"
-                                overflowY="auto"
-                                css={{
-                                  "&::-webkit-scrollbar": {
-                                    display: "none",
-                                  },
-                                  msOverflowStyle: "none", // IE and Edge
-                                  scrollbarWidth: "none", // Firefox
-                                }}
+                              <Button
+                                width="100%"
+                                colorPalette="blue"
+                                onClick={scoreTypeDrawerOpen.onOpen}
+                                variant="outline"
+                                size="sm"
                               >
-                                {props.children}
-                              </Box>
-                              <Box
-                                p={2}
-                                position="sticky"
-                                bottom={0}
-                                bg="white"
-                                borderTop="1px solid"
-                                borderColor="gray.100"
-                              >
-                                <Button
-                                  width="100%"
-                                  colorPalette="blue"
-                                  onClick={scoreTypeDrawerOpen.onOpen}
-                                  variant="outline"
-                                  size="sm"
-                                >
-                                  <Plus /> Add New
-                                </Button>
-                              </Box>
-                            </chakraComponents.MenuList>
-                          ),
-                        }}
-                      />
-                    </Box>
+                                <Plus /> Add New
+                              </Button>
+                            </Box>
+                          </chakraComponents.MenuList>
+                        ),
+                      }}
+                    />
                   </VStack>
                 </Field.Root>
                 <HStack width="full">
