@@ -1,12 +1,12 @@
 import {
   Box,
-  Divider,
+  Separator,
   HStack,
   Spacer,
   Text,
-  Tooltip,
   VStack,
 } from "@chakra-ui/react";
+import { Tooltip } from "../../../components/ui/tooltip";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
@@ -85,7 +85,7 @@ export function BatchEvaluationV2EvaluationSummary({
                   {formatEvaluationSummary(evaluation)}
                 </HoverableBigText>
               </VStack>
-              <Divider orientation="vertical" height="48px" />
+              <Separator orientation="vertical" height="48px" />
             </>
           );
         })}
@@ -132,7 +132,7 @@ export function BatchEvaluationV2EvaluationSummary({
             />
           </Text>
         </VStack>
-        <Divider orientation="vertical" height="48px" />
+        <Separator orientation="vertical" height="48px" />
         <VStack align="start" gap={1}>
           <HoverableBigText fontWeight="500" lineClamp={1} expandable={false}>
             Mean Duration
@@ -156,6 +156,7 @@ export function BatchEvaluationV2EvaluationSummary({
                 </Text>
               </VStack>
             }
+            positioning={{ placement: "top" }}
           >
             <Text>
               {formatMilliseconds(
@@ -165,7 +166,7 @@ export function BatchEvaluationV2EvaluationSummary({
             </Text>
           </Tooltip>
         </VStack>
-        <Divider orientation="vertical" height="48px" />
+        <Separator orientation="vertical" height="48px" />
         <VStack align="start" gap={1}>
           <HoverableBigText fontWeight="500" lineClamp={1} expandable={false}>
             Total Cost
@@ -209,7 +210,7 @@ export function BatchEvaluationV2EvaluationSummary({
             />
           </Text>
         </VStack>
-        <Divider orientation="vertical" height="48px" />
+        <Separator orientation="vertical" height="48px" />
         <VStack align="start" gap={1}>
           <Text fontWeight="500" lineClamp={1}>
             Runtime

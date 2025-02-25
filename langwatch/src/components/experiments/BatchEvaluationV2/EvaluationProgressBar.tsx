@@ -19,17 +19,19 @@ export function EvaluationProgressBar({
       {!isIndeterminate && size !== "xs" && (
         <Text whiteSpace="nowrap">{Math.round((progress / total) * 100)}%</Text>
       )}
-      <Progress
+      <Progress.Root
         size={size}
         width="full"
         colorPalette="blue"
-        isIndeterminate={isIndeterminate}
-        isAnimated
+        value={isIndeterminate ? null : progress}
         borderRadius="sm"
-        value={progress}
         max={total ? total : undefined}
-        hasStripe
-      />
+        animated
+      >
+        <Progress.Track>
+          <Progress.Range />
+        </Progress.Track>
+      </Progress.Root>
       {!isIndeterminate && size !== "xs" && (
         <Text whiteSpace="nowrap">
           {progress} / {total}

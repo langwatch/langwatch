@@ -1,34 +1,23 @@
 import {
   Alert,
-  AlertIcon,
   Box,
   Button,
   Card,
-  CardBody,
-  CardHeader,
   Center,
-  Divider,
+  Field,
   HStack,
   Heading,
+  Icon,
+  NativeSelect,
+  Separator,
   Skeleton,
   Spacer,
   Spinner,
-  Switch,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
   Table,
   Tabs,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
-  Tr,
   VStack,
-  useTheme,
-  Tooltip as ChakraTooltip,
+  useDisclosure,
 } from "@chakra-ui/react";
 import type { Experiment, Project, WorkflowVersion } from "@prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
@@ -67,6 +56,8 @@ import { RenderInputOutput } from "../traces/RenderInputOutput";
 import { titleCase } from "../../utils/stringCasing";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { LLMIcon } from "../icons/LLMIcon";
+import { Switch } from "../ui/switch";
+import { getComputedCSSVariableValue } from "../ui/color-mode";
 
 export function DSPyExperiment({
   project,
@@ -118,17 +109,17 @@ export function DSPyExperiment({
           {dspyRuns.isLoading ? (
             <Skeleton width="100%" height="30px" />
           ) : dspyRuns.error ? (
-            <Alert status="error">
-              <AlertIcon />
+            <Alert.Root>
+              <Alert.Indicator />
               Error loading experiment runs
-            </Alert>
+            </Alert.Root>
           ) : dspyRuns.data?.length === 0 ? (
             <Text>Waiting for the first completed step to arrive...</Text>
           ) : (
             dspyRuns.data && (
               <>
-                <Card width="100%">
-                  <CardHeader>
+                <Card.Root width="100%">
+                  <Card.Header>
                     <Heading as="h2" size="md">
                       {optimizerNames.length == 1
                         ? optimizerNames[0]!
@@ -136,8 +127,8 @@ export function DSPyExperiment({
                         ? "Multiple Optimizers"
                         : "Waiting for the first completed step to arrive..."}
                     </Heading>
-                  </CardHeader>
-                  <CardBody>
+                  </Card.Header>
+                  <Card.Body>
                     <DSPyRunsScoresChart
                       dspyRuns={dspyRuns.data}
                       selectedPoint={selectedPoint}
@@ -147,13 +138,13 @@ export function DSPyExperiment({
                       stepToDisplay={stepToDisplay}
                       labelNames={labelNames}
                     />
-                  </CardBody>
-                </Card>
+                  </Card.Body>
+                </Card.Root>
                 {stepToDisplay &&
                   (!highlightedRun ||
                     highlightedRun === stepToDisplay.run_id) && (
-                    <Card width="100%">
-                      <CardBody padding={0}>
+                    <Card.Root width="100%">
+                      <Card.Body padding={0}>
                         <RunDetails
                           project={project}
                           experiment={experiment}
@@ -162,8 +153,8 @@ export function DSPyExperiment({
                             runsById?.[stepToDisplay.run_id]?.workflow_version
                           }
                         />
-                      </CardBody>
-                    </Card>
+                      </Card.Body>
+                    </Card.Root>
                   )}
               </>
             )
@@ -379,10 +370,10 @@ export function DSPyExperimentRunList({
           ))}
         </>
       ) : dspyRuns.error ? (
-        <Alert status="error">
-          <AlertIcon />
+        <Alert.Root>
+          <Alert.Indicator />
           Error loading experiment runs
-        </Alert>
+        </Alert.Root>
       ) : dspyRuns.data?.length === 0 ? (
         <Text paddingX={6} paddingY={4}>
           Waiting for runs...
@@ -443,12 +434,7 @@ export function DSPyExperimentRunList({
               {!dspyRuns.data?.find((r) => r.runId === run.runId) ? (
                 <>
                   <VersionBox minWidth={hasAnyVersion ? "48px" : "0"} />
-                  <VStack
-                    align="start"
-                    gap={2}
-                    width="100%"
-                    paddingRight={2}
-                  >
+                  <VStack align="start" gap={2} width="100%" paddingRight={2}>
                     <HStack width="100%">
                       <Skeleton width="100%" height="12px" />
                       <Spinner size="xs" />
@@ -476,12 +462,7 @@ export function DSPyExperimentRunList({
                       }
                     />
                   )}
-                  <VStack
-                    width="full"
-                    align="start"
-                    gap={0}
-                    paddingRight={2}
-                  >
+                  <VStack width="full" align="start" gap={0} paddingRight={2}>
                     <HStack width="full">
                       {run.workflow_version && (
                         <Box
@@ -631,9 +612,9 @@ export const RunDetails = React.memo(
             </HStack>
           </HStack>
         )}
-        <Tabs
-          index={tabIndex}
-          onChange={setTabIndex}
+        <Tabs.Root
+          value={tabIndex.toString()}
+          onValueChange={(e) => setTabIndex(parseInt(e.value))}
           size={size}
           width="full"
           height="full"
@@ -641,7 +622,7 @@ export const RunDetails = React.memo(
           flexDirection="column"
           minWidth="0"
         >
-          <TabList
+          <Tabs.List
             position="relative"
             overflowX="auto"
             overflowY="hidden"
@@ -663,24 +644,26 @@ export const RunDetails = React.memo(
               <Box position="absolute" top={0} right={4}>
                 <HStack>
                   <Text>Raw</Text>
-                  <Switch
-                    isChecked={displayRawParams}
-                    onChange={() => setDisplayRawParams(!displayRawParams)}
-                  />
+                  <Field.Root>
+                    <Switch
+                      checked={displayRawParams}
+                      onChange={() => setDisplayRawParams(!displayRawParams)}
+                    />
+                  </Field.Root>
                 </HStack>
               </Box>
             )}
-            <Tab>
+            <Tabs.Trigger value="0">
               Predictors{" "}
               {dspyStep.data && `(${dspyStep.data.predictors.length})`}
-            </Tab>
-            <Tab>
+            </Tabs.Trigger>
+            <Tabs.Trigger value="1">
               Evaluations{" "}
               {dspyStep.data && `(${dspyStep.data.examples.length})`}
-            </Tab>
-            <Tab>
+            </Tabs.Trigger>
+            <Tabs.Trigger value="2">
               LLM Calls {dspyStep.data && `(${dspyStep.data.llm_calls.length})`}
-            </Tab>
+            </Tabs.Trigger>
             {size === "sm" && (
               <>
                 <Spacer />
@@ -700,14 +683,14 @@ export const RunDetails = React.memo(
                       "$0.00[00]"
                     )}
                   </Text>
-                  <Divider orientation="vertical" />
+                  <Separator orientation="vertical" />
                   <Text>
                     Step Tokens:{" "}
                     {numeral(
                       dspyStepSummary.llm_calls_summary.total_tokens
                     ).format("0a")}
                   </Text>
-                  <Divider orientation="vertical" />
+                  <Separator orientation="vertical" />
                   <Text>
                     {dspyStepSummary.label === "score"
                       ? "Step " + dspyStepSummary.label
@@ -717,320 +700,351 @@ export const RunDetails = React.memo(
                 </HStack>
               </>
             )}
-          </TabList>
+          </Tabs.List>
 
-          <TabPanels
+          <Tabs.Content
+            value="0"
             width="full"
             height="full"
             minWidth="0"
             overflowX="auto"
             display="flex"
+            padding={0}
+            paddingTop={displayRawParams ? 4 : 0}
           >
-            <TabPanel padding={0} paddingTop={displayRawParams ? 4 : 0}>
-              {dspyStep.isLoading ? (
-                <Skeleton width="100%" height="30px" />
-              ) : dspyStep.error ? (
-                <Alert status="error">
-                  <AlertIcon />
-                  Error loading step data
-                </Alert>
-              ) : dspyStep.data && displayRawParams ? (
-                <RenderInputOutput
-                  value={JSON.stringify(dspyStep.data?.predictors)}
-                  collapseStringsAfterLength={140}
-                />
-              ) : dspyStep.data ? (
-                <Table
-                  height="fit-content"
-                  size={size === "sm" ? "xs" : "sm"}
-                  variant="grid"
-                >
-                  <Thead>
-                    <Tr>
-                      <Th minWidth="15px" maxWidth="15px" paddingY={3}></Th>
-                      <Th width="10%" paddingY={3}>
-                        Name
-                      </Th>
-                      <Th width="25%" paddingY={3}>
-                        Instructions
-                      </Th>
-                      <Th width="25%" paddingY={3}>
-                        Signature
-                      </Th>
-                      <Th width="40%" paddingY={3}>
-                        Demonstrations
-                      </Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {dspyStep.isLoading ? (
-                      Array.from({ length: 3 }).map((_, index) => (
-                        <Tr key={index}>
-                          <Td background="gray.50">&nbsp;</Td>
-                          <Td>
-                            <Skeleton width="100%" height="30px" />
-                          </Td>
-                          <Td>
-                            <Skeleton width="100%" height="30px" />
-                          </Td>
-                          <Td>
-                            <Skeleton width="100%" height="30px" />
-                          </Td>
-                          <Td>
-                            <Skeleton width="100%" height="30px" />
-                          </Td>
-                        </Tr>
-                      ))
-                    ) : dspyStep.error ? (
-                      <Tr>
-                        <Td colSpan={5} color="red.600">
-                          Error loading step data
-                        </Td>
-                      </Tr>
-                    ) : dspyStep.data.predictors.length === 0 ? (
-                      <Tr>
-                        <Td colSpan={5}>No entries</Td>
-                      </Tr>
-                    ) : dspyStep.data ? (
-                      dspyStep.data.predictors.map(
-                        ({ name, predictor }, index) => {
-                          const signature =
-                            predictor?.extended_signature ??
-                            predictor?.signature;
-                          return (
-                            <Tr key={index}>
-                              <Td background="gray.50" textAlign="center">
-                                {index + 1}
-                              </Td>
-                              <Td>{name}</Td>
-                              <Td whiteSpace="pre-wrap">
-                                {signature?.instructions ?? "-"}
-                              </Td>
-                              <Td>
-                                <CollapsableSignature signature={signature} />
-                              </Td>
-                              <Td>
-                                {predictor?.demos ? (
-                                  <RenderInputOutput
-                                    value={JSON.stringify(
-                                      predictor.demos.map((demo: any) =>
-                                        demo._store ? demo._store : demo
-                                      )
-                                    )}
-                                    collapseStringsAfterLength={140}
-                                    shouldCollapse={(field) => {
-                                      return field.type === "array";
-                                    }}
-                                    displayObjectSize={true}
-                                  />
-                                ) : (
-                                  "-"
-                                )}
-                              </Td>
-                            </Tr>
-                          );
-                        }
-                      )
-                    ) : null}
-                  </Tbody>
-                </Table>
-              ) : null}
-            </TabPanel>
-            <TabPanel padding={0}>
-              {tabIndex === 1 && (
-                <Table
-                  height="fit-content"
-                  size={size === "sm" ? "xs" : "sm"}
-                  variant="grid"
-                >
-                  <Thead>
-                    <Tr>
-                      <Th minWidth="15px" maxWidth="15px" paddingY={3}></Th>
-                      <Th width="30%" paddingY={3}>
-                        Example
-                      </Th>
-                      <Th width="50%" paddingY={3}>
-                        Prediction
-                      </Th>
-                      <Th width="20%" paddingY={3}>
-                        Score
-                      </Th>
-                      {hasTrace && (
-                        <Th minWidth="200px" paddingY={3}>
-                          Trace
-                        </Th>
-                      )}
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {dspyStep.isLoading ? (
-                      Array.from({ length: 3 }).map((_, index) => (
-                        <Tr key={index}>
-                          <Td background="gray.50">&nbsp;</Td>
-                          <Td>
-                            <Skeleton width="100%" height="30px" />
-                          </Td>
-                          <Td>
-                            <Skeleton width="100%" height="30px" />
-                          </Td>
-                          <Td>
-                            <Skeleton width="100%" height="30px" />
-                          </Td>
-                        </Tr>
-                      ))
-                    ) : dspyStep.error ? (
-                      <Tr>
-                        <Td colSpan={4} color="red.600">
-                          Error loading step data
-                        </Td>
-                      </Tr>
-                    ) : dspyStep.data.examples.length === 0 ? (
-                      <Tr>
-                        <Td colSpan={4}>No entries</Td>
-                      </Tr>
-                    ) : dspyStep.data ? (
-                      dspyStep.data.examples.map((example, index) => (
-                        <Tr key={index}>
-                          <Td background="gray.50" textAlign="center">
-                            {index + 1}
-                          </Td>
-                          <Td>
-                            <RenderInputOutput
-                              value={JSON.stringify(example.example)}
-                              collapseStringsAfterLength={140}
-                            />
-                          </Td>
-                          <Td>
-                            <RenderInputOutput
-                              value={JSON.stringify(example.pred)}
-                              collapseStringsAfterLength={140}
-                            />
-                          </Td>
-                          <Td>{example.score}</Td>
-                          {hasTrace && (
-                            <Td>
-                              <RenderInputOutput
-                                value={JSON.stringify(example.trace)}
-                                collapseStringsAfterLength={140}
-                                collapsed={true}
-                              />
-                            </Td>
-                          )}
-                        </Tr>
-                      ))
-                    ) : null}
-                  </Tbody>
-                </Table>
-              )}
-            </TabPanel>
-            <TabPanel padding={0}>
-              <Table
+            {dspyStep.isLoading ? (
+              <Skeleton width="100%" height="30px" />
+            ) : dspyStep.error ? (
+              <Alert.Root>
+                <Alert.Indicator />
+                Error loading step data
+              </Alert.Root>
+            ) : dspyStep.data && displayRawParams ? (
+              <RenderInputOutput
+                value={JSON.stringify(dspyStep.data?.predictors)}
+                collapseStringsAfterLength={140}
+              />
+            ) : dspyStep.data ? (
+              <Table.Root
                 height="fit-content"
+                // @ts-ignore
                 size={size === "sm" ? "xs" : "sm"}
-                variant="grid"
+                variant="line"
               >
-                <Thead>
-                  <Tr>
-                    <Th minWidth="15px" maxWidth="15px" paddingY={3}></Th>
-                    <Th width="20%" paddingY={3}>
-                      Model
-                    </Th>
-                    <Th width="25%" paddingY={3}>
-                      Messages
-                    </Th>
-                    <Th width="45%" paddingY={3}>
-                      Response
-                    </Th>
-                    <Th width="10%" paddingY={3}>
-                      Cost
-                    </Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader
+                      minWidth="15px"
+                      maxWidth="15px"
+                      paddingY={3}
+                    ></Table.ColumnHeader>
+                    <Table.ColumnHeader width="10%" paddingY={3}>
+                      Name
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="25%" paddingY={3}>
+                      Instructions
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="25%" paddingY={3}>
+                      Signature
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="40%" paddingY={3}>
+                      Demonstrations
+                    </Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
                   {dspyStep.isLoading ? (
                     Array.from({ length: 3 }).map((_, index) => (
-                      <Tr key={index}>
-                        <Td background="gray.50">&nbsp;</Td>
-                        <Td>
+                      <Table.Row key={index}>
+                        <Table.Cell background="gray.50">&nbsp;</Table.Cell>
+                        <Table.Cell>
                           <Skeleton width="100%" height="30px" />
-                        </Td>
-                        <Td>
+                        </Table.Cell>
+                        <Table.Cell>
                           <Skeleton width="100%" height="30px" />
-                        </Td>
-                        <Td>
+                        </Table.Cell>
+                        <Table.Cell>
                           <Skeleton width="100%" height="30px" />
-                        </Td>
-                        <Td>
+                        </Table.Cell>
+                        <Table.Cell>
                           <Skeleton width="100%" height="30px" />
-                        </Td>
-                      </Tr>
+                        </Table.Cell>
+                      </Table.Row>
                     ))
                   ) : dspyStep.error ? (
-                    <Tr>
-                      <Td colSpan={6} color="red.600">
+                    <Table.Row>
+                      <Table.Cell colSpan={5} color="red.600">
                         Error loading step data
-                      </Td>
-                    </Tr>
-                  ) : dspyStep.data.llm_calls.length === 0 ? (
-                    <Tr>
-                      <Td colSpan={6}>No entries</Td>
-                    </Tr>
+                      </Table.Cell>
+                    </Table.Row>
+                  ) : dspyStep.data.predictors.length === 0 ? (
+                    <Table.Row>
+                      <Table.Cell colSpan={5}>No entries</Table.Cell>
+                    </Table.Row>
                   ) : dspyStep.data ? (
-                    dspyStep.data.llm_calls.map((llmCall, index) => {
-                      const response =
-                        llmCall.response?.choices?.[0]?.message?.content ??
-                        llmCall.response?.output;
-                      return (
-                        <Tr key={index}>
-                          <Td background="gray.50" textAlign="center">
-                            {index + 1}
-                          </Td>
-                          <Td>{llmCall.model}</Td>
-                          <Td>
-                            <RenderInputOutput
-                              value={JSON.stringify(
-                                llmCall.response?.prompt ??
-                                  llmCall.response?.messages
+                    dspyStep.data.predictors.map(
+                      ({ name, predictor }, index) => {
+                        const signature =
+                          predictor?.extended_signature ?? predictor?.signature;
+                        return (
+                          <Table.Row key={index}>
+                            <Table.Cell background="gray.50" textAlign="center">
+                              {index + 1}
+                            </Table.Cell>
+                            <Table.Cell>{name}</Table.Cell>
+                            <Table.Cell whiteSpace="pre-wrap">
+                              {signature?.instructions ?? "-"}
+                            </Table.Cell>
+                            <Table.Cell>
+                              <CollapsableSignature signature={signature} />
+                            </Table.Cell>
+                            <Table.Cell>
+                              {predictor?.demos ? (
+                                <RenderInputOutput
+                                  value={JSON.stringify(
+                                    predictor.demos.map((demo: any) =>
+                                      demo._store ? demo._store : demo
+                                    )
+                                  )}
+                                  collapseStringsAfterLength={140}
+                                  shouldCollapse={(field) => {
+                                    return field.type === "array";
+                                  }}
+                                  displayObjectSize={true}
+                                />
+                              ) : (
+                                "-"
                               )}
+                            </Table.Cell>
+                          </Table.Row>
+                        );
+                      }
+                    )
+                  ) : null}
+                </Table.Body>
+              </Table.Root>
+            ) : null}
+          </Tabs.Content>
+          <Tabs.Content
+            value="1"
+            width="full"
+            height="full"
+            minWidth="0"
+            overflowX="auto"
+            display="flex"
+            padding={0}
+          >
+            {tabIndex === 1 && (
+              <Table.Root
+                height="fit-content"
+                // @ts-ignore
+                size={size === "sm" ? "xs" : "sm"}
+                variant="line"
+              >
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader
+                      minWidth="15px"
+                      maxWidth="15px"
+                      paddingY={3}
+                    ></Table.ColumnHeader>
+                    <Table.ColumnHeader width="30%" paddingY={3}>
+                      Example
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="50%" paddingY={3}>
+                      Prediction
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="20%" paddingY={3}>
+                      Score
+                    </Table.ColumnHeader>
+                    {hasTrace && (
+                      <Table.ColumnHeader minWidth="200px" paddingY={3}>
+                        Trace
+                      </Table.ColumnHeader>
+                    )}
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {dspyStep.isLoading ? (
+                    Array.from({ length: 3 }).map((_, index) => (
+                      <Table.Row key={index}>
+                        <Table.Cell background="gray.50">&nbsp;</Table.Cell>
+                        <Table.Cell>
+                          <Skeleton width="100%" height="30px" />
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Skeleton width="100%" height="30px" />
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Skeleton width="100%" height="30px" />
+                        </Table.Cell>
+                      </Table.Row>
+                    ))
+                  ) : dspyStep.error ? (
+                    <Table.Row>
+                      <Table.Cell colSpan={4} color="red.600">
+                        Error loading step data
+                      </Table.Cell>
+                    </Table.Row>
+                  ) : dspyStep.data.examples.length === 0 ? (
+                    <Table.Row>
+                      <Table.Cell colSpan={4}>No entries</Table.Cell>
+                    </Table.Row>
+                  ) : dspyStep.data ? (
+                    dspyStep.data.examples.map((example, index) => (
+                      <Table.Row key={index}>
+                        <Table.Cell background="gray.50" textAlign="center">
+                          {index + 1}
+                        </Table.Cell>
+                        <Table.Cell>
+                          <RenderInputOutput
+                            value={JSON.stringify(example.example)}
+                            collapseStringsAfterLength={140}
+                          />
+                        </Table.Cell>
+                        <Table.Cell>
+                          <RenderInputOutput
+                            value={JSON.stringify(example.pred)}
+                            collapseStringsAfterLength={140}
+                          />
+                        </Table.Cell>
+                        <Table.Cell>{example.score}</Table.Cell>
+                        {hasTrace && (
+                          <Table.Cell>
+                            <RenderInputOutput
+                              value={JSON.stringify(example.trace)}
                               collapseStringsAfterLength={140}
                               collapsed={true}
                             />
-                          </Td>
-                          <Td>
-                            {response ? (
-                              response
-                            ) : (
-                              <RenderInputOutput
-                                value={JSON.stringify(llmCall.response)}
-                                collapseStringsAfterLength={140}
-                                collapsed={true}
-                              />
-                            )}
-                          </Td>
-                          <Td>
-                            {llmCall.cost ? (
-                              formatMoney(
-                                { amount: llmCall.cost, currency: "USD" },
-                                "$0.00[0000]"
-                              )
-                            ) : llmCall.response.cached ? (
-                              <HStack align="start">
-                                <Text>$0.00</Text>
-                                <Text color="gray.400">(cached)</Text>
-                              </HStack>
-                            ) : (
-                              "-"
-                            )}
-                          </Td>
-                        </Tr>
-                      );
-                    })
+                          </Table.Cell>
+                        )}
+                      </Table.Row>
+                    ))
                   ) : null}
-                </Tbody>
-              </Table>
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
+                </Table.Body>
+              </Table.Root>
+            )}
+          </Tabs.Content>
+          <Tabs.Content
+            value="2"
+            width="full"
+            height="full"
+            minWidth="0"
+            overflowX="auto"
+            display="flex"
+            padding={0}
+          >
+            <Table.Root
+              height="fit-content"
+              // @ts-ignore
+              size={size === "sm" ? "xs" : "sm"}
+              variant="line"
+            >
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader
+                    minWidth="15px"
+                    maxWidth="15px"
+                    paddingY={3}
+                  ></Table.ColumnHeader>
+                  <Table.ColumnHeader width="20%" paddingY={3}>
+                    Model
+                  </Table.ColumnHeader>
+                  <Table.ColumnHeader width="25%" paddingY={3}>
+                    Messages
+                  </Table.ColumnHeader>
+                  <Table.ColumnHeader width="45%" paddingY={3}>
+                    Response
+                  </Table.ColumnHeader>
+                  <Table.ColumnHeader width="10%" paddingY={3}>
+                    Cost
+                  </Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {dspyStep.isLoading ? (
+                  Array.from({ length: 3 }).map((_, index) => (
+                    <Table.Row key={index}>
+                      <Table.Cell background="gray.50">&nbsp;</Table.Cell>
+                      <Table.Cell>
+                        <Skeleton width="100%" height="30px" />
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Skeleton width="100%" height="30px" />
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Skeleton width="100%" height="30px" />
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Skeleton width="100%" height="30px" />
+                      </Table.Cell>
+                    </Table.Row>
+                  ))
+                ) : dspyStep.error ? (
+                  <Table.Row>
+                    <Table.Cell colSpan={6} color="red.600">
+                      Error loading step data
+                    </Table.Cell>
+                  </Table.Row>
+                ) : dspyStep.data.llm_calls.length === 0 ? (
+                  <Table.Row>
+                    <Table.Cell colSpan={6}>No entries</Table.Cell>
+                  </Table.Row>
+                ) : dspyStep.data ? (
+                  dspyStep.data.llm_calls.map((llmCall, index) => {
+                    const response =
+                      llmCall.response?.choices?.[0]?.message?.content ??
+                      llmCall.response?.output;
+                    return (
+                      <Table.Row key={index}>
+                        <Table.Cell background="gray.50" textAlign="center">
+                          {index + 1}
+                        </Table.Cell>
+                        <Table.Cell>{llmCall.model}</Table.Cell>
+                        <Table.Cell>
+                          <RenderInputOutput
+                            value={JSON.stringify(
+                              llmCall.response?.prompt ??
+                                llmCall.response?.messages
+                            )}
+                            collapseStringsAfterLength={140}
+                            collapsed={true}
+                          />
+                        </Table.Cell>
+                        <Table.Cell>
+                          {response ? (
+                            response
+                          ) : (
+                            <RenderInputOutput
+                              value={JSON.stringify(llmCall.response)}
+                              collapseStringsAfterLength={140}
+                              collapsed={true}
+                            />
+                          )}
+                        </Table.Cell>
+                        <Table.Cell>
+                          {llmCall.cost ? (
+                            formatMoney(
+                              { amount: llmCall.cost, currency: "USD" },
+                              "$0.00[0000]"
+                            )
+                          ) : llmCall.response.cached ? (
+                            <HStack align="start">
+                              <Text>$0.00</Text>
+                              <Text color="gray.400">(cached)</Text>
+                            </HStack>
+                          ) : (
+                            "-"
+                          )}
+                        </Table.Cell>
+                      </Table.Row>
+                    );
+                  })
+                ) : null}
+              </Table.Body>
+            </Table.Root>
+          </Tabs.Content>
+        </Tabs.Root>
       </VStack>
     );
   },
@@ -1059,11 +1073,9 @@ function CollapsableSignature({
           fontWeight="normal"
           variant="ghost"
           onClick={() => setIsOpen(!isOpen)}
-          rightIcon={
-            isOpen ? <ChevronUp width="12px" /> : <ChevronDown width="12px" />
-          }
         >
           {signature?.signature ?? "-"}
+          {isOpen ? <ChevronUp width="12px" /> : <ChevronDown width="12px" />}
         </Button>
       </HStack>
       {isOpen && signature?.fields ? (
@@ -1143,13 +1155,14 @@ export function DSPyRunsScoresChart({
     return 0;
   });
 
-  const theme = useTheme();
   const getColor = (runId: string) => {
     const [name, number] = getColorForString("colors", runId).color.split(".");
     if (!name || !number) {
-      return theme.colors.gray[300];
+      return getComputedCSSVariableValue("--chakra-colors-gray-300");
     }
-    return theme.colors[name][number];
+
+    const cssVariable = `--chakra-colors-${name}-${number}`;
+    return getComputedCSSVariableValue(cssVariable);
   };
 
   const [hoveredRunIndex, setHoveredRunIndex] = useState<{
@@ -1243,7 +1256,7 @@ export function DSPyRunsScoresChart({
             }}
           />
           <Tooltip
-            contentFormatter={(value) => `Step ${value}`}
+            labelFormatter={(value) => `Step ${value}`}
             formatter={(value, name, props) => {
               const label = props.payload[`${name}_label`];
               const version = props.payload[`${name}_version`];
@@ -1267,7 +1280,7 @@ export function DSPyRunsScoresChart({
                 value="Best"
                 position="top"
                 offset={10}
-                fill={theme.colors.gray[700]}
+                fill={getComputedCSSVariableValue("--chakra-colors-gray-700")}
                 fontSize="12px"
               />
             </ReferenceDot>
@@ -1378,7 +1391,7 @@ export function DSPyExperimentSummary({
           {numeral(bestScore).format("0.[00]")}
         </Text>
       </VStack>
-      <Divider orientation="vertical" height="48px" />
+      <Separator orientation="vertical" height="48px" />
       <VStack align="start" gap={1}>
         <Text fontWeight="500" lineClamp={1}>
           Total Cost
@@ -1398,47 +1411,44 @@ export function DSPyExperimentSummary({
         </Button>
       )}
       {bestScoreStep.data && onApply && (
-        <ChakraTooltip label="Applies the optimization that resulted in the best score for this run to your workflow">
-          <Button
-            size="md"
-            colorPalette="green"
-            leftIcon={<LLMIcon />}
-            onClick={() => {
-              if (!bestScoreStep.data) return;
-              const appliedOptimizations: AppliedOptimization[] =
-                bestScoreStep.data.predictors.map((predictor) => {
-                  const optimization: AppliedOptimization = {
-                    id: predictor.name,
-                    instructions:
-                      predictor.predictor.extended_signature?.instructions ??
-                      predictor.predictor.signature?.instructions,
-                    fields: Object.entries(
-                      predictor.predictor.signature?.fields ?? {}
-                    ).map(([key, value]: [string, any]) => {
-                      const field: AppliedOptimizationField = {
-                        identifier: key,
-                        field_type: value.field_type ?? "input",
-                        prefix: value.prefix,
-                        desc: value.desc,
-                      };
+        <Button
+          size="md"
+          colorPalette="green"
+          onClick={() => {
+            if (!bestScoreStep.data) return;
+            const appliedOptimizations: AppliedOptimization[] =
+              bestScoreStep.data.predictors.map((predictor) => {
+                const optimization: AppliedOptimization = {
+                  id: predictor.name,
+                  instructions:
+                    predictor.predictor.extended_signature?.instructions ??
+                    predictor.predictor.signature?.instructions,
+                  fields: Object.entries(
+                    predictor.predictor.signature?.fields ?? {}
+                  ).map(([key, value]: [string, any]) => {
+                    const field: AppliedOptimizationField = {
+                      identifier: key,
+                      field_type: value.field_type ?? "input",
+                      prefix: value.prefix,
+                      desc: value.desc,
+                    };
 
-                      return field;
-                    }),
-                    demonstrations: predictor.predictor.demos
-                      ?.map((demo: any) => demo._store ?? demo)
-                      .filter(Boolean),
-                  };
-                  return optimization;
-                });
+                    return field;
+                  }),
+                  demonstrations: predictor.predictor.demos
+                    ?.map((demo: any) => demo._store ?? demo)
+                    .filter(Boolean),
+                };
+                return optimization;
+              });
 
-              if (onApply) {
-                onApply(appliedOptimizations);
-              }
-            }}
-          >
-            Apply Optimization
-          </Button>
-        </ChakraTooltip>
+            if (onApply) {
+              onApply(appliedOptimizations);
+            }
+          }}
+        >
+          <LLMIcon /> Apply Optimization
+        </Button>
       )}
     </HStack>
   );
