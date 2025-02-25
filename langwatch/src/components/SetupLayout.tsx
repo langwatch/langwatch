@@ -1,7 +1,6 @@
 import {
   Box,
   Card,
-  CardBody,
   Container,
   HStack,
   Spacer,
@@ -14,7 +13,7 @@ import { LogOut } from "react-feather";
 
 export const SetupLayout = ({
   children,
-  maxWidth = "container.sm",
+  maxWidth = "780px",
 }: PropsWithChildren<{ maxWidth?: string }>) => {
   return (
     <Box
@@ -34,9 +33,9 @@ export const SetupLayout = ({
         </Button>
       </HStack>
       <Container maxWidth={maxWidth}>
-        <Card>
-          <CardBody>{children}</CardBody>
-        </Card>
+        <Card.Root>
+          <Card.Body>{children}</Card.Body>
+        </Card.Root>
       </Container>
     </Box>
   );

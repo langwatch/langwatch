@@ -100,8 +100,11 @@ function SignInForm() {
       toaster.create({
         title: "Error",
         description: "Failed to sign up",
-        status: "error",
-        duration: 5000,
+        type: "error",
+        placement: "top-end",
+        meta: {
+          closable: true,
+        },
       });
     }
   };
@@ -131,9 +134,7 @@ function SignInForm() {
               <HorizontalFormControl
                 label="Password"
                 helper="Enter your password"
-                invalid={
-                  form.formState.errors.password?.message !== undefined
-                }
+                invalid={form.formState.errors.password?.message !== undefined}
               >
                 <Input type="password" {...form.register("password")} />
               </HorizontalFormControl>
@@ -149,7 +150,10 @@ function SignInForm() {
               )}
               <HStack width="full" paddingTop={4}>
                 <Box asChild>
-                  <Link href="/auth/signup" style={{ textDecoration: "underline" }}>
+                  <Link
+                    href="/auth/signup"
+                    style={{ textDecoration: "underline" }}
+                  >
                     Register new account
                   </Link>
                 </Box>

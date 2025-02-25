@@ -24,6 +24,7 @@ import { AddAnnotationScoreDrawer } from "./AddAnnotationScoreDrawer";
 import { useDrawer } from "./CurrentDrawer";
 import { FullWidthFormControl } from "./FullWidthFormControl";
 import { getColorForString } from "../utils/rotatingColors";
+import { RandomColorAvatar } from "./RandomColorAvatar";
 
 export const AddAnnotationQueueDrawer = ({
   open = true,
@@ -240,16 +241,10 @@ export const AddAnnotationQueueDrawer = ({
                       <chakraComponents.Option {...props}>
                         <VStack align="start">
                           <HStack>
-                            <Avatar.Root
+                            <RandomColorAvatar
                               size="2xs"
-                              color="white"
-                              background={
-                                getColorForString("colors", props.data.label)
-                                  .color
-                              }
-                            >
-                              <Avatar.Fallback name={props.data.label} />
-                            </Avatar.Root>
+                              name={props.data.label}
+                            />
                             <Text>{children}</Text>
                           </HStack>
                         </VStack>
@@ -259,16 +254,10 @@ export const AddAnnotationQueueDrawer = ({
                       <chakraComponents.MultiValueLabel {...props}>
                         <VStack align="start" padding={1} paddingX={0}>
                           <HStack>
-                            <Avatar.Root
+                            <RandomColorAvatar
                               size="2xs"
-                              color="white"
-                              background={
-                                getColorForString("colors", props.data.label)
-                                  .color
-                              }
-                            >
-                              <Avatar.Fallback name={props.data.label} />
-                            </Avatar.Root>
+                              name={props.data.label}
+                            />
                             <Text>{children}</Text>
                           </HStack>
                         </VStack>

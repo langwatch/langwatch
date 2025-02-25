@@ -1,11 +1,12 @@
 import { Switch as ChakraSwitch } from "@chakra-ui/react";
 import * as React from "react";
 
-export interface SwitchProps extends ChakraSwitch.RootProps {
+export interface SwitchProps extends Omit<ChakraSwitch.RootProps, "onChange"> {
   inputProps?: React.InputHTMLAttributes<HTMLInputElement>;
   rootRef?: React.Ref<HTMLLabelElement>;
   trackLabel?: { on: React.ReactNode; off: React.ReactNode };
   thumbLabel?: { on: React.ReactNode; off: React.ReactNode };
+  onChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
@@ -16,7 +17,7 @@ export const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
     return (
       <ChakraSwitch.Root
         ref={rootRef}
-        {...rest}
+        {...(rest as ChakraSwitch.RootProps)}
         colorPalette={rest.colorPalette ?? "blue"}
       >
         <ChakraSwitch.HiddenInput ref={ref} {...inputProps} />

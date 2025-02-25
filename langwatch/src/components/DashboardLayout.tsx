@@ -901,7 +901,7 @@ export const DashboardLayout = ({
           <HStack gap={6} flex={1}>
             <Spacer />
             <HStack gap={4}>
-              {integrationsLeft || 1 ? (
+              {integrationsLeft ? (
                 <Popover.Root positioning={{ placement: "bottom-end" }}>
                   <Popover.Trigger>
                     <Button position="relative" variant="ghost">

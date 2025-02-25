@@ -1,27 +1,19 @@
 import {
   Button,
   Card,
-  CardBody,
   HStack,
   Heading,
-  LinkBox,
-  LinkOverlay,
   Spacer,
   Table,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
-  Tr,
   VStack,
 } from "@chakra-ui/react";
-import NextLink from "next/link";
 import { Plus } from "react-feather";
 import SettingsLayout from "../../components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
+import { Link } from "../../components/ui/link";
 
 export default function Teams() {
   const { organization } = useOrganizationTeamProject();
@@ -54,54 +46,48 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
             Teams
           </Heading>
           <Spacer />
-          <Button
-            as={NextLink}
-            href={`/settings/teams/new`}
-            size="sm"
-            colorPalette="orange"
-          >
-            <HStack gap={2}>
+          <Link href={`/settings/teams/new`} asChild>
+            <Button size="sm" colorPalette="orange">
               <Plus size={20} />
               <Text>Add new team</Text>
-            </HStack>
-          </Button>
+            </Button>
+          </Link>
         </HStack>
-        <Card width="full">
-          <CardBody width="full" paddingY={0} paddingX={0}>
-            <Table variant="simple" width="full">
-              <Thead>
-                <Tr>
-                  <Th>Name</Th>
-                  <Th>Members</Th>
-                  <Th>Projects</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
+        <Card.Root width="full">
+          <Card.Body width="full" paddingY={0} paddingX={0}>
+            <Table.Root variant="line" width="full">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Name</Table.ColumnHeader>
+                  <Table.ColumnHeader>Members</Table.ColumnHeader>
+                  <Table.ColumnHeader>Projects</Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
                 {teams.map((team) => (
-                  <LinkBox as="tr" key={team.id}>
-                    <Td>
-                      <LinkOverlay
-                        as={NextLink}
+                  <Table.Row key={team.id}>
+                    <Table.Cell>
+                      <Link
                         href={`/settings/teams/${team.slug}`}
                         _hover={{ textDecoration: "underline" }}
                       >
                         {team.name}
-                      </LinkOverlay>
-                    </Td>
-                    <Td>
+                      </Link>
+                    </Table.Cell>
+                    <Table.Cell>
                       {team.members.length}{" "}
                       {team.members.length == 1 ? "member" : "members"}
-                    </Td>
-                    <Td>
+                    </Table.Cell>
+                    <Table.Cell>
                       {team.projects.length}{" "}
                       {team.projects.length == 1 ? "project" : "projects"}
-                    </Td>
-                  </LinkBox>
+                    </Table.Cell>
+                  </Table.Row>
                 ))}
-              </Tbody>
-            </Table>
-          </CardBody>
-        </Card>
+              </Table.Body>
+            </Table.Root>
+          </Card.Body>
+        </Card.Root>
       </VStack>
     </SettingsLayout>
   );

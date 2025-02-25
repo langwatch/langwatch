@@ -2,15 +2,12 @@ import {
   Alert,
   Button,
   Card,
-  CardBody,
-  CardHeader,
   Container,
   HStack,
   Heading,
   Input,
   Spacer,
   VStack,
-  useToast,
 } from "@chakra-ui/react";
 import { Link } from "../../components/ui/link";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,6 +22,7 @@ import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import type { GetServerSidePropsContext } from "next";
 import { api } from "../../utils/api";
+import { toaster } from "../../components/ui/toaster";
 
 export default function SignUp({ session }: { session: Session | null }) {
   const publicEnv = usePublicEnv();
@@ -94,7 +92,6 @@ function SignUpForm() {
 
   const register = api.user.register.useMutation();
   const [signInLoading, setSignInLoading] = useState(false);
-  const toast = useToast();
 
   const onSubmit = async (values: z.infer<typeof schema>) => {
     try {
@@ -111,11 +108,14 @@ function SignUpForm() {
         throw new Error("Network response was not ok");
       }
     } catch (e) {
-      toast({
+      toaster.create({
         title: "Error",
         description: "Failed to sign up",
-        status: "error",
-        duration: 5000,
+        type: "error",
+        placement: "top-end",
+        meta: {
+          closable: true,
+        },
       });
     }
   };
@@ -124,16 +124,16 @@ function SignUpForm() {
     <Container maxW="container.md" marginTop="calc(40vh - 164px)">
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        <Card>
-          <CardHeader>
+        <Card.Root>
+          <Card.Header>
             <HStack gap={4}>
               <LogoIcon width={30.69} height={42} />
               <Heading size="lg" as="h1">
                 Sign up
               </Heading>
             </HStack>
-          </CardHeader>
-          <CardBody>
+          </Card.Header>
+          <Card.Body>
             <VStack width="full">
               <HorizontalFormControl
                 label="Name"
@@ -152,9 +152,7 @@ function SignUpForm() {
               <HorizontalFormControl
                 label="Password"
                 helper="Enter your password"
-                invalid={
-                  form.formState.errors.password?.message !== undefined
-                }
+                invalid={form.formState.errors.password?.message !== undefined}
               >
                 <Input type="password" {...form.register("password")} />
               </HorizontalFormControl>
@@ -168,7 +166,17 @@ function SignUpForm() {
                 <Input type="password" {...form.register("confirmPassword")} />
               </HorizontalFormControl>
               {register.error && (
-                <Alert status="error">{register.error.message}</Alert>
+                <Alert.Root
+                  borderStartWidth="4px"
+                  borderStartColor="colorPalette.solid"
+                  colorPalette="red"
+                >
+                  <Alert.Content>
+                    <Alert.Description>
+                      {register.error.message}
+                    </Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
               )}
               <HStack width="full" paddingTop={4}>
                 <Link href="/auth/signin" textDecoration="underline">
@@ -178,14 +186,14 @@ function SignUpForm() {
                 <Button
                   colorPalette="orange"
                   type="submit"
-                  isLoading={register.isLoading || signInLoading}
+                  loading={register.isLoading || signInLoading}
                 >
                   Sign up
                 </Button>
               </HStack>
             </VStack>
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
       </form>
     </Container>
   );

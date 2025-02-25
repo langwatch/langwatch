@@ -154,12 +154,8 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
             </HorizontalFormControl>
           ))}
           <HStack width="full" justify="end">
-            <Button
-              type="submit"
-              colorPalette="green"
-              rightIcon={<Play size={16} />}
-            >
-              Execute
+            <Button type="submit" colorPalette="green">
+              Execute <Play size={16} />
             </Button>
           </HStack>
         </VStack>

@@ -1,18 +1,14 @@
 import {
   Box,
   Card,
-  CardBody,
-  CardHeader,
-  FormControl,
+  Field,
   HStack,
   Heading,
   Image,
-  ListItem,
-  RadioGroup,
+  List,
   SimpleGrid,
   Spacer,
   Text,
-  UnorderedList,
   VStack,
 } from "@chakra-ui/react";
 import ErrorPage from "next/error";
@@ -83,21 +79,21 @@ export default function ProjectOnboardingSelect() {
       icon: <PuzzleIcon />,
       image: "/images/optimization.png",
       text: (
-        <UnorderedList>
-          <ListItem>
+        <List.Root>
+          <List.Item>
             <b>Ensure quality</b> with a single click
-          </ListItem>
-          <ListItem>
+          </List.Item>
+          <List.Item>
             <b>Upload your datasets</b> for easy performance tracking
-          </ListItem>
-          <ListItem>
+          </List.Item>
+          <List.Item>
             <b>Automatically evaluate</b> the performance of your models
-          </ListItem>
-          <ListItem>
+          </List.Item>
+          <List.Item>
             <b>Optimize</b> your solution using advanced DSPy algorithms in a
             single click
-          </ListItem>
-        </UnorderedList>
+          </List.Item>
+        </List.Root>
       ),
     },
     monitoring: {
@@ -105,21 +101,21 @@ export default function ProjectOnboardingSelect() {
       icon: <TrendingUp />,
       image: "/images/analytics.png",
       text: (
-        <UnorderedList>
-          <ListItem>
+        <List.Root>
+          <List.Item>
             Gain <b>full visibility</b> into your LLM features
-          </ListItem>
-          <ListItem>
+          </List.Item>
+          <List.Item>
             Add <b>evaluations and guardrails</b> from 30+ libraries or{" "}
             <b>build your own</b>
-          </ListItem>
-          <ListItem>
+          </List.Item>
+          <List.Item>
             <b>Get alerts</b> to slack or e-mail of any errors
-          </ListItem>
-          <ListItem>
+          </List.Item>
+          <List.Item>
             Share the performance via <b>Analytics</b> to anyone
-          </ListItem>
-        </UnorderedList>
+          </List.Item>
+        </List.Root>
       ),
     },
   };
@@ -130,49 +126,48 @@ export default function ProjectOnboardingSelect() {
       <form>
         <VStack gap={4} alignItems="left">
           <Heading as="h1" fontSize="x-large">
-            Let’s kick things off by monitoring, evaluating, and optimizing your
-            LLMs! 🚀
+            Let&apos;s kick things off by monitoring, evaluating, and optimizing
+            your LLMs! 🚀
           </Heading>
 
           <Text paddingBottom={4} fontSize="14px">
-            With LangWatch, you’ve got two awesome solutions at your fingertips,
-            and you can totally use both! Just pick one to get started below.
+            With LangWatch, you&apos;ve got two awesome solutions at your
+            fingertips, and you can totally use both! Just pick one to get
+            started below.
             <br />
           </Text>
 
-          <FormControl>
-            <RadioGroup value={""}>
-              <Box>
-                <SimpleGrid columns={[1, null, 2]} gap="20px">
-                  {Object.entries(projectTypes).map(([value, details]) => {
-                    return (
-                      <Box
+          <Field.Root>
+            <Box>
+              <SimpleGrid columns={[1, null, 2]} gap="20px">
+                {Object.entries(projectTypes).map(([value, details]) => {
+                  return (
+                    <Box
+                      key={value}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (createProject.isLoading) return;
+                        void onSubmit(value);
+                      }}
+                      height="100%"
+                      padding={0}
+                      margin={0}
+                    >
+                      <CustomRadio
                         key={value}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          if (createProject.isLoading) return;
-                          void onSubmit(value);
-                        }}
-                        height="100%"
-                        padding={0}
-                        margin={0}
-                      >
-                        <CustomRadio
-                          key={value}
-                          value={value}
-                          heading={details.heading}
-                          text={details.text}
-                          image={details.image}
-                          icon={details.icon}
-                          isDisabled={createProject.isLoading}
-                        />
-                      </Box>
-                    );
-                  })}
-                </SimpleGrid>
-              </Box>
-            </RadioGroup>
-          </FormControl>
+                        value={value}
+                        heading={details.heading}
+                        text={details.text}
+                        image={details.image}
+                        icon={details.icon}
+                        disabled={createProject.isLoading}
+                      />
+                    </Box>
+                  );
+                })}
+              </SimpleGrid>
+            </Box>
+          </Field.Root>
 
           {createProject.error && <p>Something went wrong!</p>}
         </VStack>
@@ -187,14 +182,14 @@ const CustomRadio = ({
   text,
   image,
   icon,
-  isDisabled,
+  disabled,
 }: {
   value: string;
   heading: string;
   text: React.ReactNode;
   image: string;
   icon: React.ReactNode;
-  isDisabled: boolean;
+  disabled: boolean;
 }) => {
   return (
     <Box as="label" key={value} width="50%">
@@ -202,9 +197,9 @@ const CustomRadio = ({
         type="radio"
         value={value}
         style={{ display: "none" }}
-        disabled={isDisabled}
+        disabled={disabled}
       />
-      <Card
+      <Card.Root
         borderWidth="1px"
         height="100%"
         _hover={{
@@ -218,7 +213,7 @@ const CustomRadio = ({
         }}
         _active={{ borderColor: "orange.600" }}
       >
-        <CardHeader>
+        <Card.Header>
           <Heading size="md">
             <HStack>
               {icon}
@@ -226,14 +221,13 @@ const CustomRadio = ({
             </HStack>
           </Heading>
           <HStack padding={6}>
-            {/* {icon} */}
             <Spacer />
             <Image src={image} alt={heading} width="300px" height="200px" />
             <Spacer />
           </HStack>
-        </CardHeader>
-        <CardBody>{text}</CardBody>
-      </Card>
+        </Card.Header>
+        <Card.Body>{text}</Card.Body>
+      </Card.Root>
     </Box>
   );
 };

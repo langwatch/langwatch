@@ -1,45 +1,22 @@
-import { DeleteIcon, EditIcon } from "@chakra-ui/icons";
 import {
   Box,
   Button,
   Card,
-  CardBody,
   Container,
-  HStack,
   Heading,
+  HStack,
   Input,
-  Link,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuList,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  Select,
+  NativeSelect,
   Spacer,
-  Switch,
   Table,
-  TableContainer,
-  Tbody,
-  Td,
   Text,
   Textarea,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
-  VStack,
   useDisclosure,
-  useToast,
+  VStack,
 } from "@chakra-ui/react";
 import type { Check, TriggerAction } from "@prisma/client";
 import { type AlertType } from "@prisma/client";
-import { Bell, Filter, MoreVertical } from "react-feather";
+import { Bell, Edit2, Filter, MoreVertical, Trash } from "react-feather";
 import {
   Controller,
   useForm,
@@ -48,22 +25,27 @@ import {
   type UseFormHandleSubmit,
 } from "react-hook-form";
 import { z } from "zod";
+import { useDrawer } from "~/components/CurrentDrawer";
+import { HoverableBigText } from "~/components/HoverableBigText";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { SmallLabel } from "~/components/SmallLabel";
 import {
   DashboardLayout,
   ProjectSelector,
 } from "../../components/DashboardLayout";
+import { Dialog } from "../../components/ui/dialog";
+import { Link } from "../../components/ui/link";
+import { Menu } from "../../components/ui/menu";
+import { Switch } from "../../components/ui/switch";
+import { toaster } from "../../components/ui/toaster";
+import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
-import { HoverableBigText } from "~/components/HoverableBigText";
-import { useDrawer } from "~/components/CurrentDrawer";
 
 export default function Members() {
   const { project, organizations } = useOrganizationTeamProject();
-  const toast = useToast();
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { open, onOpen, onClose } = useDisclosure();
   const { openDrawer } = useDrawer();
 
   const triggers = api.trigger.getTriggers.useQuery(
@@ -83,7 +65,7 @@ export default function Members() {
     defaultValues: {
       triggerId: "",
       customMessage: "",
-      alertType: "INFO",
+      alertType: "",
       name: "",
     },
   });
@@ -99,12 +81,14 @@ export default function Members() {
           void triggers.refetch();
         },
         onError: () => {
-          toast({
+          toaster.create({
             title: "Update trigger",
-            status: "error",
+            type: "error",
             description: "Failed to update trigger",
-            duration: 6000,
-            isClosable: true,
+            placement: "top-end",
+            meta: {
+              closable: true,
+            },
           });
         },
       }
@@ -131,22 +115,26 @@ export default function Members() {
       { triggerId, projectId: project?.id ?? "" },
       {
         onSuccess: () => {
-          toast({
+          toaster.create({
             title: "Delete trigger",
-            status: "success",
+            type: "success",
             description: "Trigger deleted",
-            duration: 5000,
-            isClosable: true,
+            placement: "top-end",
+            meta: {
+              closable: true,
+            },
           });
           void triggers.refetch();
         },
         onError: () => {
-          toast({
+          toaster.create({
             title: "Delete trigger",
-            status: "error",
+            type: "error",
             description: "Failed to delete trigger",
-            duration: 5000,
-            isClosable: true,
+            placement: "top-end",
+            meta: {
+              closable: true,
+            },
           });
         },
       }
@@ -318,8 +306,8 @@ export default function Members() {
             <ProjectSelector organizations={organizations} project={project} />
           )}
         </HStack>
-        <Card width="full" padding={6}>
-          <CardBody width="full" paddingY={0} paddingX={0}>
+        <Card.Root width="full" padding={6}>
+          <Card.Body width="full" paddingY={0} paddingX={0}>
             {triggers.data && triggers.data.length == 0 ? (
               <NoDataInfoBlock
                 title="No triggers yet"
@@ -330,7 +318,7 @@ export default function Members() {
                     <Link
                       color="orange.400"
                       href="https://docs.langwatch.ai/features/triggers"
-                      target="_blank"
+                      isExternal
                     >
                       documentation
                     </Link>
@@ -340,139 +328,169 @@ export default function Members() {
                 icon={<Bell />}
               />
             ) : (
-              <TableContainer>
-                <Table variant="simple" width="full">
-                  <Thead>
-                    <Tr>
-                      <Th>Name</Th>
-                      <Th>Action</Th>
-                      <Th>Destination</Th>
-                      <Th>Filters</Th>
-                      <Th>Last Triggered At</Th>
-                      <Th>Active</Th>
-                      <Th>Actions</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {triggers.isLoading ? (
-                      <Tr>
-                        <Td colSpan={5}>Loading...</Td>
-                      </Tr>
-                    ) : (
-                      triggers.data?.map((trigger) => {
-                        return (
-                          <Tr key={trigger.id} data-trigger-id={trigger.id}>
-                            <Td>{trigger.name}</Td>
-                            <Td>{triggerActionName(trigger.action)}</Td>
-                            <Td>
-                              {actionItems(
-                                trigger.action,
-                                trigger.actionParams as ActionParams
+              <Table.Root variant="line" width="full">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Name</Table.ColumnHeader>
+                    <Table.ColumnHeader>Action</Table.ColumnHeader>
+                    <Table.ColumnHeader>Destination</Table.ColumnHeader>
+                    <Table.ColumnHeader>Filters</Table.ColumnHeader>
+                    <Table.ColumnHeader>Last Triggered At</Table.ColumnHeader>
+                    <Table.ColumnHeader>Active</Table.ColumnHeader>
+                    <Table.ColumnHeader>Actions</Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {triggers.isLoading ? (
+                    <Table.Row>
+                      <Table.Cell colSpan={5}>Loading...</Table.Cell>
+                    </Table.Row>
+                  ) : (
+                    triggers.data?.map((trigger) => {
+                      return (
+                        <Table.Row
+                          key={trigger.id}
+                          data-trigger-id={trigger.id}
+                        >
+                          <Table.Cell>{trigger.name}</Table.Cell>
+                          <Table.Cell>
+                            {triggerActionName(trigger.action)}
+                          </Table.Cell>
+                          <Table.Cell>
+                            {actionItems(
+                              trigger.action,
+                              trigger.actionParams as ActionParams
+                            )}
+                          </Table.Cell>
+
+                          <Table.Cell maxWidth="500px">
+                            <VStack gap={2}>
+                              {applyChecks(
+                                trigger.checks?.filter(
+                                  (check): check is Check => !!check
+                                ) ?? []
                               )}
-                            </Td>
 
-                            <Td maxWidth="500px">
-                              <VStack gap={2}>
-                                {applyChecks(
-                                  trigger.checks?.filter(
-                                    (check): check is Check => !!check
-                                  ) ?? []
-                                )}
-
-                                {trigger.filters &&
-                                typeof trigger.filters === "string"
-                                  ? applyFilters(trigger.filters)
-                                  : null}
-                              </VStack>
-                            </Td>
-                            <Td whiteSpace="nowrap">
-                              {formatTimeAgo(trigger.lastRunAt)}
-                            </Td>
-                            <Td textAlign="center">
-                              <Switch
-                                isChecked={trigger.active}
-                                onChange={() => {
-                                  handleToggleTrigger(
-                                    trigger.id,
-                                    !trigger.active
-                                  );
-                                }}
-                              />
-                            </Td>
-                            <Td>
-                              <Menu>
-                                <MenuButton
-                                  as={Button}
+                              {trigger.filters &&
+                              typeof trigger.filters === "string"
+                                ? applyFilters(trigger.filters)
+                                : null}
+                            </VStack>
+                          </Table.Cell>
+                          <Table.Cell whiteSpace="nowrap">
+                            {formatTimeAgo(trigger.lastRunAt)}
+                          </Table.Cell>
+                          <Table.Cell textAlign="center">
+                            <Switch
+                              checked={trigger.active}
+                              onChange={() => {
+                                handleToggleTrigger(
+                                  trigger.id,
+                                  !trigger.active
+                                );
+                              }}
+                            />
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Menu.Root>
+                              <Menu.Trigger asChild>
+                                <Button
                                   variant={"ghost"}
                                   onClick={(event) => {
                                     event.stopPropagation();
                                   }}
                                 >
                                   <MoreVertical />
-                                </MenuButton>
-                                <MenuList>
-                                  {trigger.action != "ADD_TO_DATASET" && (
-                                    <MenuItem
-                                      icon={<EditIcon />}
-                                      onClick={() => {
-                                        setValue("triggerId", trigger.id);
-                                        setValue(
-                                          "customMessage",
-                                          trigger.message ?? ""
-                                        );
-                                        setValue(
-                                          "alertType",
-                                          trigger.alertType ?? ""
-                                        );
-                                        setValue("name", trigger.name ?? "");
-                                        onOpen();
-                                      }}
+                                </Button>
+                              </Menu.Trigger>
+                              <Menu.Content>
+                                {trigger.action != "ADD_TO_DATASET" && (
+                                  <Menu.Item
+                                    value="customize"
+                                    onClick={() => {
+                                      setValue("triggerId", trigger.id);
+                                      setValue(
+                                        "customMessage",
+                                        trigger.message ?? ""
+                                      );
+                                      setValue(
+                                        "alertType",
+                                        trigger.alertType ?? ""
+                                      );
+                                      setValue("name", trigger.name ?? "");
+                                      onOpen();
+                                    }}
+                                  >
+                                    <Box
+                                      display="flex"
+                                      alignItems="center"
+                                      gap={2}
                                     >
+                                      <Edit2 size={14} />
                                       Customize Message
-                                    </MenuItem>
-                                  )}
-                                  <MenuItem
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      openDrawer("editTriggerFilter", {
-                                        triggerId: trigger.id,
-                                      });
-                                    }}
-                                    icon={<Filter size={14} />}
+                                    </Box>
+                                  </Menu.Item>
+                                )}
+                                <Menu.Item
+                                  value="edit"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openDrawer("editTriggerFilter", {
+                                      triggerId: trigger.id,
+                                    });
+                                  }}
+                                >
+                                  <Box
+                                    display="flex"
+                                    alignItems="center"
+                                    gap={2}
                                   >
+                                    <Filter size={14} />
                                     Edit Filters
-                                  </MenuItem>
-                                  <MenuItem
+                                  </Box>
+                                </Menu.Item>
+                                <Menu.Item
+                                  value="delete"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    deleteTrigger(trigger.id);
+                                  }}
+                                >
+                                  <Box
+                                    display="flex"
+                                    alignItems="center"
+                                    gap={2}
                                     color="red.600"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-
-                                      deleteTrigger(trigger.id);
-                                    }}
-                                    icon={<DeleteIcon />}
                                   >
+                                    <Trash size={14} />
                                     Delete
-                                  </MenuItem>
-                                </MenuList>
-                              </Menu>
-                            </Td>
-                          </Tr>
-                        );
-                      })
-                    )}
-                  </Tbody>
-                </Table>
-              </TableContainer>
+                                  </Box>
+                                </Menu.Item>
+                              </Menu.Content>
+                            </Menu.Root>
+                          </Table.Cell>
+                        </Table.Row>
+                      );
+                    })
+                  )}
+                </Table.Body>
+              </Table.Root>
             )}
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
       </Container>
-      <Modal isOpen={isOpen} onClose={handleCloseModal} size="2xl">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Trigger Message</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
+      <Dialog.Root
+        open={open}
+        onOpenChange={({ open }) => (open ? onOpen() : handleCloseModal())}
+        size="lg"
+      >
+        <Dialog.Backdrop />
+        <Dialog.Content>
+          <Dialog.Header>
+            <Dialog.Title>Trigger Message</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.CloseTrigger />
+          <Dialog.Body>
             <TriggerForm
               control={
                 formMethods.control as unknown as Control<TriggerFormData>
@@ -482,11 +500,10 @@ export default function Members() {
               }
               onClose={handleCloseModal}
             />
-          </ModalBody>
-
-          <ModalFooter></ModalFooter>
-        </ModalContent>
-      </Modal>
+          </Dialog.Body>
+          <Dialog.Footer></Dialog.Footer>
+        </Dialog.Content>
+      </Dialog.Root>
     </DashboardLayout>
   );
 }
@@ -511,7 +528,6 @@ const TriggerForm = ({
 }) => {
   const addCustomMessageMutation = api.trigger.addCustomMessage.useMutation();
   const { project } = useOrganizationTeamProject();
-  const toast = useToast();
 
   const onSubmit: SubmitHandler<TriggerFormData> = (data) => {
     addCustomMessageMutation.mutate(
@@ -524,22 +540,26 @@ const TriggerForm = ({
       },
       {
         onSuccess: () => {
-          toast({
+          toaster.create({
             title: "Custom message",
-            status: "success",
+            type: "success",
             description: "Custom message added",
-            duration: 5000,
-            isClosable: true,
+            placement: "top-end",
+            meta: {
+              closable: true,
+            },
           });
           onClose();
         },
         onError: () => {
-          toast({
+          toaster.create({
             title: "Custom message",
-            status: "error",
+            type: "error",
             description: "Failed to add custom message",
-            duration: 5000,
-            isClosable: true,
+            placement: "top-end",
+            meta: {
+              closable: true,
+            },
           });
         },
       }
@@ -567,13 +587,15 @@ const TriggerForm = ({
           <Controller
             name="alertType"
             control={control}
-            rules={{ required: "Alert type is required" }}
             render={({ field }) => (
-              <Select {...field} placeholder="Select Alert Type">
-                <option value="INFO">Info</option>
-                <option value="WARNING">Warning</option>
-                <option value="CRITICAL">Critical</option>
-              </Select>
+              <NativeSelect.Root>
+                <NativeSelect.Field {...field} placeholder="Select Alert Type">
+                  <option value="INFO">Info</option>
+                  <option value="WARNING">Warning</option>
+                  <option value="CRITICAL">Critical</option>
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
             )}
           />
         </VStack>

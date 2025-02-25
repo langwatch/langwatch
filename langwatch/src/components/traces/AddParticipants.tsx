@@ -14,6 +14,7 @@ import {
 import { Plus, Users } from "react-feather";
 import { Select } from "../../components/ui/select";
 import { getColorForString } from "../../utils/rotatingColors";
+import { RandomColorAvatar } from "../RandomColorAvatar";
 
 export const AddParticipants = ({
   options,
@@ -135,15 +136,7 @@ export const AddParticipants = ({
                   <VStack align="start">
                     <HStack>
                       {item.value.startsWith("user-") ? (
-                        <Avatar.Root
-                          size="2xs"
-                          color="white"
-                          background={
-                            getColorForString("colors", item.label).color
-                          }
-                        >
-                          <Avatar.Fallback name={item.label} />
-                        </Avatar.Root>
+                        <RandomColorAvatar size="2xs" name={item.label} />
                       ) : (
                         <Box padding={1}>
                           <Users size={18} />

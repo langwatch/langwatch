@@ -1,24 +1,15 @@
+import { Alert, Button, VStack } from "@chakra-ui/react";
+import { signOut } from "next-auth/react";
 import { useRouter } from "next/router";
+import { useEffect } from "react";
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { SetupLayout } from "../../components/SetupLayout";
+import { toaster } from "../../components/ui/toaster";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
-import { useEffect } from "react";
-import {
-  Alert,
-  AlertDescription,
-  AlertIcon,
-  AlertTitle,
-  Box,
-  Button,
-  VStack,
-  useToast,
-} from "@chakra-ui/react";
 import { api } from "../../utils/api";
-import { signOut } from "next-auth/react";
 
 export default function Accept() {
   const router = useRouter();
-  const toast = useToast();
   const { inviteCode } = router.query;
   const acceptInviteMutation = api.organization.acceptInvite.useMutation();
 
@@ -32,13 +23,15 @@ export default function Accept() {
       { inviteCode },
       {
         onSuccess: (data) => {
-          toast({
+          toaster.create({
             title: "Invite Accepted",
             description: `You have successfully accepted the invite for ${data.invite.organization.name}.`,
-            status: "success",
+            type: "success",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
             duration: 5000,
-            isClosable: true,
-            position: "top-right",
           });
           void router.push(`/${data.project?.slug ?? ""}`);
         },
@@ -60,17 +53,17 @@ export default function Accept() {
     return (
       <SetupLayout>
         <VStack gap={4}>
-          <Alert status="error">
-            <AlertIcon />
-            <Box>
-              <AlertTitle>
+          <Alert.Root status="error">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>
                 An error occurred while accepting the invite.
-              </AlertTitle>
-              <AlertDescription>
+              </Alert.Title>
+              <Alert.Description>
                 {acceptInviteMutation.error.message}
-              </AlertDescription>
-            </Box>
-          </Alert>
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
           <Button colorPalette="orange" onClick={() => void signOut()}>
             Log Out and Try Again
           </Button>

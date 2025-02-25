@@ -1,18 +1,9 @@
 import {
   Button,
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  DrawerHeader,
   Field,
   HStack,
   Input,
-  InputGroup,
-  InputLeftAddon,
-  InputRightAddon,
   Text,
-  useToast,
 } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useDrawer } from "../CurrentDrawer";
@@ -20,6 +11,9 @@ import { api } from "../../utils/api";
 import { useForm } from "react-hook-form";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import type { MaybeStoredLLMModelCost } from "../../server/modelProviders/llmModelCost";
+import { Drawer } from "../../components/ui/drawer";
+import { InputGroup } from "../../components/ui/input-group";
+import { toaster } from "../../components/ui/toaster";
 
 export function LLMModelCostDrawer({
   id,
@@ -37,25 +31,20 @@ export function LLMModelCostDrawer({
   );
 
   return (
-    <Drawer
-      isOpen={true}
-      placement="right"
-      size={"xl"}
-      onClose={closeDrawer}
-      onOverlayClick={closeDrawer}
-    >
-      <DrawerContent>
-        <DrawerHeader>
+    <Drawer.Root open={true} placement="end" size={"xl"} onOpenChange={() => closeDrawer()}>
+      <Drawer.Backdrop />
+      <Drawer.Content>
+        <Drawer.Header>
           <HStack>
-            <DrawerCloseButton />
+            <Drawer.CloseTrigger />
           </HStack>
           <HStack>
             <Text paddingTop={5} fontSize="2xl">
               {id ? "Edit LLM Model Cost" : "Add LLM Model Cost"}
             </Text>
           </HStack>
-        </DrawerHeader>
-        <DrawerBody>
+        </Drawer.Header>
+        <Drawer.Body>
           {llmModelCosts.data && (
             <LLMModelCostForm
               id={id}
@@ -63,9 +52,9 @@ export function LLMModelCostDrawer({
               llmModelCosts={llmModelCosts.data}
             />
           )}
-        </DrawerBody>
-      </DrawerContent>
-    </Drawer>
+        </Drawer.Body>
+      </Drawer.Content>
+    </Drawer.Root>
   );
 }
 
@@ -80,7 +69,6 @@ function LLMModelCostForm({
 }) {
   const { project } = useOrganizationTeamProject();
 
-  const toast = useToast();
   const { closeDrawer } = useDrawer();
   const createOrUpdate = api.llmModelCost.createOrUpdate.useMutation();
 
@@ -131,27 +119,31 @@ function LLMModelCostForm({
       },
       {
         onSuccess: () => {
-          toast({
+          toaster.create({
             title: "Success",
             description: `LLM model cost ${
               id ? "updated" : "created"
             } successfully`,
-            status: "success",
+            type: "success",
             duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
           closeDrawer();
           void llmModelCostsQuery.refetch();
         },
         onError: () => {
-          toast({
+          toaster.create({
             title: "Error",
             description: "Error creating LLM model cost",
-            status: "error",
+            type: "error",
             duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
         },
       }
@@ -175,10 +167,10 @@ function LLMModelCostForm({
           helper="Regular expression used to match the model name captured during tracing"
           invalid={!!errors.regex}
         >
-          <InputGroup>
-            <InputLeftAddon paddingX={2} fontFamily="monospace">
-              /
-            </InputLeftAddon>
+          <InputGroup
+            startElement={<Text paddingX={2} fontFamily="monospace">/</Text>}
+            endElement={<Text paddingX={2} fontFamily="monospace">/</Text>}
+          >
             <Input
               required
               {...register("regex", {
@@ -187,9 +179,6 @@ function LLMModelCostForm({
                   "Please enter a valid regular expression",
               })}
             />
-            <InputRightAddon paddingX={2} fontFamily="monospace">
-              /
-            </InputRightAddon>
           </InputGroup>
           <Field.ErrorText>{errors.regex?.message}</Field.ErrorText>
         </HorizontalFormControl>
@@ -198,8 +187,7 @@ function LLMModelCostForm({
           helper="Cost per input token in USD"
           invalid={!!errors.inputCostPerToken}
         >
-          <InputGroup>
-            <InputLeftAddon>$</InputLeftAddon>
+          <InputGroup startElement={<Text>$</Text>}>
             <Input
               placeholder="0.00"
               required
@@ -218,8 +206,7 @@ function LLMModelCostForm({
           helper="Cost per output token in USD"
           invalid={!!errors.outputCostPerToken}
         >
-          <InputGroup>
-            <InputLeftAddon>$</InputLeftAddon>
+          <InputGroup startElement={<Text>$</Text>}>
             <Input
               placeholder="0.00"
               required
@@ -238,7 +225,7 @@ function LLMModelCostForm({
           colorPalette="orange"
           type="submit"
           minWidth="fit-content"
-          isLoading={createOrUpdate.isLoading}
+          loading={createOrUpdate.isLoading}
         >
           Save
         </Button>
