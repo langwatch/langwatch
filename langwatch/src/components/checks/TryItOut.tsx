@@ -374,6 +374,13 @@ export function TryItOut({
                       ) : evaluatorDefinition?.result.score ? (
                         <Th width="120px">Score</Th>
                       ) : null}
+                      {evaluatorType?.startsWith("custom/") ? (
+                        <Th width="120px">Passed</Th>
+                      ) : null}
+
+                      {evaluatorType?.startsWith("custom/") ? (
+                        <Th width="120px">Score</Th>
+                      ) : null}
                       {hasAnyLabels && <Th width="120px">Label</Th>}
                       <Th width="250px">Details</Th>
                       <Th width="120px">Cost</Th>
@@ -523,6 +530,14 @@ export function TryItOut({
                                   <Td maxWidth="120" color={color}>
                                     Error
                                   </Td>
+                                ) : evaluatorType?.startsWith("custom/") ? (
+                                  <Td maxWidth="120" color={color}>
+                                    {"passed" in runningResult
+                                      ? runningResult.passed
+                                        ? "Pass"
+                                        : "Fail"
+                                      : "-"}
+                                  </Td>
                                 ) : evaluatorDefinition?.isGuardrail ? (
                                   <Td maxWidth="120" color={color}>
                                     {runningResult.passed ? "Pass" : "Fail"}
@@ -534,6 +549,17 @@ export function TryItOut({
                                     )}
                                   </Td>
                                 ) : null}
+
+                                {evaluatorType?.startsWith("custom/") ? (
+                                  <Td maxWidth="120" color={color}>
+                                    {"score" in runningResult
+                                      ? numeral(runningResult.score).format(
+                                          "0.[00]"
+                                        )
+                                      : "-"}
+                                  </Td>
+                                ) : null}
+
                                 {hasAnyLabels &&
                                   (evaluatorDefinition?.isGuardrail ||
                                     !!evaluatorDefinition?.result.score ||
