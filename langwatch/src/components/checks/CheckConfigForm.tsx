@@ -64,6 +64,7 @@ export interface CheckConfigFormData {
   executionMode: EvaluationExecutionMode;
   storeSettingsOnCode: boolean;
   mappings: Record<string, string>;
+  customMapping: Record<string, string>;
 }
 
 interface CheckConfigFormProps {
@@ -143,7 +144,8 @@ export default function CheckConfigForm({
               EvaluationExecutionMode.MANUALLY,
             ])
             .optional(),
-          mappings: z.record(z.string(), z.string().optional()), // Allow any string key with optional string value
+          mappings: z.record(z.string(), z.string().optional()),
+          customMapping: z.record(z.string(), z.string().optional()),
         })
       )({ ...data, settings: data.settings || {} }, ...args);
     },
@@ -290,7 +292,13 @@ export default function CheckConfigForm({
   return (
     <FormProvider {...form}>
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
-      <form onSubmit={handleSubmit(onSubmit)} style={{ width: "100%" }}>
+      <form
+        onSubmit={handleSubmit((data) => {
+          data.mappings = data.customMapping;
+          return onSubmit(data);
+        })}
+        style={{ width: "100%" }}
+      >
         {!checkType || isChoosing ? (
           <EvaluatorSelection form={form} />
         ) : (
