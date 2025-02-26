@@ -5,7 +5,6 @@ import {
   Box,
   Button,
   HStack,
-  Icon,
   Input,
   Portal,
   Spacer,
@@ -338,7 +337,12 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                       }
                     >
                       {projectGroup.projects.map((project) => (
-                        <Menu.Item value={project.name} fontSize="14px" asChild>
+                        <Menu.Item
+                          key={project.id}
+                          value={project.name}
+                          fontSize="14px"
+                          asChild
+                        >
                           <Link
                             key={project.id}
                             href={

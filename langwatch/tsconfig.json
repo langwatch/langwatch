@@ -26,7 +26,11 @@
       "@trpc-internal/utils": [
         "node_modules/@trpc/server/dist/core/internals/utils"
       ],
-      "zod/lib/helpers/errorUtil": ["node_modules/zod/lib/helpers/errorUtil"]
+      "zod/lib/helpers/errorUtil": ["node_modules/zod/lib/helpers/errorUtil"],
+      "@chakra-ui/internal": ["node_modules/@chakra-ui/react"],
+      "@chakra-ui/react/dialog": ["./src/utils/forbidden-import.d.ts"],
+      "@chakra-ui/react": ["./src/utils/chakra-override.d.ts"],
+      "@chakra-ui/react/": ["./src/utils/forbidden-import.d.ts"]
     },
     "plugins": [
       {

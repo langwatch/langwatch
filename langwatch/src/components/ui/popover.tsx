@@ -1,4 +1,4 @@
-import { Popover as ChakraPopover, Portal } from "@chakra-ui/react";
+import { Popover as ChakraPopover, Portal } from "@chakra-ui/internal";
 import { CloseButton } from "./close-button";
 import * as React from "react";
 

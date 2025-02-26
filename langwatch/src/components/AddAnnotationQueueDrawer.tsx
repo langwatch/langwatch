@@ -322,7 +322,7 @@ export const AddAnnotationQueueDrawer = ({
                             {children}
                           </chakraComponents.Menu>
                         ),
-                        MultiValueLabel: ({ children, ...props }) => (
+                        MultiValueLabel: ({ ...props }) => (
                           <chakraComponents.MultiValueLabel {...props}>
                             <VStack align="start" padding={1} paddingX={0}>
                               <HStack>

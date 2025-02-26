@@ -1,5 +1,6 @@
-import { Button, Input, Dialog } from "@chakra-ui/react";
+import { Button, Input } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
+import { Dialog } from "./ui/dialog";
 
 export function ScoreReasonModal({
   reason: initialReason,

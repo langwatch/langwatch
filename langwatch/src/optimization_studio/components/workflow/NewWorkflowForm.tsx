@@ -1,6 +1,5 @@
 import {
   Button,
-  Dialog,
   Field,
   HStack,
   Input,
@@ -17,6 +16,7 @@ import type { Workflow } from "../../types/dsl";
 import { EmojiPickerModal } from "../properties/modals/EmojiPickerModal";
 import { trackEvent } from "../../../utils/tracking";
 import { toaster } from "../../../components/ui/toaster";
+import { Dialog } from "../../../components/ui/dialog";
 
 type FormData = {
   name: string;
@@ -102,6 +102,7 @@ export const NewWorkflowForm = ({
     setValue("name", template.name ?? "New Workflow");
     setValue("icon", template.icon ?? "🧩");
     setValue("description", template.description ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [template]);
 
   return (
