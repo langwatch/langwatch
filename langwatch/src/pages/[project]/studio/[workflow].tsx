@@ -23,8 +23,9 @@ export default function Studio() {
     // Invalidate the workflow once navigating away to make sure when comming back
     // that is doesn't accidentaly renders the previous version of the workflow
     return () => {
-      queryClient.workflow.getById.invalidate();
+      void queryClient.workflow.getById.invalidate();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

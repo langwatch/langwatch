@@ -117,6 +117,7 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
       </PropertyField>
       <PropertyField title="Instructions">
         <Textarea
+          height="100px"
           fontFamily="monospace"
           fontSize="13px"
           value={(parameters.instructions?.value as string | undefined) ?? ""}

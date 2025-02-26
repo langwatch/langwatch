@@ -426,9 +426,9 @@ export const NodeDraggable = (props: {
               {props.component.name}
             </HoverableBigText>
             <Spacer />
-            <Icon width="18px" height="18px" color="gray.350">
-              <LuGripVertical />
-            </Icon>
+            <Box color="gray.350">
+              <LuGripVertical size={18} />
+            </Box>
           </HStack>
         </Box>
       </Tooltip>

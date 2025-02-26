@@ -290,7 +290,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
             <Button
               background="white"
               position="absolute"
-              top="-26px"
+              top="-28px"
               right={1}
               paddingX={1}
               paddingY={1}
@@ -298,6 +298,8 @@ export const ComponentNode = forwardRef(function ComponentNode(
               minWidth="auto"
               minHeight="auto"
               boxShadow="sm"
+              width="auto"
+              height="auto"
             >
               <MoreHorizontal size={11} />
             </Button>

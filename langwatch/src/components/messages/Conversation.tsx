@@ -160,7 +160,7 @@ export function Conversation({
                     }
                     paddingTop="20px"
                   >
-                    <Box paddingY="6px" marginBottom="62px">
+                    <Box paddingY="6px" marginBottom="62px" maxWidth="90%">
                       <VStack gap={4} width="full" align="start">
                         <Skeleton width="720px" maxWidth="100%" height="20px" />
                         <Skeleton width="720px" maxWidth="100%" height="20px" />
@@ -177,7 +177,7 @@ export function Conversation({
                       />
                     }
                   >
-                    <Box paddingY="6px" marginBottom="62px">
+                    <Box paddingY="6px" marginBottom="62px" maxWidth="90%">
                       <VStack gap={4} width="full" align="start">
                         <Skeleton width="720px" maxWidth="100%" height="20px" />
                         <Skeleton width="720px" maxWidth="100%" height="20px" />

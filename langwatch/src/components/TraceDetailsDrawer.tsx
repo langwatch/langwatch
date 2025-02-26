@@ -37,7 +37,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
         maxWidth={traceView === "full" ? undefined : "70%"}
       >
         <Drawer.Body
-          paddingTop={0}
+          paddingY={0}
           paddingX={0}
           overflowY="auto"
           id="conversation-scroll-container"
