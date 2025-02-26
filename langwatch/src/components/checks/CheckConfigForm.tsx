@@ -331,7 +331,7 @@ export default function CheckConfigForm({
                           fontWeight="normal"
                           color="gray.600"
                         >
-                          <Edit2 />
+                          <Edit2 size={14} />
                         </Button>
                       </HStack>
                       <Text fontSize="12px" color="gray.500">

@@ -29,23 +29,21 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { Popover } from "../../components/ui/popover";
 
 export function History() {
-  const { open, onToggle, onClose } = useDisclosure();
+  const { open, onToggle, onClose, setOpen } = useDisclosure();
 
   return (
     <Popover.Root
       open={open}
-      onOpenChange={onClose}
-      closeOnInteractOutside={false}
+      onOpenChange={({ open }) => setOpen(open)}
+      // closeOnInteractOutside={false}
+      // modal
     >
-      <Popover.Trigger>
+      <Popover.Trigger asChild>
         <Button variant="ghost" color="gray.500" size="xs" onClick={onToggle}>
           <HistoryIcon size={16} />
         </Button>
       </Popover.Trigger>
-      {/* TODO: do we need a portal here? */}
-      <Box zIndex="popover" position="relative">
-        {open && <HistoryPopover onClose={onClose} />}
-      </Box>
+      {open && <HistoryPopover onClose={onClose} />}
     </Popover.Root>
   );
 }
@@ -175,7 +173,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
         <form
           // eslint-disable-next-line @typescript-eslint/no-misused-promises
           onSubmit={form.handleSubmit(onSubmit)}
-          style={{ width: "100%", padding: "12px" }}
+          style={{ width: "100%", padding: "20px" }}
         >
           <VStack align="start" width="full">
             <NewVersionFields
@@ -200,12 +198,12 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
             </Tooltip>
           </VStack>
         </form>
-        <Separator borderBottomWidth="2px" />
+        <Separator />
         <VStack
           align="start"
           width="full"
-          padding={3}
-          maxHeight="500px"
+          padding={5}
+          maxHeight="350px"
           overflowY="auto"
         >
           <Text fontWeight={600} fontSize="16px" paddingTop={2}>
@@ -232,24 +230,28 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                       </Tag.Root>
                     )}
                   </HStack>
-                  <HStack>
-                    <Avatar.Root size="2xs">
+                  <HStack fontSize="12px">
+                    <Avatar.Root
+                      size="2xs"
+                      backgroundColor="orange.400"
+                      color="white"
+                      width="16px"
+                      height="16px"
+                    >
                       <Avatar.Fallback
                         name={version.author?.name ?? ""}
-                        backgroundColor="orange.400"
-                        color="white"
+                        fontSize="6.4px"
                       />
                     </Avatar.Root>
-                    <Text fontSize="12px">
-                      {version.author?.name}
-                      {" · "}
-                      <Tooltip
-                        content={new Date(version.updatedAt).toLocaleString()}
-                        positioning={{ placement: "top" }}
-                      >
-                        {formatTimeAgo(version.updatedAt.getTime())}
-                      </Tooltip>
-                    </Text>
+                    {version.author?.name}
+                    {/* {" · "}
+                    <Tooltip
+                      // content={new Date(version.updatedAt).toLocaleString()}
+                      content="what"
+                      positioning={{ placement: "top" }}
+                    >
+                      {formatTimeAgo(version.updatedAt.getTime())}
+                    </Tooltip> */}
                   </HStack>
                 </VStack>
                 {!version.isCurrentVersion && (

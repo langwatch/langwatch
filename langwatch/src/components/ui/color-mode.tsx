@@ -57,7 +57,10 @@ export function getComputedCSSVariableValue(variable: string) {
   return value.trim();
 }
 
-export function useColorRawValue(variable: string): string {
+export function useColorRawValue(
+  variable: string,
+  defaultValue: string | undefined = undefined
+): string {
   const [color, number] = variable.split(".");
   const cssVariable = `--chakra-colors-${color}-${number}`;
 
@@ -66,7 +69,7 @@ export function useColorRawValue(variable: string): string {
     setValue(getComputedCSSVariableValue(cssVariable));
   }, [cssVariable]);
 
-  return value ?? "pink";
+  return value ?? defaultValue ?? "pink";
 }
 
 export function useColorModeValue<T>(light: T, dark: T) {

@@ -390,8 +390,8 @@ export default function OptimizationStudio() {
 }
 
 function ReactFlowBackground() {
-  const gray100 = useColorRawValue("gray.100");
-  const gray300 = useColorRawValue("gray.300");
+  const gray100 = useColorRawValue("gray.100", "#F2F4F8");
+  const gray300 = useColorRawValue("gray.300", "#E5E7EB");
 
   return (
     <Background

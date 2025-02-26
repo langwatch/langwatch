@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Box,
   Button,
   Field,
@@ -23,7 +22,6 @@ import { toaster } from "../components/ui/toaster";
 import { AddAnnotationScoreDrawer } from "./AddAnnotationScoreDrawer";
 import { useDrawer } from "./CurrentDrawer";
 import { FullWidthFormControl } from "./FullWidthFormControl";
-import { getColorForString } from "../utils/rotatingColors";
 import { RandomColorAvatar } from "./RandomColorAvatar";
 
 export const AddAnnotationQueueDrawer = ({
@@ -46,7 +44,7 @@ export const AddAnnotationQueueDrawer = ({
       projectId: project?.id ?? "",
     },
     {
-      enabled: !!project,
+      enabled: !!project && !!queueId && open,
     }
   );
 
