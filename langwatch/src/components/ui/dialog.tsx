@@ -52,11 +52,16 @@ export const DialogCloseTrigger = React.forwardRef<
 });
 
 export const DialogRoot = function DialogRoot(
-  props: ChakraDialog.RootProps & {
+  props: Omit<ChakraDialog.RootProps, "size"> & {
     size?: "xs" | "sm" | "md" | "lg" | "xl" | "5xl" | "6xl" | "cover" | "full";
   }
 ) {
-  return <ChakraDialog.Root {...props} trapFocus={false} />;
+  return (
+    <ChakraDialog.Root
+      {...(props as ChakraDialog.RootProps)}
+      trapFocus={false}
+    />
+  );
 };
 
 export const DialogFooter = ChakraDialog.Footer;
