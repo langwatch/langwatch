@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   Button,
   HStack,
@@ -9,8 +10,6 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { Alert } from "@chakra-ui/react";
-import { Dialog } from "@chakra-ui/react";
 
 import type { Node } from "@xyflow/react";
 import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
@@ -39,6 +38,8 @@ import { checkIsEvaluator } from "../utils/nodeUtils";
 import { trackEvent } from "../../utils/tracking";
 import { Tooltip } from "../../components/ui/tooltip";
 import { toaster } from "../../components/ui/toaster";
+import { Dialog } from "../../components/ui/dialog";
+
 
 const optimizerOptions: {
   label: string;

@@ -1,4 +1,4 @@
-import { Tooltip as ChakraTooltip, Portal } from "@chakra-ui/react";
+import { Tooltip as ChakraTooltip, Portal } from "@chakra-ui/internal";
 import * as React from "react";
 
 export interface TooltipProps extends ChakraTooltip.RootProps {

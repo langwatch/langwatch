@@ -1,7 +1,5 @@
-import {
-  Dialog,
-  Button,
-} from "@chakra-ui/react";
+import { Button } from "@chakra-ui/react";
+import { Dialog } from "../../../components/ui/dialog";
 
 require("prismjs/components/prism-python");
 
