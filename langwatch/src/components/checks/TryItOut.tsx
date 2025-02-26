@@ -67,7 +67,8 @@ export function TryItOut({
   const evaluatorType = watch("checkType");
   const preconditions = watch("preconditions");
   const settings = watch("settings");
-  const mappings = watch("mappings");
+  const customMappings = watch("customMapping");
+
   const evaluatorDefinition =
     evaluatorType && getEvaluatorDefinitions(evaluatorType);
 
@@ -202,7 +203,7 @@ export function TryItOut({
         evaluatorType: evaluatorType,
         traceId: runningState.nextTraceId,
         settings: settings_,
-        mappings: mappings,
+        mappings: customMappings,
       },
       {
         onSuccess: (result) => {
