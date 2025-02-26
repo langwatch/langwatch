@@ -202,6 +202,7 @@ const CustomRadio = ({
       <Card.Root
         borderWidth="1px"
         height="100%"
+        padding={3}
         _hover={{
           borderWidth: "1px",
           borderColor: "orange.500",
@@ -213,16 +214,21 @@ const CustomRadio = ({
         }}
         _active={{ borderColor: "orange.600" }}
       >
-        <Card.Header>
+        <Card.Header padding={2}>
           <Heading size="md">
             <HStack>
               {icon}
               <Text>{heading}</Text>
             </HStack>
           </Heading>
-          <HStack padding={6}>
+          <HStack padding={4}>
             <Spacer />
-            <Image src={image} alt={heading} width="300px" height="200px" />
+            <Image
+              src={image}
+              alt={heading}
+              maxWidth="320px"
+              maxHeight="200px"
+            />
             <Spacer />
           </HStack>
         </Card.Header>
