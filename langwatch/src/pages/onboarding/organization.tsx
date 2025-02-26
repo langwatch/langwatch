@@ -89,6 +89,7 @@ export default function OrganizationOnboarding() {
     setValue,
     watch,
     getValues,
+    setError,
     formState: { errors },
     reset: resetForm,
   } = useForm<OrganizationFormData>({
@@ -114,11 +115,15 @@ export default function OrganizationOnboarding() {
   const onSubmit: SubmitHandler<OrganizationFormData> = (
     data: OrganizationFormData
   ) => {
+    const formattedData = {
+      ...data,
+      terms: Boolean(data.terms),
+    };
     createOrganization.mutate(
       {
-        orgName: data.organizationName,
-        phoneNumber: data.phoneNumber,
-        signUpData: data,
+        orgName: formattedData.organizationName,
+        phoneNumber: formattedData.phoneNumber,
+        signUpData: formattedData,
       },
       {
         onSuccess: (data) => {
@@ -213,24 +218,58 @@ export default function OrganizationOnboarding() {
   const selectedValueHowDidYouHearAboutUs = watch("howDidYouHearAboutUs");
 
   const checkFirstStep = () => {
-    if (
-      getValues("organizationName") &&
-      getValues("terms") &&
-      getValues("usage")
-    ) {
+    const organizationName = getValues("organizationName");
+    const terms = getValues("terms");
+    const usage = getValues("usage");
+    const solution = getValues("solution");
+
+    if (!organizationName) {
+      setError("organizationName", {
+        message: "Organization name is required",
+      });
+    }
+
+    if (!terms) {
+      setError("terms", {
+        message: "Please agree to terms",
+      });
+    }
+
+    if (!usage) {
+      setError("usage", {
+        message: "Please select how you will be using LangWatch",
+      });
+    }
+
+    if (!solution) {
+      setError("solution", {
+        message: "Please select a solution",
+      });
+    }
+
+    if (organizationName && terms && usage && solution) {
       setActiveStep(1);
     }
   };
 
   const checkSecondStep = () => {
-    if (getValues("companyType") && getValues("companySize")) {
-      setActiveStep(2);
-    }
-  };
+    const companyType = getValues("companyType");
+    const companySize = getValues("companySize");
 
-  const checkThirdStep = () => {
-    if (getValues("projectType") && getValues("howDidYouHearAboutUs")) {
-      return true;
+    if (!companyType) {
+      setError("companyType", {
+        message: "Please select a company type",
+      });
+    }
+
+    if (!companySize) {
+      setError("companySize", {
+        message: "Please select a company size",
+      });
+    }
+
+    if (companyType && companySize) {
+      setActiveStep(2);
     }
   };
 
@@ -271,127 +310,133 @@ export default function OrganizationOnboarding() {
                 <Field.Label>Email</Field.Label>
                 <Input type="email" disabled value={session.user.email ?? ""} />
               </Field.Root>
-              <Field.Root invalid={!!errors?.organizationName}>
-                <Field.Label>Organization Name</Field.Label>
-                <Input {...register("organizationName", { required: true })} />
-                <Field.ErrorText>Organization name is required</Field.ErrorText>
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Phone Number</Field.Label>
-                <PhoneInput
-                  {...phoneNumber}
-                  autoFocus
-                  countries={defaultCountries.map((country) => {
-                    const country_ = parseCountry(country);
-                    if (country_.iso2 === "nl") {
-                      return buildCountryData({
-                        ...country_,
-                        format: ". ........",
-                      });
-                    }
-                    return country;
-                  })}
-                  inputStyle={{ width: "100%", border: "1px solid #e6e9f0" }}
-                  countrySelectorStyleProps={{
-                    buttonStyle: {
-                      borderColor: "#e6e9f0",
-                      paddingLeft: "8px",
-                      paddingRight: "8px",
-                    },
-                  }}
-                  onChange={(phone) => {
-                    void phoneNumber.onChange({
-                      target: {
-                        value: phone,
-                      },
-                    });
-                  }}
-                />
-              </Field.Root>
-
-              {isSaaS && (
-                <Field.Root invalid={!!errors.usage}>
-                  <Field.Label>How will you be using LangWatch?</Field.Label>
-                  <RadioGroup
-                    value={selectedValueUsage || ""}
-                    onValueChange={(e) => setValue("usage", e.value)}
-                  >
-                    <HStack width="full" wrap="wrap">
-                      {Object.entries(options).map(([value, icon]) => (
-                        <CustomRadio
-                          key={value}
-                          value={value}
-                          registerProps={register("usage", {
-                            required: "This field is required",
-                          })}
-                          selectedValue={selectedValueUsage}
-                          icon={icon}
-                        />
-                      ))}
-                    </HStack>
-                  </RadioGroup>
-                  <Field.ErrorText>{errors.usage?.message}</Field.ErrorText>
+              <VStack gap={4}>
+                <Field.Root invalid={!!errors?.organizationName}>
+                  <Field.Label>Organization Name</Field.Label>
+                  <Input
+                    {...register("organizationName", { required: true })}
+                  />
+                  <Field.ErrorText>
+                    Organization name is required
+                  </Field.ErrorText>
                 </Field.Root>
-              )}
-              {isSaaS && (
-                <Field.Root invalid={!!errors.solution}>
-                  <Field.Label>
-                    What solution are you interested in?
-                  </Field.Label>
-                  <RadioGroup
-                    value={selectedValueSolution || ""}
-                    onValueChange={(e) => setValue("solution", e.value)}
-                  >
-                    <HStack width="full" wrap="wrap">
-                      {Object.entries(langwatchSolution).map(
-                        ([value, icon]) => (
+                <Field.Root>
+                  <Field.Label>Phone Number</Field.Label>
+                  <PhoneInput
+                    {...phoneNumber}
+                    autoFocus
+                    countries={defaultCountries.map((country) => {
+                      const country_ = parseCountry(country);
+                      if (country_.iso2 === "nl") {
+                        return buildCountryData({
+                          ...country_,
+                          format: ". ........",
+                        });
+                      }
+                      return country;
+                    })}
+                    inputStyle={{ width: "100%", border: "1px solid #e6e9f0" }}
+                    countrySelectorStyleProps={{
+                      buttonStyle: {
+                        borderColor: "#e6e9f0",
+                        paddingLeft: "8px",
+                        paddingRight: "8px",
+                      },
+                    }}
+                    onChange={(phone) => {
+                      void phoneNumber.onChange({
+                        target: {
+                          value: phone,
+                        },
+                      });
+                    }}
+                  />
+                </Field.Root>
+
+                {isSaaS && (
+                  <Field.Root invalid={!!errors.usage}>
+                    <Field.Label>How will you be using LangWatch?</Field.Label>
+                    <RadioGroup
+                      value={selectedValueUsage || ""}
+                      onValueChange={(e) => setValue("usage", e.value)}
+                    >
+                      <HStack width="full" wrap="wrap">
+                        {Object.entries(options).map(([value, icon]) => (
                           <CustomRadio
                             key={value}
                             value={value}
-                            registerProps={register("solution", {
+                            registerProps={register("usage", {
                               required: "This field is required",
                             })}
-                            selectedValue={selectedValueSolution}
+                            selectedValue={selectedValueUsage}
                             icon={icon}
                           />
-                        )
-                      )}
-                    </HStack>
-                  </RadioGroup>
-                  <Field.ErrorText>{errors.solution?.message}</Field.ErrorText>
-                </Field.Root>
-              )}
-              <Field.Root marginTop={4} invalid={!!errors?.terms}>
-                <Checkbox {...register("terms", { required: true })}>
-                  <Text fontSize="14px">
-                    I agree with LangWatch{" "}
-                    <Link
-                      href="https://langwatch.ai/legal/terms-conditions"
-                      isExternal
-                      _hover={{
-                        textDecoration: "none",
-                      }}
+                        ))}
+                      </HStack>
+                    </RadioGroup>
+                    <Field.ErrorText>{errors.usage?.message}</Field.ErrorText>
+                  </Field.Root>
+                )}
+                {isSaaS && (
+                  <Field.Root invalid={!!errors.solution}>
+                    <Field.Label>
+                      What solution are you interested in?
+                    </Field.Label>
+                    <RadioGroup
+                      value={selectedValueSolution || ""}
+                      onValueChange={(e) => setValue("solution", e.value)}
                     >
-                      terms of service
-                    </Link>
-                  </Text>
-                </Checkbox>
-                <Field.ErrorText>Please agree to terms</Field.ErrorText>
-              </Field.Root>
-
-              {utmCampaign && (
-                <Field.Root>
-                  <Text fontSize="14px">
-                    You are signing up via the{" "}
-                    <b>{titleCase(utmCampaign.replaceAll("-", " "))}</b>{" "}
-                    campaign
-                  </Text>
+                      <HStack width="full" wrap="wrap">
+                        {Object.entries(langwatchSolution).map(
+                          ([value, icon]) => (
+                            <CustomRadio
+                              key={value}
+                              value={value}
+                              registerProps={register("solution", {
+                                required: "This field is required",
+                              })}
+                              selectedValue={selectedValueSolution}
+                              icon={icon}
+                            />
+                          )
+                        )}
+                      </HStack>
+                    </RadioGroup>
+                    <Field.ErrorText>
+                      {errors.solution?.message}
+                    </Field.ErrorText>
+                  </Field.Root>
+                )}
+                <Field.Root invalid={!!errors?.terms}>
+                  <Checkbox {...register("terms", { required: true })}>
+                    <Text fontSize="14px">
+                      I agree with LangWatch{" "}
+                      <Link
+                        href="https://langwatch.ai/legal/terms-conditions"
+                        isExternal
+                        _hover={{
+                          textDecoration: "none",
+                        }}
+                      >
+                        terms of service
+                      </Link>
+                    </Text>
+                  </Checkbox>
+                  <Field.ErrorText>Please agree to terms</Field.ErrorText>
                 </Field.Root>
-              )}
 
-              <Separator />
-              <HStack width="full">
-                <Steps.NextTrigger asChild>
+                {utmCampaign && (
+                  <Field.Root>
+                    <Text fontSize="14px">
+                      You are signing up via the{" "}
+                      <b>{titleCase(utmCampaign.replaceAll("-", " "))}</b>{" "}
+                      campaign
+                    </Text>
+                  </Field.Root>
+                )}
+
+                <Separator />
+                <HStack width="full">
                   <Button
                     colorPalette="orange"
                     type="button"
@@ -404,8 +449,8 @@ export default function OrganizationOnboarding() {
                   >
                     Next
                   </Button>
-                </Steps.NextTrigger>
-              </HStack>
+                </HStack>
+              </VStack>
             </Steps.Content>
 
             <Steps.Content index={1}>
@@ -416,75 +461,80 @@ export default function OrganizationOnboarding() {
                 Enter company type and team size to customize your LangWatch
                 experience.
               </Text>
-              <Field.Root invalid={!!errors.companyType}>
-                <Field.Label>Type of company?</Field.Label>
-                <RadioGroup
-                  value={selectedValueCompanyType || ""}
-                  onValueChange={(e) => setValue("companyType", e.value)}
-                >
-                  <HStack width="full" wrap="wrap">
-                    {Object.entries(companyType).map(([value, icon]) => {
-                      return (
-                        <React.Fragment key={value}>
+              <VStack gap={4}>
+                <Field.Root invalid={!!errors.companyType}>
+                  <Field.Label>Type of company?</Field.Label>
+                  <RadioGroup
+                    value={selectedValueCompanyType || ""}
+                    onValueChange={(e) => setValue("companyType", e.value)}
+                  >
+                    <HStack width="full" wrap="wrap">
+                      {Object.entries(companyType).map(([value, icon]) => {
+                        return (
+                          <React.Fragment key={value}>
+                            <CustomRadio
+                              value={value}
+                              registerProps={register("companyType", {
+                                required: "Please select a company type",
+                              })}
+                              selectedValue={selectedValueCompanyType}
+                              icon={icon}
+                            />
+                            {value === "Other" &&
+                              selectedValueCompanyType === "Other" && (
+                                <Input
+                                  type="text"
+                                  {...register("otherCompanyType")}
+                                  placeholder="Please specify"
+                                />
+                              )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </HStack>
+                  </RadioGroup>
+                  <Field.ErrorText>
+                    {errors.companyType?.message}
+                  </Field.ErrorText>
+                </Field.Root>
+                <Field.Root invalid={!!errors.companySize}>
+                  <Field.Label>Company size?</Field.Label>
+                  <RadioGroup
+                    value={selectedValueCompanySize || ""}
+                    onValueChange={(e) => setValue("companySize", e.value)}
+                  >
+                    <HStack width="full" wrap="wrap">
+                      {Object.entries(companySize).map(([value, icon]) => {
+                        return (
                           <CustomRadio
+                            key={value}
                             value={value}
-                            registerProps={register("companyType", {
-                              required: "Please select a company type",
+                            registerProps={register("companySize", {
+                              required: "Please select a company size",
                             })}
-                            selectedValue={selectedValueCompanyType}
+                            selectedValue={selectedValueCompanySize}
                             icon={icon}
                           />
-                          {value === "Other" &&
-                            selectedValueCompanyType === "Other" && (
-                              <Input
-                                type="text"
-                                {...register("otherCompanyType")}
-                                placeholder="Please specify"
-                              />
-                            )}
-                        </React.Fragment>
-                      );
-                    })}
-                  </HStack>
-                </RadioGroup>
-                <Field.ErrorText>{errors.companyType?.message}</Field.ErrorText>
-              </Field.Root>
-              <Field.Root invalid={!!errors.companySize}>
-                <Field.Label>Company size?</Field.Label>
-                <RadioGroup
-                  value={selectedValueCompanySize || ""}
-                  onValueChange={(e) => setValue("companySize", e.value)}
-                >
-                  <HStack width="full" wrap="wrap">
-                    {Object.entries(companySize).map(([value, icon]) => {
-                      return (
-                        <CustomRadio
-                          key={value}
-                          value={value}
-                          registerProps={register("companySize", {
-                            required: "Please select a company size",
-                          })}
-                          selectedValue={selectedValueCompanySize}
-                          icon={icon}
-                        />
-                      );
-                    })}
-                  </HStack>
-                </RadioGroup>
-                <Field.ErrorText>{errors.companySize?.message}</Field.ErrorText>
-              </Field.Root>
-              <Separator />
-              <HStack width="full">
-                <Steps.PrevTrigger asChild>
-                  <Button
-                    variant="outline"
-                    type="button"
-                    disabled={createOrganization.isLoading}
-                  >
-                    Back
-                  </Button>
-                </Steps.PrevTrigger>
-                <Steps.NextTrigger asChild>
+                        );
+                      })}
+                    </HStack>
+                  </RadioGroup>
+                  <Field.ErrorText>
+                    {errors.companySize?.message}
+                  </Field.ErrorText>
+                </Field.Root>
+                <Separator />
+                <HStack width="full">
+                  <Steps.PrevTrigger asChild>
+                    <Button
+                      variant="outline"
+                      type="button"
+                      disabled={createOrganization.isLoading}
+                    >
+                      Back
+                    </Button>
+                  </Steps.PrevTrigger>
+
                   <Button
                     colorPalette="orange"
                     type="button"
@@ -496,8 +546,8 @@ export default function OrganizationOnboarding() {
                       ? "Loading..."
                       : "Next"}
                   </Button>
-                </Steps.NextTrigger>
-              </HStack>
+                </HStack>
+              </VStack>
             </Steps.Content>
 
             <Steps.Content index={2}>
@@ -508,105 +558,114 @@ export default function OrganizationOnboarding() {
                 Enter your project type and how you heard about LangWatch to
                 customize your LangWatch experience.
               </Text>
-              <Field.Root invalid={!!errors.projectType}>
-                <Field.Label>Type of project?</Field.Label>
-                <RadioGroup
-                  value={selectedValueProjectType || ""}
-                  onValueChange={(e) => setValue("projectType", e.value)}
-                >
-                  <HStack width="full" wrap="wrap">
-                    {Object.entries(projectType).map(([value, icon]) => {
-                      return (
-                        <React.Fragment key={value}>
-                          <CustomRadio
-                            value={value}
-                            registerProps={register("projectType", {
-                              required: "Please select a project type",
-                            })}
-                            selectedValue={selectedValueProjectType}
-                            icon={icon}
-                          />
-                          {value === "Other" &&
-                            selectedValueProjectType === "Other" && (
-                              <Input
-                                type="text"
-                                {...register("otherProjectType")}
-                                placeholder="Please specify"
-                              />
-                            )}
-                        </React.Fragment>
-                      );
-                    })}
-                  </HStack>
-                </RadioGroup>
-                <Field.ErrorText>{errors.projectType?.message}</Field.ErrorText>
-              </Field.Root>
-              <Field.Root invalid={!!errors.howDidYouHearAboutUs}>
-                <Field.Label>How did you hear about us?</Field.Label>
-                <RadioGroup
-                  value={selectedValueHowDidYouHearAboutUs || ""}
-                  onValueChange={(e) =>
-                    setValue("howDidYouHearAboutUs", e.value)
-                  }
-                >
-                  <HStack width="full" wrap="wrap">
-                    {Object.entries(howDidYouHearAboutUs).map(
-                      ([value, icon]) => {
+              <VStack gap={4}>
+                <Field.Root invalid={!!errors.projectType}>
+                  <Field.Label>Type of project?</Field.Label>
+                  <RadioGroup
+                    value={selectedValueProjectType || ""}
+                    onValueChange={(e) => setValue("projectType", e.value)}
+                  >
+                    <HStack width="full" wrap="wrap">
+                      {Object.entries(projectType).map(([value, icon]) => {
                         return (
                           <React.Fragment key={value}>
                             <CustomRadio
                               value={value}
-                              registerProps={register("howDidYouHearAboutUs", {
-                                required:
-                                  "Please select how you heard about us",
+                              registerProps={register("projectType", {
+                                required: "Please select a project type",
                               })}
-                              selectedValue={selectedValueHowDidYouHearAboutUs}
+                              selectedValue={selectedValueProjectType}
                               icon={icon}
                             />
                             {value === "Other" &&
-                              selectedValueHowDidYouHearAboutUs === "Other" && (
+                              selectedValueProjectType === "Other" && (
                                 <Input
                                   type="text"
-                                  {...register("otherHowDidYouHearAboutUs")}
+                                  {...register("otherProjectType")}
                                   placeholder="Please specify"
                                 />
                               )}
                           </React.Fragment>
                         );
-                      }
-                    )}
-                  </HStack>
-                </RadioGroup>
-                <Field.ErrorText>
-                  {errors.howDidYouHearAboutUs?.message}
-                </Field.ErrorText>
-              </Field.Root>
-              <Separator />
-              <HStack width="full">
-                <Steps.PrevTrigger asChild>
-                  <Button
-                    variant="outline"
-                    type="button"
-                    disabled={createOrganization.isLoading}
+                      })}
+                    </HStack>
+                  </RadioGroup>
+                  <Field.ErrorText>
+                    {errors.projectType?.message}
+                  </Field.ErrorText>
+                </Field.Root>
+                <Field.Root invalid={!!errors.howDidYouHearAboutUs}>
+                  <Field.Label>How did you hear about us?</Field.Label>
+                  <RadioGroup
+                    value={selectedValueHowDidYouHearAboutUs || ""}
+                    onValueChange={(e) =>
+                      setValue("howDidYouHearAboutUs", e.value)
+                    }
                   >
-                    Back
+                    <HStack width="full" wrap="wrap">
+                      {Object.entries(howDidYouHearAboutUs).map(
+                        ([value, icon]) => {
+                          return (
+                            <React.Fragment key={value}>
+                              <CustomRadio
+                                value={value}
+                                registerProps={register(
+                                  "howDidYouHearAboutUs",
+                                  {
+                                    required:
+                                      "Please select how you heard about us",
+                                  }
+                                )}
+                                selectedValue={
+                                  selectedValueHowDidYouHearAboutUs
+                                }
+                                icon={icon}
+                              />
+                              {value === "Other" &&
+                                selectedValueHowDidYouHearAboutUs ===
+                                  "Other" && (
+                                  <Input
+                                    type="text"
+                                    {...register("otherHowDidYouHearAboutUs")}
+                                    placeholder="Please specify"
+                                  />
+                                )}
+                            </React.Fragment>
+                          );
+                        }
+                      )}
+                    </HStack>
+                  </RadioGroup>
+                  <Field.ErrorText>
+                    {errors.howDidYouHearAboutUs?.message}
+                  </Field.ErrorText>
+                </Field.Root>
+                <Separator />
+                <HStack width="full">
+                  <Steps.PrevTrigger asChild>
+                    <Button
+                      variant="outline"
+                      type="button"
+                      disabled={createOrganization.isLoading}
+                    >
+                      Back
+                    </Button>
+                  </Steps.PrevTrigger>
+                  <Button
+                    colorPalette="orange"
+                    type="submit"
+                    disabled={
+                      createOrganization.isLoading ||
+                      createOrganization.isSuccess
+                    }
+                  >
+                    {createOrganization.isLoading ||
+                    createOrganization.isSuccess
+                      ? "Loading..."
+                      : "Next"}
                   </Button>
-                </Steps.PrevTrigger>
-                <Button
-                  colorPalette="orange"
-                  type="submit"
-                  disabled={
-                    createOrganization.isLoading || createOrganization.isSuccess
-                  }
-                  onClick={() => {
-                    checkThirdStep();
-                  }}
-                >
-                  {createOrganization.isLoading || createOrganization.isSuccess
-                    ? "Loading..."
-                    : "Next"}
-                </Button>
-              </HStack>
+                </HStack>
+              </VStack>
             </Steps.Content>
           </Steps.Root>
 
@@ -629,7 +688,7 @@ const CustomRadio = ({
   icon: React.ReactNode;
 }) => {
   return (
-    <Box as="label" key={value}>
+    <Box as="label" key={value} marginTop={1}>
       <input
         type="radio"
         value={value}
@@ -639,10 +698,10 @@ const CustomRadio = ({
       />
       <Box
         cursor="pointer"
-        borderWidth="1px"
         borderRadius="md"
+        borderWidth="1px"
         boxShadow="sm"
-        borderColor={selectedValue === value ? "orange.500" : "gray.300"}
+        borderColor={selectedValue === value ? "orange.500" : "white.300"}
         _checked={{
           borderColor: "orange.500",
         }}
