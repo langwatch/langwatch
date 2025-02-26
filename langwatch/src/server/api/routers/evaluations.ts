@@ -37,7 +37,10 @@ export const evaluationsRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        evaluatorType: evaluatorsSchema.keyof(),
+        evaluatorType: z.union([
+          evaluatorsSchema.keyof(),
+          z.string().refine((val) => val.startsWith("custom/")),
+        ]),
         traceId: z.string(),
         settings: z.object({}).passthrough(),
         mappings: z.record(z.string(), z.string()).optional(),
