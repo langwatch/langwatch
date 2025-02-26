@@ -1,9 +1,10 @@
-import { Button, HStack, Heading, Spacer, Tooltip } from "@chakra-ui/react";
+import { Box, Button, HStack, Heading, Spacer } from "@chakra-ui/react";
 import { MessageSquare } from "react-feather";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { FilterToggle } from "../filters/FilterToggle";
 import { useRouter } from "next/router";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { Tooltip } from "../ui/tooltip";
 
 export function AnalyticsHeader({ title }: { title: string }) {
   const router = useRouter();
@@ -15,12 +16,12 @@ export function AnalyticsHeader({ title }: { title: string }) {
   } = usePeriodSelector();
 
   return (
-    <HStack width="full" align="top" paddingBottom={6}>
-      <HStack align="center" spacing={6}>
+    <HStack width="full" align="top" paddingBottom={4}>
+      <HStack align="center" gap={6}>
         <Heading as={"h1"} size="lg" paddingTop={1}>
           {title}
         </Heading>
-        <Tooltip label="Show messages behind those metrics">
+        <Tooltip content="Show messages behind those metrics">
           <Button
             variant="outline"
             minWidth={0}
@@ -45,8 +46,10 @@ export function AnalyticsHeader({ title }: { title: string }) {
         </Tooltip>
       </HStack>
       <Spacer />
-      <FilterToggle />
-      <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+      <HStack marginBottom="-8px" gap={0}>
+        <FilterToggle />
+        <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+      </HStack>
     </HStack>
   );
 }

@@ -48,7 +48,7 @@ export function UndoRedo() {
         size="xs"
         variant="ghost"
         onClick={() => undo()}
-        isDisabled={pastStates.length === 0}
+        disabled={pastStates.length === 0}
       >
         <RotateCcw width="16px" />
       </Button>
@@ -57,7 +57,7 @@ export function UndoRedo() {
         size="xs"
         variant="ghost"
         onClick={() => redo()}
-        isDisabled={futureStates.length === 0}
+        disabled={futureStates.length === 0}
       >
         <RotateCw width="16px" />
       </Button>

@@ -1,36 +1,29 @@
 import {
   Button,
-  Checkbox,
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  DrawerHeader,
-  FormControl,
-  FormHelperText,
+  Field,
   HStack,
   IconButton,
   Input,
-  Radio,
-  RadioGroup,
-  Select,
+  NativeSelect,
   Spacer,
   Text,
   Textarea,
   VStack,
-  useToast,
 } from "@chakra-ui/react";
 import { useForm } from "react-hook-form";
 
-import { AddIcon } from "@chakra-ui/icons";
 import { useState } from "react";
-import { X } from "react-feather";
+import { Plus, X } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useDrawer } from "./CurrentDrawer";
 
 import { AnnotationScoreDataType } from "@prisma/client";
 import { FullWidthFormControl } from "./FullWidthFormControl";
+import { toaster } from "../components/ui/toaster";
+import { Checkbox } from "./ui/checkbox";
+import { Radio, RadioGroup } from "./ui/radio";
+import { Drawer } from "./ui/drawer";
 
 export const AddAnnotationScoreDrawer = ({
   onClose,
@@ -40,7 +33,6 @@ export const AddAnnotationScoreDrawer = ({
   onOverlayClick: () => void;
 }) => {
   const { project } = useOrganizationTeamProject();
-  const toast = useToast();
   const createAnnotationScore = api.annotationScore.create.useMutation();
   const { closeDrawer } = useDrawer();
 
@@ -96,13 +88,14 @@ export const AddAnnotationScoreDrawer = ({
       radioCheckboxOptions.length === 0 ||
       radioCheckboxOptions.every((opt) => !opt.trim())
     ) {
-      toast({
+      toaster.create({
         title: "Error creating annotation score",
         description: "Please add at least one option",
-        status: "error",
-        duration: 5000,
-        isClosable: true,
-        position: "top-right",
+        type: "error",
+        meta: {
+          closable: true,
+        },
+        placement: "top-end",
       });
       return;
     }
@@ -115,12 +108,14 @@ export const AddAnnotationScoreDrawer = ({
       opt.toLowerCase()
     );
     if (normalizedOptions.length !== new Set(normalizedOptions).size) {
-      toast({
+      toaster.create({
         title: "Error creating annotation score",
         description: "Duplicate options are not allowed (case-insensitive)",
-        status: "error",
-        duration: 5000,
-        isClosable: true,
+        type: "error",
+        meta: {
+          closable: true,
+        },
+        placement: "top-end",
       });
       return;
     }
@@ -140,13 +135,14 @@ export const AddAnnotationScoreDrawer = ({
       },
       {
         onSuccess: (data) => {
-          toast({
+          toaster.create({
             title: "Annotation Score Created",
             description: `Successfully created ${data.name} annotation score`,
-            status: "success",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            type: "success",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
           void queryClient.annotationScore.getAllActive.invalidate();
 
@@ -154,13 +150,14 @@ export const AddAnnotationScoreDrawer = ({
           reset();
         },
         onError: (error) => {
-          toast({
+          toaster.create({
             title: "Error creating annotation score",
             description: error.message,
-            status: "error",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            type: "error",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
         },
       }
@@ -170,39 +167,43 @@ export const AddAnnotationScoreDrawer = ({
   const watchDataType = watch("dataType");
 
   return (
-    <Drawer
-      isOpen={true}
-      placement="right"
-      size={"lg"}
-      onClose={handleClose}
-      onOverlayClick={handleClose}
+    <Drawer.Root
+      open={true}
+      placement="end"
+      size="lg"
+      onOpenChange={({ open }) => {
+        if (!open) {
+          handleClose();
+        }
+      }}
+      onInteractOutside={handleClose}
     >
-      <DrawerContent>
-        <DrawerHeader>
+      <Drawer.Content>
+        <Drawer.Header>
           <HStack>
-            <DrawerCloseButton />
+            <Drawer.CloseTrigger />
           </HStack>
           <HStack>
             <Text paddingTop={5} fontSize="2xl">
               Add Score Metric
             </Text>
           </HStack>
-        </DrawerHeader>
-        <DrawerBody>
+        </Drawer.Header>
+        <Drawer.Body>
           {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
           <form onSubmit={handleSubmit(onSubmit)}>
-            <VStack spacing={2} align="start">
+            <VStack gap={2} align="start">
               <FullWidthFormControl
                 label="Name"
                 helper="Give it a name that makes it easy to identify this score metric"
-                isInvalid={!!errors.name}
+                invalid={!!errors.name}
               >
                 <Input {...register("name")} required />
               </FullWidthFormControl>
               <FullWidthFormControl
                 label="Description"
                 helper="Provide a description of the score metric"
-                isInvalid={!!errors.description}
+                invalid={!!errors.description}
               >
                 <Textarea {...register("description")} required />
               </FullWidthFormControl>
@@ -215,43 +216,38 @@ export const AddAnnotationScoreDrawer = ({
                     ? "Allow multiple selections with checkboxes"
                     : "Select the score type for the score metric"
                 }
-                isInvalid={!!errors.dataType}
+                invalid={!!errors.dataType}
               >
                 <HStack width="full">
-                  <VStack align="start" width="full" spacing={0}>
-                    <Select
-                      {...register("dataType")}
-                      placeholder="Select score type"
-                      required
-                    >
-                      <option value={AnnotationScoreDataType.OPTION}>
-                        Multiple choice
-                      </option>
-                      <option value={AnnotationScoreDataType.CHECKBOX}>
-                        Checkboxes
-                      </option>
-                    </Select>
+                  <VStack align="start" width="full" gap={0}>
+                    <NativeSelect.Root>
+                      <NativeSelect.Field {...register("dataType")}>
+                        <option value={AnnotationScoreDataType.OPTION}>
+                          Multiple choice
+                        </option>
+                        <option value={AnnotationScoreDataType.CHECKBOX}>
+                          Checkboxes
+                        </option>
+                      </NativeSelect.Field>
+                      <NativeSelect.Indicator />
+                    </NativeSelect.Root>
                   </VStack>
                 </HStack>
 
                 {watchDataType === "OPTION" && (
-                  <FormControl mt={4}>
-                    <VStack align="start" width="full" spacing={2}>
+                  <Field.Root mt={4}>
+                    <VStack align="start" width="full" gap={2}>
                       <RadioGroup
                         verticalAlign="start"
                         width="full"
                         defaultValue={defaultRadioOption}
                         value={defaultRadioOption}
                       >
-                        <VStack align="start" width="full" spacing={2}>
+                        <VStack align="start" width="full" gap={2}>
                           {radioCheckboxOptions.map((option, index) => (
-                            <HStack key={index} spacing={2} width="full">
+                            <HStack key={index} gap={2} width="full">
                               <Radio
                                 value={option}
-                                isChecked={
-                                  defaultRadioOption === option &&
-                                  defaultRadioOption !== ""
-                                }
                                 onChange={(e) => {
                                   setDefaultRadioOption(e.target.value);
                                 }}
@@ -277,7 +273,6 @@ export const AddAnnotationScoreDrawer = ({
                               />
                               <IconButton
                                 aria-label="Remove option"
-                                icon={<X />}
                                 onClick={() => {
                                   const newOptions =
                                     radioCheckboxOptions.filter(
@@ -285,42 +280,44 @@ export const AddAnnotationScoreDrawer = ({
                                     );
                                   setRadioCheckboxOptions(newOptions);
                                 }}
-                                isDisabled={radioCheckboxOptions.length === 1}
-                              />
+                                disabled={radioCheckboxOptions.length === 1}
+                              >
+                                <X />
+                              </IconButton>
                             </HStack>
                           ))}
                         </VStack>
                       </RadioGroup>
 
                       <Button
-                        leftIcon={<AddIcon />}
                         onClick={() =>
                           setRadioCheckboxOptions([...radioCheckboxOptions, ""])
                         }
                         size="sm"
-                        colorScheme="orange"
+                        colorPalette="orange"
                       >
+                        <Plus />
                         Add Option
                       </Button>
                       {defaultRadioOption !== "" && (
-                        <FormHelperText>
+                        <Field.HelperText>
                           <HStack>
                             <Text>Default Option: {defaultRadioOption} </Text>
                           </HStack>
-                        </FormHelperText>
+                        </Field.HelperText>
                       )}
                     </VStack>
-                  </FormControl>
+                  </Field.Root>
                 )}
                 {watchDataType === "CHECKBOX" && (
-                  <FormControl mt={4}>
+                  <Field.Root mt={4}>
                     <VStack align="start" width="full">
                       {radioCheckboxOptions.map((option, index) => (
-                        <HStack key={index} spacing={2} width="full">
+                        <HStack key={index} gap={2} width="full">
                           <Checkbox
                             value={option}
-                            isDisabled={!option.trim()}
-                            onChange={(e) => {
+                            disabled={!option.trim()}
+                            onChange={() => {
                               if (defaultCheckboxOption.includes(option)) {
                                 setTimeout(() => {
                                   setDefaultCheckboxOption(
@@ -348,46 +345,47 @@ export const AddAnnotationScoreDrawer = ({
                           />
                           <IconButton
                             aria-label="Remove option"
-                            icon={<X />}
                             onClick={() => {
                               const newOptions = radioCheckboxOptions.filter(
                                 (_, i) => i !== index
                               );
                               setRadioCheckboxOptions(newOptions);
                             }}
-                            isDisabled={radioCheckboxOptions.length === 1}
-                          />
+                            disabled={radioCheckboxOptions.length === 1}
+                          >
+                            <X />
+                          </IconButton>
                         </HStack>
                       ))}
                       <Button
-                        leftIcon={<AddIcon />}
                         onClick={() =>
                           setRadioCheckboxOptions([...radioCheckboxOptions, ""])
                         }
                         size="sm"
-                        colorScheme="orange"
+                        colorPalette="orange"
                       >
+                        <Plus />
                         Add Option
                       </Button>
                       {defaultCheckboxOption.length > 0 && (
-                        <FormHelperText>
+                        <Field.HelperText>
                           <HStack>
                             <Text>
                               Default Options:{" "}
                               {defaultCheckboxOption.join(", ")}
                             </Text>
                           </HStack>
-                        </FormHelperText>
+                        </Field.HelperText>
                       )}
                     </VStack>
-                  </FormControl>
+                  </Field.Root>
                 )}
               </FullWidthFormControl>
 
               <HStack width="full">
                 <Spacer />
                 <Button
-                  colorScheme="orange"
+                  colorPalette="orange"
                   type="submit"
                   minWidth="fit-content"
                 >
@@ -396,8 +394,8 @@ export const AddAnnotationScoreDrawer = ({
               </HStack>
             </VStack>
           </form>
-        </DrawerBody>
-      </DrawerContent>
-    </Drawer>
+        </Drawer.Body>
+      </Drawer.Content>
+    </Drawer.Root>
   );
 };

@@ -1,7 +1,7 @@
 import {
   Box,
   Button,
-  FormErrorMessage,
+  Field,
   Heading,
   HStack,
   Textarea,
@@ -120,10 +120,10 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
     >
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={handleSubmit(onSubmit)}>
-        <VStack align="start" spacing={3} width="full">
+        <VStack align="start" gap={3} width="full">
           <Heading
             as="h3"
-            fontSize={16}
+            fontSize="16px"
             fontWeight="bold"
             textTransform="uppercase"
             color="gray.600"
@@ -136,7 +136,7 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
               key={input.identifier}
               label={input.identifier}
               helper={""}
-              isInvalid={!!errors[input.identifier]}
+              invalid={!!errors[input.identifier]}
             >
               <Textarea
                 {...register(input.identifier)}
@@ -148,18 +148,14 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
                     : input.type
                 }
               />
-              <FormErrorMessage>
+              <Field.ErrorText>
                 {errors[input.identifier]?.message}
-              </FormErrorMessage>
+              </Field.ErrorText>
             </HorizontalFormControl>
           ))}
           <HStack width="full" justify="end">
-            <Button
-              type="submit"
-              colorScheme="green"
-              rightIcon={<Play size={16} />}
-            >
-              Execute
+            <Button type="submit" colorPalette="green">
+              Execute <Play size={16} />
             </Button>
           </HStack>
         </VStack>

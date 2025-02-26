@@ -1,4 +1,4 @@
-import { useToast } from "@chakra-ui/react";
+import { toaster } from "../../components/ui/toaster";
 import { useCallback, useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { getDebugger } from "../../utils/logger";
@@ -53,7 +53,6 @@ export const useSocketClient = () => {
     playgroundOpen: state.playgroundOpen,
   }));
 
-  const toast = useToast();
   const alertOnComponent = useAlertOnComponent();
 
   const checkIfUnreachableErrorMessage = useCallback(
@@ -88,31 +87,32 @@ export const useSocketClient = () => {
     [setWorkflowExecutionState, getWorkflow, setComponentExecutionState]
   );
 
-  const alertOnError = useCallback(
-    (message: string | undefined) => {
-      if (
-        !!message?.toLowerCase().includes("stopped") ||
-        !!message?.toLowerCase().includes("interrupted")
-      ) {
-        toast({
-          title: "Stopped",
-          description: message?.slice(0, 140),
-          status: "info",
-          duration: 3000,
-          isClosable: true,
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: message?.slice(0, 140),
-          status: "error",
-          duration: 5000,
-          isClosable: true,
-        });
-      }
-    },
-    [toast]
-  );
+  const alertOnError = useCallback((message: string | undefined) => {
+    if (
+      !!message?.toLowerCase().includes("stopped") ||
+      !!message?.toLowerCase().includes("interrupted")
+    ) {
+      toaster.create({
+        title: "Stopped",
+        description: message?.slice(0, 140),
+        type: "info",
+        meta: {
+          closable: true,
+        },
+        duration: 3000,
+      });
+    } else {
+      toaster.create({
+        title: "Error",
+        description: message?.slice(0, 140),
+        type: "error",
+        meta: {
+          closable: true,
+        },
+        duration: 5000,
+      });
+    }
+  }, []);
 
   const handleMessage = useCallback(
     (event: MessageEvent) => {
@@ -199,33 +199,34 @@ export const useSocketClient = () => {
         case "done":
           break;
         default:
-          toast({
+          toaster.create({
             title: "Unknown message type on client",
             //@ts-expect-error
             description: data.type,
-            status: "warning",
+            type: "warning",
+            meta: {
+              closable: true,
+            },
             duration: 5000,
-            isClosable: true,
           });
           break;
       }
     },
     [
       setSocketStatus,
-      setComponentExecutionState,
       getWorkflow,
+      setComponentExecutionState,
+      playgroundOpen,
       setWorkflowExecutionState,
       setEvaluationState,
       setOptimizationState,
       checkIfUnreachableErrorMessage,
       stopWorkflowIfRunning,
       alertOnError,
-      toast,
       alertOnComponent,
       setSelectedNode,
       setPropertiesExpanded,
       setOpenResultsPanelRequest,
-      playgroundOpen,
     ]
   );
 

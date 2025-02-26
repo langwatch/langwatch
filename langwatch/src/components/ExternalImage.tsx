@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Box, Image, Tooltip, Text } from "@chakra-ui/react";
+import { Box, Image, Text } from "@chakra-ui/react";
+import { Tooltip } from "../components/ui/tooltip";
 
 export const isImageUrl = (str: string): boolean => {
   if (!str) {
@@ -66,9 +67,9 @@ export const ExternalImage = ({
   if (error) {
     return (
       <Tooltip
-        label={<Text noOfLines={1}>Failed to load image: {src}</Text>}
-        hasArrow
-        placement="top"
+        content={<Text lineClamp={1}>Failed to load image: {src}</Text>}
+        showArrow
+        positioning={{ placement: "top" }}
       >
         <Box
           border="1px solid"

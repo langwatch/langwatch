@@ -1,8 +1,5 @@
 import {
   Alert,
-  AlertDescription,
-  AlertIcon,
-  AlertTitle,
   Button,
   HStack,
   Progress,
@@ -16,7 +13,7 @@ import { EvaluationProgressBar } from "../../components/experiments/BatchEvaluat
 
 export function ProgressToast() {
   return (
-    <VStack spacing={4}>
+    <VStack gap={4}>
       <EvaluationProgressToast />
       <OptimizationProgressToast />
     </VStack>
@@ -99,8 +96,7 @@ export function BaseProgressToast({
   onCancel: () => void;
 }) {
   return (
-    <Alert
-      status="info"
+    <Alert.Root
       position="absolute"
       bottom="3"
       right="3"
@@ -113,14 +109,14 @@ export function BaseProgressToast({
       borderColor="gray.200"
       onClick={onClick}
     >
-      <VStack align="start" spacing={1}>
-        <VStack align="start" spacing={1} paddingY={2} paddingX={3}>
-          <HStack spacing={0}>
-            <AlertIcon />
-            <AlertTitle>Please wait...</AlertTitle>
+      <VStack align="start" gap={1}>
+        <VStack align="start" gap={1} paddingY={2} paddingX={3}>
+          <HStack gap={0}>
+            <Alert.Indicator />
+            <Alert.Title>Please wait...</Alert.Title>
           </HStack>
           <HStack minWidth="300px">
-            <AlertDescription fontSize="14px">{description}</AlertDescription>
+            <Alert.Description fontSize="14px">{description}</Alert.Description>
             <Spacer />
             <Button
               size="sm"
@@ -135,7 +131,7 @@ export function BaseProgressToast({
         </VStack>
         {progress}
       </VStack>
-    </Alert>
+    </Alert.Root>
   );
 }
 
@@ -147,16 +143,19 @@ export function OptimizationProgressBar({
   const isIndeterminate = true;
 
   return (
-    <HStack width="full" spacing={4}>
-      <Progress
+    <HStack width="full" gap={4}>
+      <Progress.Root
         size={size}
         width="full"
-        colorScheme="blue"
-        isIndeterminate={isIndeterminate}
-        isAnimated
-        borderRadius="sm"
-        hasStripe
-      />
+        colorPalette="blue"
+        value={undefined}
+      >
+        <Progress.Track>
+          <Progress.Range
+            animation={isIndeterminate ? "progress-indeterminate" : undefined}
+          />
+        </Progress.Track>
+      </Progress.Root>
     </HStack>
   );
 }

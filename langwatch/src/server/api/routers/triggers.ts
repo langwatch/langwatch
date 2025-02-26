@@ -109,7 +109,10 @@ export const triggerRouter = createTRPCRouter({
         triggerId: z.string(),
         message: z.string(),
         projectId: z.string(),
-        alertType: z.nativeEnum(AlertType),
+        alertType: z
+          .union([z.nativeEnum(AlertType), z.literal("")])
+          .optional()
+          .nullable(),
         name: z.string().optional(),
       })
     )
@@ -119,7 +122,7 @@ export const triggerRouter = createTRPCRouter({
         where: { id: input.triggerId, projectId: input.projectId },
         data: {
           message: input.message,
-          alertType: input.alertType,
+          alertType: input.alertType ? input.alertType : null,
           name: input.name,
         },
       });

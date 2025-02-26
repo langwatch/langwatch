@@ -1,12 +1,11 @@
 import {
   Box,
   Card,
-  CardBody,
-  CardHeader,
   GridItem,
+  SimpleGrid,
   HStack,
   Heading,
-  SimpleGrid,
+  VStack,
 } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
 import GraphsLayout from "~/components/GraphsLayout";
@@ -102,75 +101,73 @@ export default function Topics() {
   return (
     <GraphsLayout>
       <AnalyticsHeader title="Topics" />
-      <HStack alignItems={"start"}>
-        <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width={"100%"}>
-          <GridItem colSpan={1}>
-            <Card height="100%">
-              <CardHeader>
+      <HStack alignItems="start" width="full" gap={6}>
+        <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
+          <GridItem colSpan={1} display="inline-grid">
+            <Card.Root height="100%">
+              <Card.Header>
                 <Heading size="sm">Top Topics</Heading>
-              </CardHeader>
-              <CardBody maxHeight="340px" overflowY="scroll">
+              </Card.Header>
+              <Card.Body maxHeight="340px" overflowY="scroll">
                 <TopicsSelector showTitle={false} />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
-          <GridItem colSpan={3} display={"inline-grid"}>
-            <Card>
-              <CardHeader>
-                <HStack>
+          <GridItem colSpan={3} display="inline-grid">
+            <Card.Root>
+              <Card.Header>
+                <HStack gap={2}>
                   <BarChart2 color="orange" />
                   <Heading size="sm">Threads Per Topic</Heading>
                 </HStack>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <CustomGraph input={threadsPerTopic as CustomGraphInput} />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
-          <GridItem colSpan={2} display={"inline-grid"}>
-            <Card>
-              <CardHeader>
-                <HStack>
+          <GridItem colSpan={2} display="inline-grid">
+            <Card.Root>
+              <Card.Header>
+                <HStack gap={2}>
                   <BarChart2 color="orange" />
                   <Heading size="sm">Input Sentiment Per Topic</Heading>
                 </HStack>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <CustomGraph
                   input={inputSentimenPerTopic as CustomGraphInput}
                 />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
-          <GridItem colSpan={2} display={"inline-grid"}>
-            <Card>
-              <CardHeader>
-                <HStack>
+          <GridItem colSpan={2} display="inline-grid">
+            <Card.Root>
+              <Card.Header>
+                <HStack gap={2}>
                   <BarChart2 color="orange" />
                   <Heading size="sm">Most Discussed Topics</Heading>
                 </HStack>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <CustomGraph input={mostDisucussedTopics as CustomGraphInput} />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
           <GridItem colSpan={4}>
-            <Card>
-              <CardBody>
-                <HStack>
-                  <Heading size="sm"> Total documents</Heading>
+            <Card.Root>
+              <Card.Body>
+                <HStack gap={2}>
+                  <Heading size="sm">Total documents</Heading>
                 </HStack>
 
                 <DocumentsCountsSummary />
                 <DocumentsCountsTable />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
         </SimpleGrid>
-        <Box padding={3}>
-          <FilterSidebar hideTopics={true} />
-        </Box>
+        <FilterSidebar hideTopics={true} />
       </HStack>
     </GraphsLayout>
   );

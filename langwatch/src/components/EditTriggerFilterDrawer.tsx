@@ -1,27 +1,18 @@
-import {
-  Button,
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  DrawerHeader,
-  HStack,
-  Text,
-  useToast,
-} from "@chakra-ui/react";
+import { Button, HStack, Text } from "@chakra-ui/react";
+import { useRouter } from "next/router";
 import { useDrawer } from "~/components/CurrentDrawer";
-import { HorizontalFormControl } from "./HorizontalFormControl";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
 import type { FilterField } from "~/server/filters/types";
+import { api } from "~/utils/api";
+import { Drawer } from "../components/ui/drawer";
+import { toaster } from "../components/ui/toaster";
 import { FieldsFilters } from "./filters/FieldsFilters";
-import { useRouter } from "next/router";
+import { HorizontalFormControl } from "./HorizontalFormControl";
 
 export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
   const { project } = useOrganizationTeamProject();
 
-  const toast = useToast();
   const updateTriggerFilters = api.trigger.updateTriggerFilters.useMutation();
   const { getLatestFilters, clearFilters, setFilters } = useFilterParams();
   const router = useRouter();
@@ -65,12 +56,14 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
     if (
       Object.values(filterParams.filters).every((values) => values.length === 0)
     ) {
-      toast({
+      toaster.create({
         title: "Error",
         description: "Please add at least one filter",
-        status: "error",
-        position: "top-right",
-        isClosable: true,
+        type: "error",
+        placement: "top-end",
+        meta: {
+          closable: true,
+        },
       });
       return;
     }
@@ -89,14 +82,14 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
       },
       {
         onSuccess: () => {
-          toast({
+          toaster.create({
             title: "Trigger Updated",
             description: `You have successfully updated the trigger`,
-
-            status: "success",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            type: "success",
+            placement: "top-end",
+            meta: {
+              closable: true,
+            },
           });
 
           void queryClient.trigger.getTriggers.invalidate();
@@ -107,13 +100,14 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
           });
         },
         onError: () => {
-          toast({
+          toaster.create({
             title: "Error",
             description: "Error updating trigger",
-            status: "error",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            type: "error",
+            placement: "top-end",
+            meta: {
+              closable: true,
+            },
           });
         },
       }
@@ -121,25 +115,25 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
   };
 
   return (
-    <Drawer
-      isOpen={true}
-      placement="right"
-      size={"lg"}
-      onClose={closeDrawer}
-      onOverlayClick={closeDrawer}
+    <Drawer.Root
+      open={true}
+      placement="end"
+      size="lg"
+      onOpenChange={() => closeDrawer()}
     >
-      <DrawerContent>
-        <DrawerHeader>
+      <Drawer.Backdrop />
+      <Drawer.Content>
+        <Drawer.Header>
           <HStack>
-            <DrawerCloseButton />
+            <Drawer.CloseTrigger />
           </HStack>
           <HStack>
             <Text paddingTop={5} fontSize="2xl">
               Edit Trigger Filter
             </Text>
           </HStack>
-        </DrawerHeader>
-        <DrawerBody>
+        </Drawer.Header>
+        <Drawer.Body>
           <HorizontalFormControl
             label="Current filters"
             helper="Add or remove filters to the trigger."
@@ -150,17 +144,17 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
 
           <HStack justifyContent="flex-end" marginY={5}>
             <Button
-              colorScheme="blue"
+              colorPalette="blue"
               type="submit"
               minWidth="fit-content"
-              isLoading={updateTriggerFilters.isLoading}
+              loading={updateTriggerFilters.isLoading}
               onClick={onSubmit}
             >
               Update Filters
             </Button>
           </HStack>
-        </DrawerBody>
-      </DrawerContent>
-    </Drawer>
+        </Drawer.Body>
+      </Drawer.Content>
+    </Drawer.Root>
   );
 }

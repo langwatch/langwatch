@@ -1,4 +1,4 @@
-import { useToast } from "@chakra-ui/react";
+import { toaster } from "../../components/ui/toaster";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import type { StudioClientEvent } from "../types/events";
@@ -7,8 +7,6 @@ import { useWorkflowStore } from "./useWorkflowStore";
 
 export const useEvaluationExecution = () => {
   const { sendMessage, socketStatus } = useSocketClient();
-
-  const toast = useToast();
 
   const [triggerTimeout, setTriggerTimeout] = useState<{
     run_id: string;
@@ -24,16 +22,18 @@ export const useEvaluationExecution = () => {
 
   const socketAvailable = useCallback(() => {
     if (socketStatus !== "connected") {
-      toast({
+      toaster.create({
         title: "Studio is not connected",
-        status: "error",
+        type: "error",
         duration: 5000,
-        isClosable: true,
+        meta: {
+          closable: true,
+        },
       });
       return false;
     }
     return true;
-  }, [socketStatus, toast]);
+  }, [socketStatus]);
 
   useEffect(() => {
     const workflow = getWorkflow();
@@ -47,18 +47,20 @@ export const useEvaluationExecution = () => {
         error: "Timeout",
         timestamps: { finished_at: Date.now() },
       });
-      toast({
+      toaster.create({
         title: `Timeout ${
           triggerTimeout.timeout_on_status === "waiting"
             ? "starting"
             : "stopping"
         } evaluation execution`,
-        status: "error",
+        type: "error",
         duration: 5000,
-        isClosable: true,
+        meta: {
+          closable: true,
+        },
       });
     }
-  }, [triggerTimeout, setEvaluationState, getWorkflow, toast]);
+  }, [triggerTimeout, setEvaluationState, getWorkflow]);
 
   const startEvaluationExecution = useCallback(
     ({

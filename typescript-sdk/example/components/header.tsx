@@ -38,7 +38,7 @@ async function UserOrLogin() {
         {session?.user ? (
           <UserMenu user={session.user} />
         ) : (
-          <Button variant="link" asChild className="-ml-2">
+          <Button variant="plain" asChild className="-ml-2">
             <Link href="/login">Login</Link>
           </Button>
         )}
@@ -74,23 +74,23 @@ export function Header() {
       <div className="flex items-center">
         <LogoIcon width={19} height={26} />
         <IconSeparator className="size-6 text-muted-foreground/50 ml-3" />
-        <Button variant="link" asChild className="-ml-2">
+        <Button variant="plain" asChild className="-ml-2">
           <Link href="/">Vercel AI SDK</Link>
         </Button>
         <IconSeparator className="size-6 text-muted-foreground/50" />
-        <Button variant="link" asChild className="-ml-2">
+        <Button variant="plain" asChild className="-ml-2">
           <Link href="/langchain">LangChain.js</Link>
         </Button>
         <IconSeparator className="size-6 text-muted-foreground/50" />
-        <Button variant="link" asChild className="-ml-2">
+        <Button variant="plain" asChild className="-ml-2">
           <Link href="/langchain-rag">LangChain.js RAG</Link>
         </Button>
         <IconSeparator className="size-6 text-muted-foreground/50" />
-        <Button variant="link" asChild className="-ml-2">
+        <Button variant="plain" asChild className="-ml-2">
           <Link href="/guardrails">Guardrails</Link>
         </Button>
         <IconSeparator className="size-6 text-muted-foreground/50" />
-        <Button variant="link" asChild className="-ml-2">
+        <Button variant="plain" asChild className="-ml-2">
           <Link href="/manual">Manual Tracing</Link>
         </Button>
       </div>

@@ -44,11 +44,11 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
       boxShadow="0 0 10px rgba(0,0,0,0.05)"
       overflowY="auto"
     >
-      <VStack align="start" spacing={3}>
+      <VStack align="start" gap={3}>
         <HStack align="center" width="full" paddingBottom={3}>
           <Heading
             as="h3"
-            fontSize={16}
+            fontSize="16px"
             fontWeight="bold"
             textTransform="uppercase"
             color="gray.600"
@@ -60,7 +60,7 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
           {node.data.execution_state?.timestamps &&
             (node.data.execution_state?.status === "success" ||
               node.data.execution_state?.status === "error") && (
-              <HStack spacing={3}>
+              <HStack gap={3}>
                 {node.data.execution_state.cost !== undefined && (
                   <Text color="gray.500">
                     {numeral(node.data.execution_state.cost).format(
@@ -122,9 +122,9 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
               <Text>Running...</Text>
             ) : null}
             {node.data.execution_state.status === "error" && (
-              <VStack width="full" align="start" spacing={3}>
+              <VStack width="full" align="start" gap={3}>
                 <Text
-                  fontSize={13}
+                  fontSize="13px"
                   fontWeight="bold"
                   textTransform="uppercase"
                   color="gray.600"
@@ -164,7 +164,7 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
                       width="full"
                       align="start"
                       key={identifier}
-                      spacing={3}
+                      gap={3}
                       color={
                         isSkipped
                           ? "yellow.600"
@@ -176,7 +176,7 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
                       }
                     >
                       <Text
-                        fontSize={13}
+                        fontSize="13px"
                         fontWeight="bold"
                         textTransform="uppercase"
                         color={

@@ -1,43 +1,31 @@
 import {
+  Badge,
   Button,
   Card,
-  CardBody,
-  HStack,
   Heading,
-  Link,
+  HStack,
   Spacer,
   Table,
-  Tbody,
-  Td,
-  Th,
-  Thead,
-  Tr,
-  VStack,
-  useToast,
   Text,
-  RadioGroup,
-  Radio,
-  Checkbox,
-  CheckboxGroup,
-  Tag,
+  VStack,
 } from "@chakra-ui/react";
-import { Bell, Plus, ThumbsUp } from "react-feather";
-import { useDrawer } from "~/components/CurrentDrawer";
-import { CheckIcon } from "@chakra-ui/icons";
 import { AnnotationScoreDataType } from "@prisma/client";
+import { Plus, ThumbsUp } from "react-feather";
+import { useDrawer } from "~/components/CurrentDrawer";
 
-import { Switch } from "@chakra-ui/react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import SettingsLayout from "../../components/SettingsLayout";
-import { api } from "../../utils/api";
 import { useEffect } from "react";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import SettingsLayout from "../../components/SettingsLayout";
+import { Link } from "../../components/ui/link";
+import { Switch } from "../../components/ui/switch";
+import { toaster } from "../../components/ui/toaster";
+import { api } from "../../utils/api";
 
 const AnnotationScorePage = () => {
   const { project } = useOrganizationTeamProject();
-  const toast = useToast();
 
-  const { openDrawer, isDrawerOpen } = useDrawer();
+  const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
 
   const getAllAnnotationScores = api.annotationScore.getAll.useQuery(
     {
@@ -62,12 +50,14 @@ const AnnotationScorePage = () => {
           void getAllAnnotationScores.refetch();
         },
         onError: () => {
-          toast({
+          toaster.create({
             title: "Update score",
-            status: "error",
+            type: "error",
             description: "Failed to update score",
             duration: 6000,
-            isClosable: true,
+            meta: {
+              closable: true,
+            },
           });
         },
       }
@@ -79,7 +69,7 @@ const AnnotationScorePage = () => {
       <VStack
         paddingX={4}
         paddingY={6}
-        spacing={6}
+        gap={6}
         width="full"
         maxWidth="6xl"
         align="start"
@@ -91,15 +81,14 @@ const AnnotationScorePage = () => {
           <Spacer />
           <Button
             size="sm"
-            colorScheme="orange"
-            leftIcon={<Plus size={20} />}
+            colorPalette="orange"
             onClick={() => openDrawer("addAnnotationScore")}
           >
-            Add new score metric
+            <Plus size={20} /> Add new score metric
           </Button>
         </HStack>
-        <Card width="full">
-          <CardBody>
+        <Card.Root width="full">
+          <Card.Body>
             {getAllAnnotationScores.data &&
             getAllAnnotationScores.data.length == 0 ? (
               <NoDataInfoBlock
@@ -112,7 +101,7 @@ const AnnotationScorePage = () => {
                     <Link
                       color="orange.400"
                       href="https://docs.langwatch.ai/features/annotations#annotation-scoring"
-                      target="_blank"
+                      isExternal
                     >
                       documentation
                     </Link>
@@ -122,29 +111,29 @@ const AnnotationScorePage = () => {
                 icon={<ThumbsUp />}
               />
             ) : (
-              <Table variant="simple" width="full">
-                <Thead>
-                  <Tr>
-                    <Th>Name</Th>
-                    <Th>Description</Th>
-                    <Th>Score Type</Th>
-                    <Th>Score Options</Th>
-                    <Th>Status</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
+              <Table.Root variant="line" width="full">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Name</Table.ColumnHeader>
+                    <Table.ColumnHeader>Description</Table.ColumnHeader>
+                    <Table.ColumnHeader>Score Type</Table.ColumnHeader>
+                    <Table.ColumnHeader>Score Options</Table.ColumnHeader>
+                    <Table.ColumnHeader>Enabled</Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
                   {getAllAnnotationScores.data?.map((score) => (
-                    <Tr key={score.id}>
-                      <Td>{score.name}</Td>
-                      <Td>{score.description}</Td>
-                      <Td width="20%">
-                        <Text noOfLines={1}>
+                    <Table.Row key={score.id}>
+                      <Table.Cell>{score.name}</Table.Cell>
+                      <Table.Cell>{score.description}</Table.Cell>
+                      <Table.Cell width="20%">
+                        <Text lineClamp={1}>
                           {score.dataType === AnnotationScoreDataType.CHECKBOX
                             ? "Checkbox"
                             : "Multiple choice"}
                         </Text>
-                      </Td>
-                      <Td>
+                      </Table.Cell>
+                      <Table.Cell>
                         <ScoreOptions
                           options={
                             Array.isArray(score.options)
@@ -156,22 +145,22 @@ const AnnotationScorePage = () => {
                           }
                           dataType={score.dataType ?? ""}
                         />
-                      </Td>
-                      <Td textAlign="center">
+                      </Table.Cell>
+                      <Table.Cell textAlign="center">
                         <Switch
-                          isChecked={score.active}
-                          onChange={() => {
+                          checked={score.active}
+                          onCheckedChange={() => {
                             handleToggleScore(score.id, !score.active);
                           }}
                         />
-                      </Td>
-                    </Tr>
+                      </Table.Cell>
+                    </Table.Row>
                   ))}
-                </Tbody>
-              </Table>
+                </Table.Body>
+              </Table.Root>
             )}
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
       </VStack>
     </SettingsLayout>
   );
@@ -190,17 +179,17 @@ const ScoreOptions = ({
     <>
       {dataType === "CHECKBOX" ? (
         <HStack>
-          <HStack flexWrap="wrap" gap={2} spacing={4}>
+          <HStack flexWrap="wrap" gap={4}>
             {options.map((option) => (
-              <Tag key={option.value}>{option.label}</Tag>
+              <Badge key={option.value}>{option.label}</Badge>
             ))}
           </HStack>
         </HStack>
       ) : (
         <HStack>
-          <HStack flexWrap="wrap" gap={2} spacing={4}>
+          <HStack flexWrap="wrap" gap={4}>
             {options.map((option) => (
-              <Tag key={option.value}>{option.label}</Tag>
+              <Badge key={option.value}>{option.label}</Badge>
             ))}
           </HStack>
         </HStack>

@@ -1,12 +1,7 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Text,
-  Tooltip,
-  useToast,
-  type ButtonProps,
-} from "@chakra-ui/react";
+import React from "react";
+import { Box, Button, HStack, Text, type ButtonProps } from "@chakra-ui/react";
+import { Tooltip } from "../ui/tooltip";
+import { toaster } from "../ui/toaster";
 import type { ReactJsonViewProps } from "@microlink/react-json-view";
 import dynamic from "next/dynamic";
 import { useState } from "react";
@@ -16,7 +11,7 @@ import {
 } from "../../utils/parsePythonInsideJson";
 import { CopyIcon } from "../icons/Copy";
 
-export function RenderInputOutput(
+export const RenderInputOutput = React.memo(function RenderInputOutput(
   props: Partial<ReactJsonViewProps> & {
     value: string | undefined;
     showTools?: boolean | "copy-only";
@@ -48,11 +43,9 @@ export function RenderInputOutput(
 
   const [raw, setRaw] = useState(false);
 
-  const toast = useToast();
-
   const renderCopyButton = () => {
     return (
-      <Tooltip label="Copy">
+      <Tooltip content="Copy">
         <Box>
           <TinyButton
             position="relative"
@@ -68,9 +61,9 @@ export function RenderInputOutput(
                         : (value as any).toString()
                       : `${value}`
                   );
-                  toast({
+                  toaster.create({
                     title: "Copied to clipboard",
-                    status: "success",
+                    type: "success",
                   });
                 } catch (e) {
                   if (
@@ -78,15 +71,15 @@ export function RenderInputOutput(
                     window.location.hostname !== "localhost" &&
                     window.location.hostname !== "127.0.0.1"
                   ) {
-                    toast({
+                    toaster.create({
                       title: "Cannot copy to clipboard on HTTP",
-                      status: "error",
+                      type: "error",
                     });
                     return;
                   }
-                  toast({
+                  toaster.create({
                     title: "Failed to copy to clipboard",
-                    status: "error",
+                    type: "error",
                   });
                 }
               })();
@@ -110,15 +103,9 @@ export function RenderInputOutput(
     return (
       <>
         {props.showTools && (
-          <HStack
-            position="absolute"
-            top={-2}
-            right={-2}
-            zIndex={1}
-            spacing="-1px"
-          >
+          <HStack position="absolute" top={-2} right={-2} zIndex={1} gap="-1px">
             {!forceRaw && props.showTools !== "copy-only" && (
-              <Tooltip label="View Raw">
+              <Tooltip content="View Raw">
                 <Box>
                   <TinyButton
                     onClick={() => setRaw(!raw)}
@@ -133,7 +120,7 @@ export function RenderInputOutput(
           </HStack>
         )}
         {raw || forceRaw ? (
-          <Text fontFamily="mono" fontSize="14px">
+          <Text fontFamily="mono" fontSize="13px">
             {JSON.stringify(json, null, 2)}
           </Text>
         ) : (
@@ -144,6 +131,7 @@ export function RenderInputOutput(
             displayObjectSize={false}
             enableClipboard={false}
             collapseStringsAfterLength={1000}
+            style={{ fontSize: "13px" }}
             //@ts-ignore
             displayArrayKey={false}
             {...propsWithoutValue}
@@ -166,7 +154,7 @@ export function RenderInputOutput(
               top={-2}
               right={-2}
               zIndex={1}
-              spacing="-1px"
+              gap="-1px"
             >
               {renderCopyButton()}
             </HStack>
@@ -182,7 +170,7 @@ export function RenderInputOutput(
       )}
     </Box>
   );
-}
+});
 
 function TinyButton(props: ButtonProps) {
   return (
@@ -191,12 +179,13 @@ function TinyButton(props: ButtonProps) {
       fontSize="10px"
       fontFamily="mono"
       padding={1}
-      height="auto"
+      height="22px"
       width="auto"
       minWidth="0"
       borderRadius="0"
       border="1px solid"
       borderColor="gray.300"
+      colorPalette="gray"
       {...props}
     />
   );

@@ -1,17 +1,6 @@
-import {
-  Button,
-  HStack,
-  Popover,
-  PopoverArrow,
-  PopoverBody,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTrigger,
-  Text,
-  VStack,
-  useDisclosure,
-  useToast,
-} from "@chakra-ui/react";
+import { Button, HStack, Text, VStack, useDisclosure } from "@chakra-ui/react";
+import { Popover } from "../ui/popover";
+import { toaster } from "../ui/toaster";
 import { PublicShareResourceTypes, type Project } from "@prisma/client";
 import { useCallback, useState } from "react";
 import { Globe, Share } from "react-feather";
@@ -28,7 +17,7 @@ export function ShareButton({
   traceId: string;
 }) {
   const { hasTeamPermission } = useOrganizationTeamProject();
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { open, onOpen, onClose, setOpen } = useDisclosure();
   const shareState = api.share.getSharedState.useQuery(
     {
       projectId: project.id,
@@ -42,7 +31,6 @@ export function ShareButton({
   );
   const shareItemMutation = api.share.shareItem.useMutation();
   const unshareItemMutation = api.share.unshareItem.useMutation();
-  const toast = useToast();
   const [disableClose, setDisableClose] = useState(false); // bugfix for modal closing when starting the mutation
   const hasSharePermission = hasTeamPermission(TeamRoleGroup.MESSAGES_SHARE);
 
@@ -56,28 +44,30 @@ export function ShareButton({
   }
 
   return (
-    <Popover
-      isOpen={isOpen}
-      onOpen={onOpen}
-      onClose={onClose_}
-      placement="bottom-end"
+    <Popover.Root
+      open={open}
+      onOpenChange={({ open }) => {
+        if (!open) {
+          onClose_();
+        } else {
+          onOpen();
+        }
+      }}
+      positioning={{ placement: "bottom-end" }}
     >
-      <PopoverTrigger>
-        <Button
-          colorScheme="black"
-          variant="outline"
-          leftIcon={
-            shareState.data?.id ? <Globe size={16} /> : <Share size={16} />
-          }
-        >
+      <Popover.Trigger asChild>
+        <Button colorPalette="black" variant="outline">
+          {shareState.data?.id ? <Globe size={16} /> : <Share size={16} />}
           {shareState.data?.id ? "Public" : "Share"}
         </Button>
-      </PopoverTrigger>
-      <PopoverContent fontSize={16} minWidth="400px">
-        <PopoverArrow />
-        <PopoverHeader fontWeight={600}>Share Trace</PopoverHeader>
-        <PopoverBody>
-          <VStack align="start" fontWeight="normal" spacing={4}>
+      </Popover.Trigger>
+      <Popover.Content fontSize="16px" minWidth="400px">
+        <Popover.Arrow />
+        <Popover.Header>
+          <Popover.Title fontWeight={600}>Share Trace</Popover.Title>
+        </Popover.Header>
+        <Popover.Body>
+          <VStack align="start" fontWeight="normal" gap={4}>
             {shareState.data?.id ? (
               <>
                 <Text>
@@ -91,8 +81,8 @@ export function ShareButton({
                   />
                   {hasSharePermission && (
                     <Button
-                      colorScheme="gray"
-                      isLoading={
+                      colorPalette="gray"
+                      loading={
                         unshareItemMutation.isLoading || shareState.isRefetching
                       }
                       onClick={() => {
@@ -112,35 +102,41 @@ export function ShareButton({
                                 .refetch()
                                 .then((shareState) => {
                                   if (!shareState.data?.id) {
-                                    toast({
+                                    toaster.create({
                                       title: "Shared link removed",
                                       description: "Trace is no longer public",
-                                      status: "success",
-                                      duration: 5000,
-                                      isClosable: true,
+                                      type: "success",
+                                      meta: {
+                                        closable: true,
+                                      },
+                                      placement: "top-end",
                                     });
                                   }
                                 })
                                 .catch(() => {
-                                  toast({
+                                  toaster.create({
                                     title: "Failed to fetch trace shared state",
                                     description:
                                       "Something went wrong, please try again.",
-                                    status: "error",
-                                    duration: 5000,
-                                    isClosable: true,
+                                    type: "error",
+                                    meta: {
+                                      closable: true,
+                                    },
+                                    placement: "top-end",
                                   });
                                 });
                             },
                             onError: () => {
                               setDisableClose(false);
-                              toast({
+                              toaster.create({
                                 title: "Failed to unshare trace",
                                 description:
                                   "Something went wrong, please try again.",
-                                status: "error",
-                                duration: 5000,
-                                isClosable: true,
+                                type: "error",
+                                meta: {
+                                  closable: true,
+                                },
+                                placement: "top-end",
                               });
                             },
                           }
@@ -156,8 +152,8 @@ export function ShareButton({
               <>
                 <Text>Are you sure you want to share this trace publicly?</Text>
                 <Button
-                  colorScheme="orange"
-                  isLoading={
+                  colorPalette="orange"
+                  loading={
                     shareItemMutation.isLoading || shareState.isRefetching
                   }
                   onClick={(e) => {
@@ -177,13 +173,15 @@ export function ShareButton({
                         },
                         onError: () => {
                           setDisableClose(false);
-                          toast({
+                          toaster.create({
                             title: "Failed to share trace",
                             description:
                               "Something went wrong, please try again.",
-                            status: "error",
-                            duration: 5000,
-                            isClosable: true,
+                            type: "error",
+                            meta: {
+                              closable: true,
+                            },
+                            placement: "top-end",
                           });
                         },
                       }
@@ -195,8 +193,8 @@ export function ShareButton({
               </>
             )}
           </VStack>
-        </PopoverBody>
-      </PopoverContent>
-    </Popover>
+        </Popover.Body>
+      </Popover.Content>
+    </Popover.Root>
   );
 }

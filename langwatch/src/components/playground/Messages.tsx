@@ -1,11 +1,4 @@
-import {
-  Avatar,
-  AvatarBadge,
-  Box,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Avatar, Box, Text, VStack, HStack } from "@chakra-ui/react";
 import { type Message } from "ai/react";
 import React, { useCallback, useEffect, useRef } from "react";
 import { usePlaygroundStore } from "../../hooks/usePlaygroundStore";
@@ -136,16 +129,15 @@ export function Messages({
       height="full"
       overflowY="auto"
       align="start"
-      spacing={0}
+      gap={0}
       borderTop="1px solid"
       borderColor="gray.200"
     >
       {messages.map((message, index) => (
         <MessageBlock key={message.id} message={message} index={index}>
           {message.role === "user" && (
-            <Avatar
+            <Avatar.Root
               size="xs"
-              name={session?.user.name ?? ""}
               backgroundColor={"orange.400"}
               color="white"
               minWidth="22px"
@@ -153,8 +145,17 @@ export function Messages({
               height="22px"
               fontSize="8px"
             >
-              <AvatarBadge boxSize="1.25em" bg="green.500" />
-            </Avatar>
+              <Avatar.Fallback name={session?.user.name ?? ""} />
+              <Box
+                as="span"
+                position="absolute"
+                bottom="0"
+                right="0"
+                boxSize="1.25em"
+                bg="green.500"
+                borderRadius="full"
+              />
+            </Avatar.Root>
           )}
           {message.role === "assistant" && (
             <Box minWidth="22px" height="22px" padding="1px">
@@ -259,7 +260,7 @@ function MessageBlock({
       background={message.role === "user" ? "#FCFEFF" : "white"}
       align="start"
       fontSize="13px"
-      spacing={3}
+      gap={3}
     >
       {children}
     </HStack>

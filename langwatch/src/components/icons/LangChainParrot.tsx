@@ -7,7 +7,7 @@ export function LangChainParrot() {
       preserveAspectRatio="xMinYMid meet"
       viewBox="0 0 75 75"
     >
-      <text y="65" fontSize="65">
+      <text y="65" fontSize="65px" style={{ fontSize: "65px" }}>
         🦜
       </text>
     </svg>

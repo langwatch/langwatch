@@ -13,6 +13,15 @@ a {
   box-sizing: border-box;
 }
 
+// Override Chakra UI default annoying overrides
+label {
+  user-select: auto !important;
+}
+
+label {
+  cursor: auto !important;
+}
+
 .fade-in {
   opacity: 1;
   animation: fadeIn 0.1s ease-out;
@@ -61,10 +70,6 @@ a {
       padding-right: 40px;
     }
   }
-}
-
-.markdown.markdown-conversation-history {
-  font-size: 16px;
 }
 
 div input[type="number"] {

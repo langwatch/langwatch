@@ -47,7 +47,6 @@ const initTikToken = async (
 
   if (!cachedModel[tokenizer]) {
     loadingModel.add(tokenizer);
-    const startTime = Date.now();
     const registryInfo = (registry as any)[tokenizer];
     const fetch = NodeFetchCache.create({
       cache: new FileSystemCache({
@@ -57,9 +56,6 @@ const initTikToken = async (
     });
     const model = await load(registryInfo, (url) =>
       fetch(url).then((r) => r.text())
-    );
-    console.info(
-      `Initialized ${tokenizer} tokenizer in ${Date.now() - startTime}ms`
     );
     const encoder = new Tiktoken(
       model.bpe_ranks,

@@ -6,7 +6,9 @@ import React, {
   useMemo,
 } from "react";
 import type { CustomCellEditorProps } from "@ag-grid-community/react";
-import { Textarea, VStack, Text, Alert, Tooltip } from "@chakra-ui/react";
+import { Textarea, VStack, Text } from "@chakra-ui/react";
+import { Alert } from "@chakra-ui/react";
+import { Tooltip } from "../../components/ui/tooltip";
 import { ZodError, type ZodType } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { deepStrict } from "../../utils/zod";
@@ -49,15 +51,22 @@ export function MultilineJSONCellEditor({
   const [jsonError, setJsonError] = useState<string | null>(null);
 
   return (
-    <VStack width="100%" minHeight="100%" spacing={0}>
+    <VStack width="100%" minHeight="100%" gap={0}>
       {jsonError && (
         <Tooltip
-          maxWidth="700px"
-          label={<Text whiteSpace="pre-wrap">{jsonError}</Text>}
+          content={<Text whiteSpace="pre-wrap">{jsonError}</Text>}
+          positioning={{ placement: "top" }}
+          showArrow
         >
-          <Alert status="error">
-            <Text noOfLines={1}>{jsonError}</Text>
-          </Alert>
+          <Alert.Root
+            borderStartWidth="4px"
+            borderStartColor="colorPalette.solid"
+            colorPalette="red"
+          >
+            <Alert.Content>
+              <Text truncate>{jsonError}</Text>
+            </Alert.Content>
+          </Alert.Root>
         </Tooltip>
       )}
       <Textarea

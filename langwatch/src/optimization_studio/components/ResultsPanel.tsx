@@ -1,20 +1,14 @@
 import {
   Alert,
-  AlertIcon,
   Box,
   Button,
   Heading,
   HStack,
   Skeleton,
   Spacer,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
   Tabs,
   Text,
   useDisclosure,
-  useToast,
   VStack,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
@@ -25,8 +19,8 @@ import {
   BatchEvaluationV2RunList,
   useBatchEvaluationState,
 } from "../../components/experiments/BatchEvaluationV2";
-import { BatchEvaluationV2EvaluationResults } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationV2EvaluationResults";
 import { BatchEvaluationV2EvaluationSummary } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationSummary";
+import { BatchEvaluationV2EvaluationResults } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationV2EvaluationResults";
 import { EvaluationProgressBar } from "../../components/experiments/BatchEvaluationV2/EvaluationProgressBar";
 import {
   DSPyExperimentRunList,
@@ -35,6 +29,7 @@ import {
   RunDetails,
   useDSPyExperimentState,
 } from "../../components/experiments/DSPyExperiment";
+import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppliedOptimization } from "../../server/experiments/types";
 import { experimentSlugify } from "../../server/experiments/utils";
@@ -55,12 +50,10 @@ export function ResultsPanel({
   collapsePanel: (isCollapsed: boolean) => void;
   defaultTab: "evaluations" | "optimizations";
 }) {
-  const [tabIndex, setTabIndex] = useState(
-    defaultTab === "evaluations" ? 0 : 1
-  );
+  const [tabIndex, setTabIndex] = useState(defaultTab);
 
   useEffect(() => {
-    setTabIndex(defaultTab === "evaluations" ? 0 : 1);
+    setTabIndex(defaultTab);
   }, [defaultTab]);
 
   return (
@@ -86,28 +79,31 @@ export function ResultsPanel({
       >
         <X size={16} />
       </Button>
-      <Tabs
+      <Tabs.Root
+        value={tabIndex}
+        onValueChange={(change) =>
+          setTabIndex(change.value as "evaluations" | "optimizations")
+        }
         width="full"
         height="full"
         display="flex"
         flexDirection="column"
         size="sm"
-        index={tabIndex}
-        onChange={(index) => setTabIndex(index)}
       >
-        <TabList>
-          <Tab>Evaluations</Tab>
-          <Tab>Optimizations</Tab>
-        </TabList>
-        <TabPanels minHeight="0" height="full">
-          <TabPanel padding={0} height="full">
-            {!isCollapsed && tabIndex === 0 && <EvaluationResults />}
-          </TabPanel>
-          <TabPanel padding={0} height="full">
-            {!isCollapsed && tabIndex === 1 && <OptimizationResults />}
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
+        <Tabs.List>
+          <Tabs.Trigger value="evaluations">Evaluations</Tabs.Trigger>
+          <Tabs.Trigger value="optimizations">Optimizations</Tabs.Trigger>
+          <Tabs.Indicator />
+        </Tabs.List>
+        <Tabs.Content value="evaluations" padding={0} height="full">
+          {!isCollapsed && tabIndex === "evaluations" && <EvaluationResults />}
+        </Tabs.Content>
+        <Tabs.Content value="optimizations" padding={0} height="full">
+          {!isCollapsed && tabIndex === "optimizations" && (
+            <OptimizationResults />
+          )}
+        </Tabs.Content>
+      </Tabs.Root>
     </HStack>
   );
 }
@@ -176,10 +172,10 @@ export function EvaluationResults() {
 
   if (experiment.isError) {
     return (
-      <Alert status="error">
-        <AlertIcon />
+      <Alert.Root status="error">
+        <Alert.Indicator />
         Error loading evaluation results
-      </Alert>
+      </Alert.Root>
     );
   }
 
@@ -190,7 +186,7 @@ export function EvaluationResults() {
   const evaluationStateRunId = evaluationState?.run_id;
 
   return (
-    <HStack align="start" width="full" height="full" spacing={0}>
+    <HStack align="start" width="full" height="full" gap={0}>
       <BatchEvaluationV2RunList
         batchEvaluationRuns={batchEvaluationRuns}
         selectedRun={selectedRun}
@@ -198,7 +194,7 @@ export function EvaluationResults() {
         setSelectedRunId={setSelectedRunId}
         size="sm"
       />
-      <VStack spacing={0} width="full" height="full" minWidth="0">
+      <VStack gap={0} width="full" height="full" minWidth="0">
         <BatchEvaluationV2EvaluationResults
           project={project}
           experiment={experiment.data}
@@ -218,7 +214,7 @@ export function EvaluationResults() {
               padding={3}
               borderTop="1px solid"
               borderColor="gray.200"
-              spacing={2}
+              gap={2}
             >
               <Text whiteSpace="nowrap" marginTop="-1px" paddingX={2}>
                 Running
@@ -228,7 +224,7 @@ export function EvaluationResults() {
                 size="lg"
               />
               <Button
-                colorScheme="red"
+                colorPalette="red"
                 onClick={() =>
                   stopEvaluationExecution({
                     run_id: evaluationStateRunId,
@@ -294,10 +290,10 @@ export function OptimizationResults() {
 
   if (experiment.isError) {
     return (
-      <Alert status="error">
-        <AlertIcon />
+      <Alert.Root status="error">
+        <Alert.Indicator />
         Error loading optimization results
-      </Alert>
+      </Alert.Root>
     );
   }
 
@@ -367,8 +363,6 @@ export function LoadedOptimizationResults({
   const { stopOptimizationExecution } = useOptimizationExecution();
 
   const optimizationStateRunId = optimizationState?.run_id;
-
-  const toast = useToast();
 
   const onApplyOptimizations = (
     appliedOptimizations: AppliedOptimization[]
@@ -464,14 +458,16 @@ export function LoadedOptimizationResults({
     );
 
     setOpenResultsPanelRequest("closed");
-    toast({
+    toaster.create({
       title: "Optimizations Applied!",
       description: `${matchingNodes.length} ${
         matchingNodes.length === 1 ? "component was" : "components were"
       } updated.`,
-      status: "success",
+      type: "success",
       duration: 5000,
-      isClosable: true,
+      meta: {
+        closable: true,
+      },
     });
   };
 
@@ -480,7 +476,7 @@ export function LoadedOptimizationResults({
   const hasLogs = optimizationState?.run_id === currentSelectedRun;
 
   return (
-    <HStack align="start" width="full" height="full" spacing={0} minWidth="0">
+    <HStack align="start" width="full" height="full" gap={0} minWidth="0">
       <DSPyExperimentRunList
         dspyRuns={dspyRuns}
         selectedRuns={selectedRuns_}
@@ -490,15 +486,15 @@ export function LoadedOptimizationResults({
         size="sm"
         incomingRunIds={incomingRunIds}
       />
-      <VStack align="start" width="full" height="full" spacing={0} minWidth="0">
+      <VStack align="start" width="full" height="full" gap={0} minWidth="0">
         <VStack width="full" height="full" overflowY="auto" minWidth="0">
           {dspyRuns.isLoading ? (
             <Skeleton width="100%" height="30px" />
           ) : dspyRuns.error ? (
-            <Alert status="error">
-              <AlertIcon />
+            <Alert.Root status="error">
+              <Alert.Indicator />
               Error loading experiment runs
-            </Alert>
+            </Alert.Root>
           ) : dspyRuns.data?.length === 0 ? (
             <Text>Waiting for the first completed step to arrive...</Text>
           ) : (
@@ -560,7 +556,7 @@ export function LoadedOptimizationResults({
             }
             onViewLogs={
               !hasLogs ||
-              logsPanel.isOpen ||
+              logsPanel.open ||
               optimizationState?.status === "running"
                 ? undefined
                 : logsPanel.onOpen
@@ -581,7 +577,7 @@ export function LoadedOptimizationResults({
                 Running
               </Text>
               <OptimizationProgressBar size="lg" />
-              {hasLogs && !logsPanel.isOpen && (
+              {hasLogs && !logsPanel.open && (
                 <Button
                   size="sm"
                   onClick={logsPanel.onOpen}
@@ -592,7 +588,7 @@ export function LoadedOptimizationResults({
                 </Button>
               )}
               <Button
-                colorScheme="red"
+                colorPalette="red"
                 onClick={() =>
                   stopOptimizationExecution({
                     run_id: optimizationStateRunId,
@@ -607,7 +603,7 @@ export function LoadedOptimizationResults({
               </Button>
             </HStack>
           )}
-        {logsPanel.isOpen && (
+        {logsPanel.open && (
           <VStack
             width="full"
             borderTop="1px solid"
@@ -627,34 +623,29 @@ export function LoadedOptimizationResults({
             >
               <ChevronDown size={16} />
             </Button>
-            <Tabs
-              size="sm"
+            <Tabs.Root
+              defaultValue="logs"
               width="full"
               height="full"
               display="flex"
               flexDirection="column"
               minHeight="0"
             >
-              <TabList>
-                <Tab>Logs</Tab>
-              </TabList>
-              <TabPanels
+              <Tabs.List>
+                <Tabs.Trigger value="logs">Logs</Tabs.Trigger>
+                <Tabs.Indicator />
+              </Tabs.List>
+              <Tabs.Content
+                value="logs"
                 width="100%"
                 height="100%"
                 display="flex"
                 minHeight="0"
+                padding="0"
               >
-                <TabPanel
-                  width="100%"
-                  height="100%"
-                  display="flex"
-                  minHeight="0"
-                  padding="0"
-                >
-                  <LogsPanel />
-                </TabPanel>
-              </TabPanels>
-            </Tabs>
+                <LogsPanel />
+              </Tabs.Content>
+            </Tabs.Root>
           </VStack>
         )}
       </VStack>

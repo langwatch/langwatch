@@ -1,15 +1,8 @@
-import {
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  HStack,
-} from "@chakra-ui/react";
 import { useState } from "react";
-import { Maximize2, Minimize2 } from "react-feather";
+import { Drawer } from "../components/ui/drawer";
+import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
 import { useDrawer } from "./CurrentDrawer";
 import { TraceDetails } from "./traces/TraceDetails";
-import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
 
 interface TraceDetailsDrawerProps {
   traceId: string;
@@ -28,19 +21,23 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
   };
 
   return (
-    <Drawer
-      isOpen={true}
-      blockScrollOnMount={false}
-      placement="right"
-      size={traceView}
-      onClose={() => {
+    <Drawer.Root
+      open={true}
+      preventScroll={true}
+      placement="end"
+      size={traceView === "full" ? "full" : "xl"}
+      onOpenChange={() => {
         closeDrawer();
         commentState.resetComment();
       }}
     >
-      <DrawerContent paddingX={0}>
-        <DrawerBody
-          paddingTop={0}
+      <Drawer.Backdrop />
+      <Drawer.Content
+        paddingX={0}
+        maxWidth={traceView === "full" ? undefined : "70%"}
+      >
+        <Drawer.Body
+          paddingY={0}
           paddingX={0}
           overflowY="auto"
           id="conversation-scroll-container"
@@ -52,8 +49,8 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
             traceView={traceView}
             onToggleView={toggleView}
           />
-        </DrawerBody>
-      </DrawerContent>
-    </Drawer>
+        </Drawer.Body>
+      </Drawer.Content>
+    </Drawer.Root>
   );
 };

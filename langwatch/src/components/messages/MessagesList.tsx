@@ -1,40 +1,31 @@
 import {
   Alert,
-  AlertIcon,
   Box,
   Button,
   Card,
-  CardBody,
   Container,
   HStack,
   Heading,
   LinkBox,
-  Menu,
-  MenuButton,
-  MenuGroup,
-  MenuItem,
-  MenuList,
-  Radio,
+  Separator,
   Skeleton,
   Spacer,
   Text,
-  Tooltip,
   VStack,
-  Select,
-  Divider,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
 import React, { createRef, useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   ChevronUp,
   Layers,
   Maximize2,
   RefreshCw,
 } from "react-feather";
+import { Menu } from "../../components/ui/menu";
+import { Radio, RadioGroup } from "../../components/ui/radio";
+import { Tooltip } from "../../components/ui/tooltip";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { ElasticSearchEvaluation } from "../../server/tracer/types";
@@ -45,6 +36,10 @@ import { FilterSidebar } from "../filters/FilterSidebar";
 import { FilterToggle } from "../filters/FilterToggle";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import { MessageCard, type TraceWithGuardrail } from "./MessageCard";
+import {
+  MessagesNavigationFooter,
+  useMessagesNavigationFooter,
+} from "./MessagesNavigationFooter";
 
 export function MessagesList() {
   const { project } = useOrganizationTeamProject();
@@ -54,20 +49,20 @@ export function MessagesList() {
   >();
   const [groupBy] = useGroupBy();
   const { filterParams, queryOpts } = useFilterParams();
-  const [pageOffset, setPageOffset] = useState<number>(0);
-  const [pageSize, setPageSize] = useState<number>(25);
-  const [totalHits, setTotalHits] = useState<number>(0);
+  const navigationFooter = useMessagesNavigationFooter();
 
   const traceGroups = api.traces.getAllForProject.useQuery(
     {
       ...filterParams,
       query: getSingleQueryParam(router.query.query),
       groupBy,
-      pageOffset: pageOffset,
-      pageSize: pageSize,
+      pageOffset: navigationFooter.pageOffset,
+      pageSize: navigationFooter.pageSize,
     },
     queryOpts
   );
+  navigationFooter.useUpdateTotalHits(traceGroups);
+
   const traceIds =
     traceGroups.data?.groups.flatMap((group) =>
       group.map((trace) => trace.trace_id)
@@ -105,14 +100,6 @@ export function MessagesList() {
   }, [evaluations.data]);
 
   useEffect(() => {
-    if (traceGroups.isFetched) {
-      const totalHits: number = traceGroups.data?.totalHits ?? 0;
-
-      setTotalHits(totalHits);
-    }
-  }, [traceGroups.data?.totalHits, traceGroups.isFetched]);
-
-  useEffect(() => {
     const onFocus = () => {
       setTimeout(() => {
         void traceGroups.refetch();
@@ -122,34 +109,15 @@ export function MessagesList() {
     return () => window.removeEventListener("focus", onFocus);
   }, [traceGroups]);
 
-  const nextPage = () => {
-    setPageOffset(pageOffset + pageSize);
-  };
-
-  const prevPage = () => {
-    if (pageOffset > 0) {
-      setPageOffset(pageOffset - pageSize);
-    }
-  };
-
-  useEffect(() => {
-    setPageOffset(0);
-  }, [router.query.query]);
-
-  const changePageSize = (size: number) => {
-    setPageSize(size);
-    setPageOffset(0);
-  };
-
   return (
     <Container maxW={"calc(min(1440px, 100vw - 200px))"} padding={6}>
       <HStack width="full" align="top" paddingBottom={6}>
-        <HStack align="center" spacing={6}>
+        <HStack align="center" gap={6}>
           <Heading as={"h1"} size="lg" paddingTop={1}>
             Messages
           </Heading>
           <ToggleAnalytics />
-          <Tooltip label="Refresh">
+          <Tooltip content="Refresh">
             <Button
               variant="outline"
               minWidth={0}
@@ -173,12 +141,17 @@ export function MessagesList() {
           </Tooltip>
         </HStack>
         <Spacer />
-        <ToggleTableView />
-        <GroupingSelector />
-        <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
-        <FilterToggle defaultShowFilters={true} />
+        <HStack gap="2px" marginBottom="-8px">
+          <ToggleTableView />
+          <GroupingSelector />
+          <PeriodSelector
+            period={{ startDate, endDate }}
+            setPeriod={setPeriod}
+          />
+          <FilterToggle defaultShowFilters={true} />
+        </HStack>
       </HStack>
-      <HStack align="start" spacing={8}>
+      <HStack align="start" gap={8}>
         <VStack gap={6} width="full">
           {project && traceGroups.data && traceGroups.data.groups.length > 0 ? (
             <ExpandableMessages
@@ -187,15 +160,17 @@ export function MessagesList() {
               checksMap={evaluations.data}
             />
           ) : traceGroups.data ? (
-            <Alert status="info">
-              <AlertIcon />
-              No messages found
-            </Alert>
+            <Alert.Root status="info">
+              <Alert.Indicator />
+              <Alert.Content>No messages found</Alert.Content>
+            </Alert.Root>
           ) : traceGroups.isError ? (
-            <Alert status="error">
-              <AlertIcon />
-              An error has occurred trying to load the messages
-            </Alert>
+            <Alert.Root status="error">
+              <Alert.Indicator />
+              <Alert.Content>
+                An error has occurred trying to load the messages
+              </Alert.Content>
+            </Alert.Root>
           ) : (
             <>
               <MessageSkeleton />
@@ -203,52 +178,7 @@ export function MessagesList() {
               <MessageSkeleton />
             </>
           )}
-          <HStack padding={6}>
-            <Text>Items per page </Text>
-
-            <Select
-              defaultValue={"25"}
-              placeholder=""
-              maxW="70px"
-              size="sm"
-              onChange={(e) => changePageSize(parseInt(e.target.value))}
-              borderColor={"black"}
-              borderRadius={"lg"}
-            >
-              <option value="10">10</option>
-              <option value="25">25</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
-              <option value="250">250</option>
-            </Select>
-
-            <Text marginLeft={"20px"}>
-              {" "}
-              {`${pageOffset + 1}`} -{" "}
-              {`${
-                pageOffset + pageSize > totalHits
-                  ? totalHits
-                  : pageOffset + pageSize
-              }`}{" "}
-              of {`${totalHits}`} items
-            </Text>
-            <Button
-              width={10}
-              padding={0}
-              onClick={prevPage}
-              isDisabled={pageOffset === 0}
-            >
-              <ChevronLeft />
-            </Button>
-            <Button
-              width={10}
-              padding={0}
-              isDisabled={pageOffset + pageSize >= totalHits}
-              onClick={nextPage}
-            >
-              <ChevronRight />
-            </Button>
-          </HStack>
+          <MessagesNavigationFooter {...navigationFooter} />
         </VStack>
         <FilterSidebar defaultShowFilters={true} />
       </HStack>
@@ -278,7 +208,7 @@ const ExpandableMessages = React.memo(
     };
 
     const [cardHeights, setCardHeights] = useState<Record<number, number>>({});
-    const cardRefs = (traceGroups ?? []).map(() => createRef<Element>());
+    const cardRefs = (traceGroups ?? []).map(() => createRef<HTMLDivElement>());
     const [groupBy] = useGroupBy();
     const [transitionsEnabled, setTransitionsEnabled] = useState(false);
 
@@ -296,6 +226,7 @@ const ExpandableMessages = React.memo(
 
     return traceGroups.map((traceGroup, groupIndex) => {
       const isExpanded = !!expandedGroups[groupIndex];
+      const zIndex = 1000 + traceGroups.length - groupIndex;
 
       return (
         <VStack
@@ -335,9 +266,9 @@ const ExpandableMessages = React.memo(
                   traceGroup.length > 2 ? -4 : traceGroup.length > 1 ? -2 : 0,
                 cursor: "pointer",
                 width: "full",
-                zIndex: 2,
                 _hover: {
                   transform: "scale(1.04)",
+                  zIndex,
                 },
               })}
         >
@@ -358,15 +289,15 @@ const ExpandableMessages = React.memo(
               position="absolute"
               left="64px"
               marginTop="-22px"
-              fontSize={13}
+              fontSize="13px"
               fontWeight={600}
               color="gray.500"
               cursor="default"
             >
-              <HStack spacing={1}>
-                <Text>User ID: </Text>
+              <HStack gap={1}>
+                <Text flexShrink={0}>User ID: </Text>
                 <Text>{traceGroup[0]?.metadata.user_id ?? "null"}</Text>
-                <Divider orientation="vertical" height="20px" />
+                <Separator orientation="vertical" height="20px" />
               </HStack>
             </Box>
           )}
@@ -376,15 +307,15 @@ const ExpandableMessages = React.memo(
               position="absolute"
               left="64px"
               marginTop="-22px"
-              fontSize={13}
+              fontSize="13px"
               fontWeight={600}
               color="gray.500"
               cursor="default"
             >
-              <HStack spacing={1}>
+              <HStack gap={1}>
                 <Text>Thread ID: </Text>
                 <Text>{traceGroup[0]?.metadata.thread_id ?? "null"}</Text>
-                <Divider orientation="vertical" height="20px" />
+                <Separator orientation="vertical" height="20px" />
               </HStack>
             </Box>
           )}
@@ -397,52 +328,51 @@ const ExpandableMessages = React.memo(
                 const renderContent = isExpanded || traceIndex === 0;
 
                 return (
-                  <LinkBox
-                    as={Card}
-                    className="card"
-                    key={trace.trace_id}
-                    ref={traceIndex === 0 ? cardRefs[groupIndex] : null}
-                    height={
-                      renderContent
-                        ? "auto"
-                        : `${cardHeights[groupIndex] ?? 0}px`
-                    }
-                    marginTop={
-                      renderContent
-                        ? "0"
-                        : `-${(cardHeights[groupIndex] ?? 0) + 24}px`
-                    }
-                    padding={0}
-                    cursor="pointer"
-                    width="full"
-                    transition={
-                      transitionsEnabled ? "all .2s linear" : undefined
-                    }
-                    border="1px solid"
-                    borderColor="gray.300"
-                    _hover={
-                      expanded
-                        ? {
-                            transform: "scale(1.04)",
-                          }
-                        : {}
-                    }
-                  >
-                    {!expanded && (
-                      <Box position="absolute" right={5} top={5}>
-                        <Maximize2 />
-                      </Box>
-                    )}
-                    <CardBody padding={8} width="fill">
-                      {renderContent && (
-                        <MessageCard
-                          linkActive={expanded}
-                          project={project}
-                          trace={trace}
-                          checksMap={checksMap}
-                        />
+                  <LinkBox asChild key={trace.trace_id}>
+                    <Card.Root
+                      variant="elevated"
+                      className="card"
+                      ref={traceIndex === 0 ? cardRefs[groupIndex] : null}
+                      height={
+                        renderContent
+                          ? "auto"
+                          : `${cardHeights[groupIndex] ?? 0}px`
+                      }
+                      marginTop={
+                        renderContent
+                          ? "0"
+                          : `-${(cardHeights[groupIndex] ?? 0) + 24}px`
+                      }
+                      padding={0}
+                      cursor="pointer"
+                      width="full"
+                      transition={
+                        transitionsEnabled ? "all .2s linear" : undefined
+                      }
+                      _hover={
+                        expanded
+                          ? {
+                              transform: "scale(1.04)",
+                            }
+                          : {}
+                      }
+                    >
+                      {!expanded && (
+                        <Box position="absolute" right={6} top={6}>
+                          <Maximize2 />
+                        </Box>
                       )}
-                    </CardBody>
+                      <Card.Body padding={7} width="fill">
+                        {renderContent && (
+                          <MessageCard
+                            linkActive={expanded}
+                            project={project}
+                            trace={trace}
+                            checksMap={checksMap}
+                          />
+                        )}
+                      </Card.Body>
+                    </Card.Root>
                   </LinkBox>
                 );
               })}
@@ -468,11 +398,11 @@ const ExpandableMessages = React.memo(
 
 function MessageSkeleton() {
   return (
-    <Card width="full" padding={0}>
-      <CardBody padding={8}>
-        <VStack alignItems="flex-start" spacing={4}>
-          <HStack spacing={12} width="full">
-            <Box fontSize={24} fontWeight="bold" width="full">
+    <Card.Root width="full" padding={0} variant="elevated">
+      <Card.Body padding={8}>
+        <VStack alignItems="flex-start" gap={4}>
+          <HStack gap={12} width="full">
+            <Box fontSize="24px" fontWeight="bold" width="full">
               <Skeleton width="50%" height="20px" />
             </Box>
           </HStack>
@@ -482,8 +412,8 @@ function MessageSkeleton() {
             <Skeleton width="full" height="20px" />
           </VStack>
         </VStack>
-      </CardBody>
-    </Card>
+      </Card.Body>
+    </Card.Root>
   );
 }
 
@@ -516,37 +446,43 @@ const useGroupBy = () => {
 };
 
 function GroupingSelector() {
-  const ref = useRef<HTMLDivElement>(null);
-
   const [groupBy, setGroupBy] = useGroupBy();
 
   return (
-    <Menu initialFocusRef={ref}>
-      <MenuButton as={Button} variant="outline" minWidth="fit-content">
-        <HStack spacing={2}>
-          <Layers size={16} />
-          <Box>{groups[groupBy]}</Box>
-          <Box>
-            <ChevronDown width={14} />
-          </Box>
-        </HStack>
-      </MenuButton>
-      <MenuList zIndex="popover">
-        <MenuGroup title="Group by">
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Button variant="ghost" minWidth="fit-content">
+          <HStack gap={2}>
+            <Layers size={16} />
+            <Box>{groups[groupBy]}</Box>
+            <Box>
+              <ChevronDown />
+            </Box>
+          </HStack>
+        </Button>
+      </Menu.Trigger>
+      <Menu.Content>
+        <Box paddingX={3} paddingY={2} fontWeight="medium" color="gray.500">
+          Group by
+        </Box>
+        <RadioGroup
+          value={groupBy}
+          onChange={(e) => setGroupBy(e.target.value as keyof typeof groups)}
+        >
           {Object.entries(groups).map(([key, value]) => (
-            <MenuItem
+            <Menu.Item
               key={key}
+              value={key}
               onClick={() => setGroupBy(key as keyof typeof groups)}
-              {...(groupBy === key ? { ref: ref as any } : {})}
             >
-              <HStack spacing={2}>
-                <Radio isChecked={groupBy === key} />
+              <HStack gap={2}>
+                <Radio value={key} />
                 <Text>{value}</Text>
               </HStack>
-            </MenuItem>
+            </Menu.Item>
           ))}
-        </MenuGroup>
-      </MenuList>
-    </Menu>
+        </RadioGroup>
+      </Menu.Content>
+    </Menu.Root>
   );
 }

@@ -1,18 +1,10 @@
 import {
   Box,
   Button,
-  FormControl,
-  FormLabel,
+  Field,
   HStack,
   Heading,
   Input,
-  Popover,
-  PopoverArrow,
-  PopoverBody,
-  PopoverCloseButton,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTrigger,
   Text,
   VStack,
   useDisclosure,
@@ -28,6 +20,7 @@ import {
 import { useRouter } from "next/router";
 import { useCallback, useMemo } from "react";
 import { Calendar, ChevronDown } from "react-feather";
+import { Popover } from "./ui/popover";
 
 const getDaysDifference = (startDate: Date, endDate: Date) =>
   differenceInCalendarDays(endDate, startDate) + 1;
@@ -106,7 +99,7 @@ export function PeriodSelector({
   };
   setPeriod: (startDate: Date, endDate: Date) => void;
 }) {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { open, onOpen, onClose, setOpen } = useDisclosure();
 
   const daysDifference = getDaysDifference(startDate, endDate);
 
@@ -139,29 +132,34 @@ export function PeriodSelector({
   };
 
   return (
-    <Popover isOpen={isOpen} onClose={onClose} placement="bottom-end">
-      <PopoverTrigger>
-        <Button variant="outline" onClick={onOpen} minWidth="fit-content">
-          <HStack spacing={2}>
+    <Popover.Root
+      open={open}
+      onOpenChange={({ open }) => setOpen(open)}
+      positioning={{ placement: "bottom-end" }}
+      size="sm"
+    >
+      <Popover.Trigger asChild>
+        <Button variant="ghost" minWidth="fit-content" onClick={onOpen}>
+          <HStack gap={2}>
             <Calendar size={16} />
             <Text>{getDateRangeLabel()}</Text>
             <Box>
-              <ChevronDown width={14} />
+              <ChevronDown />
             </Box>
           </HStack>
         </Button>
-      </PopoverTrigger>
-      <PopoverContent width="fit-content">
-        <PopoverArrow />
-        <PopoverCloseButton />
-        <PopoverHeader>
-          <Heading size="sm">Select Date Range</Heading>
-        </PopoverHeader>
-        <PopoverBody padding={4}>
-          <HStack align="start" spacing={6}>
-            <VStack spacing={4}>
-              <FormControl>
-                <FormLabel>Start Date</FormLabel>
+      </Popover.Trigger>
+      <Popover.Content width="fit-content">
+        <Popover.Arrow />
+        <Popover.CloseTrigger />
+        <Popover.Header>
+          <Popover.Title>Select Date Range</Popover.Title>
+        </Popover.Header>
+        <Popover.Body>
+          <HStack align="start" gap={6}>
+            <VStack gap={4}>
+              <Field.Root>
+                <Field.Label>Start Date</Field.Label>
                 <Input
                   type="date"
                   value={format(startDate, "yyyy-MM-dd")}
@@ -172,9 +170,9 @@ export function PeriodSelector({
                     )
                   }
                 />
-              </FormControl>
-              <FormControl>
-                <FormLabel>End Date</FormLabel>
+              </Field.Root>
+              <Field.Root>
+                <Field.Label>End Date</Field.Label>
                 <Input
                   type="date"
                   value={format(endDate, "yyyy-MM-dd")}
@@ -185,7 +183,7 @@ export function PeriodSelector({
                     )
                   }
                 />
-              </FormControl>
+              </Field.Root>
             </VStack>
             <VStack>
               {quickSelectors.map((selector) => (
@@ -199,8 +197,8 @@ export function PeriodSelector({
               ))}
             </VStack>
           </HStack>
-        </PopoverBody>
-      </PopoverContent>
-    </Popover>
+        </Popover.Body>
+      </Popover.Content>
+    </Popover.Root>
   );
 }

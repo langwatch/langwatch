@@ -1,15 +1,4 @@
-import {
-  Card,
-  CardBody,
-  HStack,
-  Tab,
-  TabIndicator,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
-  Text,
-} from "@chakra-ui/react";
+import { Card, HStack, Tabs, Text } from "@chakra-ui/react";
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 
@@ -52,38 +41,60 @@ export const SatisfactionGraphs = () => {
   };
 
   return (
-    <Card width="full" height="400px">
-      <CardBody padding={0}>
-        <Tabs variant="unstyled">
-          <TabList gap={0}>
-            <Tab width="50%" fontSize={14} paddingX={2} paddingY={4}>
-              <HStack flexWrap="nowrap">
-                <Text noOfLines={1}>Input Sentiment</Text>
+    <Card.Root width="full" height="360px">
+      <Card.Body padding={0}>
+        <Tabs.Root variant="plain" defaultValue="input-sentiment">
+          <Tabs.List gap={0} width="100%">
+            <Tabs.Trigger
+              value="input-sentiment"
+              width="50%"
+              fontSize="14px"
+              paddingX={2}
+            >
+              <HStack
+                width="100%"
+                paddingY={2}
+                flexWrap="nowrap"
+                justifyContent="center"
+              >
+                <Text lineClamp={1}>Input Sentiment</Text>
               </HStack>
-            </Tab>
-            <Tab width="50%" fontSize={14} paddingX={2} paddingY={4}>
-              <HStack flexWrap="nowrap">
-                <Text noOfLines={1}>Thumbs Up/Down</Text>
+            </Tabs.Trigger>
+            <Tabs.Trigger
+              value="thumbs"
+              width="50%"
+              fontSize="14px"
+              paddingX={2}
+            >
+              <HStack
+                width="100%"
+                paddingY={2}
+                flexWrap="nowrap"
+                justifyContent="center"
+              >
+                <Text lineClamp={1}>Thumbs Up/Down</Text>
               </HStack>
-            </Tab>
-          </TabList>
-          <TabIndicator
-            height="4px"
-            bg="orange.400"
-            borderRadius="1px"
-            minWidth="50%"
-            maxWidth="50%"
-          />
-          <TabPanels>
-            <TabPanel padding={isNotQuickwit ? 0 : undefined}>
-              <CustomGraph input={inputSentimentGraph} hideGroupLabel={true} />
-            </TabPanel>
-            <TabPanel padding={isNotQuickwit ? 0 : undefined}>
-              <CustomGraph input={thumbsUpDownGraph} hideGroupLabel={true} />
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </CardBody>
-    </Card>
+            </Tabs.Trigger>
+            <Tabs.Indicator
+              height="4px"
+              bg="orange.400"
+              borderRadius="1px"
+              minWidth="50%"
+              maxWidth="50%"
+              bottom={0}
+            />
+          </Tabs.List>
+          <Tabs.Content
+            value="input-sentiment"
+            padding={isNotQuickwit ? 0 : undefined}
+          >
+            <CustomGraph input={inputSentimentGraph} hideGroupLabel={true} />
+          </Tabs.Content>
+          <Tabs.Content value="thumbs" padding={isNotQuickwit ? 0 : undefined}>
+            <CustomGraph input={thumbsUpDownGraph} hideGroupLabel={true} />
+          </Tabs.Content>
+        </Tabs.Root>
+      </Card.Body>
+    </Card.Root>
   );
 };

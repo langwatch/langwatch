@@ -1,22 +1,17 @@
 import { useRouter } from "next/router";
 import {
-  Alert,
-  AlertIcon,
   Button,
   Card,
-  CardBody,
   Container,
   HStack,
   Heading,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuList,
   Skeleton,
   Spacer,
   VStack,
-  useToast,
 } from "@chakra-ui/react";
+import { Alert } from "@chakra-ui/react";
+import { Menu } from "../../../../components/ui/menu";
+import { toaster } from "../../../../components/ui/toaster";
 import CheckConfigForm, {
   type CheckConfigFormData,
 } from "../../../../components/checks/CheckConfigForm";
@@ -28,7 +23,6 @@ import { MoreVertical } from "react-feather";
 export default function EditTraceCheck() {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
-  const toast = useToast();
 
   const checkId = typeof router.query.id == "string" ? router.query.id : "";
   const check = api.checks.getById.useQuery(
@@ -48,21 +42,23 @@ export default function EditTraceCheck() {
         id: checkId,
         projectId: project.id,
       });
-      toast({
+      toaster.create({
         title: "Check updated successfully",
-        status: "success",
-        duration: 5000,
-        isClosable: true,
+        type: "success",
+        meta: {
+          closable: true,
+        },
       });
       void router.push(`/${project.slug}/evaluations`);
       check.remove();
     } catch (error) {
-      toast({
+      toaster.create({
         title: "Failed to update check",
         description: "Please try again",
-        status: "error",
-        duration: 5000,
-        isClosable: true,
+        type: "error",
+        meta: {
+          closable: true,
+        },
       });
     }
   };
@@ -75,21 +71,23 @@ export default function EditTraceCheck() {
         { id: checkId, projectId: project.id },
         {
           onSuccess: () => {
-            toast({
+            toaster.create({
               title: "Check deleted successfully",
-              status: "success",
-              duration: 5000,
-              isClosable: true,
+              type: "success",
+              meta: {
+                closable: true,
+              },
             });
             void router.push(`/${project.slug}/evaluations`);
           },
           onError: () => {
-            toast({
+            toaster.create({
               title: "Failed to delete check",
               description: "Please try again",
-              status: "error",
-              duration: 5000,
-              isClosable: true,
+              type: "error",
+              meta: {
+                closable: true,
+              },
             });
           },
         }
@@ -111,45 +109,53 @@ export default function EditTraceCheck() {
   return (
     <DashboardLayout>
       <Container maxWidth="1200" padding={6}>
-        <VStack align="start" spacing={4}>
+        <VStack align="start" gap={4}>
           <HStack align="end" width="full">
             <Heading as="h1" size="xl" textAlign="center" paddingTop={4}>
               Editing Evaluation
             </Heading>
             <Spacer />
-            <Menu>
-              <MenuButton as={Button}>
-                <MoreVertical />
-              </MenuButton>
-              <MenuList>
-                <MenuItem color="red.600" onClick={handleDeleteCheck}>
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <Button>
+                  <MoreVertical />
+                </Button>
+              </Menu.Trigger>
+              <Menu.Content>
+                <Menu.Item
+                  value="delete"
+                  color="red.600"
+                  onClick={handleDeleteCheck}
+                >
                   Delete Check
-                </MenuItem>
-              </MenuList>
-            </Menu>
+                </Menu.Item>
+              </Menu.Content>
+            </Menu.Root>
           </HStack>
 
           {check.isLoading ? (
-            <Card width="full">
-              <CardBody>
+            <Card.Root width="full">
+              <Card.Body>
                 <VStack gap={4} width="full">
                   <Skeleton width="full" height="20px" />
                   <Skeleton width="full" height="20px" />
                   <Skeleton width="full" height="20px" />
                 </VStack>
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           ) : check.isError ? (
-            <Alert status="error">
-              <AlertIcon />
-              An error has occurred trying to load the check configs
-            </Alert>
+            <Alert.Root status="error">
+              <Alert.Indicator />
+              <Alert.Content>
+                An error has occurred trying to load the check configs
+              </Alert.Content>
+            </Alert.Root>
           ) : (
             <CheckConfigForm
               checkId={checkId}
               defaultValues={defaultValues}
               onSubmit={onSubmit}
-              isLoading={updateCheck.isLoading}
+              loading={updateCheck.isLoading}
             />
           )}
         </VStack>

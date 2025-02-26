@@ -1,8 +1,7 @@
-import { useToast } from "@chakra-ui/react";
-import { TeamUserRole } from "@prisma/client";
 import { useRouter } from "next/router";
 import { useCallback } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
+import { TeamUserRole } from "@prisma/client";
 import SettingsLayout from "../../../components/SettingsLayout";
 import {
   TeamForm,
@@ -13,6 +12,7 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import type { FullyLoadedOrganization } from "../../../server/api/routers/organization";
 import { api } from "../../../utils/api";
+import { toaster } from "../../../components/ui/toaster";
 
 export default function NewTeamPage() {
   const { organization } = useOrganizationTeamProject();
@@ -38,7 +38,6 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
       ],
     },
   });
-  const toast = useToast();
   const router = useRouter();
 
   const createTeam = api.team.createTeamWithMembers.useMutation();
@@ -56,27 +55,31 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
         },
         {
           onSuccess: () => {
-            toast({
+            toaster.create({
               title: "Team created successfully",
-              status: "success",
+              type: "success",
               duration: 5000,
-              isClosable: true,
+              meta: {
+                closable: true,
+              },
             });
             void router.push(`/settings/teams`);
           },
           onError: () => {
-            toast({
+            toaster.create({
               title: "Failed to create team",
               description: "Please try again",
-              status: "error",
+              type: "error",
               duration: 5000,
-              isClosable: true,
+              meta: {
+                closable: true,
+              },
             });
           },
         }
       );
     },
-    [createTeam, organization.id, router, toast]
+    [createTeam, organization.id, router]
   );
 
   return (

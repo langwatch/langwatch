@@ -1,29 +1,22 @@
 import {
   Alert,
-  AlertIcon,
   Card,
-  CardBody,
   HStack,
   Heading,
   Spacer,
   Table,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
-  Tr,
   VStack,
 } from "@chakra-ui/react";
-import SettingsLayout from "../../components/SettingsLayout";
-import { api } from "../../utils/api";
-import { camelCaseToTitleCase } from "../../utils/stringCasing";
 import {
   PeriodSelector,
   usePeriodSelector,
 } from "../../components/PeriodSelector";
-import { Link } from "@chakra-ui/next-js";
+import SettingsLayout from "../../components/SettingsLayout";
+import { Link } from "../../components/ui/link";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
+import { camelCaseToTitleCase } from "../../utils/stringCasing";
 
 export default function Usage() {
   const { organization } = useOrganizationTeamProject();
@@ -52,7 +45,7 @@ export default function Usage() {
       <VStack
         paddingX={4}
         paddingY={6}
-        spacing={6}
+        gap={6}
         width="full"
         maxWidth="920px"
         align="start"
@@ -64,11 +57,11 @@ export default function Usage() {
           <Spacer />
           <PeriodSelector period={period} setPeriod={setPeriod} />
         </HStack>
-        <Card width="full">
-          <CardBody width="full">
+        <Card.Root width="full">
+          <Card.Body width="full">
             <VStack
               width="full"
-              spacing={4}
+              gap={4}
               paddingY={4}
               paddingX={4}
               align="start"
@@ -99,10 +92,12 @@ export default function Usage() {
               {aggregatedCosts.isLoading ? (
                 <Text>Loading... </Text>
               ) : aggregatedCosts.error ? (
-                <Alert status="error">
-                  <AlertIcon />
-                  An error has occurred trying to load the costs
-                </Alert>
+                <Alert.Root status="error">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    An error has occurred trying to load the costs
+                  </Alert.Content>
+                </Alert.Root>
               ) : aggregatedCosts.data.length == 0 ? (
                 <Text>No costs</Text>
               ) : (
@@ -110,48 +105,52 @@ export default function Usage() {
                   <VStack
                     key={costGroup.project.id}
                     align="start"
-                    spacing={4}
+                    gap={4}
                     width="full"
                   >
                     <Heading size="sm" as="h3">
                       {costGroup.project.name}
                     </Heading>
-                    <Table border="1px solid" borderColor="gray.200">
-                      <Thead>
-                        <Tr>
-                          <Th>Cost</Th>
-                          <Th>Count</Th>
-                          <Th>Amount</Th>
-                        </Tr>
-                      </Thead>
-                      <Tbody>
+                    <Table.Root
+                      variant="line"
+                      border="1px solid"
+                      borderColor="gray.200"
+                    >
+                      <Table.Header>
+                        <Table.Row>
+                          <Table.ColumnHeader>Cost</Table.ColumnHeader>
+                          <Table.ColumnHeader>Count</Table.ColumnHeader>
+                          <Table.ColumnHeader>Amount</Table.ColumnHeader>
+                        </Table.Row>
+                      </Table.Header>
+                      <Table.Body>
                         {costGroup.costs.map((cost) => (
-                          <Tr key={`${cost.costType}-${cost.currency}`}>
-                            <Td>
+                          <Table.Row key={`${cost.costType}-${cost.currency}`}>
+                            <Table.Cell>
                               {camelCaseToTitleCase(
                                 cost.costType.toLowerCase()
                               )}
                               {cost.costType === "TRACE_CHECK" &&
                                 ` - ${cost.costName}`}
-                            </Td>
-                            <Td>{cost._count.id}</Td>
-                            <Td>
+                            </Table.Cell>
+                            <Table.Cell>{cost._count.id}</Table.Cell>
+                            <Table.Cell>
                               {(cost._sum.amount ?? 0) < 0.01
                                 ? `< ${cost.currency} 0.01`
                                 : `${cost.currency} ${cost._sum.amount?.toFixed(
                                     2
                                   )}`}
-                            </Td>
-                          </Tr>
+                            </Table.Cell>
+                          </Table.Row>
                         ))}
-                      </Tbody>
-                    </Table>
+                      </Table.Body>
+                    </Table.Root>
                   </VStack>
                 ))
               )}
             </VStack>
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
       </VStack>
     </SettingsLayout>
   );

@@ -15,21 +15,23 @@ export function EvaluationProgressBar({
     evaluationState?.status === "waiting" || !evaluationState?.total;
 
   return (
-    <HStack width="full" spacing={4}>
+    <HStack width="full" gap={4}>
       {!isIndeterminate && size !== "xs" && (
         <Text whiteSpace="nowrap">{Math.round((progress / total) * 100)}%</Text>
       )}
-      <Progress
+      <Progress.Root
         size={size}
         width="full"
-        colorScheme="blue"
-        isIndeterminate={isIndeterminate}
-        isAnimated
+        colorPalette="blue"
+        value={isIndeterminate ? null : progress}
         borderRadius="sm"
-        value={progress}
         max={total ? total : undefined}
-        hasStripe
-      />
+        animated
+      >
+        <Progress.Track>
+          <Progress.Range />
+        </Progress.Track>
+      </Progress.Root>
       {!isIndeterminate && size !== "xs" && (
         <Text whiteSpace="nowrap">
           {progress} / {total}

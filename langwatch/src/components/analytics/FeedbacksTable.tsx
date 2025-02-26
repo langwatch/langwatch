@@ -1,16 +1,9 @@
 import {
   Box,
   Center,
-  HStack,
   Link,
   Table,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
   VStack,
 } from "@chakra-ui/react";
 import { useFilterParams } from "../../hooks/useFilterParams";
@@ -18,6 +11,7 @@ import { api } from "../../utils/api";
 import { SummaryMetricValue } from "./SummaryMetric";
 import { ExternalLink } from "react-feather";
 import { useDrawer } from "../CurrentDrawer";
+import { Tooltip } from "../ui/tooltip";
 
 export const FeedbacksTable = () => {
   const { filterParams, queryOpts } = useFilterParams();
@@ -28,22 +22,22 @@ export const FeedbacksTable = () => {
   if (feedbacks.error) return <Box>An error occurred</Box>;
 
   return (
-    <VStack align="start" spacing={4}>
-      <Table variant="simple" padding={0} margin={0}>
-        <Thead>
-          <Tr>
-            <Th width="48px" paddingLeft={0}></Th>
-            <Th>Feedback</Th>
-            <Th width="250px">Date</Th>
-            <Th width="180px" textAlign="center">
+    <VStack align="start" gap={4}>
+      <Table.Root variant="line" padding={0} margin={0}>
+        <Table.Header>
+          <Table.Row>
+            <Table.ColumnHeader width="48px" paddingLeft={0}></Table.ColumnHeader>
+            <Table.ColumnHeader>Feedback</Table.ColumnHeader>
+            <Table.ColumnHeader width="250px">Date</Table.ColumnHeader>
+            <Table.ColumnHeader width="180px" textAlign="center">
               Open Message
-            </Th>
-          </Tr>
-        </Thead>
-        <Tbody>
+            </Table.ColumnHeader>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
           {feedbacks.data?.events.length === 0 && (
-            <Tr>
-              <Td colSpan={2}>
+            <Table.Row>
+              <Table.Cell colSpan={2}>
                 No written feedbacks received yet, check out our{" "}
                 <a
                   href="https://docs.langwatch.ai/docs/user-events/thumbs-up-down"
@@ -53,8 +47,8 @@ export const FeedbacksTable = () => {
                   docs
                 </a>{" "}
                 on how to integrate
-              </Td>
-            </Tr>
+              </Table.Cell>
+            </Table.Row>
           )}
 
           {feedbacks.data?.events.map((event, index) => {
@@ -65,37 +59,37 @@ export const FeedbacksTable = () => {
             )?.value;
 
             return (
-              <Tr
+              <Table.Row
                 key={index}
                 onClick={() => {
                   openDrawer("traceDetails", {
-                    traceId: event.trace_id!,
+                    traceId: event.trace_id,
                   });
                 }}
                 cursor="pointer"
               >
-                <Td paddingLeft={0} textAlign="center" paddingRight="0">
+                <Table.Cell paddingLeft={0} textAlign="center" paddingRight="0">
                   {vote === 1 ? "👍" : vote === -1 ? "👎" : "-"}
-                </Td>
-                <Td>
-                  <Tooltip label={feedback}>
-                    <Text noOfLines={1} wordBreak="break-all" display="block">
+                </Table.Cell>
+                <Table.Cell>
+                  <Tooltip content={feedback}>
+                    <Text lineClamp={1} wordBreak="break-all" display="block">
                       {feedback}
                     </Text>
                   </Tooltip>
-                </Td>
-                <Td>
+                </Table.Cell>
+                <Table.Cell>
                   {new Date(
                     event.timestamps.started_at ?? event.timestamps.inserted_at
                   ).toLocaleString()}
-                </Td>
-                <Td>
+                </Table.Cell>
+                <Table.Cell>
                   <Center>
                     {event.trace_id && (
                       <Link
                         onClick={() => {
                           openDrawer("traceDetails", {
-                            traceId: event.trace_id!,
+                            traceId: event.trace_id,
                           });
                         }}
                       >
@@ -103,12 +97,12 @@ export const FeedbacksTable = () => {
                       </Link>
                     )}
                   </Center>
-                </Td>
-              </Tr>
+                </Table.Cell>
+              </Table.Row>
             );
           })}
-        </Tbody>
-      </Table>
+        </Table.Body>
+      </Table.Root>
     </VStack>
   );
 };

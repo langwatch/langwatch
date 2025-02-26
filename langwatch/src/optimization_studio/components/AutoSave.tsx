@@ -96,19 +96,19 @@ export function AutoSave() {
       {autosave.isLoading ? (
         <HStack>
           <Spinner size="xs" />
-          <Text fontSize={13}>Saving...</Text>
+          <Text fontSize="13px">Saving...</Text>
         </HStack>
       ) : autosave.isError ? (
         <HStack color="red.600">
           <X size={16} />
-          <Text fontSize={13}>Failed to autosave</Text>
+          <Text fontSize="13px">Failed to autosave</Text>
         </HStack>
       ) : recentlySaved ? (
         <HStack>
           <Box color="green.600">
             <Check width="16px" height="16px" />
           </Box>
-          <Text fontSize={13}>Saved</Text>
+          <Text fontSize="13px">Saved</Text>
         </HStack>
       ) : null}
     </Box>
