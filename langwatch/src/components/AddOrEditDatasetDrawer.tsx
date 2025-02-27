@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Dialog } from "../components/ui/dialog";
+import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCallback, useEffect } from "react";
@@ -224,14 +224,14 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   );
 
   return (
-    <Dialog.Root
+    <Drawer.Root
       open={isOpen}
       onOpenChange={({ open }) => !open && onClose()}
       size="xl"
     >
-      <Dialog.Content>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
+      <Drawer.Content>
+        <Drawer.CloseTrigger />
+        <Drawer.Header>
           <HStack>
             <Text paddingTop={5} fontSize="2xl">
               {props.datasetToSave?.datasetId
@@ -241,8 +241,8 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                 : "New Dataset"}
             </Text>
           </HStack>
-        </Dialog.Header>
-        <Dialog.Body>
+        </Drawer.Header>
+        <Drawer.Body>
           {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
           <form onSubmit={handleSubmit(onSubmit)}>
             <HorizontalFormControl
@@ -333,9 +333,9 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               {props.datasetToSave ? "Save" : "Create Dataset"}
             </Button>
           </form>
-        </Dialog.Body>
-      </Dialog.Content>
-    </Dialog.Root>
+        </Drawer.Body>
+      </Drawer.Content>
+    </Drawer.Root>
   );
 }
 

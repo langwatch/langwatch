@@ -11,8 +11,6 @@ a {
 
 * {
   box-sizing: border-box;
-  // Override Chakra UI default annoying overrides
-  user-select: auto !important;
 }
 
 label {

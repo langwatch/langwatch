@@ -10,12 +10,12 @@ import {
   Table,
   Tabs,
   Text,
-  VStack
+  VStack,
 } from "@chakra-ui/react";
 import { EvaluationExecutionMode, type Check } from "@prisma/client";
 import type { JsonObject } from "@prisma/client/runtime/library";
 import { useRouter } from "next/router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { RenderCode } from "~/components/code/RenderCode";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { Drawer } from "~/components/ui/drawer";
@@ -61,6 +61,12 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
     }
   );
 
+  useEffect(() => {
+    if (datasets.data && datasets.data.length > 0 && !selectedDataset) {
+      setSelectedDataset(datasets.data[0]?.id ?? "");
+    }
+  }, [datasets.data, selectedDataset]);
+
   const evaluations = Object.entries(AVAILABLE_EVALUATORS);
 
   type ExtendedCheck = Check & {
@@ -103,8 +109,8 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
       <Alert.Root borderStartWidth="4px" borderStartColor="colorPalette.solid">
         <Alert.Indicator />
         <Alert.Content>
-          No checks configured, you can add them in the Guardrails and Evaluations
-          page&nbsp;
+          No checks configured, you can add them in the Guardrails and
+          Evaluations page&nbsp;
           <Link href={`/${project?.slug}/evaluations`} isExternal>
             here
           </Link>
@@ -123,15 +129,21 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
   };
 
   return (
-    <Drawer.Root open={true} placement="end">
+    <Drawer.Root
+      open={true}
+      placement="end"
+      // @ts-ignore
+      size="eval"
+      onOpenChange={({ open }) => {
+        if (!open) {
+          setStep(1);
+          closeDrawer();
+        }
+      }}
+    >
       <Drawer.Backdrop />
       <Drawer.Content>
-        <Drawer.CloseTrigger
-          onClick={() => {
-            setStep(1);
-            closeDrawer();
-          }}
-        />
+        <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack>
             <Text paddingTop={5} fontSize="2xl">
@@ -157,12 +169,12 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                       <Field.Root invalid={selectDBError}>
                         <NativeSelect.Root>
                           <NativeSelect.Field
+                            value={selectedDataset}
                             onChange={(e) => {
                               setSelectedDataset(e.target.value);
                               setSelectDBError(false);
                             }}
                           >
-                            <option value={""}>Select a dataset</option>
                             {datasets.data
                               ? datasets.data?.map((dataset, index) => (
                                   <option
@@ -194,22 +206,22 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
               </HStack>
 
               <HStack align={"start"} gap={12}>
-                <Tabs.Root defaultValue="evaluations">
-                  <Tabs.List>
+                <Tabs.Root defaultValue="evaluations" width="full">
+                  <Tabs.List colorPalette="blue">
                     {/* <Tabs.Trigger value="output-comparison">Output Comparison</Tabs.Trigger> */}
                     <Tabs.Trigger value="evaluations">Evaluations</Tabs.Trigger>
                     <Tabs.Trigger value="guardrails">Guardrails</Tabs.Trigger>
-                    <Tabs.Indicator />
                   </Tabs.List>
 
-                  <Tabs.Content value="evaluations" padding={0}>
+                  <Tabs.Content value="evaluations" padding={0} width="full">
                     <Table.Root
                       variant="line"
                       borderWidth={1}
                       borderColor={"gray.200"}
+                      width="full"
                     >
-                      <Table.Header backgroundColor={"gray.200"}>
-                        <Table.Row>
+                      <Table.Header>
+                        <Table.Row backgroundColor={"gray.200"}>
                           <Table.ColumnHeader></Table.ColumnHeader>
                           <Table.ColumnHeader>NAME</Table.ColumnHeader>
                           <Table.ColumnHeader>DESCRIPTION</Table.ColumnHeader>
@@ -325,7 +337,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                       borderColor={"gray.200"}
                     >
                       <Table.Header backgroundColor={"gray.200"}>
-                        <Table.Row>
+                        <Table.Row backgroundColor={"gray.200"}>
                           <Table.ColumnHeader></Table.ColumnHeader>
                           <Table.ColumnHeader>NAME</Table.ColumnHeader>
                           <Table.ColumnHeader>DESCRIPTION</Table.ColumnHeader>

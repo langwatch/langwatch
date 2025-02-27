@@ -85,32 +85,34 @@ const DynamicZodForm = ({
       );
     } else if (fieldSchema_ instanceof z.ZodBoolean) {
       return (
-        <HStack width="full" gap={2}>
-          <Controller
-            name={fullPath}
-            control={control}
-            render={({ field: { onChange, onBlur, value, name, ref } }) => (
-              <Switch
-                id={fullPath}
-                checked={value}
-                onChange={onChange}
-                onBlur={onBlur}
-                name={name}
-                ref={ref}
-                size={variant === "studio" ? "sm" : "md"}
-                paddingLeft={variant === "studio" ? 2 : undefined}
-              />
-            )}
-          />
-          <Field.Label
-            htmlFor={fullPath}
-            marginBottom="0"
-            fontWeight={variant === "studio" ? 400 : undefined}
-            fontSize={variant === "studio" ? "13px" : undefined}
-          >
-            {camelCaseToTitleCase(fieldName.split(".").reverse()[0] ?? "")}
-          </Field.Label>
-        </HStack>
+        <Field.Root>
+          <HStack width="full" gap={2}>
+            <Controller
+              name={fullPath}
+              control={control}
+              render={({ field: { onChange, onBlur, value, name, ref } }) => (
+                <Switch
+                  id={fullPath}
+                  checked={value}
+                  onChange={onChange}
+                  onBlur={onBlur}
+                  name={name}
+                  ref={ref}
+                  size={variant === "studio" ? "sm" : "md"}
+                  paddingLeft={variant === "studio" ? 2 : undefined}
+                />
+              )}
+            />
+            <Field.Label
+              htmlFor={fullPath}
+              marginBottom="0"
+              fontWeight={variant === "studio" ? 400 : undefined}
+              fontSize={variant === "studio" ? "13px" : undefined}
+            >
+              {camelCaseToTitleCase(fieldName.split(".").reverse()[0] ?? "")}
+            </Field.Label>
+          </HStack>
+        </Field.Root>
       );
     } else if (
       fieldSchema_ instanceof z.ZodUnion ||
