@@ -115,7 +115,6 @@ export function PlaygroundTabs() {
               <Tabs.Trigger value={state.tabs.length.toString()}>
                 <Plus width="16px" />
               </Tabs.Trigger>
-              <Tabs.Indicator />
             </Tabs.List>
           </Box>
           <Spacer />

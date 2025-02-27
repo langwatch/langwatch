@@ -349,7 +349,7 @@ export default function AnalyticsCustomGraph({
       </Container>
       <Dialog.Root
         open={jsonModal.open}
-        onOpenChange={jsonModal.onClose}
+        onOpenChange={({ open }) => jsonModal.setOpen(open)}
         size="lg"
       >
         <Dialog.Backdrop />
@@ -367,7 +367,7 @@ export default function AnalyticsCustomGraph({
       </Dialog.Root>
       <Dialog.Root
         open={apiModal.open}
-        onOpenChange={apiModal.onClose}
+        onOpenChange={({ open }) => apiModal.setOpen(open)}
         size="lg"
       >
         <Dialog.Backdrop />

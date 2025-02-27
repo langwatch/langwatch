@@ -33,7 +33,7 @@ import {
   DashboardLayout,
   ProjectSelector,
 } from "../../components/DashboardLayout";
-import { Dialog } from "../../components/ui/dialog";
+import { Drawer } from "../../components/ui/drawer";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { Switch } from "../../components/ui/switch";
@@ -479,18 +479,18 @@ export default function Members() {
           </Card.Body>
         </Card.Root>
       </Container>
-      <Dialog.Root
+      <Drawer.Root
         open={open}
         onOpenChange={({ open }) => (open ? onOpen() : handleCloseModal())}
         size="lg"
       >
-        <Dialog.Backdrop />
-        <Dialog.Content>
-          <Dialog.Header>
-            <Dialog.Title>Trigger Message</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.CloseTrigger />
-          <Dialog.Body>
+        <Drawer.Backdrop />
+        <Drawer.Content>
+          <Drawer.Header>
+            <Drawer.Title>Trigger Message</Drawer.Title>
+          </Drawer.Header>
+          <Drawer.CloseTrigger />
+          <Drawer.Body>
             <TriggerForm
               control={
                 formMethods.control as unknown as Control<TriggerFormData>
@@ -500,10 +500,9 @@ export default function Members() {
               }
               onClose={handleCloseModal}
             />
-          </Dialog.Body>
-          <Dialog.Footer></Dialog.Footer>
-        </Dialog.Content>
-      </Dialog.Root>
+          </Drawer.Body>
+        </Drawer.Content>
+      </Drawer.Root>
     </DashboardLayout>
   );
 }

@@ -72,7 +72,7 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
 
       <Dialog.Root
         open={publishModal.open}
-        onOpenChange={publishModal.onClose}
+        onOpenChange={({ open }) => publishModal.setOpen(open)}
         size="md"
       >
         <Dialog.Backdrop />
@@ -88,7 +88,7 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
 
       <Dialog.Root
         open={apiModal.open}
-        onOpenChange={apiModal.onClose}
+        onOpenChange={({ open }) => apiModal.setOpen(open)}
         size="lg"
       >
         <Dialog.Backdrop />

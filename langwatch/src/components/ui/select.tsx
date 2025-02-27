@@ -1,6 +1,7 @@
 "use client";
 
 import type { CollectionItem } from "@chakra-ui/react";
+// eslint-disable-next-line no-restricted-imports
 import { Select as ChakraSelect, Portal } from "@chakra-ui/react";
 import { CloseButton } from "./close-button";
 import * as React from "react";

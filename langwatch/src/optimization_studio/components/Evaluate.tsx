@@ -6,17 +6,20 @@ import {
   Text,
   useDisclosure,
   VStack,
+  createListCollection,
+  Portal,
 } from "@chakra-ui/react";
+import { Select } from "../../components/ui/select";
 import { Dialog } from "../../components/ui/dialog";
 import { Tooltip } from "../../components/ui/tooltip";
 
 import type { Node } from "@xyflow/react";
-import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckSquare } from "react-feather";
 import {
   Controller,
   useForm,
+  type ControllerRenderProps,
   type UseControllerProps,
   type UseFormReturn,
 } from "react-hook-form";
@@ -35,7 +38,7 @@ import { trackEvent } from "../../utils/tracking";
 import { toaster } from "../../components/ui/toaster";
 
 export function Evaluate() {
-  const { open, onToggle, onClose } = useDisclosure();
+  const { open, onToggle, onClose, setOpen } = useDisclosure();
 
   const { project } = useOrganizationTeamProject();
 
@@ -68,10 +71,8 @@ export function Evaluate() {
           <CheckSquare size={16} /> Evaluate
         </Button>
       </Tooltip>
-      <Dialog.Root open={open} onOpenChange={onClose}>
-        <Dialog.Content>
-          {open && <EvaluateModalContent form={form} onClose={onClose} />}
-        </Dialog.Content>
+      <Dialog.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
+        {open && <EvaluateModalContent form={form} onClose={onClose} />}
       </Dialog.Root>
     </>
   );
@@ -407,48 +408,47 @@ const DatasetSplitSelect = ({
   field,
   options,
 }: {
-  field: UseControllerProps<EvaluateForm>;
+  field: ControllerRenderProps<EvaluateForm, "evaluateOn">;
   options: DatasetSplitOption[];
 }) => {
+  const datasetSplitCollection = createListCollection({
+    items: options,
+  });
+
   return (
-    <MultiSelect
+    <Select.Root
       {...field}
-      options={options}
-      hideSelectedOptions={false}
-      isSearchable={false}
-      chakraStyles={{
-        container: (base) => ({
-          ...base,
-          background: "white",
-          width: "100%",
-          borderRadius: "5px",
-        }),
+      collection={datasetSplitCollection}
+      value={field.value?.value ? [field.value.value] : []}
+      onChange={undefined}
+      onValueChange={(change) => {
+        const selectedOption = options.find(
+          (option) => option.value === change.value[0]
+        );
+        field.onChange({
+          target: {
+            name: field.name,
+            value: selectedOption,
+          },
+        });
       }}
-      components={{
-        Menu: ({ children, ...props }) => (
-          <chakraComponents.Menu
-            {...props}
-            innerProps={{
-              ...props.innerProps,
-            }}
-          >
-            {children}
-          </chakraComponents.Menu>
-        ),
-        Option: ({ children, ...props }) => (
-          <chakraComponents.Option {...props}>
-            <VStack align="start">
-              <Text>{children}</Text>
-              <Text
-                color={props.isSelected ? "white" : "gray.500"}
-                fontSize="13px"
-              >
-                {(props.data as any).description}
+      width="100%"
+    >
+      <Select.Trigger>
+        <Select.ValueText placeholder="Select dataset split" />
+      </Select.Trigger>
+      <Select.Content zIndex="popover">
+        {options.map((option) => (
+          <Select.Item item={option} key={option.value}>
+            <VStack align="start" width="full">
+              <Text>{option.label}</Text>
+              <Text fontSize="13px" color="gray.500">
+                {option.description}
               </Text>
             </VStack>
-          </chakraComponents.Option>
-        ),
-      }}
-    />
+          </Select.Item>
+        ))}
+      </Select.Content>
+    </Select.Root>
   );
 };

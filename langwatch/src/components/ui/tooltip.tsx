@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-restricted-imports
 import { Tooltip as ChakraTooltip, Portal } from "@chakra-ui/react";
 import * as React from "react";
 

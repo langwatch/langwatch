@@ -9,16 +9,17 @@ import {
   Text,
   useDisclosure,
   VStack,
+  createListCollection,
 } from "@chakra-ui/react";
 
 import type { Node } from "@xyflow/react";
-import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
 import { useCallback, useEffect, useState } from "react";
 import { CheckSquare, Info, TrendingUp } from "react-feather";
 import {
   Controller,
   useForm,
   type UseControllerProps,
+  type ControllerRenderProps,
   type UseFormReturn,
 } from "react-hook-form";
 import { SmallLabel } from "../../components/SmallLabel";
@@ -39,7 +40,7 @@ import { trackEvent } from "../../utils/tracking";
 import { Tooltip } from "../../components/ui/tooltip";
 import { toaster } from "../../components/ui/toaster";
 import { Dialog } from "../../components/ui/dialog";
-
+import { Select } from "../../components/ui/select";
 
 const optimizerOptions: {
   label: string;
@@ -52,7 +53,7 @@ const optimizerOptions: {
 }));
 
 export function Optimize() {
-  const { open, onToggle, onClose } = useDisclosure();
+  const { open, onToggle, onClose, setOpen } = useDisclosure();
 
   const { project } = useOrganizationTeamProject();
   const { optimizationState } = useWorkflowStore(({ state }) => ({
@@ -86,7 +87,7 @@ export function Optimize() {
           Optimize
         </Button>
       </Tooltip>
-      <Dialog.Root open={open} onOpenChange={onClose}>
+      <Dialog.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
         <Dialog.Backdrop />
         {open && <OptimizeModalContent form={form} onClose={onClose} />}
       </Dialog.Root>
@@ -516,48 +517,46 @@ export function OptimizeModalContent({
 const OptimizerSelect = ({
   field,
 }: {
-  field: UseControllerProps<OptimizeForm>;
+  field: ControllerRenderProps<OptimizeForm, "optimizer">;
 }) => {
+  const optimizerCollection = createListCollection({
+    items: optimizerOptions,
+  });
+
   return (
-    // @ts-ignore
-    <MultiSelect
+    <Select.Root
       {...field}
-      options={optimizerOptions}
-      hideSelectedOptions={false}
-      isSearchable={false}
-      chakraStyles={{
-        container: (base) => ({
-          ...base,
-          background: "white",
-          width: "100%",
-          borderRadius: "5px",
-        }),
+      collection={optimizerCollection}
+      value={field.value?.value ? [field.value.value] : []}
+      onChange={undefined}
+      onValueChange={(change) => {
+        const selectedOption = optimizerOptions.find(
+          (option) => option.value === change.value[0]
+        );
+        field.onChange({
+          target: {
+            name: field.name,
+            value: selectedOption,
+          },
+        });
       }}
-      components={{
-        Menu: ({ children, ...props }) => (
-          <chakraComponents.Menu
-            {...props}
-            innerProps={{
-              ...props.innerProps,
-            }}
-          >
-            {children}
-          </chakraComponents.Menu>
-        ),
-        Option: ({ children, ...props }) => (
-          <chakraComponents.Option {...props}>
-            <VStack align="start">
-              <Text>{children}</Text>
-              <Text
-                color={props.isSelected ? "white" : "gray.500"}
-                fontSize="13px"
-              >
-                {(props.data as any).description}
+      width="100%"
+    >
+      <Select.Trigger>
+        <Select.ValueText placeholder="Select optimizer" />
+      </Select.Trigger>
+      <Select.Content zIndex="popover">
+        {optimizerOptions.map((option) => (
+          <Select.Item item={option} key={option.value}>
+            <VStack align="start" width="full">
+              <Text>{option.label}</Text>
+              <Text fontSize="13px" color="gray.500">
+                {option.description}
               </Text>
             </VStack>
-          </chakraComponents.Option>
-        ),
-      }}
-    />
+          </Select.Item>
+        ))}
+      </Select.Content>
+    </Select.Root>
   );
 };

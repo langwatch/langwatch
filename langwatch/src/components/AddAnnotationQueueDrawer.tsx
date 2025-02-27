@@ -183,7 +183,11 @@ export const AddAnnotationQueueDrawer = ({
         open={open}
         placement="end"
         size="lg"
-        onOpenChange={handleClose}
+        onOpenChange={({ open }) => {
+          if (!open) {
+            closeDrawer();
+          }
+        }}
       >
         <Drawer.Backdrop />
         <Drawer.Content>

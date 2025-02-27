@@ -25,7 +25,11 @@ export const NewWorkflowModal = ({
   }, [open]);
 
   return (
-    <Dialog.Root open={open} onOpenChange={onClose} size="6xl">
+    <Dialog.Root
+      open={open}
+      onOpenChange={({ open }) => !open && onClose()}
+      size="6xl"
+    >
       <Dialog.Backdrop />
       <Dialog.Content paddingX={0}>
         <Dialog.Header>

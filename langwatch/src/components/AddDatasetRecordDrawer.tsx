@@ -209,7 +209,11 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       open={true}
       placement="end"
       size="xl"
-      onOpenChange={() => handleOnClose()}
+      onOpenChange={({ open }) => {
+        if (!open) {
+          handleOnClose();
+        }
+      }}
       preventScroll={true}
     >
       <Drawer.Content

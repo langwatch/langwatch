@@ -420,11 +420,11 @@ const ScoreBlock = ({
   const [tempValue, setTempValue] = useState<string | string[]>();
 
   useEffect(() => {
-    const currentValue = watch(`scoreOptions.${scoreType.id}.value`);
+    const currentValue = scoreValue;
     if (currentValue) {
       setTempValue(currentValue);
     }
-  }, [watch(`scoreOptions.${scoreType.id}.value`)]);
+  }, [scoreValue]);
 
   const [open, setOpen] = useState(false);
 

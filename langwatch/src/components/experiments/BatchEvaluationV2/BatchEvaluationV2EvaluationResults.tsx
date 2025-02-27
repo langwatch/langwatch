@@ -284,12 +284,12 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
             minHeight="0"
             overflowX="auto"
             padding={0}
+            colorPalette="blue"
           >
             <Tabs.List>
               <Tabs.Trigger value="skeleton">
                 <Skeleton width="60px" height="22px" />
               </Tabs.Trigger>
-              <Tabs.Indicator />
             </Tabs.List>
             <Tabs.Content
               value="skeleton"

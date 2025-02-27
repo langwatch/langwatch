@@ -89,11 +89,11 @@ export function ResultsPanel({
         display="flex"
         flexDirection="column"
         size="sm"
+        colorPalette="blue"
       >
         <Tabs.List>
           <Tabs.Trigger value="evaluations">Evaluations</Tabs.Trigger>
           <Tabs.Trigger value="optimizations">Optimizations</Tabs.Trigger>
-          <Tabs.Indicator />
         </Tabs.List>
         <Tabs.Content value="evaluations" padding={0} height="full">
           {!isCollapsed && tabIndex === "evaluations" && <EvaluationResults />}
@@ -630,10 +630,10 @@ export function LoadedOptimizationResults({
               display="flex"
               flexDirection="column"
               minHeight="0"
+              colorPalette="blue"
             >
               <Tabs.List>
                 <Tabs.Trigger value="logs">Logs</Tabs.Trigger>
-                <Tabs.Indicator />
               </Tabs.List>
               <Tabs.Content
                 value="logs"
