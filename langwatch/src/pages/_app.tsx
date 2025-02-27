@@ -240,6 +240,10 @@ export const system = createSystem(defaultConfig, {
           variant: {
             outline: {
               borderColor: "gray.300",
+              color: "gray.800",
+              _hover: {
+                backgroundColor: "gray.50",
+              },
             },
           },
           size: {
@@ -280,15 +284,6 @@ export const system = createSystem(defaultConfig, {
         },
         defaultVariants: {
           size: "sm",
-        },
-      }),
-      drawer: defineRecipe({
-        variants: {
-          size: {
-            span: { maxWidth: "70%" },
-            full: { maxWidth: "100%" },
-            eval: { maxWidth: "1024px" },
-          },
         },
       }),
       separator: defineRecipe({
@@ -516,6 +511,23 @@ export const system = createSystem(defaultConfig, {
           trigger: {
             cursor: "pointer",
           },
+        },
+      }),
+      drawer: defineSlotRecipe({
+        slots: ["content"],
+        base: {
+          content: { maxWidth: "70%" },
+        },
+        variants: {
+          size: {
+            span: { content: { maxWidth: "70%" } },
+            full: { content: { maxWidth: "100%" } },
+            eval: { content: { maxWidth: "1024px" } },
+            xl: { content: { maxWidth: "4xl" } },
+          },
+        },
+        defaultVariants: {
+          size: "xl",
         },
       }),
     },

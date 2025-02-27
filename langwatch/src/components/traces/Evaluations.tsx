@@ -87,7 +87,6 @@ export const EvaluationsCount = (trace: TraceEval) => {
   if (totalErrors > 0) {
     return (
       <Text
-        marginLeft={3}
         borderRadius={"md"}
         paddingX={2}
         backgroundColor={"red.500"}
@@ -108,7 +107,6 @@ export const EvaluationsCount = (trace: TraceEval) => {
 
   return (
     <Text
-      marginLeft={3}
       borderRadius={"md"}
       paddingX={2}
       backgroundColor={totalProcessed > 0 ? "green.500" : "yellow.500"}
@@ -131,7 +129,6 @@ export const Blocked = (trace: TraceEval) => {
 
   return (
     <Text
-      marginLeft={3}
       borderRadius={"md"}
       paddingX={2}
       backgroundColor={"blue.100"}

@@ -1,6 +1,5 @@
 import {
   Box,
-  Container,
   Grid,
   GridItem,
   HStack,
@@ -63,7 +62,7 @@ export function Conversation({
   }, [!!threadTraces.data]);
 
   return (
-    <Box width="full" minWidth="800px">
+    <Box width="full" minWidth="800px" paddingX={10}>
       <VStack align="start" width="full" gap={0}>
         {!!threadId || trace.data ? (
           <>
@@ -89,34 +88,23 @@ export function Conversation({
                   />
                 ))
               ) : threadTraces.error ? (
-                <Container maxWidth="800px" paddingTop={8} paddingBottom={4}>
+                <Box maxWidth="800px" paddingTop={8} paddingBottom={4}>
                   <Text color="red.500">
                     Something went wrong trying to load previous messages
                   </Text>
-                </Container>
-              ) : (
-                <Container
-                  maxWidth="800px"
-                  height="56px"
-                  paddingTop={4}
-                  paddingBottom={4}
-                >
-                  <HStack gap={3}>
-                    <Spinner size="sm" />
-                    <Text>Loading messages...</Text>
-                  </HStack>
-                </Container>
-              )
+                </Box>
+              ) : null
             ) : null}
             {trace.data && !threadTraces.data && (
               <TraceMessages
                 trace={trace.data}
                 highlighted={!!modalTraceId}
                 index="only"
+                loadingMore={threadTraces.isLoading}
               />
             )}
             {trace.data && !trace.data.metadata.thread_id && (
-              <Container maxWidth="1400px" padding={8}>
+              <Box maxWidth="1400px" paddingY={8}>
                 <Text fontStyle="italic" color="gray.500">
                   Pass the thread_id on your integration to capture and
                   visualize the whole conversation or associated actions. Read
@@ -130,11 +118,11 @@ export function Conversation({
                   </Link>
                   .
                 </Text>
-              </Container>
+              </Box>
             )}
           </>
         ) : trace.isLoading ? (
-          <Container maxWidth="1400px" width="full">
+          <Box maxWidth="1400px" width="full">
             <Grid templateColumns="repeat(4, 1fr)">
               <GridItem colSpan={3}>
                 <Box
@@ -148,6 +136,7 @@ export function Conversation({
                   paddingY={4}
                   background="white"
                   borderRadius="4px"
+                  minHeight="524px"
                 >
                   <Message
                     author=""
@@ -188,7 +177,7 @@ export function Conversation({
               </GridItem>
               <GridItem minWidth="420px"></GridItem>
             </Grid>
-          </Container>
+          </Box>
         ) : null}
       </VStack>
     </Box>

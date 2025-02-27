@@ -257,7 +257,7 @@ export function TraceDetails(props: {
             <HStack>
               {hasTeamPermission(TeamRoleGroup.ANNOTATIONS_MANAGE) && (
                 <Button
-                  colorPalette="black"
+
                   variant="outline"
                   onClick={() => {
                     commentState.setCommentState({
@@ -283,7 +283,7 @@ export function TraceDetails(props: {
                     open={open}
                   >
                     <Popover.Trigger asChild>
-                      <Button colorPalette="black" variant="outline">
+                      <Button variant="outline">
                         Annotation Queue
                       </Button>
                     </Popover.Trigger>
@@ -308,7 +308,7 @@ export function TraceDetails(props: {
               )}
               {hasTeamPermission(TeamRoleGroup.DATASETS_MANAGE) && (
                 <Button
-                  colorPalette="black"
+
                   type="submit"
                   variant="outline"
                   minWidth="fit-content"
@@ -327,14 +327,14 @@ export function TraceDetails(props: {
             </HStack>
           </HStack>
 
-          <Tabs.List paddingLeft={6}>
+          <Tabs.List paddingLeft={6} width="full">
             {canViewMessages && (
               <Tabs.Trigger value="messages">Messages</Tabs.Trigger>
             )}
             <Tabs.Trigger value="traceDetails">Trace Details</Tabs.Trigger>
             {anyGuardrails && (
               <Tabs.Trigger value="guardrails">
-                Guardrails{" "}
+                Guardrails
                 <Blocked
                   project={project}
                   traceId={props.traceId}
@@ -343,7 +343,7 @@ export function TraceDetails(props: {
               </Tabs.Trigger>
             )}
             <Tabs.Trigger value="evaluations">
-              Evaluations{" "}
+              Evaluations
               <EvaluationsCount
                 project={project}
                 traceId={props.traceId}
@@ -351,10 +351,9 @@ export function TraceDetails(props: {
               />
             </Tabs.Trigger>
             <Tabs.Trigger value="events">
-              Events{" "}
+              Events
               {trace.data?.events && trace.data.events.length > 0 && (
                 <Text
-                  marginLeft={3}
                   borderRadius={"md"}
                   paddingX={2}
                   backgroundColor={"green.500"}

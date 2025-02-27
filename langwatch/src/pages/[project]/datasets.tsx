@@ -302,7 +302,9 @@ export default function Datasets() {
         }}
         onCreateFromScratch={() => {
           uploadCSVModal.onClose();
-          addEditDatasetDrawer.onOpen();
+          setTimeout(() => {
+            addEditDatasetDrawer.onOpen();
+          }, 100);
         }}
       />
     </DashboardLayout>
