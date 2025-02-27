@@ -2,7 +2,7 @@ import {
   Checkbox as ChakraCheckbox,
   CheckboxGroup as ChakraCheckboxGroup,
   type CheckboxGroupProps,
-} from "@chakra-ui/internal";
+} from "@chakra-ui/react";
 import * as React from "react";
 
 export interface CheckboxProps extends ChakraCheckbox.RootProps {
