@@ -554,6 +554,17 @@ export function TryItOut({
                                   )}
                                 </Table.Cell>
                               ) : null}
+
+                              {evaluatorType?.startsWith("custom/") ? (
+                                <Table.Cell maxWidth="120" color={color}>
+                                  {"score" in runningResult
+                                    ? numeral(runningResult.score).format(
+                                        "0.[00]"
+                                      )
+                                    : "-"}
+                                </Table.Cell>
+                              ) : null}
+
                               {hasAnyLabels &&
                                 (evaluatorDefinition?.isGuardrail ||
                                   !!evaluatorDefinition?.result.score ||
