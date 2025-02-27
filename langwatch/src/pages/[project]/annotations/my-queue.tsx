@@ -66,7 +66,7 @@ export default function TraceAnnotations() {
 
   return (
     <DashboardLayout backgroundColor="white">
-      <VStack height="100%" width="full">
+      <VStack height="100%" width="full" padding={4}>
         <Conversation traceId={currentQueueItem?.trace?.trace_id ?? ""} />
         <Spacer />
         {currentQueueItem?.trace && (
@@ -121,16 +121,14 @@ const AnnotationQueuePicker = ({
         projectId: project?.id ?? "",
       },
       {
-        onSuccess: () => {
-          void (async () => {
-            await refetchQueueItems();
-            const nextItem = queueItems[currentQueueItemIndex + 1];
-            if (nextItem) {
-              navigateToQueue(nextItem.id);
-            } else {
-              await router.replace(`/${project?.slug}/annotations/my-queue`);
-            }
-          });
+        onSuccess: async () => {
+          await refetchQueueItems();
+          const nextItem = queueItems[currentQueueItemIndex + 1];
+          if (nextItem) {
+            navigateToQueue(nextItem.id);
+          } else {
+            await router.replace(`/${project?.slug}/annotations/my-queue`);
+          }
         },
       }
     );

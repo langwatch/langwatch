@@ -131,10 +131,10 @@ export const AnnotationsTable = ({
     } else {
       if (scoreOptionsIDArray.length > 0) {
         return scoreOptionsIDArray.map((_, i) => (
-          <Table.Cell key={i}></Table.Cell>
+          <Table.Cell key={i} minWidth={200}></Table.Cell>
         ));
       }
-      return <Table.Cell></Table.Cell>;
+      return <Table.Cell minWidth={200}></Table.Cell>;
     }
   };
 
@@ -224,7 +224,7 @@ export const AnnotationsTable = ({
                     setSelectedAnnotations([change.value])
                   }
                 >
-                  <VStack align="start" padding={2}>
+                  <VStack align="start" padding={3} gap={3}>
                     <Radio value="pending">Pending</Radio>
                     <Radio value="all">All Annotations</Radio>
                     <Radio value="completed">Completed</Radio>
@@ -399,7 +399,7 @@ export const AnnotationsTable = ({
                               </Tooltip>
                             </Table.Cell>
                             {!isDone && (
-                              <Table.Cell>
+                              <Table.Cell minWidth={150}>
                                 <Text>
                                   {item.createdAt
                                     ? `${item.createdAt.getDate()}/${item.createdAt.toLocaleDateString(
@@ -413,7 +413,7 @@ export const AnnotationsTable = ({
                               </Table.Cell>
                             )}
 
-                            <Table.Cell>
+                            <Table.Cell minWidth={350}>
                               <Tooltip content={item.trace?.input?.value}>
                                 <Text
                                   lineClamp={2}
@@ -426,7 +426,7 @@ export const AnnotationsTable = ({
                                 </Text>
                               </Tooltip>
                             </Table.Cell>
-                            <Table.Cell>
+                            <Table.Cell minWidth={350}>
                               <Tooltip content={item.trace?.output?.value}>
                                 <Text
                                   lineClamp={2}
@@ -439,7 +439,7 @@ export const AnnotationsTable = ({
                                 </Text>
                               </Tooltip>
                             </Table.Cell>
-                            <Table.Cell>
+                            <Table.Cell minWidth={350}>
                               <VStack align="start" gap={2} divideX="1px">
                                 {item.annotations.map(
                                   (annotation: Annotation) =>

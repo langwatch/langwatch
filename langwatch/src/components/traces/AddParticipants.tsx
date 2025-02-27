@@ -178,6 +178,7 @@ export const AddParticipants = ({
           <Spacer />
           <Button
             colorPalette="orange"
+            disabled={annotators.length == 0}
             size="sm"
             onClick={sendToQueue}
             loading={isLoading}
