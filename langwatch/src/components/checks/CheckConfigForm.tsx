@@ -592,7 +592,7 @@ const MappingsFields = ({
                 <NativeSelect.Root maxWidth="50%">
                   <NativeSelect.Field
                     defaultValue={defaultValues[field]}
-                    {...register(`mappings.${field}`)}
+                    {...register(`customMapping.${field}`)}
                   >
                     {mappingOptions.map(({ value, label }) => (
                       <option key={value} value={value}>
@@ -615,7 +615,7 @@ const MappingsFields = ({
                 <NativeSelect.Root maxWidth="50%">
                   <NativeSelect.Field
                     defaultValue={defaultValues[field]}
-                    {...register(`mappings.${field}`)}
+                    {...register(`customMapping.${field}`)}
                   >
                     <option value="">(empty)</option>
                     {mappingOptions.map(({ value, label }) => (

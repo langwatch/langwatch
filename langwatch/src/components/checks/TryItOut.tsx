@@ -370,6 +370,16 @@ export function TryItOut({
                         Score
                       </Table.ColumnHeader>
                     ) : null}
+                    {evaluatorType?.startsWith("custom/") ? (
+                      <Table.ColumnHeader width="120px">
+                        Passed
+                      </Table.ColumnHeader>
+                    ) : null}
+                    {evaluatorType?.startsWith("custom/") ? (
+                      <Table.ColumnHeader width="120px">
+                        Score
+                      </Table.ColumnHeader>
+                    ) : null}
                     {hasAnyLabels && (
                       <Table.ColumnHeader width="120px">
                         Label
@@ -525,6 +535,14 @@ export function TryItOut({
                                 <Table.Cell maxWidth="120" color={color}>
                                   Error
                                 </Table.Cell>
+                              ) : evaluatorType?.startsWith("custom/") ? (
+                                <Table.Cell maxWidth="120" color={color}>
+                                  {"passed" in runningResult
+                                    ? runningResult.passed
+                                      ? "Pass"
+                                      : "Fail"
+                                    : "-"}
+                                </Table.Cell>
                               ) : evaluatorDefinition?.isGuardrail ? (
                                 <Table.Cell maxWidth="120" color={color}>
                                   {runningResult.passed ? "Pass" : "Fail"}
@@ -536,6 +554,17 @@ export function TryItOut({
                                   )}
                                 </Table.Cell>
                               ) : null}
+
+                              {evaluatorType?.startsWith("custom/") ? (
+                                <Table.Cell maxWidth="120" color={color}>
+                                  {"score" in runningResult
+                                    ? numeral(runningResult.score).format(
+                                        "0.[00]"
+                                      )
+                                    : "-"}
+                                </Table.Cell>
+                              ) : null}
+
                               {hasAnyLabels &&
                                 (evaluatorDefinition?.isGuardrail ||
                                   !!evaluatorDefinition?.result.score ||
