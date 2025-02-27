@@ -8,7 +8,7 @@ import {
   SliderTrack,
   SliderControl,
   SliderRoot,
-} from "@chakra-ui/internal";
+} from "@chakra-ui/react";
 import * as React from "react";
 
 export interface SliderProps extends ChakraSlider.RootProps {
