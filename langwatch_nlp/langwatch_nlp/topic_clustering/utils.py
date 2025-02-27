@@ -2,6 +2,7 @@ from typing import Optional
 import litellm
 import numpy as np
 from scipy.spatial.distance import cdist
+import concurrent.futures
 
 from langwatch_nlp.topic_clustering.types import Trace, TraceWithEmbeddings
 
@@ -28,6 +29,75 @@ def normalize_embedding_dimensions(
         return embedding + [0.0] * (target_dim - len(embedding))
 
     return embedding[:target_dim]
+
+
+def _generate_single_embedding(
+    text: str,
+    embeddings_litellm_params: dict[str, str],
+    dimensions: int
+) -> Optional[list[float]]:
+    """Generate embedding for a single text item with proper error handling."""
+    try:
+        text_to_embed = text if text else "<empty>"
+        response = litellm.embedding(
+            **embeddings_litellm_params,  # type: ignore
+            input=text_to_embed,
+        )
+        return normalize_embedding_dimensions(
+            response.data[0]["embedding"],
+            target_dim=dimensions,
+        )
+    except Exception as e:
+        print(f"[WARN] Error generating single embedding: {e}\n\nText: {text}\n\n")
+        raise e  # Re-raise the exception to be handled by the caller
+
+
+def generate_embeddings_threaded(
+    texts: list[str],
+    embeddings_litellm_params: dict[str, str],
+    max_workers: int = 8
+) -> list[Optional[list[float]]]:
+    """Generate embeddings in parallel using ThreadPoolExecutor."""
+    dimensions = int(embeddings_litellm_params.get("dimensions", 1536))
+    params_copy = embeddings_litellm_params.copy()
+    if "dimensions" in params_copy:
+        del params_copy["dimensions"]
+
+    embeddings: list[Optional[list[float]]] = []
+    errors = 0
+    last_error: Optional[Exception] = None
+
+    # Process in smaller chunks to handle errors properly
+    chunk_size = 20
+    for i in range(0, len(texts), chunk_size):
+        print("\n\ni", i, "\n\n")
+        chunk = texts[i:i + chunk_size]
+        futures = []
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks
+            for text in chunk:
+                futures.append(executor.submit(_generate_single_embedding, text, params_copy, dimensions))
+
+            # Process results as they complete
+            for future in futures:
+                try:
+                    result = future.result()
+                    embeddings.append(result)
+                except Exception as e:
+                    embeddings.append(None)
+                    errors += 1
+                    last_error = e
+                    print(f"[WARN] Error generating embeddings: {e}")
+                    if errors >= 3:
+                        print(f"[WARN] Too many errors generating embeddings, reraising")
+                        raise e
+
+    if last_error and errors == len(texts):
+        print(f"[WARN] All embeddings failed to generate, reraising last error")
+        raise last_error
+
+    return embeddings
 
 
 def generate_embeddings(
@@ -59,9 +129,10 @@ def generate_embeddings(
             ]
         except Exception as e:
             if batch_size > 1:
-                return generate_embeddings(
-                    texts, embeddings_litellm_params, batch_size=1
-                )
+                # Instead of falling back to batch_size=1, use threaded implementation
+                print(f"[INFO] Batch embedding failed, falling back to threaded implementation")
+                return generate_embeddings_threaded(texts, embeddings_litellm_params)
+
             embeddings += [None] * batch_size
 
             errors += 1
