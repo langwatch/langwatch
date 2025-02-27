@@ -19,7 +19,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
-import { AddAnnotationScoreDrawer } from "./AddAnnotationScoreDrawer";
+import { AddAnnotationScore } from "./annotations/AddAnnotationScore";
 import { useDrawer } from "./CurrentDrawer";
 import { FullWidthFormControl } from "./FullWidthFormControl";
 import { RandomColorAvatar } from "./RandomColorAvatar";
@@ -44,7 +44,7 @@ export const AddAnnotationQueueDrawer = ({
       projectId: project?.id ?? "",
     },
     {
-      enabled: !!project && !!queueId && open,
+      enabled: !!project,
     }
   );
 
@@ -391,12 +391,20 @@ export const AddAnnotationQueueDrawer = ({
         size="lg"
         onOpenChange={({ open }) => scoreTypeDrawerOpen.setOpen(open)}
       >
-        <Drawer.Backdrop />
         <Drawer.Content>
-          <AddAnnotationScoreDrawer
-            onClose={scoreTypeDrawerOpen.onClose}
-            onOverlayClick={scoreTypeDrawerOpen.onClose}
-          />
+          <Drawer.Header>
+            <HStack>
+              <Drawer.CloseTrigger />
+            </HStack>
+            <HStack>
+              <Text paddingTop={5} fontSize="2xl">
+                Add Score Metric
+              </Text>
+            </HStack>
+          </Drawer.Header>
+          <Drawer.Body>
+            <AddAnnotationScore onClose={scoreTypeDrawerOpen.onClose} />
+          </Drawer.Body>
         </Drawer.Content>
       </Drawer.Root>
     </>

@@ -1,6 +1,5 @@
 import {
   Button,
-  FocusTrap,
   HStack,
   Spacer,
   Tabs,
@@ -11,7 +10,7 @@ import {
 import { type PublicShare } from "@prisma/client";
 import { useRouter } from "next/router";
 import qs from "qs";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Maximize2, Minimize2 } from "react-feather";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
@@ -28,6 +27,7 @@ import { TraceSummary } from "./Summary";
 
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
+import { Drawer } from "../ui/drawer";
 import { AddParticipants } from "./AddParticipants";
 import {
   Blocked,
@@ -36,7 +36,6 @@ import {
   Guardrails,
 } from "./Evaluations";
 import { Events } from "./Events";
-import { Drawer } from "../ui/drawer";
 
 export function TraceDetails(props: {
   traceId: string;
@@ -165,8 +164,7 @@ export function TraceDetails(props: {
   const queueDrawerOpen = useDisclosure();
 
   const queueItem = api.annotation.createQueueItem.useMutation();
-
-  const popover = useDisclosure();
+  const [open, setOpen] = useState(false);
 
   const sendToQueue = () => {
     queueItem.mutate(
@@ -177,7 +175,7 @@ export function TraceDetails(props: {
       },
       {
         onSuccess: () => {
-          popover.onClose();
+          setOpen(false);
           toaster.create({
             title: "Trace added to annotation queue",
             description: (
@@ -214,7 +212,13 @@ export function TraceDetails(props: {
   const commentState = useAnnotationCommentStore();
 
   return (
-    <VStack align="start" width="full" height="full" background="white" gap={0}>
+    <VStack
+      align="start"
+      width="full"
+      height="full"
+      backgroundColor="white"
+      gap={0}
+    >
       <Tabs.Root
         width="full"
         height="full"
@@ -273,7 +277,11 @@ export function TraceDetails(props: {
               )}
               {hasTeamPermission(TeamRoleGroup.ANNOTATIONS_MANAGE) && (
                 <>
-                  <Popover.Root modal>
+                  <Popover.Root
+                    modal
+                    onOpenChange={(e) => setOpen(e.open)}
+                    open={open}
+                  >
                     <Popover.Trigger asChild>
                       <Button colorPalette="black" variant="outline">
                         Annotation Queue

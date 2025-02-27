@@ -233,7 +233,12 @@ export function AnnotationComment({ key = "" }: { key: string }) {
     : "";
 
   return (
-    <Box width="full" onClick={(e) => e.stopPropagation()} key={key}>
+    <Box
+      width="full"
+      onClick={(e) => e.stopPropagation()}
+      key={key}
+      minWidth={395}
+    >
       <Card.Root>
         <Card.Body>
           {getAnnotation.isLoading ? (
@@ -421,9 +426,11 @@ const ScoreBlock = ({
     }
   }, [watch(`scoreOptions.${scoreType.id}.value`)]);
 
+  const [open, setOpen] = useState(false);
+
   return (
     <>
-      <Popover.Root>
+      <Popover.Root open={open} onOpenChange={(e) => setOpen(e.open)}>
         <Popover.Trigger asChild>
           <Button size="xs" variant="outline">
             {scoreValue
@@ -460,6 +467,7 @@ const ScoreBlock = ({
                       watch={watch}
                       tempValue={tempValue ?? ""}
                       setTempValue={setTempValue}
+                      setOpen={setOpen}
                     />
                   </VStack>
                 </CheckboxGroup>
@@ -486,6 +494,7 @@ const ScoreBlock = ({
                       watch={watch}
                       tempValue={tempValue ?? ""}
                       setTempValue={setTempValue}
+                      setOpen={setOpen}
                     />
                   </VStack>
                 </RadioGroup>
@@ -505,6 +514,7 @@ const ReasonButtons = ({
   watch,
   tempValue,
   setTempValue,
+  setOpen,
 }: {
   scoreTypeId: string;
   onReasonClick: (scoreTypeId: string) => void;
@@ -512,6 +522,7 @@ const ReasonButtons = ({
   watch: UseFormWatch<Annotation>;
   tempValue: string | string[];
   setTempValue: (value: string | string[]) => void;
+  setOpen: (open: boolean) => void;
 }) => (
   <>
     <Text fontSize="sm">
@@ -536,6 +547,7 @@ const ReasonButtons = ({
         onClick={() => {
           onReasonClick(scoreTypeId);
           setValue(`scoreOptions.${scoreTypeId}.value`, tempValue);
+          setOpen(false);
         }}
         colorPalette="blue"
         disabled={!tempValue}
