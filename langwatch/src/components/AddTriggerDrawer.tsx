@@ -269,7 +269,11 @@ export function TriggerDrawer() {
   const editDataset = useDisclosure();
 
   return (
-    <Drawer.Root open={true} onOpenChange={({ open }) => !open && closeDrawer()} placement="end">
+    <Drawer.Root
+      open={true}
+      onOpenChange={({ open }) => !open && closeDrawer()}
+      placement="end"
+    >
       <Drawer.Backdrop />
       <Drawer.Content maxWidth="1200px">
         <Drawer.Header>

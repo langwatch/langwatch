@@ -7,8 +7,6 @@ import {
   Field,
   HStack,
   Heading,
-  Icon,
-  NativeSelect,
   Separator,
   Skeleton,
   Spacer,
@@ -17,7 +15,6 @@ import {
   Tabs,
   Text,
   VStack,
-  useDisclosure,
 } from "@chakra-ui/react";
 import type { Experiment, Project, WorkflowVersion } from "@prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
@@ -38,6 +35,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { VersionBox } from "../../optimization_studio/components/History";
 import type { AppRouter } from "../../server/api/root";
 import type {
@@ -50,14 +48,13 @@ import { api } from "../../utils/api";
 import { formatMoney } from "../../utils/formatMoney";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { getColorForString } from "../../utils/rotatingColors";
+import { titleCase } from "../../utils/stringCasing";
 import { FeedbackLink } from "../FeedbackLink";
+import { LLMIcon } from "../icons/LLMIcon";
 import { MetadataTag } from "../MetadataTag";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
-import { titleCase } from "../../utils/stringCasing";
-import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
-import { LLMIcon } from "../icons/LLMIcon";
-import { Switch } from "../ui/switch";
 import { getComputedCSSVariableValue } from "../ui/color-mode";
+import { Switch } from "../ui/switch";
 
 export function DSPyExperiment({
   project,
@@ -210,7 +207,7 @@ export const useDSPyExperimentState = ({
       selectedRuns_ = dspyRuns.data?.[0]?.runId ? [dspyRuns.data[0].runId] : [];
     }
     return selectedRuns_;
-  }, [dspyRuns.data, router.query.runIds, selectedRuns, incomingRunIds]);
+  }, [dspyRuns.data, router.query.runIds, selectedRuns]);
 
   const setSelectedRuns_ = useCallback(
     (runIds: string[]) => {
@@ -1087,7 +1084,7 @@ function CollapsableSignature({
                   key,
                   Object.fromEntries(
                     Object.entries(value as any).filter(
-                      ([key, value]) => key !== "__class__"
+                      ([key]) => key !== "__class__"
                     )
                   ),
                 ];
@@ -1256,7 +1253,7 @@ export function DSPyRunsScoresChart({
             }}
           />
           <Tooltip
-            contentFormatter={(value) => `Step ${value}`}
+            labelFormatter={(value) => `Step ${value}`}
             formatter={(value, name, props) => {
               const label = props.payload[`${name}_label`];
               const version = props.payload[`${name}_version`];
