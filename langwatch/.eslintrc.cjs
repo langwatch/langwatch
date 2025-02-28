@@ -31,7 +31,43 @@ const config = {
         fixStyle: "inline-type-imports",
       },
     ],
-    "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      {
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_",
+      },
+    ],
+    // Also, Checkbox, CheckboxGroup (from ui/checkbox), Drawer, Radio, RadioGroup (from ui/radio), InputGroup (from ui/input-group), Switch, Popover, Link, Menu, Dialog, InputGroup and Tooltip should always be imported from components/ui, not from chakra directly, and it should always be a relative import, we don't use @ aliases.
+
+    "no-restricted-imports": [
+      "error",
+      {
+        paths: [
+          {
+            name: "@chakra-ui/react",
+            importNames: [
+              "Checkbox",
+              "CheckboxGroup",
+              "Drawer",
+              "Radio",
+              "RadioGroup",
+              "InputGroup",
+              "Switch",
+              "Popover",
+              "Link",
+              "Menu",
+              "Dialog",
+              "InputGroup",
+              "Tooltip",
+            ],
+            message:
+              "Component must be imported from 'components/ui' instead of '@chakra-ui/react'.",
+          },
+        ],
+      },
+    ],
   },
 };
 

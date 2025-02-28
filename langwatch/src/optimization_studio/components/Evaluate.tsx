@@ -1,29 +1,25 @@
 import {
   Button,
   HStack,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
   Skeleton,
   Spacer,
   Text,
-  Tooltip,
   useDisclosure,
-  useToast,
   VStack,
+  createListCollection,
+  Portal,
 } from "@chakra-ui/react";
+import { Select } from "../../components/ui/select";
+import { Dialog } from "../../components/ui/dialog";
+import { Tooltip } from "../../components/ui/tooltip";
 
 import type { Node } from "@xyflow/react";
-import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckSquare } from "react-feather";
 import {
   Controller,
   useForm,
+  type ControllerRenderProps,
   type UseControllerProps,
   type UseFormReturn,
 } from "react-hook-form";
@@ -39,9 +35,10 @@ import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
 import { trainTestSplit } from "../utils/datasetUtils";
 import { trackEvent } from "../../utils/tracking";
+import { toaster } from "../../components/ui/toaster";
 
 export function Evaluate() {
-  const { isOpen, onToggle, onClose } = useDisclosure();
+  const { open, onToggle, onClose, setOpen } = useDisclosure();
 
   const { project } = useOrganizationTeamProject();
 
@@ -61,7 +58,7 @@ export function Evaluate() {
 
   return (
     <>
-      <Tooltip label={isRunning ? "Evaluation is running" : ""}>
+      <Tooltip content={isRunning ? "Evaluation is running" : ""}>
         <Button
           variant="outline"
           size="sm"
@@ -69,16 +66,14 @@ export function Evaluate() {
             trackEvent("evaluate_click", { project_id: project?.id });
             onToggle();
           }}
-          leftIcon={<CheckSquare size={16} />}
-          isDisabled={isRunning}
+          disabled={isRunning}
         >
-          Evaluate
+          <CheckSquare size={16} /> Evaluate
         </Button>
       </Tooltip>
-      <Modal isOpen={isOpen} onClose={onClose}>
-        <ModalOverlay />
-        {isOpen && <EvaluateModalContent form={form} onClose={onClose} />}
-      </Modal>
+      <Dialog.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
+        {open && <EvaluateModalContent form={form} onClose={onClose} />}
+      </Dialog.Root>
     </>
   );
 }
@@ -204,7 +199,6 @@ export function EvaluateModalContent({
       allowSaveIfAutoSaveIsCurrentButNotLatest: false,
     });
 
-  const toast = useToast();
   const commitVersion = api.workflow.commitVersion.useMutation();
   const { startEvaluationExecution } = useEvaluationExecution();
 
@@ -265,24 +259,24 @@ export function EvaluateModalContent({
           });
           versionId = versionResponse.id;
         } catch (error) {
-          toast({
+          toaster.create({
             title: "Error saving version",
-            status: "error",
+            type: "error",
             duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            meta: { closable: true },
+            placement: "top-end",
           });
           throw error;
         }
       }
 
       if (!versionId) {
-        toast({
+        toaster.create({
           title: "Version ID not found for evaluation",
-          status: "error",
+          type: "error",
           duration: 5000,
-          isClosable: true,
-          position: "top-right",
+          meta: { closable: true },
+          placement: "top-end",
         });
         return;
       }
@@ -302,7 +296,6 @@ export function EvaluateModalContent({
       getWorkflow,
       project,
       startEvaluationExecution,
-      toast,
       versionToBeEvaluated.id,
       versions,
       workflowId,
@@ -317,17 +310,19 @@ export function EvaluateModalContent({
 
   if (!versions.data) {
     return (
-      <ModalContent borderTop="5px solid" borderColor="green.400">
-        <ModalHeader fontWeight={600}>Evaluate Workflow</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
+      <Dialog.Content borderTop="5px solid" borderTopColor="green.400">
+        <Dialog.Header>
+          <Dialog.Title fontWeight={600}>Evaluate Workflow</Dialog.Title>
+          <Dialog.CloseTrigger />
+        </Dialog.Header>
+        <Dialog.Body>
           <VStack align="start" width="full">
             <Skeleton width="full" height="20px" />
             <Skeleton width="full" height="20px" />
           </VStack>
-        </ModalBody>
-        <ModalFooter />
-      </ModalContent>
+        </Dialog.Body>
+        <Dialog.Footer />
+      </Dialog.Content>
     );
   }
 
@@ -338,17 +333,19 @@ export function EvaluateModalContent({
     : false;
 
   return (
-    <ModalContent
+    <Dialog.Content
       as="form"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onSubmit={form.handleSubmit(onSubmit)}
       borderTop="5px solid"
-      borderColor="green.400"
+      borderTopColor="green.400"
     >
-      <ModalHeader fontWeight={600}>Evaluate Workflow</ModalHeader>
-      <ModalCloseButton />
-      <ModalBody>
-        <VStack align="start" width="full" spacing={4}>
+      <Dialog.Header>
+        <Dialog.Title fontWeight={600}>Evaluate Workflow</Dialog.Title>
+        <Dialog.CloseTrigger />
+      </Dialog.Header>
+      <Dialog.Body>
+        <VStack align="start" width="full" gap={4}>
           <VStack align="start" width="full">
             <VersionToBeUsed
               form={
@@ -362,7 +359,7 @@ export function EvaluateModalContent({
               versionToBeEvaluated={versionToBeEvaluated}
             />
           </VStack>
-          <VStack align="start" width="full" spacing={2}>
+          <VStack align="start" width="full" gap={2}>
             <SmallLabel color="gray.600">Evaluate on</SmallLabel>
             <Controller
               control={form.control}
@@ -374,9 +371,9 @@ export function EvaluateModalContent({
             />
           </VStack>
         </VStack>
-      </ModalBody>
-      <ModalFooter borderTop="1px solid" borderColor="gray.200" marginTop={4}>
-        <VStack align="start" width="full" spacing={3}>
+      </Dialog.Body>
+      <Dialog.Footer borderTop="1px solid" borderColor="gray.200" marginTop={4}>
+        <VStack align="start" width="full" gap={3}>
           {hasProvidersWithoutCustomKeys && (
             <AddModelProviderKey
               runWhat="run evaluations"
@@ -386,24 +383,24 @@ export function EvaluateModalContent({
           <HStack width="full">
             <Text fontWeight={500}>{estimatedTotal} entries</Text>
             <Spacer />
-            <Tooltip label={isDisabled}>
+            <Tooltip content={isDisabled}>
               <Button
                 variant="outline"
                 type="submit"
-                leftIcon={<CheckSquare size={16} />}
-                isLoading={
+                disabled={!!isDisabled}
+                loading={
                   commitVersion.isLoading ||
                   evaluationState?.status === "waiting"
                 }
-                isDisabled={!!isDisabled}
               >
+                <CheckSquare size={16} />
                 {canSaveNewVersion ? "Save & Run Evaluation" : "Run Evaluation"}
               </Button>
             </Tooltip>
           </HStack>
         </VStack>
-      </ModalFooter>
-    </ModalContent>
+      </Dialog.Footer>
+    </Dialog.Content>
   );
 }
 
@@ -411,49 +408,47 @@ const DatasetSplitSelect = ({
   field,
   options,
 }: {
-  field: UseControllerProps<EvaluateForm>;
+  field: ControllerRenderProps<EvaluateForm, "evaluateOn">;
   options: DatasetSplitOption[];
 }) => {
+  const datasetSplitCollection = createListCollection({
+    items: options,
+  });
+
   return (
-    <MultiSelect
+    <Select.Root
       {...field}
-      options={options}
-      hideSelectedOptions={false}
-      isSearchable={false}
-      useBasicStyles
-      chakraStyles={{
-        container: (base) => ({
-          ...base,
-          background: "white",
-          width: "100%",
-          borderRadius: "5px",
-        }),
+      collection={datasetSplitCollection}
+      value={field.value?.value ? [field.value.value] : []}
+      onChange={undefined}
+      onValueChange={(change) => {
+        const selectedOption = options.find(
+          (option) => option.value === change.value[0]
+        );
+        field.onChange({
+          target: {
+            name: field.name,
+            value: selectedOption,
+          },
+        });
       }}
-      components={{
-        Menu: ({ children, ...props }) => (
-          <chakraComponents.Menu
-            {...props}
-            innerProps={{
-              ...props.innerProps,
-            }}
-          >
-            {children}
-          </chakraComponents.Menu>
-        ),
-        Option: ({ children, ...props }) => (
-          <chakraComponents.Option {...props}>
-            <VStack align="start">
-              <Text>{children}</Text>
-              <Text
-                color={props.isSelected ? "white" : "gray.500"}
-                fontSize={13}
-              >
-                {(props.data as any).description}
+      width="100%"
+    >
+      <Select.Trigger>
+        <Select.ValueText placeholder="Select dataset split" />
+      </Select.Trigger>
+      <Select.Content zIndex="popover">
+        {options.map((option) => (
+          <Select.Item item={option} key={option.value}>
+            <VStack align="start" width="full">
+              <Text>{option.label}</Text>
+              <Text fontSize="13px" color="gray.500">
+                {option.description}
               </Text>
             </VStack>
-          </chakraComponents.Option>
-        ),
-      }}
-    />
+          </Select.Item>
+        ))}
+      </Select.Content>
+    </Select.Root>
   );
 };

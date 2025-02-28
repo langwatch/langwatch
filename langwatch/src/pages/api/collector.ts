@@ -35,7 +35,7 @@ const debug = getDebugger("langwatch:collector");
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: process.env.COLLECTOR_MAX_BODY_SIZE ?? "5mb",
+      sizeLimit: "10mb",
     },
   },
 };

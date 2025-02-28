@@ -19,7 +19,7 @@ export const FilterSidebar = React.memo(function FilterSidebar({
         align="start"
         minWidth="380"
         maxWidth="380"
-        spacing={12}
+        gap={12}
         paddingTop={2}
         paddingBottom={"120px"}
       >

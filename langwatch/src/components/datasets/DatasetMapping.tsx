@@ -1,12 +1,9 @@
 import {
   Box,
-  FormControl,
-  FormHelperText,
-  FormLabel,
+  Field,
   HStack,
-  Select,
+  NativeSelect,
   Spacer,
-  Switch,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -35,6 +32,7 @@ import type {
 import { datasetSpanSchema } from "../../server/tracer/types.generated";
 import { getRAGChunks, getRAGInfo } from "../../server/tracer/utils";
 import { api } from "../../utils/api";
+import { Switch } from "../ui/switch";
 
 type TraceWithSpansAndAnnotations = TraceWithSpans & {
   annotations?: (Annotation & {
@@ -566,7 +564,7 @@ export const TracesMapping = ({
   ]);
 
   return (
-    <VStack align="start" width="full" spacing={2}>
+    <VStack align="start" width="full" gap={2}>
       {Object.entries(mapping).map(
         ([column, { source, key, subkey }], index) => {
           const mapping = source ? TRACE_MAPPINGS[source] : undefined;
@@ -580,56 +578,57 @@ export const TracesMapping = ({
 
           return (
             <HStack key={index}>
-              <VStack align="start" spacing={2}>
-                <Select
-                  width="200px"
-                  flexShrink={0}
-                  onChange={(e) => {
-                    setMappingState((prev) => {
-                      const targetMapping = e.target.value
-                        ? TRACE_MAPPINGS[
-                            e.target.value as keyof typeof TRACE_MAPPINGS
-                          ]
-                        : undefined;
+              <VStack align="start" gap={2}>
+                <NativeSelect.Root width="200px" flexShrink={0}>
+                  <NativeSelect.Field
+                    onChange={(e) => {
+                      setMappingState((prev) => {
+                        const targetMapping = e.target.value
+                          ? TRACE_MAPPINGS[
+                              e.target.value as keyof typeof TRACE_MAPPINGS
+                            ]
+                          : undefined;
 
-                      let newExpansions = expansions;
-                      if (
-                        targetMapping &&
-                        "expandable_by" in targetMapping &&
-                        targetMapping.expandable_by &&
-                        !availableExpansions.has(targetMapping.expandable_by)
-                      ) {
-                        newExpansions = new Set([
-                          ...new Set(Array.from(newExpansions)),
-                          targetMapping.expandable_by,
-                        ]);
-                      }
+                        let newExpansions = expansions;
+                        if (
+                          targetMapping &&
+                          "expandable_by" in targetMapping &&
+                          targetMapping.expandable_by &&
+                          !availableExpansions.has(targetMapping.expandable_by)
+                        ) {
+                          newExpansions = new Set([
+                            ...new Set(Array.from(newExpansions)),
+                            targetMapping.expandable_by,
+                          ]);
+                        }
 
-                      return {
-                        ...prev,
-                        mapping: {
-                          ...prev.mapping,
-                          [column]: {
-                            source: e.target.value as
-                              | keyof typeof TRACE_MAPPINGS
-                              | "",
-                            key: undefined,
-                            subkey: undefined,
+                        return {
+                          ...prev,
+                          mapping: {
+                            ...prev.mapping,
+                            [column]: {
+                              source: e.target.value as
+                                | keyof typeof TRACE_MAPPINGS
+                                | "",
+                              key: undefined,
+                              subkey: undefined,
+                            },
                           },
-                        },
-                        expansions: newExpansions,
-                      };
-                    });
-                  }}
-                  value={source}
-                >
-                  <option value=""></option>
-                  {Object.keys(TRACE_MAPPINGS).map((key) => (
-                    <option key={key} value={key}>
-                      {key}
-                    </option>
-                  ))}
-                </Select>
+                          expansions: newExpansions,
+                        };
+                      });
+                    }}
+                    value={source}
+                  >
+                    <option value=""></option>
+                    {Object.keys(TRACE_MAPPINGS).map((key) => (
+                      <option key={key} value={key}>
+                        {key}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
                 {mapping && "keys" in mapping && (
                   <HStack width="200px" flexShrink={0} align="start">
                     <Box
@@ -643,29 +642,31 @@ export const TracesMapping = ({
                       borderRight={0}
                       marginLeft="12px"
                     />
-                    <Select
-                      width="full"
-                      onChange={(e) => {
-                        setMappingState((prev) => ({
-                          ...prev,
-                          mapping: {
-                            ...prev.mapping,
-                            [column]: {
-                              ...(prev.mapping[column] as any),
-                              key: e.target.value,
+                    <NativeSelect.Root width="full">
+                      <NativeSelect.Field
+                        onChange={(e) => {
+                          setMappingState((prev) => ({
+                            ...prev,
+                            mapping: {
+                              ...prev.mapping,
+                              [column]: {
+                                ...(prev.mapping[column] as any),
+                                key: e.target.value,
+                              },
                             },
-                          },
-                        }));
-                      }}
-                      value={key}
-                    >
-                      <option value=""></option>
-                      {mapping.keys(traces_).map(({ key, label }) => (
-                        <option key={key} value={key}>
-                          {label}
-                        </option>
-                      ))}
-                    </Select>
+                          }));
+                        }}
+                        value={key}
+                      >
+                        <option value=""></option>
+                        {mapping.keys(traces_).map(({ key, label }) => (
+                          <option key={key} value={key}>
+                            {label}
+                          </option>
+                        ))}
+                      </NativeSelect.Field>
+                      <NativeSelect.Indicator />
+                    </NativeSelect.Root>
                   </HStack>
                 )}
                 {subkeys && subkeys.length > 0 && (
@@ -681,29 +682,31 @@ export const TracesMapping = ({
                       borderRight={0}
                       marginLeft="12px"
                     />
-                    <Select
-                      width="full"
-                      onChange={(e) => {
-                        setMappingState((prev) => ({
-                          ...prev,
-                          mapping: {
-                            ...prev.mapping,
-                            [column]: {
-                              ...(prev.mapping[column] as any),
-                              subkey: e.target.value,
+                    <NativeSelect.Root width="full">
+                      <NativeSelect.Field
+                        onChange={(e) => {
+                          setMappingState((prev) => ({
+                            ...prev,
+                            mapping: {
+                              ...prev.mapping,
+                              [column]: {
+                                ...(prev.mapping[column] as any),
+                                subkey: e.target.value,
+                              },
                             },
-                          },
-                        }));
-                      }}
-                      value={subkey}
-                    >
-                      <option value=""></option>
-                      {subkeys.map(({ key, label }) => (
-                        <option key={key} value={key}>
-                          {label}
-                        </option>
-                      ))}
-                    </Select>
+                          }));
+                        }}
+                        value={subkey}
+                      >
+                        <option value=""></option>
+                        {subkeys.map(({ key, label }) => (
+                          <option key={key} value={key}>
+                            {label}
+                          </option>
+                        ))}
+                      </NativeSelect.Field>
+                      <NativeSelect.Indicator />
+                    </NativeSelect.Root>
                   </HStack>
                 )}
               </VStack>
@@ -719,28 +722,28 @@ export const TracesMapping = ({
       )}
 
       {availableExpansions.size > 0 && (
-        <FormControl width="full" paddingY={4} marginTop={2}>
+        <Field.Root width="full" paddingY={4} marginTop={2}>
           <VStack align="start">
-            <FormLabel margin={0}>Expansions</FormLabel>
-            <FormHelperText
+            <Field.Label margin={0}>Expansions</Field.Label>
+            <Field.HelperText
               margin={0}
-              fontSize={13}
+              fontSize="13px"
               marginBottom={2}
               maxWidth="600px"
             >
               Normalize the dataset to duplicate the rows and have one entry per
               line instead of an array for the following mappings:
-            </FormHelperText>
+            </Field.HelperText>
           </VStack>
-          <VStack align="start" paddingTop={2} spacing={2}>
+          <VStack align="start" paddingTop={2} gap={2}>
             {Array.from(availableExpansions).map((expansion) => (
               <HStack key={expansion}>
                 <Switch
-                  isChecked={expansions.has(expansion)}
-                  onChange={(e) => {
+                  checked={expansions.has(expansion)}
+                  onCheckedChange={(checked) => {
                     setMappingState((prev) => ({
                       ...prev,
-                      expansions: e.target.checked
+                      expansions: checked
                         ? new Set([...prev.expansions, expansion])
                         : new Set(
                             Array.from(prev.expansions).filter(
@@ -754,7 +757,7 @@ export const TracesMapping = ({
               </HStack>
             ))}
           </VStack>
-        </FormControl>
+        </Field.Root>
       )}
     </VStack>
   );

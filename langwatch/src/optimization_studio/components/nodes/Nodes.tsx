@@ -2,16 +2,10 @@ import {
   Box,
   Button,
   Center,
-  forwardRef,
   HStack,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuList,
   Spacer,
   Spinner,
   Text,
-  Tooltip,
   VStack,
   type ButtonProps,
 } from "@chakra-ui/react";
@@ -23,7 +17,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import React, { useMemo, type Ref } from "react";
+import React, { forwardRef, useMemo, type Ref } from "react";
 import { useDragLayer } from "react-dnd";
 import {
   Check,
@@ -37,6 +31,8 @@ import {
 import { PulseLoader } from "react-spinners";
 import { useDebounceValue } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
+import { Menu } from "../../../components/ui/menu";
+import { Tooltip } from "../../../components/ui/tooltip";
 import { useComponentExecution } from "../../hooks/useComponentExecution";
 import { useWorkflowExecution } from "../../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
@@ -70,7 +66,7 @@ function NodeInputs({
       {inputs.map((input) => (
         <HStack
           key={input.identifier}
-          spacing={1}
+          gap={1}
           paddingX={2}
           paddingY={1}
           background="gray.100"
@@ -97,7 +93,8 @@ function NodeInputs({
           <TypeLabel type={input.type} />
           <Spacer />
           {input.optional &&
-            (!node || node.type !== "end" ||
+            (!node ||
+              node.type !== "end" ||
               (input.identifier !== "score" &&
                 input.identifier !== "passed")) && (
               <Text color="gray.400">(optional)</Text>
@@ -124,7 +121,7 @@ function NodeOutputs({
       {outputs.map((output) => (
         <HStack
           key={output.identifier}
-          spacing={1}
+          gap={1}
           paddingX={2}
           paddingY={1}
           background="gray.100"
@@ -169,12 +166,12 @@ export function NodeSectionTitle({
   fontSize,
   children,
 }: {
-  fontSize?: number;
+  fontSize?: string;
   children: React.ReactNode;
 }) {
   return (
     <Text
-      fontSize={fontSize ?? 9}
+      fontSize={fontSize ?? "9px"}
       textTransform="uppercase"
       color="gray.500"
       fontWeight="bold"
@@ -267,10 +264,10 @@ export const ComponentNode = forwardRef(function ComponentNode(
       borderRadius="12px"
       backgroundColor={props.backgroundColor ?? "white"}
       padding="10px"
-      spacing={2}
+      gap={2}
       align="start"
       color="gray.600"
-      fontSize={11}
+      fontSize="11px"
       minWidth="180px"
       boxShadow={`0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.2" : "0.1"})`}
       border="none"
@@ -288,51 +285,50 @@ export const ComponentNode = forwardRef(function ComponentNode(
       }}
     >
       {props.selected && !["entry", "end"].includes(props.type) && (
-        <Menu placement="top-start" size="xs" autoSelect={false}>
-          <MenuButton
-            background="white"
-            position="absolute"
-            top="-26px"
-            right={1}
-            paddingX={1}
-            paddingY={1}
-            borderRadius={6}
-            minWidth="auto"
-            minHeight="auto"
-            boxShadow="sm"
-          >
-            <MoreHorizontal size={11} />
-          </MenuButton>
+        <Menu.Root positioning={{ placement: "top-start" }}>
+          <Menu.Trigger asChild>
+            <Button
+              background="white"
+              position="absolute"
+              top="-28px"
+              right={1}
+              paddingX={1}
+              paddingY={1}
+              borderRadius={6}
+              minWidth="auto"
+              minHeight="auto"
+              boxShadow="sm"
+              width="auto"
+              height="auto"
+            >
+              <MoreHorizontal size={11} />
+            </Button>
+          </Menu.Trigger>
           <NodeToolbar>
-            <MenuList>
-              <MenuItem
-                icon={<Copy size={14} />}
-                onClick={() => {
-                  duplicateNode(props.id);
-                }}
+            <Menu.Content>
+              <Menu.Item
+                value="duplicate"
+                onSelect={() => duplicateNode(props.id)}
               >
+                <Copy size={14} />
                 Duplicate
-              </MenuItem>
-              <MenuItem
-                icon={<Trash2 size={14} />}
-                onClick={() => {
-                  deleteNode(props.id);
-                }}
-              >
+              </Menu.Item>
+              <Menu.Item value="delete" onSelect={() => deleteNode(props.id)}>
+                <Trash2 size={14} />
                 Delete
-              </MenuItem>
-            </MenuList>
+              </Menu.Item>
+            </Menu.Content>
           </NodeToolbar>
-        </Menu>
+        </Menu.Root>
       )}
-      <HStack spacing={2} width="full">
+      <HStack gap={2} width="full">
         <ComponentIcon
           type={props.type as ComponentType}
           cls={props.data.cls}
           behave_as={props.data.behave_as}
           size="md"
         />
-        <Text fontSize={12} fontWeight={500}>
+        <Text fontSize="12px" fontWeight={500}>
           {getNodeDisplayName(props)}
         </Text>
         <Spacer />
@@ -357,8 +353,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
             <HStack width="full">
               <LLMModelDisplay
                 model={(llmParam?.value as LLMConfig).model}
-                fontSize={11}
-                showVersion={false}
+                fontSize="11px"
               />
             </HStack>
           </React.Fragment>
@@ -429,9 +424,9 @@ export function ComponentExecutionButton({
   return (
     <>
       <Tooltip
-        label={shouldOpenExecutionResults ? "Execution results" : ""}
-        placement="top"
-        hasArrow
+        content={shouldOpenExecutionResults ? "Execution results" : ""}
+        positioning={{ placement: "top" }}
+        showArrow
       >
         <Center
           minWidth="24px"
@@ -514,33 +509,33 @@ export function ComponentExecutionButton({
           <Play size={iconSize} />
         </Button>
       ) : (
-        <Menu placement="top-start" size="xs" autoSelect={false}>
-          <MenuButton variant="ghost" size="xs" paddingX={2} {...props}>
-            <Play size={iconSize} />
-          </MenuButton>
+        <Menu.Root positioning={{ placement: "top-start" }}>
+          <Menu.Trigger asChild>
+            <Button variant="ghost" size="xs" paddingX={2} {...props}>
+              <Play size={iconSize} />
+            </Button>
+          </Menu.Trigger>
           <Wrapper>
-            <MenuList>
-              <MenuItem
-                icon={<Play size={14} />}
-                onClick={() => {
-                  node && startComponentExecution({ node });
-                }}
-                fontSize={13}
+            <Menu.Content>
+              <Menu.Item
+                value="run-manual"
+                onSelect={() => node && startComponentExecution({ node })}
               >
+                <Play size={14} />
                 Run with manual input
-              </MenuItem>
-              <MenuItem
-                icon={<Play size={14} />}
-                onClick={() => {
-                  node && startWorkflowExecution({ untilNodeId: node.id });
-                }}
-                fontSize={13}
+              </Menu.Item>
+              <Menu.Item
+                value="run-workflow"
+                onSelect={() =>
+                  node && startWorkflowExecution({ untilNodeId: node.id })
+                }
               >
+                <Play size={14} />
                 Run workflow until here
-              </MenuItem>
-            </MenuList>
+              </Menu.Item>
+            </Menu.Content>
           </Wrapper>
-        </Menu>
+        </Menu.Root>
       )}
     </>
   );

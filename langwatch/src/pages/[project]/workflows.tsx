@@ -1,4 +1,4 @@
-import { Link } from "@chakra-ui/next-js";
+import { Link } from "../../components/ui/link";
 import {
   Box,
   Center,
@@ -10,7 +10,6 @@ import {
   Text,
   useDisclosure,
   VStack,
-  Tooltip,
 } from "@chakra-ui/react";
 import { Lock, Plus } from "react-feather";
 import { DashboardLayout } from "../../components/DashboardLayout";
@@ -21,15 +20,16 @@ import {
   WorkflowCard,
   WorkflowCardBase,
 } from "../../optimization_studio/components/workflow/WorkflowCard";
+import { Tooltip } from "../../components/ui/tooltip";
 
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
 
-export default function MessagesOrIntegrationGuide() {
+export default function Workflows() {
   const { project, isOrganizationFeatureEnabled, organization } =
     useOrganizationTeamProject();
 
-  const { isOpen, onClose, onOpen } = useDisclosure();
+  const { open, onClose, onOpen } = useDisclosure();
 
   const workflows = api.workflow.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -53,9 +53,9 @@ export default function MessagesOrIntegrationGuide() {
   return (
     <DashboardLayout>
       <Container maxWidth="1200px" padding={6}>
-        <VStack spacing={8} width="full" align="start">
+        <VStack gap={8} width="full" align="start">
           <IntroducingStudio />
-          <HStack align="center" spacing={6}>
+          <HStack align="center" gap={6}>
             <Heading as={"h1"} size="lg" paddingTop={1}>
               Optimization Studio Workflows
             </Heading>
@@ -67,7 +67,7 @@ export default function MessagesOrIntegrationGuide() {
           >
             {!canCreateWorkflow ? (
               <WorkflowCardBase opacity={0.5}>
-                <Tooltip label="You reached the limit of max workflows, click to upgrade your plan to add more workflows">
+                <Tooltip content="You reached the limit of max workflows, click to upgrade your plan to add more workflows">
                   <Center width="full" height="full">
                     <Link
                       href={`/settings/subscription`}
@@ -81,10 +81,10 @@ export default function MessagesOrIntegrationGuide() {
                         });
                       }}
                     >
-                      <HStack spacing={3}>
+                      <HStack gap={3}>
                         <Lock size={14} color="#777" />
 
-                        <Text fontSize={18} color="gray.600">
+                        <Text fontSize="18px" color="gray.600">
                           Create new
                         </Text>
                       </HStack>
@@ -95,7 +95,7 @@ export default function MessagesOrIntegrationGuide() {
             ) : (
               <WorkflowCardBase onClick={onOpen}>
                 <Center width="full" height="full">
-                  <HStack spacing={3}>
+                  <HStack gap={3}>
                     <Box
                       borderRadius="full"
                       border="2px solid"
@@ -105,7 +105,7 @@ export default function MessagesOrIntegrationGuide() {
                       <Plus size={14} color="#777" />
                     </Box>
 
-                    <Text fontSize={18} color="gray.500">
+                    <Text fontSize="18px" color="gray.500">
                       Create new
                     </Text>
                   </HStack>
@@ -117,32 +117,36 @@ export default function MessagesOrIntegrationGuide() {
                 <Skeleton key={index} height="200px" />
               ))}
             {workflows.data?.map((workflow) => (
-              <WorkflowCard
-                as={Link}
+              <Link
                 href={`/${project?.slug}/studio/${workflow.id}`}
                 key={workflow.id}
-                workflowId={workflow.id}
-                query={workflows}
-                name={workflow.name}
-                icon={workflow.icon}
-                description={workflow.description}
-                onClick={(e) => {
-                  let target = e.target as HTMLElement;
-                  while (target.parentElement) {
-                    if (target.classList.contains("js-inner-menu")) {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      return false;
+                display="block"
+                asChild
+              >
+                <WorkflowCard
+                  workflowId={workflow.id}
+                  query={workflows}
+                  name={workflow.name}
+                  icon={workflow.icon}
+                  description={workflow.description}
+                  onClick={(e) => {
+                    let target = e.target as HTMLElement;
+                    while (target.parentElement) {
+                      if (target.classList.contains("js-inner-menu")) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        return false;
+                      }
+                      target = target.parentElement;
                     }
-                    target = target.parentElement;
-                  }
-                }}
-              />
+                  }}
+                />
+              </Link>
             ))}
           </Grid>
         </VStack>
       </Container>
-      <NewWorkflowModal isOpen={isOpen} onClose={onClose} />
+      <NewWorkflowModal open={open} onClose={onClose} />
     </DashboardLayout>
   );
 }

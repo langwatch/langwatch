@@ -10,7 +10,9 @@
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "moduleDetection": "force",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
@@ -19,7 +21,12 @@
     "verbatimModuleSyntax": true,
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./src/*"]
+      "~/*": ["./src/*"],
+      "@trpc-internal/parser": ["node_modules/@trpc/server/dist/core/parser"],
+      "@trpc-internal/utils": [
+        "node_modules/@trpc/server/dist/core/internals/utils"
+      ],
+      "zod/lib/helpers/errorUtil": ["node_modules/zod/lib/helpers/errorUtil"]
     },
     "plugins": [
       {

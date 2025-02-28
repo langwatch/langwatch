@@ -1,23 +1,20 @@
-import {
-  Alert,
-  AlertDescription,
-  AlertIcon,
-  AlertTitle,
-  CloseButton,
-  Text,
-  useToast,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Text, VStack } from "@chakra-ui/react";
 import { useCallback } from "react";
+import { toaster } from "../../components/ui/toaster";
 import type { BaseComponent } from "../types/dsl";
 import { useWorkflowStore } from "./useWorkflowStore";
 
 export const useAlertOnComponent = () => {
-  const toast = useToast();
-
-  const { selectedNode, propertiesExpanded } = useWorkflowStore((state) => ({
+  const {
+    selectedNode,
+    propertiesExpanded,
+    setSelectedNode,
+    setPropertiesExpanded,
+  } = useWorkflowStore((state) => ({
     selectedNode: state.nodes.find((node) => node.selected),
     propertiesExpanded: state.propertiesExpanded,
+    setSelectedNode: state.setSelectedNode,
+    setPropertiesExpanded: state.setPropertiesExpanded,
   }));
 
   return useCallback(
@@ -31,54 +28,43 @@ export const useAlertOnComponent = () => {
       if (componentId === selectedNode?.id && propertiesExpanded) {
         return;
       }
-      toast({
+
+      const toastId = `component-error-${componentId}`;
+
+      toaster.create({
         title: "Error",
-        description: execution_state?.error,
-        render: ({ onClose }) => {
-          return (
-            <Alert
-              status="error"
-              variant="solid"
-              alignItems="start"
-              display="flex"
-              flexDirection="row"
+        id: toastId,
+        description: (
+          <VStack align="start">
+            <Text>{execution_state?.error}</Text>
+            <Button
+              unstyled
+              color="white"
+              cursor="pointer"
+              textDecoration="underline"
+              size="sm"
+              onClick={() => {
+                setSelectedNode(componentId);
+                setPropertiesExpanded(true);
+                toaster.dismiss(toastId);
+              }}
             >
-              <AlertIcon />
-              <VStack align="start" spacing={0} width="full">
-                <AlertTitle fontSize="md">Error</AlertTitle>
-                <AlertDescription>
-                  <VStack align="start">
-                    <Text>{execution_state?.error}</Text>
-                    {/* <Button
-                      colorScheme="white"
-                      variant="link"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedNode(componentId);
-                        setPropertiesExpanded(true);
-                        onClose();
-                      }}
-                    >
-                      Go to component
-                    </Button> */}
-                  </VStack>
-                </AlertDescription>
-              </VStack>
-              <CloseButton
-                alignSelf="flex-start"
-                position="relative"
-                right={-1}
-                top={-1}
-                onClick={onClose}
-              />
-            </Alert>
-          );
-        },
-        status: "error",
+              Go to component
+            </Button>
+          </VStack>
+        ),
+        type: "error",
         duration: 5000,
-        isClosable: true,
+        meta: {
+          closable: true,
+        },
       });
     },
-    [selectedNode?.id, propertiesExpanded, toast]
+    [
+      selectedNode?.id,
+      propertiesExpanded,
+      setSelectedNode,
+      setPropertiesExpanded,
+    ]
   );
 };

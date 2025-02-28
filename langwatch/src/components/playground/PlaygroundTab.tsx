@@ -3,12 +3,7 @@ import {
   Button,
   HStack,
   Spacer,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
   Tabs,
-  Text,
 } from "@chakra-ui/react";
 import {
   DndContext,
@@ -71,14 +66,15 @@ export function PlaygroundTabs() {
 
   return (
     <>
-      <Tabs
-        colorScheme="orange"
+      <Tabs.Root
+        colorPalette="orange"
         width="full"
         height="calc(100vh - 115px)"
         backgroundColor="white"
         paddingTop={4}
-        index={state.activeTabIndex}
-        onChange={(index) => {
+        value={state.activeTabIndex.toString()}
+        onValueChange={(change) => {
+          const index = parseInt(change.value);
           if (index >= state.tabs.length) {
             state.addNewTab();
           } else {
@@ -88,11 +84,11 @@ export function PlaygroundTabs() {
       >
         <HStack width="full">
           <Box overflowX="auto" paddingBottom="9px" marginBottom="-9px">
-            <TabList>
+            <Tabs.List>
               {state.tabs.map((tab, index) => (
-                <Tab key={index}>
-                  <HStack spacing={3}>
-                    <Text whiteSpace="nowrap">{tab.name}</Text>
+                <Tabs.Trigger key={index} value={index.toString()}>
+                  <HStack gap={3}>
+                    <Box as="span" whiteSpace="nowrap">{tab.name}</Box>
                     {state.tabs.length > 1 &&
                       index === state.activeTabIndex && (
                         <Box
@@ -106,27 +102,29 @@ export function PlaygroundTabs() {
                               ? "orange.400"
                               : "gray.500"
                           }
-                          _hover={{ background: "gray.50" }}
+                          css={{
+                            "&:hover": { background: "var(--chakra-colors-gray-50)" }
+                          }}
                         >
                           <X width="16px" />
                         </Box>
                       )}
                   </HStack>
-                </Tab>
+                </Tabs.Trigger>
               ))}
-              <Tab>
+              <Tabs.Trigger value={state.tabs.length.toString()}>
                 <Plus width="16px" />
-              </Tab>
-            </TabList>
+              </Tabs.Trigger>
+            </Tabs.List>
           </Box>
           <Spacer />
-          <HStack spacing={0} paddingRight={3}>
+          <HStack gap={0} paddingRight={3}>
             <Button
               color="gray.500"
               size="xs"
               variant="ghost"
               onClick={() => undo()}
-              isDisabled={pastStates.length === 0}
+              disabled={pastStates.length === 0}
             >
               <RotateCcw width="16px" />
             </Button>
@@ -135,23 +133,22 @@ export function PlaygroundTabs() {
               size="xs"
               variant="ghost"
               onClick={() => redo()}
-              isDisabled={futureStates.length === 0}
+              disabled={futureStates.length === 0}
             >
               <RotateCw width="16px" />
             </Button>
           </HStack>
         </HStack>
 
-        <TabPanels height="full" minHeight={0}>
-          {state.tabs.map((tab, tabIndex) => (
+        {state.tabs.map((tab, tabIndex) => (
+          <Tabs.Content key={tabIndex} value={tabIndex.toString()}>
             <PlaygroundTab
-              key={tabIndex}
               chatWindows={tab.chatWindows}
               tabIndex={tabIndex}
             />
-          ))}
-        </TabPanels>
-      </Tabs>
+          </Tabs.Content>
+        ))}
+      </Tabs.Root>
     </>
   );
 }
@@ -174,7 +171,7 @@ function PlaygroundTab({
   );
 
   return (
-    <TabPanel
+    <Box
       key={tabIndex}
       padding={0}
       height="full"
@@ -183,7 +180,7 @@ function PlaygroundTab({
       outline="1px solid"
       outlineColor="gray.200"
     >
-      <HStack spacing={0} overflowX="auto" height="full" minHeight={0}>
+      <HStack gap={0} overflowX="auto" height="full" minHeight={0}>
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -212,6 +209,6 @@ function PlaygroundTab({
           </SortableContext>
         </DndContext>
       </HStack>
-    </TabPanel>
+    </Box>
   );
 }

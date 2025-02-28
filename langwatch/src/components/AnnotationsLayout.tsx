@@ -1,4 +1,4 @@
-import { Avatar, Divider, HStack, Text, VStack } from "@chakra-ui/react";
+import { Avatar, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { type PropsWithChildren } from "react";
 import { Check, Edit, Inbox, Plus, Users } from "react-feather";
@@ -8,6 +8,7 @@ import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { useDrawer } from "./CurrentDrawer";
+import { RandomColorAvatar } from "./RandomColorAvatar";
 
 export default function AnnotationsLayout({
   children,
@@ -32,24 +33,28 @@ export default function AnnotationsLayout({
     inbox: <Inbox width={20} height={20} />,
     queues: <Users width={20} height={20} />,
     myQueues: (
-      <Avatar name={user?.name ?? ""} width={5} height={5} size="2xs" />
+      <RandomColorAvatar
+        size="2xs"
+        width={5}
+        height={5}
+        name={user?.name ?? ""}
+      />
     ),
     all: <Edit width={20} height={20} />,
     done: <Check width={20} height={20} />,
   };
 
   const router = useRouter();
-  const id = router.query.id;
   const { openDrawer } = useDrawer();
 
   return (
-    <DashboardLayout>
+    <DashboardLayout background="gray.100">
       <HStack
         align="start"
         width="full"
         height="full"
         background="gray.100"
-        spacing={0}
+        gap={0}
         position="relative"
       >
         <VStack
@@ -61,7 +66,7 @@ export default function AnnotationsLayout({
           fontSize="14px"
           minWidth="240px"
           height="full"
-          spacing={1}
+          gap={1}
           display={isSubscription ? "none" : "flex"}
         >
           <Text fontSize="md" fontWeight="500" paddingX={4} paddingY={2}>
@@ -108,7 +113,7 @@ export default function AnnotationsLayout({
           >
             All
           </MenuLink>
-          <Divider />
+          <Separator />
           <HStack width="full" justify="space-between" paddingRight={3}>
             <Text fontSize="sm" fontWeight="500" paddingX={4} paddingY={2}>
               My Queues

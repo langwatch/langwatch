@@ -1,14 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Input,
-  Link,
-  Spacer,
-  Text,
-  Tooltip,
-  useDisclosure,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Input, Spacer, Text } from "@chakra-ui/react";
 import { Settings, X } from "react-feather";
 import { HorizontalFormControl } from "../../../../components/HorizontalFormControl";
 import { Sliders2 } from "../../../../components/icons/Sliders2";
@@ -22,15 +12,16 @@ import { ConfigModal } from "./ConfigModal";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useWorkflowStore } from "../../../hooks/useWorkflowStore";
 import { AddModelProviderKey } from "../../AddModelProviderKey";
+import { Link } from "../../../../components/ui/link";
+import { Tooltip } from "../../../../components/ui/tooltip";
+import { useDisclosure } from "@chakra-ui/react";
 
 export function LLMModelDisplay({
   model,
-  fontSize = 14,
-  showVersion = true,
+  fontSize = "14px",
 }: {
   model: string;
-  fontSize?: number;
-  showVersion?: boolean;
+  fontSize?: string;
 }) {
   const { modelOption } = useModelSelectionOptions(
     allModelOptions,
@@ -46,7 +37,7 @@ export function LLMModelDisplay({
       <Box
         fontSize={fontSize}
         fontFamily="mono"
-        noOfLines={1}
+        lineClamp={1}
         wordBreak="break-all"
       >
         {modelOption?.label}
@@ -87,7 +78,7 @@ export function LLMConfigField({
       defaultLLMConfig?: undefined;
       onChange: (llmConfig: LLMConfig) => void;
     }) {
-  const { isOpen, onClose, onToggle } = useDisclosure();
+  const { open, onClose, onToggle } = useDisclosure();
 
   const model = llmConfig?.model ?? defaultLLMConfig!.model;
   const { modelOption } = useModelSelectionOptions(
@@ -110,13 +101,13 @@ export function LLMConfigField({
   return (
     <>
       <LLMConfigModal
-        isOpen={isOpen}
+        open={open}
         onClose={onClose}
         llmConfig={llmConfig ?? defaultLLMConfig!}
         onChange={onChange}
       />
       <HStack
-        spacing={2}
+        gap={2}
         paddingX={2}
         width="full"
         align="center"
@@ -125,9 +116,9 @@ export function LLMConfigField({
         <LLMModelDisplay model={model} />
         {allowDefault && llmConfig != undefined ? (
           <Tooltip
-            label="Overriding default LLM, click to reset"
-            placement="top"
-            hasArrow
+            content="Overriding default LLM, click to reset"
+            positioning={{ placement: "top" }}
+            showArrow
           >
             <Button
               size="sm"
@@ -156,24 +147,24 @@ export function LLMConfigField({
 }
 
 export function LLMConfigModal({
-  isOpen,
+  open,
   onClose,
   llmConfig,
   onChange,
 }: {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
   llmConfig: LLMConfig;
   onChange: (llmConfig: LLMConfig) => void;
 }) {
   return (
-    <ConfigModal isOpen={isOpen} onClose={onClose} title="LLM Config">
+    <ConfigModal open={open} onClose={onClose} title="LLM Config">
       <HorizontalFormControl
         label="Model"
         helper={"The LLM model to use"}
         inputWidth="55%"
       >
-        <HStack width="full" spacing={2}>
+        <HStack width="full" gap={2}>
           <ModelSelector
             model={llmConfig.model ?? ""}
             options={allModelOptions}
@@ -181,16 +172,16 @@ export function LLMConfigModal({
             mode="chat"
             size="full"
           />
-          <Tooltip label="Configure available models" placement="top" hasArrow>
-            <Button
-              as={Link}
-              size="sm"
-              variant="ghost"
-              href="/settings/model-providers"
-              target="_blank"
-            >
-              <Settings size={16} />
-            </Button>
+          <Tooltip
+            content="Configure available models"
+            positioning={{ placement: "top" }}
+            showArrow
+          >
+            <Link href="/settings/model-providers" target="_blank" asChild>
+              <Button variant="ghost" size="sm">
+                <Settings size={16} />
+              </Button>
+            </Link>
           </Tooltip>
         </HStack>
       </HorizontalFormControl>

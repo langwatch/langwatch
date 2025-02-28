@@ -5,13 +5,13 @@ import {
   Spacer,
   Text,
   Textarea,
-  Tooltip,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { Edit2, Info, X } from "react-feather";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
+import { Tooltip } from "../../../components/ui/tooltip";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type {
@@ -42,7 +42,7 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
     ? Object.fromEntries(node.data.parameters.map((p) => [p.identifier, p]))
     : {};
 
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { open, onOpen, onClose } = useDisclosure();
   const {
     rows: demonstrationRows,
     columns: demonstrationColumns,
@@ -58,7 +58,7 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
       hideParameters
       fieldsAfter={
         <>
-          <VStack width="full" align="start" spacing={2}>
+          <VStack width="full" align="start" gap={2}>
             <HStack width="full">
               <PropertySectionTitle>
                 Demonstrations{" "}
@@ -68,7 +68,7 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
                   </Text>
                 )}
               </PropertySectionTitle>
-              <Tooltip label="Few-shot examples to guide the LLM to generate the correct output.">
+              <Tooltip content="Few-shot examples to guide the LLM to generate the correct output.">
                 <Box paddingTop={1}>
                   <Info size={14} />
                 </Box>
@@ -78,11 +78,11 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
                 size="xs"
                 variant="ghost"
                 marginBottom={-1}
-                leftIcon={<Edit2 size={14} />}
                 onClick={() => {
                   onOpen();
                 }}
               >
+                <Edit2 size={14} />
                 <Text>Edit</Text>
               </Button>
             </HStack>
@@ -91,11 +91,7 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
               columns={demonstrationColumns}
               minHeight={`${36 + 29 * (demonstrationRows?.length ?? 0)}px`}
             />
-            <DemonstrationsModal
-              isOpen={isOpen}
-              onClose={onClose}
-              node={node}
-            />
+            <DemonstrationsModal open={open} onClose={onClose} node={node} />
           </VStack>
         </>
       }
@@ -121,8 +117,9 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
       </PropertyField>
       <PropertyField title="Instructions">
         <Textarea
+          height="100px"
           fontFamily="monospace"
-          fontSize={13}
+          fontSize="13px"
           value={(parameters.instructions?.value as string | undefined) ?? ""}
           onChange={(e) =>
             setNodeParameter(node.id, {
@@ -157,7 +154,7 @@ function PromptingTechniqueField({ value }: { value: string | undefined }) {
   return (
     <PropertyField title="Prompting Technique">
       <HStack
-        spacing={2}
+        gap={2}
         width="full"
         paddingX={3}
         paddingY={2}
@@ -175,7 +172,7 @@ function PromptingTechniqueField({ value }: { value: string | undefined }) {
           cls={promptingTechniqueNode.data.cls}
           size="md"
         />
-        <Text fontSize={13} fontWeight={500}>
+        <Text fontSize="13px" fontWeight={500}>
           {promptingTechniqueNode.data.cls}
         </Text>
         <Spacer />

@@ -2,12 +2,9 @@ import {
   Box,
   HStack,
   Input,
-  Select,
   Spacer,
-  Switch,
   Text,
   Textarea,
-  useDisclosure,
   VStack,
 } from "@chakra-ui/react";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
@@ -19,8 +16,11 @@ import { useState } from "react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { evaluatorInputs } from "./EndPropertiesPanel";
 import type { End } from "../../types/dsl";
+import { Switch } from "../../../components/ui/switch";
+import { NativeSelect } from "@chakra-ui/react";
+import { useDisclosure } from "@chakra-ui/react";
 
-export function WorkflowPropertiesPanel() {
+export const WorkflowPropertiesPanel = () => {
   const { getWorkflow, setWorkflow, setNode } = useWorkflowStore(
     ({ getWorkflow, setWorkflow, setNode }) => ({
       getWorkflow,
@@ -35,7 +35,7 @@ export function WorkflowPropertiesPanel() {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [description, setDescription] = useState<string | undefined>(undefined);
 
-  const { isOpen, onClose, onToggle } = useDisclosure();
+  const { open, onClose, onToggle } = useDisclosure();
 
   const updateNodeInternals = useUpdateNodeInternals();
 
@@ -46,7 +46,7 @@ export function WorkflowPropertiesPanel() {
   );
 
   const setAsEvaluator = () => {
-    if (!endNode) return; // Add this check
+    if (!endNode) return;
 
     if (!isEvaluator) {
       setNode({
@@ -79,11 +79,11 @@ export function WorkflowPropertiesPanel() {
       node={workflow}
       header={
         <>
-          <HStack align="center" spacing={2}>
+          <HStack align="center" gap={2}>
             <VStack align="flex-start">
               <HStack align="center">
                 <EmojiPickerModal
-                  isOpen={isOpen}
+                  open={open}
                   onClose={onClose}
                   onChange={(emoji) => {
                     setWorkflow({ icon: emoji });
@@ -100,7 +100,7 @@ export function WorkflowPropertiesPanel() {
 
                 {isEditingName ? (
                   <Input
-                    fontSize={15}
+                    fontSize="15px"
                     marginLeft={1}
                     fontWeight={500}
                     variant="outline"
@@ -130,7 +130,7 @@ export function WorkflowPropertiesPanel() {
                   />
                 ) : (
                   <Text
-                    fontSize={16}
+                    fontSize="16px"
                     fontWeight={500}
                     onClick={() => {
                       setIsEditingName(true);
@@ -144,7 +144,7 @@ export function WorkflowPropertiesPanel() {
 
               {isEditingDescription ? (
                 <Textarea
-                  fontSize={12}
+                  fontSize="12px"
                   marginLeft={1}
                   fontWeight={300}
                   variant="outline"
@@ -175,7 +175,7 @@ export function WorkflowPropertiesPanel() {
                 />
               ) : (
                 <Text
-                  fontSize={12}
+                  fontSize="12px"
                   fontWeight={400}
                   onClick={() => {
                     setIsEditingDescription(true);
@@ -194,16 +194,16 @@ export function WorkflowPropertiesPanel() {
         title="Workflow Type"
         tooltip="Select Evaluator if you want to publish this workflow as an evaluator to be used for other workflows and on monitoring messages, this will change the End node for expected properties of an evaluator."
       >
-        <Select
-          size="sm"
-          value={isEvaluator ? "evaluator" : "workflow"}
-          onChange={() => {
-            setAsEvaluator();
-          }}
-        >
-          <option value="workflow">Workflow</option>
-          <option value="evaluator">Evaluator</option>
-        </Select>
+        <NativeSelect.Root size="sm">
+          <NativeSelect.Field
+            value={isEvaluator ? "evaluator" : "workflow"}
+            onChange={() => setAsEvaluator()}
+          >
+            <option value="workflow">Workflow</option>
+            <option value="evaluator">Evaluator</option>
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
       </PropertyField>
       <PropertyField title="Default LLM">
         <LLMConfigField
@@ -215,13 +215,13 @@ export function WorkflowPropertiesPanel() {
       </PropertyField>
       <PropertyField title="Enable Tracing">
         <HStack paddingX={2} width="full">
-          <Text fontSize={14}>
+          <Text fontSize="14px">
             Store execution traces when running this workflow
           </Text>
           <Spacer />
           <Switch
-            isChecked={workflow.enable_tracing}
-            onChange={() => {
+            checked={workflow.enable_tracing}
+            onCheckedChange={() => {
               setWorkflow({ enable_tracing: !workflow.enable_tracing });
             }}
           />
@@ -229,4 +229,4 @@ export function WorkflowPropertiesPanel() {
       </PropertyField>
     </BasePropertiesPanel>
   );
-}
+};

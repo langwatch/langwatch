@@ -1,14 +1,4 @@
-import {
-  Box,
-  Button,
-  Checkbox,
-  FormControl,
-  FormHelperText,
-  FormLabel,
-  HStack,
-  Spacer,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Field, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { Edit2 } from "react-feather";
 import type {
   DatasetColumns,
@@ -23,6 +13,7 @@ import {
 import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import type { Dataset } from "@prisma/client";
 import { useMemo } from "react";
+import { Checkbox } from "../../components/ui/checkbox";
 import { TracesMapping, type MappingState } from "./DatasetMapping";
 
 interface DatasetMappingPreviewProps {
@@ -81,7 +72,7 @@ export function DatasetMappingPreview({
         <Checkbox
           marginLeft="3px"
           {...props}
-          isChecked={props.value}
+          checked={props.value}
           onChange={(e) => props.setValue?.(e.target.checked)}
         />
       ),
@@ -91,13 +82,13 @@ export function DatasetMappingPreview({
   }, [selectedDataset]);
 
   return (
-    <FormControl width="full" paddingY={4}>
-      <HStack width="full" spacing="64px" align="start">
+    <Field.Root width="full" paddingY={4}>
+      <HStack width="full" gap="64px" align="start">
         <VStack align="start" maxWidth="50%">
-          <FormLabel margin={0}>Mapping</FormLabel>
-          <FormHelperText margin={0} fontSize={13} marginBottom={2}>
+          <Field.Label margin={0}>Mapping</Field.Label>
+          <Field.HelperText margin={0} fontSize="13px" marginBottom={2}>
             Map the trace data to the dataset columns
-          </FormHelperText>
+          </Field.HelperText>
 
           <TracesMapping
             dataset={selectedDataset}
@@ -110,22 +101,21 @@ export function DatasetMappingPreview({
         <VStack align="start" width="full" height="full">
           <HStack width="full" align="end">
             <VStack align="start">
-              <FormLabel margin={0}>Preview</FormLabel>
-              <FormHelperText margin={0} fontSize={13}>
+              <Field.Label margin={0}>Preview</Field.Label>
+              <Field.HelperText margin={0} fontSize="13px">
                 {paragraph
                   ? paragraph
                   : "Those are the rows that are going to be added, double click on the cell to edit them"}
-              </FormHelperText>
+              </Field.HelperText>
             </VStack>
             <Spacer />
             <Button
               size="sm"
-              colorScheme="blue"
+              colorPalette="blue"
               variant="outline"
-              leftIcon={<Edit2 height={16} />}
               onClick={onEditColumns}
             >
-              Edit Columns
+              <Edit2 height={16} /> Edit Columns
             </Button>
           </HStack>
           <Box width="full" display="block" paddingTop={2}>
@@ -141,6 +131,6 @@ export function DatasetMappingPreview({
           </Box>
         </VStack>
       </HStack>
-    </FormControl>
+    </Field.Root>
   );
 }

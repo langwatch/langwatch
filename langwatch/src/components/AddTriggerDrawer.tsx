@@ -1,35 +1,26 @@
 import {
+  Box,
   Button,
-  Checkbox,
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  DrawerHeader,
-  FormControl,
-  FormErrorMessage,
+  Field,
   HStack,
   Input,
-  Popover,
-  PopoverBody,
-  PopoverCloseButton,
-  PopoverContent,
-  PopoverTrigger,
-  Radio,
-  RadioGroup,
   Stack,
   Text,
-  Tooltip,
-  VStack,
   useDisclosure,
-  useToast,
+  VStack,
 } from "@chakra-ui/react";
 import { TriggerAction } from "@prisma/client";
 import { useDrawer } from "~/components/CurrentDrawer";
 
-import { HorizontalFormControl } from "./HorizontalFormControl";
+// Import from our UI components
+import { Drawer } from "../components/ui/drawer";
+import { Popover } from "../components/ui/popover";
+import { Radio, RadioGroup } from "../components/ui/radio";
+import { toaster } from "../components/ui/toaster";
+import { Tooltip } from "../components/ui/tooltip";
 
 import { useFilterParams } from "~/hooks/useFilterParams";
+import { HorizontalFormControl } from "./HorizontalFormControl";
 
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -47,17 +38,19 @@ import type {
   MappingState,
   TRACE_EXPANSIONS,
 } from "./datasets/DatasetMapping";
+
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 import { DatasetSelector } from "./datasets/DatasetSelector";
 
+import { CheckSquare } from "react-feather";
+
 export function TriggerDrawer() {
   const { project, organization, team } = useOrganizationTeamProject();
-  const { onOpen, onClose, isOpen } = useDisclosure();
+  const { onOpen, onClose, open } = useDisclosure();
 
   const publicEnv = usePublicEnv();
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
 
-  const toast = useToast();
   const createTrigger = api.trigger.create.useMutation();
   const teamSlug = team?.slug;
   const datasets = api.dataset.getAll.useQuery(
@@ -80,6 +73,15 @@ export function TriggerDrawer() {
   const [localStorageDatasetId, setLocalStorageDatasetId] =
     useLocalStorage<string>("selectedDatasetId", "");
 
+  type FormValues = {
+    name: string;
+    action: TriggerAction;
+    email: string;
+    members: string[];
+    slackWebhook: string;
+    datasetId: string;
+  };
+
   const {
     register,
     handleSubmit,
@@ -87,15 +89,17 @@ export function TriggerDrawer() {
     formState: { errors },
     reset,
     setValue,
-  } = useForm({
+    control,
+  } = useForm<FormValues>({
     defaultValues: {
       name: "",
-      action: TriggerAction.SEND_EMAIL,
+      action: TriggerAction.SEND_SLACK_MESSAGE,
       email: "",
       members: [],
       slackWebhook: "",
       datasetId: localStorageDatasetId,
     },
+    mode: "onChange",
   });
 
   const datasetId = watch("datasetId");
@@ -196,7 +200,7 @@ export function TriggerDrawer() {
             ? {
                 mapping: actionParams.datasetMapping.mapping,
                 expansions: Array.from(
-                  actionParams.datasetMapping.expansions || []
+                  actionParams.datasetMapping.expansions ?? []
                 ),
               }
             : undefined,
@@ -204,26 +208,27 @@ export function TriggerDrawer() {
       },
       {
         onSuccess: () => {
-          toast({
+          toaster.create({
             title: "Trigger Created",
-            description: `You have successfully created a trigger`,
-
-            status: "success",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            description: "You have successfully created a trigger",
+            type: "success",
+            placement: "top-end",
+            meta: {
+              closable: true,
+            },
           });
           reset();
           closeDrawer();
         },
         onError: () => {
-          toast({
+          toaster.create({
             title: "Error",
             description: "Error creating trigger",
-            status: "error",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            type: "error",
+            placement: "top-end",
+            meta: {
+              closable: true,
+            },
           });
         },
       }
@@ -231,90 +236,113 @@ export function TriggerDrawer() {
   };
 
   const MultiSelect = () => {
-    const members = watch("members");
+    const formMembers = watch("members") || [];
+    const [selectedMembers, setSelectedMembers] =
+      useState<string[]>(formMembers);
+
+    const handlePopoverChange = ({ open }: { open: boolean }) => {
+      if (open) {
+        onOpen();
+      } else {
+        setValue("members", selectedMembers);
+        onClose();
+      }
+    };
+
     return (
-      <>
-        <Popover
-          placement="bottom"
-          matchWidth={true}
-          isOpen={isOpen}
-          onOpen={onOpen}
-          onClose={onClose}
+      <VStack width="full" align="start">
+        <Popover.Root
+          positioning={{ placement: "bottom" }}
+          open={open}
+          onOpenChange={handlePopoverChange}
         >
-          <PopoverTrigger>
-            <FormControl isInvalid={!!errors.members}>
+          <Popover.Trigger width={"full"}>
+            <Field.Root width="100%">
               <Input
                 placeholder="Select email/s"
-                defaultValue={members}
+                defaultValue={selectedMembers}
+                value={selectedMembers.join(", ")}
                 readOnly
-                {...register("members", {
-                  required: "Please select at least one member",
-                })}
+                required
+                {...register("members")}
+                width="100%"
               />
-              <FormErrorMessage>{errors.members?.message}</FormErrorMessage>
-            </FormControl>
-          </PopoverTrigger>
-          <PopoverContent marginTop="-8px" width="100%">
-            <PopoverCloseButton onClick={onClose} zIndex={1000} />
-            <PopoverBody>
-              <FormControl>
-                <Stack spacing={5} direction="column" marginRight={4}>
-                  {teamWithMembers.data &&
-                    teamWithMembers.data?.members.map((member) => {
-                      return (
-                        <Checkbox
-                          key={member.user.id}
-                          {...register("members")}
-                          value={member.user!.email ?? ""}
-                        >
-                          {member.user.email}
-                        </Checkbox>
-                      );
-                    })}
-                </Stack>
-              </FormControl>
-            </PopoverBody>
-          </PopoverContent>
-        </Popover>
-      </>
+            </Field.Root>
+          </Popover.Trigger>
+          <Popover.Content marginTop="-8px">
+            <Popover.CloseTrigger onClick={onClose} zIndex={1000} />
+            <Popover.Body>
+              <VStack width="full" align="start">
+                {teamWithMembers.data?.members.map((member) => {
+                  const email = member.user.email ?? "";
+                  return (
+                    <HStack
+                      key={member.user.id}
+                      cursor="pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const email = member.user.email ?? "";
+                        if (selectedMembers.includes(email)) {
+                          setSelectedMembers(
+                            selectedMembers.filter((m) => m !== email)
+                          );
+                        } else {
+                          setSelectedMembers([...selectedMembers, email]);
+                        }
+                      }}
+                    >
+                      <CheckSquare
+                        width={18}
+                        color={
+                          selectedMembers.includes(email) ? "green" : "gray"
+                        }
+                      />
+                      <Box key={member.user.id}>{member.user.email}</Box>
+                    </HStack>
+                  );
+                })}
+              </VStack>
+            </Popover.Body>
+          </Popover.Content>
+        </Popover.Root>
+      </VStack>
     );
   };
 
   const editDataset = useDisclosure();
 
   return (
-    <Drawer
-      isOpen={true}
-      placement="right"
-      size={"xl"}
-      onClose={closeDrawer}
-      onOverlayClick={closeDrawer}
+    <Drawer.Root
+      open={true}
+      onOpenChange={({ open }) => !open && closeDrawer()}
+      placement="end"
     >
-      <DrawerContent maxWidth="1200px">
-        <DrawerHeader>
+      <Drawer.Backdrop />
+      <Drawer.Content maxWidth="1200px">
+        <Drawer.Header>
           <HStack>
-            <DrawerCloseButton />
+            <Drawer.CloseTrigger />
           </HStack>
           <HStack>
             <Text paddingTop={5} fontSize="2xl">
               Add Trigger
             </Text>
           </HStack>
-        </DrawerHeader>
-        <DrawerBody>
+        </Drawer.Header>
+        <Drawer.Body>
           {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
           <form onSubmit={handleSubmit(onSubmit)}>
             <HorizontalFormControl
               label="Name"
               helper="Give it a name that identifies what trigger it might be"
-              isInvalid={!!errors.name}
+              invalid={!!errors.name}
             >
               <Input
                 placeholder="Evaluation trigger"
                 required
                 {...register("name")}
               />
-              <FormErrorMessage>{errors.name?.message}</FormErrorMessage>
+              <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
             </HorizontalFormControl>
 
             <HorizontalFormControl
@@ -322,28 +350,26 @@ export function TriggerDrawer() {
               helper="Select action you would like to take once a your trigger has taken place."
               minWidth="calc(50% - 16px)"
             >
-              <RadioGroup defaultValue={TriggerAction.SEND_SLACK_MESSAGE}>
-                <Stack spacing={4}>
+              <RadioGroup {...register("action")}>
+                <Stack gap={4}>
                   <VStack align="start">
                     <Radio
-                      size="md"
                       value={TriggerAction.SEND_SLACK_MESSAGE}
-                      colorScheme="blue"
+                      colorPalette="blue"
                       alignItems="start"
-                      spacing={3}
-                      paddingTop={2}
+                      gap={3}
                       {...register("action")}
+                      paddingTop={2}
                     >
                       <VStack align="start" marginTop={-1}>
                         <Text fontWeight="500">Send Slack Message</Text>
-                        <Text fontSize={13}>
+                        <Text fontSize="13px" fontWeight="normal">
                           Add your slack webhook url to send a message to when
                           the trigger is activated.
                         </Text>
                       </VStack>
                     </Radio>
-                    {currentAction ===
-                      (TriggerAction.SEND_SLACK_MESSAGE as TriggerAction) && (
+                    {currentAction === TriggerAction.SEND_SLACK_MESSAGE && (
                       <Input
                         placeholder="Your slack hook url"
                         required
@@ -352,24 +378,23 @@ export function TriggerDrawer() {
                     )}
                   </VStack>
                   <Tooltip
-                    label="Add a SendGrid API key or AWS SES credentials(Only if you are using AWS SES) to your environment variables to enable email functionality."
-                    hasArrow
-                    placement="top"
-                    isDisabled={hasEmailProvider}
+                    content="Add a SendGrid API key or AWS SES credentials(Only if you are using AWS SES) to your environment variables to enable email functionality."
+                    positioning={{ placement: "top" }}
+                    showArrow
+                    disabled={hasEmailProvider}
                   >
-                    <VStack align="start">
+                    <VStack align="start" width="full">
                       <Radio
-                        size="md"
                         value={TriggerAction.SEND_EMAIL}
-                        colorScheme="blue"
+                        colorPalette="blue"
                         alignItems="start"
-                        spacing={3}
-                        paddingTop={2}
-                        isDisabled={!hasEmailProvider}
+                        gap={3}
                         {...register("action")}
+                        paddingTop={2}
+                        disabled={!hasEmailProvider}
                       >
                         <Text fontWeight="500">Email</Text>
-                        <Text fontSize={13}>
+                        <Text fontSize="13px" fontWeight="normal">
                           Receive an email with the details and the items that
                           triggered the alert.
                         </Text>
@@ -383,17 +408,16 @@ export function TriggerDrawer() {
 
                   <VStack align="start">
                     <Radio
-                      size="md"
                       value={TriggerAction.ADD_TO_DATASET}
-                      colorScheme="blue"
+                      colorPalette="blue"
                       alignItems="start"
-                      spacing={3}
+                      gap={3}
                       paddingTop={2}
                       {...register("action")}
                     >
                       <VStack align="start" marginTop={-1}>
                         <Text fontWeight="500">Add to Dataset</Text>
-                        <Text fontSize={13}>
+                        <Text fontSize="13px" fontWeight="normal">
                           Add entries to the dataset, this allows you to keep
                           track of the results of your triggers.
                         </Text>
@@ -403,8 +427,7 @@ export function TriggerDrawer() {
                 </Stack>
               </RadioGroup>
             </HorizontalFormControl>
-            {(currentAction as TriggerAction) ===
-              TriggerAction.ADD_TO_DATASET && (
+            {currentAction === TriggerAction.ADD_TO_DATASET && (
               <>
                 <DatasetSelector
                   datasets={datasets.data}
@@ -429,19 +452,19 @@ export function TriggerDrawer() {
               </>
             )}
 
-            <HStack justifyContent="flex-end">
+            <HStack justifyContent="flex-end" paddingTop={4}>
               <Button
-                colorScheme="blue"
+                colorPalette="blue"
                 type="submit"
                 minWidth="fit-content"
-                isLoading={createTrigger.isLoading}
+                loading={createTrigger.isLoading}
               >
                 Add Trigger
               </Button>
             </HStack>
           </form>
-        </DrawerBody>
-      </DrawerContent>
+        </Drawer.Body>
+      </Drawer.Content>
       <AddOrEditDatasetDrawer
         datasetToSave={
           selectedDataset
@@ -454,10 +477,10 @@ export function TriggerDrawer() {
               }
             : undefined
         }
-        isOpen={editDataset.isOpen}
+        open={editDataset.open}
         onClose={editDataset.onClose}
         onSuccess={onCreateDatasetSuccess}
       />
-    </Drawer>
+    </Drawer.Root>
   );
 }

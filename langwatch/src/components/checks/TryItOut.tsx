@@ -1,36 +1,23 @@
 import {
   Alert,
-  AlertIcon,
   Button,
   Card,
-  CardBody,
-  CardHeader,
   HStack,
   Heading,
   Input,
-  InputGroup,
-  InputLeftElement,
   Skeleton,
   Spacer,
   Spinner,
   Table,
-  TableContainer,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
   VStack,
-  useTheme,
-  useToast,
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import { useEffect, useState } from "react";
 import { Pause, Play, RefreshCw, Search } from "react-feather";
 import { type UseFormReturn } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
+import { useColorRawValue } from "../../components/ui/color-mode";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import {
@@ -41,18 +28,21 @@ import { evaluatorsSchema } from "../../server/evaluations/evaluators.zod.genera
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { evaluatePreconditions } from "../../server/evaluations/preconditions";
 import type { CheckPreconditions } from "../../server/evaluations/types";
+import { type ElasticSearchSpan } from "../../server/tracer/types";
+import { elasticSearchSpanToSpan } from "../../server/tracer/utils";
 import { api } from "../../utils/api";
 import { formatMoney } from "../../utils/formatMoney";
 import type { Money } from "../../utils/types";
 import { useDrawer } from "../CurrentDrawer";
+import { HoverableBigText } from "../HoverableBigText";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { FilterToggle } from "../filters/FilterToggle";
+import { Tooltip } from "../ui/tooltip";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 import { evaluationStatusColor } from "./EvaluationStatus";
-import { elasticSearchSpanToSpan } from "../../server/tracer/utils";
-import { type ElasticSearchSpan } from "../../server/tracer/types";
-import { HoverableBigText } from "../HoverableBigText";
+import { toaster } from "../../components/ui/toaster";
+import { InputGroup } from "../ui/input-group";
 
 export function TryItOut({
   form,
@@ -61,8 +51,7 @@ export function TryItOut({
 }) {
   const { project } = useOrganizationTeamProject();
   const { watch } = form;
-  const theme = useTheme();
-  const gray400 = theme.colors.gray["400"];
+  const gray400 = useColorRawValue("gray.400");
 
   const evaluatorType = watch("checkType");
   const preconditions = watch("preconditions");
@@ -136,8 +125,6 @@ export function TryItOut({
 
   const runEvaluation = api.evaluations.runEvaluation.useMutation();
 
-  const toast = useToast();
-
   useEffect(() => {
     setRunningResults({});
     setRunningState({ state: "idle" });
@@ -186,11 +173,14 @@ export function TryItOut({
       if (Object.keys(evaluatorDefinition?.settings ?? {}).length === 0) {
         settings_ = {};
       } else {
-        toast({
+        toaster.create({
           title: "Invalid evaluator settings",
           description: "Please check your settings and try again.",
-          status: "error",
-          duration: 5000,
+          type: "error",
+          meta: {
+            closable: true,
+          },
+          placement: "top-end",
         });
         console.error(e);
         return;
@@ -242,22 +232,23 @@ export function TryItOut({
   const hasAnyLabels = evaluatorDefinition?.result.label;
 
   return (
-    <VStack width="full" spacing={6} marginTop={6}>
+    <VStack width="full" gap={6} marginTop={6}>
       <HStack width="full" align="end">
         <Heading as="h2" size="lg" textAlign="center" paddingTop={4}>
           Try it out
         </Heading>
         <Spacer />
-        <InputGroup maxWidth="350px" borderColor="gray.300">
-          <InputLeftElement paddingY={1.5} height="auto" pointerEvents="none">
-            <Search color={gray400} width={16} />
-          </InputLeftElement>
+        <InputGroup
+          maxWidth="350px"
+          borderColor="gray.300"
+          startElement={<Search color={gray400} width={16} />}
+        >
           <Input
             name="query"
             type="search"
             placeholder="Search"
             _placeholder={{ color: "gray.800" }}
-            fontSize={14}
+            fontSize="14px"
             paddingY={1.5}
             height="auto"
             onChange={(e) => setQuery(e.target.value)}
@@ -267,18 +258,20 @@ export function TryItOut({
         <FilterToggle />
       </HStack>
       {evaluatorType === "presidio/pii_detection" && (
-        <Alert status="info">
-          <AlertIcon />
-          <Text>
-            Heads up! Since LangWatch already redacts PII, you won{"'"}t see any
-            bad examples here. You can still try it though.
-          </Text>
-        </Alert>
+        <Alert.Root>
+          <Alert.Indicator />
+          <Alert.Content>
+            <Text>
+              Heads up! Since LangWatch already redacts PII, you won{"'"}t see
+              any bad examples here. You can still try it though.
+            </Text>
+          </Alert.Content>
+        </Alert.Root>
       )}
-      <HStack width="full" align="start" spacing={6} paddingBottom={6}>
-        <Card width="full" minHeight="400px">
-          <CardHeader>
-            <HStack spacing={4}>
+      <HStack width="full" align="start" gap={6} paddingBottom={6}>
+        <Card.Root width="full" minHeight="400px">
+          <Card.Header>
+            <HStack gap={4}>
               <Text fontWeight="500">
                 {tracesPassingPreconditionsOnLoad.isLoading
                   ? "Fetching samples..."
@@ -299,34 +292,22 @@ export function TryItOut({
                   });
                   setRandomSeed(Math.random() * 1000);
                 }}
-                leftIcon={
-                  <RefreshCw
-                    size={16}
-                    className={
-                      tracesPassingPreconditionsOnLoad.isLoading
-                        ? "refresh-icon animation-spinning"
-                        : "refresh-icon"
-                    }
-                  />
-                }
-                isDisabled={tracesPassingPreconditionsOnLoad.isLoading}
                 size="sm"
               >
+                <RefreshCw
+                  size={16}
+                  className={
+                    tracesPassingPreconditionsOnLoad.isLoading
+                      ? "refresh-icon animation-spinning"
+                      : "refresh-icon"
+                  }
+                />
                 Shuffle
               </Button>
               <Button
-                leftIcon={
-                  runningState.state === "running" ? (
-                    <Spinner size="sm" />
-                  ) : runningState.state === "paused" ? (
-                    <Pause size={16} />
-                  ) : (
-                    <Play size={16} />
-                  )
-                }
-                colorScheme="orange"
+                colorPalette="orange"
                 size="sm"
-                isDisabled={firstPassingPrecondition === -1}
+                disabled={firstPassingPrecondition === -1}
                 onClick={() => {
                   if (runningState.state === "idle") {
                     const firstTraceId =
@@ -353,6 +334,13 @@ export function TryItOut({
                   }
                 }}
               >
+                {runningState.state === "running" ? (
+                  <Spinner size="sm" />
+                ) : runningState.state === "paused" ? (
+                  <Pause size={16} />
+                ) : (
+                  <Play size={16} />
+                )}
                 {runningState.state === "running"
                   ? "Running..."
                   : runningState.state === "paused"
@@ -360,92 +348,153 @@ export function TryItOut({
                   : "Run on samples"}
               </Button>
             </HStack>
-          </CardHeader>
-          <CardBody paddingX={2} paddingTop={0}>
-            <VStack width="full" align="start" spacing={6}>
-              <TableContainer>
-                <Table variant="simple">
-                  <Thead>
-                    <Tr>
-                      <Th width="180px">Timestamp</Th>
-                      <Th width="225px">Input</Th>
-                      <Th width="225px">Output</Th>
-                      {evaluatorDefinition?.isGuardrail ? (
-                        <Th width="120px">Passed</Th>
-                      ) : evaluatorDefinition?.result.score ? (
-                        <Th width="120px">Score</Th>
-                      ) : null}
-                      {evaluatorType?.startsWith("custom/") ? (
-                        <Th width="120px">Passed</Th>
-                      ) : null}
+          </Card.Header>
+          <Card.Body paddingX={2} paddingTop={0}>
+            <VStack width="full" align="start" gap={6}>
+              <Table.Root variant="line">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader width="180px">
+                      Timestamp
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="225px">Input</Table.ColumnHeader>
+                    <Table.ColumnHeader width="225px">
+                      Output
+                    </Table.ColumnHeader>
+                    {evaluatorDefinition?.isGuardrail ? (
+                      <Table.ColumnHeader width="120px">
+                        Passed
+                      </Table.ColumnHeader>
+                    ) : evaluatorDefinition?.result.score ? (
+                      <Table.ColumnHeader width="120px">
+                        Score
+                      </Table.ColumnHeader>
+                    ) : null}
+                    {evaluatorType?.startsWith("custom/") ? (
+                      <Table.ColumnHeader width="120px">
+                        Passed
+                      </Table.ColumnHeader>
+                    ) : null}
+                    {evaluatorType?.startsWith("custom/") ? (
+                      <Table.ColumnHeader width="120px">
+                        Score
+                      </Table.ColumnHeader>
+                    ) : null}
+                    {hasAnyLabels && (
+                      <Table.ColumnHeader width="120px">
+                        Label
+                      </Table.ColumnHeader>
+                    )}
+                    <Table.ColumnHeader width="250px">
+                      Details
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="120px">Cost</Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {tracesPassingPreconditionsOnLoad.data?.map((trace, i) => {
+                    const livePassesPreconditions =
+                      tracesLivePassesPreconditions[i];
+                    const runningResult = runningResults[trace.trace_id];
+                    const color =
+                      runningResult && runningResult.status !== "loading"
+                        ? evaluationStatusColor(runningResult)
+                        : undefined;
+                    const resultDetails = runningResult
+                      ? "details" in runningResult
+                        ? runningResult.details
+                        : ""
+                      : "";
 
-                      {evaluatorType?.startsWith("custom/") ? (
-                        <Th width="120px">Score</Th>
-                      ) : null}
-                      {hasAnyLabels && <Th width="120px">Label</Th>}
-                      <Th width="250px">Details</Th>
-                      <Th width="120px">Cost</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {tracesPassingPreconditionsOnLoad.data?.map((trace, i) => {
-                      const livePassesPreconditions =
-                        tracesLivePassesPreconditions[i];
-                      const runningResult = runningResults[trace.trace_id];
-                      const color =
-                        runningResult && runningResult.status !== "loading"
-                          ? evaluationStatusColor(runningResult)
-                          : undefined;
-                      const resultDetails = runningResult
-                        ? "details" in runningResult
-                          ? runningResult.details
-                          : ""
-                        : "";
-
-                      return (
-                        <Tooltip
-                          key={trace.trace_id}
-                          hasArrow
-                          placement="top"
-                          label={
-                            livePassesPreconditions
-                              ? undefined
-                              : "Entry does not match the pre-conditions"
+                    return (
+                      <Tooltip
+                        key={trace.trace_id}
+                        showArrow
+                        positioning={{ placement: "top" }}
+                        content={
+                          livePassesPreconditions
+                            ? undefined
+                            : "Entry does not match the pre-conditions"
+                        }
+                      >
+                        <Table.Row
+                          role="button"
+                          cursor="pointer"
+                          background={
+                            livePassesPreconditions ? undefined : "gray.100"
+                          }
+                          color={
+                            livePassesPreconditions ? undefined : "gray.400"
                           }
                         >
-                          <Tr
-                            role="button"
-                            cursor="pointer"
-                            background={
-                              livePassesPreconditions ? undefined : "gray.100"
-                            }
-                            color={
-                              livePassesPreconditions ? undefined : "gray.400"
+                          <Table.Cell
+                            maxWidth="180px"
+                            onClick={() =>
+                              openDrawer("traceDetails", {
+                                traceId: trace.trace_id,
+                              })
                             }
                           >
-                            <Td
-                              maxWidth="180px"
+                            {new Date(
+                              trace.timestamps.started_at
+                            ).toLocaleDateString(undefined, {
+                              month: "numeric",
+                              day: "numeric",
+                            }) +
+                              ", " +
+                              new Date(
+                                trace.timestamps.started_at
+                              ).toLocaleTimeString(undefined, {
+                                hour: "numeric",
+                                minute: "numeric",
+                              })}
+                          </Table.Cell>
+                          <Table.Cell
+                            maxWidth="225px"
+                            onClick={() =>
+                              openDrawer("traceDetails", {
+                                traceId: trace.trace_id,
+                              })
+                            }
+                          >
+                            <Tooltip
+                              content={
+                                livePassesPreconditions
+                                  ? trace.input?.value ?? ""
+                                  : undefined
+                              }
+                            >
+                              <Text
+                                lineClamp={1}
+                                wordBreak="break-all"
+                                display="block"
+                              >
+                                {trace.input?.value ?? "<empty>"}
+                              </Text>
+                            </Tooltip>
+                          </Table.Cell>
+                          {trace.error ? (
+                            <Table.Cell
+                              maxWidth="225px"
                               onClick={() =>
                                 openDrawer("traceDetails", {
                                   traceId: trace.trace_id,
                                 })
                               }
                             >
-                              {new Date(
-                                trace.timestamps.started_at
-                              ).toLocaleDateString(undefined, {
-                                month: "numeric",
-                                day: "numeric",
-                              }) +
-                                ", " +
-                                new Date(
-                                  trace.timestamps.started_at
-                                ).toLocaleTimeString(undefined, {
-                                  hour: "numeric",
-                                  minute: "numeric",
-                                })}
-                            </Td>
-                            <Td
+                              <Text
+                                lineClamp={1}
+                                maxWidth="250px"
+                                display="block"
+                                color="red.400"
+                              >
+                                Error
+                                {trace.error.message ? ": " : ""}
+                                {trace.error.message}
+                              </Text>
+                            </Table.Cell>
+                          ) : (
+                            <Table.Cell
                               maxWidth="225px"
                               onClick={() =>
                                 openDrawer("traceDetails", {
@@ -454,206 +503,170 @@ export function TryItOut({
                               }
                             >
                               <Tooltip
-                                label={
+                                content={
                                   livePassesPreconditions
-                                    ? trace.input?.value ?? ""
+                                    ? trace.output?.value
                                     : undefined
                                 }
                               >
                                 <Text
-                                  noOfLines={1}
-                                  wordBreak="break-all"
+                                  lineClamp={1}
                                   display="block"
+                                  maxWidth="250px"
                                 >
-                                  {trace.input?.value ?? "<empty>"}
+                                  {(trace.output?.value ?? "").trim() !== ""
+                                    ? trace.output?.value
+                                    : "<empty>"}
                                 </Text>
                               </Tooltip>
-                            </Td>
-                            {trace.error ? (
-                              <Td
-                                maxWidth="225px"
-                                onClick={() =>
-                                  openDrawer("traceDetails", {
-                                    traceId: trace.trace_id,
-                                  })
-                                }
-                              >
-                                <Text
-                                  noOfLines={1}
-                                  maxWidth="250px"
-                                  display="block"
-                                  color="red.400"
-                                >
+                            </Table.Cell>
+                          )}
+                          {runningResult ? (
+                            <>
+                              {runningResult.status === "loading" ? (
+                                <Table.Cell maxWidth="120">
+                                  <Spinner size="sm" />
+                                </Table.Cell>
+                              ) : runningResult.status === "skipped" ? (
+                                <Table.Cell maxWidth="120" color={color}>
+                                  Skipped
+                                </Table.Cell>
+                              ) : runningResult.status === "error" ? (
+                                <Table.Cell maxWidth="120" color={color}>
                                   Error
-                                  {trace.error.message ? ": " : ""}
-                                  {trace.error.message}
-                                </Text>
-                              </Td>
-                            ) : (
-                              <Td
-                                maxWidth="225px"
-                                onClick={() =>
-                                  openDrawer("traceDetails", {
-                                    traceId: trace.trace_id,
-                                  })
-                                }
-                              >
-                                <Tooltip
-                                  label={
-                                    livePassesPreconditions
-                                      ? trace.output?.value
-                                      : undefined
-                                  }
-                                >
-                                  <Text
-                                    noOfLines={1}
-                                    display="block"
-                                    maxWidth="250px"
-                                  >
-                                    {(trace.output?.value ?? "").trim() !== ""
-                                      ? trace.output?.value
-                                      : "<empty>"}
-                                  </Text>
-                                </Tooltip>
-                              </Td>
-                            )}
-                            {runningResult ? (
-                              <>
-                                {runningResult.status === "loading" ? (
-                                  <Td maxWidth="120">
-                                    <Spinner size="sm" />
-                                  </Td>
-                                ) : runningResult.status === "skipped" ? (
-                                  <Td maxWidth="120" color={color}>
-                                    Skipped
-                                  </Td>
-                                ) : runningResult.status === "error" ? (
-                                  <Td maxWidth="120" color={color}>
-                                    Error
-                                  </Td>
-                                ) : evaluatorType?.startsWith("custom/") ? (
-                                  <Td maxWidth="120" color={color}>
-                                    {"passed" in runningResult
-                                      ? runningResult.passed
-                                        ? "Pass"
-                                        : "Fail"
-                                      : "-"}
-                                  </Td>
-                                ) : evaluatorDefinition?.isGuardrail ? (
-                                  <Td maxWidth="120" color={color}>
-                                    {runningResult.passed ? "Pass" : "Fail"}
-                                  </Td>
-                                ) : evaluatorDefinition?.result.score ? (
-                                  <Td maxWidth="120" color={color}>
-                                    {numeral(runningResult.score).format(
-                                      "0.[00]"
-                                    )}
-                                  </Td>
-                                ) : null}
-
-                                {evaluatorType?.startsWith("custom/") ? (
-                                  <Td maxWidth="120" color={color}>
-                                    {"score" in runningResult
-                                      ? numeral(runningResult.score).format(
-                                          "0.[00]"
-                                        )
-                                      : "-"}
-                                  </Td>
-                                ) : null}
-
-                                {hasAnyLabels &&
-                                  (evaluatorDefinition?.isGuardrail ||
-                                    !!evaluatorDefinition?.result.score ||
-                                    runningResult.status === "processed") && (
-                                    <Td maxWidth="120" color={color}>
-                                      {"label" in runningResult
-                                        ? runningResult.label
-                                        : "-"}
-                                    </Td>
+                                </Table.Cell>
+                              ) : evaluatorType?.startsWith("custom/") ? (
+                                <Table.Cell maxWidth="120" color={color}>
+                                  {"passed" in runningResult
+                                    ? runningResult.passed
+                                      ? "Pass"
+                                      : "Fail"
+                                    : "-"}
+                                </Table.Cell>
+                              ) : evaluatorDefinition?.isGuardrail ? (
+                                <Table.Cell maxWidth="120" color={color}>
+                                  {runningResult.passed ? "Pass" : "Fail"}
+                                </Table.Cell>
+                              ) : evaluatorDefinition?.result.score ? (
+                                <Table.Cell maxWidth="120" color={color}>
+                                  {numeral(runningResult.score).format(
+                                    "0.[00]"
                                   )}
-                              </>
-                            ) : i == firstPassingPrecondition ? (
-                              <Td maxWidth="120">Waiting to run</Td>
-                            ) : (
-                              <Td maxWidth="120"></Td>
-                            )}
-                            <Td color={color} maxWidth="250px">
-                              {runningResult &&
-                                (resultDetails ? (
-                                  <HoverableBigText noOfLines={3}>
-                                    {resultDetails}
-                                  </HoverableBigText>
-                                ) : runningResult.status === "loading" ? (
-                                  ""
-                                ) : (
-                                  "-"
-                                ))}
-                            </Td>
-                            <Td maxWidth="120px">
-                              {runningResult &&
-                                (runningResult.status === "processed"
-                                  ? formatMoney(
-                                      (runningResult.cost as Money) ?? {
-                                        amount: 0,
-                                        currency: "USD",
-                                      }
-                                    )
-                                  : runningResult.status === "loading"
-                                  ? ""
-                                  : "-")}
-                            </Td>
-                          </Tr>
-                        </Tooltip>
-                      );
-                    })}
+                                </Table.Cell>
+                              ) : null}
 
-                    {tracesPassingPreconditionsOnLoad.isLoading &&
-                      Array.from({ length: 10 }).map((_, i) => (
-                        <Tr key={i}>
-                          {Array.from({ length: 6 }).map((_, i) => (
-                            <Td key={i}>
-                              <Skeleton height="20px" />
-                            </Td>
-                          ))}
-                        </Tr>
-                      ))}
-                    {tracesPassingPreconditionsOnLoad.isFetched &&
-                      tracesPassingPreconditionsOnLoad.data?.length === 0 && (
-                        <Tr>
-                          <Td colSpan={5}>
-                            No messages found, try selecting different filters
-                            and dates
-                          </Td>
-                        </Tr>
-                      )}
-                    <Tr>
-                      <Td colSpan={5} textAlign="right" fontWeight={500}>
-                        Total Cost:
-                      </Td>
-                      <Td>
-                        {Object.values(runningResults).filter(
-                          (result) => result.status !== "loading"
-                        ).length > 0
-                          ? formatMoney({
-                              amount: totalCost,
-                              currency:
-                                (
-                                  Object.values(runningResults).filter(
-                                    (result) =>
-                                      result.status === "processed" &&
-                                      result.cost
-                                  )[0] as any
-                                )?.cost.currency ?? "USD",
-                            })
-                          : "-"}
-                      </Td>
-                    </Tr>
-                  </Tbody>
-                </Table>
-              </TableContainer>
+                              {evaluatorType?.startsWith("custom/") ? (
+                                <Table.Cell maxWidth="120" color={color}>
+                                  {"score" in runningResult
+                                    ? numeral(runningResult.score).format(
+                                        "0.[00]"
+                                      )
+                                    : "-"}
+                                </Table.Cell>
+                              ) : null}
+
+                              {hasAnyLabels &&
+                                (evaluatorDefinition?.isGuardrail ||
+                                  !!evaluatorDefinition?.result.score ||
+                                  runningResult.status === "processed") && (
+                                  <Table.Cell maxWidth="120" color={color}>
+                                    {"label" in runningResult
+                                      ? runningResult.label
+                                      : "-"}
+                                  </Table.Cell>
+                                )}
+                              {evaluatorType?.startsWith("custom/") ? (
+                                <Table.Cell maxWidth="120" color={color}>
+                                  {"score" in runningResult
+                                    ? numeral(runningResult.score).format(
+                                        "0.[00]"
+                                      )
+                                    : "-"}
+                                </Table.Cell>
+                              ) : null}
+                            </>
+                          ) : i == firstPassingPrecondition ? (
+                            <Table.Cell maxWidth="120">
+                              Waiting to run
+                            </Table.Cell>
+                          ) : (
+                            <Table.Cell maxWidth="120"></Table.Cell>
+                          )}
+                          <Table.Cell color={color} maxWidth="250px">
+                            {runningResult &&
+                              (resultDetails ? (
+                                <HoverableBigText lineClamp={3}>
+                                  {resultDetails}
+                                </HoverableBigText>
+                              ) : runningResult.status === "loading" ? (
+                                ""
+                              ) : (
+                                "-"
+                              ))}
+                          </Table.Cell>
+                          <Table.Cell maxWidth="120px">
+                            {runningResult &&
+                              (runningResult.status === "processed"
+                                ? formatMoney(
+                                    (runningResult.cost as Money) ?? {
+                                      amount: 0,
+                                      currency: "USD",
+                                    }
+                                  )
+                                : runningResult.status === "loading"
+                                ? ""
+                                : "-")}
+                          </Table.Cell>
+                        </Table.Row>
+                      </Tooltip>
+                    );
+                  })}
+
+                  {tracesPassingPreconditionsOnLoad.isLoading &&
+                    Array.from({ length: 10 }).map((_, i) => (
+                      <Table.Row key={i}>
+                        {Array.from({ length: 6 }).map((_, i) => (
+                          <Table.Cell key={i}>
+                            <Skeleton height="20px" />
+                          </Table.Cell>
+                        ))}
+                      </Table.Row>
+                    ))}
+                  {tracesPassingPreconditionsOnLoad.isFetched &&
+                    tracesPassingPreconditionsOnLoad.data?.length === 0 && (
+                      <Table.Row>
+                        <Table.Cell colSpan={5}>
+                          No messages found, try selecting different filters and
+                          dates
+                        </Table.Cell>
+                      </Table.Row>
+                    )}
+                  <Table.Row>
+                    <Table.Cell colSpan={5} textAlign="right" fontWeight={500}>
+                      Total Cost:
+                    </Table.Cell>
+                    <Table.Cell>
+                      {Object.values(runningResults).filter(
+                        (result) => result.status !== "loading"
+                      ).length > 0
+                        ? formatMoney({
+                            amount: totalCost,
+                            currency:
+                              (
+                                Object.values(runningResults).filter(
+                                  (result) =>
+                                    result.status === "processed" && result.cost
+                                )[0] as any
+                              )?.cost.currency ?? "USD",
+                          })
+                        : "-"}
+                    </Table.Cell>
+                  </Table.Row>
+                </Table.Body>
+              </Table.Root>
             </VStack>
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
         <FilterSidebar />
       </HStack>
     </VStack>

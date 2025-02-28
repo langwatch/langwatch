@@ -1,18 +1,14 @@
 import {
   Alert,
-  AlertIcon,
   Box,
   Button,
   Card,
-  CardBody,
-  CardHeader,
   HStack,
   Heading,
   Skeleton,
   Spacer,
   Spinner,
   Text,
-  Tooltip,
   VStack,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
@@ -22,6 +18,8 @@ import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, ExternalLink } from "react-feather";
+import { Link } from "../../components/ui/link";
+import { Tooltip } from "../../components/ui/tooltip";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { VersionBox } from "../../optimization_studio/components/History";
 import type { AppRouter } from "../../server/api/root";
@@ -64,7 +62,7 @@ export function BatchEvaluationV2({
   });
 
   return (
-    <HStack align="start" width="full" height="full" spacing={0}>
+    <HStack align="start" width="full" height="full" gap={0}>
       <BatchEvaluationV2RunList
         batchEvaluationRuns={batchEvaluationRuns}
         selectedRun={selectedRun}
@@ -76,45 +74,40 @@ export function BatchEvaluationV2({
         height="fit-content"
         minHeight="100%"
         position="relative"
-        spacing={0}
+        gap={0}
         justify="space-between"
         minWidth="0"
       >
-        <VStack
-          align="start"
-          width="full"
-          height="full"
-          spacing={8}
-          padding={6}
-        >
-          <HStack width="full" align="end" spacing={4}>
+        <VStack align="start" width="full" height="full" gap={8} padding={6}>
+          <HStack width="full" align="end" gap={4}>
             <Heading as="h1" size="lg">
               {experiment.name ?? experiment.slug}
             </Heading>
             <Spacer />
             <Button
               size="sm"
-              colorScheme="blue"
-              leftIcon={<Download size={16} />}
+              colorPalette="blue"
               onClick={() => void downloadCSV()}
               disabled={!isDownloadCSVEnabled}
               marginBottom="-6px"
             >
-              Export to CSV
+              <Download size={16} /> Export to CSV
             </Button>
             {experiment.workflowId && (
-              <Button
-                as={"a"}
-                size="sm"
+              <Link
                 target="_blank"
                 href={`/${project.slug}/studio/${experiment.workflowId}`}
-                leftIcon={<ExternalLink size={16} />}
-                textDecoration="none"
-                marginBottom="-6px"
-                colorScheme="orange"
+                asChild
               >
-                Open Workflow
-              </Button>
+                <Button
+                  size="sm"
+                  textDecoration="none"
+                  marginBottom="-6px"
+                  colorPalette="orange"
+                >
+                  <ExternalLink size={16} /> Open Workflow
+                </Button>
+              </Link>
             )}
           </HStack>
           {batchEvaluationRuns.isLoading ||
@@ -122,30 +115,30 @@ export function BatchEvaluationV2({
             batchEvaluationRuns.error.data?.httpStatus == 404) ? (
             <Skeleton width="100%" height="30px" />
           ) : batchEvaluationRuns.error ? (
-            <Alert status="error">
-              <AlertIcon />
+            <Alert.Root status="error">
+              <Alert.Indicator />
               Error loading experiment runs
-            </Alert>
+            </Alert.Root>
           ) : batchEvaluationRuns.data?.runs.length === 0 ? (
             <Text>Waiting for results...</Text>
           ) : (
             <>
-              <Card width="100%">
-                <CardHeader>
+              <Card.Root width="100%">
+                <Card.Header>
                   <Heading as="h2" size="md">
                     {selectedRun?.workflow_version?.commitMessage ??
                       "Evaluation Results"}
                   </Heading>
-                </CardHeader>
-                <CardBody paddingTop={0}>
+                </Card.Header>
+                <Card.Body paddingTop={0}>
                   <BatchEvaluationV2EvaluationResults
                     project={project}
                     experiment={experiment}
                     runId={selectedRun?.run_id}
                     isFinished={isFinished}
                   />
-                </CardBody>
-              </Card>
+                </Card.Body>
+              </Card.Root>
             </>
           )}
         </VStack>
@@ -286,7 +279,7 @@ export function BatchEvaluationV2RunList({
       minWidth={size === "sm" ? "250px" : "300px"}
       maxWidth={size === "sm" ? "250px" : "300px"}
       height="full"
-      spacing={0}
+      gap={0}
       overflowY="auto"
     >
       {size !== "sm" && (
@@ -303,10 +296,10 @@ export function BatchEvaluationV2RunList({
           ))}
         </>
       ) : batchEvaluationRuns.error ? (
-        <Alert status="error">
-          <AlertIcon />
+        <Alert.Root status="error">
+          <Alert.Indicator />
           Error loading experiment runs
-        </Alert>
+        </Alert.Root>
       ) : batchEvaluationRuns.data?.runs.length === 0 ? (
         <Text paddingX={6} paddingY={4}>
           Waiting for runs...
@@ -326,15 +319,15 @@ export function BatchEvaluationV2RunList({
               _hover={{
                 background: "gray.100",
               }}
-              spacing={3}
+              gap={3}
             >
               <VersionBox minWidth={hasAnyVersion ? "48px" : "0"} />
-              <VStack align="start" spacing={2} width="100%" paddingRight={2}>
+              <VStack align="start" gap={2} width="100%" paddingRight={2}>
                 <HStack width="100%">
-                  <Skeleton width="100%" height="12px" />
-                  <Spinner size="xs" />
+                  <Skeleton height="12px" background="gray.400" flexGrow={1} />
+                  <Spinner size="xs" flexShrink={0} />
                 </HStack>
-                <Skeleton width="100%" height="12px" />
+                <Skeleton width="100%" height="12px" background="gray.400" />
               </VStack>
             </HStack>
           )}
@@ -365,7 +358,7 @@ export function BatchEvaluationV2RunList({
                   e.stopPropagation();
                   setSelectedRunId(run.run_id);
                 }}
-                spacing={3}
+                gap={3}
               >
                 {run.workflow_version ? (
                   <VersionBox
@@ -382,10 +375,10 @@ export function BatchEvaluationV2RunList({
                     }
                   />
                 )}
-                <VStack align="start" spacing={0}>
+                <VStack align="start" gap={0}>
                   <Text
                     fontSize={size === "sm" ? "13px" : "14px"}
-                    noOfLines={1}
+                    lineClamp={1}
                     wordBreak="break-all"
                   >
                     {runName}
@@ -402,14 +395,17 @@ export function BatchEvaluationV2RunList({
                   <HStack
                     color="gray.400"
                     fontSize={size === "sm" ? "12px" : "13px"}
-                    spacing={1}
+                    gap={1}
                   >
                     {Object.values(run.summary.evaluations)
                       .slice(0, 2)
                       .map((evaluation, index) => (
                         <>
                           {index > 0 && <Text>·</Text>}
-                          <Tooltip label={evaluation.name}>
+                          <Tooltip
+                            content={evaluation.name}
+                            positioning={{ placement: "top" }}
+                          >
                             <Text>
                               {formatEvaluationSummary(evaluation, true)}
                             </Text>
@@ -435,7 +431,7 @@ export function BatchEvaluationV2RunList({
                     color="gray.400"
                     fontSize={size === "sm" ? "12px" : "13px"}
                   >
-                    <Text whiteSpace="nowrap" noOfLines={1}>
+                    <Text whiteSpace="nowrap" lineClamp={1}>
                       {run.timestamps.created_at
                         ? formatTimeAgo(
                             run.timestamps.created_at,

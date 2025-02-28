@@ -2,17 +2,15 @@ import {
   Box,
   Button,
   Center,
-  FormControl,
-  FormErrorMessage,
   HStack,
   Input,
-  Select,
+  NativeSelect,
   Spacer,
   Text,
-  Tooltip,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { Field } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
 import React, { useEffect, useState } from "react";
 import {
@@ -33,7 +31,7 @@ import { camelCaseToTitleCase } from "../../../utils/stringCasing";
 import type {
   Component,
   ComponentType,
-  Field,
+  Field as FieldType,
   LLMConfig,
   Workflow,
 } from "../../types/dsl";
@@ -50,6 +48,7 @@ import {
 import { LLMConfigField } from "./modals/LLMConfigModal";
 import { RenderCode } from "../../../components/code/RenderCode";
 import { CodeEditorModal } from "../code/CodeEditorModal";
+import { Tooltip } from "../../../components/ui/tooltip";
 
 export function PropertyField({
   title,
@@ -61,7 +60,7 @@ export function PropertyField({
   tooltip?: React.ReactNode;
 }) {
   return (
-    <VStack align="start" spacing={3} width="full">
+    <VStack align="start" gap={3} width="full">
       <PropertySectionTitle tooltip={tooltip}>{title}</PropertySectionTitle>
       {children}
     </VStack>
@@ -69,7 +68,7 @@ export function PropertyField({
 }
 
 type FieldArrayForm = {
-  fields: Field[];
+  fields: FieldType[];
 };
 
 export function FieldsDefinition({
@@ -130,7 +129,7 @@ export function FieldsDefinition({
     <VStack
       as="form"
       align="start"
-      spacing={3}
+      gap={3}
       width="full"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onSubmit={handleSubmit(onSubmit)}
@@ -159,7 +158,7 @@ export function FieldsDefinition({
           },
           validate: (value) => {
             const identifiers = control._formValues.fields.map(
-              (f: Field) => f.identifier
+              (f: FieldType) => f.identifier
             );
             return (
               identifiers.filter((id: string) => id === value).length === 1 ||
@@ -169,9 +168,9 @@ export function FieldsDefinition({
         });
 
         return (
-          <FormControl
+          <Field.Root
             key={field_.id}
-            isInvalid={!!errors.fields?.[index]?.identifier}
+            invalid={!!errors.fields?.[index]?.identifier}
           >
             <HStack width="full">
               <HStack
@@ -191,7 +190,7 @@ export function FieldsDefinition({
                     }}
                     width="full"
                     fontFamily="monospace"
-                    fontSize={13}
+                    fontSize="13px"
                     border="none"
                     background="transparent"
                     padding="6px 0px 6px 12px"
@@ -199,7 +198,7 @@ export function FieldsDefinition({
                 ) : (
                   <Text
                     fontFamily="monospace"
-                    fontSize={13}
+                    fontSize="13px"
                     width="full"
                     padding="8px 0px 8px 12px"
                   >
@@ -212,10 +211,10 @@ export function FieldsDefinition({
                   borderRadius="8px"
                   paddingX={2}
                   paddingY={1}
-                  spacing={2}
+                  gap={2}
                   height="full"
                 >
-                  <Box fontSize={13}>
+                  <Box fontSize="13px">
                     <TypeLabel type={watchedFields[index]?.type ?? ""} />
                   </Box>
                   {!readOnly ? (
@@ -223,53 +222,47 @@ export function FieldsDefinition({
                       <Box color="gray.600">
                         <ChevronDown size={14} />
                       </Box>
-                      <Select
-                        {...control.register(`fields.${index}.type`)}
-                        opacity={0}
-                        position="absolute"
-                        top={0}
-                        left={0}
-                        width="100%"
-                        height="32px"
-                        icon={<></>}
-                      >
-                        <option value="str">str</option>
-                        {field === "inputs" && (
-                          <option value="image">image</option>
-                        )}
-                        <option value="float">float</option>
-
-                        <option value="bool">bool</option>
-                        {/* <option value="int">int</option>
-                        <option value="list[str]">list[str]</option>
-                        <option value="list[float]">list[float]</option>
-                        <option value="list[int]">list[int]</option>
-                        <option value="list[bool]">list[bool]</option>
-                        <option value="dict">dict</option> */}
-                      </Select>
+                      <NativeSelect.Root>
+                        <NativeSelect.Field
+                          {...control.register(`fields.${index}.type`)}
+                          opacity={0}
+                          position="absolute"
+                          top={0}
+                          left={0}
+                          width="100%"
+                          height="32px"
+                        >
+                          <option value="str">str</option>
+                          {field === "inputs" && (
+                            <option value="image">image</option>
+                          )}
+                          <option value="float">float</option>
+                          <option value="bool">bool</option>
+                        </NativeSelect.Field>
+                      </NativeSelect.Root>
                     </>
                   ) : null}
                 </HStack>
               </HStack>
               {!readOnly ? (
                 <Button
-                  colorScheme="gray"
+                  colorPalette="gray"
                   size="sm"
                   height="40px"
                   onClick={() => {
                     remove(index);
                     void handleSubmit(onSubmit)();
                   }}
-                  isDisabled={fields.length === 1}
+                  disabled={fields.length === 1}
                 >
                   <Trash2 size={18} />
                 </Button>
               ) : null}
             </HStack>
-            <FormErrorMessage>
+            <Field.ErrorText>
               {errors.fields?.[index]?.identifier?.message}
-            </FormErrorMessage>
-          </FormControl>
+            </Field.ErrorText>
+          </Field.Root>
         );
       })}
     </VStack>
@@ -323,7 +316,7 @@ export function FieldsForm({
     <VStack
       as="form"
       align="start"
-      spacing={3}
+      gap={3}
       width="full"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onChange={handleSubmit(onSubmit)}
@@ -378,8 +371,8 @@ export function FieldsForm({
                 }}
               >
                 <HStack
-                  spacing={2}
-                  fontSize={18}
+                  gap={2}
+                  fontSize="18px"
                   fontWeight="bold"
                   color="white"
                   background="rgba(0, 0, 0, .5)"
@@ -413,7 +406,7 @@ export function FieldsForm({
                     value: code,
                   });
                 }}
-                isOpen={codeEditorModal.isOpen}
+                open={codeEditorModal.open}
                 onClose={codeEditorModal.onClose}
               />
             </Box>
@@ -421,22 +414,22 @@ export function FieldsForm({
         }
 
         return (
-          <FormControl
+          <Field.Root
             key={field.id}
-            isInvalid={!!errors.fields?.[index]?.identifier}
+            invalid={!!errors.fields?.[index]?.identifier}
           >
-            <VStack align="start" spacing={3} width="full">
+            <VStack align="start" gap={3} width="full">
               <HStack width="full">
                 <PropertySectionTitle>
                   {camelCaseToTitleCase(field.identifier)}
                 </PropertySectionTitle>
                 {field.optional && (
-                  <Text color="gray.500" fontSize={12}>
+                  <Text color="gray.500" fontSize="12px">
                     (optional)
                   </Text>
                 )}
                 {field.desc && (
-                  <Tooltip label={field.desc}>
+                  <Tooltip content={field.desc}>
                     <Info size={14} />
                   </Tooltip>
                 )}
@@ -457,11 +450,11 @@ export function FieldsForm({
                   />
                 )}
               </HStack>
-              <FormErrorMessage>
+              <Field.ErrorText>
                 {errors.fields?.[index]?.identifier?.message}
-              </FormErrorMessage>
+              </Field.ErrorText>
             </VStack>
-          </FormControl>
+          </Field.Root>
         );
       })}
     </VStack>
@@ -477,9 +470,9 @@ export function PropertySectionTitle({
 }) {
   return (
     <HStack paddingLeft={2}>
-      <NodeSectionTitle fontSize={12}>{children}</NodeSectionTitle>
+      <NodeSectionTitle fontSize="12px">{children}</NodeSectionTitle>
       {tooltip && (
-        <Tooltip label={tooltip}>
+        <Tooltip content={tooltip}>
           <Box marginBottom="-2px">
             <Info size={14} />
           </Box>
@@ -542,7 +535,7 @@ export function BasePropertiesPanel({
   return (
     <VStack
       align="start"
-      spacing={6}
+      gap={6}
       padding={3}
       maxWidth="550px"
       width="25vw"
@@ -550,16 +543,16 @@ export function BasePropertiesPanel({
       height="full"
       overflowY="auto"
     >
-      <VStack spacing={2} width="full" align="start">
+      <VStack gap={2} width="full" align="start">
         <HStack
           paddingY={1}
           paddingLeft={2}
           width="full"
           justify="space-between"
-          spacing={0}
+          gap={0}
           alignItems="flex-start"
         >
-          <HStack spacing={2}>
+          <HStack gap={2}>
             {header ? (
               header
             ) : !isWorkflow(node) ? (
@@ -571,7 +564,7 @@ export function BasePropertiesPanel({
                 />
                 {isEditingName ? (
                   <Input
-                    fontSize={15}
+                    fontSize="15px"
                     marginLeft={1}
                     fontWeight={500}
                     variant="outline"
@@ -601,8 +594,8 @@ export function BasePropertiesPanel({
                   />
                 ) : (
                   <HoverableBigText
-                    noOfLines={2}
-                    fontSize={15}
+                    lineClamp={2}
+                    fontSize="15px"
                     fontWeight={500}
                     onClick={() => {
                       if (node.type !== "prompting_technique") {
@@ -623,11 +616,11 @@ export function BasePropertiesPanel({
               </>
             ) : null}
           </HStack>
-          <HStack spacing={0} marginRight="-4px" hidden={isEditingName}>
+          <HStack gap={0} marginRight="-4px" hidden={isEditingName}>
             {!isWorkflow(node) && isExecutableComponent(node) && (
               <>
                 <HStack
-                  spacing={2}
+                  gap={2}
                   onClick={() => {
                     if (!propertiesExpanded) {
                       setPropertiesExpanded(true);
@@ -670,7 +663,7 @@ export function BasePropertiesPanel({
           </HStack>
         </HStack>
         {node.data?.description && (
-          <Text fontSize={12} color="gray.500" paddingX={2}>
+          <Text fontSize="12px" color="gray.500" paddingX={2}>
             {node.data?.description}
           </Text>
         )}

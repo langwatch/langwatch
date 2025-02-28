@@ -1,51 +1,43 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Popover,
-  PopoverAnchor,
-  PopoverContent,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Popover } from "../../../../components/ui/popover";
 import { useState, useEffect } from "react";
 import { X } from "react-feather";
 
 export function ConfigModal({
-  isOpen,
+  open,
   onClose,
   title,
   unstyled = false,
   children,
 }: {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
   title: string;
   unstyled?: boolean;
   children: React.ReactNode;
 }) {
-  const [localIsOpen, setLocalIsOpen] = useState(isOpen);
+  const [localIsOpen, setLocalIsOpen] = useState(open);
 
   useEffect(() => {
-    setLocalIsOpen(isOpen);
-  }, [isOpen]);
+    setLocalIsOpen(open);
+  }, [open]);
 
   if (!localIsOpen) {
     return null;
   }
 
   return (
-    <Popover
-      isOpen={localIsOpen}
-      onClose={() => {
+    <Popover.Root
+      open={localIsOpen}
+      onOpenChange={() => {
         setTimeout(() => setLocalIsOpen(false), 10);
         // To fix issue of popover reopening immediately on the trigger button
         setTimeout(onClose, 300);
       }}
-      placement="auto-start"
+      positioning={{ placement: "bottom-start" }}
     >
-      <PopoverAnchor>
+      {/* TODO: find alternative to this */}
+      {/* <Popover.Anchor>
         <Box
           position="absolute"
           left={0}
@@ -53,15 +45,15 @@ export function ConfigModal({
           height="80px"
           zIndex={-1}
         />
-      </PopoverAnchor>
+      </Popover.Anchor> */}
       {unstyled ? (
         children
       ) : (
-        <PopoverContent
+        <Popover.Content
           borderRadius="2px"
-          border="1px solid"
+          borderWidth="1px"
           borderColor="gray.200"
-          background="white"
+          bg="white"
           minWidth="600px"
           gap={0}
           boxShadow="0px 0px 10px rgba(0, 0, 0, 0.1)"
@@ -71,10 +63,10 @@ export function ConfigModal({
             paddingX={4}
             paddingY={2}
             paddingRight={1}
-            borderBottom="1px solid"
+            borderBottomWidth="1px"
             borderColor="gray.200"
           >
-            <Text fontSize={14} fontWeight={500}>
+            <Text fontSize="14px" fontWeight={500}>
               {title}
             </Text>
             <Spacer />
@@ -85,8 +77,8 @@ export function ConfigModal({
           <VStack paddingY={2} paddingX={4} width="full" align="start">
             {children}
           </VStack>
-        </PopoverContent>
+        </Popover.Content>
       )}
-    </Popover>
+    </Popover.Root>
   );
 }

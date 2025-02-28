@@ -1,11 +1,13 @@
-import { useTheme } from "@chakra-ui/react";
 import { rotatingColors, type RotatingColorSet } from "../utils/rotatingColors";
+import { getRawColorValue } from "../components/ui/color-mode";
 
 export const useGetRotatingColorForCharts = () => {
-  const theme = useTheme();
-
   return (set: RotatingColorSet, index: number) => {
-    const [name, number] = rotatingColors[set]![index % rotatingColors[set]!.length]!.color.split(".");
-    return theme.colors[name ?? ""][+(number ?? "")];
+    const [name, number] =
+      rotatingColors[set]![index % rotatingColors[set]!.length]!.color.split(
+        "."
+      );
+
+    return getRawColorValue(`${name}.${number}`);
   };
 };

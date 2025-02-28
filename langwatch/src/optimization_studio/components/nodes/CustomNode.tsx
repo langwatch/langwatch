@@ -1,13 +1,11 @@
-import { forwardRef } from "@chakra-ui/react";
 import { type Node, type NodeProps } from "@xyflow/react";
 import type { Ref } from "react";
-import type { End } from "../../types/dsl";
 import { ComponentNode } from "./Nodes";
 
-import { Alert, AlertIcon, Text } from "@chakra-ui/react";
+import { Alert, Text } from "@chakra-ui/react";
 
 import { useUpdateNodeInternals } from "@xyflow/react";
-import { useEffect } from "react";
+import { forwardRef, useEffect } from "react";
 import { useComponentVersion } from "../../hooks/useComponentVersion";
 import { type Custom } from "../../types/dsl";
 
@@ -38,6 +36,7 @@ const LatestComponentVersionCheck = ({
         updateNodeInternals(node.id);
       }, 0);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentVersion]);
 
   if (!currentVersion) return null;
@@ -45,10 +44,12 @@ const LatestComponentVersionCheck = ({
   return (
     <>
       {node?.data.isCustom && !currentVersion?.isPublishedVersion && (
-        <Alert status="warning" padding="4px">
-          <AlertIcon />
-          Version outdated
-        </Alert>
+        <Alert.Root padding="4px">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Text>Version outdated</Text>
+          </Alert.Content>
+        </Alert.Root>
       )}
     </>
   );

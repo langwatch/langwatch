@@ -1,31 +1,16 @@
 import {
   Box,
   Button,
-  Checkbox,
-  FocusLock,
-  FormControl,
+  Field,
   HStack,
   Heading,
   Input,
-  InputGroup,
-  InputLeftElement,
-  Popover,
-  PopoverBody,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTrigger,
-  RangeSlider,
-  RangeSliderFilledTrack,
-  RangeSliderThumb,
-  RangeSliderTrack,
   Skeleton,
   Spacer,
   Tag,
   Text,
-  Tooltip,
   VStack,
   useDisclosure,
-  useTheme,
 } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
@@ -43,10 +28,16 @@ import type { AppRouter } from "../../server/api/root";
 import { availableFilters } from "../../server/filters/registry";
 import type { FilterDefinition, FilterField } from "../../server/filters/types";
 import { api } from "../../utils/api";
+import { Popover } from "../ui/popover";
+import { Checkbox } from "../ui/checkbox";
+import { Tooltip } from "../ui/tooltip";
+import { useColorRawValue } from "../ui/color-mode";
+import { InputGroup } from "../ui/input-group";
+import { Slider } from "../ui/slider";
 
 export function FieldsFilters() {
   const { nonEmptyFilters } = useFilterParams();
-  const { openDrawer, isDrawerOpen } = useDrawer();
+  const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
   const { hasTeamPermission } = useOrganizationTeamProject();
 
   const isEditMode = isDrawerOpen("editTriggerFilter");
@@ -75,26 +66,25 @@ export function FieldsFilters() {
   const hasAnyFilters = nonEmptyFilters.length > 0;
 
   return (
-    <VStack align="start" width="full" spacing={6}>
+    <VStack align="start" width="300px" gap={6}>
       <HStack width={"full"}>
         <Heading size="md">Filters</Heading>
 
         <Spacer />
 
         {hasTeamPermission(TeamRoleGroup.TRIGGERS_MANAGE) && !isEditMode && (
-          <Tooltip label="Create a filter to add a trigger.">
+          <Tooltip content="Create a filter to add a trigger.">
             <Button
-              colorScheme="orange"
+              colorPalette="orange"
               onClick={() => openDrawer("trigger", undefined)}
-              size="sm"
-              isDisabled={!hasAnyFilters}
+              disabled={!hasAnyFilters}
             >
               Add Trigger
             </Button>
           </Tooltip>
         )}
       </HStack>
-      <VStack spacing={4} width="full">
+      <VStack gap={3} width="full">
         {filters.map(([id, filter]) => (
           <FieldsFilter key={id} filterId={id} filter={filter} />
         ))}
@@ -110,14 +100,13 @@ function FieldsFilter({
   filterId: FilterField;
   filter: FilterDefinition;
 }) {
-  const theme = useTheme();
-  const gray400 = theme.colors.gray["400"];
+  const gray400 = useColorRawValue("gray.400");
 
   const { setFilter, filters } = useFilterParams();
 
   const searchRef = React.useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useDebounceValue("", 300);
-  const { onOpen, onClose, isOpen } = useDisclosure();
+  const { open, setOpen } = useDisclosure();
   const current = filters[filterId] ?? [];
 
   const currentStringList = Array.isArray(current)
@@ -125,51 +114,45 @@ function FieldsFilter({
     : Object.keys(current);
 
   return (
-    <FormControl>
-      <Popover
-        matchWidth={true}
-        initialFocusRef={searchRef}
-        isOpen={isOpen}
-        onOpen={onOpen}
-        onClose={onClose}
-        placement="bottom"
+    <Field.Root>
+      <Popover.Root
+        positioning={{ placement: "bottom" }}
+        open={open}
+        onOpenChange={({ open }) => setOpen(open)}
       >
-        <PopoverTrigger>
+        <Popover.Trigger asChild>
           <Button
             variant="outline"
+            size="md"
             width="100%"
             background="white"
             fontWeight="normal"
             _hover={{ background: "white" }}
           >
-            <HStack width="full" spacing={0}>
+            <HStack width="full" gap={1}>
               <Text color="gray.500" fontWeight="500" paddingRight={4}>
                 {filter.name}
               </Text>
               {currentStringList.length > 0 ? (
                 <>
-                  <Text noOfLines={1} wordBreak="break-all" display="block">
-                    {currentStringList.join(", ")}
-                  </Text>
+                  <Text lineClamp={1}>{currentStringList.join(", ")}</Text>
                   <Spacer />
                   {currentStringList.length > 1 && (
-                    <Tag
-                      width="fit-content"
-                      padding={0}
+                    <Tag.Root
                       justifyContent="center"
                       display="flex"
+                      flexShrink={0}
                     >
-                      {currentStringList.length}
-                    </Tag>
+                      <Tag.Label>{currentStringList.length}</Tag.Label>
+                    </Tag.Root>
                   )}
                   <Tooltip
-                    label={`Clear ${filter.name.toLowerCase()} filter`}
-                    gutter={0}
+                    content={`Clear ${filter.name.toLowerCase()} filter`}
                   >
                     <Button
                       as={Box}
                       role="button"
-                      variant="unstyled"
+                      variant="ghost"
                       width="fit-content"
                       display="flex"
                       onClick={(e) => {
@@ -177,7 +160,7 @@ function FieldsFilter({
                         setFilter(filterId, []);
                       }}
                     >
-                      <X width={12} />
+                      <X />
                     </Button>
                   </Tooltip>
                 </>
@@ -187,56 +170,46 @@ function FieldsFilter({
                   <Spacer />
                 </>
               )}
-              <ChevronDown width={12} style={{ minWidth: "12px" }} />
+              <ChevronDown />
             </HStack>
           </Button>
-        </PopoverTrigger>
-        <PopoverContent
-          marginTop="-8px"
-          width="100%"
-          motionProps={{
-            variants: {
-              enter: {},
-              exit: {},
-            },
-          }}
-        >
-          <FocusLock restoreFocus persistentFocus={false}>
-            <PopoverHeader paddingY={1} paddingX={1}>
-              <InputGroup>
-                <InputLeftElement>
-                  <Search width={16} color={gray400} />
-                </InputLeftElement>
-                <Input
-                  placeholder="Search..."
-                  border="none"
-                  ref={searchRef}
-                  _focusVisible={{ boxShadow: "none" }}
-                  onChange={(e) => {
-                    setQuery(e.target.value);
-                  }}
-                />
-              </InputGroup>
-            </PopoverHeader>
-            <PopoverBody paddingY={1} paddingX={4}>
-              {isOpen && (
-                <NestedListSelection
-                  query={query}
-                  current={current}
-                  keysAhead={[
-                    ...(filter.requiresKey ? [filter.requiresKey.filter] : []),
-                    ...(filter.requiresSubkey
-                      ? [filter.requiresSubkey.filter]
-                      : []),
-                    filterId,
-                  ]}
-                />
-              )}
-            </PopoverBody>
-          </FocusLock>
-        </PopoverContent>
-      </Popover>
-    </FormControl>
+        </Popover.Trigger>
+        <Popover.Content>
+          <Popover.Header paddingY={1} paddingX={1}>
+            <InputGroup
+              width="full"
+              startElement={<Search width={16} color={gray400} />}
+            >
+              <Input
+                width="full"
+                placeholder="Search..."
+                border="none"
+                ref={searchRef}
+                _focusVisible={{ boxShadow: "none" }}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                }}
+              />
+            </InputGroup>
+          </Popover.Header>
+          <Popover.Body paddingY={1} paddingX={4}>
+            {open && (
+              <NestedListSelection
+                query={query}
+                current={current}
+                keysAhead={[
+                  ...(filter.requiresKey ? [filter.requiresKey.filter] : []),
+                  ...(filter.requiresSubkey
+                    ? [filter.requiresSubkey.filter]
+                    : []),
+                  filterId,
+                ]}
+              />
+            )}
+          </Popover.Body>
+        </Popover.Content>
+      </Popover.Root>
+    </Field.Root>
   );
 }
 
@@ -397,7 +370,7 @@ function ListSelection({
     <VStack
       width="full"
       align="start"
-      spacing={2}
+      gap={2}
       paddingY={2}
       maxHeight="300px"
       overflowY="scroll"
@@ -419,28 +392,31 @@ function ListSelection({
             details = labelDetailsMatch[1] ?? "";
           }
 
+          const onChange_ = (e: any) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (currentValues.includes(field.toString())) {
+              onChange(
+                currentValues.filter((v) => v.toString() !== field.toString())
+              );
+            } else {
+              onChange([...currentValues, field]);
+            }
+          };
+
           return (
             <React.Fragment key={field}>
               <HStack width="full">
                 <Checkbox
                   width="full"
                   paddingY={1}
-                  spacing={3}
-                  isChecked={currentValues.includes(field.toString())}
-                  onChange={(e) => {
-                    e.stopPropagation();
-                    if (currentValues.includes(field.toString())) {
-                      onChange(
-                        currentValues.filter(
-                          (v) => v.toString() !== field.toString()
-                        )
-                      );
-                    } else {
-                      onChange([...currentValues, field]);
-                    }
-                  }}
+                  gap={3}
+                  checked={currentValues.includes(field.toString())}
+                  onClick={onChange_}
+                  onChange={onChange_}
                 >
-                  <VStack width="full" align="start" spacing={"2px"}>
+                  <VStack width="full" align="start" gap={"2px"}>
                     {details && (
                       <Text fontSize="sm" color="gray.500">
                         {details}
@@ -451,7 +427,7 @@ function ListSelection({
                 </Checkbox>
                 <Spacer />
                 {typeof count !== "undefined" && (
-                  <Text fontSize={13} color="gray.400">
+                  <Text fontSize="13px" color="gray.400">
                     {count}
                   </Text>
                 )}
@@ -467,7 +443,13 @@ function ListSelection({
       )}
       {filterData.isLoading &&
         Array.from({ length: keys && keys.length > 0 ? 2 : 5 }).map((_, i) => (
-          <Checkbox key={i} isChecked={false} paddingY={2} spacing={3}>
+          <Checkbox
+            key={i}
+            checked={false}
+            paddingY={2}
+            gap={3}
+            onChange={() => void 0}
+          >
             <Skeleton height="12px" width="120px" />
           </Checkbox>
         ))}
@@ -515,7 +497,7 @@ function RangeFilter({
   }, [min, max, !!filterData.data]);
 
   return (
-    <HStack width="full" spacing={4}>
+    <HStack width="full" gap={4}>
       <Input
         width="72px"
         paddingX={2}
@@ -525,10 +507,8 @@ function RangeFilter({
           onChange([e.target.value, currentValues[1] ?? max.toString()]);
         }}
       />
-      <RangeSlider
-        colorScheme="orange"
-        // eslint-disable-next-line jsx-a11y/aria-proptypes
-        aria-label={["min", "max"]}
+      <Slider.Root
+        width="full"
         min={min}
         max={max}
         step={0.1}
@@ -537,16 +517,23 @@ function RangeFilter({
             ? currentValues?.map((v) => +v)
             : [min, max]
         }
-        onChange={(values) => {
-          onChange(values.map((v) => v.toString()));
+        onValueChange={(values) => {
+          onChange(values.value.map((v) => v.toString()));
         }}
+        colorPalette="orange"
       >
-        <RangeSliderTrack>
-          <RangeSliderFilledTrack />
-        </RangeSliderTrack>
-        <RangeSliderThumb index={0} />
-        <RangeSliderThumb index={1} />
-      </RangeSlider>
+        <Slider.Control>
+          <Slider.Track>
+            <Slider.Range />
+          </Slider.Track>
+          <Slider.Thumb index={0} cursor="grab">
+            <Slider.HiddenInput />
+          </Slider.Thumb>
+          <Slider.Thumb index={1} cursor="grab">
+            <Slider.HiddenInput />
+          </Slider.Thumb>
+        </Slider.Control>
+      </Slider.Root>
       <Input
         width="72px"
         paddingX={2}
@@ -574,7 +561,7 @@ function ThumbsUpDownVoteFilter({
     <VStack
       width="full"
       align="start"
-      spacing={2}
+      gap={2}
       paddingY={2}
       maxHeight="300px"
       overflowY="scroll"
@@ -588,8 +575,8 @@ function ThumbsUpDownVoteFilter({
           key={field}
           width="full"
           paddingY={1}
-          spacing={3}
-          isChecked={!!(min && max && min <= field && max >= field)}
+          gap={3}
+          checked={!!(min && max && min <= field && max >= field)}
           onChange={(e) => {
             e.stopPropagation();
             if (e.target.checked) {
@@ -612,7 +599,7 @@ function ThumbsUpDownVoteFilter({
             }
           }}
         >
-          <VStack width="full" align="start" spacing={"2px"}>
+          <VStack width="full" align="start" gap={"2px"}>
             <Text>{label}</Text>
           </VStack>
         </Checkbox>

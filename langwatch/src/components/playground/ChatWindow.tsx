@@ -1,12 +1,9 @@
-import { DragHandleIcon } from "@chakra-ui/icons";
 import {
   Box,
   Button,
-  Checkbox,
   HStack,
+  Icon,
   Input,
-  InputGroup,
-  InputRightElement,
   Spacer,
   Text,
   Textarea,
@@ -17,6 +14,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { type Message } from "ai/react";
 import React, { useEffect, useRef } from "react";
 import { ChevronDown, MinusCircle, PlusCircle, Send } from "react-feather";
+import { LuGripVertical } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 import {
   useChatWithSubscription,
@@ -24,6 +22,8 @@ import {
 } from "../../hooks/useChatWithSubscription";
 import { usePlaygroundStore } from "../../hooks/usePlaygroundStore";
 import { allModelOptions, ModelSelector } from "../ModelSelector";
+import { Checkbox } from "../ui/checkbox";
+import { InputGroup } from "../ui/input-group";
 import { Messages } from "./Messages";
 
 export const ChatWindowWrapper = React.memo(function ChatWindowWrapper({
@@ -145,7 +145,7 @@ const ChatWindow = React.memo(function ChatWindow({
       marginLeft="-1px"
       marginTop="-1px"
       background="white"
-      spacing={0}
+      gap={0}
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
@@ -159,14 +159,16 @@ const ChatWindow = React.memo(function ChatWindow({
         outlineColor="gray.200"
         padding={2}
       >
-        <DragHandleIcon
-          width="14px"
-          height="14px"
-          color="gray.350"
+        <Icon
           {...attributes}
           {...listeners}
           cursor="move"
-        />
+          width="14px"
+          height="14px"
+          color="gray.350"
+        >
+          <LuGripVertical />
+        </Icon>
         <ModelSelector
           options={allModelOptions}
           model={chatWindowState.model}
@@ -175,14 +177,14 @@ const ChatWindow = React.memo(function ChatWindow({
           mode="chat"
         />
         <Spacer />
-        <HStack spacing={0}>
+        <HStack gap={0}>
           <Button
             size="xs"
             color="gray.500"
             variant="ghost"
             padding="6px"
             onClick={() => removeChatWindow(windowId)}
-            isDisabled={windowsCount === 1}
+            disabled={windowsCount === 1}
           >
             <MinusCircle width="18px" height="18px" />
           </Button>
@@ -192,13 +194,13 @@ const ChatWindow = React.memo(function ChatWindow({
             variant="ghost"
             padding="6px"
             onClick={() => addChatWindow(windowId)}
-            isDisabled={windowsCount >= 10}
+            disabled={windowsCount >= 10}
           >
             <PlusCircle width="18px" height="18px" />
           </Button>
         </HStack>
       </HStack>
-      <VStack width="full" height="full" minHeight={0} spacing={0}>
+      <VStack width="full" height="full" minHeight={0} gap={0}>
         <ChatSystemPrompt tabIndex={tabIndex} windowId={windowId} />
         <Messages
           tabIndex={tabIndex}
@@ -264,7 +266,7 @@ function ChatSystemPrompt({
         {systemPromptExpanded && (
           <Checkbox
             size="sm"
-            isChecked={syncSystemPrompts}
+            checked={syncSystemPrompts}
             onChange={(e) => {
               e.stopPropagation();
               toggleSyncSystemPrompts(systemPrompt);
@@ -314,14 +316,12 @@ function ChatInputBox({
   const undoHistory = usePlaygroundStore.temporal.getState();
 
   const { syncInputs, toggleSyncInputs, onChangeInput, onSubmit } =
-    usePlaygroundStore((state) => {
-      return {
-        syncInputs: state.syncInputs,
-        toggleSyncInputs: state.toggleSyncInputs,
-        onChangeInput: state.onChangeInput,
-        onSubmit: state.onSubmit,
-      };
-    });
+    usePlaygroundStore((state) => ({
+      syncInputs: state.syncInputs,
+      toggleSyncInputs: state.toggleSyncInputs,
+      onChangeInput: state.onChangeInput,
+      onSubmit: state.onSubmit,
+    }));
 
   return (
     <Box
@@ -337,32 +337,13 @@ function ChatInputBox({
           onSubmit(windowId, true);
         }}
       >
-        <InputGroup>
-          <Input
-            autoFocus={windowIndex === 0}
-            value={chatWindowState.input}
-            onChange={(e) => {
-              undoHistory.pause();
-              onChangeInput(windowId, e.target.value);
-              undoHistory.resume();
-            }}
-            placeholder="Say something..."
-            background="white"
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            ref={inputRef}
-            fontSize="14px"
-          />
-          <InputRightElement
-            width="100px"
-            justifyContent="end"
-            paddingRight={2}
-          >
-            <HStack spacing={2}>
+        <InputGroup
+          endElement={
+            <HStack gap={2}>
               {isFocused && (
                 <Checkbox
                   size="sm"
-                  isChecked={syncInputs}
+                  checked={syncInputs}
                   onChange={(e) => {
                     inputRef.current?.focus();
                     e.stopPropagation();
@@ -385,7 +366,23 @@ function ChatInputBox({
                 <Send width="16px" height="16px" />
               </Button>
             </HStack>
-          </InputRightElement>
+          }
+        >
+          <Input
+            autoFocus={windowIndex === 0}
+            value={chatWindowState.input}
+            onChange={(e) => {
+              undoHistory.pause();
+              onChangeInput(windowId, e.target.value);
+              undoHistory.resume();
+            }}
+            placeholder="Say something..."
+            background="white"
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            ref={inputRef}
+            fontSize="14px"
+          />
         </InputGroup>
       </form>
     </Box>

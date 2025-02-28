@@ -1,10 +1,11 @@
-export const ChecklistIcon = () => (
+export const ChecklistIcon = ({ style }: { style?: React.CSSProperties }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    width="23"
-    height="22"
+    width="23px"
+    height="22px"
     fill="none"
     viewBox="0 0 23 22"
+    style={style}
   >
     <path
       stroke="#000"

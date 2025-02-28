@@ -1,21 +1,12 @@
 import {
   Button,
   Card,
-  CardBody,
   HStack,
   Heading,
-  Link,
-  LinkBox,
-  LinkOverlay,
   Table,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
   VStack,
+  Box,
 } from "@chakra-ui/react";
 import NextLink from "next/link";
 import React from "react";
@@ -30,6 +21,8 @@ import type {
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
+import { Link } from "../../components/ui/link";
+import { Tooltip } from "../../components/ui/tooltip";
 
 export default function Projects() {
   const { organization } = useOrganizationTeamProject();
@@ -61,7 +54,7 @@ function ProjectsList({
       <VStack
         paddingX={4}
         paddingY={6}
-        spacing={6}
+        gap={6}
         width="full"
         maxWidth="920px"
         align="start"
@@ -71,15 +64,15 @@ function ProjectsList({
             Projects
           </Heading>
         </HStack>
-        <Card width="full">
-          <CardBody width="full" paddingY={0} paddingX={0}>
-            <Table variant="simple" width="full">
+        <Card.Root width="full">
+          <Card.Body width="full" paddingY={0} paddingX={0}>
+            <Table.Root variant="line" width="full">
               {organization.teams.map((team) => (
                 <React.Fragment key={team.id}>
-                  <Thead key={team.id}>
-                    <Tr>
-                      <Th>{team.name}</Th>
-                      <Td textAlign="right">
+                  <Table.Header key={team.id}>
+                    <Table.Row>
+                      <Table.ColumnHeader>{team.name}</Table.ColumnHeader>
+                      <Table.Cell textAlign="right">
                         {hasTeamPermission(
                           TeamRoleGroup.TEAM_CREATE_NEW_PROJECTS,
                           team
@@ -88,19 +81,22 @@ function ProjectsList({
                           usage.data.projectsCount <
                             usage.data.activePlan.maxProjects ||
                           usage.data.activePlan.overrideAddingLimitations ? (
-                            <Button
-                              as={NextLink}
+                            <Link
                               href={`/onboarding/${team.slug}/project`}
-                              size="sm"
-                              colorScheme="orange"
+                              asChild
                             >
-                              <HStack spacing={2}>
-                                <Plus size={20} />
-                                <Text>Add new project</Text>
-                              </HStack>
-                            </Button>
+                              <Button size="sm" colorPalette="orange">
+                                <HStack gap={2}>
+                                  <Plus size={20} />
+                                  <Text>Add new project</Text>
+                                </HStack>
+                              </Button>
+                            </Link>
                           ) : (
-                            <Tooltip label="You reached the limit of max new projects, click to upgrade your plan to add more projects">
+                            <Tooltip
+                              content="You reached the limit of max new projects, click to upgrade your plan to add more projects"
+                              positioning={{ placement: "top" }}
+                            >
                               <Link
                                 href={`/settings/subscription`}
                                 _hover={{
@@ -118,7 +114,7 @@ function ProjectsList({
                                   _hover={{ background: "gray.50" }}
                                   color="gray.400"
                                 >
-                                  <HStack spacing={2}>
+                                  <HStack gap={2}>
                                     <Plus size={20} />
                                     <Text>Add new project</Text>
                                   </HStack>
@@ -126,15 +122,15 @@ function ProjectsList({
                               </Link>
                             </Tooltip>
                           ))}
-                      </Td>
-                    </Tr>
-                  </Thead>
+                      </Table.Cell>
+                    </Table.Row>
+                  </Table.Header>
                   <TeamProjectsList team={team} />
                 </React.Fragment>
               ))}
-            </Table>
-          </CardBody>
-        </Card>
+            </Table.Root>
+          </Card.Body>
+        </Card.Root>
       </VStack>
     </SettingsLayout>
   );
@@ -142,28 +138,26 @@ function ProjectsList({
 
 export function TeamProjectsList({ team }: { team: TeamWithProjects }) {
   return (
-    <Tbody>
+    <Table.Body>
       {team.projects.map((project) => (
-        <Tr key={project.id}>
-          <Td colSpan={2}>
-            <LinkBox>
+        <Table.Row key={project.id}>
+          <Table.Cell colSpan={2}>
+            <Box as="div" cursor="pointer">
               <HStack width="full" gap={2} data-project-id={project.id}>
                 <ProjectTechStackIcon project={project} />
-                <LinkOverlay as={NextLink} href={`/${project.slug}/messages`}>
-                  {project.name}
-                </LinkOverlay>
+                <Link href={`/${project.slug}/messages`}>{project.name}</Link>
               </HStack>
-            </LinkBox>
-          </Td>
-        </Tr>
+            </Box>
+          </Table.Cell>
+        </Table.Row>
       ))}
       {team.projects.length === 0 && (
-        <Tr>
-          <Td>
+        <Table.Row>
+          <Table.Cell>
             <Text>No projects on this team</Text>
-          </Td>
-        </Tr>
+          </Table.Cell>
+        </Table.Row>
       )}
-    </Tbody>
+    </Table.Body>
   );
 }

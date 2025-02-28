@@ -129,7 +129,7 @@ export const ModelSelector = React.memo(function ModelSelector({
       components={{
         Option: ({ children, ...props }) => (
           <chakraComponents.Option {...props}>
-            <HStack spacing={2} align="center">
+            <HStack gap={2} align="center">
               <Box width="14px" minWidth="14px">
                 {props.data.icon}
               </Box>
@@ -165,7 +165,7 @@ export const ModelSelector = React.memo(function ModelSelector({
             <chakraComponents.ValueContainer {...props}>
               <HStack
                 overflow="hidden"
-                spacing={2}
+                gap={2}
                 align="center"
                 opacity={isDisabled ? 0.5 : 1}
               >

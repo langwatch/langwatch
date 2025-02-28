@@ -1,30 +1,30 @@
-import { Link } from "@chakra-ui/next-js";
 import {
+  Badge,
   Box,
   HStack,
   Heading,
   Spacer,
   Text,
-  Tooltip,
   VStack,
-  Tag,
 } from "@chakra-ui/react";
+import type { Project } from "@prisma/client";
 import numeral from "numeral";
 import { Clock, Settings } from "react-feather";
-import { TraceToPlaygroundLink } from "../TraceToPlaygroundLink";
-import { RenderInputOutput } from "./RenderInputOutput";
 import type {
   ElasticSearchSpan,
   ErrorCapture,
   EvaluationResult,
 } from "../../server/tracer/types";
-import type { Project } from "@prisma/client";
-import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { durationColor } from "../../utils/durationColor";
+import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import {
-  evaluationStatusColor,
   evaluationPassed,
+  evaluationStatusColor,
 } from "../checks/EvaluationStatus";
+import { Link } from "../ui/link";
+import { Tooltip } from "../ui/tooltip";
+import { RenderInputOutput } from "./RenderInputOutput";
+import { OverflownTextWithTooltip } from "../OverflownText";
 
 export function SpanDetails({
   project,
@@ -34,7 +34,7 @@ export function SpanDetails({
   span: ElasticSearchSpan;
 }) {
   const estimatedCost = (
-    <Tooltip label="When `metrics.completion_tokens` and `metrics.prompt_tokens` are not available, they are estimated based on input, output and the model for calculating costs.">
+    <Tooltip content="When `metrics.completion_tokens` and `metrics.prompt_tokens` are not available, they are estimated based on input, output and the model for calculating costs.">
       <Text as="span" color="gray.400" borderBottom="1px dotted">
         {" (estimated)"}
       </Text>
@@ -42,24 +42,15 @@ export function SpanDetails({
   );
 
   return (
-    <VStack flexGrow={1} spacing={3} align="start">
+    <VStack flexGrow={1} gap={3} align="start">
       <HStack width="full">
         <SpanTypeTag span={span} />
-        <Heading as="h2" fontSize={22}>
-          {span.name ?? span.model}
+        <Heading as="h2" fontSize="22px" asChild>
+          <OverflownTextWithTooltip lineClamp={1} wordBreak="break-word">
+            {span.name ?? span.model}
+          </OverflownTextWithTooltip>
         </Heading>
         <Spacer />
-        {project &&
-          span.type === "llm" &&
-          span.input?.type === "chat_messages" && (
-            <TraceToPlaygroundLink
-              projectSlug={project.slug}
-              traceId={span.trace_id}
-              spanId={span.span_id}
-              tooltipLabel="Try different prompts and models for this LLM call on the playground"
-              buttonLabel="Try in Playground"
-            />
-          )}
       </HStack>
       <VStack align="start" color="gray.500">
         <HStack>
@@ -121,7 +112,7 @@ export function SpanDetails({
               <b>Cost:</b> {numeral(span.metrics.cost).format("$0.00000a")}
               {span.metrics?.tokens_estimated && estimatedCost}
             </Text>
-            <Tooltip label="Edit model costs">
+            <Tooltip content="Edit model costs">
               <Link target="_blank" href={`/settings/model-costs`}>
                 <Settings size={14} />
               </Link>
@@ -130,9 +121,9 @@ export function SpanDetails({
         )}
       </VStack>
       {span.params && (
-        <VStack alignItems="flex-start" spacing={2} paddingTop={4} width="full">
+        <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
-            fontSize={13}
+            fontSize="13px"
             color="gray.400"
             textTransform="uppercase"
             fontWeight="bold"
@@ -164,9 +155,9 @@ export function SpanDetails({
         </VStack>
       )}
       {span.input && (
-        <VStack alignItems="flex-start" spacing={2} paddingTop={4} width="full">
+        <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
-            fontSize={13}
+            fontSize="13px"
             color="gray.400"
             textTransform="uppercase"
             fontWeight="bold"
@@ -187,9 +178,9 @@ export function SpanDetails({
         </VStack>
       )}
       {span.contexts && (
-        <VStack alignItems="flex-start" spacing={2} paddingTop={4} width="full">
+        <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
-            fontSize={13}
+            fontSize="13px"
             color="gray.400"
             textTransform="uppercase"
             fontWeight="bold"
@@ -227,9 +218,9 @@ export function SpanDetails({
         </VStack>
       )}
       {span.error ? (
-        <VStack alignItems="flex-start" spacing={2} paddingTop={4} width="full">
+        <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
-            fontSize={13}
+            fontSize="13px"
             color="red.400"
             textTransform="uppercase"
             fontWeight="bold"
@@ -252,14 +243,9 @@ export function SpanDetails({
       ) : (
         span.output !== undefined &&
         span.output !== null && (
-          <VStack
-            alignItems="flex-start"
-            spacing={2}
-            paddingTop={4}
-            width="full"
-          >
+          <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
             <Box
-              fontSize={13}
+              fontSize="13px"
               color="gray.400"
               textTransform="uppercase"
               fontWeight="bold"
@@ -306,8 +292,8 @@ export const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
     evaluationResult && evaluationPassed(evaluationResult);
 
   return (
-    <Tag
-      colorScheme={
+    <Badge
+      colorPalette={
         span.error
           ? "red"
           : {
@@ -338,10 +324,10 @@ export const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
             }[span.type]
       }
       backgroundColor={evaluationPassed_ === true ? "#ccf6c6" : undefined}
-      fontSize={13}
+      fontSize="12px"
     >
       {span.type.toUpperCase()}
-    </Tag>
+    </Badge>
   );
 };
 
@@ -367,7 +353,7 @@ export const SpanDuration = ({
 
   return (
     <Tooltip
-      label={
+      content={
         <>
           Started at: {new Date(startedAt).toLocaleString()}
           <br />
@@ -377,7 +363,7 @@ export const SpanDuration = ({
       }
     >
       <HStack
-        spacing={"6px"}
+        gap={"6px"}
         color={span.error ? "red" : durationColor("span", duration)}
       >
         <Clock width={12} />

@@ -16,7 +16,7 @@ export function DatasetPreview({
   rows: DatasetRecordEntry[];
   columns: DatasetColumns;
   onClick?: () => void;
-} & ComponentProps<typeof Box>) {
+} & Omit<ComponentProps<typeof Box>, "columns" | "rows">) {
   const columnDefs = useMemo(() => {
     const headers: DatasetColumnDef[] = columns.map((column) => ({
       headerName: column.name,
@@ -78,8 +78,8 @@ export function DatasetPreview({
           }}
         >
           <HStack
-            spacing={2}
-            fontSize={18}
+            gap={2}
+            fontSize="18px"
             fontWeight="bold"
             color="white"
             background="rgba(0, 0, 0, .5)"

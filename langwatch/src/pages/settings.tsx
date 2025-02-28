@@ -1,16 +1,14 @@
 import {
+  Button,
   Card,
-  CardBody,
-  FormErrorMessage,
-  HStack,
+  Field,
   Heading,
   Input,
-  Link,
+  Separator,
   Spacer,
   Spinner,
   Text,
-  VStack,
-  useToast,
+  createListCollection,
 } from "@chakra-ui/react";
 import { PIIRedactionLevel, type Project } from "@prisma/client";
 import isEqual from "lodash.isequal";
@@ -32,9 +30,11 @@ import {
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { OrganizationRoleGroup, TeamRoleGroup } from "../server/api/permission";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { api } from "../utils/api";
 import { usePublicEnv } from "../hooks/usePublicEnv";
+import { HStack, VStack } from "@chakra-ui/react";
+import { toaster } from "../components/ui/toaster";
+import { Select } from "../components/ui/select";
 
 type OrganizationFormData = {
   name: string;
@@ -66,7 +66,6 @@ function SettingsForm({
   const formWatch = useWatch({ control });
   const updateOrganization = api.organization.update.useMutation();
   const apiContext = api.useContext();
-  const toast = useToast();
 
   const onSubmit: SubmitHandler<OrganizationFormData> = useDebouncedCallback(
     (data: OrganizationFormData) => {
@@ -84,13 +83,14 @@ function SettingsForm({
             void apiContext.organization.getAll.refetch();
           },
           onError: () => {
-            toast({
+            toaster.create({
               title: "Failed to create organization",
               description: "Please try that again",
-              status: "error",
-              duration: 5000,
-              isClosable: true,
-              position: "top-right",
+              type: "error",
+              meta: {
+                closable: true,
+              },
+              placement: "top-end",
             });
           },
         }
@@ -108,7 +108,7 @@ function SettingsForm({
       <VStack
         paddingX={4}
         paddingY={6}
-        spacing={6}
+        gap={6}
         width="full"
         maxWidth="920px"
         align="start"
@@ -120,14 +120,14 @@ function SettingsForm({
           <Spacer />
           {updateOrganization.isLoading && <Spinner />}
         </HStack>
-        <Card width="full">
-          <CardBody width="full" paddingY={2}>
+        <Card.Root width="full">
+          <Card.Body width="full" paddingY={2}>
             <form onSubmit={void handleSubmit(onSubmit)}>
-              <VStack spacing={0}>
+              <VStack gap={0}>
                 <HorizontalFormControl
                   label="Name"
                   helper="The name of your organization"
-                  isInvalid={!!getFieldState("name").error}
+                  invalid={!!getFieldState("name").error}
                 >
                   {hasOrganizationPermission(
                     OrganizationRoleGroup.ORGANIZATION_MANAGE
@@ -143,7 +143,7 @@ function SettingsForm({
                           },
                         })}
                       />
-                      <FormErrorMessage>Name is required</FormErrorMessage>
+                      <Field.ErrorText>Name is required</Field.ErrorText>
                     </>
                   ) : (
                     <Text>{organization.name}</Text>
@@ -168,8 +168,8 @@ function SettingsForm({
                 </HorizontalFormControl>
               </VStack>
             </form>
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
         {hasTeamPermission(TeamRoleGroup.SETUP_PROJECT) && (
           <ProjectSettingsForm project={project} />
         )}
@@ -183,51 +183,49 @@ type ProjectFormData = {
   language: string;
   framework: string;
   userLinkTemplate?: string;
-  piiRedactionLevel: {
-    label: string;
-    value: PIIRedactionLevel;
-    description?: string;
-  };
+  piiRedactionLevel: PIIRedactionLevel;
 };
 
 function ProjectSettingsForm({ project }: { project: Project }) {
   const { organization, organizations } = useOrganizationTeamProject();
   const publicEnv = usePublicEnv();
 
-  const piiRedactionLevelOptions: ProjectFormData["piiRedactionLevel"][] = [
-    {
-      label: "Strict",
-      value: PIIRedactionLevel.STRICT,
-      description: "Redacts all PII data including names and addresses",
-    },
-    {
-      label: "Essential",
-      value: PIIRedactionLevel.ESSENTIAL,
-      description:
-        "Redacts only essential PII data like email addresses, phone numbers, credit card numbers and IP addresses",
-    },
-    ...(!!organization?.signedDPA ||
-    !publicEnv.data?.IS_SAAS ||
-    publicEnv.data?.NODE_ENV === "development"
-      ? [
-          {
-            label: "Disabled",
-            value: PIIRedactionLevel.DISABLED,
-            description: "PII data will not be redacted",
-          },
-        ]
-      : []),
-  ];
+  const piiRedactionLevelCollection = createListCollection({
+    items: [
+      {
+        label: "Strict",
+        value: PIIRedactionLevel.STRICT,
+        description: "Redacts all PII data including names and addresses",
+      },
+      {
+        label: "Essential",
+        value: PIIRedactionLevel.ESSENTIAL,
+        description:
+          "Redacts only essential PII data like email addresses, phone numbers, credit card numbers and IP addresses",
+      },
+      ...(!!organization?.signedDPA ||
+      !publicEnv.data?.IS_SAAS ||
+      publicEnv.data?.NODE_ENV === "development"
+        ? [
+            {
+              label: "Disabled",
+              value: PIIRedactionLevel.DISABLED,
+              description: "PII data will not be redacted",
+            },
+          ]
+        : []),
+    ],
+  });
 
-  const [defaultValues, setDefaultValues] = useState<ProjectFormData>({
+  const defaultValues = {
     name: project.name,
     language: project.language,
     framework: project.framework,
     userLinkTemplate: project.userLinkTemplate ?? "",
-    piiRedactionLevel: piiRedactionLevelOptions.find(
-      (x) => x.value === project.piiRedactionLevel
-    )!,
-  });
+    piiRedactionLevel: project.piiRedactionLevel,
+  };
+  const [previousValues, setPreviousValues] =
+    useState<ProjectFormData>(defaultValues);
   const form = useForm({
     defaultValues,
   });
@@ -235,20 +233,18 @@ function ProjectSettingsForm({ project }: { project: Project }) {
   const formWatch = useWatch({ control });
   const updateProject = api.project.update.useMutation();
   const apiContext = api.useContext();
-  const toast = useToast();
   const [changeLanguageFramework, setChangeLanguageFramework] = useState(false);
 
   const onSubmit: SubmitHandler<ProjectFormData> = useDebouncedCallback(
     (data: ProjectFormData) => {
-      if (isEqual(data, defaultValues)) return;
+      if (isEqual(data, previousValues)) return;
 
-      setDefaultValues(data);
+      setPreviousValues(data);
 
       updateProject.mutate(
         {
           projectId: project.id,
           ...data,
-          piiRedactionLevel: data.piiRedactionLevel.value,
           userLinkTemplate: data.userLinkTemplate ?? "",
         },
         {
@@ -256,13 +252,14 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             void apiContext.organization.getAll.refetch();
           },
           onError: () => {
-            toast({
+            toaster.create({
               title: "Failed to create organization",
               description: "Please try that again",
-              status: "error",
-              duration: 5000,
-              isClosable: true,
-              position: "top-right",
+              type: "error",
+              meta: {
+                closable: true,
+              },
+              placement: "top-end",
             });
           },
         }
@@ -287,13 +284,13 @@ function ProjectSettingsForm({ project }: { project: Project }) {
           <ProjectSelector organizations={organizations} project={project} />
         )}
       </HStack>
-      <Card width="full">
-        <CardBody width="full" paddingY={2}>
+      <Card.Root width="full">
+        <Card.Body width="full" paddingY={2}>
           <form onSubmit={void handleSubmit(onSubmit)}>
             <HorizontalFormControl
               label="Name"
               helper="The name of the project"
-              isInvalid={!!formState.errors.name}
+              invalid={!!formState.errors.name}
             >
               <Input
                 width="full"
@@ -305,12 +302,12 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   },
                 })}
               />
-              <FormErrorMessage>Name is required</FormErrorMessage>
+              <Field.ErrorText>Name is required</Field.ErrorText>
             </HorizontalFormControl>
             <HorizontalFormControl
               label="Tech Stack"
               helper="The project language and framework"
-              isInvalid={
+              invalid={
                 !!formState.errors.language || !!formState.errors.framework
               }
             >
@@ -322,75 +319,57 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   <Text>
                     {project.language} / {project.framework}
                   </Text>
-                  <Link
+                  <Button
+                    variant="ghost"
                     textDecoration="underline"
                     onClick={() => setChangeLanguageFramework(true)}
                   >
                     (change)
-                  </Link>
+                  </Button>
                 </HStack>
               )}
             </HorizontalFormControl>
             <HorizontalFormControl
               label="PII Redaction Level"
               helper="The level of redaction for PII"
-              isInvalid={!!formState.errors.piiRedactionLevel}
+              invalid={!!formState.errors.piiRedactionLevel}
             >
               <Controller
                 control={control}
                 name="piiRedactionLevel"
                 rules={{ required: "PII Redaction Level is required" }}
                 render={({ field }) => (
-                  <MultiSelect
+                  <Select.Root
+                    collection={piiRedactionLevelCollection}
                     {...field}
-                    options={piiRedactionLevelOptions}
-                    hideSelectedOptions={false}
-                    isSearchable={false}
-                    useBasicStyles
-                    components={{
-                      Menu: ({ children, ...props }) => (
-                        <chakraComponents.Menu
-                          {...props}
-                          innerProps={{
-                            ...props.innerProps,
-                            style: { width: "300px" },
-                          }}
-                        >
-                          {children}
-                        </chakraComponents.Menu>
-                      ),
-                      Option: ({ children, ...props }) => (
-                        <chakraComponents.Option {...props}>
-                          <VStack align="start">
-                            <Text>{children}</Text>
-                            <Text
-                              color={props.isSelected ? "white" : "gray.500"}
-                              fontSize={13}
-                            >
-                              {props.data.description}
+                    onChange={undefined}
+                    value={[field.value]}
+                    onValueChange={(e) => {
+                      field.onChange(e.value[0]);
+                    }}
+                  >
+                    <Select.Trigger width="full">
+                      <Select.ValueText placeholder="Select PII redaction level" />
+                    </Select.Trigger>
+                    <Select.Content width="300px">
+                      {piiRedactionLevelCollection.items.map((option) => (
+                        <Select.Item key={option.value} item={option}>
+                          <VStack align="start" gap={0}>
+                            <Text>{option.label}</Text>
+                            <Text fontSize="13px" color="gray.500">
+                              {option.description}
                             </Text>
                           </VStack>
-                        </chakraComponents.Option>
-                      ),
-                    }}
-                  />
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select.Root>
                 )}
               />
             </HorizontalFormControl>
-            <HorizontalFormControl
-              label="External User Link"
-              helper="Linkify user_ids using a template URL"
-            >
-              <Input
-                width="full"
-                type="text"
-                placeholder="https://example.com/user/{{user_id}}"
-                {...register("userLinkTemplate")}
-              />
-            </HorizontalFormControl>
           </form>
-        </CardBody>
-      </Card>
+        </Card.Body>
+      </Card.Root>
     </>
   );
 }

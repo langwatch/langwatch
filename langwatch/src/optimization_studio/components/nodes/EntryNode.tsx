@@ -1,5 +1,4 @@
 import { Box, Text, useDisclosure } from "@chakra-ui/react";
-
 import { type Node, type NodeProps } from "@xyflow/react";
 import { forwardRef, useEffect, useState, type Ref } from "react";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
@@ -13,7 +12,7 @@ export const EntryNode = forwardRef(function EntryNode(
   ref: Ref<HTMLDivElement>
 ) {
   const [rendered, setRendered] = useState(false);
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { open, onOpen, onClose } = useDisclosure();
 
   useEffect(() => {
     setRendered(true);
@@ -52,7 +51,7 @@ export const EntryNode = forwardRef(function EntryNode(
         )}
       </Box>
       <DatasetModal
-        isOpen={isOpen}
+        open={open}
         editingDataset={(props.data as Entry).dataset}
         onClose={onClose}
         node={props}

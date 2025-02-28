@@ -1,16 +1,13 @@
 import {
   Box,
   Button,
-  FormLabel,
+  Field,
   HStack,
   Input,
-  Select,
-  Switch,
-  Textarea,
+  NativeSelect,
   Text,
+  Textarea,
   VStack,
-  Tooltip,
-  FormControl,
 } from "@chakra-ui/react";
 import React from "react";
 import { Info, Plus, Trash2, X } from "react-feather";
@@ -21,18 +18,20 @@ import {
   type FieldErrors,
 } from "react-hook-form";
 import { z, type ZodType } from "zod";
+import { PropertySectionTitle } from "../../optimization_studio/components/properties/BasePropertiesPanel";
 import type {
   EvaluatorDefinition,
-  EvaluatorTypes,
   Evaluators,
+  EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { camelCaseToTitleCase, titleCase } from "../../utils/stringCasing";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { allModelOptions, ModelSelector } from "../ModelSelector";
 import { SmallLabel } from "../SmallLabel";
+import { Tooltip } from "../ui/tooltip";
+import { Switch } from "../ui/switch";
 import type { CheckConfigFormData } from "./CheckConfigForm";
-import { PropertySectionTitle } from "../../optimization_studio/components/properties/BasePropertiesPanel";
 
 const DynamicZodForm = ({
   schema,
@@ -86,32 +85,34 @@ const DynamicZodForm = ({
       );
     } else if (fieldSchema_ instanceof z.ZodBoolean) {
       return (
-        <HStack width="full" spacing={2}>
-          <Controller
-            name={fullPath}
-            control={control}
-            render={({ field: { onChange, onBlur, value, name, ref } }) => (
-              <Switch
-                id={fullPath}
-                isChecked={value}
-                onChange={onChange}
-                onBlur={onBlur}
-                name={name}
-                ref={ref}
-                size={variant === "studio" ? "sm" : "md"}
-                paddingLeft={variant === "studio" ? 2 : undefined}
-              />
-            )}
-          />
-          <FormLabel
-            htmlFor={fullPath}
-            marginBottom="0"
-            fontWeight={variant === "studio" ? 400 : undefined}
-            fontSize={variant === "studio" ? "13px" : undefined}
-          >
-            {camelCaseToTitleCase(fieldName.split(".").reverse()[0] ?? "")}
-          </FormLabel>
-        </HStack>
+        <Field.Root>
+          <HStack width="full" gap={2}>
+            <Controller
+              name={fullPath}
+              control={control}
+              render={({ field: { onChange, onBlur, value, name, ref } }) => (
+                <Switch
+                  id={fullPath}
+                  checked={value}
+                  onChange={onChange}
+                  onBlur={onBlur}
+                  name={name}
+                  ref={ref}
+                  size={variant === "studio" ? "sm" : "md"}
+                  paddingLeft={variant === "studio" ? 2 : undefined}
+                />
+              )}
+            />
+            <Field.Label
+              htmlFor={fullPath}
+              marginBottom="0"
+              fontWeight={variant === "studio" ? 400 : undefined}
+              fontSize={variant === "studio" ? "13px" : undefined}
+            >
+              {camelCaseToTitleCase(fieldName.split(".").reverse()[0] ?? "")}
+            </Field.Label>
+          </HStack>
+        </Field.Root>
       );
     } else if (
       fieldSchema_ instanceof z.ZodUnion ||
@@ -158,35 +159,37 @@ const DynamicZodForm = ({
           name={fullPath}
           control={control}
           render={({ field }) => (
-            <Select
-              {...field}
-              size={variant === "studio" ? "sm" : "md"}
-              onChange={(e) => {
-                const literalValues = options.map(
-                  (option: any) => option.value
-                );
+            <NativeSelect.Root size={variant === "studio" ? "sm" : "md"}>
+              <NativeSelect.Field
+                {...field}
+                onChange={(e) => {
+                  const literalValues = options.map(
+                    (option: any) => option.value
+                  );
 
-                if (e.target.value === "") {
-                  field.onChange(undefined);
-                } else if (
-                  !isNaN(+e.target.value) &&
-                  literalValues.includes(+e.target.value)
-                ) {
-                  field.onChange(+e.target.value);
-                } else {
-                  field.onChange(e.target.value);
-                }
-              }}
-            >
-              {fieldSchema instanceof z.ZodOptional && (
-                <option value=""></option>
-              )}
-              {options.map((option: { value: string }, index: number) => (
-                <option key={index} value={option.value}>
-                  {option.value}
-                </option>
-              ))}
-            </Select>
+                  if (e.target.value === "") {
+                    field.onChange(undefined);
+                  } else if (
+                    !isNaN(+e.target.value) &&
+                    literalValues.includes(+e.target.value)
+                  ) {
+                    field.onChange(+e.target.value);
+                  } else {
+                    field.onChange(e.target.value);
+                  }
+                }}
+              >
+                {fieldSchema instanceof z.ZodOptional && (
+                  <option value=""></option>
+                )}
+                {options.map((option: { value: string }, index: number) => (
+                  <option key={index} value={option.value}>
+                    {option.value}
+                  </option>
+                ))}
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
           )}
         />
       );
@@ -295,11 +298,15 @@ const DynamicZodForm = ({
       );
     } else if (fieldSchema_ instanceof z.ZodObject) {
       return (
-        <VStack width="full" spacing={2}>
+        <VStack width="full" gap={2}>
           {Object.keys(fieldSchema_.shape).map((key) => (
             <VStack key={key} align="start" width="full">
               {!(fieldSchema_.shape[key] instanceof z.ZodBoolean) && (
-                <SmallLabel>{fieldName.startsWith("rubrics.") ? `Level ${parseInt(fieldName.split(".")[1] ?? "0") + 1}` : titleCase(key)}</SmallLabel>
+                <SmallLabel>
+                  {fieldName.startsWith("rubrics.")
+                    ? `Level ${parseInt(fieldName.split(".")[1] ?? "0") + 1}`
+                    : titleCase(key)}
+                </SmallLabel>
               )}
               {renderField(
                 fieldSchema_.shape[key],
@@ -338,35 +345,32 @@ const DynamicZodForm = ({
 
           if (variant === "studio") {
             return (
-              <VStack
-                key={key}
-                as="form"
-                align="start"
-                spacing={3}
-                width="full"
-              >
+              <VStack key={key} as="form" align="start" gap={3} width="full">
                 <HStack width="full">
                   <PropertySectionTitle>
                     {camelCaseToTitleCase(key)}
                   </PropertySectionTitle>
                   {isOptional && (
-                    <Text color="gray.500" fontSize={12}>
+                    <Text color="gray.500" fontSize="12px">
                       (optional)
                     </Text>
                   )}
                   {helperText && (
-                    <Tooltip label={helperText}>
+                    <Tooltip
+                      content={helperText}
+                      positioning={{ placement: "top" }}
+                    >
                       <Info size={14} />
                     </Tooltip>
                   )}
                 </HStack>
-                <FormControl isInvalid={isInvalid}>
+                <Field.Root invalid={isInvalid}>
                   {renderField(
                     field,
                     basePath ? `${basePath}.${key}` : key,
                     evaluatorDefinition
                   )}
-                </FormControl>
+                </Field.Root>
               </VStack>
             );
           }
@@ -378,7 +382,7 @@ const DynamicZodForm = ({
                   camelCaseToTitleCase(key) + (isOptional ? " (Optional)" : "")
                 }
                 helper={helperText}
-                isInvalid={isInvalid}
+                invalid={isInvalid}
               >
                 {renderField(
                   field,

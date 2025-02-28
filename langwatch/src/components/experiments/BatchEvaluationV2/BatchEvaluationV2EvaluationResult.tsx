@@ -1,18 +1,5 @@
-import {
-  Box,
-  HStack,
-  Image,
-  Table,
-  TableContainer,
-  Tbody,
-  Td,
-  Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, HStack, Table, VStack } from "@chakra-ui/react";
+import { Tooltip } from "../../../components/ui/tooltip";
 import numeral from "numeral";
 import { useEffect, useRef } from "react";
 import { Info } from "react-feather";
@@ -72,7 +59,7 @@ const evaluationResultsTableRow = (
   return {
     datasetColumns: Array.from(datasetColumns).map((column) => ({
       render: () => (
-        <Td key={`dataset-${column}`} maxWidth="250px">
+        <Table.Cell key={`dataset-${column}`} maxWidth="250px">
           {datasetEntry && isImageUrl(datasetEntry.entry[column]) ? (
             <ExternalImage
               src={datasetEntry.entry[column]}
@@ -88,13 +75,13 @@ const evaluationResultsTableRow = (
           ) : (
             "-"
           )}
-        </Td>
+        </Table.Cell>
       ),
       value: () => stringify(datasetEntry?.entry[column]),
     })),
     predictedColumns: Array.from(predictedColumns).map((column) => ({
       render: () => (
-        <Td key={`predicted-${column}`} maxWidth="250px">
+        <Table.Cell key={`predicted-${column}`} maxWidth="250px">
           {datasetEntry ? (
             <HoverableBigText>
               {stringify(datasetEntry.predicted?.[column])}
@@ -102,20 +89,21 @@ const evaluationResultsTableRow = (
           ) : (
             "-"
           )}
-        </Td>
+        </Table.Cell>
       ),
       value: () => stringify(datasetEntry?.predicted?.[column]),
     })),
     cost: {
       render: () => (
-        <Td>
+        <Table.Cell>
           <Tooltip
-            label={
-              <VStack align="start" spacing={0}>
-                <Text>Prediction cost: {datasetEntry?.cost ?? "-"}</Text>
-                <Text>Evaluation cost: {evaluationsCost ?? "-"}</Text>
+            content={
+              <VStack align="start" gap={0}>
+                <Box>Prediction cost: {datasetEntry?.cost ?? "-"}</Box>
+                <Box>Evaluation cost: {evaluationsCost ?? "-"}</Box>
               </VStack>
             }
+            positioning={{ placement: "top" }}
           >
             {!!datasetEntry?.cost || !!evaluationsCost
               ? formatMoney(
@@ -127,30 +115,31 @@ const evaluationResultsTableRow = (
                 )
               : "-"}
           </Tooltip>
-        </Td>
+        </Table.Cell>
       ),
       value: () => datasetEntry?.cost?.toString() ?? "",
     },
     duration: {
       render: () => (
-        <Td>
+        <Table.Cell>
           <Tooltip
-            label={
-              <VStack align="start" spacing={0}>
-                <Text>
+            content={
+              <VStack align="start" gap={0}>
+                <Box>
                   Prediction duration:{" "}
                   {datasetEntry?.duration
                     ? formatMilliseconds(datasetEntry.duration)
                     : "-"}
-                </Text>
-                <Text>
+                </Box>
+                <Box>
                   Evaluation duration:{" "}
                   {evaluationsDuration
                     ? formatMilliseconds(evaluationsDuration)
                     : "-"}
-                </Text>
+                </Box>
               </VStack>
             }
+            positioning={{ placement: "top" }}
           >
             {!!datasetEntry?.duration || !!evaluationsDuration
               ? formatMilliseconds(
@@ -158,7 +147,7 @@ const evaluationResultsTableRow = (
                 )
               : "-"}
           </Tooltip>
-        </Td>
+        </Table.Cell>
       ),
       value: () => datasetEntry?.duration?.toString() ?? "",
     },
@@ -174,23 +163,29 @@ const evaluationResultsTableRow = (
             evaluator,
             {
               evaluationCost: {
-                render: () => <Td>{evaluation?.cost}</Td>,
+                render: () => <Table.Cell>{evaluation?.cost}</Table.Cell>,
                 value: () => evaluation?.cost?.toString() ?? "",
               },
               evaluationInputs: Array.from(evaluationInputsColumns).map(
                 (column) => ({
                   render: () =>
                     datasetEntry?.error ? (
-                      <Td
+                      <Table.Cell
                         key={`evaluation-entry-${column}`}
                         background="red.200"
                       >
-                        <Tooltip label={datasetEntry.error}>
-                          <Box noOfLines={1}>Error</Box>
+                        <Tooltip
+                          content={datasetEntry.error}
+                          positioning={{ placement: "top" }}
+                        >
+                          <Box lineClamp={1}>Error</Box>
                         </Tooltip>
-                      </Td>
+                      </Table.Cell>
                     ) : (
-                      <Td key={`evaluation-entry-${column}`} maxWidth="250px">
+                      <Table.Cell
+                        key={`evaluation-entry-${column}`}
+                        maxWidth="250px"
+                      >
                         {evaluation ? (
                           <HoverableBigText>
                             {stringify(evaluation.inputs?.[column] ?? "-")}
@@ -198,7 +193,7 @@ const evaluationResultsTableRow = (
                         ) : (
                           "-"
                         )}
-                      </Td>
+                      </Table.Cell>
                     ),
                   value: () => evaluation?.inputs?.[column] ?? "",
                 })
@@ -211,14 +206,17 @@ const evaluationResultsTableRow = (
                       evaluation?.status === "error"
                     ) {
                       return (
-                        <Td
+                        <Table.Cell
                           key={`evaluation-result-${column}`}
                           background="red.200"
                         >
-                          <Tooltip label={evaluation.details}>
-                            <Box noOfLines={1}>Error</Box>
+                          <Tooltip
+                            content={evaluation.details}
+                            positioning={{ placement: "top" }}
+                          >
+                            <Box lineClamp={1}>Error</Box>
                           </Tooltip>
-                        </Td>
+                        </Table.Cell>
                       );
                     }
 
@@ -227,14 +225,17 @@ const evaluationResultsTableRow = (
                       evaluation?.status === "skipped"
                     ) {
                       return (
-                        <Td
+                        <Table.Cell
                           key={`evaluation-result-${column}`}
                           background="yellow.100"
                         >
-                          <Tooltip label={evaluation.details}>
-                            <Box noOfLines={1}>Skipped</Box>
+                          <Tooltip
+                            content={evaluation.details}
+                            positioning={{ placement: "top" }}
+                          >
+                            <Box lineClamp={1}>Skipped</Box>
                           </Tooltip>
-                        </Td>
+                        </Table.Cell>
                       );
                     }
 
@@ -242,7 +243,7 @@ const evaluationResultsTableRow = (
                       evaluation as Record<string, any> | undefined
                     )?.[column];
                     return (
-                      <Td
+                      <Table.Cell
                         key={`evaluation-result-${column}`}
                         background={
                           value === false
@@ -254,7 +255,7 @@ const evaluationResultsTableRow = (
                       >
                         {column === "details" ? (
                           <HoverableBigText
-                            noOfLines={3}
+                            lineClamp={3}
                             maxWidth="300px"
                             whiteSpace="pre-wrap"
                           >
@@ -269,7 +270,7 @@ const evaluationResultsTableRow = (
                         ) : (
                           value ?? "-"
                         )}
-                      </Td>
+                      </Table.Cell>
                     );
                   },
                   value: () => {
@@ -472,74 +473,81 @@ export function BatchEvaluationV2EvaluationResult({
   }, [results, isFinished, hasScrolled]);
 
   return (
-    <TableContainer ref={containerRef}>
-      <Table size={size === "sm" ? "xs" : "sm"} variant="grid">
-        <Thead>
-          <Tr>
-            <Th width="35px" rowSpan={2}></Th>
+    <Box ref={containerRef} overflowX="auto">
+      {/* @ts-ignore */}
+      <Table.Root size={size === "sm" ? "xs" : "sm"} variant="grid">
+        <Table.Header>
+          <Table.Row>
+            <Table.ColumnHeader width="35px" rowSpan={2}></Table.ColumnHeader>
 
-            <Th colSpan={datasetColumns.size} paddingY={2}>
-              <Text>Dataset</Text>
-            </Th>
+            <Table.ColumnHeader colSpan={datasetColumns.size} paddingY={2}>
+              <Box>Dataset</Box>
+            </Table.ColumnHeader>
 
             {predictedColumns.size > 0 && (
-              <Th colSpan={predictedColumns.size} paddingY={2}>
+              <Table.ColumnHeader colSpan={predictedColumns.size} paddingY={2}>
                 <HStack>
-                  <Text>Predicted</Text>
+                  <Box>Predicted</Box>
                   {workflowId && (
-                    <Tooltip label="Values plugged in the End node will show up here">
+                    <Tooltip content="Values plugged in the End node will show up here">
                       <Info size={14} />
                     </Tooltip>
                   )}
                 </HStack>
-              </Th>
+              </Table.ColumnHeader>
             )}
 
             {results.length > 0 &&
               evaluatorHeaders.evaluationInputsColumns.size > 0 && (
-                <Th
+                <Table.ColumnHeader
                   colSpan={evaluatorHeaders.evaluationInputsColumns.size}
                   paddingY={2}
                 >
-                  <Text>Evaluation Entry</Text>
-                </Th>
+                  <Box>Evaluation Entry</Box>
+                </Table.ColumnHeader>
               )}
 
-            <Th rowSpan={2}>Cost</Th>
-            <Th rowSpan={2}>Duration</Th>
+            <Table.ColumnHeader rowSpan={2}>Cost</Table.ColumnHeader>
+            <Table.ColumnHeader rowSpan={2}>Duration</Table.ColumnHeader>
 
             {Array.from(evaluatorHeaders.evaluationResultsColumns).map(
               (column) => (
-                <Th key={`evaluation-result-${column}`} rowSpan={2}>
+                <Table.ColumnHeader
+                  key={`evaluation-result-${column}`}
+                  rowSpan={2}
+                >
                   {column}
-                </Th>
+                </Table.ColumnHeader>
               )
             )}
-          </Tr>
-          <Tr>
+          </Table.Row>
+          <Table.Row>
             {Array.from(tableData.headers.datasetColumns).map((column) => (
-              <Th key={`dataset-${column}`} paddingY={2}>
+              <Table.ColumnHeader key={`dataset-${column}`} paddingY={2}>
                 {column}
-              </Th>
+              </Table.ColumnHeader>
             ))}
             {Array.from(tableData.headers.predictedColumns).map((column) => (
-              <Th key={`predicted-${column}`} paddingY={2}>
+              <Table.ColumnHeader key={`predicted-${column}`} paddingY={2}>
                 {column}
-              </Th>
+              </Table.ColumnHeader>
             ))}
             {Array.from(evaluatorHeaders.evaluationInputsColumns).map(
               (column) => (
-                <Th key={`evaluation-entry-${column}`} paddingY={2}>
+                <Table.ColumnHeader
+                  key={`evaluation-entry-${column}`}
+                  paddingY={2}
+                >
                   {column}
-                </Th>
+                </Table.ColumnHeader>
               )
             )}
-          </Tr>
-        </Thead>
-        <Tbody>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
           {tableData.rows.map((row, index) => (
-            <Tr key={index}>
-              <Td width="35px">{index + 1}</Td>
+            <Table.Row key={index}>
+              <Table.Cell width="35px">{index + 1}</Table.Cell>
 
               {Array.from(row.datasetColumns).map((column) => column.render())}
 
@@ -556,10 +564,10 @@ export function BatchEvaluationV2EvaluationResult({
               {Array.from(
                 row.evaluationsColumns[evaluator]?.evaluationResults ?? []
               ).map((result) => result.render())}
-            </Tr>
+            </Table.Row>
           ))}
-        </Tbody>
-      </Table>
-    </TableContainer>
+        </Table.Body>
+      </Table.Root>
+    </Box>
   );
 }
