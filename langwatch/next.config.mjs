@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import webpack from "webpack";
 
 process.env.SENTRY_IGNORE_API_RESOLUTION_ERROR = "1";
 
@@ -117,7 +118,28 @@ const config = {
     config.resolve.alias["next-auth"] = `${__dirname}/node_modules/next-auth`;
     // eslint-disable-next-line @typescript-eslint/dot-notation
     config.resolve.alias["zod"] = `${__dirname}/node_modules/zod`;
-    config.resolve.alias["@langwatch-oss/*"] = `${__dirname}/*`;
+
+    config.module.rules.push({
+      test: /\.(js|jsx|ts|tsx)$/,
+      use: [
+        {
+          loader: "string-replace-loader",
+          options: {
+            search: /@langwatch-oss\/node_modules\//g,
+            replace: "",
+            flags: "g",
+          },
+        },
+        {
+          loader: "string-replace-loader",
+          options: {
+            search: /@langwatch-oss\/src\//g,
+            replace: "~/",
+            flags: "g",
+          },
+        },
+      ],
+    });
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return config;
