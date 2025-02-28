@@ -175,7 +175,7 @@ export default function Checks() {
           <HStack paddingTop={4}>
             <Heading as="h1">Guardrails and Evaluations</Heading>
             <Spacer />
-            {toggleConfig.isLoading && <Spinner size="lg" />}
+            {toggleConfig.isLoading && <Spinner />}
           </HStack>
           <HStack align="end">
             <Text>

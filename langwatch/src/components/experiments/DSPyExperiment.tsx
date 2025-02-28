@@ -53,7 +53,7 @@ import { FeedbackLink } from "../FeedbackLink";
 import { LLMIcon } from "../icons/LLMIcon";
 import { MetadataTag } from "../MetadataTag";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
-import { getComputedCSSVariableValue } from "../ui/color-mode";
+import { getRawColorValue } from "../ui/color-mode";
 import { Switch } from "../ui/switch";
 
 export function DSPyExperiment({
@@ -1160,11 +1160,10 @@ export function DSPyRunsScoresChart({
   const getColor = (runId: string) => {
     const [name, number] = getColorForString("colors", runId).color.split(".");
     if (!name || !number) {
-      return getComputedCSSVariableValue("--chakra-colors-gray-300");
+      return getRawColorValue("gray.300");
     }
 
-    const cssVariable = `--chakra-colors-${name}-${number}`;
-    return getComputedCSSVariableValue(cssVariable);
+    return getRawColorValue(`${name}.${number}`);
   };
 
   const [hoveredRunIndex, setHoveredRunIndex] = useState<{
@@ -1282,7 +1281,7 @@ export function DSPyRunsScoresChart({
                 value="Best"
                 position="top"
                 offset={10}
-                fill={getComputedCSSVariableValue("--chakra-colors-gray-700")}
+                fill={getRawColorValue("--chakra-colors-gray-700")}
                 fontSize="12px"
               />
             </ReferenceDot>

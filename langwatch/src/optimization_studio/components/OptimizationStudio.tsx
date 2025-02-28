@@ -31,7 +31,6 @@ import {
 } from "react-resizable-panels";
 import { useShallow } from "zustand/react/shallow";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
-import { setRecentMenuLinkClick } from "../../components/DashboardLayout";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { useColorRawValue } from "../../components/ui/color-mode";
 import { Link } from "../../components/ui/link";
@@ -59,6 +58,7 @@ import { PropertiesPanel } from "./properties/PropertiesPanel";
 import { Publish } from "./Publish";
 import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
+import { setRecentMenuLinkClick } from "../../components/MainMenu";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {
   const [_, drop] = useDrop(() => ({
@@ -390,8 +390,8 @@ export default function OptimizationStudio() {
 }
 
 function ReactFlowBackground() {
-  const gray100 = useColorRawValue("gray.100", "#F2F4F8");
-  const gray300 = useColorRawValue("gray.300", "#E5E7EB");
+  const gray100 = useColorRawValue("gray.100");
+  const gray300 = useColorRawValue("gray.300");
 
   return (
     <Background

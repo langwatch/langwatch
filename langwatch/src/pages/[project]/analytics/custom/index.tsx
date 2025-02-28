@@ -71,7 +71,7 @@ import {
   PeriodSelector,
   usePeriodSelector,
 } from "../../../../components/PeriodSelector";
-import { getComputedCSSVariableValue } from "../../../../components/ui/color-mode";
+import { getRawColorValue } from "../../../../components/ui/color-mode";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import {
   analyticsGroups,
@@ -789,9 +789,7 @@ function SeriesFieldItem({
 }) {
   const colorSet = form.watch(`series.${index}.colorSet`);
   const coneColors = rotatingColors[colorSet].map((color, i) => {
-    const [name, number] = color.color.split(".");
-    const cssVariable = `--chakra-colors-${name}-${number}`;
-    const color_ = getComputedCSSVariableValue(cssVariable) ?? "pink";
+    const color_ = getRawColorValue(color.color);
     const len = rotatingColors[colorSet].length;
 
     return `${color_} ${(i / len) * 100}%, ${color_} ${((i + 1) / len) * 100}%`;
