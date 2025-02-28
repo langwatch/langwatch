@@ -11,7 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import React from "react";
+import React, { useEffect } from "react";
 import {
   Briefcase,
   Check,
@@ -59,6 +59,7 @@ import { toaster } from "../../components/ui/toaster";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import { titleCase } from "../../utils/stringCasing";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
 type OrganizationFormData = {
   organizationName: string;
@@ -77,6 +78,11 @@ type OrganizationFormData = {
 };
 
 export default function OrganizationOnboarding() {
+  const { organization, isLoading: organizationIsLoading } =
+    useOrganizationTeamProject({
+      redirectToProjectOnboarding: false,
+    });
+
   const { data: session } = useRequiredSession();
   const utmCampaign =
     typeof window !== "undefined"
@@ -155,7 +161,13 @@ export default function OrganizationOnboarding() {
     );
   };
 
-  if (!session) {
+  useEffect(() => {
+    if (organization) {
+      void router.push(`/`);
+    }
+  }, [organization, router]);
+
+  if (!session || !!organization || organizationIsLoading) {
     return <LoadingScreen />;
   }
 
