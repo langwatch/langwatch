@@ -81,7 +81,14 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
   const hostname = "0.0.0.0";
   const port = parseInt(process.env.PORT ?? "5560");
   // when using middleware `hostname` and `port` must be provided below
-  const app = next({ dev, hostname, port, dir, turbo: true, turbopack: true });
+  const app = next({
+    dev,
+    hostname,
+    port,
+    dir,
+    turbo: !!dev,
+    turbopack: !!dev,
+  });
   await app.prepare();
   const handle = app.getRequestHandler();
   const upgradeHandler = app.getUpgradeHandler();

@@ -108,19 +108,16 @@ const config = {
       "injection.server.ts"
     );
 
-    if (process.env.EXTRA_INCLUDE) {
-      // @ts-ignore
-      const index = config.module.rules.findIndex((rule) =>
-        rule.oneOf?.[0]?.include?.[0]?.includes("langwatch")
-      );
-      // TODO: find a less hacky way to make sure injected src will be compiled as well
-      for (const rule of config.module.rules?.[index].oneOf ?? []) {
-        const includeIsArray = Array.isArray(rule.include);
-        if (includeIsArray) {
-          rule.include.push(process.env.EXTRA_INCLUDE);
-        }
-      }
-    }
+    // Ensures that only a single version of those are ever loaded
+    // eslint-disable-next-line @typescript-eslint/dot-notation
+    config.resolve.alias["react"] = `${__dirname}/node_modules/react`;
+    config.resolve.alias["react-dom"] = `${__dirname}/node_modules/react-dom`;
+    // eslint-disable-next-line @typescript-eslint/dot-notation
+    config.resolve.alias["next"] = `${__dirname}/node_modules/next`;
+    config.resolve.alias["next-auth"] = `${__dirname}/node_modules/next-auth`;
+    // eslint-disable-next-line @typescript-eslint/dot-notation
+    config.resolve.alias["zod"] = `${__dirname}/node_modules/zod`;
+    config.resolve.alias["@langwatch-oss/*"] = `${__dirname}/*`;
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return config;
