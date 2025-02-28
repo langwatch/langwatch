@@ -551,100 +551,109 @@ function MembersList({
                   {fields.map((field, index) => (
                     <Table.Row key={field.id}>
                       <Table.Cell paddingLeft={0} paddingY={2}>
-                        <Input
-                          placeholder="Enter email address"
-                          {...register(`invites.${index}.email`, {
-                            required: "Email is required",
-                          })}
-                        />
-                        <Field.ErrorText>
-                          {errors.invites?.[index]?.email &&
-                            "Email is required"}
-                        </Field.ErrorText>
+                        <Field.Root>
+                          <Input
+                            placeholder="Enter email address"
+                            {...register(`invites.${index}.email`, {
+                              required: "Email is required",
+                            })}
+                          />
+                          <Field.ErrorText>
+                            {errors.invites?.[index]?.email &&
+                              "Email is required"}
+                          </Field.ErrorText>
+                        </Field.Root>
                       </Table.Cell>
                       <Table.Cell width="24%" paddingLeft={0} paddingY={2}>
-                        <Controller
-                          control={control}
-                          name={`invites.${index}.role`}
-                          rules={{ required: "User role is required" }}
-                          render={({ field }) => (
-                            <MultiSelect
-                              {...field}
-                              options={[
-                                {
-                                  label: "Admin",
-                                  value: OrganizationUserRole.ADMIN,
-                                  description:
-                                    "Can manage organization and add or remove members",
-                                },
-                                {
-                                  label: "Member",
-                                  value: OrganizationUserRole.MEMBER,
-                                  description:
-                                    "Can manage their own projects and view other projects",
-                                },
-                                {
-                                  label: "External / Viewer",
-                                  value: OrganizationUserRole.EXTERNAL,
-                                  description:
-                                    "Can only view projects they are invited to, cannot see costs",
-                                },
-                              ]}
-                              hideSelectedOptions={false}
-                              isSearchable={false}
-                              components={{
-                                Menu: ({ children, ...props }) => (
-                                  <chakraComponents.Menu
-                                    {...props}
-                                    innerProps={{
-                                      ...props.innerProps,
-                                      style: { width: "300px" },
-                                    }}
-                                  >
-                                    {children}
-                                  </chakraComponents.Menu>
-                                ),
-                                Option: ({ children, ...props }) => (
-                                  <chakraComponents.Option {...props}>
-                                    <VStack align="start">
-                                      <Text>{children}</Text>
-                                      <Text
-                                        color={
-                                          props.isSelected
-                                            ? "white"
-                                            : "gray.500"
-                                        }
-                                        fontSize="13px"
-                                      >
-                                        {props.data.description}
-                                      </Text>
-                                    </VStack>
-                                  </chakraComponents.Option>
-                                ),
-                              }}
-                            />
-                          )}
-                        />
-                        <Field.ErrorText>
-                          {errors.invites?.[index]?.role && "Role is required"}
-                        </Field.ErrorText>
+                        <Field.Root>
+                          <Controller
+                            control={control}
+                            name={`invites.${index}.role`}
+                            rules={{ required: "User role is required" }}
+                            render={({ field }) => (
+                              <MultiSelect
+                                {...field}
+                                options={[
+                                  {
+                                    label: "Admin",
+                                    value: OrganizationUserRole.ADMIN,
+                                    description:
+                                      "Can manage organization and add or remove members",
+                                  },
+                                  {
+                                    label: "Member",
+                                    value: OrganizationUserRole.MEMBER,
+                                    description:
+                                      "Can manage their own projects and view other projects",
+                                  },
+                                  {
+                                    label: "External / Viewer",
+                                    value: OrganizationUserRole.EXTERNAL,
+                                    description:
+                                      "Can only view projects they are invited to, cannot see costs",
+                                  },
+                                ]}
+                                hideSelectedOptions={false}
+                                isSearchable={false}
+                                components={{
+                                  Menu: ({ children, ...props }) => (
+                                    <chakraComponents.Menu
+                                      {...props}
+                                      innerProps={{
+                                        ...props.innerProps,
+                                        style: { width: "300px" },
+                                      }}
+                                    >
+                                      {children}
+                                    </chakraComponents.Menu>
+                                  ),
+                                  Option: ({ children, ...props }) => (
+                                    <chakraComponents.Option {...props}>
+                                      <VStack align="start">
+                                        <Text>{children}</Text>
+                                        <Text
+                                          color={
+                                            props.isSelected
+                                              ? "white"
+                                              : "gray.500"
+                                          }
+                                          fontSize="13px"
+                                        >
+                                          {props.data.description}
+                                        </Text>
+                                      </VStack>
+                                    </chakraComponents.Option>
+                                  ),
+                                }}
+                              />
+                            )}
+                          />
+                          <Field.ErrorText>
+                            {errors.invites?.[index]?.role &&
+                              "Role is required"}
+                          </Field.ErrorText>
+                        </Field.Root>
                       </Table.Cell>
                       <Table.Cell width="35%" paddingLeft={0} paddingY={2}>
-                        <Controller
-                          control={control}
-                          name={`invites.${index}.teamOptions`}
-                          rules={{ required: "At least one team is required" }}
-                          render={({ field }) => (
-                            <MultiSelect
-                              {...field}
-                              options={teamOptions}
-                              isMulti
-                              closeMenuOnSelect={false}
-                              selectedOptionStyle="check"
-                              hideSelectedOptions={false}
-                            />
-                          )}
-                        />
+                        <Field.Root>
+                          <Controller
+                            control={control}
+                            name={`invites.${index}.teamOptions`}
+                            rules={{
+                              required: "At least one team is required",
+                            }}
+                            render={({ field }) => (
+                              <MultiSelect
+                                {...field}
+                                options={teamOptions}
+                                isMulti
+                                closeMenuOnSelect={false}
+                                selectedOptionStyle="check"
+                                hideSelectedOptions={false}
+                              />
+                            )}
+                          />
+                        </Field.Root>
                       </Table.Cell>
                       <Table.Cell paddingLeft={0} paddingRight={0} paddingY={2}>
                         <Button
