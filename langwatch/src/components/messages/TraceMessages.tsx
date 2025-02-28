@@ -114,162 +114,138 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
           }
         }}
       >
-        <GridItem colSpan={showAnnotations ? 3 : 4}>
-          <VStack gap={0} marginRight={5}>
+        <GridItem
+          colSpan={showAnnotations ? 3 : 4}
+          height="100%"
+          maxWidth="1000px"
+          width="100%"
+          position="relative"
+          background={
+            hover
+              ? highlighted
+                ? "blue.50"
+                : "gray.50"
+              : highlighted
+              ? "blue.50"
+              : "white"
+          }
+          paddingLeft={10}
+          paddingRight={10}
+          paddingY={4}
+          borderX="1px solid"
+          borderTop={
+            highlighted ||
+            (!loadingMore && (index === "first" || index === "only"))
+              ? "1px solid"
+              : "none"
+          }
+          borderRadius={
+            loadingMore
+              ? "0"
+              : index === "only"
+              ? "4px"
+              : index === "first"
+              ? "4px 4px 0 0"
+              : index === "last"
+              ? "0 0 4px 4px"
+              : "0"
+          }
+          borderBottom={highlighted || index === "last" ? "1px solid" : "none"}
+          borderColor={highlighted ? "blue.200" : "gray.200"}
+          onMouseEnter={() => setHover(true)}
+          onMouseMove={() => setHover(true)}
+          onMouseLeave={() => setHover(false)}
+        >
+          <VStack gap={0} marginRight={5} width="100%" align="start">
             {loadingMore && (
-              <Box
-                width="100%"
-                height="100%"
-                border="1px solid"
-                borderColor="gray.200"
-                borderBottom="none"
-                borderRadius="4px"
-                background="white"
-                paddingTop={6}
-                paddingX={10}
-              >
-                <HStack gap={3}>
-                  <Spinner size="sm" />
-                  <Text>Loading messages...</Text>
-                </HStack>
-              </Box>
+              <HStack gap={3} paddingBottom={6}>
+                <Spinner size="sm" />
+                <Text>Loading messages...</Text>
+              </HStack>
             )}
-            <Box
-              maxWidth="1000px"
-              width="100%"
-              height="100%"
-              position="relative"
-              background={
-                hover
-                  ? highlighted
-                    ? "blue.50"
-                    : "gray.50"
-                  : highlighted
-                  ? "blue.50"
-                  : "white"
+            {hover && (
+              <MessageHoverActions trace={trace} {...translationState} />
+            )}
+            <Message
+              author="Input"
+              avatar={
+                <Avatar.Root size="sm">
+                  <Avatar.Fallback />
+                </Avatar.Root>
               }
-              paddingLeft={10}
-              paddingRight={10}
-              paddingY={4}
-              borderX="1px solid"
-              borderTop={
-                highlighted ||
-                (!loadingMore && (index === "first" || index === "only"))
-                  ? "1px solid"
-                  : "none"
-              }
-              borderRadius={
-                loadingMore
-                  ? "0"
-                  : index === "only"
-                  ? "4px"
-                  : index === "first"
-                  ? "4px 4px 0 0"
-                  : index === "last"
-                  ? "0 0 4px 4px"
-                  : "0"
-              }
-              borderBottom={
-                highlighted || index === "last" ? "1px solid" : "none"
-              }
-              borderColor={highlighted ? "blue.200" : "gray.200"}
-              onMouseEnter={() => setHover(true)}
-              onMouseMove={() => setHover(true)}
-              onMouseLeave={() => setHover(false)}
+              timestamp={trace.timestamps.started_at}
+              paddingTop="20px"
             >
-              {hover && (
-                <MessageHoverActions trace={trace} {...translationState} />
+              <Text paddingY="6px" marginBottom="38px">
+                <Markdown className="markdown">
+                  {translationState.translatedTextInput &&
+                  translationState.translationActive
+                    ? translationState.translatedTextInput
+                    : getExtractedInput(trace)}
+                </Markdown>
+              </Text>
+            </Message>
+            <Message
+              author={project?.name ?? ""}
+              avatar={
+                <Avatar.Root size="sm" background="orange.400">
+                  <Avatar.Fallback name={project?.name} />
+                </Avatar.Root>
+              }
+              timestamp={
+                trace.timestamps.started_at +
+                (trace.metrics?.first_token_ms ??
+                  trace.metrics?.total_time_ms ??
+                  0)
+              }
+            >
+              {trace.error && !trace.output?.value ? (
+                <VStack alignItems="flex-start" gap={2} paddingY={2}>
+                  <Box
+                    fontSize="11px"
+                    color="red.400"
+                    textTransform="uppercase"
+                    fontWeight="bold"
+                  >
+                    Exception
+                  </Box>
+                  <Text color="red.900">{trace.error.message}</Text>
+                </VStack>
+              ) : trace.output?.value &&
+                (isJson(trace.output.value) ||
+                  isPythonRepr(trace.output.value)) ? (
+                <MessageCardJsonOutput value={trace.output.value} />
+              ) : trace.output?.value ? (
+                <Markdown className="markdown">
+                  {translationState.translatedTextOutput &&
+                  translationState.translationActive
+                    ? translationState.translatedTextOutput
+                    : trace.output.value}
+                </Markdown>
+              ) : (
+                <Text paddingY={2}>{"<empty>"}</Text>
               )}
-              <Message
-                author="Input"
-                avatar={
-                  <Avatar.Root size="sm">
-                    <Avatar.Fallback />
-                  </Avatar.Root>
-                }
-                timestamp={trace.timestamps.started_at}
-                paddingTop="20px"
-              >
-                <Text paddingY="6px" marginBottom="38px">
-                  <Markdown className="markdown">
-                    {translationState.translatedTextInput &&
-                    translationState.translationActive
-                      ? translationState.translatedTextInput
-                      : getExtractedInput(trace)}
-                  </Markdown>
-                </Text>
-              </Message>
-              <Message
-                author={project?.name ?? ""}
-                avatar={
-                  <Avatar.Root size="sm" background="orange.400">
-                    <Avatar.Fallback name={project?.name} />
-                  </Avatar.Root>
-                }
-                timestamp={
-                  trace.timestamps.started_at +
-                  (trace.metrics?.first_token_ms ??
-                    trace.metrics?.total_time_ms ??
-                    0)
-                }
-              >
-                {trace.error && !trace.output?.value ? (
-                  <VStack alignItems="flex-start" gap={2} paddingY={2}>
-                    <Box
-                      fontSize="11px"
-                      color="red.400"
-                      textTransform="uppercase"
-                      fontWeight="bold"
-                    >
-                      Exception
-                    </Box>
-                    <Text color="red.900">{trace.error.message}</Text>
-                  </VStack>
-                ) : trace.output?.value &&
-                  (isJson(trace.output.value) ||
-                    isPythonRepr(trace.output.value)) ? (
-                  <MessageCardJsonOutput value={trace.output.value} />
-                ) : trace.output?.value ? (
-                  <Markdown className="markdown">
-                    {translationState.translatedTextOutput &&
-                    translationState.translationActive
-                      ? translationState.translatedTextOutput
-                      : trace.output.value}
-                  </Markdown>
-                ) : (
-                  <Text paddingY={2}>{"<empty>"}</Text>
-                )}
-                {trace.expected_output && (
-                  <Alert.Root status="warning">
-                    <Alert.Indicator>
-                      <CornerDownRight size="16" />
-                    </Alert.Indicator>
-                    <Alert.Content>
-                      <Alert.Title>Expected Output:</Alert.Title>
-                      <Text>
-                        {translationState.translatedTextOutput &&
-                        translationState.translationActive
-                          ? translationState.translatedTextOutput
-                          : getSlicedExpectedOutput(trace)}
-                      </Text>
-                    </Alert.Content>
-                  </Alert.Root>
-                )}
-                <HStack fontSize="13px" color="gray.400">
-                  <EventsCounter trace={trace} addDot={false} />
-                </HStack>
-              </Message>
-            </Box>
-            {index === "only" && (
-              <Box
-                width="100%"
-                height="200px"
-                background="white"
-                border="1px solid"
-                borderColor="gray.200"
-                borderTop="none"
-              />
-            )}
+              {trace.expected_output && (
+                <Alert.Root status="warning">
+                  <Alert.Indicator>
+                    <CornerDownRight size="16" />
+                  </Alert.Indicator>
+                  <Alert.Content>
+                    <Alert.Title>Expected Output:</Alert.Title>
+                    <Text>
+                      {translationState.translatedTextOutput &&
+                      translationState.translationActive
+                        ? translationState.translatedTextOutput
+                        : getSlicedExpectedOutput(trace)}
+                    </Text>
+                  </Alert.Content>
+                </Alert.Root>
+              )}
+              <HStack fontSize="13px" color="gray.400">
+                <EventsCounter trace={trace} addDot={false} />
+              </HStack>
+            </Message>
+            {index === "only" && <Box width="100%" height="200px" />}
           </VStack>
         </GridItem>
         {showAnnotations && (

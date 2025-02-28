@@ -602,7 +602,14 @@ export const getAllTracesForProject = async ({
     messagesFromThreadIds = await esClient.search<ElasticSearchTrace>({
       index: TRACE_INDEX.alias,
       body: {
-        query: { terms: { "metadata.thread_id": threadIds } },
+        query: {
+          bool: {
+            filter: [
+              { terms: { "metadata.thread_id": threadIds } },
+              { term: { project_id: input.projectId } },
+            ] as QueryDslBoolQuery["filter"],
+          } as QueryDslBoolQuery,
+        },
       },
       size: 100,
     });
