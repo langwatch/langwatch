@@ -2,6 +2,7 @@ import {
   Alert,
   Box,
   Button,
+  createListCollection,
   HStack,
   Input,
   Skeleton,
@@ -9,7 +10,6 @@ import {
   Text,
   useDisclosure,
   VStack,
-  createListCollection,
 } from "@chakra-ui/react";
 
 import type { Node } from "@xyflow/react";
@@ -18,13 +18,17 @@ import { CheckSquare, Info, TrendingUp } from "react-feather";
 import {
   Controller,
   useForm,
-  type UseControllerProps,
   type ControllerRenderProps,
   type UseFormReturn,
 } from "react-hook-form";
 import { SmallLabel } from "../../components/SmallLabel";
+import { Dialog } from "../../components/ui/dialog";
+import { Select } from "../../components/ui/select";
+import { toaster } from "../../components/ui/toaster";
+import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { trackEvent } from "../../utils/tracking";
 import { useGetDatasetData } from "../hooks/useGetDatasetData";
 import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
@@ -32,15 +36,10 @@ import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Entry } from "../types/dsl";
 import { OPTIMIZERS } from "../types/optimizers";
 import { trainTestSplit } from "../utils/datasetUtils";
+import { checkIsEvaluator } from "../utils/nodeUtils";
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
 import { LLMConfigField } from "./properties/modals/LLMConfigModal";
-import { checkIsEvaluator } from "../utils/nodeUtils";
-import { trackEvent } from "../../utils/tracking";
-import { Tooltip } from "../../components/ui/tooltip";
-import { toaster } from "../../components/ui/toaster";
-import { Dialog } from "../../components/ui/dialog";
-import { Select } from "../../components/ui/select";
 
 const optimizerOptions: {
   label: string;

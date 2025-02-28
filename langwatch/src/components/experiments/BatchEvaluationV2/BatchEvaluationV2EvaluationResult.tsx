@@ -10,7 +10,7 @@ import { HoverableBigText } from "../../HoverableBigText";
 import { ExternalImage, isImageUrl } from "../../ExternalImage";
 
 type RenderableRow = {
-  render: () => JSX.Element;
+  render: () => React.ReactNode;
   value: () => string;
 };
 
