@@ -123,7 +123,11 @@ export function DatasetModal({
   );
 
   return (
-    <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={({ open }) => !open && onClose()}
+      size="6xl"
+    >
       <Dialog.Backdrop />
       <Dialog.Content
         css={{
