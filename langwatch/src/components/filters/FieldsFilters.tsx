@@ -508,6 +508,7 @@ function RangeFilter({
         }}
       />
       <Slider.Root
+        width="full"
         min={min}
         max={max}
         step={0.1}
@@ -525,10 +526,10 @@ function RangeFilter({
           <Slider.Track>
             <Slider.Range />
           </Slider.Track>
-          <Slider.Thumb index={0}>
+          <Slider.Thumb index={0} cursor="grab">
             <Slider.HiddenInput />
           </Slider.Thumb>
-          <Slider.Thumb index={1}>
+          <Slider.Thumb index={1} cursor="grab">
             <Slider.HiddenInput />
           </Slider.Thumb>
         </Slider.Control>
