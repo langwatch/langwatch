@@ -278,17 +278,19 @@ export default function OrganizationOnboarding() {
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={handleSubmit(onSubmit)}>
         <VStack gap={4} alignItems="left">
-          <Box
-            backgroundColor="gray.100"
-            paddingX={2}
-            paddingY={1}
-            borderRadius={8}
-            width="fit-content"
-          >
-            <Text fontSize="sm" fontWeight="medium" color="gray.500">
-              {activeStep + 1} / {steps}
-            </Text>
-          </Box>
+          {isSaaS && (
+            <Box
+              backgroundColor="gray.100"
+              paddingX={2}
+              paddingY={1}
+              borderRadius={8}
+              width="fit-content"
+            >
+              <Text fontSize="sm" fontWeight="medium" color="gray.500">
+                {activeStep + 1} / {steps}
+              </Text>
+            </Box>
+          )}
           <Steps.Root
             step={activeStep}
             onStepChange={(e) => setActiveStep(e.step)}
