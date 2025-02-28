@@ -3,10 +3,13 @@ import { Button } from "@chakra-ui/react";
 import { RotateCcw, RotateCw } from "react-feather";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { useEffect } from "react";
+import { useLoadWorkflow } from "../hooks/useLoadWorkflow";
 
 export function UndoRedo() {
   const { undo, redo, pastStates, futureStates, clear, pause, resume } =
     useWorkflowStore.temporal.getState();
+
+  const { workflow } = useLoadWorkflow();
 
   useEffect(() => {
     const handleUndoRedoKeyDown = (event: KeyboardEvent) => {
@@ -33,13 +36,15 @@ export function UndoRedo() {
 
   // Fix for initial state
   useEffect(() => {
-    pause();
-    setTimeout(() => {
-      resume();
-      clear();
-    }, 1000);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (workflow.isFetched) {
+      setTimeout(() => {
+        resume();
+        clear();
+      }, 1000);
+    } else {
+      pause();
+    }
+  }, [workflow.isFetched]);
 
   return (
     <>
