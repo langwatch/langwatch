@@ -8,6 +8,7 @@ import {
   Toast,
   createToaster,
 } from "@chakra-ui/react";
+import { Info } from "react-feather";
 
 const toaster_ = createToaster({
   placement: "top-end",
@@ -33,6 +34,8 @@ export const Toaster = () => {
           <Toast.Root width={{ md: "sm" }}>
             {toast.type === "loading" ? (
               <Spinner size="sm" color="blue.solid" />
+            ) : toast.type === "info" ? (
+              <Info size={18} style={{ marginTop: "2px" }} />
             ) : (
               <Toast.Indicator />
             )}

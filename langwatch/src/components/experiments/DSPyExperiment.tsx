@@ -352,6 +352,7 @@ export function DSPyExperimentRunList({
       maxWidth={size === "sm" ? "250px" : "300px"}
       height="full"
       gap={0}
+      overflowY="auto"
     >
       {size !== "sm" && (
         <Heading as="h2" size="md" paddingX={6} paddingY={4}>
@@ -376,7 +377,7 @@ export function DSPyExperimentRunList({
           Waiting for runs...
         </Text>
       ) : (
-        dspyRunsPlusIncoming?.map((run) => {
+        dspyRunsPlusIncoming?.slice(0, 21).map((run) => {
           const runCost = run.steps
             ?.map((step) => step.llm_calls_summary.total_cost)
             .reduce((acc, cost) => acc + cost, 0);
@@ -401,13 +402,6 @@ export function DSPyExperimentRunList({
                   ? "gray.200"
                   : "gray.100",
               }}
-              // Remove this for now, maybe a bit akward UX
-              // onMouseEnter={() => {
-              //   if (!selectedRuns?.includes(run.runId)) {
-              //     setHighlightedRun(run.runId);
-              //   }
-              // }}
-              // onMouseLeave={() => setHighlightedRun(null)}
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
@@ -433,10 +427,18 @@ export function DSPyExperimentRunList({
                   <VersionBox minWidth={hasAnyVersion ? "48px" : "0"} />
                   <VStack align="start" gap={2} width="100%" paddingRight={2}>
                     <HStack width="100%">
-                      <Skeleton width="100%" height="12px" />
-                      <Spinner size="xs" />
+                      <Skeleton
+                        height="12px"
+                        background="gray.400"
+                        flexGrow={1}
+                      />
+                      <Spinner size="xs" flexShrink={0} />
                     </HStack>
-                    <Skeleton width="100%" height="12px" />
+                    <Skeleton
+                      width="100%"
+                      height="12px"
+                      background="gray.400"
+                    />
                   </VStack>
                 </>
               ) : (
@@ -726,7 +728,8 @@ export const RunDetails = React.memo(
                 height="fit-content"
                 // @ts-ignore
                 size={size === "sm" ? "xs" : "sm"}
-                variant="line"
+                // @ts-ignore
+                variant="grid"
               >
                 <Table.Header>
                   <Table.Row>
@@ -836,7 +839,8 @@ export const RunDetails = React.memo(
                 height="fit-content"
                 // @ts-ignore
                 size={size === "sm" ? "xs" : "sm"}
-                variant="line"
+                // @ts-ignore
+                variant="grid"
               >
                 <Table.Header>
                   <Table.Row>
@@ -935,7 +939,8 @@ export const RunDetails = React.memo(
               height="fit-content"
               // @ts-ignore
               size={size === "sm" ? "xs" : "sm"}
-              variant="line"
+              // @ts-ignore
+              variant="grid"
             >
               <Table.Header>
                 <Table.Row>

@@ -245,6 +245,12 @@ export const system = createSystem(defaultConfig, {
                 backgroundColor: "gray.50",
               },
             },
+            ghost: {
+              color: "gray.800",
+              _hover: {
+                backgroundColor: "gray.50",
+              },
+            },
           },
           size: {
             xs: {
@@ -287,8 +293,17 @@ export const system = createSystem(defaultConfig, {
         },
       }),
       separator: defineRecipe({
-        base: {
-          width: "full",
+        variants: {
+          orientation: {
+            vertical: {
+              width: "1px",
+              height: "full",
+            },
+            horizontal: {
+              height: "1px",
+              width: "full",
+            },
+          },
         },
       }),
       input: defineRecipe({
@@ -367,6 +382,30 @@ export const system = createSystem(defaultConfig, {
         base: {
           trigger: {
             height: "auto",
+          },
+        },
+        variants: {
+          variant: {
+            line: {
+              trigger: {
+                _selected: {
+                  color: "colorPalette.solid",
+                },
+              },
+            },
+          },
+          size: {
+            sm: {
+              root: {
+                "--tabs-height": "sizes.8",
+                "--tabs-content-padding": "spacing.3",
+              },
+              trigger: {
+                py: "1",
+                px: "3",
+                textStyle: "sm",
+              },
+            },
           },
         },
       }),
@@ -529,6 +568,32 @@ export const system = createSystem(defaultConfig, {
         defaultVariants: {
           size: "xl",
         },
+      }),
+      toast: defineSlotRecipe({
+        slots: ["root"],
+        base: {
+          root: {
+            "&[data-type=info]": {
+              bg: "blue.solid",
+              color: "blue.contrast",
+              "--toast-trigger-bg": "{white/10}",
+              "--toast-border-color": "{white/40}",
+            },
+          },
+        },
+      }),
+      progress: defineSlotRecipe({
+        slots: ["root", "track", "range"],
+        variants: {
+          // @ts-ignore
+          striped: {
+            true: {
+              range: {
+                "--stripe-color": "rgba(255, 255, 255, 0.2)",
+              }
+            }
+          }
+        }
       }),
     },
   },

@@ -24,11 +24,11 @@ export function EvaluationProgressBar({
         width="full"
         colorPalette="blue"
         value={isIndeterminate ? null : progress}
-        borderRadius="sm"
         max={total ? total : undefined}
         animated
+        striped
       >
-        <Progress.Track>
+        <Progress.Track borderRadius="sm">
           <Progress.Range />
         </Progress.Track>
       </Progress.Root>

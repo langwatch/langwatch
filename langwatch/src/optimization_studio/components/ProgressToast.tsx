@@ -108,10 +108,11 @@ export function BaseProgressToast({
       border="1px solid"
       borderColor="gray.200"
       onClick={onClick}
+      color="gray.800"
     >
       <VStack align="start" gap={1}>
         <VStack align="start" gap={1} paddingY={2} paddingX={3}>
-          <HStack gap={0}>
+          <HStack gap={2}>
             <Alert.Indicator />
             <Alert.Title>Please wait...</Alert.Title>
           </HStack>
@@ -148,12 +149,12 @@ export function OptimizationProgressBar({
         size={size}
         width="full"
         colorPalette="blue"
-        value={undefined}
+        value={isIndeterminate ? null : undefined}
+        animated
+        striped
       >
-        <Progress.Track>
-          <Progress.Range
-            animation={isIndeterminate ? "progress-indeterminate" : undefined}
-          />
+        <Progress.Track borderRadius="sm">
+          <Progress.Range />
         </Progress.Track>
       </Progress.Root>
     </HStack>

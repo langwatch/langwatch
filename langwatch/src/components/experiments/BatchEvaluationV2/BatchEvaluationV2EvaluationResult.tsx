@@ -475,7 +475,7 @@ export function BatchEvaluationV2EvaluationResult({
   return (
     <Box ref={containerRef} overflowX="auto">
       {/* @ts-ignore */}
-      <Table.Root size={size === "sm" ? "xs" : "sm"} variant="line">
+      <Table.Root size={size === "sm" ? "xs" : "sm"} variant="grid">
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader width="35px" rowSpan={2}></Table.ColumnHeader>

@@ -91,14 +91,14 @@ export function ResultsPanel({
         size="sm"
         colorPalette="blue"
       >
-        <Tabs.List>
+        <Tabs.List borderBottomWidth="2px">
           <Tabs.Trigger value="evaluations">Evaluations</Tabs.Trigger>
           <Tabs.Trigger value="optimizations">Optimizations</Tabs.Trigger>
         </Tabs.List>
-        <Tabs.Content value="evaluations" padding={0} height="full">
+        <Tabs.Content value="evaluations" padding={0} height="calc(100% - 32px)">
           {!isCollapsed && tabIndex === "evaluations" && <EvaluationResults />}
         </Tabs.Content>
-        <Tabs.Content value="optimizations" padding={0} height="full">
+        <Tabs.Content value="optimizations" padding={0} height="calc(100% - 32px)">
           {!isCollapsed && tabIndex === "optimizations" && (
             <OptimizationResults />
           )}
@@ -563,10 +563,10 @@ export function LoadedOptimizationResults({
             }
           />
         )}
-        {(selectedRuns.length === 0 ||
+        {(true || (selectedRuns.length === 0 ||
           selectedRuns.includes(optimizationStateRunId ?? "")) &&
           optimizationStateRunId &&
-          optimizationState?.status === "running" && (
+          optimizationState?.status === "running") && (
             <HStack
               width="full"
               padding={3}

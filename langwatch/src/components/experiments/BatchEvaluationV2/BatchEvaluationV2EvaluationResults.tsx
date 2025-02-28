@@ -299,7 +299,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
               onScroll={() => setHasScrolled(true)}
             >
               {/* @ts-ignore */}
-              <Table.Root size={size === "sm" ? "xs" : "sm"} variant="line">
+              <Table.Root size={size === "sm" ? "xs" : "sm"} variant="grid">
                 <Table.Header>
                   <Table.Row>
                     <Table.ColumnHeader rowSpan={2} width="50px">
@@ -374,6 +374,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
           setTabIndex(Object.keys(resultsByEvaluator).indexOf(change.value))
         }
         defaultValue={Object.keys(resultsByEvaluator)[0]}
+        colorPalette="blue"
       >
         <HStack top={1} right={2}>
           <Tabs.List minWidth={0}>
@@ -395,7 +396,6 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
                 </Tabs.Trigger>
               )
             )}
-            <Tabs.Indicator />
           </Tabs.List>
           <Spacer />
           <Text color="gray.400" fontSize="12px" flexShrink={0}>

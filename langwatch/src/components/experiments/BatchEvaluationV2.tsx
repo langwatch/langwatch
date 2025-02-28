@@ -324,10 +324,10 @@ export function BatchEvaluationV2RunList({
               <VersionBox minWidth={hasAnyVersion ? "48px" : "0"} />
               <VStack align="start" gap={2} width="100%" paddingRight={2}>
                 <HStack width="100%">
-                  <Skeleton width="100%" height="12px" />
-                  <Spinner size="xs" />
+                  <Skeleton height="12px" background="gray.400" flexGrow={1} />
+                  <Spinner size="xs" flexShrink={0} />
                 </HStack>
-                <Skeleton width="100%" height="12px" />
+                <Skeleton width="100%" height="12px" background="gray.400" />
               </VStack>
             </HStack>
           )}

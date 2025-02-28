@@ -1,5 +1,5 @@
 // eslint-disable-next-line no-restricted-imports
-import { Tooltip as ChakraTooltip, Portal } from "@chakra-ui/react";
+import { Tooltip as ChakraTooltip, Portal, Text } from "@chakra-ui/react";
 import * as React from "react";
 
 export interface TooltipProps extends ChakraTooltip.RootProps {
@@ -36,7 +36,9 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(
             : props.disabled
         }
       >
-        <ChakraTooltip.Trigger asChild>{children}</ChakraTooltip.Trigger>
+        <ChakraTooltip.Trigger asChild>
+          {typeof children === "string" ? <Text>{children}</Text> : children}
+        </ChakraTooltip.Trigger>
         <Portal disabled={!portalled} container={portalRef}>
           <ChakraTooltip.Positioner>
             <ChakraTooltip.Content ref={ref} {...contentProps}>
