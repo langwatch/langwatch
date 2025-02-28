@@ -134,6 +134,7 @@ export default function OrganizationOnboarding() {
       {
         onSuccess: (data) => {
           void (async () => {
+            await apiContext.organization.getAll.invalidate();
             await apiContext.organization.getAll.refetch();
             // For some reason even though we await for the refetch it's not done yet when we move pages
             setTimeout(() => {
@@ -162,12 +163,15 @@ export default function OrganizationOnboarding() {
   };
 
   useEffect(() => {
-    if (organization) {
+    if (organization && !createOrganization.isSuccess) {
       void router.push(`/`);
     }
-  }, [organization, router]);
+  }, [organization, router, createOrganization.isSuccess]);
 
-  if (!session || !!organization || organizationIsLoading) {
+  if (
+    !session ||
+    (!createOrganization.isSuccess && (!!organization || organizationIsLoading))
+  ) {
     return <LoadingScreen />;
   }
 
