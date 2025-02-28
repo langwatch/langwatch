@@ -190,7 +190,8 @@
     "braces": "^3.0.3",
     "cross-spawn": "^7.0.6",
     "exec-sh": "^0.4.0",
-    "glob": "^11.0.1"
+    "glob": "^11.0.1",
+    "@zag-js/core": "^0.82.2"
   },
   "ct3aMetadata": {
     "initVersion": "7.19.0"
