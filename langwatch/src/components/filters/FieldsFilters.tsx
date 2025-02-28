@@ -152,7 +152,7 @@ function FieldsFilter({
                     <Button
                       as={Box}
                       role="button"
-                      variant="plain"
+                      variant="ghost"
                       width="fit-content"
                       display="flex"
                       onClick={(e) => {
@@ -160,7 +160,7 @@ function FieldsFilter({
                         setFilter(filterId, []);
                       }}
                     >
-                      <X width={12} />
+                      <X />
                     </Button>
                   </Tooltip>
                 </>

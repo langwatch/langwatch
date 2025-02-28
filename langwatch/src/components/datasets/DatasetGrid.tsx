@@ -5,7 +5,7 @@ import {
   type CustomCellEditorProps,
   type CustomCellRendererProps,
 } from "@ag-grid-community/react";
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Field, Text } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
 import { MultilineCellEditor } from "./MultilineCellEditor";
 
@@ -81,12 +81,14 @@ export const DatasetGrid = React.memo(
               ...column,
               cellDataType: "boolean",
               cellRenderer: (props: CustomCellRendererProps) => (
-                <Checkbox
-                  marginLeft="3px"
-                  checked={props.value}
-                  readOnly={column.editable === false ? true : undefined}
-                  onChange={(e) => props.setValue?.(e.target.checked)}
-                />
+                <Field.Root>
+                  <Checkbox
+                    marginLeft="3px"
+                    checked={props.value}
+                    readOnly={column.editable === false ? true : undefined}
+                    onChange={(e) => props.setValue?.(e.target.checked)}
+                  />
+                </Field.Root>
               ),
             };
           } else if (column.type_ === "number") {
@@ -292,17 +294,21 @@ export function HeaderCheckboxComponent(props: CustomCellRendererProps) {
   }, [props.api]);
 
   return (
-    <Checkbox
-      marginLeft="3px"
-      checked={checkboxState === "checked" || checkboxState === "indeterminate"}
-      icon={checkboxState === "indeterminate" ? <Minus /> : undefined}
-      onChange={(e) => {
-        const isChecked = e.target.checked;
-        props.api.forEachNode((node) => {
-          node.setDataValue("selected", isChecked);
-        });
-      }}
-    />
+    <Field.Root>
+      <Checkbox
+        marginLeft="3px"
+        checked={
+          checkboxState === "checked" || checkboxState === "indeterminate"
+        }
+        icon={checkboxState === "indeterminate" ? <Minus /> : undefined}
+        onChange={(e) => {
+          const isChecked = e.target.checked;
+          props.api.forEachNode((node) => {
+            node.setDataValue("selected", isChecked);
+          });
+        }}
+      />
+    </Field.Root>
   );
 }
 

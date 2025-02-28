@@ -166,7 +166,7 @@ export function MessagesTable() {
             onClick={() =>
               openDrawer("traceDetails", {
                 traceId: traceId,
-                selectedTab: "annotations",
+                selectedTab: "messages",
               })
             }
           >
@@ -1018,7 +1018,7 @@ export function MessagesTable() {
             </Tooltip>
             <Popover.Root
               open={open}
-              onOpenChange={(open) => (open ? onOpen() : onClose())}
+              onOpenChange={({ open }) => (open ? onOpen() : onClose())}
             >
               <Popover.Trigger asChild>
                 <Button variant="ghost" minWidth="fit-content">
