@@ -36,6 +36,10 @@ export default function TraceAnnotations() {
     await queryClient.annotation.getQueues.invalidate();
   };
 
+  if (queuesLoading) {
+    return <AnnotationsLayout />;
+  }
+
   if (allQueueItems.length === 0 && !queuesLoading) {
     return (
       <AnnotationsLayout>
@@ -65,27 +69,27 @@ export default function TraceAnnotations() {
   }
 
   return (
-    <DashboardLayout backgroundColor="white">
+    <DashboardLayout>
       <VStack height="100%" width="full" padding={4}>
         <Conversation traceId={currentQueueItem?.trace?.trace_id ?? ""} />
         <Spacer />
-        {currentQueueItem?.trace && (
-          <Box
-            position="sticky"
-            bottom={0}
-            left={0}
-            right={0}
-            width="100%"
-            backgroundColor="white"
-          >
-            <AnnotationQueuePicker
-              queueItems={allQueueItems}
-              currentQueueItem={currentQueueItem}
-              refetchQueueItems={refetchQueueItems}
-            />
-          </Box>
-        )}
       </VStack>
+      {currentQueueItem?.trace && (
+        <Box
+          position="sticky"
+          bottom={0}
+          left={0}
+          right={0}
+          width="100%"
+          backgroundColor="white"
+        >
+          <AnnotationQueuePicker
+            queueItems={allQueueItems}
+            currentQueueItem={currentQueueItem}
+            refetchQueueItems={refetchQueueItems}
+          />
+        </Box>
+      )}
     </DashboardLayout>
   );
 }
@@ -135,7 +139,7 @@ const AnnotationQueuePicker = ({
   };
 
   return (
-    <Box boxShadow="0px -3px 15px rgba(0, 0, 0, 0.1)" padding={4} width="full">
+    <Box boxShadow="0px -3px 10px rgba(0, 0, 0, 0.05)" padding={5} width="full">
       <VStack>
         <HStack gap={8}>
           <HStack gap={2}>

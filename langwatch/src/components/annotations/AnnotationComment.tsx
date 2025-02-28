@@ -9,6 +9,7 @@ import {
   Separator,
   Skeleton,
   Spacer,
+  Spinner,
   Text,
   useDisclosure,
   VStack,
@@ -43,6 +44,8 @@ type Annotation = {
   comment?: string | null;
   scoreOptions?: Record<string, { value: string | string[]; reason: string }>;
 };
+
+let doNotCloseMenu = false;
 
 export function AnnotationComment({ key = "" }: { key: string }) {
   const { project, isPublicRoute } = useOrganizationTeamProject();
@@ -125,7 +128,10 @@ export function AnnotationComment({ key = "" }: { key: string }) {
           scoreOptions: filteredScoreOptions,
         },
         {
-          onSuccess: () => {
+          onSuccess: async () => {
+            await queryClient.annotation.getByTraceId.invalidate();
+            await queryClient.annotation.getAll.invalidate();
+
             toaster.create({
               title: "Annotation Updated",
               description: `You have successfully updated the annotation`,
@@ -139,8 +145,6 @@ export function AnnotationComment({ key = "" }: { key: string }) {
             reset();
 
             commentState.resetComment();
-            void queryClient.annotation.getByTraceId.invalidate();
-            void queryClient.annotation.getAll.invalidate();
           },
           onError: () => {
             toaster.create({
@@ -164,7 +168,9 @@ export function AnnotationComment({ key = "" }: { key: string }) {
           scoreOptions: filteredScoreOptions,
         },
         {
-          onSuccess: () => {
+          onSuccess: async () => {
+            await queryClient.annotation.getByTraceId.invalidate();
+
             toaster.create({
               title: "Annotation Created",
               description: `You have successfully created an annotation`,
@@ -177,7 +183,6 @@ export function AnnotationComment({ key = "" }: { key: string }) {
 
             reset();
             commentState.resetComment();
-            void queryClient.annotation.getByTraceId.invalidate();
           },
           onError: () => {
             toaster.create({
@@ -202,7 +207,9 @@ export function AnnotationComment({ key = "" }: { key: string }) {
         projectId: project?.id ?? "",
       },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
+          await queryClient.annotation.getByTraceId.invalidate();
+
           toaster.create({
             title: "Annotation Deleted",
             description: `You have successfully deleted the annotation`,
@@ -212,7 +219,6 @@ export function AnnotationComment({ key = "" }: { key: string }) {
             },
             placement: "top-end",
           });
-          void queryClient.annotation.getByTraceId.invalidate();
           commentState.resetComment();
         },
       }
@@ -231,6 +237,12 @@ export function AnnotationComment({ key = "" }: { key: string }) {
   const selectedReason = selectedScoreTypeId
     ? watch(`scoreOptions.${selectedScoreTypeId}`)?.reason ?? ""
     : "";
+
+  const { open, setOpen } = useDisclosure();
+
+  useEffect(() => {
+    doNotCloseMenu = false;
+  }, [open]);
 
   return (
     <Box
@@ -275,18 +287,32 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                   <Spacer />
 
                   {action === "edit" && (
-                    <Menu.Root>
+                    <Menu.Root
+                      open={open}
+                      onOpenChange={(e) =>
+                        setOpen(doNotCloseMenu ? true : e.open)
+                      }
+                    >
                       <Menu.Trigger asChild>
-                        <Button size="xs" variant="outline">
+                        <Button size="xs" variant="ghost">
                           <MoreVertical size={16} />
                         </Button>
                       </Menu.Trigger>
-                      <Menu.Content>
+                      <Menu.Content portalled={false}>
                         <Menu.Item
                           value="delete"
-                          onClick={() => handleDelete()}
+                          color="red.600"
+                          onClick={() => {
+                            doNotCloseMenu = true;
+                            handleDelete();
+                          }}
                         >
-                          <Trash2 size={16} />
+                          {deleteAnnotation.isLoading ||
+                          getAnnotation.isLoading ? (
+                            <Spinner size="sm" />
+                          ) : (
+                            <Trash2 size={16} />
+                          )}
                           Delete
                         </Menu.Item>
                       </Menu.Content>
@@ -295,7 +321,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                 </HStack>
                 <Input
                   {...register("comment")}
-                  autoFocus
+                  autoFocus={action === "new"}
                   placeholder={
                     action === "new" ? "Leave your comment here" : ""
                   }
@@ -339,7 +365,9 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                     minWidth="fit-content"
                     size="sm"
                     loading={
-                      createAnnotation.isLoading || updateAnnotation.isLoading
+                      createAnnotation.isLoading ||
+                      updateAnnotation.isLoading ||
+                      getAnnotation.isLoading
                     }
                   >
                     {action === "new" ? "Save" : "Update"}

@@ -27,7 +27,7 @@ export default function Annotations() {
       projectId: project?.id ?? "",
       slug: slug as string,
     },
-    { enabled: !!project?.id }
+    { enabled: !!project?.id && typeof slug === "string" && !!slug }
   );
 
   const {

@@ -32,9 +32,7 @@ export const Annotations = ({
       projectId: project?.id ?? "",
       traceId: traceId,
     },
-    {
-      enabled: !!project?.id,
-    }
+    { enabled: !!project?.id }
   );
 
   const scoreOptions = api.annotationScore.getAll.useQuery(

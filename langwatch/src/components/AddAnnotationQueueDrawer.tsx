@@ -44,7 +44,7 @@ export const AddAnnotationQueueDrawer = ({
       projectId: project?.id ?? "",
     },
     {
-      enabled: !!project,
+      enabled: !!project && !!queueId,
     }
   );
 
@@ -380,6 +380,7 @@ export const AddAnnotationQueueDrawer = ({
                     colorPalette="orange"
                     type="submit"
                     minWidth="fit-content"
+                    loading={createOrUpdateQueue.isLoading}
                   >
                     Save
                   </Button>

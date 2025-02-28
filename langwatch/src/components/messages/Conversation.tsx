@@ -1,20 +1,11 @@
-import {
-  Box,
-  Grid,
-  GridItem,
-  HStack,
-  Skeleton,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Grid, GridItem, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { api } from "../../utils/api";
-import { Message, TraceMessages } from "./TraceMessages";
 import { Link } from "../ui/link";
+import { Message, TraceMessages } from "./TraceMessages";
 
 export function Conversation({
   threadId,
@@ -51,7 +42,7 @@ export function Conversation({
         "conversation-scroll-container"
       )!;
       if (container) {
-        container.scrollTop = (currentTraceRef.current?.offsetTop ?? 0) - 56;
+        container.scrollTop = (currentTraceRef.current?.offsetTop ?? 0) - 176;
       } else {
         document.body.scrollTop =
           (currentTraceRef.current?.offsetTop ?? 0) - 56;
@@ -62,7 +53,7 @@ export function Conversation({
   }, [!!threadTraces.data]);
 
   return (
-    <Box width="full" minWidth="800px" paddingX={10}>
+    <Box width="full" minWidth="800px" paddingX={6}>
       <VStack align="start" width="full" gap={0}>
         {!!threadId || trace.data ? (
           <>
@@ -100,12 +91,17 @@ export function Conversation({
                 trace={trace.data}
                 highlighted={!!modalTraceId}
                 index="only"
-                loadingMore={threadTraces.isLoading}
+                loadingMore={threadTraces.isFetching}
               />
             )}
             {trace.data && !trace.data.metadata.thread_id && (
-              <Box maxWidth="1400px" paddingY={8}>
-                <Text fontStyle="italic" color="gray.500">
+              <Box width="full" maxWidth="1000px" paddingY={8}>
+                <Text
+                  fontStyle="italic"
+                  color="gray.500"
+                  textAlign="center"
+                  width="full"
+                >
                   Pass the thread_id on your integration to capture and
                   visualize the whole conversation or associated actions. Read
                   more on our{" "}
@@ -122,15 +118,14 @@ export function Conversation({
             )}
           </>
         ) : trace.isLoading ? (
-          <Box maxWidth="1400px" width="full">
+          <Box maxWidth="1000px" width="full">
             <Grid templateColumns="repeat(4, 1fr)">
-              <GridItem colSpan={3}>
+              <GridItem colSpan={4}>
                 <Box
-                  minWidth="65%"
                   position="relative"
                   border="1px solid"
                   borderColor="gray.200"
-                  marginRight={10}
+                  marginRight={5}
                   paddingLeft={10}
                   paddingRight={10}
                   paddingY={4}
@@ -143,8 +138,8 @@ export function Conversation({
                     avatar={
                       <Skeleton
                         borderRadius="full"
-                        minWidth="32px"
-                        minHeight="32px"
+                        minWidth="36px"
+                        minHeight="36px"
                       />
                     }
                     paddingTop="20px"
@@ -161,8 +156,8 @@ export function Conversation({
                     avatar={
                       <Skeleton
                         borderRadius="full"
-                        minWidth="32px"
-                        minHeight="32px"
+                        minWidth="36px"
+                        minHeight="36px"
                       />
                     }
                   >
@@ -175,7 +170,6 @@ export function Conversation({
                   </Message>
                 </Box>
               </GridItem>
-              <GridItem minWidth="420px"></GridItem>
             </Grid>
           </Box>
         ) : null}

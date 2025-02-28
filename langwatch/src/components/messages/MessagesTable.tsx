@@ -17,6 +17,7 @@ import {
   Icon,
   useDisclosure,
   Field,
+  Badge,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
@@ -445,7 +446,7 @@ export function MessagesTable() {
         <Table.Cell key={index}>
           <HStack gap={1}>
             {(trace.metadata.labels ?? []).map((label) => (
-              <Tag.Root
+              <Badge
                 key={label}
                 size="sm"
                 paddingX={2}
@@ -453,8 +454,8 @@ export function MessagesTable() {
                 color={getColorForString("colors", label).color}
                 fontSize="12px"
               >
-                <Tag.Label>{label}</Tag.Label>
-              </Tag.Root>
+                {label}
+              </Badge>
             ))}
           </HStack>
         </Table.Cell>

@@ -19,7 +19,13 @@ import { Radio, RadioGroup } from "../../components/ui/radio";
 import { Tooltip } from "../../components/ui/tooltip";
 
 import { useRouter } from "next/router";
-import { ChevronsDown, Edit, MessageCircle, MoreVertical } from "react-feather";
+import {
+  ChevronDown,
+  ChevronsDown,
+  Edit,
+  MessageCircle,
+  MoreVertical,
+} from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import type { Annotation } from "@prisma/client";
@@ -214,7 +220,7 @@ export const AnnotationsTable = ({
             <Menu.Root>
               <Menu.Trigger asChild>
                 <Button variant="outline">
-                  Status <ChevronsDown />
+                  Status <ChevronDown />
                 </Button>
               </Menu.Trigger>
               <Menu.Content>
@@ -226,8 +232,8 @@ export const AnnotationsTable = ({
                 >
                   <VStack align="start" padding={3} gap={3}>
                     <Radio value="pending">Pending</Radio>
-                    <Radio value="all">All Annotations</Radio>
                     <Radio value="completed">Completed</Radio>
+                    <Radio value="all">All Annotations</Radio>
                   </VStack>
                 </RadioGroup>
               </Menu.Content>

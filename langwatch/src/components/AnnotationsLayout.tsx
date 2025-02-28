@@ -48,7 +48,7 @@ export default function AnnotationsLayout({
   const { openDrawer } = useDrawer();
 
   return (
-    <DashboardLayout>
+    <DashboardLayout background="gray.100">
       <HStack
         align="start"
         width="full"

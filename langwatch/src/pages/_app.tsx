@@ -244,10 +244,16 @@ export const system = createSystem(defaultConfig, {
               _hover: {
                 backgroundColor: "gray.50",
               },
+              _expanded: {
+                backgroundColor: "gray.50",
+              },
             },
             ghost: {
               color: "gray.800",
               _hover: {
+                backgroundColor: "gray.50",
+              },
+              _expanded: {
                 backgroundColor: "gray.50",
               },
             },
@@ -356,6 +362,7 @@ export const system = createSystem(defaultConfig, {
           },
           label: {
             fontWeight: "normal",
+            cursor: "pointer",
           },
         },
         variants: {
@@ -590,10 +597,10 @@ export const system = createSystem(defaultConfig, {
             true: {
               range: {
                 "--stripe-color": "rgba(255, 255, 255, 0.2)",
-              }
-            }
-          }
-        }
+              },
+            },
+          },
+        },
       }),
     },
   },

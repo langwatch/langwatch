@@ -371,7 +371,7 @@ export function TraceDetails(props: {
             value="messages"
             paddingX={0}
             padding={0}
-            paddingTop={2}
+            paddingY={6}
             background="gray.100"
             flexGrow={1}
           >
