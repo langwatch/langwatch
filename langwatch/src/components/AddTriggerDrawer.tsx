@@ -127,8 +127,6 @@ export function TriggerDrawer() {
 
   const currentAction: TriggerAction = watch("action");
 
-  console.log(currentAction);
-
   const onCreateDatasetSuccess = ({ datasetId }: { datasetId: string }) => {
     editDataset.onClose();
     void datasets.refetch().then(() => {
