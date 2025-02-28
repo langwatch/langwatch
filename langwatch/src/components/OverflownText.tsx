@@ -10,7 +10,10 @@ export function OverflownTextWithTooltip({
   const [isOverflown, setIsOverflown] = useState(false);
 
   useEffect(() => {
-    const element = ref.current!;
+    const element = ref.current;
+
+    if (!element) return;
+
     setIsOverflown(element.scrollHeight > element.clientHeight);
   }, []);
 

@@ -26,7 +26,8 @@
       "@trpc-internal/utils": [
         "node_modules/@trpc/server/dist/core/internals/utils"
       ],
-      "zod/lib/helpers/errorUtil": ["node_modules/zod/lib/helpers/errorUtil"]
+      "zod/lib/helpers/errorUtil": ["node_modules/zod/lib/helpers/errorUtil"],
+      "@langwatch-oss/*": ["./*"]
     },
     "plugins": [
       {

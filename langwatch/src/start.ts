@@ -81,11 +81,10 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
   const hostname = "0.0.0.0";
   const port = parseInt(process.env.PORT ?? "5560");
   // when using middleware `hostname` and `port` must be provided below
-  const app = next({ dev, hostname, port, dir });
+  const app = next({ dev, hostname, port, dir, turbo: true, turbopack: true });
+  await app.prepare();
   const handle = app.getRequestHandler();
   const upgradeHandler = app.getUpgradeHandler();
-
-  await app.prepare();
 
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
   const server = createServer(async (req, res) => {
@@ -163,7 +162,7 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
     process.exit(1);
   });
 
-  server.listen(port, async () => {
+  server.listen(port, () => {
     console.log(
       `\n🎉 LangWatch is ready on http://${hostname.replace(
         "0.0.0.0",
