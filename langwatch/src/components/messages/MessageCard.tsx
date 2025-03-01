@@ -241,10 +241,10 @@ export function MessageCard({
             </Box>
             {trace.expected_output && (
               <Alert.Root status="warning" fontSize="13px">
+                <Alert.Indicator>
+                  <CornerDownRight size="16" />
+                </Alert.Indicator>
                 <Alert.Content>
-                  <Box paddingRight={2}>
-                    <CornerDownRight size="16" />
-                  </Box>
                   <Alert.Title>Expected Output:</Alert.Title>
                   <Text>{getSlicedExpectedOutput(trace)}</Text>
                 </Alert.Content>

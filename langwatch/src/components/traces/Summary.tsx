@@ -112,7 +112,7 @@ const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
                 {numeral(trace.metrics.total_cost).format("$0.00000a")}
               </SummaryItem>
             )}
-          {trace.metrics?.first_token_ms && (
+          {!!trace.metrics?.first_token_ms && (
             <SummaryItem
               label="Time to First Token"
               tooltip="How long did it took for the first token of the last span to arrive, that is, the smallest delay between request and the first output token to appear for the user"
@@ -120,7 +120,7 @@ const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
               {formatMilliseconds(trace.metrics.first_token_ms)}
             </SummaryItem>
           )}
-          {trace.metrics?.total_time_ms && (
+          {!!trace.metrics?.total_time_ms && (
             <SummaryItem
               label="Total Completion Time"
               tooltip="How long it took for completion output to be fully finished"
