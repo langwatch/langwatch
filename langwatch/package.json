@@ -51,6 +51,7 @@
     "@microlink/react-json-view": "^1.23.1",
     "@monaco-editor/react": "^4.7.0-rc.0",
     "@next-auth/prisma-adapter": "^1.0.7",
+    "@next/bundle-analyzer": "^15.2.0",
     "@opensearch-project/opensearch": "^2.11.0",
     "@opentelemetry/exporter-trace-otlp-proto": "0.55.0",
     "@opentelemetry/otlp-transformer": "0.55.0",
