@@ -21,7 +21,6 @@ export const AddModelProviderKey = ({
 }) => {
   return (
     <Alert.Root status="warning">
-      <Alert.Indicator />
       <Alert.Content>
         <VStack align="start" width="full">
           <HStack paddingBottom={3}>
@@ -40,7 +39,7 @@ export const AddModelProviderKey = ({
                     ]
                   }
                 </Box>
-                <Text>{titleCase(provider)}</Text>
+                <Text color="gray.800">{titleCase(provider)}</Text>
                 <Spacer />
 
                 <Link href="/settings/model-providers" isExternal>

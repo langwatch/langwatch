@@ -146,7 +146,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                       {projectGroup.projects.map((project) => (
                         <Menu.Item
                           key={project.id}
-                          value={project.name}
+                          value={project.id}
                           fontSize="14px"
                           asChild
                         >

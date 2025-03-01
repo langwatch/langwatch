@@ -80,7 +80,9 @@ export function HoverableBigText({
   const expandedVersion_ = expandedVersion ?? children;
 
   useEffect(() => {
-    const element = ref.current!;
+    const element = ref.current;
+
+    if (!element) return;
 
     const checkOverflow = () => {
       setIsOverflown(

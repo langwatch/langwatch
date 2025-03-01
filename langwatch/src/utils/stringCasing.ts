@@ -22,6 +22,7 @@ export const titleCase = (input: string): string => {
   return input
     .replace(/^./, (str) => str.toUpperCase())
     .replace(/ (\w)/g, (_, char) => ` ${char.toUpperCase()}`)
+    .replace(/openai/gi, "OpenAI")
     .replace(accronyms, (str) => str.toUpperCase());
 };
 

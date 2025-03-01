@@ -28,13 +28,10 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(
 
     return (
       <ChakraTooltip.Root
+        openDelay={420}
+        closeDelay={0}
+        disabled={!props.content}
         {...rest}
-        openDelay={props.openDelay ?? 500}
-        disabled={
-          typeof props.disabled === "undefined"
-            ? !props.content
-            : props.disabled
-        }
       >
         <ChakraTooltip.Trigger asChild>
           {typeof children === "string" ? <Text>{children}</Text> : children}

@@ -35,7 +35,7 @@ export const PreconditionsField = ({
   remove,
   fields,
 }: {
-  runOn: JSX.Element | null;
+  runOn: React.ReactNode | null;
   append: (value: any) => void;
   remove: (index: number) => void;
   fields: Record<"id", string>[];

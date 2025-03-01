@@ -15,6 +15,7 @@ import { AddModelProviderKey } from "../../AddModelProviderKey";
 import { Link } from "../../../../components/ui/link";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useDisclosure } from "@chakra-ui/react";
+import { OverflownTextWithTooltip } from "../../../../components/OverflownText";
 
 export function LLMModelDisplay({
   model,
@@ -29,33 +30,28 @@ export function LLMModelDisplay({
     "chat"
   );
 
+  const isDisabled = modelOption?.isDisabled || !modelOption?.label;
+
   return (
     <>
-      <Box width="14px" minWidth="14px">
-        {modelOption?.icon}
-      </Box>
-      <Box
+      {modelOption?.icon && (
+        <Box width="14px" minWidth="14px">
+          {modelOption?.icon}
+        </Box>
+      )}
+      <OverflownTextWithTooltip
+        label={`${modelOption?.label ?? model} ${
+          modelOption?.isDisabled ? "(disabled)" : !modelOption?.label ? "(deprecated)" : ""
+        }`}
         fontSize={fontSize}
         fontFamily="mono"
         lineClamp={1}
         wordBreak="break-all"
+        color={isDisabled ? "gray.500" : undefined}
+        textDecoration={isDisabled ? "line-through" : undefined}
       >
-        {modelOption?.label}
-        {modelOption?.isDisabled && (
-          <>
-            {" "}
-            <Text
-              as="span"
-              fontSize={fontSize}
-              fontFamily="mono"
-              color="gray.500"
-              opacity={modelOption?.isDisabled ? 0.5 : 1}
-            >
-              (disabled)
-            </Text>
-          </>
-        )}
-      </Box>
+        {modelOption?.label ?? model}
+      </OverflownTextWithTooltip>
     </>
   );
 }

@@ -84,6 +84,7 @@ export const system = createSystem(defaultConfig, {
         orange: {
           solid: { value: "#ED8926" },
           focusRing: { value: "rgb(49, 130, 206)" },
+          fg: { value: "{colors.orange.800}" },
         },
         green: {
           solid: { value: "{colors.green.500}" },

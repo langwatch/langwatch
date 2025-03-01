@@ -120,10 +120,6 @@ export function MessageCard({
           position="relative"
           zIndex="popover"
           borderRadius="full"
-          right={2}
-          top={2}
-          borderWidth={1}
-          borderColor="gray.300"
           onClick={() =>
             openDrawer("traceDetails", {
               traceId: trace.trace_id,
@@ -133,7 +129,7 @@ export function MessageCard({
         >
           <Tag.Label>
             <HStack>
-              <Edit />
+              <Edit size={24} />
               <Text>
                 {annotations.length} annotation
                 {annotations.length > 1 ? "s" : ""}
@@ -386,6 +382,7 @@ export function MessageCard({
                 paddingX={2}
                 position="relative"
                 zIndex="popover"
+                borderRadius="full"
               >
                 <Tag.Label>
                   {allGuardrailsSkipped ? (

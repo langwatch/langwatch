@@ -1,7 +1,14 @@
-import { Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  HStack,
+  PopoverTrigger,
+  Spacer,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { Popover } from "../../../../components/ui/popover";
 import { useState, useEffect } from "react";
-import { X } from "react-feather";
+import { Box, X } from "react-feather";
 
 export function ConfigModal({
   open,
@@ -36,16 +43,13 @@ export function ConfigModal({
       }}
       positioning={{ placement: "bottom-start" }}
     >
-      {/* TODO: find alternative to this */}
-      {/* <Popover.Anchor>
-        <Box
-          position="absolute"
-          left={0}
-          width="100%"
-          height="80px"
-          zIndex={-1}
-        />
-      </Popover.Anchor> */}
+      <PopoverTrigger
+        position="absolute"
+        left={0}
+        width="100%"
+        height="80px"
+        zIndex={-1}
+      />
       {unstyled ? (
         children
       ) : (
