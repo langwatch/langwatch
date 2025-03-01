@@ -86,8 +86,8 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
     hostname,
     port,
     dir,
-    turbo: !!dev,
-    turbopack: !!dev,
+    turbo: !!dev && !process.env.USE_WEBPACK,
+    turbopack: !!dev && !process.env.USE_WEBPACK,
   });
   await app.prepare();
   const handle = app.getRequestHandler();

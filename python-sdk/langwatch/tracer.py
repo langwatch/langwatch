@@ -1191,8 +1191,10 @@ def send_spans(
 ):
     import json
 
+    json_data = json.dumps(data, cls=SerializableWithStringFallback, indent=2)
+
     get_logger().debug(
-        f"Sending trace: {json.dumps(data, cls=SerializableWithStringFallback, indent=2)}"
+        f"Sending trace: {json_data}"
     )
 
     api_key = api_key or langwatch.api_key
@@ -1220,7 +1222,7 @@ def send_spans(
     with httpx.Client(timeout=60.0) as client:
         response = client.post(
             f"{langwatch.endpoint}/api/collector{force_sync}",
-            json=data,
+            json=json.loads(json_data),
             headers={
                 "X-Auth-Token": str(api_key),
                 "Content-Type": "application/json",
