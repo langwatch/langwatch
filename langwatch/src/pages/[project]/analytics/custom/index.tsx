@@ -6,7 +6,6 @@ import {
   Center,
   Container,
   Field,
-  Flex,
   Grid,
   HStack,
   Heading,
@@ -17,7 +16,7 @@ import {
   Textarea,
   VStack,
   createListCollection,
-  useDisclosure,
+  useDisclosure
 } from "@chakra-ui/react";
 
 import {
@@ -32,13 +31,12 @@ import {
   BarChart2,
   Check,
   ChevronDown,
-  ChevronsDown,
   GitBranch,
   MoreVertical,
   PieChart,
   Trash,
   TrendingUp,
-  Triangle,
+  Triangle
 } from "react-feather";
 import {
   Controller,
@@ -52,6 +50,7 @@ import {
 } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
 import { RenderCode } from "~/components/code/RenderCode";
+import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
@@ -100,7 +99,6 @@ import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,
 } from "../../../../utils/stringCasing";
-import { Dialog } from "~/components/ui/dialog";
 
 export interface CustomGraphFormData {
   title?: string;
@@ -600,17 +598,6 @@ function CustomGraphForm({
     );
   };
 
-  const timeCollection = createListCollection({
-    items: [
-      { label: "Full Period", value: "full" },
-      { label: "Daily", value: "1" },
-      { label: "7 days", value: "7" },
-      { label: "30 days", value: "30" },
-      { label: "90 days", value: "90" },
-      { label: "365 days", value: "356" },
-    ],
-  });
-
   return (
     <VStack width="full" align="start" gap={4} maxWidth="500px">
       <Field.Root>
@@ -624,22 +611,17 @@ function CustomGraphForm({
             control={form.control}
             name="timeScale"
             render={({ field }) => (
-              <Select.Root
-                {...field}
-                collection={timeCollection}
-                value={[field.value.toString()]}
-              >
-                <Select.Trigger>
-                  <Select.ValueText />
-                </Select.Trigger>
-                <Select.Content>
-                  {timeCollection.items.map((item) => (
-                    <Select.Item item={item} key={item.value}>
-                      {item.label}
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Root>
+              <NativeSelect.Root>
+                <NativeSelect.Field {...field}>
+                  <option value="full">Full Period</option>
+                  <option value="1">Daily</option>
+                  <option value="7">7 days</option>
+                  <option value="30">30 days</option>
+                  <option value="90">90 days</option>
+                  <option value="365">365 days</option>
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
             )}
           />
         </Field.Root>

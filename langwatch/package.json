@@ -137,7 +137,7 @@
     "react-select": "^5.8.2",
     "react-simple-code-editor": "^0.14.1",
     "react-spinners": "^0.14.1",
-    "recharts": "^2.15.0",
+    "recharts": "^2.15.1",
     "remark-gfm": "^4.0.0",
     "safe-regex2": "^4.0.1",
     "sass": "^1.79.0",
@@ -194,7 +194,8 @@
     "glob": "^11.0.1",
     "@zag-js/core": "^0.82.2",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-is": "19.0.0"
   },
   "ct3aMetadata": {
     "initVersion": "7.19.0"
