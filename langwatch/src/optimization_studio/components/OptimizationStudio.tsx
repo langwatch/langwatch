@@ -58,7 +58,6 @@ import { PropertiesPanel } from "./properties/PropertiesPanel";
 import { Publish } from "./Publish";
 import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
-import { setRecentMenuLinkClick } from "../../components/MainMenu";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {
   const [_, drop] = useDrop(() => ({
@@ -211,12 +210,7 @@ export default function OptimizationStudio() {
               borderColor="gray.350"
             >
               <HStack width="full">
-                <Link
-                  href={`/${project?.slug}/workflows`}
-                  onClick={() => {
-                    setRecentMenuLinkClick(true);
-                  }}
-                >
+                <Link href={`/${project?.slug}/workflows`}>
                   <LogoIcon width={24} height={24} />
                 </Link>
                 <RunningStatus />

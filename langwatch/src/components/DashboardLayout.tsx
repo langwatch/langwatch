@@ -20,7 +20,6 @@ import { useRouter } from "next/router";
 import numeral from "numeral";
 import React, { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Lock, Plus, Search } from "react-feather";
-import { useDebounceValue } from "usehooks-ts";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -33,7 +32,7 @@ import { CurrentDrawer } from "./CurrentDrawer";
 import { HoverableBigText } from "./HoverableBigText";
 import { IntegrationChecks, useIntegrationChecks } from "./IntegrationChecks";
 import { LoadingScreen } from "./LoadingScreen";
-import { getRecentMenuLinkClick, MainMenu } from "./MainMenu";
+import { MainMenu } from "./MainMenu";
 import { ProjectTechStackIcon } from "./TechStack";
 import { ChecklistIcon } from "./icons/Checklist";
 import { useColorRawValue } from "./ui/color-mode";
@@ -278,14 +277,6 @@ export const DashboardLayout = ({
     ).length;
   }, [integrationChecks.data]);
 
-  const [isHovered, setIsHovered] = useDebounceValue(
-    getRecentMenuLinkClick(),
-    200,
-    {
-      leading: true,
-    }
-  );
-
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return <ErrorPage statusCode={404} />;
   }
@@ -322,24 +313,9 @@ export const DashboardLayout = ({
             : ""}
         </title>
       </Head>
-      {!isHovered && (
-        <Box
-          position="fixed"
-          zIndex={4}
-          onMouseEnter={() => setIsHovered(true)}
-          width="20px"
-          top={0}
-          left={menuWidth + 5 + "px"}
-          height="100vh"
-        ></Box>
-      )}
-      <MainMenu
-        menuWidth={menuWidth}
-        isHovered={isHovered}
-        setIsHovered={setIsHovered}
-      />
+      <MainMenu menuWidth={menuWidth} />
       <VStack
-        minWidth={`calc(100vw - ${menuWidth}px)`}
+        width={`calc(100vw - ${menuWidth}px)`}
         maxWidth={`calc(100vw - ${menuWidth}px)`}
         gap={0}
         background="gray.100"

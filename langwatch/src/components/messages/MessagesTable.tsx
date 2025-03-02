@@ -1,37 +1,32 @@
 import {
+  Badge,
   Box,
   Button,
+  Card,
   Container,
   HStack,
   Heading,
-  Input,
-  NativeSelect,
-  Card,
-  Table,
+  Icon,
   Progress,
   Skeleton,
   Spacer,
+  Table,
+  Tag,
   Text,
   VStack,
-  Tag,
-  Icon,
   useDisclosure,
-  Field,
-  Badge,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Edit,
+  ChevronUp,
   Download,
+  Edit,
   List,
   RefreshCw,
   Shield,
-  ChevronUp,
 } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
@@ -42,25 +37,25 @@ import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import { useFilterParams } from "../../hooks/useFilterParams";
 
 import Parse from "papaparse";
+import { LuChevronsUpDown } from "react-icons/lu";
 import { useLocalStorage } from "usehooks-ts";
+import { getColorForString } from "../../utils/rotatingColors";
 import { titleCase } from "../../utils/stringCasing";
 import { useDrawer } from "../CurrentDrawer";
+import { Delayed } from "../Delayed";
+import { HoverableBigText } from "../HoverableBigText";
+import { OverflownTextWithTooltip } from "../OverflownText";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { evaluationStatusColor } from "../checks/EvaluationStatus";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { FilterToggle } from "../filters/FilterToggle";
 import { formatEvaluationSingleValue } from "../traces/EvaluationStatusItem";
-import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
-import type { TraceWithGuardrail } from "./MessageCard";
-import { HoverableBigText } from "../HoverableBigText";
-import { getColorForString } from "../../utils/rotatingColors";
-import { Delayed } from "../Delayed";
 import { Checkbox } from "../ui/checkbox";
 import { Popover } from "../ui/popover";
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
-import { LuChevronsUpDown } from "react-icons/lu";
-import { OverflownTextWithTooltip } from "../OverflownText";
+import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
+import type { TraceWithGuardrail } from "./MessageCard";
 import {
   MessagesNavigationFooter,
   useMessagesNavigationFooter,
@@ -967,9 +962,14 @@ export function MessagesTable() {
     }
   };
 
+  const [isExpanded] = useLocalStorage("main-menu-expanded", false);
+
   return (
     <>
-      <Container maxW={"calc(100vw - 50px)"} padding={6}>
+      <Container
+        maxWidth={isExpanded ? "calc(100vw - 200px)" : "calc(100vw - 50px)"}
+        padding={6}
+      >
         <HStack width="full" align="top" paddingBottom={6}>
           <HStack align="center" gap={6}>
             <Heading as="h1" size="lg" paddingTop={1}>
@@ -1088,8 +1088,8 @@ export function MessagesTable() {
         <HStack align="top" gap={8}>
           <Box flex="1" minWidth="0">
             <VStack gap={0} align="start">
-              <Card.Root height="fit-content" width="100%">
-                <Card.Body padding={0}>
+              <Card.Root height="fit-content">
+                <Card.Body padding={0} maxWidth="50%">
                   {downloadProgress > 0 && (
                     <Progress.Root
                       colorPalette="orange"

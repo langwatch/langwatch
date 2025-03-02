@@ -1,43 +1,52 @@
-import { Badge, Box, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-import { LogoIcon } from "./icons/LogoIcon";
-import { useMemo } from "react";
-import { useAnnotationQueues } from "../hooks/useAnnotationQueues";
-import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import {
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Spacer,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import type { Project } from "@prisma/client";
+import { useRouter } from "next/router";
+import React, { useMemo } from "react";
 import {
   Bell,
+  BookOpen,
   CheckSquare,
+  ChevronLeft,
+  ChevronRight,
   Edit,
+  GitHub,
+  MessageSquare,
   Settings,
   Shield,
   Table,
   TrendingUp,
 } from "react-feather";
-import { MessageSquare } from "react-feather";
+import { useLocalStorage } from "usehooks-ts";
+import { useAnnotationQueues } from "../hooks/useAnnotationQueues";
+import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { OrganizationRoleGroup } from "../server/api/permission";
-import { IconWrapper } from "./IconWrapper";
-import { BookOpen, GitHub } from "react-feather";
-import { DiscordOutlineIcon } from "./icons/DiscordOutline";
-import { ChatBalloonIcon } from "./icons/ChatBalloon";
 import { findCurrentRoute, projectRoutes } from "../utils/routes";
+import { trackEvent } from "../utils/tracking";
+import { ChatBalloonIcon } from "./icons/ChatBalloon";
+import { DiscordOutlineIcon } from "./icons/DiscordOutline";
+import { LogoIcon } from "./icons/LogoIcon";
 import { PuzzleIcon } from "./icons/PuzzleIcon";
+import { IconWrapper } from "./IconWrapper";
 import { useTableView } from "./messages/HeaderButtons";
-import { useRouter } from "next/router";
 import { useColorRawValue } from "./ui/color-mode";
 import { Link } from "./ui/link";
-import { trackEvent } from "../utils/tracking";
-import type { Project } from "@prisma/client";
-import React from "react";
+import { Tooltip } from "./ui/tooltip";
 
 export const MainMenu = React.memo(
-  function MainMenu({
-    menuWidth,
-    isHovered,
-    setIsHovered,
-  }: {
-    menuWidth: number;
-    isHovered: boolean;
-    setIsHovered: (isHovered: boolean) => void;
-  }) {
+  function MainMenu({ menuWidth }: { menuWidth: number }) {
+    const [isExpanded, setIsExpanded] = useLocalStorage(
+      "main-menu-expanded",
+      false
+    );
+
     const { project, hasOrganizationPermission, isPublicRoute } =
       useOrganizationTeamProject();
     const { assignedQueueItems, memberAccessibleQueueItems } =
@@ -55,14 +64,9 @@ export const MainMenu = React.memo(
         borderRightWidth="1px"
         borderRightColor="gray.300"
         background="white"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => {
-          setIsHovered(false);
-          setRecentMenuLinkClick(false);
-        }}
         transition="all 0.2s ease-in-out"
-        width={isHovered ? "200px" : menuWidth + "px"}
-        minWidth={isHovered ? "200px" : menuWidth + "px"}
+        width={isExpanded ? "200px" : menuWidth + "px"}
+        minWidth={isExpanded ? "200px" : menuWidth + "px"}
         overflowX="hidden"
         height="100vh"
         position="sticky"
@@ -70,37 +74,70 @@ export const MainMenu = React.memo(
       >
         <VStack
           paddingX={0}
-          paddingTop={5}
+          paddingTop={4}
           paddingBottom={3}
           gap={6}
           height="100vh"
           align="start"
-          width={isHovered ? "200px" : "full"}
+          width={isExpanded ? "200px" : "full"}
         >
-          <Box fontSize="32px" fontWeight="bold" paddingX={6}>
-            <LogoIcon width={25} height={34} />
+          <Box width="full" paddingX="6px">
+            <Button
+              asChild
+              className="group"
+              variant="plain"
+              onClick={() => setIsExpanded(!isExpanded)}
+              width="full"
+              minWidth="0"
+              padding={2}
+              paddingRight={isExpanded ? "6px" : "2px"}
+              size="lg"
+              _icon={{
+                width: "auto",
+                height: "auto",
+                maxWidth: "none",
+                maxHeight: "none",
+              }}
+              backgroundColor="white"
+              _hover={{
+                backgroundColor: isExpanded ? undefined : "gray.50",
+              }}
+            >
+              <HStack fontSize="32px" fontWeight="bold" gap={0}>
+                <LogoIcon width={25} height={34} />
+                <Spacer />
+                <Box
+                  padding={isExpanded ? 2 : 0}
+                  borderRadius="md"
+                  backgroundColor="white"
+                  _groupHover={{
+                    backgroundColor: isExpanded ? "gray.50" : undefined,
+                  }}
+                >
+                  {isExpanded ? (
+                    <ChevronLeft size={16} />
+                  ) : (
+                    <ChevronRight size={16} />
+                  )}
+                </Box>
+              </HStack>
+            </Button>
           </Box>
 
-          <VStack
-            width="full"
-            height="full"
-            gap={0}
-            paddingTop={1}
-            align="start"
-          >
+          <VStack width="full" height="full" gap={0} align="start">
             <PageMenuLink
               path={projectRoutes.home.path}
               icon={TrendingUp}
               label={projectRoutes.home.title}
               project={project}
-              isHovered={isHovered}
+              isExpanded={isExpanded}
             />
             <PageMenuLink
               path={projectRoutes.messages.path}
               icon={MessageSquare}
               label={projectRoutes.messages.title}
               project={project}
-              isHovered={isHovered}
+              isExpanded={isExpanded}
             />
 
             <PageMenuLink
@@ -108,7 +145,7 @@ export const MainMenu = React.memo(
               icon={Shield}
               label={projectRoutes.evaluations.title}
               project={project}
-              isHovered={isHovered}
+              isExpanded={isExpanded}
             />
 
             <PageMenuLink
@@ -116,7 +153,7 @@ export const MainMenu = React.memo(
               icon={PuzzleIcon}
               label={projectRoutes.workflows.title}
               project={project}
-              isHovered={isHovered}
+              isExpanded={isExpanded}
             />
 
             <PageMenuLink
@@ -124,7 +161,7 @@ export const MainMenu = React.memo(
               icon={Table}
               label={projectRoutes.datasets.title}
               project={project}
-              isHovered={isHovered}
+              isExpanded={isExpanded}
             />
             <PageMenuLink
               path={projectRoutes.annotations.path}
@@ -132,7 +169,7 @@ export const MainMenu = React.memo(
               label={projectRoutes.annotations.title}
               project={project}
               badgeNumber={totalQueueItems}
-              isHovered={isHovered}
+              isExpanded={isExpanded}
               iconStyle={{ marginLeft: "1px" }}
             />
 
@@ -141,7 +178,7 @@ export const MainMenu = React.memo(
               icon={CheckSquare}
               label={projectRoutes.experiments.title}
               project={project}
-              isHovered={isHovered}
+              isExpanded={isExpanded}
             />
 
             <PageMenuLink
@@ -149,7 +186,7 @@ export const MainMenu = React.memo(
               icon={Bell}
               label={projectRoutes.triggers.title}
               project={project}
-              isHovered={isHovered}
+              isExpanded={isExpanded}
             />
 
             {/*<SideMenuLink
@@ -167,7 +204,7 @@ export const MainMenu = React.memo(
                 icon={Settings}
                 label={projectRoutes.settings.title}
                 project={project}
-                isHovered={isHovered}
+                isExpanded={isExpanded}
               />
             )}
 
@@ -183,7 +220,7 @@ export const MainMenu = React.memo(
               label="Documentation"
               isActive={false}
               project={project}
-              isHovered={isHovered}
+              isExpanded={isExpanded}
             />
 
             <SideMenuLink
@@ -197,7 +234,7 @@ export const MainMenu = React.memo(
               label="GitHub"
               isActive={false}
               project={project}
-              isHovered={isHovered}
+              isExpanded={isExpanded}
             />
 
             <SideMenuLink
@@ -211,7 +248,7 @@ export const MainMenu = React.memo(
               label="Community"
               isActive={false}
               project={project}
-              isHovered={isHovered}
+              isExpanded={isExpanded}
             />
             {(window as any)?.$crisp && project && (
               <SideMenuLink
@@ -257,7 +294,7 @@ export const MainMenu = React.memo(
                 label="Live Help"
                 isActive={false}
                 project={project}
-                isHovered={isHovered}
+                isExpanded={isExpanded}
               />
             )}
           </VStack>
@@ -266,10 +303,7 @@ export const MainMenu = React.memo(
     );
   },
   (prevProps, nextProps) => {
-    return (
-      prevProps.isHovered === nextProps.isHovered &&
-      prevProps.menuWidth === nextProps.menuWidth
-    );
+    return prevProps.menuWidth === nextProps.menuWidth;
   }
 );
 
@@ -279,7 +313,7 @@ const PageMenuLink = ({
   path,
   project,
   badgeNumber,
-  isHovered,
+  isExpanded,
   iconStyle,
 }: {
   icon: React.ComponentType<{ size?: string | number; color?: string }>;
@@ -287,7 +321,7 @@ const PageMenuLink = ({
   path: string;
   project?: Project;
   badgeNumber?: number;
-  isHovered?: boolean;
+  isExpanded?: boolean;
   iconStyle?: React.CSSProperties;
 }) => {
   const router = useRouter();
@@ -329,23 +363,10 @@ const PageMenuLink = ({
       }
       isActive={isActive}
       badgeNumber={badgeNumber}
-      isHovered={isHovered}
+      isExpanded={isExpanded}
       iconStyle={iconStyle}
     />
   );
-};
-
-export const setRecentMenuLinkClick = (value: boolean) => {
-  if (typeof window !== "undefined") {
-    (window as any).recentMenuLinkClick = value;
-  }
-};
-
-export const getRecentMenuLinkClick = () => {
-  if (typeof window !== "undefined") {
-    return (window as any).recentMenuLinkClick ?? false;
-  }
-  return false;
 };
 
 const SideMenuLink = ({
@@ -356,7 +377,7 @@ const SideMenuLink = ({
   project,
   isActive,
   badgeNumber,
-  isHovered,
+  isExpanded,
   onClick,
   iconStyle,
 }: {
@@ -369,7 +390,7 @@ const SideMenuLink = ({
   project?: Project;
   isActive: boolean;
   badgeNumber?: number;
-  isHovered?: boolean;
+  isExpanded?: boolean;
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
   iconStyle?: React.CSSProperties;
 }) => {
@@ -404,44 +425,49 @@ const SideMenuLink = ({
     );
 
   return (
-    <Link
-      role="group"
-      variant="plain"
-      width="full"
-      paddingX={6}
-      paddingY={size === "sm" ? 2 : 3}
-      href={href}
-      aria-label={label}
-      onClick={(e) => {
-        trackEvent("side_menu_click", {
-          project_id: project?.id,
-          menu_item: label,
-        });
-        setRecentMenuLinkClick(true);
-        onClick?.(e);
-      }}
-      fontSize={size === "sm" ? 13 : 14}
-      _hover={{
-        backgroundColor: "gray.50",
-      }}
-      cursor="pointer"
+    <Tooltip
+      content={label}
+      positioning={{ placement: "right" }}
+      disabled={isExpanded}
     >
-      <HStack align="center" gap={4} minHeight="21px">
-        <VStack align="start" position="relative">
-          {iconNode}
+      <Link
+        role="group"
+        variant="plain"
+        width="full"
+        paddingX={6}
+        paddingY={size === "sm" ? 2 : 3}
+        href={href}
+        aria-label={label}
+        onClick={(e) => {
+          trackEvent("side_menu_click", {
+            project_id: project?.id,
+            menu_item: label,
+          });
+          onClick?.(e);
+        }}
+        fontSize={size === "sm" ? 13 : 14}
+        _hover={{
+          backgroundColor: "gray.50",
+        }}
+        cursor="pointer"
+      >
+        <HStack align="center" gap={4} minHeight="21px">
+          <VStack align="start" position="relative">
+            {iconNode}
 
-          {badge && (
-            <Box position="absolute" bottom="-8px" right="-8px">
-              {badge}
-            </Box>
+            {badge && (
+              <Box position="absolute" bottom="-8px" right="-8px">
+                {badge}
+              </Box>
+            )}
+          </VStack>
+          {isExpanded && (
+            <Text color={isActive ? "orange.600" : "gray.900"} marginTop="-1px">
+              {label}
+            </Text>
           )}
-        </VStack>
-        {isHovered && (
-          <Text color={isActive ? "orange.600" : "gray.900"} marginTop="-1px">
-            {label}
-          </Text>
-        )}
-      </HStack>
-    </Link>
+        </HStack>
+      </Link>
+    </Tooltip>
   );
 };
