@@ -321,6 +321,8 @@ export type ElasticSearchTrace = Omit<
   spans?: ElasticSearchSpan[];
   evaluations?: ElasticSearchEvaluation[];
   events?: ElasticSearchEvent[];
+  retention_policy?: "180d" | "365d" | "730d" | null;
+  retention_holdouts?: string[] | null;
 };
 
 type EvaluationStatus =

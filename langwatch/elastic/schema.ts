@@ -249,6 +249,8 @@ export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
     type: "nested",
     properties: eventsMapping,
   },
+  retention_policy: { type: "keyword" },
+  retention_holdouts: { type: "keyword" },
 };
 
 export const dspyStepsMapping: ElasticSearchMappingFrom<DSPyStep> = {
