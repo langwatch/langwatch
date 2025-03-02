@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getLatestUpdatedAt } from "./triggers";
+import { getLatestUpdatedAt } from "./cron/triggers";
 import type { Trace } from "../../server/tracer/types";
 
 describe("utils test", () => {

@@ -49,7 +49,7 @@ export default async function handler(
     return res.status(405).end();
   }
 
-  let cronApiKey = req.headers["authorization"];
+  let cronApiKey = req.headers.authorization;
   cronApiKey = cronApiKey?.startsWith("Bearer ")
     ? cronApiKey.slice(7)
     : cronApiKey;
