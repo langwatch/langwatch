@@ -473,19 +473,31 @@ export function BatchEvaluationV2EvaluationResult({
   }, [results, isFinished, hasScrolled]);
 
   return (
-    <Box ref={containerRef} overflowX="auto">
+    <Box ref={containerRef}>
       {/* @ts-ignore */}
       <Table.Root size={size === "sm" ? "xs" : "sm"} variant="grid">
         <Table.Header>
           <Table.Row>
-            <Table.ColumnHeader width="35px" rowSpan={2}></Table.ColumnHeader>
+            <Table.ColumnHeader
+              width="35px"
+              rowSpan={2}
+              borderTop="none"
+            ></Table.ColumnHeader>
 
-            <Table.ColumnHeader colSpan={datasetColumns.size} paddingY={2}>
+            <Table.ColumnHeader
+              colSpan={datasetColumns.size}
+              paddingY={2}
+              borderTop="none"
+            >
               <Box>Dataset</Box>
             </Table.ColumnHeader>
 
             {predictedColumns.size > 0 && (
-              <Table.ColumnHeader colSpan={predictedColumns.size} paddingY={2}>
+              <Table.ColumnHeader
+                colSpan={predictedColumns.size}
+                paddingY={2}
+                borderTop="none"
+              >
                 <HStack>
                   <Box>Predicted</Box>
                   {workflowId && (
@@ -502,19 +514,25 @@ export function BatchEvaluationV2EvaluationResult({
                 <Table.ColumnHeader
                   colSpan={evaluatorHeaders.evaluationInputsColumns.size}
                   paddingY={2}
+                  borderTop="none"
                 >
                   <Box>Evaluation Entry</Box>
                 </Table.ColumnHeader>
               )}
 
-            <Table.ColumnHeader rowSpan={2}>Cost</Table.ColumnHeader>
-            <Table.ColumnHeader rowSpan={2}>Duration</Table.ColumnHeader>
+            <Table.ColumnHeader rowSpan={2} borderTop="none">
+              Cost
+            </Table.ColumnHeader>
+            <Table.ColumnHeader rowSpan={2} borderTop="none">
+              Duration
+            </Table.ColumnHeader>
 
             {Array.from(evaluatorHeaders.evaluationResultsColumns).map(
               (column) => (
                 <Table.ColumnHeader
                   key={`evaluation-result-${column}`}
                   rowSpan={2}
+                  borderTop="none"
                 >
                   {column}
                 </Table.ColumnHeader>

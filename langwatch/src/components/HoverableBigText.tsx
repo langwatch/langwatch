@@ -116,7 +116,7 @@ export function HoverableBigText({
                 marginTop="-4px"
                 color="yellow.400"
               >
-                click to expand
+                click anywhere to expand
               </Text>
             )}
             <Box whiteSpace="pre-wrap">

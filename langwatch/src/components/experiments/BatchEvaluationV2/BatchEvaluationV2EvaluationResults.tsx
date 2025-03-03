@@ -368,7 +368,6 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
         display="flex"
         flexDirection="column"
         minHeight="0"
-        overflowX="hidden"
         position="relative"
         onValueChange={(change) =>
           setTabIndex(Object.keys(resultsByEvaluator).indexOf(change.value))
@@ -376,7 +375,12 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
         defaultValue={Object.keys(resultsByEvaluator)[0]}
         colorPalette="blue"
       >
-        <HStack top={1} right={2}>
+        <HStack
+          top={1}
+          right={2}
+          borderBottom="1px solid"
+          borderColor="gray.200"
+        >
           <Tabs.List minWidth={0}>
             {Object.entries(resultsByEvaluator).map(
               ([evaluator, results], idx) => (
@@ -438,8 +442,8 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
                 value={evaluator}
                 padding={0}
                 minWidth="full"
-                width="fit-content"
                 minHeight="0"
+                overflow="auto"
               >
                 {tabIndex === index ? (
                   <BatchEvaluationV2EvaluationResult
