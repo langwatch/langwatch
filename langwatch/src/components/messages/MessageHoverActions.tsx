@@ -4,10 +4,12 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type { Trace } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 
-import { Edit } from "react-feather";
+import { Edit, Italic, Tool } from "react-feather";
 import { getExtractedInput } from "../../components/messages/MessageCard";
 
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
+import { useDrawer } from "../../components/CurrentDrawer";
+
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
 
@@ -77,6 +79,8 @@ export const MessageHoverActions = ({
   };
 
   const { setCommentState } = useAnnotationCommentStore();
+
+  const { openDrawer, drawerOpen } = useDrawer();
 
   return (
     <VStack
@@ -149,6 +153,84 @@ export const MessageHoverActions = ({
         >
           <VStack>
             <Edit size={"20px"} />
+          </VStack>
+        </Box>
+      </Tooltip>
+      <Tooltip
+        content="Expected Output"
+        showArrow
+        positioning={{ placement: "top" }}
+      >
+        <Box
+          width="38px"
+          height="38px"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          paddingY={2}
+          paddingX={2}
+          borderRadius={"3xl"}
+          border="1px solid"
+          borderColor="gray.200"
+          backgroundColor="white"
+          onClick={(e) => {
+            e.stopPropagation();
+
+            setCommentState?.({
+              traceId: trace.trace_id,
+              action: "new",
+              annotationId: undefined,
+              expectedOutput: trace.output?.value,
+              expectedOutputAction: "new",
+            });
+          }}
+          cursor="pointer"
+        >
+          <VStack>
+            <Italic size={"20px"} />
+          </VStack>
+        </Box>
+      </Tooltip>
+      <Tooltip
+        content="View Trace"
+        showArrow
+        positioning={{ placement: "top" }}
+      >
+        <Box
+          width="38px"
+          height="38px"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          paddingY={2}
+          paddingX={2}
+          borderRadius={"3xl"}
+          border="1px solid"
+          borderColor="gray.200"
+          backgroundColor="white"
+          onClick={(e) => {
+            e.stopPropagation();
+
+            if (!trace) return;
+            if (drawerOpen("traceDetails")) {
+              openDrawer(
+                "traceDetails",
+                {
+                  traceId: trace.trace_id,
+                  selectedTab: "traceDetails",
+                },
+                { replace: true }
+              );
+            } else {
+              openDrawer("traceDetails", {
+                traceId: trace.trace_id,
+              });
+            }
+          }}
+          cursor="pointer"
+        >
+          <VStack>
+            <Tool size={"20px"} />
           </VStack>
         </Box>
       </Tooltip>

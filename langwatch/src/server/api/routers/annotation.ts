@@ -29,10 +29,12 @@ export const annotationRouter = createTRPCRouter({
         isThumbsUp: z.boolean().optional().nullable(),
         traceId: z.string(),
         scoreOptions: scoreOptions,
+        expectedOutput: z.string().optional().nullable(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
+      console.log(input);
       return ctx.prisma.annotation.create({
         data: {
           id: nanoid(),
@@ -42,6 +44,7 @@ export const annotationRouter = createTRPCRouter({
           traceId: input.traceId,
           userId: ctx.session.user.id,
           scoreOptions: input.scoreOptions ?? {},
+          expectedOutput: input.expectedOutput ?? null,
         },
       });
     }),
@@ -53,6 +56,7 @@ export const annotationRouter = createTRPCRouter({
         projectId: z.string(),
         comment: z.string().optional().nullable(),
         isThumbsUp: z.boolean().optional().nullable(),
+        expectedOutput: z.string().optional().nullable(),
         scoreOptions: scoreOptions,
       })
     )
@@ -68,6 +72,7 @@ export const annotationRouter = createTRPCRouter({
           comment: input.comment ?? "",
           isThumbsUp: input.isThumbsUp,
           scoreOptions: input.scoreOptions ?? {},
+          expectedOutput: input.expectedOutput ?? null,
         },
       });
     }),

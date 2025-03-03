@@ -50,7 +50,7 @@ let doNotCloseMenu = false;
 export function AnnotationComment({ key = "" }: { key: string }) {
   const { project, isPublicRoute } = useOrganizationTeamProject();
   const commentState = useAnnotationCommentStore();
-  const { traceId, action, annotationId } = commentState;
+  const { traceId, action, annotationId, expectedOutput } = commentState;
 
   const queryClient = api.useContext();
 
@@ -126,11 +126,12 @@ export function AnnotationComment({ key = "" }: { key: string }) {
           comment: data.comment,
           traceId: traceId ?? "",
           scoreOptions: filteredScoreOptions,
+          expectedOutput: expectedOutput ?? "",
         },
         {
-          onSuccess: async () => {
-            await queryClient.annotation.getByTraceId.invalidate();
-            await queryClient.annotation.getAll.invalidate();
+          onSuccess: () => {
+            void queryClient.annotation.getByTraceId.invalidate();
+            void queryClient.annotation.getAll.invalidate();
 
             toaster.create({
               title: "Annotation Updated",
@@ -166,10 +167,11 @@ export function AnnotationComment({ key = "" }: { key: string }) {
           comment: data.comment,
           traceId: traceId ?? "",
           scoreOptions: filteredScoreOptions,
+          expectedOutput: expectedOutput ?? "",
         },
         {
-          onSuccess: async () => {
-            await queryClient.annotation.getByTraceId.invalidate();
+          onSuccess: () => {
+            void queryClient.annotation.getByTraceId.invalidate();
 
             toaster.create({
               title: "Annotation Created",
@@ -207,8 +209,8 @@ export function AnnotationComment({ key = "" }: { key: string }) {
         projectId: project?.id ?? "",
       },
       {
-        onSuccess: async () => {
-          await queryClient.annotation.getByTraceId.invalidate();
+        onSuccess: () => {
+          void queryClient.annotation.getByTraceId.invalidate();
 
           toaster.create({
             title: "Annotation Deleted",
@@ -334,7 +336,8 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                       scoreType={{
                         ...scoreType,
                         options: scoreType.options as AnnotationScoreOption[],
-                        dataType: scoreType.dataType as AnnotationScoreDataType,
+                        dataType:
+                          scoreType.dataType! as AnnotationScoreDataType,
                         defaultValue: scoreType.defaultValue as {
                           value: string;
                           options: string[];
@@ -353,6 +356,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                     variant="outline"
                     size="sm"
                     onClick={(e) => {
+                      e.stopPropagation();
                       reset();
                       commentState.resetComment();
                     }}

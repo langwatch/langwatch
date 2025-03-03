@@ -37,6 +37,8 @@ import {
 } from "./MessageHoverActions";
 import { api } from "../../utils/api";
 
+import { AnnotationExpectedOutputs } from "../../components/AnnotationExpectedOutputs";
+
 export const TraceMessages = React.forwardRef(function TraceMessages(
   {
     trace,
@@ -61,6 +63,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
     action,
     conversationHasSomeComments,
     setConversationHasSomeComments,
+    expectedOutputAction,
   } = useAnnotationCommentStore();
 
   const translationState = useTranslationState();
@@ -95,24 +98,24 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
         maxWidth={showAnnotations ? "1420px" : "1000px"}
         alignItems="start"
         role="group"
-        cursor="pointer"
-        onClick={() => {
-          if (!trace) return;
-          if (drawerOpen("traceDetails")) {
-            openDrawer(
-              "traceDetails",
-              {
-                traceId: trace.trace_id,
-                selectedTab: "traceDetails",
-              },
-              { replace: true }
-            );
-          } else {
-            openDrawer("traceDetails", {
-              traceId: trace.trace_id,
-            });
-          }
-        }}
+        // cursor="pointer"
+        // onClick={() => {
+        // if (!trace) return;
+        // if (drawerOpen("traceDetails")) {
+        //   openDrawer(
+        //     "traceDetails",
+        //     {
+        //       traceId: trace.trace_id,
+        //       selectedTab: "traceDetails",
+        //     },
+        //     { replace: true }
+        //   );
+        // } else {
+        //   openDrawer("traceDetails", {
+        //     traceId: trace.trace_id,
+        //   });
+        // }
+        // }}
       >
         <GridItem
           colSpan={showAnnotations ? 3 : 4}
@@ -134,7 +137,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
           paddingY={4}
           borderX="1px solid"
           borderTop={
-            highlighted ||
+            highlighted ??
             (!loadingMore && (index === "first" || index === "only"))
               ? "1px solid"
               : "none"
@@ -150,7 +153,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
               ? "0 0 4px 4px"
               : "0"
           }
-          borderBottom={highlighted || index === "last" ? "1px solid" : "none"}
+          borderBottom={highlighted ?? index === "last" ? "1px solid" : "none"}
           borderColor={highlighted ? "blue.200" : "gray.200"}
           onMouseEnter={() => setHover(true)}
           onMouseMove={() => setHover(true)}
@@ -216,12 +219,38 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                   isPythonRepr(trace.output.value)) ? (
                 <MessageCardJsonOutput value={trace.output.value} />
               ) : trace.output?.value ? (
-                <Markdown className="markdown">
-                  {translationState.translatedTextOutput &&
-                  translationState.translationActive
-                    ? translationState.translatedTextOutput
-                    : trace.output.value}
-                </Markdown>
+                <VStack
+                  alignItems="flex-start"
+                  gap={2}
+                  paddingY={2}
+                  width="80%"
+                >
+                  {expectedOutputAction !== "new" && (
+                    <Box
+                      onDoubleClick={() => {
+                        setCommentState?.({
+                          traceId: trace.trace_id,
+                          action: "new",
+                          annotationId: undefined,
+                          expectedOutput: trace.output?.value,
+                          expectedOutputAction: "new",
+                        });
+                      }}
+                    >
+                      <Markdown className="markdown">
+                        {translationState.translatedTextOutput &&
+                        translationState.translationActive
+                          ? translationState.translatedTextOutput
+                          : trace.output.value}
+                      </Markdown>
+                    </Box>
+                  )}
+                  <AnnotationExpectedOutputs
+                    traceId={trace.trace_id}
+                    setHover={setHover}
+                    output={trace.output.value}
+                  />
+                </VStack>
               ) : (
                 <Text paddingY={2}>{"<empty>"}</Text>
               )}
@@ -252,6 +281,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
           <GridItem
             minWidth="420px"
             paddingRight={6}
+            paddingLeft={4}
             onClick={(e) => {
               e.stopPropagation();
 
@@ -259,6 +289,8 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                 traceId: trace.trace_id,
                 action: "new",
                 annotationId: undefined,
+                expectedOutputAction: "new",
+                expectedOutput: null,
               });
             }}
           >
