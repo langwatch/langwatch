@@ -1,6 +1,6 @@
 import { Box, Image, Spinner, VStack } from "@chakra-ui/react";
-import { useState } from "react";
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { Trace } from "../../server/tracer/types";
 import { api } from "../../utils/api";
@@ -8,8 +8,8 @@ import { api } from "../../utils/api";
 import { Edit, Italic, Search } from "react-feather";
 import { getExtractedInput } from "../../components/messages/MessageCard";
 
-import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 import { useDrawer } from "../../components/CurrentDrawer";
+import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
@@ -37,14 +37,12 @@ type ActionButtonProps = {
   tooltipContent: string;
   onClick: (e: React.MouseEvent) => void;
   children: ReactNode;
-  borderRadius?: string | number;
 };
 
 const ActionButton = ({
   tooltipContent,
   onClick,
   children,
-  borderRadius = "3xl",
 }: ActionButtonProps) => {
   return (
     <Tooltip
@@ -60,7 +58,7 @@ const ActionButton = ({
         justifyContent="center"
         paddingY={2}
         paddingX={2}
-        borderRadius={borderRadius}
+        borderRadius={"50%"}
         border="1px solid"
         borderColor="gray.200"
         backgroundColor="white"
@@ -136,7 +134,6 @@ export const MessageHoverActions = ({
       <ActionButton
         tooltipContent="Translate message to English"
         onClick={translate}
-        borderRadius="50%"
       >
         {translateAPI.isLoading ? (
           <Spinner size="sm" />

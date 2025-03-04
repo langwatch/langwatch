@@ -29,13 +29,13 @@ import { isPythonRepr } from "../../utils/parsePythonInsideJson";
 
 import { Markdown } from "../../components/Markdown";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
+import { api } from "../../utils/api";
 import { SmallLabel } from "../SmallLabel";
 import { Tooltip } from "../ui/tooltip";
 import {
   MessageHoverActions,
   useTranslationState,
 } from "./MessageHoverActions";
-import { api } from "../../utils/api";
 
 import { AnnotationExpectedOutputs } from "../../components/AnnotationExpectedOutputs";
 

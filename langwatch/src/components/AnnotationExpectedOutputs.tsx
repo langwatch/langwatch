@@ -1,9 +1,8 @@
 import { Avatar, HStack, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
 import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
-import { Tooltip } from "~/components/ui/tooltip";
 
 export const AnnotationExpectedOutputs = ({
   traceId,
@@ -15,14 +14,8 @@ export const AnnotationExpectedOutputs = ({
   const { project } = useOrganizationTeamProject();
   const commentState = useAnnotationCommentStore();
 
-  const {
-    annotationId,
-
-    expectedOutput,
-    setExpectedOutput,
-
-    setCommentState,
-  } = commentState;
+  const { annotationId, expectedOutput, setExpectedOutput, setCommentState } =
+    commentState;
 
   const annotations = api.annotation.getByTraceId.useQuery(
     {
