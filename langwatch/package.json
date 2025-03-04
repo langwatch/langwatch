@@ -103,6 +103,7 @@
     "lodash.omit": "^4.5.0",
     "lodash.shuffle": "^4.2.0",
     "lodash.throttle": "^4.1.1",
+    "lucide-react": "^0.477.0",
     "micro": "^10.0.1",
     "mustache": "^4.2.0",
     "nanoid": "^3.3.8",

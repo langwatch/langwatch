@@ -28,7 +28,7 @@ export const AnnotationExpectedOutputs = ({
   );
 
   return (
-    <VStack gap={3} align="start" paddingY={4} width="full">
+    <VStack gap={3} align="start" paddingBottom={4} width="full">
       {commentState.expectedOutputAction === "new" && (
         <>
           <Textarea

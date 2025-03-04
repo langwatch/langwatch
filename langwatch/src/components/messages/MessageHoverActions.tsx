@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { Trace } from "../../server/tracer/types";
 import { api } from "../../utils/api";
+import { TextCursorInput, Bug } from "lucide-react";
 
 import { Edit, Italic, Search } from "react-feather";
 import { getExtractedInput } from "../../components/messages/MessageCard";
@@ -132,6 +133,29 @@ export const MessageHoverActions = ({
       transform="translateY(-50%)"
     >
       <ActionButton
+        tooltipContent="View Trace"
+        onClick={() => {
+          if (!trace) return;
+          if (drawerOpen("traceDetails")) {
+            openDrawer(
+              "traceDetails",
+              {
+                traceId: trace.trace_id,
+                selectedTab: "traceDetails",
+              },
+              { replace: true }
+            );
+          } else {
+            openDrawer("traceDetails", {
+              traceId: trace.trace_id,
+            });
+          }
+        }}
+      >
+        <Bug size={"20px"} />
+      </ActionButton>
+
+      <ActionButton
         tooltipContent="Translate message to English"
         onClick={translate}
       >
@@ -162,7 +186,7 @@ export const MessageHoverActions = ({
       </ActionButton>
 
       <ActionButton
-        tooltipContent="Expected Output"
+        tooltipContent="Suggest"
         onClick={() => {
           setCommentState?.({
             traceId: trace.trace_id,
@@ -173,30 +197,7 @@ export const MessageHoverActions = ({
           });
         }}
       >
-        <Italic size={"20px"} />
-      </ActionButton>
-
-      <ActionButton
-        tooltipContent="View Trace"
-        onClick={() => {
-          if (!trace) return;
-          if (drawerOpen("traceDetails")) {
-            openDrawer(
-              "traceDetails",
-              {
-                traceId: trace.trace_id,
-                selectedTab: "traceDetails",
-              },
-              { replace: true }
-            );
-          } else {
-            openDrawer("traceDetails", {
-              traceId: trace.trace_id,
-            });
-          }
-        }}
-      >
-        <Search size={"20px"} />
+        <TextCursorInput size={"20px"} />
       </ActionButton>
     </VStack>
   );

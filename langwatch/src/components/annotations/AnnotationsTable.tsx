@@ -21,7 +21,7 @@ import { ChevronDown, Edit, MessageCircle, MoreVertical } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import type { Annotation } from "@prisma/client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "../CurrentDrawer";
 import { NoDataInfoBlock } from "../NoDataInfoBlock";
@@ -76,9 +76,12 @@ export const AnnotationsTable = ({
     }
   };
 
-  const scoreOptionsIDArray = scoreOptions.data
-    ? scoreOptions.data.map((scoreOption) => scoreOption.id)
-    : [];
+  const scoreOptionsIDArray = useMemo(() => {
+    if (!scoreOptions.data) return [];
+    return scoreOptions.data
+      .filter((key) => key.active === true)
+      .map((key) => key.id);
+  }, [scoreOptions.data]);
 
   type ScoreOption = Record<
     string,
@@ -155,6 +158,35 @@ export const AnnotationsTable = ({
     }
     return true;
   });
+
+  const hasExpectedOutput = () => {
+    return queueItemsFiltered.some((item) =>
+      item.annotations.some(
+        (annotation: Annotation) => annotation.expectedOutput
+      )
+    );
+  };
+
+  const hasComments = () => {
+    return queueItemsFiltered.some((item) =>
+      item.annotations.some((annotation: Annotation) => annotation.comment)
+    );
+  };
+
+  const hasScoreOptions = () => {
+    if (!scoreOptions.data || scoreOptions.data.length === 0) {
+      return false;
+    }
+
+    return queueItemsFiltered.some((item) =>
+      item.annotations.some(
+        (annotation: Annotation) =>
+          annotation.scoreOptions &&
+          Object.keys(annotation.scoreOptions).length > 0
+      )
+    );
+  };
+
   if (queuesLoading) {
     return (
       <VStack align="start" marginTop={4} width="full" padding={6}>
@@ -282,15 +314,22 @@ export const AnnotationsTable = ({
                       )}
                       <Table.ColumnHeader>Input</Table.ColumnHeader>
                       <Table.ColumnHeader>Output</Table.ColumnHeader>
-                      <Table.ColumnHeader>Expected Output</Table.ColumnHeader>
-                      <Table.ColumnHeader>Comments</Table.ColumnHeader>
-                      {scoreOptions.data &&
+                      {hasExpectedOutput() && (
+                        <Table.ColumnHeader>Expected Output</Table.ColumnHeader>
+                      )}
+                      {hasComments() && (
+                        <Table.ColumnHeader>Comments</Table.ColumnHeader>
+                      )}
+                      {hasScoreOptions() &&
+                        scoreOptions.data &&
                         scoreOptions.data.length > 0 &&
-                        scoreOptions.data?.map((key) => (
-                          <Table.ColumnHeader key={key.id}>
-                            {key.name}
-                          </Table.ColumnHeader>
-                        ))}
+                        scoreOptions.data
+                          ?.filter((key) => key.active === true)
+                          .map((key) => (
+                            <Table.ColumnHeader key={key.id}>
+                              {key.name}
+                            </Table.ColumnHeader>
+                          ))}
                       <Table.ColumnHeader>Trace Date</Table.ColumnHeader>
                     </Table.Row>
                   </Table.Header>
@@ -440,49 +479,52 @@ export const AnnotationsTable = ({
                                 </Text>
                               </Tooltip>
                             </Table.Cell>
-                            <Table.Cell minWidth={350}>
-                              <VStack align="start" gap={2} divideX="1px">
-                                {item.annotations.map(
-                                  (annotation: Annotation) =>
-                                    annotation.expectedOutput ? (
-                                      <Text
-                                        key={annotation.id}
-                                        width="full"
-                                        textAlign="left"
-                                        whiteSpace="pre-wrap"
-                                        wordBreak="break-word"
-                                        minWidth={400}
-                                        paddingX={4}
-                                      >
-                                        {annotation.expectedOutput}
-                                      </Text>
-                                    ) : null
-                                )}
-                              </VStack>
-                            </Table.Cell>
-                            <Table.Cell minWidth={350}>
-                              <VStack align="start" gap={2} divideX="1px">
-                                {item.annotations.map(
-                                  (annotation: Annotation) =>
-                                    annotation.comment ? (
-                                      <Text
-                                        key={annotation.id}
-                                        width="full"
-                                        textAlign="left"
-                                        whiteSpace="pre-wrap"
-                                        wordBreak="break-word"
-                                        minWidth={400}
-                                        paddingX={4}
-                                      >
-                                        {annotation.comment}
-                                      </Text>
-                                    ) : null
-                                )}
-                              </VStack>
-                            </Table.Cell>
+                            {hasExpectedOutput() && (
+                              <Table.Cell minWidth={350}>
+                                <VStack align="start" gap={2} divideY="1px">
+                                  {item.annotations.map(
+                                    (annotation: Annotation) =>
+                                      annotation.expectedOutput ? (
+                                        <Text
+                                          key={annotation.id}
+                                          width="full"
+                                          textAlign="left"
+                                          whiteSpace="pre-wrap"
+                                          wordBreak="break-word"
+                                          minWidth={400}
+                                          paddingY={2}
+                                        >
+                                          {annotation.expectedOutput}
+                                        </Text>
+                                      ) : null
+                                  )}
+                                </VStack>
+                              </Table.Cell>
+                            )}
+                            {hasComments() && (
+                              <Table.Cell minWidth={350}>
+                                <VStack align="start" gap={2} divideY="1px">
+                                  {item.annotations.map(
+                                    (annotation: Annotation) =>
+                                      annotation.comment ? (
+                                        <Text
+                                          key={annotation.id}
+                                          width="full"
+                                          textAlign="left"
+                                          whiteSpace="pre-wrap"
+                                          wordBreak="break-word"
+                                          minWidth={400}
+                                          paddingY={2}
+                                        >
+                                          {annotation.comment}
+                                        </Text>
+                                      ) : null
+                                  )}
+                                </VStack>
+                              </Table.Cell>
+                            )}
 
-                            {scoreOptions.data &&
-                              scoreOptions.data.length > 0 &&
+                            {hasScoreOptions() &&
                               annotationScoreValues(
                                 item.annotations,
                                 scoreOptionsIDArray
