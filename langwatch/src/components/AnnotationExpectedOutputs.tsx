@@ -77,6 +77,7 @@ export const AnnotationExpectedOutputs = ({
                     {commentState.expectedOutputAction === "edit" &&
                     annotationId === annotation.id ? (
                       <Textarea
+                        backgroundColor="white"
                         value={
                           commentState.expectedOutputAction === "edit"
                             ? expectedOutput ?? ""
