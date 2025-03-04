@@ -383,9 +383,9 @@ export const AnnotationsTable = ({
                                           user: { name: string | null };
                                         })
                                     >),
-                                  ].map((item) => (
+                                  ].map((item, index) => (
                                     <RandomColorAvatar
-                                      key={item.user.id!}
+                                      key={index}
                                       size="2xs"
                                       name={item.user.name ?? ""}
                                       css={{
