@@ -6,7 +6,7 @@
     "build": "npm run start:prepare:files && npm run build:websocket && BUILD_TIME=1 next build --no-lint && rm -rf .next/cache",
     "build:websocket": "esbuild src/optimization_studio/server/socketServer.ts --bundle --platform=node --outfile=build-websocket/socketServer.js --packages=external --alias:@injected-dependencies.server=src/injection/injection.server.ts",
     "lint": "next lint",
-    "dev": "npm run start:prepare:files && npm run build:websocket && NODE_ENV=development npm run start",
+    "dev": "./scripts/dev-start.sh",
     "start": "./scripts/start.sh",
     "start:app": "tsx src/server.ts",
     "start:quickwit": "cd quickwit && ./quickwit run",

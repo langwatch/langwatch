@@ -7,6 +7,21 @@ if [ -z "$NODE_ENV" ]; then
   RUNTIME_ENV="$RUNTIME_ENV NODE_ENV=production"
 fi
 
+#If on Windows, prefix the RUNTIME_ENV with && set
+if [ "$OS" = "Windows_NT" ]; then
+  RUNTIME_ENV_TEMP=""
+  first=1
+  for VAR in $RUNTIME_ENV; do
+    if [ $first -eq 1 ]; then
+      RUNTIME_ENV_TEMP="set \"$VAR\""
+      first=0
+    else
+      RUNTIME_ENV_TEMP="$RUNTIME_ENV_TEMP && set \"$VAR\""
+    fi
+  done
+  RUNTIME_ENV="$RUNTIME_ENV_TEMP"
+fi
+
 START_APP_COMMAND="npm run start:app"
 
 START_WORKERS_COMMAND=""
@@ -35,18 +50,23 @@ if [ "$NODE_ENV" = "development" ]; then
 fi
 
 
+SEPARATOR=" "
+if [ "$OS" = "Windows_NT" ]; then 
+  SEPARATOR=" && "
+fi
+
 COMMANDS=()
 if [ -n "$START_APP_COMMAND" ]; then
-  COMMANDS+=("\"$RUNTIME_ENV $START_APP_COMMAND\"")
+  COMMANDS+=("\"$RUNTIME_ENV${SEPARATOR}$START_APP_COMMAND\"")
 fi
 if [ -n "$START_WORKERS_COMMAND" ]; then
-  COMMANDS+=("\"$RUNTIME_ENV $START_WORKERS_COMMAND\"")
+  COMMANDS+=("\"$RUNTIME_ENV${SEPARATOR}$START_WORKERS_COMMAND\"")
 fi
 if [ -n "$START_QUICKWIT_COMMAND" ]; then
-  COMMANDS+=("\"$RUNTIME_ENV $START_QUICKWIT_COMMAND\"")
+  COMMANDS+=("\"$RUNTIME_ENV${SEPARATOR}$START_QUICKWIT_COMMAND\"")
 fi
 if [ -n "$WATCH_WEBSOCKET_COMMAND" ]; then
-  COMMANDS+=("\"$RUNTIME_ENV $WATCH_WEBSOCKET_COMMAND\"")
+  COMMANDS+=("\"$RUNTIME_ENV${SEPARATOR}$WATCH_WEBSOCKET_COMMAND\"")
 fi
 
 concurrently --restart-tries -1 "${COMMANDS[@]}"
