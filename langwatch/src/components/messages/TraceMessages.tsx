@@ -98,24 +98,6 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
         maxWidth={showAnnotations ? "1420px" : "1000px"}
         alignItems="start"
         role="group"
-        // cursor="pointer"
-        // onClick={() => {
-        // if (!trace) return;
-        // if (drawerOpen("traceDetails")) {
-        //   openDrawer(
-        //     "traceDetails",
-        //     {
-        //       traceId: trace.trace_id,
-        //       selectedTab: "traceDetails",
-        //     },
-        //     { replace: true }
-        //   );
-        // } else {
-        //   openDrawer("traceDetails", {
-        //     traceId: trace.trace_id,
-        //   });
-        // }
-        // }}
       >
         <GridItem
           colSpan={showAnnotations ? 3 : 4}
