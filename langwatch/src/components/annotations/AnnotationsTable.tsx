@@ -1,11 +1,9 @@
 import {
-  Avatar,
   Badge,
   Box,
   Button,
   Heading,
   HStack,
-  Separator,
   Skeleton,
   Spacer,
   Table,
@@ -19,13 +17,7 @@ import { Radio, RadioGroup } from "../../components/ui/radio";
 import { Tooltip } from "../../components/ui/tooltip";
 
 import { useRouter } from "next/router";
-import {
-  ChevronDown,
-  ChevronsDown,
-  Edit,
-  MessageCircle,
-  MoreVertical,
-} from "react-feather";
+import { ChevronDown, Edit, MessageCircle, MoreVertical } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import type { Annotation } from "@prisma/client";
@@ -77,7 +69,7 @@ export const AnnotationsTable = ({
     queueItemId: string,
     doneAt: Date | null
   ) => {
-    if (isDone || doneAt) {
+    if (isDone ?? doneAt) {
       openTraceDrawer(traceId);
     } else {
       openAnnotationQueue(queueItemId);
@@ -88,12 +80,13 @@ export const AnnotationsTable = ({
     ? scoreOptions.data.map((scoreOption) => scoreOption.id)
     : [];
 
-  type ScoreOption = {
-    [key: string]: {
+  type ScoreOption = Record<
+    string,
+    {
       value: string | string[];
       reason?: string | null;
-    };
-  };
+    }
+  >;
 
   const [selectedAnnotations, setSelectedAnnotations] = useState<string[]>([
     "pending",
@@ -289,6 +282,7 @@ export const AnnotationsTable = ({
                       )}
                       <Table.ColumnHeader>Input</Table.ColumnHeader>
                       <Table.ColumnHeader>Output</Table.ColumnHeader>
+                      <Table.ColumnHeader>Expected Output</Table.ColumnHeader>
                       <Table.ColumnHeader>Comments</Table.ColumnHeader>
                       {scoreOptions.data &&
                         scoreOptions.data.length > 0 &&
@@ -391,6 +385,7 @@ export const AnnotationsTable = ({
                                     >),
                                   ].map((item) => (
                                     <RandomColorAvatar
+                                      key={item.user.id!}
                                       size="2xs"
                                       name={item.user.name ?? ""}
                                       css={{
@@ -449,6 +444,26 @@ export const AnnotationsTable = ({
                               <VStack align="start" gap={2} divideX="1px">
                                 {item.annotations.map(
                                   (annotation: Annotation) =>
+                                    annotation.expectedOutput ? (
+                                      <Text
+                                        key={annotation.id}
+                                        width="full"
+                                        textAlign="left"
+                                        whiteSpace="pre-wrap"
+                                        wordBreak="break-word"
+                                        minWidth={400}
+                                        paddingX={4}
+                                      >
+                                        {annotation.expectedOutput}
+                                      </Text>
+                                    ) : null
+                                )}
+                              </VStack>
+                            </Table.Cell>
+                            <Table.Cell minWidth={350}>
+                              <VStack align="start" gap={2} divideX="1px">
+                                {item.annotations.map(
+                                  (annotation: Annotation) =>
                                     annotation.comment ? (
                                       <Text
                                         key={annotation.id}
@@ -465,6 +480,7 @@ export const AnnotationsTable = ({
                                 )}
                               </VStack>
                             </Table.Cell>
+
                             {scoreOptions.data &&
                               scoreOptions.data.length > 0 &&
                               annotationScoreValues(
