@@ -3,6 +3,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
 import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
+import { Tooltip } from "~/components/ui/tooltip";
 
 export const AnnotationExpectedOutputs = ({
   traceId,
@@ -19,6 +20,8 @@ export const AnnotationExpectedOutputs = ({
 
     expectedOutput,
     setExpectedOutput,
+
+    setCommentState,
   } = commentState;
 
   const annotations = api.annotation.getByTraceId.useQuery(
@@ -59,9 +62,23 @@ export const AnnotationExpectedOutputs = ({
             if (annotation.expectedOutput) {
               return (
                 <>
-                  <HStack width="full" key={annotation.id}>
+                  <HStack
+                    width="full"
+                    key={annotation.id}
+                    onDoubleClick={() => {
+                      setCommentState({
+                        expectedOutputAction: "edit",
+                        annotationId: annotation.id,
+                        expectedOutput: annotation.expectedOutput,
+                        traceId: traceId,
+                        action: "edit",
+                      });
+                    }}
+                  >
                     <Avatar.Root size="xs">
-                      <Avatar.Fallback name={annotation.user?.name ?? ""} />
+                      <Tooltip content={annotation.user?.name ?? ""}>
+                        <Avatar.Fallback name={annotation.user?.name ?? ""} />
+                      </Tooltip>
                     </Avatar.Root>
 
                     {commentState.expectedOutputAction === "edit" &&

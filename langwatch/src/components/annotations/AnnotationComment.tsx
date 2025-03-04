@@ -80,7 +80,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
     scoreOptions: {},
   };
 
-  const { register, handleSubmit, watch, setValue, reset, getValues } =
+  const { register, handleSubmit, watch, setValue, reset } =
     useForm<Annotation>({
       defaultValues: {
         comment: "",
@@ -251,7 +251,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
       width="full"
       onClick={(e) => e.stopPropagation()}
       key={key}
-      minWidth={395}
+      minWidth={380}
     >
       <Card.Root>
         <Card.Body>
@@ -336,8 +336,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
                       scoreType={{
                         ...scoreType,
                         options: scoreType.options as AnnotationScoreOption[],
-                        dataType:
-                          scoreType.dataType! as AnnotationScoreDataType,
+                        dataType: scoreType.dataType!,
                         defaultValue: scoreType.defaultValue as {
                           value: string;
                           options: string[];
