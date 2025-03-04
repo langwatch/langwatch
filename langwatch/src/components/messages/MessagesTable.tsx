@@ -48,7 +48,7 @@ import { OverflownTextWithTooltip } from "../OverflownText";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { evaluationStatusColor } from "../checks/EvaluationStatus";
 import { FilterSidebar } from "../filters/FilterSidebar";
-import { FilterToggle } from "../filters/FilterToggle";
+import { FilterToggle, useFilterToggle } from "../filters/FilterToggle";
 import { formatEvaluationSingleValue } from "../traces/EvaluationStatusItem";
 import { Checkbox } from "../ui/checkbox";
 import { Popover } from "../ui/popover";
@@ -68,6 +68,8 @@ export function MessagesTable() {
 
   const { filterParams, queryOpts } = useFilterParams();
   const [selectedTraceIds, setSelectedTraceIds] = useState<string[]>([]);
+
+  const { showFilters } = useFilterToggle();
 
   const {
     period: { startDate, endDate },
@@ -1089,7 +1091,16 @@ export function MessagesTable() {
           <Box flex="1" minWidth="0">
             <VStack gap={0} align="start">
               <Card.Root height="fit-content">
-                <Card.Body padding={0} maxWidth="50%">
+                <Card.Body
+                  padding={0}
+                  maxWidth={
+                    showFilters && isExpanded
+                      ? "calc(100vw - 580px)"
+                      : showFilters
+                      ? "calc(100vw - 450px)"
+                      : "50%"
+                  }
+                >
                   {downloadProgress > 0 && (
                     <Progress.Root
                       colorPalette="orange"
