@@ -76,14 +76,12 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
         size="md"
       >
         <Dialog.Backdrop />
-        <Dialog.Content>
-          {publishModal.open && (
-            <PublishModalContent
-              onClose={publishModal.onClose}
-              onApiToggle={apiModal.onToggle}
-            />
-          )}
-        </Dialog.Content>
+        {publishModal.open && (
+          <PublishModalContent
+            onClose={publishModal.onClose}
+            onApiToggle={apiModal.onToggle}
+          />
+        )}
       </Dialog.Root>
 
       <Dialog.Root
@@ -92,7 +90,7 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
         size="lg"
       >
         <Dialog.Backdrop />
-        <Dialog.Content>{apiModal.open && <ApiModalContent />}</Dialog.Content>
+        {apiModal.open && <ApiModalContent />}
       </Dialog.Root>
     </>
   );
