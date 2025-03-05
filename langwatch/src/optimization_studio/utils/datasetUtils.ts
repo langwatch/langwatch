@@ -170,8 +170,9 @@ export const tryToMapPreviousColumnsToNewColumns = (
     for (const [key, value] of Object.entries(record)) {
       const index = previousColumns.findIndex((col) => col.name === key);
       if (index !== -1) {
-        if (newColumns[index]) {
-          convertedRecord[newColumns[index].name] = value;
+        const newColumn = newColumns[index];
+        if (newColumn) {
+          convertedRecord[newColumn.name] = value;
         }
       } else {
         convertedRecord[key] = value;
