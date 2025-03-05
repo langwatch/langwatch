@@ -1,11 +1,4 @@
-import {
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
@@ -151,6 +144,8 @@ export function DatasetSelectionItem({
                 <Button
                   colorPalette="white"
                   variant="plain"
+                  paddingX={0}
+                  color="white"
                   textDecoration="underline"
                   onClick={() => {
                     toaster.remove(`delete-dataset-${id}`);
@@ -197,7 +192,8 @@ export function DatasetSelectionItem({
         onError: () => {
           toaster.create({
             title: "Failed to delete dataset",
-            description: "There was an error deleting the dataset. Please try again.",
+            description:
+              "There was an error deleting the dataset. Please try again.",
             type: "error",
             duration: 5000,
             meta: {
@@ -232,14 +228,19 @@ export function DatasetSelectionItem({
                 height="auto"
                 minWidth="0"
                 color="gray.400"
+                colorPalette="gray"
+                rounded="md"
                 onClick={(event) => {
                   event.stopPropagation();
+                }}
+                _hover={{
+                  backgroundColor: "gray.200",
                 }}
               >
                 <MoreHorizontal />
               </Button>
             </Menu.Trigger>
-            <Menu.Content>
+            <Menu.Content zIndex="popover">
               <Menu.Item
                 value="delete"
                 css={{ color: "var(--chakra-colors-red-600)" }}

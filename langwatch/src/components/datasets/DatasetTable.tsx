@@ -5,7 +5,6 @@ import {
   Card,
   Heading,
   HStack,
-  Menu,
   Spacer,
   Text,
   useDisclosure,
@@ -41,6 +40,7 @@ import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
 import { AddRowsFromCSVModal } from "./AddRowsFromCSVModal";
 
 import { toaster } from "../ui/toaster";
+import { Menu } from "../ui/menu";
 
 export type InMemoryDataset = {
   datasetId?: string;
@@ -158,6 +158,7 @@ export function DatasetTable({
         rows: DatasetRecordEntry[] | undefined
       ) => DatasetRecordEntry[] | undefined
     ) => {
+      if (datasetId) return;
       setParentRowData_((rows) => {
         const rows_ = callback(rows);
         onUpdateDataset?.({
@@ -585,7 +586,7 @@ export function DatasetTable({
             <ChevronDown width={16} height={16} />
           </Button>
         </Menu.Trigger>
-        <Menu.Content>
+        <Menu.Content zIndex="popover">
           <Menu.Item
             value="import-csv"
             onClick={() => addRowsFromCSVModal.onOpen()}
@@ -670,6 +671,7 @@ export function DatasetTable({
                 columnTypes: updatedDataset.columnTypes,
               });
             }
+            setDatasetId(updatedDataset.datasetId);
             setColumnTypes(updatedDataset.columnTypes);
             void databaseDataset.refetch();
             editDataset.onClose();

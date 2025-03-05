@@ -23,6 +23,7 @@ import { RenderInputOutput } from "../traces/RenderInputOutput";
 import { MultilineJSONCellEditor } from "./MultilineJSONCellEditor";
 import { Checkbox } from "../ui/checkbox";
 import { Minus } from "react-feather";
+import { useDebounce } from "use-debounce";
 
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
@@ -58,7 +59,7 @@ export const DatasetGrid = React.memo(
       []
     );
 
-    const columnDefs_ = useMemo(() => {
+    const columnDefsMemo = useMemo(() => {
       return (props.columnDefs as DatasetColumnDef[])?.map(
         (column: DatasetColumnDef) => {
           const basicTypes = ["string", "number", "boolean", "date"];
@@ -124,6 +125,8 @@ export const DatasetGrid = React.memo(
         }
       );
     }, [props.columnDefs]);
+
+    const [columnDefs_] = useDebounce(columnDefsMemo, 100);
 
     return (
       <Box asChild className="ag-theme-balham" style={{ height: "100%" }}>

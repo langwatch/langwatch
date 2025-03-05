@@ -383,10 +383,12 @@ const saveOrCommitWorkflowVersion = async ({
   );
   const nextVersion = `${versionMajor}.${parseInt(versionMinor ?? "0") + 1}`;
 
-  const dslWithoutStates = {
-    ...input.dsl,
-    state: {},
-  };
+  const dslWithoutStates = JSON.parse(
+    JSON.stringify({
+      ...input.dsl,
+      state: {},
+    })
+  );
   const data = {
     commitMessage,
     authorId: ctx.session.user.id,

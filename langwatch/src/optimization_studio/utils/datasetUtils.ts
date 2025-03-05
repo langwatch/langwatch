@@ -157,3 +157,28 @@ export const trainTestSplit = (
     test: list.slice(train_count, train_count + test_count),
   };
 };
+
+export const tryToMapPreviousColumnsToNewColumns = (
+  datasetRecords: DatasetRecordEntry[],
+  previousColumns: DatasetColumns,
+  newColumns: DatasetColumns
+): DatasetRecordEntry[] => {
+  const res = datasetRecords.map((record) => {
+    const convertedRecord: DatasetRecordEntry = {
+      id: record.id,
+    };
+    for (const [key, value] of Object.entries(record)) {
+      const index = previousColumns.findIndex((col) => col.name === key);
+      if (index !== -1) {
+        if (newColumns[index]) {
+          convertedRecord[newColumns[index].name] = value;
+        }
+      } else {
+        convertedRecord[key] = value;
+      }
+    }
+    return convertedRecord;
+  });
+
+  return res;
+};

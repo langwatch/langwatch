@@ -10,6 +10,8 @@ import {
 } from "../../datasets/types.generated";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import { createManyDatasetRecords } from "./datasetRecord";
+import { tryToMapPreviousColumnsToNewColumns } from "../../../optimization_studio/utils/datasetUtils";
+import type { DatasetColumns, DatasetRecordEntry } from "../../datasets/types";
 
 export const datasetRouter = createTRPCRouter({
   upsert: protectedProcedure
@@ -26,6 +28,53 @@ export const datasetRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       if (input.datasetId) {
+        const existingDataset = await ctx.prisma.dataset.findFirst({
+          where: {
+            id: input.datasetId,
+            projectId: input.projectId,
+          },
+        });
+
+        if (!existingDataset) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Dataset not found.",
+          });
+        }
+
+        if (
+          JSON.stringify(existingDataset.columnTypes) !==
+          JSON.stringify(input.columnTypes)
+        ) {
+          const datasetRecords = await ctx.prisma.datasetRecord.findMany({
+            where: {
+              datasetId: input.datasetId,
+              projectId: input.projectId,
+            },
+          });
+
+          const updatedEntries = tryToMapPreviousColumnsToNewColumns(
+            datasetRecords.map((record) => record.entry as DatasetRecordEntry),
+            existingDataset.columnTypes as DatasetColumns,
+            input.columnTypes
+          );
+
+          await ctx.prisma.$transaction(
+            datasetRecords.map((record, index) =>
+              ctx.prisma.datasetRecord.update({
+                where: {
+                  id: record.id,
+                  datasetId: input.datasetId,
+                  projectId: input.projectId,
+                },
+                data: {
+                  entry: updatedEntries[index],
+                },
+              })
+            )
+          );
+        }
+
         return await ctx.prisma.dataset.update({
           where: {
             id: input.datasetId,

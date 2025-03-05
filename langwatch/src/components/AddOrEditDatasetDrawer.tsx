@@ -9,16 +9,16 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Drawer } from "../components/ui/drawer";
-import { toaster } from "../components/ui/toaster";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useCallback, useEffect } from "react";
+import { useEffect } from "react";
 import { Trash2 } from "react-feather";
 import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
 import slugify from "slugify";
+import { Drawer } from "../components/ui/drawer";
+import { toaster } from "../components/ui/toaster";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { tryToMapPreviousColumnsToNewColumns } from "../optimization_studio/utils/datasetUtils";
 import type {
-  DatasetColumnType,
   DatasetColumns,
   DatasetRecordEntry,
   DatasetRecordForm,
@@ -44,14 +44,9 @@ interface AddDatasetDrawerProps {
   }) => void;
 }
 
-type ColumnType = {
-  name: string;
-  type: DatasetColumnType;
-};
-
 type FormValues = {
   name: string;
-  columnTypes: ColumnType[];
+  columnTypes: DatasetColumns;
 };
 
 export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
@@ -61,7 +56,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   const onClose = props.onClose ?? closeDrawer;
   const isOpen = props.open ?? true;
 
-  const initialColumns: ColumnType[] = [
+  const initialColumns: DatasetColumns = [
     { name: "trace_id", type: "string" },
     { name: "timestamp", type: "date" },
     { name: "input", type: "string" },
@@ -157,7 +152,11 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
         ...(props.datasetToSave?.datasetRecords
           ? {
               datasetRecords: tryToConvertRowsToAppropriateType(
-                props.datasetToSave.datasetRecords,
+                tryToMapPreviousColumnsToNewColumns(
+                  props.datasetToSave.datasetRecords,
+                  props.datasetToSave.columnTypes,
+                  data.columnTypes
+                ),
                 data.columnTypes
               ),
             }
@@ -204,24 +203,6 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
       }
     );
   };
-
-  const setColumn = useCallback(
-    (columnName: string, columnType: DatasetColumnType) =>
-      (e: React.ChangeEvent<HTMLInputElement>) => {
-        const currentColumnTypes = watch("columnTypes");
-        if (e.target.checked) {
-          append({ name: columnName, type: columnType });
-        } else {
-          const index = currentColumnTypes.findIndex(
-            (col) => col.name === columnName
-          );
-          if (index !== -1) {
-            remove(index);
-          }
-        }
-      },
-    [append, remove, watch]
-  );
 
   return (
     <Drawer.Root
@@ -315,7 +296,11 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                   <Box width={`${Math.max(20 * columnTypes.length, 100)}%`}>
                     <DatasetPreview
                       rows={tryToConvertRowsToAppropriateType(
-                        props.datasetToSave.datasetRecords.slice(0, 5),
+                        tryToMapPreviousColumnsToNewColumns(
+                          props.datasetToSave.datasetRecords.slice(0, 5),
+                          props.datasetToSave.columnTypes,
+                          columnTypes
+                        ),
                         columnTypes
                       )}
                       columns={columnTypes.slice(0, 50)}
@@ -341,7 +326,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
 
 export const tryToConvertRowsToAppropriateType = (
   datasetRecords: DatasetRecordEntry[],
-  columnTypes: ColumnType[]
+  columnTypes: DatasetColumns
 ) => {
   const typeForColumn = Object.fromEntries(
     columnTypes.map((col) => [col.name, col.type])

@@ -126,7 +126,7 @@ export function DatasetModal({
     <Dialog.Root
       open={open}
       onOpenChange={({ open }) => !open && onClose()}
-      size="6xl"
+      size="full"
     >
       <Dialog.Backdrop />
       <Dialog.Content
@@ -166,7 +166,7 @@ export function DatasetModal({
           </>
         ) : rendered ? (
           <>
-            <Tabs.Root defaultValue="datasets">
+            <Tabs.Root defaultValue="datasets" colorPalette="blue">
               <Dialog.Header>
                 <Tabs.List>
                   <Tabs.Trigger value="datasets">Datasets</Tabs.Trigger>

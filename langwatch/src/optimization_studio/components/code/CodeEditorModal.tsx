@@ -85,8 +85,10 @@ export function CodeEditorModal({
           <Button
             onClick={handleSave}
             variant="outline"
+            color="white"
             colorPalette="white"
             size="lg"
+            _hover={{ color: "black" }}
           >
             Save
           </Button>
