@@ -519,14 +519,14 @@ export function ComponentExecutionButton({
             <Menu.Content>
               <Menu.Item
                 value="run-manual"
-                onSelect={() => node && startComponentExecution({ node })}
+                onClick={() => node && startComponentExecution({ node })}
               >
                 <Play size={14} />
                 Run with manual input
               </Menu.Item>
               <Menu.Item
                 value="run-workflow"
-                onSelect={() =>
+                onClick={() =>
                   node && startWorkflowExecution({ untilNodeId: node.id })
                 }
               >
