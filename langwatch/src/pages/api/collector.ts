@@ -358,6 +358,12 @@ export default async function handler(
         "Over 256 updates were sent for this trace already, no more updates will be accepted",
     });
   }
+  if (existingTrace?.existing_metadata.custom) {
+    customMetadata = {
+      ...existingTrace.existing_metadata.custom,
+      ...customMetadata,
+    };
+  }
 
   debug(`collecting traceId ${traceId}`);
 
