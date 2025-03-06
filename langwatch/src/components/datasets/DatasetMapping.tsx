@@ -170,12 +170,17 @@ export const TRACE_MAPPINGS = {
   },
   annotations: {
     keys: (_traces: TraceWithSpansAndAnnotations[]) => {
-      return ["comment", "is_thumbs_up", "author", "score", "score.reason"].map(
-        (key) => ({
-          key,
-          label: key,
-        })
-      );
+      return [
+        "comment",
+        "is_thumbs_up",
+        "author",
+        "score",
+        "score.reason",
+        "expected_output",
+      ].map((key) => ({
+        key,
+        label: key,
+      }));
     },
     subkeys: (
       traces: TraceWithSpansAndAnnotations[],
@@ -225,6 +230,7 @@ export const TRACE_MAPPINGS = {
           author: () => annotation.user?.name ?? annotation.email ?? "",
           score: scoreOptions,
           "score.reason": scoreOptions,
+          expected_output: () => annotation.expectedOutput,
         };
         return keyMap[key as keyof typeof keyMap]();
       });
@@ -740,17 +746,23 @@ export const TracesMapping = ({
               <HStack key={expansion}>
                 <Switch
                   checked={expansions.has(expansion)}
-                  onCheckedChange={(checked) => {
-                    setMappingState((prev) => ({
-                      ...prev,
-                      expansions: checked
+                  onCheckedChange={(event) => {
+                    const isChecked = event.checked;
+
+                    setMappingState((prev) => {
+                      const newExpansions = isChecked
                         ? new Set([...prev.expansions, expansion])
                         : new Set(
                             Array.from(prev.expansions).filter(
                               (x) => x !== expansion
                             )
-                          ),
-                    }));
+                          );
+
+                      return {
+                        ...prev,
+                        expansions: newExpansions,
+                      };
+                    });
                   }}
                 />
                 <Text>One row per {TRACE_EXPANSIONS[expansion].label}</Text>

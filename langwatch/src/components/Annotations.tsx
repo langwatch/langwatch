@@ -55,6 +55,7 @@ export const Annotations = ({
         ) {
           return (
             <Box
+              key={annotation.id}
               onMouseEnter={() => setHover(true)}
               onMouseMove={() => setHover(true)}
               onMouseLeave={() => setHover(false)}
@@ -77,6 +78,8 @@ export const Annotations = ({
                       traceId: traceId,
                       action: "edit",
                       annotationId: annotation.id,
+                      expectedOutput: annotation.expectedOutput,
+                      expectedOutputAction: "edit",
                     });
                   }
                 : undefined

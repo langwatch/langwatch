@@ -1,13 +1,17 @@
 import { Box, Image, Spinner, VStack } from "@chakra-ui/react";
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { Trace } from "../../server/tracer/types";
 import { api } from "../../utils/api";
+import { TextCursorInput, Bug } from "lucide-react";
 
-import { Edit } from "react-feather";
+import { Edit, Italic, Search } from "react-feather";
 import { getExtractedInput } from "../../components/messages/MessageCard";
 
+import { useDrawer } from "../../components/CurrentDrawer";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
+
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
 
@@ -28,6 +32,47 @@ export const useTranslationState = () => {
     translationActive,
     setTranslationActive,
   };
+};
+
+type ActionButtonProps = {
+  tooltipContent: string;
+  onClick: (e: React.MouseEvent) => void;
+  children: ReactNode;
+};
+
+const ActionButton = ({
+  tooltipContent,
+  onClick,
+  children,
+}: ActionButtonProps) => {
+  return (
+    <Tooltip
+      content={tooltipContent}
+      showArrow
+      positioning={{ placement: "top" }}
+    >
+      <Box
+        width="38px"
+        height="38px"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        paddingY={2}
+        paddingX={2}
+        borderRadius={"50%"}
+        border="1px solid"
+        borderColor="gray.200"
+        backgroundColor="white"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick(e);
+        }}
+        cursor="pointer"
+      >
+        <VStack>{children}</VStack>
+      </Box>
+    </Tooltip>
+  );
 };
 
 export const MessageHoverActions = ({
@@ -78,6 +123,8 @@ export const MessageHoverActions = ({
 
   const { setCommentState } = useAnnotationCommentStore();
 
+  const { openDrawer, drawerOpen } = useDrawer();
+
   return (
     <VStack
       position="absolute"
@@ -85,73 +132,73 @@ export const MessageHoverActions = ({
       right={-5}
       transform="translateY(-50%)"
     >
-      <Tooltip
-        content="Translate message to English"
-        showArrow
-        positioning={{ placement: "top" }}
-      >
-        <Box
-          width="38px"
-          height="38px"
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          paddingY={2}
-          paddingX={2}
-          borderRadius={"50%"}
-          border="1px solid"
-          borderColor="gray.200"
-          backgroundColor="white"
-          onClick={(e) => {
-            e.stopPropagation();
-            translate();
-          }}
-          cursor="pointer"
-        >
-          <VStack>
-            {translateAPI.isLoading ? (
-              <Spinner size="sm" />
-            ) : translationActive ? (
-              <Image
-                src="/images/translate-active.svg"
-                alt="Translate"
-                width="20px"
-              />
-            ) : (
-              <Image src="/images/translate.svg" alt="Translate" width="20px" />
-            )}
-          </VStack>
-        </Box>
-      </Tooltip>
-      <Tooltip content="Annotate" showArrow positioning={{ placement: "top" }}>
-        <Box
-          width="38px"
-          height="38px"
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          paddingY={2}
-          paddingX={2}
-          borderRadius={"3xl"}
-          border="1px solid"
-          borderColor="gray.200"
-          backgroundColor="white"
-          onClick={(e) => {
-            e.stopPropagation();
-
-            setCommentState?.({
+      <ActionButton
+        tooltipContent="View Trace"
+        onClick={() => {
+          if (!trace) return;
+          if (drawerOpen("traceDetails")) {
+            openDrawer(
+              "traceDetails",
+              {
+                traceId: trace.trace_id,
+                selectedTab: "traceDetails",
+              },
+              { replace: true }
+            );
+          } else {
+            openDrawer("traceDetails", {
               traceId: trace.trace_id,
-              action: "new",
-              annotationId: undefined,
             });
-          }}
-          cursor="pointer"
-        >
-          <VStack>
-            <Edit size={"20px"} />
-          </VStack>
-        </Box>
-      </Tooltip>
+          }
+        }}
+      >
+        <Bug size={"20px"} />
+      </ActionButton>
+
+      <ActionButton
+        tooltipContent="Translate message to English"
+        onClick={translate}
+      >
+        {translateAPI.isLoading ? (
+          <Spinner size="sm" />
+        ) : translationActive ? (
+          <Image
+            src="/images/translate-active.svg"
+            alt="Translate"
+            width="20px"
+          />
+        ) : (
+          <Image src="/images/translate.svg" alt="Translate" width="20px" />
+        )}
+      </ActionButton>
+
+      <ActionButton
+        tooltipContent="Annotate"
+        onClick={() => {
+          setCommentState?.({
+            traceId: trace.trace_id,
+            action: "new",
+            annotationId: undefined,
+          });
+        }}
+      >
+        <Edit size={"20px"} />
+      </ActionButton>
+
+      <ActionButton
+        tooltipContent="Suggest"
+        onClick={() => {
+          setCommentState?.({
+            traceId: trace.trace_id,
+            action: "new",
+            annotationId: undefined,
+            expectedOutput: trace.output?.value,
+            expectedOutputAction: "new",
+          });
+        }}
+      >
+        <TextCursorInput size={"20px"} />
+      </ActionButton>
     </VStack>
   );
 };

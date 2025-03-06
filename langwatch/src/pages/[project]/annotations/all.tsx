@@ -6,16 +6,16 @@ import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "next/router";
+import { Download } from "react-feather";
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { AppRouter } from "~/server/api/root";
 import type { Trace } from "~/server/tracer/types";
 import { api } from "~/utils/api";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
-import type { AppRouter } from "~/server/api/root";
-import { Download } from "react-feather";
 
 export default function Annotations() {
   const { project } = useOrganizationTeamProject();
@@ -96,6 +96,7 @@ export default function Annotations() {
         >;
         createdAt: Date;
         user: User;
+        expectedOutput: string | null;
       }>;
     }
   >;
@@ -115,6 +116,7 @@ export default function Annotations() {
 
         acc[item.traceId]!.annotations.push({
           comment: item.comment,
+          expectedOutput: item.expectedOutput,
           scoreOptions: item.scoreOptions as Record<
             string,
             { value: string | string[]; reason: string }
@@ -133,6 +135,9 @@ export default function Annotations() {
   const downloadCSV = () => {
     const fields = [
       "User",
+      "Input",
+      "Output",
+      "Expected Output",
       "Comment",
       "Trace ID",
       "Rating",
@@ -142,8 +147,15 @@ export default function Annotations() {
 
     const csv =
       annotations?.data?.map((annotation) => {
+        const trace = traces.data?.find(
+          (trace) => trace.trace_id === annotation.traceId
+        );
+
         return [
           annotation.user?.name ?? "",
+          trace?.input?.value ?? "",
+          trace?.output?.value ?? "",
+          annotation.expectedOutput ?? "",
           annotation.comment ?? "",
           annotation.traceId ?? "",
           annotation.isThumbsUp ? "Thumbs Up" : "Thumbs Down",
