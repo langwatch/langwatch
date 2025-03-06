@@ -424,6 +424,24 @@ export function TriggerDrawer() {
                       </VStack>
                     </Radio>
                   </VStack>
+                  <VStack align="start">
+                    <Radio
+                      value={TriggerAction.ADD_TO_ANNOTATION_QUEUE}
+                      colorPalette="blue"
+                      alignItems="start"
+                      gap={3}
+                      paddingTop={2}
+                      {...register("action")}
+                    >
+                      <VStack align="start" marginTop={-1}>
+                        <Text fontWeight="500">Add to Annotation Queue</Text>
+                        <Text fontSize="13px" fontWeight="normal">
+                          Add entries to the annotation queue, this allows you
+                          to keep track of the results of your triggers.
+                        </Text>
+                      </VStack>
+                    </Radio>
+                  </VStack>
                 </Stack>
               </RadioGroup>
             </HorizontalFormControl>
