@@ -308,12 +308,12 @@ export const ComponentNode = forwardRef(function ComponentNode(
             <Menu.Content>
               <Menu.Item
                 value="duplicate"
-                onSelect={() => duplicateNode(props.id)}
+                onClick={() => duplicateNode(props.id)}
               >
                 <Copy size={14} />
                 Duplicate
               </Menu.Item>
-              <Menu.Item value="delete" onSelect={() => deleteNode(props.id)}>
+              <Menu.Item value="delete" onClick={() => deleteNode(props.id)}>
                 <Trash2 size={14} />
                 Delete
               </Menu.Item>
@@ -519,14 +519,14 @@ export function ComponentExecutionButton({
             <Menu.Content>
               <Menu.Item
                 value="run-manual"
-                onSelect={() => node && startComponentExecution({ node })}
+                onClick={() => node && startComponentExecution({ node })}
               >
                 <Play size={14} />
                 Run with manual input
               </Menu.Item>
               <Menu.Item
                 value="run-workflow"
-                onSelect={() =>
+                onClick={() =>
                   node && startWorkflowExecution({ untilNodeId: node.id })
                 }
               >

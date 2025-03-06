@@ -222,15 +222,18 @@ export function FieldsDefinition({
                       <Box color="gray.600">
                         <ChevronDown size={14} />
                       </Box>
-                      <NativeSelect.Root>
+                      <NativeSelect.Root
+                        position="absolute"
+                        top={0}
+                        left={0}
+                        height="32px"
+                        width="100%"
+                        cursor="pointer"
+                        zIndex={10}
+                        opacity={0}
+                      >
                         <NativeSelect.Field
                           {...control.register(`fields.${index}.type`)}
-                          opacity={0}
-                          position="absolute"
-                          top={0}
-                          left={0}
-                          width="100%"
-                          height="32px"
                         >
                           <option value="str">str</option>
                           {field === "inputs" && (
