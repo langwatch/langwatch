@@ -371,9 +371,9 @@ export function MessagesTable() {
               <Box whiteSpace="pre-wrap">{trace.input?.value ?? ""}</Box>
             }
           >
-            <Box lineClamp={1} display="block">
+            <Text truncate display="block">
               {trace.input?.value ? trace.input?.value : "<empty>"}
-            </Box>
+            </Text>
           </Tooltip>
         </Table.Cell>
       ),
