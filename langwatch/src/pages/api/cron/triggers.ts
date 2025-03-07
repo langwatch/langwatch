@@ -5,7 +5,7 @@ import { getAllTracesForProject } from "~/server/api/routers/traces";
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
 import { prisma } from "../../../server/db";
-
+import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { type Trace } from "~/server/tracer/types";
 
 import {
@@ -31,6 +31,8 @@ interface ActionParams {
     expansions: Set<keyof typeof TRACE_EXPANSIONS>;
   };
   datasetId: string;
+  annotators?: { id: string; name: string }[];
+  createdByUserId?: string;
 }
 
 interface TriggerData {
@@ -188,6 +190,26 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           },
         });
       }
+    } else if (action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
+      try {
+        const trigger = await prisma.trigger.findUnique({
+          where: { id: triggerId, projectId: input.projectId },
+        });
+
+        const actionParamsRaw =
+          trigger?.actionParams as unknown as ActionParams;
+        const { annotators, createdByUserId } = actionParamsRaw;
+
+        await createQueueItems(triggerData, annotators!, createdByUserId);
+      } catch (error) {
+        Sentry.captureException(error, {
+          extra: {
+            triggerId,
+            projectId: input.projectId,
+            action: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
+          },
+        });
+      }
     } else if (action === TriggerAction.ADD_TO_DATASET) {
       try {
         const trigger = await prisma.trigger.findUnique({
@@ -327,4 +349,22 @@ export const getLatestUpdatedAt = (traces: TraceGroups) => {
     .sort((a: number, b: number) => b - a);
 
   return updatedTimes[0];
+};
+
+const createQueueItems = async (
+  triggerData: TriggerData[],
+  annotators: { id: string; name: string }[],
+  createdByUserId?: string
+) => {
+  await Promise.all(
+    triggerData.map((data) =>
+      createOrUpdateQueueItems({
+        traceId: data.traceId,
+        projectId: data.projectId,
+        annotators: annotators.map((annotator) => annotator.id),
+        userId: createdByUserId ?? "",
+        prisma: prisma,
+      })
+    )
+  );
 };

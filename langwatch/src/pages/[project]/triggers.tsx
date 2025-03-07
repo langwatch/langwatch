@@ -149,6 +149,8 @@ export default function Members() {
         return "Email";
       case "ADD_TO_DATASET":
         return "Add to dataset";
+      case "ADD_TO_ANNOTATION_QUEUE":
+        return "Add to annotation queue";
     }
   };
 
@@ -288,7 +290,7 @@ export default function Members() {
       <FilterContainer fontSize="sm">
         <FilterLabel>Evaluations</FilterLabel>
         <FilterValue>
-          {checks.map((check, index) => check?.name).join(", ")}
+          {checks.map((check) => check?.name).join(", ")}
         </FilterValue>
       </FilterContainer>
     );
