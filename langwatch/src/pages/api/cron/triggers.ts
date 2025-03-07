@@ -200,7 +200,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           trigger?.actionParams as unknown as ActionParams;
         const { annotators, createdByUserId } = actionParamsRaw;
 
-        await createQueueItems(triggerData, annotators!, createdByUserId);
+        await createQueueItems(triggerData, annotators ?? [], createdByUserId);
       } catch (error) {
         Sentry.captureException(error, {
           extra: {
