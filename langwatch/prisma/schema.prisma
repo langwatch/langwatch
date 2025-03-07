@@ -370,6 +370,7 @@ model BatchEvaluation {
 enum TriggerAction {
     SEND_EMAIL
     ADD_TO_DATASET
+    ADD_TO_ANNOTATION_QUEUE
     SEND_SLACK_MESSAGE
 }
 

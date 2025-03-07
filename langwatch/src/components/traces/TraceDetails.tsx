@@ -45,8 +45,7 @@ export function TraceDetails(props: {
   showMessages?: boolean;
   onToggleView?: () => void;
 }) {
-  const { project, hasTeamPermission, organization } =
-    useOrganizationTeamProject();
+  const { project, hasTeamPermission } = useOrganizationTeamProject();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const router = useRouter();
 
@@ -66,35 +65,6 @@ export function TraceDetails(props: {
       refetchOnWindowFocus: false,
     }
   );
-
-  const annotationQueues = api.annotation.getQueues.useQuery(
-    { projectId: project?.id ?? "" },
-    {
-      enabled: !!project,
-    }
-  );
-
-  const users =
-    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-      {
-        organizationId: organization?.id ?? "",
-      },
-      {
-        enabled: !!organization,
-      }
-    );
-
-  const userOptions = users.data?.members.map((member) => ({
-    label: member.user.name ?? "",
-    value: `user-${member.user.id}`,
-  }));
-
-  const queueOptions = annotationQueues.data?.map((queue) => ({
-    label: queue.name ?? "",
-    value: `queue-${queue.id}`,
-  }));
-
-  const options = [...(userOptions ?? []), ...(queueOptions ?? [])];
 
   useEffect(() => {
     if (evaluations.data) {
@@ -199,9 +169,9 @@ export function TraceDetails(props: {
     );
   };
 
-  const [annotators, setAnnotators] = useState<
-    { id: string; name: string | null }[]
-  >([]);
+  const [annotators, setAnnotators] = useState<{ id: string; name: string }[]>(
+    []
+  );
 
   useEffect(() => {
     if (trace.data?.metadata.thread_id) {
@@ -257,7 +227,6 @@ export function TraceDetails(props: {
             <HStack>
               {hasTeamPermission(TeamRoleGroup.ANNOTATIONS_MANAGE) && (
                 <Button
-
                   variant="outline"
                   onClick={() => {
                     commentState.setCommentState({
@@ -283,9 +252,7 @@ export function TraceDetails(props: {
                     open={open}
                   >
                     <Popover.Trigger asChild>
-                      <Button variant="outline">
-                        Annotation Queue
-                      </Button>
+                      <Button variant="outline">Annotation Queue</Button>
                     </Popover.Trigger>
                     <Popover.Content
                       display={queueDrawerOpen.open ? "none" : "block"}
@@ -294,7 +261,6 @@ export function TraceDetails(props: {
                       <Popover.CloseTrigger />
                       <Popover.Body>
                         <AddParticipants
-                          options={options}
                           annotators={annotators}
                           setAnnotators={setAnnotators}
                           queueDrawerOpen={queueDrawerOpen}
@@ -308,7 +274,6 @@ export function TraceDetails(props: {
               )}
               {hasTeamPermission(TeamRoleGroup.DATASETS_MANAGE) && (
                 <Button
-
                   type="submit"
                   variant="outline"
                   minWidth="fit-content"

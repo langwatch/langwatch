@@ -38,11 +38,12 @@ import type {
   MappingState,
   TRACE_EXPANSIONS,
 } from "./datasets/DatasetMapping";
-
+import { AddParticipants } from "~/components/traces/AddParticipants";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 import { DatasetSelector } from "./datasets/DatasetSelector";
 
 import { CheckSquare } from "react-feather";
+import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
 
 export function TriggerDrawer() {
   const { project, organization, team } = useOrganizationTeamProject();
@@ -66,9 +67,13 @@ export function TriggerDrawer() {
     { enabled: typeof teamSlug === "string" && !!organization?.id }
   );
 
-  const { closeDrawer } = useDrawer();
+  const [annotators, setAnnotators] = useState<{ id: string; name: string }[]>(
+    []
+  );
 
+  const { closeDrawer } = useDrawer();
   const { filterParams } = useFilterParams();
+  const queueDrawerOpen = useDisclosure();
 
   const [localStorageDatasetId, setLocalStorageDatasetId] =
     useLocalStorage<string>("selectedDatasetId", "");
@@ -89,7 +94,6 @@ export function TriggerDrawer() {
     formState: { errors },
     reset,
     setValue,
-    control,
   } = useForm<FormValues>({
     defaultValues: {
       name: "",
@@ -158,6 +162,7 @@ export function TriggerDrawer() {
     members?: string[];
     slackWebhook?: string;
     datasetId?: string;
+    annotators?: { id: string; name: string }[];
     datasetMapping?:
       | {
           mapping: Mapping;
@@ -172,6 +177,7 @@ export function TriggerDrawer() {
       slackWebhook: "",
       datasetId: datasetId,
       datasetMapping: datasetTriggerMapping,
+      annotators: annotators,
     };
     if (data.action === TriggerAction.SEND_EMAIL) {
       actionParams = {
@@ -180,6 +186,10 @@ export function TriggerDrawer() {
     } else if (data.action === TriggerAction.SEND_SLACK_MESSAGE) {
       actionParams = {
         slackWebhook: data.slackWebhook ?? "",
+      };
+    } else if (data.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
+      actionParams = {
+        annotators: annotators,
       };
     } else if (data.action === TriggerAction.ADD_TO_DATASET) {
       actionParams = {
@@ -408,6 +418,34 @@ export function TriggerDrawer() {
 
                   <VStack align="start">
                     <Radio
+                      value={TriggerAction.ADD_TO_ANNOTATION_QUEUE}
+                      colorPalette="blue"
+                      alignItems="start"
+                      gap={3}
+                      paddingTop={2}
+                      {...register("action")}
+                    >
+                      <VStack align="start" marginTop={-1}>
+                        <Text fontWeight="500">Add to Annotation Queue</Text>
+                        <Text fontSize="13px" fontWeight="normal">
+                          Add entries to the annotation queue, this allows you
+                          to keep track of the results of your triggers.
+                        </Text>
+                      </VStack>
+                    </Radio>
+                  </VStack>
+                  {currentAction === TriggerAction.ADD_TO_ANNOTATION_QUEUE && (
+                    <Box>
+                      <AddParticipants
+                        annotators={annotators}
+                        setAnnotators={setAnnotators}
+                        queueDrawerOpen={queueDrawerOpen}
+                        isTrigger={true}
+                      />
+                    </Box>
+                  )}
+                  <VStack align="start">
+                    <Radio
                       value={TriggerAction.ADD_TO_DATASET}
                       colorPalette="blue"
                       alignItems="start"
@@ -427,6 +465,7 @@ export function TriggerDrawer() {
                 </Stack>
               </RadioGroup>
             </HorizontalFormControl>
+
             {currentAction === TriggerAction.ADD_TO_DATASET && (
               <>
                 <DatasetSelector
@@ -480,6 +519,11 @@ export function TriggerDrawer() {
         open={editDataset.open}
         onClose={editDataset.onClose}
         onSuccess={onCreateDatasetSuccess}
+      />
+      <AddAnnotationQueueDrawer
+        open={queueDrawerOpen.open}
+        onClose={queueDrawerOpen.onClose}
+        onOverlayClick={queueDrawerOpen.onClose}
       />
     </Drawer.Root>
   );

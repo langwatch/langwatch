@@ -6,48 +6,77 @@ import {
   CloseButton,
   createListCollection,
   HStack,
-  Input,
   Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { Plus, Users } from "react-feather";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 import { Select } from "../../components/ui/select";
 import { getColorForString } from "../../utils/rotatingColors";
 import { RandomColorAvatar } from "../RandomColorAvatar";
 
 export const AddParticipants = ({
-  options,
   annotators,
   setAnnotators,
   queueDrawerOpen,
   sendToQueue,
   isLoading,
+  isTrigger = false,
 }: {
-  options: {
-    value: string;
-    label: string;
-  }[];
   annotators: {
     id: string;
-    name: string | null;
+    name: string;
   }[];
-  setAnnotators: (annotators: { id: string; name: string | null }[]) => void;
-  queueDrawerOpen: {
+  setAnnotators: (annotators: { id: string; name: string }[]) => void;
+  queueDrawerOpen?: {
     onOpen: () => void;
     onClose: () => void;
   };
-  sendToQueue: () => void;
-  isLoading: boolean;
+  sendToQueue?: () => void;
+  isLoading?: boolean;
+  isTrigger?: boolean;
 }) => {
+  const { organization, project } = useOrganizationTeamProject();
+
+  const annotationQueues = api.annotation.getQueues.useQuery(
+    { projectId: project?.id ?? "" },
+    {
+      enabled: !!project,
+    }
+  );
+
+  const selectedValues = annotators.map((a) => a.id);
+
+  const users =
+    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+      {
+        organizationId: organization?.id ?? "",
+      },
+      {
+        enabled: !!organization,
+      }
+    );
+
+  const userOptions = users.data?.members.map((member) => ({
+    label: member.user.name ?? "",
+    value: `user-${member.user.id}`,
+  }));
+
+  const queueOptions = annotationQueues.data?.map((queue) => ({
+    label: queue.name ?? "",
+    value: `queue-${queue.id}`,
+  }));
+
+  const options = [...(userOptions ?? []), ...(queueOptions ?? [])];
+
   const participantsCollection = createListCollection({
     items: options.map((option) => ({
       label: option.label,
       value: option.value,
     })),
   });
-
-  const selectedValues = annotators.map((a) => a.id);
   const participantsLeft = participantsCollection.items.filter(
     (item) => !annotators.some((a) => a.id === item.value)
   );
@@ -164,7 +193,7 @@ export const AddParticipants = ({
               <Button
                 width="100%"
                 colorPalette="blue"
-                onClick={queueDrawerOpen.onOpen}
+                onClick={queueDrawerOpen?.onOpen}
                 variant="outline"
                 size="sm"
               >
@@ -174,7 +203,7 @@ export const AddParticipants = ({
           </Select.Content>
         </Select.Root>
         <Spacer />
-        <HStack width="full">
+        <HStack width="full" hidden={isTrigger}>
           <Spacer />
           <Button
             colorPalette="orange"

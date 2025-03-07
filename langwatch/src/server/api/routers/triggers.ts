@@ -16,6 +16,7 @@ export const triggerRouter = createTRPCRouter({
         action: z.nativeEnum(TriggerAction),
         filters: z.any(),
         actionParams: z.object({
+          createdByUserId: z.string().optional(),
           members: z.string().array().optional(),
           slackWebhook: z.string().optional(),
           datasetId: z.string().optional(),
@@ -24,6 +25,14 @@ export const triggerRouter = createTRPCRouter({
               mapping: z.any(),
               expansions: z.array(z.string()).optional(),
             })
+            .optional(),
+          annotators: z
+            .array(
+              z.object({
+                id: z.string(),
+                name: z.string(),
+              })
+            )
             .optional(),
         }),
       })
@@ -51,6 +60,17 @@ export const triggerRouter = createTRPCRouter({
           user: true,
         },
       });
+
+      if (input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
+        input.actionParams.createdByUserId = ctx.session?.user.id;
+
+        if (!input.actionParams.annotators) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Annotators are required",
+          });
+        }
+      }
 
       if (input.action === TriggerAction.SEND_SLACK_MESSAGE) {
         if (!input.actionParams.slackWebhook) {
