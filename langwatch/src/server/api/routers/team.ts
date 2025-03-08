@@ -129,19 +129,81 @@ export const teamRouter = createTRPCRouter({
       });
 
       if (input.members.length > 0) {
-        await prisma.teamUser.deleteMany({
+        // Get current team members from the database
+        const currentMembers = await prisma.teamUser.findMany({
           where: {
             teamId: input.teamId,
           },
+          select: {
+            userId: true,
+            role: true,
+          },
         });
 
-        await prisma.teamUser.createMany({
-          data: input.members.map((member) => ({
-            userId: member.userId,
-            teamId: input.teamId,
-            role: member.role,
-          })),
-        });
+        // Create a map of current members for easy lookup
+        const currentMembersMap = new Map(
+          currentMembers.map((member) => [member.userId, member.role])
+        );
+
+        // Create a map of new members for easy lookup
+        const newMembersMap = new Map(
+          input.members.map((member) => [member.userId, member.role])
+        );
+
+        // Find members to remove (in current but not in new list)
+        const membersToRemove = currentMembers
+          .filter((member) => !newMembersMap.has(member.userId))
+          .map((member) => member.userId);
+
+        // Find members to add (in new list but not in current)
+        const membersToAdd = input.members.filter(
+          (member) => !currentMembersMap.has(member.userId)
+        );
+
+        // Find members to update (in both lists but with different roles)
+        const membersToUpdate = input.members.filter(
+          (member) =>
+            currentMembersMap.has(member.userId) &&
+            currentMembersMap.get(member.userId) !== member.role
+        );
+
+        // Remove members who are no longer in the list
+        if (membersToRemove.length > 0) {
+          await prisma.teamUser.deleteMany({
+            where: {
+              teamId: input.teamId,
+              userId: {
+                in: membersToRemove,
+              },
+            },
+          });
+        }
+
+        // Add new members
+        if (membersToAdd.length > 0) {
+          await prisma.teamUser.createMany({
+            data: membersToAdd.map((member) => ({
+              userId: member.userId,
+              teamId: input.teamId,
+              role: member.role,
+            })),
+          });
+        }
+
+        // Update members with changed roles
+        for (const member of membersToUpdate) {
+          await prisma.teamUser.update({
+            where: {
+              userId_teamId: {
+                teamId: input.teamId,
+                userId: member.userId,
+              },
+            },
+            data: {
+              role: member.role,
+            },
+          });
+        }
       }
 
       return { success: true };
