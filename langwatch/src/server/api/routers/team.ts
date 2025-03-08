@@ -119,85 +119,87 @@ export const teamRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
-      await prisma.team.update({
-        where: {
-          id: input.teamId,
-        },
-        data: {
-          name: input.name,
-        },
-      });
-
-      if (input.members.length > 0) {
-        const currentMembers = await prisma.teamUser.findMany({
+      return await prisma.$transaction(async (tx) => {
+        await tx.team.update({
           where: {
-            teamId: input.teamId,
+            id: input.teamId,
           },
-          select: {
-            userId: true,
-            role: true,
+          data: {
+            name: input.name,
           },
         });
 
-        const currentMembersMap = new Map(
-          currentMembers.map((member) => [member.userId, member.role])
-        );
-
-        const newMembersMap = new Map(
-          input.members.map((member) => [member.userId, member.role])
-        );
-
-        const membersToRemove = currentMembers
-          .filter((member) => !newMembersMap.has(member.userId))
-          .map((member) => member.userId);
-
-        const membersToAdd = input.members.filter(
-          (member) => !currentMembersMap.has(member.userId)
-        );
-
-        const membersToUpdate = input.members.filter(
-          (member) =>
-            currentMembersMap.has(member.userId) &&
-            currentMembersMap.get(member.userId) !== member.role
-        );
-
-        if (membersToRemove.length > 0) {
-          await prisma.teamUser.deleteMany({
+        if (input.members.length > 0) {
+          const currentMembers = await tx.teamUser.findMany({
             where: {
               teamId: input.teamId,
-              userId: {
-                in: membersToRemove,
-              },
+            },
+            select: {
+              userId: true,
+              role: true,
             },
           });
-        }
 
-        if (membersToAdd.length > 0) {
-          await prisma.teamUser.createMany({
-            data: membersToAdd.map((member) => ({
-              userId: member.userId,
-              teamId: input.teamId,
-              role: member.role,
-            })),
-          });
-        }
+          const currentMembersMap = new Map(
+            currentMembers.map((member) => [member.userId, member.role])
+          );
 
-        for (const member of membersToUpdate) {
-          await prisma.teamUser.update({
-            where: {
-              userId_teamId: {
+          const newMembersMap = new Map(
+            input.members.map((member) => [member.userId, member.role])
+          );
+
+          const membersToRemove = currentMembers
+            .filter((member) => !newMembersMap.has(member.userId))
+            .map((member) => member.userId);
+
+          const membersToAdd = input.members.filter(
+            (member) => !currentMembersMap.has(member.userId)
+          );
+
+          const membersToUpdate = input.members.filter(
+            (member) =>
+              currentMembersMap.has(member.userId) &&
+              currentMembersMap.get(member.userId) !== member.role
+          );
+
+          if (membersToRemove.length > 0) {
+            await tx.teamUser.deleteMany({
+              where: {
                 teamId: input.teamId,
-                userId: member.userId,
+                userId: {
+                  in: membersToRemove,
+                },
               },
-            },
-            data: {
-              role: member.role,
-            },
-          });
-        }
-      }
+            });
+          }
 
-      return { success: true };
+          if (membersToAdd.length > 0) {
+            await tx.teamUser.createMany({
+              data: membersToAdd.map((member) => ({
+                userId: member.userId,
+                teamId: input.teamId,
+                role: member.role,
+              })),
+            });
+          }
+
+          for (const member of membersToUpdate) {
+            await tx.teamUser.update({
+              where: {
+                userId_teamId: {
+                  teamId: input.teamId,
+                  userId: member.userId,
+                },
+              },
+              data: {
+                role: member.role,
+              },
+            });
+          }
+        }
+
+        return { success: true };
+      });
     }),
   createTeamWithMembers: protectedProcedure
     .input(
