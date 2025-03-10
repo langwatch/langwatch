@@ -380,10 +380,10 @@ export function TraceDetails(props: {
         )}
         <Tabs.Content value="traceDetails" paddingX={6} paddingY={0}>
           {selectedTab === "traceDetails" && (
-            <>
+            <VStack paddingBottom={6}>
               <TraceSummary traceId={props.traceId} />
               <SpanTree traceId={props.traceId} />
-            </>
+            </VStack>
           )}
         </Tabs.Content>
         {anyGuardrails && (
