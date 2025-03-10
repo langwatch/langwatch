@@ -365,8 +365,6 @@ export default async function handler(
     };
   }
 
-  debug(`collecting traceId ${traceId}`);
-
   const forceSync = req.query.force_sync === "true";
   await scheduleTraceCollectionWithFallback(
     {

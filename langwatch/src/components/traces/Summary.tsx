@@ -130,7 +130,7 @@ const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
           )}
         </HStack>
 
-        <HStack gap={3} marginY={8} wrap={"wrap"}>
+        <HStack gap={3} marginY={8} wrap={"wrap"} width="full">
           {Object.entries({
             trace_id: trace.trace_id,
             ...trace.metadata,
