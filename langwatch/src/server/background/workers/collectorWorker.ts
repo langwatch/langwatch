@@ -324,13 +324,17 @@ const updateTrace = async (
     });
   }
 
-  await esClient.update({
-    index: TRACE_INDEX.alias,
-    id: traceIndexId({ traceId: trace.trace_id, projectId: trace.project_id }),
-    retry_on_conflict: 10,
-    body: {
-      script: {
-        source: `
+  try {
+    await esClient.update({
+      index: TRACE_INDEX.alias,
+      id: traceIndexId({
+        traceId: trace.trace_id,
+        projectId: trace.project_id,
+      }),
+      retry_on_conflict: 10,
+      body: {
+        script: {
+          source: `
           // Update the document with the trace data
           if (ctx._source == null) {
             ctx._source = params.trace;
@@ -415,21 +419,30 @@ const updateTrace = async (
             );
           }
         `,
-        lang: "painless",
-        params: {
-          trace,
-          newSpans: esSpans,
-          newEvaluations: evaluations ?? [],
+          lang: "painless",
+          params: {
+            trace,
+            newSpans: esSpans,
+            newEvaluations: evaluations ?? [],
+          },
+        },
+        upsert: {
+          ...trace,
+          spans: esSpans,
+          ...(evaluations ? { evaluations } : {}),
         },
       },
-      upsert: {
-        ...trace,
-        spans: esSpans,
-        ...(evaluations ? { evaluations } : {}),
-      },
-    },
-    refresh: true,
-  });
+      refresh: true,
+    });
+  } catch (error) {
+    if (
+      (error as any).toString().includes("version_conflict_engine_exception")
+    ) {
+      debug("Version conflict, skipping update");
+      return;
+    }
+    throw error;
+  }
 };
 
 export const processCollectorCheckAndAdjustJob = async (
