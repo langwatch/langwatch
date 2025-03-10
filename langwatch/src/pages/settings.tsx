@@ -170,6 +170,7 @@ function SettingsForm({
             </form>
           </Card.Body>
         </Card.Root>
+
         {hasTeamPermission(TeamRoleGroup.SETUP_PROJECT) && (
           <ProjectSettingsForm project={project} />
         )}

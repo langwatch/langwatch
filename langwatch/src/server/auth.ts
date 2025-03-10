@@ -13,6 +13,7 @@ import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { dependencies } from "../injection/dependencies.server";
 import type { NextRequest } from "next/server";
+import { getNextAuthSessionToken } from "../utils/auth";
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -51,9 +52,6 @@ export const authOptions = (
         if (newSession) return newSession;
       }
 
-      console.log("session", JSON.stringify(session, undefined, 2));
-      console.log("user", JSON.stringify(user, undefined, 2));
-
       if (!user && session.user.email && env.NEXTAUTH_PROVIDER === "email") {
         const user_ = await prisma.user.findUnique({
           where: {
@@ -84,6 +82,23 @@ export const authOptions = (
         },
       };
     },
+    signIn: async ({ user }) => {
+      const sessionToken = getNextAuthSessionToken(req as any);
+      if (!sessionToken) return true;
+
+      const dbSession = await prisma.session.findUnique({
+        where: { sessionToken },
+      });
+      const dbUser = await prisma.user.findUnique({
+        where: { id: dbSession?.userId },
+      });
+
+      if (dbUser?.email !== user.email) {
+        throw new Error("DIFFERENT_EMAIL_NOT_ALLOWED");
+      }
+
+      return true;
+    },
   },
   adapter: PrismaAdapter(prisma),
   providers: [
@@ -94,7 +109,6 @@ export const authOptions = (
           issuer: env.AUTH0_ISSUER ?? "",
           authorization: { params: { prompt: "login" } },
           profile(profile: Auth0Profile) {
-            console.log("profile", JSON.stringify(profile, undefined, 2));
             return {
               id: profile.sub,
               name: (profile.name as string) ?? profile.nickname,

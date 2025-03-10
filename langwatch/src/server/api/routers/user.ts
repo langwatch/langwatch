@@ -65,4 +65,21 @@ export const userRouter = createTRPCRouter({
         },
       });
     }),
+  getLinkedAccounts: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .query(async ({ ctx }) => {
+      const accounts = await ctx.prisma.account.findMany({
+        where: {
+          userId: ctx.session.user.id,
+        },
+        select: {
+          id: true,
+          provider: true,
+          providerAccountId: true,
+        },
+      });
+
+      return accounts;
+    }),
 });

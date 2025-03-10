@@ -8,7 +8,6 @@ import {
   HStack,
   Input,
   Spacer,
-  Text,
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,6 +23,7 @@ import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { toaster } from "../../components/ui/toaster";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { SignInError } from "./error";
 
 export default function SignIn({ session }: { session: Session | null }) {
   const query = useSearchParams();
@@ -49,53 +49,7 @@ export default function SignIn({ session }: { session: Session | null }) {
   }, [publicEnv.data, session, callbackUrl, isAuth0, error]);
 
   if (error) {
-    return (
-      <Container maxW="container.md" paddingTop="calc(40vh - 164px)">
-        <Card.Root>
-          <Card.Header>
-            <HStack gap={4}>
-              <LogoIcon width={30.69} height={42} />
-              <Heading size="lg" as="h1">
-                Sign in Error
-              </Heading>
-            </HStack>
-          </Card.Header>
-          <Card.Body>
-            <Alert.Root
-              status={error === "OAuthAccountNotLinked" ? "warning" : "error"}
-            >
-              <Alert.Indicator />
-              <Alert.Content gap={4}>
-                <Alert.Title fontWeight="bold">{error}</Alert.Title>
-                {error === "OAuthAccountNotLinked" ? (
-                  <Alert.Description>
-                    <VStack gap={1} align="start">
-                      <Text>
-                        It might be that an account using this email already
-                        exists but it&apos;s not linked with this authentication
-                        method. <br />
-                        Please sign in with email/password or the other provider
-                        you used before and go to the <b>Settings</b> page to
-                        link this one.
-                      </Text>
-                      <Button asChild marginTop={4} color="white">
-                        <Link href="/settings">
-                          Sign in with another method
-                        </Link>
-                      </Button>
-                    </VStack>
-                  </Alert.Description>
-                ) : (
-                  <Alert.Description>
-                    Redirecting back to sign in, please try again...
-                  </Alert.Description>
-                )}
-              </Alert.Content>
-            </Alert.Root>
-          </Card.Body>
-        </Card.Root>
-      </Container>
-    );
+    return <SignInError error={error} />;
   }
 
   if (!publicEnv.data) {
