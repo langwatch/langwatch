@@ -51,6 +51,9 @@ export const authOptions = (
         if (newSession) return newSession;
       }
 
+      console.log("session", JSON.stringify(session, undefined, 2));
+      console.log("user", JSON.stringify(user, undefined, 2));
+
       if (!user && session.user.email && env.NEXTAUTH_PROVIDER === "email") {
         const user_ = await prisma.user.findUnique({
           where: {
@@ -91,6 +94,7 @@ export const authOptions = (
           issuer: env.AUTH0_ISSUER ?? "",
           authorization: { params: { prompt: "login" } },
           profile(profile: Auth0Profile) {
+            console.log("profile", JSON.stringify(profile, undefined, 2));
             return {
               id: profile.sub,
               name: (profile.name as string) ?? profile.nickname,
