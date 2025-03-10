@@ -2,6 +2,7 @@ import {
   Button,
   HStack,
   Spacer,
+  Stack,
   Tabs,
   Text,
   useDisclosure,
@@ -380,10 +381,10 @@ export function TraceDetails(props: {
         )}
         <Tabs.Content value="traceDetails" paddingX={6} paddingY={0}>
           {selectedTab === "traceDetails" && (
-            <>
+            <Stack pb={6}>
               <TraceSummary traceId={props.traceId} />
               <SpanTree traceId={props.traceId} />
-            </>
+            </Stack>
           )}
         </Tabs.Content>
         {anyGuardrails && (
