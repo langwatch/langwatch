@@ -82,4 +82,50 @@ export const userRouter = createTRPCRouter({
 
       return accounts;
     }),
+  unlinkAccount: protectedProcedure
+    .input(
+      z.object({
+        accountId: z.string(),
+      })
+    )
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx, input }) => {
+      // First check if this is the last account
+      const accounts = await ctx.prisma.account.findMany({
+        where: {
+          userId: ctx.session.user.id,
+        },
+      });
+
+      if (accounts.length <= 1) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cannot remove the last authentication method",
+        });
+      }
+
+      // Verify the account belongs to the user
+      const account = await ctx.prisma.account.findFirst({
+        where: {
+          id: input.accountId,
+          userId: ctx.session.user.id,
+        },
+      });
+
+      if (!account) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Account not found",
+        });
+      }
+
+      // Delete the account
+      await ctx.prisma.account.delete({
+        where: {
+          id: input.accountId,
+        },
+      });
+
+      return { success: true };
+    }),
 });

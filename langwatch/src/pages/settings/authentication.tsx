@@ -3,6 +3,7 @@ import {
   Card,
   Heading,
   HStack,
+  IconButton,
   Spacer,
   Spinner,
   Text,
@@ -14,7 +15,8 @@ import SettingsLayout from "../../components/SettingsLayout";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { titleCase } from "../../utils/stringCasing";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
-import { LuKeyRound } from "react-icons/lu";
+import { LuKeyRound, LuX } from "react-icons/lu";
+import { toaster } from "../../components/ui/toaster";
 
 const getProviderDisplayName = (
   provider: string,
@@ -34,9 +36,11 @@ const getProviderDisplayName = (
 
 export default function AuthenticationSettings() {
   const { data: accounts, isLoading } = api.user.getLinkedAccounts.useQuery({});
+  const unlinkAccount = api.user.unlinkAccount.useMutation();
   const { data: session } = useSession();
   const publicEnv = usePublicEnv();
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
+  const apiContext = api.useContext();
 
   if (!isAuth0) {
     return null;
@@ -46,6 +50,32 @@ export default function AuthenticationSettings() {
     void signIn("auth0", {
       callbackUrl: window.location.href,
     });
+  };
+
+  const handleUnlink = async (accountId: string) => {
+    try {
+      await unlinkAccount.mutateAsync({ accountId });
+      await apiContext.user.getLinkedAccounts.invalidate();
+      toaster.create({
+        title: "Sign-in method removed",
+        type: "success",
+        placement: "top-end",
+        meta: {
+          closable: true,
+        },
+      });
+    } catch (error) {
+      toaster.create({
+        title: "Failed to remove sign-in method",
+        description:
+          error instanceof Error ? error.message : "Please try again",
+        type: "error",
+        placement: "top-end",
+        meta: {
+          closable: true,
+        },
+      });
+    }
   };
 
   return (
@@ -71,8 +101,10 @@ export default function AuthenticationSettings() {
               label="Linked Sign-in Methods"
               helper={
                 <Text>
-                  You can link additional sign-in methods to your account.<br />
-                  All linked methods must use the same email address as your main account.
+                  You can link additional sign-in methods to your account.
+                  <br />
+                  All linked methods must use the same email address as your
+                  main account.
                 </Text>
               }
             >
@@ -82,7 +114,7 @@ export default function AuthenticationSettings() {
                 <VStack width="full" align="end" gap={4} marginTop={4}>
                   <VStack align="start" gap={1}>
                     {accounts?.map((account) => (
-                      <HStack key={account.id} width="full">
+                      <HStack key={account.id}>
                         <LuKeyRound />
                         <Text>
                           {getProviderDisplayName(
@@ -91,6 +123,17 @@ export default function AuthenticationSettings() {
                           )}
                         </Text>
                         <Spacer />
+                        {accounts.length > 1 && (
+                          <IconButton
+                            aria-label="Remove sign-in method"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void handleUnlink(account.id)}
+                            disabled={unlinkAccount.isLoading}
+                          >
+                            <LuX />
+                          </IconButton>
+                        )}
                       </HStack>
                     ))}
                   </VStack>
