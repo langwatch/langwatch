@@ -25,11 +25,18 @@ const getProviderDisplayName = (
   if (provider === "auth0") {
     // For other auth0 providers, the ID format is "provider|id"
     const [actualProvider] = providerAccountId.split("|");
-    // If it's an auth0 internal account (email/password)
-    if (providerAccountId.startsWith("auth0|")) {
-      return "Email/Password (via auth0)";
-    }
-    return titleCase(actualProvider ?? "") + " (via auth0)";
+
+    const providerMap: Record<string, string> = {
+      auth0: "Email/Password",
+      "google-oauth2": "Google",
+      windowslive: "Microsoft",
+      github: "GitHub",
+    };
+
+    return (
+      (providerMap[actualProvider ?? ""] ??
+        titleCase(actualProvider ?? "unknown")) + " (via auth0)"
+    );
   }
   return titleCase(provider);
 };
@@ -114,7 +121,7 @@ export default function AuthenticationSettings() {
                 <VStack width="full" align="end" gap={4} marginTop={4}>
                   <VStack align="start" gap={1}>
                     {accounts?.map((account) => (
-                      <HStack key={account.id}>
+                      <HStack key={account.id} width="full">
                         <LuKeyRound />
                         <Text>
                           {getProviderDisplayName(
