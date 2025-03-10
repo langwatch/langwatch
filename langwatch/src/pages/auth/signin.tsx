@@ -1,30 +1,34 @@
 import {
   Alert,
-  Button,
   Box,
+  Button,
+  Card,
   Container,
-  HStack,
-  VStack,
   Heading,
+  HStack,
   Input,
   Spacer,
-  Card,
+  VStack,
 } from "@chakra-ui/react";
-import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type GetServerSidePropsContext } from "next";
 import { type Session } from "next-auth";
 import { getSession, signIn } from "next-auth/react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
-import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { toaster } from "../../components/ui/toaster";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { SignInError } from "./error";
 
 export default function SignIn({ session }: { session: Session | null }) {
+  const query = useSearchParams();
+  const error = query?.get("error");
+
   const publicEnv = usePublicEnv();
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
   const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
@@ -34,10 +38,19 @@ export default function SignIn({ session }: { session: Session | null }) {
       return;
     }
 
-    if (!session && isAuth0) {
-      void signIn("auth0", { callbackUrl });
+    if (error !== "OAuthAccountNotLinked" && !session && isAuth0) {
+      setTimeout(
+        () => {
+          void signIn("auth0", { callbackUrl });
+        },
+        error ? 2000 : 0
+      );
     }
-  }, [publicEnv.data, session, callbackUrl, isAuth0]);
+  }, [publicEnv.data, session, callbackUrl, isAuth0, error]);
+
+  if (error) {
+    return <SignInError error={error} />;
+  }
 
   if (!publicEnv.data) {
     return null;
@@ -110,7 +123,7 @@ function SignInForm() {
   };
 
   return (
-    <Container maxW="container.md" marginTop="calc(40vh - 164px)">
+    <Container maxW="container.md" paddingTop="calc(40vh - 164px)">
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <Card.Root>

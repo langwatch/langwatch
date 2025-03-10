@@ -714,7 +714,17 @@ const CustomRadio = ({
   icon: React.ReactNode;
 }) => {
   return (
-    <Box as="label" key={value} marginTop={1}>
+    <Button
+      as="label"
+      variant="plain"
+      key={value}
+      marginTop={1}
+      height="auto"
+      padding="0"
+      border="none"
+      boxShadow="none"
+      color="inherit"
+    >
       <input
         type="radio"
         value={value}
@@ -726,20 +736,20 @@ const CustomRadio = ({
         cursor="pointer"
         borderRadius="md"
         borderWidth="1px"
-        boxShadow="sm"
         borderColor={selectedValue === value ? "orange.500" : "white.300"}
         _checked={{
-          borderColor: "orange.500",
+          borderColor: "orange.400",
         }}
         _active={{ borderColor: "orange.600" }}
         px={5}
         py={3}
+        userSelect="none"
       >
         <HStack>
           {icon}
           <Text>{value}</Text>
         </HStack>
       </Box>
-    </Box>
+    </Button>
   );
 };
