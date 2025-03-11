@@ -1,4 +1,12 @@
-import { Box, Button, Card, Heading, HStack, Spacer, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Card,
+  Heading,
+  HStack,
+  Spacer,
+  VStack,
+} from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
 import { LuChevronRight } from "react-icons/lu";
@@ -13,13 +21,14 @@ import {
 import { TaskSelection } from "./steps/TaskSelection";
 import { DatasetSelection } from "./steps/DatasetSelection";
 import { DatasetTable } from "../../datasets/DatasetTable";
+import { ExecutorSelection } from "./steps/ExecutorSelection";
 
 export function EvaluationWizard() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const [isSticky, setIsSticky] = useState(false);
   const stickyRef = useRef<HTMLDivElement>(null);
-  const { wizardState, setWizardState } = useEvaluationWizardStore();
+  const { wizardState, setWizardState, nextStep } = useEvaluationWizardStore();
   const { step } = wizardState;
 
   useEffect(() => {
@@ -50,17 +59,6 @@ export function EvaluationWizard() {
       unmount?.();
     };
   }, []);
-
-  const handleNextClick = () => {
-    const currentStepIndex = steps.indexOf(step);
-    if (currentStepIndex < steps.length - 1) {
-      setWizardState({ step: steps[currentStepIndex + 1] });
-    }
-  };
-
-  if (typeof window !== "undefined") {
-    window.state = wizardState;
-  }
 
   return (
     <Dialog.Content width="full" height="full" minHeight="fit-content">
@@ -118,6 +116,7 @@ export function EvaluationWizard() {
             </Steps.Root>
             {step === "task" && <TaskSelection />}
             {step === "dataset" && <DatasetSelection />}
+            {step === "executor" && <ExecutorSelection />}
           </VStack>
           <HStack
             ref={stickyRef}
@@ -133,7 +132,7 @@ export function EvaluationWizard() {
             bottom="-1px"
           >
             <Spacer />
-            <Button variant="outline" onClick={handleNextClick}>
+            <Button variant="outline" onClick={() => nextStep()}>
               Next
               <LuChevronRight />
             </Button>
