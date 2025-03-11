@@ -1,6 +1,6 @@
 import { useDisclosure } from "@chakra-ui/react";
 import { useEffect } from "react";
-import { EvaluationWizard } from "../../../components/evaluations/EvaluationWizard";
+import { EvaluationWizard } from "../../../components/evaluations/wizard/EvaluationWizard";
 import { Dialog } from "../../../components/ui/dialog";
 import EvaluationsV2 from "../evaluations_v2";
 import { useRouter } from "next/router";

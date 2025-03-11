@@ -1,17 +1,21 @@
 import { create } from "zustand";
-import type { EvaluatorTypes } from "../../server/evaluations/evaluators.generated";
-import type { Workflow } from "../types/dsl";
-import { initialDSL } from "./useWorkflowStore";
+import type { EvaluatorTypes } from "../server/evaluations/evaluators.generated";
+import type { Workflow } from "../optimization_studio/types/dsl";
+import { initialDSL } from "../optimization_studio/hooks/useWorkflowStore";
+
+export const steps = ["task", "dataset", "executor", "evaluation", "finalize"] as const;
+export type Step = typeof steps[number];
 
 type State = {
-  experiment_id?: string;
-  wizard_state: {
-    step?: "task" | "dataset" | "executor" | "evaluation" | "finalize";
+  experimentId?: string;
+  wizardState: {
+    step: Step;
     task?: "real-time"; // | "llm-pipeline" | "prompt-creation"
-    // data_source: "choose" | "from-production" | "manual" | "upload"
-    data_source?: "from-production";
+    dataSource?: "choose" | "from_production" | "manual" | "upload";
+    
     // execution:
-    evaluator_category?:
+    
+    evaluatorCategory?:
       | "expected_answer"
       | "quality_aspects"
       | "llm_as_a_judge"
@@ -29,10 +33,10 @@ type EvaluationWizardStore = State & {
   getExperimentId: () => string | undefined;
   setWizardState: (
     state:
-      | Partial<State["wizard_state"]>
-      | ((state: State["wizard_state"]) => Partial<State["wizard_state"]>)
+      | Partial<State["wizardState"]>
+      | ((state: State["wizardState"]) => Partial<State["wizardState"]>)
   ) => void;
-  getWizardState: () => State["wizard_state"];
+  getWizardState: () => State["wizardState"];
   setDSL: (
     dsl:
       | Partial<State["dsl"]>
@@ -42,8 +46,10 @@ type EvaluationWizardStore = State & {
 };
 
 const initialState: State = {
-  experiment_id: undefined,
-  wizard_state: {},
+  experimentId: undefined,
+  wizardState: {
+    step: 'task',
+  },
   dsl: initialDSL,
 };
 
@@ -64,29 +70,29 @@ const store = (
     set(initialState);
   },
   setExperimentId(experiment_id) {
-    set((current) => ({ ...current, experiment_id }));
+    set((current) => ({ ...current, experimentId: experiment_id }));
   },
   getExperimentId() {
-    return get().experiment_id;
+    return get().experimentId;
   },
   setWizardState(state) {
     if (typeof state === "function") {
       set((current) => ({
         ...current,
-        wizard_state: {
-          ...current.wizard_state,
-          ...state(current.wizard_state),
+        wizardState: {
+          ...current.wizardState,
+          ...state(current.wizardState),
         },
       }));
     } else {
       set((current) => ({
         ...current,
-        wizard_state: { ...current.wizard_state, ...state },
+        wizardState: { ...current.wizardState, ...state },
       }));
     }
   },
   getWizardState() {
-    return get().wizard_state;
+    return get().wizardState;
   },
   setDSL(dsl) {
     if (typeof dsl === "function") {
