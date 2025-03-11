@@ -1,0 +1,509 @@
+---
+description: Frontend coding
+globs: *.tsx
+alwaysApply: false
+---
+
+# Chakra v3 Rules
+
+We use Chakra v3 in this repo, your knowledge cutoff might be outdated, so forgot what you know about Chakra v2 and focus on here when doing jsx frontend.
+
+We use react-feather icons, make sure to use react-feather icons instead of lucide and chakra ones.
+
+They removed support for configuring toast options. Pass it to the createToaster function in components/ui/toaster.tsx file instead.
+
+Instead of `useToast`, which got removed, we use it directly, not need for hooks:
+
+toaster.create({
+  title: "Toast Title",
+  description: "Toast Description",
+  type: "error", // notice status changed to type
+  meta: {
+    closable: true, // notice isClosable changed to meta.closable
+  },
+  placement: "top-end", // notice top-right changed to top-end
+})
+
+with the { toaster } function comming from the components/ui/toaster.tsx. Also `useToast` is gone.
+
+
+Modal
+
+    Renamed to Dialog
+    Remove isCentered prop in favor of using the placement=center prop
+    Removed isOpen and onClose props in favor of using the open and onOpenChange props
+
+Avatar
+
+    Remove max prop in favor of userland control
+    Remove excess label part
+    Move image related props to Avatar.Image component
+    Move fallback icon to Avatar.Fallback component
+    Move name prop to Avatar.Fallback component
+
+Portal
+
+    Remove appendToParentPortal prop in favor of using the containerRef
+    Remove PortalManager component
+
+Stack
+
+    Changed spacing to gap
+    Removed StackItem in favor of using the Box component directly
+
+Collapse
+
+    Rename Collapse to Collapsible namespace
+    Rename in to open
+    animateOpacity has been removed, use keyframes animations expand-height and collapse-height instead
+
+Before
+
+<Collapse in={isOpen} animateOpacity>
+  Some content
+</Collapse>
+
+After
+
+<Collapsible.Root open={isOpen}>
+  <Collapsible.Content>Some content</Collapsible.Content>
+</Collapsible.Root>
+
+Image
+
+    Now renders a native img without any fallback
+    Remove fallbackSrc due to the SSR issues it causes
+    Remove useImage hook
+    Remove Img in favor of using the Image component directly
+
+PinInput
+
+    Changed value, defaultValue and onChange to use string[] instead of string
+    Add new PinInput.Control and PinInput.Label component parts
+    PinInput.Root now renders a div element by default. Consider combining with Stack or Group for better layout control
+
+NumberInput
+
+    Rename NumberInputStepper to NumberInput.Control
+    Rename NumberInputStepperIncrement to NumberInput.IncrementTrigger
+    Rename NumberInputStepperDecrement to NumberInput.DecrementTrigger
+    Remove focusBorderColor and errorBorderColor, consider setting the --focus-color and --error-color css variables instead
+
+Before
+
+<NumberInput>
+  <NumberInputField />
+  <NumberInputStepper>
+    <NumberIncrementStepper />
+    <NumberDecrementStepper />
+  </NumberInputStepper>
+</NumberInput>
+
+After
+
+<NumberInput.Root>
+  <NumberInput.Input />
+  <NumberInput.Control>
+    <NumberInput.IncrementTrigger />
+    <NumberInput.DecrementTrigger />
+  </NumberInput.Control>
+</NumberInput.Root>
+
+Divider
+
+    Rename to Separator
+    Switch to div element for better layout control
+    Simplify component to rely on borderTopWidth and borderInlineStartWidth
+    To change the thickness reliably, set the --divider-border-width css variable
+
+Input, Select, Textarea
+
+    Removed invalid prop in favor of wrapping the component in a Field component. This allows for adding a label, error text and asterisk easily.
+
+Before
+
+<Input invalid />
+
+After
+
+<Field invalid label="Email" errorText="This field is required">
+  <Input />
+</Field>
+
+Link
+
+    Removed isExternal prop in favor of explicitly setting the target and rel props
+
+Before
+
+<Link isExternal>Click me</Link>
+
+After
+
+<Link target="_blank" rel="noopener noreferrer">
+  Click me
+</Link>
+
+IconButton
+
+    Removed icon prop in favor of rendering the children prop directly
+    Removed isRounded in favor of using the borderRadius=full prop
+
+Spinner
+
+    Change the thickness prop to borderWidth
+    Change the speed prop to animationDuration
+
+Before
+
+<Spinner thickness="2px" speed="0.5s" />
+
+After
+
+<Spinner borderWidth="2px" animationDuration="0.5s" />
+
+--
+
+Also:
+
+<Tooltip> component now comes from our own defined `ui/tooltip.jsx` and uses `content` instead of `label`, and `hasArrow` became `showArrow`, placement changed too, e.g.:
+
+<Tooltip content="Tooltip content" positioning={{ placement: "top" }} showArrow>
+  <Button>Click me</Button>
+</Tooltip>
+
+
+`spacing` on hstacks and vstacks became `gap`
+
+
+Alerts also changed the structure, it's now like this:
+
+<Alert.Root>
+  <Alert.Indicator /> // former Alert.Icon
+  <Alert.Content>
+    <Alert.Title />
+    <Alert.Description />
+  </Alert.Content>
+</Alert.Root>
+
+fix the imports for it too (remove AlertIcon)
+
+and then variant="left-accent" alerts are gone, instead we need to add a border
+
+<Alert.Root borderStartWidth="4px" borderStartColor="colorPalette.solid">
+
+
+
+Drawer changed too, similar to Alert, but CloseIcon became Drawer.CloseTrigger, and placement="right" became placement="end"
+another thing, those types:
+
+ColorProps, TypographyProps, etc
+
+all changed to SystemStyleObject, like SystemStyleObject["color"]another thing, `useTheme` is gone, so something like this:
+
+    const theme = useTheme();
+    const gray400 = theme.colors.gray["400"];
+
+should now be:
+
+const gray400 = useColorRawValue("gray.400");
+
+imported from our own ui/color-mode.tsxone other thing is that the table structure changed to this:
+
+<Table.Root>
+  <Table.Header>
+    <Table.Row>
+      <Table.ColumnHeader />
+    </Table.Row>
+  </Table.Header>
+  <Table.Body>
+    <Table.Row>
+      <Table.Cell />
+    </Table.Row>
+  </Table.Body>
+  <Table.Footer>
+    <Table.Row>
+      <Table.Cell />
+    </Table.Row>
+  </Table.Footer>
+</Table.Root>
+
+that is, no more Td, Th, etc, and table variant="simple" is now variant="line"Text lineClamp is now called lineClampthe Card structure also changed to something like this:
+
+<Card.Root>
+  <Card.Header />
+  <Card.Body />
+  <Card.Footer />
+</Card.Root>tabs also changed to this:
+
+<Tabs.Root defaultValue="firsttab" colorPalette="orange" onValueChange={(change) => setValue(change.value)}> // very important to set a defaultValue and the colorPalette, also if controlled tabs, then use onValueChange, but be careful to take the change.value not the change directly, it's an object
+  <Tabs.List>
+    <Tabs.Trigger value="firsttab" />
+  </Tabs.List>
+  <Tabs.Content value="firsttab" />
+</Tabs.Root>
+
+and the `unstyled` variant is now a prop e.g. `<Button unstyled>` not a variant
+
+now input group also changed a bit, icons are now a start and end element prop not a child for the left and right icons:
+
+<InputGroup flex="1" startElement={<LuUser />}>
+  <Input placeholder="Username" />
+</InputGroup>
+
+and so did the menu:
+
+<Menu.Root>
+  <Menu.Trigger />
+  <Menu.Content>
+    <Menu.Item value="..." />
+  </Menu.Content>
+</Menu.Root>
+
+popovers changed like this:
+
+<Popover.Root positioning={{ placement: "bottom-end" }} onOpenChange={({open}) => popover.setOpen(open)}> // notice how placement is defined now, and that onClose is gone, we need to manually check for the boolean open or use new setOpen from useDisclosure
+  <Popover.Trigger />
+  <Popover.Content>
+    <PopovedArrow /> // if popover had hasArrow prop
+    <Popover.Header>
+      <Popover.Title>
+        Title
+      </Popover.Title>
+    </Popover.Header>
+    <Popover.Body>
+      <Popover.Title />
+    </Popover.Body>
+  </Popover.Content>
+</Popover.Root>
+
+Avatar is now like this:
+
+<Avatar.Root shape="square" size="lg">
+    <Avatar.Fallback name="Dan Abramov" />
+    <Avatar.Image src="https://bit.ly/dan-abramov" />
+</Avatar.Root>
+
+Also, leftIcon and rightIcon on the buttons are gone, now they should just be inside the buttons themselves:
+
+<Button colorPalette="teal" variant="solid">
+  <Mail /> Email
+</Button>
+<Button colorPalette="teal" variant="outline">
+  Call us <ChevronRight />
+</Button>
+
+Selects now need to be ported to the NativeSelect, like this:
+
+<NativeSelect.Root size="sm">
+  <NativeSelect.Field onChange={(e) => {}}>
+    <option value="1">Option 1</option>
+    <option value="2">Option 2</option>
+  </NativeSelect.Field>
+  <NativeSelect.Indicator />
+</NativeSelect.Root>
+
+or use the new Select.Root component, but better not to make a huge change, NativeSelect is easier. The interesting use of Select.Root is to replace MultiSelect. Here is how it looks like:
+
+const frameworks = createListCollection({
+  items: [
+    { label: "React.js", value: "react" },
+    { label: "Vue.js", value: "vue" },
+    { label: "Angular", value: "angular" },
+    { label: "Svelte", value: "svelte" },
+  ],
+})
+
+<Select.Root key={size} size={size} collection={frameworks}>
+  <Select.Label>size = {size}</SelectLabel>
+  <Select.Trigger>
+    <Select.ValueText placeholder="Select movie" />
+  </Select.Trigger>
+  <Select.Content>
+    {frameworks.items.map((movie) => (
+      <Select.Item item={movie} key={movie.value}>
+        {movie.label}
+      </Select.Item>
+    ))}
+  </Select.Content>
+</Select.Root>
+
+
+Also, List/ListItem are now like this:
+
+<List.Root>
+  <List.Item>Item 1</List.Item>
+  <List.Item>Item 2</List.Item>
+</List.Root>
+
+and ListIcon is now like this:
+        <List.Indicator asChild color="green.500">
+          <LuCircleCheck />
+        </List.Indicator>
+
+Also, there is no Modal anymore, modal is now called Dialog, and it looks like this:<Dialog.Root>
+  <Dialog.Backdrop /> // former Modal.Overlay
+  <Dialog.Trigger />
+  <Dialog.Content>
+    <Dialog.CloseTrigger />
+    <Dialog.Header>
+      <Dialog.Title />
+    </Dialog.Header>
+    <Dialog.Body />
+    <Dialog.Footer />
+  </Dialog.Content>
+</Dialog.Root>
+
+useDisclosure still exists from chakra, but isOpen became just open, and a new setOpen function was added if useful:
+
+const { open, onOpen, onClose, setOpen } = useDisclosure();
+
+
+Also, Divider is now called Separator
+
+Also, InputGroup and InputLeftElement is now different, example:
+
+import { InputGroup } from "../ui/input-group" // <-- comes from components/ui/input-group not chakra      <InputGroup
+        flex="1"
+        startElement={<Search />}
+        endElement={<Kbd>⌘K</Kbd>}
+      >
+        <Input placeholder="Search contacts" />
+      </InputGroup>
+
+Also, Range became Slider, and it also comes from components/ui
+
+      <Slider.RootProvider value={slider} width="200px">
+        <Slider.Label>Slider</Slider.Label>
+        <Slider.Control>
+          <Slider.Track>
+            <Slider.Range />
+          </Slider.Track>
+          <Slider.Thumb index={0}>
+            <Slider.HiddenInput />
+          </Slider.Thumb>
+        </Slider.Control>
+      </Slider.RootProvider>
+
+Also, Tags are now Badges, comming from chakra directly:
+
+<Badge colorPalette="green">
+  Latest version
+</Badge>
+
+Also, menu components are also imported from components/ui and are now like this:
+
+<Menu.Root>
+  <Menu.Trigger />
+  <Menu.Content>
+    <Menu.Item value="..." />
+  </Menu.Content>
+</Menu.Root>
+
+
+Also, Accordion is now like this:
+
+<Accordion.Root value={value} onValueChange={(e) => setValue(e.value)}>
+  {items.map((item, index) => (
+    <Accordion.Item key={index} value={item.value}>
+      <Accordion.ItemTrigger>{item.title}</Accordion.ItemTrigger>
+      <Accordion.ItemContent>{item.text}</Accordion.ItemContent>
+    </Accordion.Item>
+  ))}
+</Accordion.Root>
+
+it needs this value thingie
+
+Also, when using external icons but you need to for example add a chakra ui color to it, you can wrap it in <Icon>:
+
+<Icon
+  width={5}
+  height={5}
+  color="blue.500"
+  cursor="pointer"
+  onClick={() => sortBy(columnKey)}
+>
+  <ChevronUp />
+</Icon>
+
+Also, Progress is now like this:
+
+<Progress.Root
+  colorPalette="orange"
+  value={downloadProgress}
+  size="xs"
+>
+  <Progress.Track>
+    <Progress.Range />
+  </Progress.Track>
+  <Progress.Label /> // if needed
+  <Progress.ValueText /> // if needed
+</Progress.Root>
+
+
+And for a checkbox group, this is how you do it:
+
+<Fieldset.Root>
+  <CheckboxGroup defaultValue={["react"]} name="framework">
+    <Fieldset.Legend fontSize="sm" mb="2">
+      Select framework
+    </Fieldset.Legend>
+    <Fieldset.Content>
+      <Checkbox value="react">React</Checkbox>
+      <Checkbox value="svelte">Svelte</Checkbox>
+      <Checkbox value="vue">Vue</Checkbox>
+      <Checkbox value="angular">Angular</Checkbox>
+    </Fieldset.Content>
+  </CheckboxGroup>
+</Fieldset.Root>
+
+Also, toast() becomes toaster.create():
+
+```
+toaster.create({
+  title: "Toast Title",
+  description: "Toast Description",
+  type: "error", // notice status changed to type
+  meta: {
+    closable: true, // notice isClosable changed to meta.closable
+  },
+  placement: "top-end", // notice top-right changed to top-end
+})
+```
+
+Also, always use VStack and HStack, not Stack directly.
+
+Also, if a link is external, just use our ui Link with isExternal prop, e.g.:
+
+import { Link } from "../../components/ui/link";
+
+<Link href="https://example.com" isExternal>
+  Example
+</Link>
+
+Also, DO NOT migrate HorizontalFormControl, it's not a chakra component, it's a custom component. HorizontalFormControl is fine as is.
+
+Also, DO NOT change my `function` declarations to `const`, leave it as is.
+
+Also, Drawer is different now:
+
+<Drawer.Root>
+  <Drawer.Backdrop />
+  <Drawer.Trigger />
+  <Drawer.Content>
+    <Drawer.CloseTrigger />
+    <Drawer.Header>
+      <Drawer.Title />
+    </Drawer.Header>
+    <Drawer.Body />
+    <Drawer.Footer />
+  </Drawer.Content>
+</Drawer.Root>
+
+Also, FormLabel and FormHelperText are Field.Label and Field.HelperText
+
+
+Also, Checkbox, CheckboxGroup (from ui/checkbox), Drawer, Radio, RadioGroup (from ui/radio), InputGroup (from ui/input-group), Switch, Popover, Link, Menu, Dialog, InputGroup and Tooltip should always be imported from components/ui, not from chakra directly, and it should always be a relative import, we don't use @ aliases.
+
+While Alert, Avatar, Button, Card, Field, Table, Input, Select, NativeSelect, Tabs, Textarea, Separator, useDisclosure, etc should be imported from @chakra-ui/react directly.
+
