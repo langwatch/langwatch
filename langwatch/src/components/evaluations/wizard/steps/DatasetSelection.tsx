@@ -1,101 +1,252 @@
-import { Heading, Text, VStack } from "@chakra-ui/react";
-import { FileText, FilePlus, Database, UploadCloud, Book } from "react-feather";
-import { ColorfulBlockIcon } from "../../../../optimization_studio/components/ColorfulBlockIcons";
-import { StepButton } from "../../StepButton";
+import {
+  Accordion,
+  Button,
+  Flex,
+  Heading,
+  HStack,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { useState } from "react";
+import {
+  ChevronDown,
+  Database,
+  FilePlus,
+  FileText,
+  Folder,
+  UploadCloud,
+} from "react-feather";
 import { useEvaluationWizardStore } from "~/hooks/useEvaluationWizardStore";
-import { Library } from "lucide-react";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+import { StepButton } from "../../StepButton";
 
 export function DatasetSelection() {
-  const { setWizardState } = useEvaluationWizardStore();
+  const { setWizardState, wizardState } = useEvaluationWizardStore();
+  const { project } = useOrganizationTeamProject();
+
+  const [accordeonValue, setAccordeonValue] = useState(
+    wizardState.dataSource ? ["configuration"] : ["data-source"]
+  );
+
+  // Fetch datasets
+  const datasets = api.dataset.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project }
+  );
+
+  const handleDataSourceSelect = (
+    dataSource: "choose" | "from_production" | "manual" | "upload"
+  ) => {
+    setWizardState({
+      dataSource,
+    });
+    setAccordeonValue(["configuration"]);
+  };
+
+  const handleDatasetSelect = (datasetId: string) => {
+    setWizardState({
+      step: "executor",
+      datasetId,
+    });
+  };
+
+  const handleContinue = (
+    dataSource: "from_production" | "manual" | "upload"
+  ) => {
+    setWizardState({
+      step: "executor",
+      dataSource,
+    });
+  };
 
   return (
-    <>
+    <VStack width="full" align="start" gap={4}>
       <VStack align="start" paddingTop={6}>
         <Heading as="h2" size="md">
           Datasets
         </Heading>
         <Text>Choose where your evaluation data will come from</Text>
       </VStack>
-      <VStack width="full" gap={3}>
-        <StepButton
-          title="Choose existing dataset"
-          description="Select from your previously created datasets"
-          onClick={() => setWizardState({ step: "executor", dataSource: "choose" })}
-          icon={
-            <ColorfulBlockIcon
-              color="blue.400"
-              size="md"
-              icon={<Database />}
-              marginTop="-2px"
-            />
-          }
-        />
-        <StepButton
-          title="Import from Production"
-          description="Import tracing data from production to test the evaluator"
-          onClick={() => setWizardState({ step: "executor", dataSource: "from_production" })}
-          icon={
-            <ColorfulBlockIcon
-              color="purple.400"
-              size="md"
-              icon={<FileText />}
-              marginTop="-2px"
-            />
-          }
-        />
-        <StepButton
-          title="Create manually"
-          description="Insert some initial test data manually, use AI to expand it"
-          onClick={() => setWizardState({ step: "executor", dataSource: "manual" })}
-          icon={
-            <ColorfulBlockIcon
-              color="green.400"
-              size="md"
-              icon={<FilePlus />}
-              marginTop="-2px"
-            />
-          }
-        />
-        <StepButton
-          title="Upload CSV"
-          description="Upload your pre-existing dataset from Excel or CSV"
-          onClick={() => setWizardState({ step: "executor", dataSource: "upload" })}
-          icon={
-            <ColorfulBlockIcon
-              color="orange.400"
-              size="md"
-              icon={<UploadCloud />}
-              marginTop="-2px"
-            />
-          }
-        />
-        <StepButton
-          title="(Future) Generate Synthetic Dataset from Documents"
-          description="Generate questions and answers based on documents you upload"
-          icon={
-            <ColorfulBlockIcon
-              color="teal.400"
-              size="md"
-              icon={<Book />}
-              marginTop="-2px"
-            />
-          }
-          disabled
-        />
-        <StepButton
-          title="(Future) Dataset Library"
-          description="Select from 100+ existing datasets from various domains"
-          icon={
-            <ColorfulBlockIcon
-              color="gray.400"
-              size="md"
-              icon={<Library />}
-              marginTop="-2px"
-            />
-          }
-          disabled
-        />
-      </VStack>
-    </>
+
+      <Accordion.Root
+        value={accordeonValue}
+        onValueChange={(e) => setAccordeonValue(e.value)}
+        multiple={false}
+        collapsible
+        width="full"
+        variant="plain"
+      >
+        {/* First Accordion - Data Source Selection */}
+        <VStack width="full" gap={3}>
+          <Accordion.Item value="data-source" width="full" paddingY={2}>
+            {wizardState.dataSource && (
+              <Accordion.ItemTrigger width="full" paddingX={2} paddingY={3}>
+                <HStack width="full" alignItems="center">
+                  <VStack width="full" align="start" gap={1}>
+                    Data Source
+                  </VStack>
+                </HStack>
+                <Accordion.ItemIndicator>
+                  <ChevronDown />
+                </Accordion.ItemIndicator>
+              </Accordion.ItemTrigger>
+            )}
+            <Accordion.ItemContent paddingTop={2}>
+              <VStack width="full" gap={3}>
+                <StepButton
+                  title="Choose existing dataset"
+                  description="Select from your previously created datasets"
+                  onClick={() => handleDataSourceSelect("choose")}
+                  _icon={{ color: "blue.400" }}
+                  icon={<Database />}
+                  indicator={null}
+                />
+
+                <StepButton
+                  title="Import from Production"
+                  description="Import tracing data from production to test the evaluator"
+                  onClick={() => handleDataSourceSelect("from_production")}
+                  _icon={{ color: "blue.400" }}
+                  icon={<FileText />}
+                  indicator={null}
+                  disabled
+                />
+
+                <StepButton
+                  title="Create manually"
+                  description="Insert some initial test data manually, use AI to expand it"
+                  onClick={() => handleDataSourceSelect("manual")}
+                  _icon={{ color: "blue.400" }}
+                  icon={<FilePlus />}
+                  indicator={null}
+                  disabled
+                />
+
+                <StepButton
+                  title="Upload CSV"
+                  description="Upload your pre-existing dataset from Excel or CSV"
+                  onClick={() => handleDataSourceSelect("upload")}
+                  _icon={{ color: "blue.400" }}
+                  icon={<UploadCloud />}
+                  indicator={null}
+                  disabled
+                />
+              </VStack>
+            </Accordion.ItemContent>
+          </Accordion.Item>
+        </VStack>
+
+        {/* Second Accordion - Configuration Options */}
+        {wizardState.dataSource && (
+          <VStack width="full" gap={3}>
+            <Accordion.Item value="configuration" width="full">
+              <Accordion.ItemTrigger width="full">
+                <HStack
+                  width="full"
+                  alignItems="center"
+                  paddingX={2}
+                  paddingY={3}
+                >
+                  <VStack width="full" align="start" gap={1}>
+                    <Text>
+                      {wizardState.dataSource === "choose" && "Select Dataset"}
+                      {wizardState.dataSource === "from_production" &&
+                        "Import from Production"}
+                      {wizardState.dataSource === "manual" &&
+                        "Create Dataset Manually"}
+                      {wizardState.dataSource === "upload" && "Upload CSV"}
+                    </Text>
+                  </VStack>
+                  <Accordion.ItemIndicator>
+                    <ChevronDown />
+                  </Accordion.ItemIndicator>
+                </HStack>
+              </Accordion.ItemTrigger>
+              <Accordion.ItemContent paddingTop={2}>
+                {wizardState.dataSource === "choose" && (
+                  <VStack width="full" align="start" gap={3}>
+                    {datasets.isLoading && <Text>Loading datasets...</Text>}
+                    {datasets.error && (
+                      <Text color="red.500">
+                        Error loading datasets: {datasets.error.message}
+                      </Text>
+                    )}
+                    {datasets.data?.length === 0 && (
+                      <Text>
+                        No datasets found. Please create a dataset first.
+                      </Text>
+                    )}
+                    <Flex width="full" flexWrap="wrap" gap={3}>
+                      {datasets.data?.map((dataset) => (
+                        <Button
+                          key={dataset.id}
+                          variant="outline"
+                          width="calc(50% - 6px)"
+                          justifyContent="flex-start"
+                          onClick={() => handleDatasetSelect(dataset.id)}
+                          height="auto"
+                          padding={3}
+                        >
+                          <VStack align="start" gap={3} _icon={{ color: "blue.300" }}>
+                            <Folder size={18} />
+                            <VStack align="start" gap={0}>
+                              <Text lineClamp={1}>{dataset.name}</Text>
+                              <Text
+                                fontSize="xs"
+                                color="gray.500"
+                                fontWeight="normal"
+                              >
+                                {dataset._count.datasetRecords} entries
+                              </Text>
+                            </VStack>
+                          </VStack>
+                        </Button>
+                      ))}
+                    </Flex>
+                  </VStack>
+                )}
+
+                {wizardState.dataSource === "from_production" && (
+                  <VStack width="full" align="start" gap={3}>
+                    <Text>Configure import from production settings</Text>
+                    <Button
+                      colorPalette="blue"
+                      onClick={() => handleContinue("from_production")}
+                    >
+                      Continue with Production Data
+                    </Button>
+                  </VStack>
+                )}
+
+                {wizardState.dataSource === "manual" && (
+                  <VStack width="full" align="start" gap={3}>
+                    <Text>Configure manual dataset creation</Text>
+                    <Button
+                      colorPalette="green"
+                      onClick={() => handleContinue("manual")}
+                    >
+                      Continue with Manual Creation
+                    </Button>
+                  </VStack>
+                )}
+
+                {wizardState.dataSource === "upload" && (
+                  <VStack width="full" align="start" gap={3}>
+                    <Text>Configure CSV upload settings</Text>
+                    <Button
+                      colorPalette="orange"
+                      onClick={() => handleContinue("upload")}
+                    >
+                      Continue to Upload
+                    </Button>
+                  </VStack>
+                )}
+              </Accordion.ItemContent>
+            </Accordion.Item>
+          </VStack>
+        )}
+      </Accordion.Root>
+    </VStack>
   );
 }
