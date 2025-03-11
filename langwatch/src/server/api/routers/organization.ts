@@ -638,4 +638,32 @@ export const organizationRouter = createTRPCRouter({
 
       return users;
     }),
+  updateMemberRole: protectedProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        organizationId: z.string(),
+        role: z.nativeEnum(OrganizationUserRole),
+      })
+    )
+    .use(
+      checkUserPermissionForOrganization(
+        OrganizationRoleGroup.ORGANIZATION_MANAGE
+      )
+    )
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+
+      await prisma.organizationUser.update({
+        where: {
+          userId_organizationId: {
+            userId: input.userId,
+            organizationId: input.organizationId,
+          },
+        },
+        data: { role: input.role },
+      });
+
+      return { success: true };
+    }),
 });

@@ -141,7 +141,7 @@ export const TeamForm = ({
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader width="48%">Name</Table.ColumnHeader>
-                  <Table.ColumnHeader>Role</Table.ColumnHeader>
+                  <Table.ColumnHeader>Team Role</Table.ColumnHeader>
                   {!team && <Table.ColumnHeader />}
                 </Table.Row>
               </Table.Header>

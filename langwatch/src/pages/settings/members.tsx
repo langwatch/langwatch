@@ -14,9 +14,14 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
+import {
+  Select as MultiSelect,
+  chakraComponents,
+  components,
+} from "chakra-react-select";
 import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
 import { CopyInput } from "../../components/CopyInput";
+// ... existing code ...
 
 import { useState } from "react";
 import {
@@ -24,6 +29,8 @@ import {
   useFieldArray,
   useForm,
   type SubmitHandler,
+  type Control,
+  type FieldArrayWithId,
 } from "react-hook-form";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
@@ -133,6 +140,8 @@ function MembersList({
   const createInvitesMutation = api.organization.createInvites.useMutation();
   const deleteMemberMutation = api.organization.deleteMember.useMutation();
   const deleteInviteMutation = api.organization.deleteInvite.useMutation();
+  const updateOrganizationMemberRoleMutation =
+    api.organization.updateMemberRole.useMutation();
 
   const [selectedInvites, setSelectedInvites] = useState<
     { inviteCode: string; email: string }[]
@@ -212,6 +221,34 @@ function MembersList({
 
   const onAddField = () => {
     append({ email: "", teamOptions });
+  };
+
+  const onRoleChange = (userId: string, value: OrganizationUserRole) => {
+    console.log("userId", userId, "value", value);
+    updateOrganizationMemberRoleMutation.mutate(
+      {
+        userId: userId,
+        organizationId: organization.id,
+        role: value,
+      },
+      {
+        onSuccess: () => {
+          void queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate();
+          toaster.create({
+            title: "Member role updated successfully",
+            description: `The member role has been updated to ${value}`,
+            type: "success",
+            duration: 5000,
+          });
+        },
+        onError: () => {
+          toaster.create({
+            title: "Sorry, something went wrong",
+            description: "Please try that again",
+          });
+        },
+      }
+    );
   };
 
   const deleteMember = (userId: string) => {
@@ -340,7 +377,15 @@ function MembersList({
                   <LinkBox as={Table.Row} key={member.userId}>
                     <Table.Cell>{member.user.name}</Table.Cell>
                     <Table.Cell>{member.user.email}</Table.Cell>
-                    <Table.Cell>{member.role}</Table.Cell>
+                    <Table.Cell>
+                      <OrganizationMemberSelect
+                        defaultValue={member.role}
+                        memberId={member.userId}
+                        onRoleChange={(userId, value) =>
+                          onRoleChange(member.userId, value)
+                        }
+                      />
+                    </Table.Cell>
                     <Table.Cell>
                       {member.user.teamMemberships
                         .flatMap((tmember) => tmember.team)
@@ -400,7 +445,7 @@ function MembersList({
                     {pendingInvites.data?.map((invite) => (
                       <Table.Row key={invite.id}>
                         <Table.Cell>{invite.email}</Table.Cell>
-                        <Table.Cell>{invite.role}</Table.Cell>
+                        <Table.Cell>{/* {invite.role} */}</Table.Cell>
                         <Table.Cell>
                           {invite.teamIds
                             .split(",")
@@ -573,26 +618,7 @@ function MembersList({
                             render={({ field }) => (
                               <MultiSelect
                                 {...field}
-                                options={[
-                                  {
-                                    label: "Admin",
-                                    value: OrganizationUserRole.ADMIN,
-                                    description:
-                                      "Can manage organization and add or remove members",
-                                  },
-                                  {
-                                    label: "Member",
-                                    value: OrganizationUserRole.MEMBER,
-                                    description:
-                                      "Can manage their own projects and view other projects",
-                                  },
-                                  {
-                                    label: "External / Viewer",
-                                    value: OrganizationUserRole.EXTERNAL,
-                                    description:
-                                      "Can only view projects they are invited to, cannot see costs",
-                                  },
-                                ]}
+                                options={selectOptions}
                                 hideSelectedOptions={false}
                                 isSearchable={false}
                                 components={{
@@ -696,3 +722,73 @@ function MembersList({
     </SettingsLayout>
   );
 }
+
+interface RoleSelectProps {
+  defaultValue?: OrganizationUserRole;
+  onRoleChange?: (userId: string, value: OrganizationUserRole) => void;
+  memberId?: string;
+}
+
+const selectOptions = [
+  {
+    label: "Admin",
+    value: OrganizationUserRole.ADMIN,
+    description: "Can manage organization and add or remove members",
+  },
+  {
+    label: "Member",
+    value: OrganizationUserRole.MEMBER,
+    description: "Can manage their own projects and view other projects",
+  },
+  {
+    label: "External / Viewer",
+    value: OrganizationUserRole.EXTERNAL,
+    description: "Can only view projects they are invited to, cannot see costs",
+  },
+];
+
+const OrganizationMemberSelect = ({
+  defaultValue,
+  onRoleChange,
+  memberId,
+}: RoleSelectProps) => {
+  return (
+    <MultiSelect
+      options={selectOptions}
+      defaultValue={selectOptions.find(
+        (option) => option.value === defaultValue
+      )}
+      onChange={(value) => {
+        onRoleChange?.(memberId ?? "", value!.value as OrganizationUserRole);
+      }}
+      hideSelectedOptions={false}
+      isSearchable={false}
+      components={{
+        Menu: ({ children, ...props }) => (
+          <chakraComponents.Menu
+            {...props}
+            innerProps={{
+              ...props.innerProps,
+              style: { width: "350px" },
+            }}
+          >
+            {children}
+          </chakraComponents.Menu>
+        ),
+        Option: ({ children, ...props }) => (
+          <chakraComponents.Option {...props}>
+            <VStack align="start">
+              <Text>{children}</Text>
+              <Text
+                color={props.isSelected ? "white" : "gray.500"}
+                fontSize="13px"
+              >
+                {props.data.description}
+              </Text>
+            </VStack>
+          </chakraComponents.Option>
+        ),
+      }}
+    />
+  );
+};
