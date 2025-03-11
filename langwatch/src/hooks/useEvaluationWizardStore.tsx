@@ -12,9 +12,10 @@ type State = {
     step: Step;
     task?: "real-time"; // | "llm-pipeline" | "prompt-creation"
     dataSource?: "choose" | "from_production" | "manual" | "upload";
-    
+    datasetId?: string;
+
     // execution:
-    
+
     evaluatorCategory?:
       | "expected_answer"
       | "quality_aspects"

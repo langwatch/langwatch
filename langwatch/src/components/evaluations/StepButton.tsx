@@ -13,11 +13,13 @@ export function StepButton({
   title,
   description,
   icon,
+  indicator,
   ...props
 }: {
   title: string;
   description: string;
   icon: React.ReactNode;
+  indicator?: React.ReactNode | null;
 } & ButtonProps) {
   return (
     <Button
@@ -46,9 +48,9 @@ export function StepButton({
             {description}
           </Text>
         </VStack>
-        <Center>
-          <LuChevronRight />
-        </Center>
+        {indicator !== null && (
+          <Center>{indicator ?? <LuChevronRight />}</Center>
+        )}
       </HStack>
     </Button>
   );
