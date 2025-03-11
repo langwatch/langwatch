@@ -1,13 +1,21 @@
 import { create } from "zustand";
-import type { EvaluatorTypes } from "../server/evaluations/evaluators.generated";
+import type { Evaluators } from "~/server/evaluations/evaluators.generated";
 import type { Workflow } from "../optimization_studio/types/dsl";
 import { initialDSL } from "../optimization_studio/hooks/useWorkflowStore";
+
+export type EvaluatorCategory =
+  | "expected_answer"
+  | "llm_judge"
+  | "quality"
+  | "rag"
+  | "safety";
 
 export const steps = [
   "task",
   "dataset",
   "executor",
-  "evaluation",
+  "evaluator",
+  "configuration",
   "finalize",
 ] as const;
 export type Step = (typeof steps)[number];
@@ -16,20 +24,15 @@ type State = {
   experimentId?: string;
   wizardState: {
     step: Step;
-    task?: "real-time"; // | "llm-pipeline" | "prompt-creation"
+    task?: "real-time" | "batch" | "prompt" | "custom" | "scan";
     dataSource?: "choose" | "from_production" | "manual" | "upload";
     datasetId?: string;
-
-    // execution:
-
-    evaluatorCategory?:
-      | "expected_answer"
-      | "quality_aspects"
-      | "llm_as_a_judge"
-      | "safety"
-      | "rag_quality"
-      | "custom";
-    evaluator?: { langevals: EvaluatorTypes } | { custom: string };
+    evaluatorCategory?: EvaluatorCategory;
+    evaluator?: {
+      langevals: keyof Evaluators;
+    } | {
+      custom: string;
+    };
   };
   dsl: Workflow;
 };
@@ -129,7 +132,7 @@ const store = (
         ) {
           return {
             ...current,
-            wizardState: { ...current.wizardState, step: "evaluation" },
+            wizardState: { ...current.wizardState, step: "evaluator" },
           };
         } else {
           return {
