@@ -143,7 +143,7 @@ export function PromptingTechniqueWrapper({
         <ComponentIcon
           type={node.type as ComponentType}
           cls={node.data.cls}
-          size="sm"
+          size="xs"
         />
         <Text fontSize="12px" fontWeight={500}>
           {node.data.cls}
