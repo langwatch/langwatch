@@ -4,30 +4,26 @@ import {
   Heading,
   HStack,
   Spacer,
-  Text,
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
-import { Activity, Edit3 } from "react-feather";
-import {
-  LuBadgeCheck,
-  LuChevronRight,
-  LuListChecks,
-  LuShield,
-} from "react-icons/lu";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { ColorfulBlockIcon } from "../../optimization_studio/components/ColorfulBlockIcons";
-import { LogoIcon } from "../icons/LogoIcon";
-import { Dialog } from "../ui/dialog";
-import { Steps } from "../ui/steps";
-import { StepButton } from "./StepButton";
+import { LuChevronRight } from "react-icons/lu";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { LogoIcon } from "../../icons/LogoIcon";
+import { Dialog } from "../../ui/dialog";
+import { Steps } from "../../ui/steps";
+import { steps, useEvaluationWizardStore } from "~/hooks/useEvaluationWizardStore";
+import { TaskSelection } from "./steps/TaskSelection";
+import { DatasetSelection } from "./steps/DatasetSelection";
 
 export function EvaluationWizard() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const [isSticky, setIsSticky] = useState(false);
   const stickyRef = useRef<HTMLDivElement>(null);
+  const { wizardState, setWizardState } = useEvaluationWizardStore();
+  const { step } = wizardState;
 
   useEffect(() => {
     let unmount: (() => void) | undefined = undefined;
@@ -57,6 +53,17 @@ export function EvaluationWizard() {
       unmount?.();
     };
   }, []);
+
+  const handleNextClick = () => {
+    const currentStepIndex = steps.indexOf(step);
+    if (currentStepIndex < steps.length - 1) {
+      setWizardState({ step: steps[currentStepIndex + 1] });
+    }
+  };
+
+  if (typeof window !== "undefined") {
+    window.state = wizardState;
+  } 
 
   return (
     <Dialog.Content width="full" height="full" minHeight="fit-content">
@@ -95,7 +102,13 @@ export function EvaluationWizard() {
             gap={8}
             height="fit-content"
           >
-            <Steps.Root size="sm" count={5} width="full">
+            <Steps.Root
+              size="sm"
+              count={5}
+              width="full"
+              step={steps.indexOf(step)}
+              onStepChange={(event) => setWizardState({ step: steps[event.step] })}
+            >
               <Steps.List>
                 <Steps.Item index={0} title="Task" />
                 <Steps.Item index={1} title="Dataset" />
@@ -104,78 +117,8 @@ export function EvaluationWizard() {
                 <Steps.Item index={4} title="Results" />
               </Steps.List>
             </Steps.Root>
-            <VStack align="start" paddingTop={6}>
-              <Heading as="h2" size="md">
-                What are you trying to do?
-              </Heading>
-              <Text>Select what evaluation flow you want to follow</Text>
-            </VStack>
-            <VStack width="full" gap={3}>
-              <StepButton
-                title="Set up real-time evaluation"
-                description="Evaluate messages as they arrive in production"
-                icon={
-                  <ColorfulBlockIcon
-                    color="green.400"
-                    size="md"
-                    icon={<Activity />}
-                    marginTop="-2px"
-                  />
-                }
-              />
-              <StepButton
-                title="Evaluate your LLM pipeline"
-                description="Run a batch evaluation of dataset examples against your existing LLM application"
-                icon={
-                  <ColorfulBlockIcon
-                    color="blue.400"
-                    size="md"
-                    icon={<LuListChecks />}
-                    marginTop="-2px"
-                  />
-                }
-                disabled
-              />
-              <StepButton
-                title="Prompt Creation"
-                description="Build a new prompt and evaluate the quality of the outputs, iteratively improving it"
-                icon={
-                  <ColorfulBlockIcon
-                    color="purple.400"
-                    size="md"
-                    icon={<Edit3 />}
-                    marginTop="-2px"
-                  />
-                }
-                disabled
-              />
-              <StepButton
-                title="Create Custom Evaluator"
-                description="Build your own reliable evaluator to be used by other flows, measuring and ensuring its accuracy"
-                icon={
-                  <ColorfulBlockIcon
-                    color="orange.400"
-                    size="md"
-                    icon={<LuBadgeCheck />}
-                    marginTop="-2px"
-                  />
-                }
-                disabled
-              />
-              <StepButton
-                title="Scan for Vulnerabilities (Coming Soon)"
-                description="Run malicious datasets and adversarial attacks against your LLM application for Red Teaming"
-                icon={
-                  <ColorfulBlockIcon
-                    color="teal.400"
-                    size="md"
-                    icon={<LuShield />}
-                    marginTop="-2px"
-                  />
-                }
-                disabled
-              />
-            </VStack>
+            {step === "task" && <TaskSelection />}
+            {step === "dataset" && <DatasetSelection />}
           </VStack>
           <HStack
             ref={stickyRef}
@@ -191,7 +134,7 @@ export function EvaluationWizard() {
             bottom="-1px"
           >
             <Spacer />
-            <Button variant="outline">
+            <Button variant="outline" onClick={handleNextClick}>
               Next
               <LuChevronRight />
             </Button>
