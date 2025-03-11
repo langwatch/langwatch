@@ -1,11 +1,4 @@
-import {
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Spacer,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Card, Heading, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
 import { LuChevronRight } from "react-icons/lu";
@@ -13,9 +6,13 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 import { LogoIcon } from "../../icons/LogoIcon";
 import { Dialog } from "../../ui/dialog";
 import { Steps } from "../../ui/steps";
-import { steps, useEvaluationWizardStore } from "~/hooks/useEvaluationWizardStore";
+import {
+  steps,
+  useEvaluationWizardStore,
+} from "~/hooks/useEvaluationWizardStore";
 import { TaskSelection } from "./steps/TaskSelection";
 import { DatasetSelection } from "./steps/DatasetSelection";
+import { DatasetTable } from "../../datasets/DatasetTable";
 
 export function EvaluationWizard() {
   const router = useRouter();
@@ -63,7 +60,7 @@ export function EvaluationWizard() {
 
   if (typeof window !== "undefined") {
     window.state = wizardState;
-  } 
+  }
 
   return (
     <Dialog.Content width="full" height="full" minHeight="fit-content">
@@ -107,7 +104,9 @@ export function EvaluationWizard() {
               count={5}
               width="full"
               step={steps.indexOf(step)}
-              onStepChange={(event) => setWizardState({ step: steps[event.step] })}
+              onStepChange={(event) =>
+                setWizardState({ step: steps[event.step] })
+              }
             >
               <Steps.List>
                 <Steps.Item index={0} title="Task" />
@@ -148,7 +147,20 @@ export function EvaluationWizard() {
           minHeight="calc(100vh - 50px)"
           borderLeft="1px solid"
           borderLeftColor="gray.200"
-        ></VStack>
+        >
+          {wizardState.datasetId && (
+            <Card.Root width="full" position="sticky" top={6}>
+              <Card.Body width="full" paddingBottom={6}>
+                <Box width="full" position="relative">
+                  <DatasetTable
+                    datasetId={wizardState.datasetId}
+                    insideWizard
+                  />
+                </Box>
+              </Card.Body>
+            </Card.Root>
+          )}
+        </VStack>
       </Dialog.Body>
     </Dialog.Content>
   );

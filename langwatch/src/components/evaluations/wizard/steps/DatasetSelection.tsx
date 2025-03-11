@@ -2,8 +2,10 @@ import {
   Accordion,
   Button,
   Flex,
+  Grid,
   Heading,
   HStack,
+  RadioCard,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -20,6 +22,7 @@ import { useEvaluationWizardStore } from "~/hooks/useEvaluationWizardStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { StepButton } from "../../StepButton";
+import { OverflownTextWithTooltip } from "../../../OverflownText";
 
 export function DatasetSelection() {
   const { setWizardState, wizardState } = useEvaluationWizardStore();
@@ -46,7 +49,6 @@ export function DatasetSelection() {
 
   const handleDatasetSelect = (datasetId: string) => {
     setWizardState({
-      step: "executor",
       datasetId,
     });
   };
@@ -163,7 +165,7 @@ export function DatasetSelection() {
                   </Accordion.ItemIndicator>
                 </HStack>
               </Accordion.ItemTrigger>
-              <Accordion.ItemContent paddingTop={2}>
+              <Accordion.ItemContent paddingTop={2} paddingX="1px">
                 {wizardState.dataSource === "choose" && (
                   <VStack width="full" align="start" gap={3}>
                     {datasets.isLoading && <Text>Loading datasets...</Text>}
@@ -177,33 +179,57 @@ export function DatasetSelection() {
                         No datasets found. Please create a dataset first.
                       </Text>
                     )}
-                    <Flex width="full" flexWrap="wrap" gap={3}>
-                      {datasets.data?.map((dataset) => (
-                        <Button
-                          key={dataset.id}
-                          variant="outline"
-                          width="calc(50% - 6px)"
-                          justifyContent="flex-start"
-                          onClick={() => handleDatasetSelect(dataset.id)}
-                          height="auto"
-                          padding={3}
-                        >
-                          <VStack align="start" gap={3} _icon={{ color: "blue.300" }}>
-                            <Folder size={18} />
-                            <VStack align="start" gap={0}>
-                              <Text lineClamp={1}>{dataset.name}</Text>
-                              <Text
-                                fontSize="xs"
-                                color="gray.500"
-                                fontWeight="normal"
-                              >
-                                {dataset._count.datasetRecords} entries
-                              </Text>
-                            </VStack>
-                          </VStack>
-                        </Button>
-                      ))}
-                    </Flex>
+                    <RadioCard.Root
+                      variant="outline"
+                      colorPalette="blue"
+                      value={wizardState.datasetId}
+                    >
+                      <Grid
+                        width="full"
+                        templateColumns="repeat(2, 1fr)"
+                        gap={3}
+                      >
+                        {datasets.data?.map((dataset) => (
+                          <RadioCard.Item
+                            key={dataset.id}
+                            value={dataset.id}
+                            width="full"
+                            minWidth={0}
+                            onClick={() => handleDatasetSelect(dataset.id)}
+                          >
+                            <RadioCard.ItemHiddenInput />
+                            <RadioCard.ItemControl
+                              cursor="pointer"
+                              width="full"
+                            >
+                              <RadioCard.ItemContent width="full">
+                                <VStack
+                                  align="start"
+                                  gap={3}
+                                  _icon={{ color: "blue.300" }}
+                                  width="full"
+                                >
+                                  <Folder size={18} />
+                                  <VStack align="start" gap={0} width="full">
+                                    <OverflownTextWithTooltip wordBreak="break-all">
+                                      {dataset.name}
+                                    </OverflownTextWithTooltip>
+                                    <Text
+                                      fontSize="xs"
+                                      color="gray.500"
+                                      fontWeight="normal"
+                                    >
+                                      {dataset._count.datasetRecords} entries
+                                    </Text>
+                                  </VStack>
+                                </VStack>
+                              </RadioCard.ItemContent>
+                              <RadioCard.ItemIndicator />
+                            </RadioCard.ItemControl>
+                          </RadioCard.Item>
+                        ))}
+                      </Grid>
+                    </RadioCard.Root>
                   </VStack>
                 )}
 
