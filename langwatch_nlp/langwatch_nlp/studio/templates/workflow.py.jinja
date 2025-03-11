@@ -1,0 +1,155 @@
+import time
+from typing import Callable, Dict, Any, Literal, Optional, Tuple, cast, overload
+import asyncio
+
+import langwatch
+from langwatch_nlp.studio.dspy.evaluation import (
+    EvaluationResultWithMetadata,
+    PredictionWithEvaluationAndMetadata,
+)
+from langwatch_nlp.studio.dspy.predict_with_metadata import (
+    PredictionWithMetadata,
+)
+from langwatch_nlp.studio.parser import autoparse_fields, parse_component
+from langwatch_nlp.studio.types.dsl import Workflow, Node
+from langwatch_nlp.studio.dspy.reporting_module import ReportingModule
+import dspy
+
+from langwatch_nlp.studio.utils import get_node_by_id, validate_identifier
+from langevals_core.base_evaluator import (
+    SingleEvaluationResult,
+    EvaluationResultError,
+    EvaluationResult,
+)
+from langwatch_nlp.studio.dspy.patched_optional_image import patch_optional_image
+
+patch_optional_image()
+
+class WorkflowModule(ReportingModule):
+    def __init__(
+        self,
+        manual_execution_mode: bool,
+        until_node_id: Optional[str] = None,
+        evaluation_weighting: Literal["mean"] = "mean",
+        inputs: Optional[Dict[str, str]] = None,
+    ):
+        super().__init__()
+
+        {% for node in workflow.nodes|selectattr("type", "ne", "end")|list %}
+        self.{{ node.id }} = asyncify({{ node.data.name }}())
+        {% endfor %}
+
+    async def forward(self, **kwargs):
+        try:
+            langwatch.get_current_span().update(type="workflow")
+        except Exception:
+            pass
+
+        {# First find the entry node and execute it #}
+        {% for node in workflow.nodes %}
+            {% if node.type == "entry" %}
+        # Execute entry node
+        entry_instance = asyncify({{ node.data.name }}Class())
+        entry_result = await entry_instance(**kwargs)
+            {% endif %}
+        {% endfor %}
+
+        {# First build dependency graph #}
+        {% set dependency_graph = {} %}
+        {% for node in workflow.nodes %}
+            {% set _ = dependency_graph.update({node.id: []}) %}
+        {% endfor %}
+        {% for edge in workflow.edges %}
+            {% set _ = dependency_graph[edge.target].append(edge.source) %}
+        {% endfor %}
+
+        {# Now generate execution layers #}
+        {% set executed = {'nodes': ['entry']} %}
+        {% set layers = [] %}
+
+        {% if debug_level > 1 %}
+        # Dependency graph: {{ dependency_graph }}
+        {% endif %}
+
+        {# Build layers until all nodes are executed #}
+        {% set remaining_nodes = workflow.nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
+        {% for i in range(workflow.nodes|length) %}
+            {% set current_layer = [] %}
+            {% for node in remaining_nodes %}
+                {% set ns = namespace(can_execute=true) %}
+                {% for dep in dependency_graph[node.id] %}
+                    {% if dep not in executed.nodes %}
+                        {% set ns.can_execute = false %}
+                    {% endif %}
+                {% endfor %}
+                {% if debug_level > 1 %}
+        # {{ i }}: Node: {{ node.id }}, can execute: {{ ns.can_execute }}, executed: {{ executed.nodes }}, dependencies: {{ dependency_graph[node.id] }}
+                {% endif %}
+                {% if ns.can_execute and node.id not in executed.nodes %}
+                    {% set _ = current_layer.append(node) %}
+                {% endif %}
+            {% endfor %}
+            {% if current_layer %}
+                {% set _ = layers.append(current_layer) %}
+                {% for node in current_layer %}
+                    {% set _ = executed.nodes.append(node.id) %}
+                {% endfor %}
+            {% endif %}
+        {% endfor %}
+
+        {% for layer in layers if debug_level > 0 %}
+        # Layer {{ loop.index }}: {{ layer|map(attribute="id")|list }}
+        {% endfor %}
+
+        {# Generate code for each layer #}
+        {% for layer in layers %}
+            {% if layer|length > 1 %}
+        # Execute parallel nodes
+        {{ layer|map(attribute="id")|list|join(", ") }} = await asyncio.gather(
+                {% for node in layer %}
+            self.{{ node.id }}(
+                    {% for edge in workflow.edges %}
+                        {% if edge.target == node.id %}
+                            {% set source_parts = edge.sourceHandle.split(".") %}
+                            {% set target_parts = edge.targetHandle.split(".") %}
+                            {% if source_parts[0] == "outputs" %}
+                {{ target_parts[1] }}={{ edge.source }}_result["{{ source_parts[1] }}"],
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+            ),
+                {% endfor %}
+        )
+            {% else %}
+        # Execute {{ layer[0].id }}
+        {{ layer[0].id }} = await self.{{ layer[0].id }}(
+                {% for edge in workflow.edges %}
+                    {% if edge.target == layer[0].id %}
+                        {% set source_parts = edge.sourceHandle.split(".") %}
+                        {% set target_parts = edge.targetHandle.split(".") %}
+                        {% if source_parts[0] == "outputs" %}
+            {{ target_parts[1] }}={{ edge.source }}["{{ source_parts[1] }}"],
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+        )
+            {% endif %}
+        {% endfor %}
+
+        {# Finally execute end node #}
+        {% for node in workflow.nodes %}
+            {% if node.type == "end" %}
+        # Execute end node
+        return PredictionWithEvaluationAndMetadata(
+                {% for edge in workflow.edges %}
+                    {% if edge.target == node.id %}
+                        {% set source_parts = edge.sourceHandle.split(".") %}
+                        {% set target_parts = edge.targetHandle.split(".") %}
+                        {% if source_parts[0] == "outputs" %}
+            {{ target_parts[1] }}={{ edge.source }}["{{ source_parts[1] }}"],
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+        )
+            {% endif %}
+        {% endfor %}
