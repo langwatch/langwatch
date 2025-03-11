@@ -3,8 +3,14 @@ import type { EvaluatorTypes } from "../server/evaluations/evaluators.generated"
 import type { Workflow } from "../optimization_studio/types/dsl";
 import { initialDSL } from "../optimization_studio/hooks/useWorkflowStore";
 
-export const steps = ["task", "dataset", "executor", "evaluation", "finalize"] as const;
-export type Step = typeof steps[number];
+export const steps = [
+  "task",
+  "dataset",
+  "executor",
+  "evaluation",
+  "finalize",
+] as const;
+export type Step = (typeof steps)[number];
 
 type State = {
   experimentId?: string;
@@ -44,12 +50,13 @@ type EvaluationWizardStore = State & {
       | ((state: State["dsl"]) => Partial<State["dsl"]>)
   ) => void;
   getDSL: () => State["dsl"];
+  nextStep: () => void;
 };
 
 const initialState: State = {
   experimentId: undefined,
   wizardState: {
-    step: 'task',
+    step: "task",
   },
   dsl: initialDSL,
 };
@@ -110,6 +117,29 @@ const store = (
   },
   getDSL() {
     return get().dsl;
+  },
+  nextStep() {
+    set((current) => {
+      const currentStepIndex = steps.indexOf(current.wizardState.step);
+      if (currentStepIndex < steps.length - 1) {
+        const nextStep = steps[currentStepIndex + 1];
+        if (
+          nextStep === "executor" &&
+          current.wizardState.task === "real-time"
+        ) {
+          return {
+            ...current,
+            wizardState: { ...current.wizardState, step: "evaluation" },
+          };
+        } else {
+          return {
+            ...current,
+            wizardState: { ...current.wizardState, step: nextStep! },
+          };
+        }
+      }
+      return current;
+    });
   },
 });
 
