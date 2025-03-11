@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box, type BoxProps } from "@chakra-ui/react";
 import {
   Check,
   Flag,
@@ -14,45 +14,56 @@ import type { ComponentType } from "../types/dsl";
 import { WeaviateIcon } from "../../components/icons/WeaviateIcon";
 
 const sizeMap = {
-  sm: "16px",
+  xs: "16px",
+  sm: "20px",
   md: "24px",
   lg: "28px",
+  xl: "32px",
 };
 
 const fontSizeMap = {
-  sm: "12px",
+  xs: "12px",
+  sm: "13px",
   md: "16px",
   lg: "18px",
+  xl: "20px",
 };
 
 export function ColorfulBlockIcon({
   color,
   size,
   icon,
+  ...props
 }: {
   color: string;
-  size: "sm" | "md" | "lg";
+  size: "xs" | "sm" | "md" | "lg" | "xl";
   icon: React.ReactNode;
-}) {
+} & BoxProps) {
   const paddingMap = {
-    sm: "2px",
+    xs: "2px",
+    sm: "3px",
     md: "3px",
-    lg: "3px",
+    lg: "4px",
+    xl: "4px",
   };
 
   return (
     <Box
       backgroundColor={color}
       borderRadius="4px"
-      padding={paddingMap[size]}
-      width={sizeMap[size]}
-      minWidth={sizeMap[size]}
-      height={sizeMap[size]}
       fontSize={fontSizeMap[size]}
       display="flex"
       alignItems="center"
       justifyContent="center"
       color="white"
+      _icon={{
+        padding: paddingMap[size],
+        minWidth: sizeMap[size],
+        minHeight: sizeMap[size],
+        maxWidth: sizeMap[size],
+        maxHeight: sizeMap[size],
+      }}
+      {...props}
     >
       {icon}
     </Box>
@@ -91,7 +102,7 @@ export const ComponentIcon = ({
 }: {
   type: ComponentType;
   cls?: string;
-  size: "sm" | "md" | "lg";
+  size: "xs" | "md" | "lg";
   behave_as?: "evaluator";
 }) => {
   const componentIconMap: Record<ComponentType, React.ReactNode> = {
@@ -135,7 +146,7 @@ export function WorkflowIcon({
   size,
 }: {
   icon: React.ReactNode;
-  size: "sm" | "md" | "lg";
+  size: "xs" | "md" | "lg";
 }) {
   const reactflowBg = `<svg width="6" height="6" viewBox="0 0 6 6" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="6" height="6" fill="#F2F4F8"/>

@@ -103,7 +103,7 @@ const DEFAULT_LLM_CONFIG: LLMConfig = {
   max_tokens: 2048,
 };
 
-const initialState: State = {
+export const initialDSL: Workflow = {
   workflow_id: undefined,
   spec_version: "1.3",
   name: "Loading...",
@@ -115,6 +115,10 @@ const initialState: State = {
   default_llm: DEFAULT_LLM_CONFIG,
   enable_tracing: true,
   state: {},
+};
+
+const initialState: State = {
+  ...initialDSL,
 
   hoveredNodeId: undefined,
   socketStatus: "disconnected",

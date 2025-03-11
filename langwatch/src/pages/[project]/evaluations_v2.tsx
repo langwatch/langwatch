@@ -1,27 +1,26 @@
 import {
   Box,
   Button,
+  Card,
   Container,
   Heading,
   HStack,
+  Skeleton,
   Spacer,
   Spinner,
+  Table,
   Text,
   VStack,
-  Skeleton,
-  Card,
 } from "@chakra-ui/react";
-import { Plus, Play } from "react-feather";
-import { DashboardLayout } from "../../components/DashboardLayout";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
-import { TeamRoleGroup } from "../../server/api/permission";
-import { toaster } from "../../components/ui/toaster";
-import { Link } from "../../components/ui/link";
-import { MonitorsSection } from "../../components/evaluations/MonitorsSection";
 import { useRouter } from "next/router";
+import { Play, Plus } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
-import { Table } from "@chakra-ui/react";
+import { DashboardLayout } from "../../components/DashboardLayout";
+import { MonitorsSection } from "../../components/evaluations/MonitorsSection";
+import { Link } from "../../components/ui/link";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { TeamRoleGroup } from "../../server/api/permission";
+import { api } from "../../utils/api";
 
 export default function EvaluationsV2() {
   const { project, hasTeamPermission } = useOrganizationTeamProject();
@@ -44,56 +43,54 @@ export default function EvaluationsV2() {
 
   if (!project) return null;
 
-  const handleNewEvaluation = () => {
-    void router.push(`/${project.slug}/evaluations/new/choose`);
-  };
-
   const handleEditMonitor = (monitorId: string) => {
     void router.push(`/${project.slug}/evaluations/${monitorId}/edit`);
   };
 
   // Transform checks data into monitor format
-  const guardrails = checks.data
-    ?.filter((check) => check.executionMode === "AS_GUARDRAIL")
-    .map((check) => ({
-      id: check.id,
-      name: check.name,
-      type: "boolean",
-      metric: "Pass Rate",
-      value: 0.95, // TODO: Get real value from metrics
-      status: "healthy" as const,
-      lastUpdated: "2 min ago", // TODO: Get real timestamp
-      history: [
-        { time: "1", value: 0.92 },
-        { time: "2", value: 0.95 },
-        { time: "3", value: 0.97 },
-        { time: "4", value: 0.96 },
-        { time: "5", value: 0.95 },
-        { time: "6", value: 0.99 },
-        { time: "7", value: 0.95 },
-      ],
-    })) ?? [];
+  const guardrails =
+    checks.data
+      ?.filter((check) => check.executionMode === "AS_GUARDRAIL")
+      .map((check) => ({
+        id: check.id,
+        name: check.name,
+        type: "boolean",
+        metric: "Pass Rate",
+        value: 0.95, // TODO: Get real value from metrics
+        status: "healthy" as const,
+        lastUpdated: "2 min ago", // TODO: Get real timestamp
+        history: [
+          { time: "1", value: 0.92 },
+          { time: "2", value: 0.95 },
+          { time: "3", value: 0.97 },
+          { time: "4", value: 0.96 },
+          { time: "5", value: 0.95 },
+          { time: "6", value: 0.99 },
+          { time: "7", value: 0.95 },
+        ],
+      })) ?? [];
 
-  const monitors = checks.data
-    ?.filter((check) => check.executionMode !== "AS_GUARDRAIL")
-    .map((check) => ({
-      id: check.id,
-      name: check.name,
-      type: "boolean",
-      metric: "Pass Rate",
-      value: 0.87, // TODO: Get real value from metrics
-      status: "healthy" as const,
-      lastUpdated: "5 min ago", // TODO: Get real timestamp
-      history: [
-        { time: "1", value: 0.82 },
-        { time: "2", value: 0.84 },
-        { time: "3", value: 0.81 },
-        { time: "4", value: 0.85 },
-        { time: "5", value: 0.86 },
-        { time: "6", value: 0.87 },
-        { time: "7", value: 0.87 },
-      ],
-    })) ?? [];
+  const monitors =
+    checks.data
+      ?.filter((check) => check.executionMode !== "AS_GUARDRAIL")
+      .map((check) => ({
+        id: check.id,
+        name: check.name,
+        type: "boolean",
+        metric: "Pass Rate",
+        value: 0.87, // TODO: Get real value from metrics
+        status: "healthy" as const,
+        lastUpdated: "5 min ago", // TODO: Get real timestamp
+        history: [
+          { time: "1", value: 0.82 },
+          { time: "2", value: 0.84 },
+          { time: "3", value: 0.81 },
+          { time: "4", value: 0.85 },
+          { time: "5", value: 0.86 },
+          { time: "6", value: 0.87 },
+          { time: "7", value: 0.87 },
+        ],
+      })) ?? [];
 
   return (
     <DashboardLayout>
@@ -103,13 +100,14 @@ export default function EvaluationsV2() {
             <VStack align="start" gap={1}>
               <Heading as="h1">Evaluations Dashboard</Heading>
               <Text color="gray.600">
-                Monitor real-time performance metrics and batch evaluation results
+                Monitor real-time performance metrics and batch evaluation
+                results
               </Text>
             </VStack>
             <Spacer />
             <HStack gap={2}>
               {hasTeamPermission(TeamRoleGroup.GUARDRAILS_MANAGE) && (
-                <Link asChild href={`/${project.slug}/evaluations/new/choose`}>
+                <Link asChild href={`/${project.slug}/evaluations/wizard`}>
                   <Button colorPalette="orange">
                     <Plus size={16} /> New Evaluation
                   </Button>
@@ -195,9 +193,13 @@ export default function EvaluationsV2() {
                                 }}
                                 key={i}
                               >
-                                <Table.Cell>{experiment.name ?? experiment.slug}</Table.Cell>
+                                <Table.Cell>
+                                  {experiment.name ?? experiment.slug}
+                                </Table.Cell>
                                 <Table.Cell>{experiment.type}</Table.Cell>
-                                <Table.Cell>{experiment.createdAt.toLocaleString()}</Table.Cell>
+                                <Table.Cell>
+                                  {experiment.createdAt.toLocaleString()}
+                                </Table.Cell>
                               </Table.Row>
                             ))
                           : null}
