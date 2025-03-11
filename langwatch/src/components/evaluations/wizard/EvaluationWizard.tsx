@@ -22,6 +22,7 @@ import { TaskSelection } from "./steps/TaskSelection";
 import { DatasetSelection } from "./steps/DatasetSelection";
 import { DatasetTable } from "../../datasets/DatasetTable";
 import { ExecutorSelection } from "./steps/ExecutorSelection";
+import { EvaluationSelection } from "./steps/EvaluationSelection";
 
 export function EvaluationWizard() {
   const router = useRouter();
@@ -117,6 +118,7 @@ export function EvaluationWizard() {
             {step === "task" && <TaskSelection />}
             {step === "dataset" && <DatasetSelection />}
             {step === "executor" && <ExecutorSelection />}
+            {step === "evaluator" && <EvaluationSelection />}
           </VStack>
           <HStack
             ref={stickyRef}
