@@ -315,6 +315,8 @@ function MembersList({
     );
   };
 
+  const sortedMembers = organization.members.sort((a, b) => b.user.id.localeCompare(a.user.id));
+
   return (
     <SettingsLayout>
       <VStack
@@ -369,7 +371,7 @@ function MembersList({
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {organization.members.map((member) => (
+                {sortedMembers.map((member) => (
                   <LinkBox as={Table.Row} key={member.userId}>
                     <Table.Cell>{member.user.name}</Table.Cell>
                     <Table.Cell>{member.user.email}</Table.Cell>
