@@ -26,6 +26,10 @@ from dspy.utils.asyncify import asyncify
 
 patch_optional_image()
 
+{% for node_id, node_template in node_templates.items() %}
+{{ node_template[1] }}
+{% endfor %}
+
 class WorkflowModule(ReportingModule):
     def __init__(
         self,
@@ -37,7 +41,7 @@ class WorkflowModule(ReportingModule):
         super().__init__()
 
         {% for node in workflow.nodes|selectattr("type", "ne", "end")|list %}
-        self.{{ node.id }} = asyncify({{ node.data.name }}())
+        self.{{ node.id }} = asyncify({{ node_templates[node.id][0] }}())
         {% endfor %}
 
     async def forward(self, **kwargs):
@@ -50,7 +54,7 @@ class WorkflowModule(ReportingModule):
         {% for node in workflow.nodes %}
             {% if node.type == "entry" %}
         # Execute entry node
-        entry_instance = asyncify({{ node.data.name }}Class())
+        entry_instance = asyncify({{ node_templates[node.id][0] }}())
         entry_result = await entry_instance(**kwargs)
             {% endif %}
         {% endfor %}

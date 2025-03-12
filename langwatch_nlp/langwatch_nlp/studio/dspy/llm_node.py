@@ -12,7 +12,7 @@ class LLMNode(dspy.Module):
         name: str,
         predict: dspy.Module,
         lm: dspy.LM,
-        demos: List[Dict[str, Any]],
+        demos: List[Dict[str, Any]] = [],
     ):
         super().__init__()
 

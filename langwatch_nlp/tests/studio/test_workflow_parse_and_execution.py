@@ -1,5 +1,9 @@
 import pytest
-from langwatch_nlp.studio.parser_v2 import parse_workflow
+from langwatch_nlp.studio.parser_v2 import (
+    get_component_class,
+    parse_and_instantiate_workflow,
+    parse_workflow,
+)
 from langwatch_nlp.studio.dspy.workflow_module import (
     PredictionWithEvaluationAndMetadata,
     WorkflowModule,
@@ -25,6 +29,19 @@ from langwatch_nlp.studio.types.dsl import (
 )
 from langwatch_nlp.studio.utils import disable_dsp_caching
 import dspy
+
+
+llm_field = Field(
+    identifier="llm",
+    type=FieldType.llm,
+    optional=None,
+    value=LLMConfig(
+        model="gpt-4o-mini",
+        temperature=0.0,
+        max_tokens=100,
+    ),
+    desc=None,
+)
 
 
 @pytest.mark.integration
@@ -100,7 +117,7 @@ def test_parse_workflow():
                 data=Signature(
                     name="GenerateAnswer",
                     cls=None,
-                    parameters=None,
+                    parameters=[llm_field],
                     inputs=[
                         Field(
                             identifier="question",
@@ -141,7 +158,7 @@ def test_parse_workflow():
                 data=Signature(
                     name="GenerateQuery",
                     cls=None,
-                    parameters=None,
+                    parameters=[llm_field],
                     inputs=[
                         Field(
                             identifier="question",
@@ -292,8 +309,10 @@ def test_parse_workflow():
         state=WorkflowState(execution=None, evaluation=None),
     )
 
-    Module = parse_workflow(workflow, format=True)
-    instance = Module(manual_execution_mode=False)
+    class_name, code = parse_workflow(workflow, format=True)
+    print("\n\ncode", code, "\n\n")
+    Module = get_component_class(class_name, code)
+    instance = Module(manual_execution_mode=False)  # type: ignore
     result: PredictionWithEvaluationAndMetadata = instance(
         question="What is the capital of France?",
         gold_answer="Paris",
