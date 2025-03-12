@@ -14,7 +14,10 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
+import {
+  Select as MultiSelect,
+  chakraComponents,
+} from "chakra-react-select";
 import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
 import { CopyInput } from "../../components/CopyInput";
 
@@ -133,6 +136,8 @@ function MembersList({
   const createInvitesMutation = api.organization.createInvites.useMutation();
   const deleteMemberMutation = api.organization.deleteMember.useMutation();
   const deleteInviteMutation = api.organization.deleteInvite.useMutation();
+  const updateOrganizationMemberRoleMutation =
+    api.organization.updateMemberRole.useMutation();
 
   const [selectedInvites, setSelectedInvites] = useState<
     { inviteCode: string; email: string }[]
@@ -214,6 +219,34 @@ function MembersList({
     append({ email: "", teamOptions });
   };
 
+  const onRoleChange = (userId: string, value: OrganizationUserRole) => {
+    updateOrganizationMemberRoleMutation.mutate(
+      {
+        userId: userId,
+        organizationId: organization.id,
+        role: value,
+      },
+      {
+        onSuccess: () => {
+          void queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate();
+          toaster.create({
+            title: "Member role updated successfully",
+            description: `The member role has been updated to ${selectOptions.find(option => option.value === value)?.label || value}`,
+            type: "success",
+            duration: 5000,
+          });
+        },
+        onError: (error) => {
+          toaster.create({
+            title: "Error updating member role",
+            type: "error",
+            description: error.message ?? "There was an error updating the member role",
+          });
+        },
+      }
+    );
+  };
+
   const deleteMember = (userId: string) => {
     deleteMemberMutation.mutate(
       {
@@ -282,6 +315,8 @@ function MembersList({
     );
   };
 
+  const sortedMembers = organization.members.sort((a, b) => b.user.id.localeCompare(a.user.id));
+
   return (
     <SettingsLayout>
       <VStack
@@ -330,54 +365,66 @@ function MembersList({
                 <Table.Row>
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Email</Table.ColumnHeader>
-                  <Table.ColumnHeader>Role</Table.ColumnHeader>
+                  <Table.ColumnHeader w={'20%'}>Role</Table.ColumnHeader>
                   <Table.ColumnHeader>Teams</Table.ColumnHeader>
                   <Table.ColumnHeader>Actions</Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {organization.members.map((member) => (
-                  <LinkBox as={Table.Row} key={member.userId}>
-                    <Table.Cell>{member.user.name}</Table.Cell>
-                    <Table.Cell>{member.user.email}</Table.Cell>
-                    <Table.Cell>{member.role}</Table.Cell>
-                    <Table.Cell>
-                      {member.user.teamMemberships
-                        .flatMap((tmember) => tmember.team)
-                        .filter(
-                          (tmember) => tmember.organizationId == organization.id
-                        )
-                        .map((tmember) => tmember.name)
-                        .join(", ")}
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Menu.Root>
-                        <Menu.Trigger asChild>
-                          <Button
-                            variant={"ghost"}
-                            // loading={
-                            //   deleteGraphs.isLoading &&
-                            //   deleteGraphs.variables?.id === graph.id
-                            // }
-                          >
-                            <MoreVertical />
-                          </Button>
-                        </Menu.Trigger>
-                        <Menu.Content>
-                          <Menu.Item
-                            value="remove"
-                            color="red.600"
-                            disabled={organization.members.length === 1}
-                            onClick={() => deleteMember(member.userId)}
-                          >
-                            <Trash size={14} style={{ marginRight: "8px" }} />
-                            Remove Member
-                          </Menu.Item>
-                        </Menu.Content>
-                      </Menu.Root>
-                    </Table.Cell>
-                  </LinkBox>
-                ))}
+                {sortedMembers.map((member) => {
+                  const relevantUpdateRoleMutation = updateOrganizationMemberRoleMutation.variables?.userId === member.userId && updateOrganizationMemberRoleMutation.variables?.organizationId === organization.id;
+                  const roleUpdateLoading = updateOrganizationMemberRoleMutation.isLoading && relevantUpdateRoleMutation;
+
+                  return (
+                    <LinkBox as={Table.Row} key={member.userId}>
+                      <Table.Cell>{member.user.name}</Table.Cell>
+                      <Table.Cell>{member.user.email}</Table.Cell>
+                      <Table.Cell>
+                        <OrganizationMemberSelect
+                          defaultValue={member.role}
+                          memberId={member.userId}
+                          onRoleChange={(_, value) => {
+                            // Only update the role if it's different
+                            if (member.role !== value) {
+                              onRoleChange(member.userId, value);
+                            }
+                          }}
+                          loading={roleUpdateLoading}
+                          disabled={roleUpdateLoading}
+                        />
+                      </Table.Cell>
+                      <Table.Cell>
+                        {member.user.teamMemberships
+                          .flatMap((tmember) => tmember.team)
+                          .filter(
+                            (tmember) => tmember.organizationId == organization.id
+                          )
+                          .map((tmember) => tmember.name)
+                          .join(", ")}
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Menu.Root>
+                          <Menu.Trigger asChild>
+                            <Button variant={"ghost"}>
+                              <MoreVertical />
+                            </Button>
+                          </Menu.Trigger>
+                          <Menu.Content>
+                            <Menu.Item
+                              value="remove"
+                              color="red.600"
+                              disabled={organization.members.length === 1}
+                              onClick={() => deleteMember(member.userId)}
+                            >
+                              <Trash size={14} style={{ marginRight: "8px" }} />
+                              Remove Member
+                            </Menu.Item>
+                          </Menu.Content>
+                        </Menu.Root>
+                      </Table.Cell>
+                    </LinkBox>
+                  );
+                })}
               </Table.Body>
             </Table.Root>
 
@@ -400,7 +447,7 @@ function MembersList({
                     {pendingInvites.data?.map((invite) => (
                       <Table.Row key={invite.id}>
                         <Table.Cell>{invite.email}</Table.Cell>
-                        <Table.Cell>{invite.role}</Table.Cell>
+                        <Table.Cell>{selectOptions.find(option => option.value === invite.role)?.label || invite.role}</Table.Cell>
                         <Table.Cell>
                           {invite.teamIds
                             .split(",")
@@ -573,26 +620,7 @@ function MembersList({
                             render={({ field }) => (
                               <MultiSelect
                                 {...field}
-                                options={[
-                                  {
-                                    label: "Admin",
-                                    value: OrganizationUserRole.ADMIN,
-                                    description:
-                                      "Can manage organization and add or remove members",
-                                  },
-                                  {
-                                    label: "Member",
-                                    value: OrganizationUserRole.MEMBER,
-                                    description:
-                                      "Can manage their own projects and view other projects",
-                                  },
-                                  {
-                                    label: "External / Viewer",
-                                    value: OrganizationUserRole.EXTERNAL,
-                                    description:
-                                      "Can only view projects they are invited to, cannot see costs",
-                                  },
-                                ]}
+                                options={selectOptions}
                                 hideSelectedOptions={false}
                                 isSearchable={false}
                                 components={{
@@ -696,3 +724,79 @@ function MembersList({
     </SettingsLayout>
   );
 }
+
+interface RoleSelectProps {
+  defaultValue?: OrganizationUserRole;
+  onRoleChange?: (userId: string, value: OrganizationUserRole) => void;
+  memberId?: string;
+  loading?: boolean;
+  disabled?: boolean;
+}
+
+const selectOptions = [
+  {
+    label: "Admin",
+    value: OrganizationUserRole.ADMIN,
+    description: "Can manage organization and add or remove members",
+  },
+  {
+    label: "Member",
+    value: OrganizationUserRole.MEMBER,
+    description: "Can manage their own projects and view other projects",
+  },
+  {
+    label: "External / Viewer",
+    value: OrganizationUserRole.EXTERNAL,
+    description: "Can only view projects they are invited to, cannot see costs",
+  },
+];
+
+const OrganizationMemberSelect = ({
+  defaultValue,
+  onRoleChange,
+  memberId,
+  loading,
+  disabled,
+}: RoleSelectProps) => {
+  return (
+    <MultiSelect size={'sm'}
+      options={selectOptions}
+      defaultValue={selectOptions.find(
+        (option) => option.value === defaultValue
+      )}
+      onChange={(value) => {
+        onRoleChange?.(memberId ?? "", value!.value as OrganizationUserRole);
+      }}
+      isLoading={loading}
+      isDisabled={disabled}
+      hideSelectedOptions={false}
+      isSearchable={false}
+      components={{
+        Menu: ({ children, ...props }) => (
+          <chakraComponents.Menu
+            {...props}
+            innerProps={{
+              ...props.innerProps,
+              style: { width: "350px" },
+            }}
+          >
+            {children}
+          </chakraComponents.Menu>
+        ),
+        Option: ({ children, ...props }) => (
+          <chakraComponents.Option {...props}>
+            <VStack align="start">
+              <Text>{children}</Text>
+              <Text
+                color={props.isSelected ? "white" : "gray.500"}
+                fontSize="13px"
+              >
+                {props.data.description}
+              </Text>
+            </VStack>
+          </chakraComponents.Option>
+        ),
+      }}
+    />
+  );
+};
