@@ -1,9 +1,18 @@
 import { create } from "zustand";
-import type { Evaluators } from "~/server/evaluations/evaluators.generated";
-import type { Entry, Workflow } from "../optimization_studio/types/dsl";
+import type {
+  AVAILABLE_EVALUATORS,
+  Evaluators,
+} from "~/server/evaluations/evaluators.generated";
+import type {
+  Entry,
+  Evaluator,
+  Workflow,
+} from "../optimization_studio/types/dsl";
 import { initialDSL } from "../optimization_studio/hooks/useWorkflowStore";
 import type { Node } from "@xyflow/react";
 import { entryNode } from "../optimization_studio/templates/blank";
+import { nameToId } from "../optimization_studio/utils/nodeUtils";
+import { convertEvaluator } from "../optimization_studio/utils/registryUtils";
 
 export type EvaluatorCategory =
   | "expected_answer"
@@ -29,13 +38,6 @@ export type State = {
     task?: "real-time" | "batch" | "prompt" | "custom" | "scan";
     dataSource?: "choose" | "from_production" | "manual" | "upload";
     evaluatorCategory?: EvaluatorCategory;
-    evaluator?:
-      | {
-          langevals: keyof Evaluators;
-        }
-      | {
-          custom: string;
-        };
   };
   dsl: Workflow;
 };
@@ -59,6 +61,10 @@ type EvaluationWizardStore = State & {
   nextStep: () => void;
   setDatasetId: (datasetId: string) => void;
   getDatasetId: () => string | undefined;
+  setFirstEvaluator: (
+    evaluator: Partial<Evaluator> & { evaluator: string }
+  ) => void;
+  getFirstEvaluator: () => Evaluator | undefined;
 };
 
 const initialState: State = {
@@ -191,6 +197,57 @@ const store = (
       ?.data;
     if (entryNodeData && "dataset" in entryNodeData) {
       return entryNodeData.dataset?.id;
+    }
+    return undefined;
+  },
+  setFirstEvaluator(evaluator: Partial<Evaluator> & { evaluator: string }) {
+    get().setDSL((current) => {
+      if (evaluator.evaluator.startsWith("custom/")) {
+        throw new Error("Custom evaluators are not supported yet");
+      }
+
+      const firstEvaluatorIndex = current.nodes.findIndex(
+        (node) => node.type === "evaluator"
+      );
+
+      const initialEvaluator = convertEvaluator(
+        evaluator.evaluator as keyof typeof AVAILABLE_EVALUATORS
+      );
+      const firstEvaluator = current.nodes[firstEvaluatorIndex] ?? {
+        id: nameToId(initialEvaluator.name ?? initialEvaluator.cls),
+        type: "evaluator",
+        data: initialEvaluator,
+        position: { x: 1200, y: 130 },
+      };
+
+      const evaluatorNode: Node<Evaluator> = {
+        ...firstEvaluator,
+        data: {
+          ...(firstEvaluator.data as Evaluator),
+          ...evaluator,
+        },
+      };
+
+      if (firstEvaluatorIndex === -1) {
+        return {
+          ...current,
+          nodes: [...current.nodes, evaluatorNode],
+        };
+      }
+
+      return {
+        ...current,
+        nodes: current.nodes.map((node, index) =>
+          index === firstEvaluatorIndex ? evaluatorNode : node
+        ),
+      };
+    });
+  },
+  getFirstEvaluator() {
+    const nodeData = get().dsl.nodes.find((node) => node.type === "evaluator")
+      ?.data;
+    if (nodeData && "evaluator" in nodeData) {
+      return nodeData;
     }
     return undefined;
   },
