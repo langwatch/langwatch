@@ -23,13 +23,23 @@ import { DatasetSelection } from "./steps/DatasetSelection";
 import { DatasetTable } from "../../datasets/DatasetTable";
 import { ExecutorSelection } from "./steps/ExecutorSelection";
 import { EvaluationSelection } from "./steps/EvaluationSelection";
+import { useShallow } from "zustand/react/shallow";
 
 export function EvaluationWizard() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const [isSticky, setIsSticky] = useState(false);
   const stickyRef = useRef<HTMLDivElement>(null);
-  const { wizardState, setWizardState, nextStep } = useEvaluationWizardStore();
+  const { wizardState, setWizardState, nextStep, getDatasetId } =
+    useEvaluationWizardStore(
+      useShallow((state) => {
+        if (typeof window !== "undefined") {
+          // @ts-ignore
+          window.state = state;
+        }
+        return state;
+      })
+    );
   const { step } = wizardState;
 
   useEffect(() => {
@@ -38,7 +48,6 @@ export function EvaluationWizard() {
     setTimeout(() => {
       const observer = new IntersectionObserver(
         ([entry]) => {
-          console.log(entry?.intersectionRatio);
           setIsSticky(!!entry && entry.intersectionRatio < 1);
         },
         { threshold: [1] }
@@ -149,14 +158,11 @@ export function EvaluationWizard() {
           borderLeft="1px solid"
           borderLeftColor="gray.200"
         >
-          {wizardState.datasetId && (
+          {getDatasetId() && (
             <Card.Root width="full" position="sticky" top={6}>
               <Card.Body width="full" paddingBottom={6}>
                 <Box width="full" position="relative">
-                  <DatasetTable
-                    datasetId={wizardState.datasetId}
-                    insideWizard
-                  />
+                  <DatasetTable datasetId={getDatasetId()} insideWizard />
                 </Box>
               </Card.Body>
             </Card.Root>
