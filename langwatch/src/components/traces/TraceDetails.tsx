@@ -50,7 +50,7 @@ export function TraceDetails(props: {
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const router = useRouter();
 
-  const canViewMessages = props.showMessages ?? router.query.view == "table";
+  const canViewMessages = true;
 
   const { openDrawer, closeDrawer } = useDrawer();
 
@@ -257,7 +257,6 @@ export function TraceDetails(props: {
             <HStack>
               {hasTeamPermission(TeamRoleGroup.ANNOTATIONS_MANAGE) && (
                 <Button
-
                   variant="outline"
                   onClick={() => {
                     commentState.setCommentState({
@@ -283,9 +282,7 @@ export function TraceDetails(props: {
                     open={open}
                   >
                     <Popover.Trigger asChild>
-                      <Button variant="outline">
-                        Annotation Queue
-                      </Button>
+                      <Button variant="outline">Annotation Queue</Button>
                     </Popover.Trigger>
                     <Popover.Content
                       display={queueDrawerOpen.open ? "none" : "block"}
@@ -308,7 +305,6 @@ export function TraceDetails(props: {
               )}
               {hasTeamPermission(TeamRoleGroup.DATASETS_MANAGE) && (
                 <Button
-
                   type="submit"
                   variant="outline"
                   minWidth="fit-content"

@@ -27,24 +27,27 @@ export const AnnotationExpectedOutputs = ({
     }
   );
 
+  console.log(traceId);
+
   return (
     <VStack gap={3} align="start" paddingBottom={4} width="full">
-      {commentState.expectedOutputAction === "new" && (
-        <>
-          <Textarea
-            width="full"
-            backgroundColor="white"
-            value={expectedOutput ?? ""}
-            placeholder="Enter your expected output here..."
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
-            onChange={(e) => {
-              setExpectedOutput(e.target.value);
-            }}
-          />
-        </>
-      )}
+      {commentState.expectedOutputAction === "new" &&
+        traceId === commentState.traceId && (
+          <>
+            <Textarea
+              width="full"
+              backgroundColor="white"
+              value={expectedOutput ?? ""}
+              placeholder="Enter your expected output here..."
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+              onChange={(e) => {
+                setExpectedOutput(e.target.value);
+              }}
+            />
+          </>
+        )}
       {annotations.data?.some(
         (annotation: { expectedOutput?: string | null }) =>
           annotation.expectedOutput

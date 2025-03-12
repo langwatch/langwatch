@@ -40,6 +40,7 @@ import {
   MessagesNavigationFooter,
   useMessagesNavigationFooter,
 } from "./MessagesNavigationFooter";
+import { useDrawer } from "../CurrentDrawer";
 
 export function MessagesList() {
   const { project } = useOrganizationTeamProject();
@@ -224,6 +225,8 @@ const ExpandableMessages = React.memo(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [traceGroups]);
 
+    const { openDrawer } = useDrawer();
+
     return traceGroups.map((traceGroup, groupIndex) => {
       const isExpanded = !!expandedGroups[groupIndex];
       const zIndex = 1000 + traceGroups.length - groupIndex;
@@ -330,6 +333,7 @@ const ExpandableMessages = React.memo(
                 return (
                   <LinkBox asChild key={trace.trace_id}>
                     <Card.Root
+                      key={trace.trace_id}
                       variant="elevated"
                       className="card"
                       ref={traceIndex === 0 ? cardRefs[groupIndex] : null}
