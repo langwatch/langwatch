@@ -379,9 +379,12 @@ function MembersList({
                       <OrganizationMemberSelect
                         defaultValue={member.role}
                         memberId={member.userId}
-                        onRoleChange={(userId, value) =>
-                          onRoleChange(member.userId, value)
-                        }
+                        onRoleChange={(_, value) => {
+                          // Only update the role if it's different
+                          if (member.role !== value) {
+                            onRoleChange(member.userId, value);
+                          }
+                        }}
                       />
                     </Table.Cell>
                     <Table.Cell>
