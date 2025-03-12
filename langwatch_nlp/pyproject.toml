@@ -5,6 +5,7 @@ description = ""
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "black>=25.1.0",
     "boto3>=1.35.74,<2",
     "dspy>=2.5.43,<2.6",
     "fastapi>=0.111.1,<1",
