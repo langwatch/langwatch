@@ -231,7 +231,7 @@ function MembersList({
           void queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate();
           toaster.create({
             title: "Member role updated successfully",
-            description: `The member role has been updated to ${value}`,
+            description: `The member role has been updated to ${selectOptions.find(option => option.value === value)?.label || value}`,
             type: "success",
             duration: 5000,
           });
@@ -401,13 +401,7 @@ function MembersList({
                     <Table.Cell>
                       <Menu.Root>
                         <Menu.Trigger asChild>
-                          <Button
-                            variant={"ghost"}
-                            // loading={
-                            //   deleteGraphs.isLoading &&
-                            //   deleteGraphs.variables?.id === graph.id
-                            // }
-                          >
+                          <Button variant={"ghost"}>
                             <MoreVertical />
                           </Button>
                         </Menu.Trigger>
@@ -448,7 +442,7 @@ function MembersList({
                     {pendingInvites.data?.map((invite) => (
                       <Table.Row key={invite.id}>
                         <Table.Cell>{invite.email}</Table.Cell>
-                        <Table.Cell>{invite.role}</Table.Cell>
+                        <Table.Cell>{selectOptions.find(option => option.value === invite.role)?.label || invite.role}</Table.Cell>
                         <Table.Cell>
                           {invite.teamIds
                             .split(",")
