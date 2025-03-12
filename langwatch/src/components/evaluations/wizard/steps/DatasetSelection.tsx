@@ -17,14 +17,18 @@ import {
   Folder,
   UploadCloud,
 } from "react-feather";
-import { useEvaluationWizardStore } from "~/hooks/useEvaluationWizardStore";
+import {
+  useEvaluationWizardStore,
+  type State,
+} from "~/hooks/useEvaluationWizardStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { StepButton } from "../../StepButton";
+import { StepButton, StepRadio } from "../../StepButton";
 import { OverflownTextWithTooltip } from "../../../OverflownText";
 
 export function DatasetSelection() {
-  const { setWizardState, wizardState } = useEvaluationWizardStore();
+  const { setWizardState, wizardState, setDatasetId, getDatasetId } =
+    useEvaluationWizardStore();
   const { project } = useOrganizationTeamProject();
 
   const [accordeonValue, setAccordeonValue] = useState(
@@ -47,9 +51,7 @@ export function DatasetSelection() {
   };
 
   const handleDatasetSelect = (datasetId: string) => {
-    setWizardState({
-      datasetId,
-    });
+    setDatasetId(datasetId);
   };
 
   const handleContinue = (
@@ -94,46 +96,56 @@ export function DatasetSelection() {
               </Accordion.ItemTrigger>
             )}
             <Accordion.ItemContent paddingTop={2}>
-              <VStack width="full" gap={3}>
-                <StepButton
-                  title="Choose existing dataset"
-                  description="Select from your previously created datasets"
-                  onClick={() => handleDataSourceSelect("choose")}
-                  _icon={{ color: "blue.400" }}
-                  icon={<Database />}
-                  indicator={null}
-                />
+              <RadioCard.Root
+                variant="outline"
+                colorPalette="blue"
+                value={wizardState.dataSource}
+                onValueChange={(e) =>
+                  handleDataSourceSelect(
+                    e.value as Exclude<
+                      State["wizardState"]["dataSource"],
+                      undefined
+                    >
+                  )
+                }
+              >
+                <VStack width="full" gap={3} paddingX="1px">
+                  <StepRadio
+                    value="choose"
+                    title="Choose existing dataset"
+                    description="Select from your previously created datasets"
+                    _icon={{ color: "blue.400" }}
+                    icon={<Database />}
+                  />
 
-                <StepButton
-                  title="Import from Production"
-                  description="Import tracing data from production to test the evaluator"
-                  onClick={() => handleDataSourceSelect("from_production")}
-                  _icon={{ color: "blue.400" }}
-                  icon={<FileText />}
-                  indicator={null}
-                  disabled
-                />
+                  <StepRadio
+                    value="from_production"
+                    title="Import from Production"
+                    description="Import tracing data from production to test the evaluator"
+                    _icon={{ color: "blue.400" }}
+                    icon={<FileText />}
+                    disabled
+                  />
 
-                <StepButton
-                  title="Create manually"
-                  description="Insert some initial test data manually, use AI to expand it"
-                  onClick={() => handleDataSourceSelect("manual")}
-                  _icon={{ color: "blue.400" }}
-                  icon={<FilePlus />}
-                  indicator={null}
-                  disabled
-                />
+                  <StepRadio
+                    value="manual"
+                    title="Create manually"
+                    description="Insert some initial test data manually, use AI to expand it"
+                    _icon={{ color: "blue.400" }}
+                    icon={<FilePlus />}
+                    disabled
+                  />
 
-                <StepButton
-                  title="Upload CSV"
-                  description="Upload your pre-existing dataset from Excel or CSV"
-                  onClick={() => handleDataSourceSelect("upload")}
-                  _icon={{ color: "blue.400" }}
-                  icon={<UploadCloud />}
-                  indicator={null}
-                  disabled
-                />
-              </VStack>
+                  <StepRadio
+                    value="upload"
+                    title="Upload CSV"
+                    description="Upload your pre-existing dataset from Excel or CSV"
+                    _icon={{ color: "blue.400" }}
+                    icon={<UploadCloud />}
+                    disabled
+                  />
+                </VStack>
+              </RadioCard.Root>
             </Accordion.ItemContent>
           </Accordion.Item>
         </VStack>
@@ -181,7 +193,7 @@ export function DatasetSelection() {
                     <RadioCard.Root
                       variant="outline"
                       colorPalette="blue"
-                      value={wizardState.datasetId}
+                      value={getDatasetId()}
                     >
                       <Grid
                         width="full"

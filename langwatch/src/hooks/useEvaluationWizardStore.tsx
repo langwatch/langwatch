@@ -1,7 +1,9 @@
 import { create } from "zustand";
 import type { Evaluators } from "~/server/evaluations/evaluators.generated";
-import type { Workflow } from "../optimization_studio/types/dsl";
+import type { Entry, Workflow } from "../optimization_studio/types/dsl";
 import { initialDSL } from "../optimization_studio/hooks/useWorkflowStore";
+import type { Node } from "@xyflow/react";
+import { entryNode } from "../optimization_studio/templates/blank";
 
 export type EvaluatorCategory =
   | "expected_answer"
@@ -20,19 +22,20 @@ export const steps = [
 ] as const;
 export type Step = (typeof steps)[number];
 
-type State = {
+export type State = {
   experimentId?: string;
   wizardState: {
     step: Step;
     task?: "real-time" | "batch" | "prompt" | "custom" | "scan";
     dataSource?: "choose" | "from_production" | "manual" | "upload";
-    datasetId?: string;
     evaluatorCategory?: EvaluatorCategory;
-    evaluator?: {
-      langevals: keyof Evaluators;
-    } | {
-      custom: string;
-    };
+    evaluator?:
+      | {
+          langevals: keyof Evaluators;
+        }
+      | {
+          custom: string;
+        };
   };
   dsl: Workflow;
 };
@@ -54,6 +57,8 @@ type EvaluationWizardStore = State & {
   ) => void;
   getDSL: () => State["dsl"];
   nextStep: () => void;
+  setDatasetId: (datasetId: string) => void;
+  getDatasetId: () => string | undefined;
 };
 
 const initialState: State = {
@@ -143,6 +148,51 @@ const store = (
       }
       return current;
     });
+  },
+  setDatasetId(datasetId) {
+    get().setDSL((current) => {
+      const hasEntryNode = current.nodes.some((node) => node.type === "entry");
+
+      if (hasEntryNode) {
+        return {
+          ...current,
+          nodes: current.nodes.map((node) => {
+            if (node.type !== "entry") {
+              return node;
+            }
+
+            return {
+              ...node,
+              data: { ...node.data, dataset: { id: datasetId } },
+            };
+          }),
+        };
+      } else {
+        const newEntryNode = entryNode();
+
+        return {
+          ...current,
+          nodes: [
+            ...current.nodes,
+            {
+              ...newEntryNode,
+              data: {
+                ...newEntryNode.data,
+                dataset: { id: datasetId },
+              },
+            },
+          ],
+        };
+      }
+    });
+  },
+  getDatasetId() {
+    const entryNodeData = get().dsl.nodes.find((node) => node.type === "entry")
+      ?.data;
+    if (entryNodeData && "dataset" in entryNodeData) {
+      return entryNodeData.dataset?.id;
+    }
+    return undefined;
   },
 });
 
