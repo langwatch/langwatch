@@ -458,17 +458,23 @@ function MembersList({
                         <Table.Cell>{selectOptions.find(option => option.value === invite.role)?.label || invite.role}</Table.Cell>
                         <Table.Cell>
                           <Flex gap={2} flexWrap="wrap">
-                            {invite.teamIds.split(",").map(teamId => (
-                              <Link href={`/settings/teams/${teamId}`} key={teamId}>
-                                <Badge
-                                  size="xs"
-                                  variant={"surface"}
-                                  colorPalette="orange"
-                                >
-                                  {teams.find(team => team.id === teamId)?.name}
-                                </Badge>
-                              </Link>
-                            ))}
+                            {invite.teamIds.split(",").map(teamId => {
+                              const team = teams.find(team => team.id === teamId);
+
+                              if (!team) return null;
+
+                              return (
+                                <Link href={`/settings/teams/${team.slug}`} key={teamId}>
+                                  <Badge
+                                    size="xs"
+                                    variant={"surface"}
+                                    colorPalette="orange"
+                                  >
+                                    {team.name}
+                                  </Badge>
+                                </Link>
+                              );
+                            })}
                           </Flex>
                         </Table.Cell>
                         <Table.Cell>
