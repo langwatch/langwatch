@@ -1,0 +1,86 @@
+import dspy
+import os
+from typing import Dict, Any, List, Optional, Union, cast
+from langwatch_nlp.studio.dspy.llm_node import LLMNode
+
+{% macro node_llm_config_to_dspy_lm(llm_config) %}
+{% set llm_params = llm_config.litellm_params or {"model": llm_config.model} %}
+{% if "azure/" in (llm_params["model"] or "") %}
+{% set _ = llm_params.update({"api_version": os.environ["AZURE_API_VERSION"]}) %}
+{% endif %}
+{% set _ = llm_params.update({"drop_params": True, "model_type": "chat"}) %}
+dspy.LM(
+            max_tokens={{ llm_config.max_tokens or 2048 }},
+            temperature={{ llm_config.temperature or 0 }},
+            {% for key, value in llm_params.items() %}
+            {{ key }}={{ value|tojson }},
+            {% endfor %}
+        )
+{% endmacro %}
+
+{% set class_name = component.name or "AnonymousSignature" %}
+{% set field_type_to_dspy_type = {
+    "image": "dspy.Image",
+    "str": "str",
+    "int": "int",
+    "float": "float",
+    "bool": "bool",
+    "list_str": "list[str]"
+} %}
+
+class {{ class_name }}Signature(dspy.Signature):
+    {% if parameters.get('instructions', '') %}
+    """{{ parameters.get('instructions', '') }}"""
+
+    {% endif %}
+    {% for input_field in component.inputs or [] %}
+    {{ input_field.identifier }}: {{ field_type_to_dspy_type[input_field.type.value] }} = dspy.InputField()
+    {% endfor %}
+    {% for output_field in component.outputs or [] %}
+    {{ output_field.identifier }}: {{ field_type_to_dspy_type[output_field.type.value] }} = dspy.OutputField()
+    {% endfor %}
+
+
+class {{ class_name }}(LLMNode):
+    def __init__(self):
+        {% if prompting_technique %}
+        {# Apply prompting technique decorator #}
+        {% set decorator_node = None %}
+        {% for node in workflow.nodes %}
+            {% if node.id == prompting_technique.ref %}
+                {% set decorator_node = node %}
+            {% endif %}
+        {% endfor %}
+
+        {% if decorator_node %}
+        predict = {{ decorator_node.data.cls }}({{ class_name }}Signature)
+        {% else %}
+        {# Decorator node {{ prompting_technique.ref }} not found #}
+        predict = dspy.Predict({{ class_name }}Signature)
+        {% endif %}
+        {% else %}
+        {# Standard prediction #}
+        predict = dspy.Predict({{ class_name }}Signature)
+        {% endif %}
+
+        {# Configure LLM #}
+        {% if llm_config %}
+        lm = {{ node_llm_config_to_dspy_lm(llm_config) }}
+        {% else %}
+        # Parsing Error: LLM is required for {{ component.name }}
+        raise ValueError("LLM is required for {{ component.name }}")
+        {% endif %}
+
+        {# Process demonstrations if available #}
+        demos = []
+        {% if demonstrations and demonstrations.inline %}
+        demos = transpose_inline_dataset_to_object_list(demonstrations.inline)
+        {% endif %}
+
+        super().__init__(
+            node_id="{{ node_id }}",
+            name="{{ class_name }}",
+            predict=predict,
+            lm=lm,
+            demos=demos
+        )
