@@ -7,7 +7,6 @@ import {
   HStack,
   Heading,
   Input,
-  Link,
   LinkBox,
   Spacer,
   Spinner,
@@ -16,6 +15,7 @@ import {
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
+import { Link } from "../../components/ui/link";
 import { OrganizationUserRole } from "@prisma/client";
 import {
   Select as MultiSelect,
