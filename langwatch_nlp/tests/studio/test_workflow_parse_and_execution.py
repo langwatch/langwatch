@@ -33,11 +33,11 @@ def test_parse_workflow():
     workflow = Workflow(
         workflow_id="simple-rag",
         api_key="",
-        spec_version="1.0",
+        spec_version="1.3",
         name="Simple RAG",
         icon="🧩",
         description="Query transformation, vector database search and answer generation",
-        version="1.0",
+        version="1.3",
         nodes=[
             EntryNode(
                 id="entry",
@@ -311,3 +311,8 @@ def test_parse_workflow():
     # assert evaluation == 1.0
     # assert evaluation_results["exact_match_evaluator"].status == "processed"
     # assert evaluation_results["exact_match_evaluator"].score == 1.0
+
+
+# TODO: test parallel execution
+# TODO: test orphan nodes
+# TODO: test infinite loops
