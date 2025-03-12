@@ -1,10 +1,13 @@
 import {
+  Badge,
   Button,
   Card,
   Field,
+  Flex,
   HStack,
   Heading,
   Input,
+  Link,
   LinkBox,
   Spacer,
   Spinner,
@@ -394,13 +397,18 @@ function MembersList({
                         />
                       </Table.Cell>
                       <Table.Cell>
-                        {member.user.teamMemberships
-                          .flatMap((tmember) => tmember.team)
-                          .filter(
-                            (tmember) => tmember.organizationId == organization.id
-                          )
-                          .map((tmember) => tmember.name)
-                          .join(", ")}
+                        <Flex gap={2} flexWrap="wrap">
+                          {member.user.teamMemberships
+                            .flatMap(m => m.team)
+                            .filter(m => m.organizationId == organization.id)
+                            .map(m => (
+                              <Link href={`/settings/teams/${m.id}`} key={m.id}>
+                                <Badge size="xs" variant="surface" colorPalette="orange">
+                                  {m.name}
+                                </Badge>
+                              </Link>
+                            ))}
+                        </Flex>
                       </Table.Cell>
                       <Table.Cell>
                         <Menu.Root>
@@ -449,13 +457,19 @@ function MembersList({
                         <Table.Cell>{invite.email}</Table.Cell>
                         <Table.Cell>{selectOptions.find(option => option.value === invite.role)?.label || invite.role}</Table.Cell>
                         <Table.Cell>
-                          {invite.teamIds
-                            .split(",")
-                            .map(
-                              (teamId) =>
-                                teams.find((team) => team.id == teamId)?.name
-                            )
-                            .join(", ")}
+                          <Flex gap={2} flexWrap="wrap">
+                            {invite.teamIds.split(",").map(teamId => (
+                              <Link href={`/settings/teams/${teamId}`} key={teamId}>
+                                <Badge
+                                  size="xs"
+                                  variant={"surface"}
+                                  colorPalette="orange"
+                                >
+                                  {teams.find(team => team.id === teamId)?.name}
+                                </Badge>
+                              </Link>
+                            ))}
+                          </Flex>
                         </Table.Cell>
                         <Table.Cell>
                           <Menu.Root>
