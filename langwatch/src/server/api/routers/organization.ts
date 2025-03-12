@@ -654,6 +654,33 @@ export const organizationRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
+      if (input.role !== OrganizationUserRole.ADMIN) {
+        const currentMember = await prisma.organizationUser.findUnique({
+          where: {
+            userId_organizationId: {
+              userId: input.userId,
+              organizationId: input.organizationId,
+            }
+          }
+        });
+
+        if (currentMember?.role === OrganizationUserRole.ADMIN) {
+          const adminCount = await prisma.organizationUser.count({
+            where: {
+              organizationId: input.organizationId,
+              role: OrganizationUserRole.ADMIN
+            }
+          });
+          
+          if (adminCount <= 1) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Cannot remove the last admin from an organization"
+            });
+          }
+        }
+      }
+
       await prisma.organizationUser.update({
         where: {
           userId_organizationId: {
