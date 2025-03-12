@@ -403,7 +403,7 @@ function MembersList({
                             .filter(m => m.organizationId == organization.id)
                             .map(m => (
                               <Link href={`/settings/teams/${m.id}`} key={m.id}>
-                                <Badge size="xs" variant="surface" colorPalette="orange">
+                                <Badge size="xs" variant="surface">
                                   {m.name}
                                 </Badge>
                               </Link>
