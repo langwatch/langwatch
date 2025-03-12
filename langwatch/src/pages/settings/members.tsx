@@ -465,13 +465,7 @@ function MembersList({
 
                               return (
                                 <Link href={`/settings/teams/${team.slug}`} key={teamId}>
-                                  <Badge
-                                    size="xs"
-                                    variant={"surface"}
-                                    colorPalette="orange"
-                                  >
-                                    {team.name}
-                                  </Badge>
+                                  <Badge size="xs" variant={"surface"}>{team.name}</Badge>
                                 </Link>
                               );
                             })}
