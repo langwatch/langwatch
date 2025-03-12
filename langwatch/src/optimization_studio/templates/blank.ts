@@ -1,6 +1,33 @@
 import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
 import type { End, Entry, Signature, Workflow } from "../types/dsl";
 
+export const entryNode = () => ({
+  id: "entry",
+  type: "entry",
+  position: {
+    x: 0,
+    y: 0,
+  },
+  deletable: false,
+  data: {
+    name: "Entry",
+    outputs: [{ identifier: "question", type: "str" }],
+    entry_selection: "random",
+    train_size: 0.8,
+    test_size: 0.2,
+    seed: 42,
+    dataset: {
+      name: DEFAULT_DATASET_NAME,
+      inline: {
+        records: {
+          question: ["Hello world"],
+        },
+        columnTypes: [{ name: "question", type: "string" }],
+      },
+    },
+  } satisfies Entry,
+});
+
 export const blankTemplate: Workflow = {
   spec_version: "1.3",
   name: "Blank Template",
@@ -14,32 +41,7 @@ export const blankTemplate: Workflow = {
   },
   enable_tracing: true,
   nodes: [
-    {
-      id: "entry",
-      type: "entry",
-      position: {
-        x: 0,
-        y: 0,
-      },
-      deletable: false,
-      data: {
-        name: "Entry",
-        outputs: [{ identifier: "question", type: "str" }],
-        entry_selection: "random",
-        train_size: 0.8,
-        test_size: 0.2,
-        seed: 42,
-        dataset: {
-          name: DEFAULT_DATASET_NAME,
-          inline: {
-            records: {
-              question: ["Hello world"],
-            },
-            columnTypes: [{ name: "question", type: "string" }],
-          },
-        },
-      } satisfies Entry,
-    },
+    entryNode(),
     {
       id: "llm_call",
       type: "signature",

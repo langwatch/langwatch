@@ -3,11 +3,13 @@ import {
   Button,
   Center,
   HStack,
+  RadioCard,
   Text,
   VStack,
   type ButtonProps,
 } from "@chakra-ui/react";
 import { LuChevronRight } from "react-icons/lu";
+import { OverflownTextWithTooltip } from "../OverflownText";
 
 export function StepButton({
   title,
@@ -53,5 +55,38 @@ export function StepButton({
         )}
       </HStack>
     </Button>
+  );
+}
+
+export function StepRadio({
+  title,
+  description,
+  icon,
+  value,
+  ...props
+}: {
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  value: string;
+} & RadioCard.ItemProps) {
+  return (
+    <RadioCard.Item value={value} width="full" minWidth={0} {...props}>
+      <RadioCard.ItemHiddenInput />
+      <RadioCard.ItemControl cursor="pointer" width="full">
+        <RadioCard.ItemContent width="full">
+          <HStack align="start" gap={3} width="full">
+            {icon}
+            <VStack align="start" gap={1} width="full">
+              <OverflownTextWithTooltip>{title}</OverflownTextWithTooltip>
+              <Text fontSize="sm" color="gray.500" fontWeight="normal">
+                {description}
+              </Text>
+            </VStack>
+          </HStack>
+        </RadioCard.ItemContent>
+        <RadioCard.ItemIndicator />
+      </RadioCard.ItemControl>
+    </RadioCard.Item>
   );
 }

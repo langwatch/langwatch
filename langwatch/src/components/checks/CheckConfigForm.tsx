@@ -291,8 +291,8 @@ export default function CheckConfigForm({
 
   return (
     <FormProvider {...form}>
-      {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onSubmit={handleSubmit((data) => {
           data.mappings = data.customMapping;
           return onSubmit(data);
