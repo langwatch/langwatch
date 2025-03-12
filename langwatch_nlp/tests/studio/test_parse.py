@@ -1,9 +1,13 @@
+import copy
 from langwatch_nlp.studio.dspy.llm_node import LLMNode
 from langwatch_nlp.studio.parser_v2 import parse_component, instantiate_component
 from langwatch_nlp.studio.types.dsl import (
     Field,
     FieldType,
     LLMConfig,
+    NodeRef,
+    PromptingTechnique,
+    PromptingTechniqueNode,
     Signature,
     SignatureNode,
     Workflow,
@@ -26,7 +30,7 @@ basic_workflow = Workflow(
 )
 
 
-def test_parse_signature_with_custom_llm():
+def test_parse_signature():
     node = SignatureNode(
         id="generate_answer",
         data=Signature(
@@ -87,6 +91,85 @@ def test_parse_signature_with_custom_llm():
     assert isinstance(component, LLMNode)
 
 
-# TODO: test with workflow llm
-# TODO: test with prompting technique
+def test_parse_signature_with_prompting_technique():
+    node = SignatureNode(
+        id="generate_answer",
+        data=Signature(
+            name="GenerateAnswer",
+            cls=None,
+            parameters=[
+                Field(
+                    identifier="llm",
+                    type=FieldType.llm,
+                    optional=None,
+                    value=LLMConfig(
+                        model="gpt-4o-mini",
+                        temperature=0.0,
+                        max_tokens=100,
+                    ),
+                    desc=None,
+                ),
+                Field(
+                    identifier="prompting_technique",
+                    type=FieldType.prompting_technique,
+                    optional=None,
+                    value=NodeRef(ref="chain_of_thought"),
+                    desc=None,
+                ),
+            ],
+            inputs=[
+                Field(
+                    identifier="question",
+                    type=FieldType.str,
+                    optional=None,
+                    value=None,
+                    desc=None,
+                    prefix=None,
+                    hidden=None,
+                ),
+                Field(
+                    identifier="query",
+                    type=FieldType.str,
+                    optional=None,
+                    value=None,
+                    desc=None,
+                    prefix=None,
+                    hidden=None,
+                ),
+            ],
+            outputs=[
+                Field(
+                    identifier="answer",
+                    type=FieldType.str,
+                    optional=None,
+                    value=None,
+                    desc=None,
+                    prefix=None,
+                    hidden=None,
+                ),
+            ],
+            execution_state=None,
+        ),
+        type="signature",
+    )
+
+    prompting_technique = PromptingTechniqueNode(
+        id="chain_of_thought",
+        data=PromptingTechnique(
+            name="ChainOfThought",
+            cls="ChainOfThought",
+            parameters=[]
+        ),
+    )
+
+    workflow = copy.deepcopy(basic_workflow)
+    workflow.nodes.append(prompting_technique)
+
+    class_name, code = parse_component(node, workflow)
+    print("\n\ncode", code, "\n\n")
+    component = instantiate_component(code, class_name)
+
+    assert isinstance(component, LLMNode)
+
+
 # TODO: test with demonstrations

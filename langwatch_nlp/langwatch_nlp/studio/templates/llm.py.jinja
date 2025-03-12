@@ -28,6 +28,10 @@ dspy.LM(
     "list_str": "list[str]"
 } %}
 
+{% set prompting_technique_map = {
+    "ChainOfThought": "dspy.ChainOfThought",
+} %}
+
 class {{ class_name }}Signature(dspy.Signature):
     {% if parameters.get('instructions', '') %}
     """{{ parameters.get('instructions', '') }}"""
@@ -43,17 +47,16 @@ class {{ class_name }}Signature(dspy.Signature):
 
 class {{ class_name }}(LLMNode):
     def __init__(self):
+        {% set ns = namespace(decorator_node=None) %}
         {% if prompting_technique %}
         {# Apply prompting technique decorator #}
-        {% set decorator_node = None %}
         {% for node in workflow.nodes %}
             {% if node.id == prompting_technique.ref %}
-                {% set decorator_node = node %}
+                {% set ns.decorator_node = node %}
             {% endif %}
         {% endfor %}
-
-        {% if decorator_node %}
-        predict = {{ decorator_node.data.cls }}({{ class_name }}Signature)
+        {% if ns.decorator_node %}
+        predict = {{ prompting_technique_map[ns.decorator_node.data.cls] }}({{ class_name }}Signature)
         {% else %}
         {# Decorator node {{ prompting_technique.ref }} not found #}
         predict = dspy.Predict({{ class_name }}Signature)
