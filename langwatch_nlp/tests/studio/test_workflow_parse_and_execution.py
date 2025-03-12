@@ -292,7 +292,7 @@ def test_parse_workflow():
         state=WorkflowState(execution=None, evaluation=None),
     )
 
-    Module = parse_workflow(workflow)
+    Module = parse_workflow(workflow, format=True)
     instance = Module(manual_execution_mode=False)
     result: PredictionWithEvaluationAndMetadata = instance(
         question="What is the capital of France?",

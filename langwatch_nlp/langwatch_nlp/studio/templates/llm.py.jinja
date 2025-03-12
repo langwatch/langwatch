@@ -43,6 +43,9 @@ class {{ class_name }}Signature(dspy.Signature):
     {% for output_field in component.outputs or [] %}
     {{ output_field.identifier }}: {{ field_type_to_dspy_type[output_field.type.value] }} = dspy.OutputField()
     {% endfor %}
+    {% if not component.inputs and not component.outputs %}
+    pass
+    {% endif %}
 
 
 class {{ class_name }}(LLMNode):
@@ -75,9 +78,8 @@ class {{ class_name }}(LLMNode):
         {% endif %}
 
         {# Process demonstrations if available #}
-        demos = []
-        {% if demonstrations and demonstrations.inline %}
-        demos = transpose_inline_dataset_to_object_list(demonstrations.inline)
+        {% if demonstrations %}
+        demos = {{ demonstrations.__repr__() }}
         {% endif %}
 
         super().__init__(
@@ -85,5 +87,7 @@ class {{ class_name }}(LLMNode):
             name="{{ class_name }}",
             predict=predict,
             lm=lm,
+            {% if demonstrations %}
             demos=demos
+            {% endif %}
         )
