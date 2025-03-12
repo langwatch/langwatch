@@ -448,7 +448,7 @@ function MembersList({
                     {pendingInvites.data?.map((invite) => (
                       <Table.Row key={invite.id}>
                         <Table.Cell>{invite.email}</Table.Cell>
-                        <Table.Cell>{/* {invite.role} */}</Table.Cell>
+                        <Table.Cell>{invite.role}</Table.Cell>
                         <Table.Cell>
                           {invite.teamIds
                             .split(",")
