@@ -1,0 +1,14 @@
+{% macro node_llm_config_to_dspy_lm(llm_config) %}
+{% set llm_params = llm_config.litellm_params or {"model": llm_config.model} %}
+{% if "azure/" in (llm_params["model"] or "") %}
+{% set _ = llm_params.update({"api_version": os.environ["AZURE_API_VERSION"]}) %}
+{% endif %}
+{% set _ = llm_params.update({"drop_params": True, "model_type": "chat"}) %}
+dspy.LM(
+            max_tokens={{ llm_config.max_tokens or 2048 }},
+            temperature={{ llm_config.temperature or 0 }},
+            {% for key, value in llm_params.items() %}
+            {{ key }}={{ value.__repr__() }},
+            {% endfor %}
+        )
+{% endmacro %}

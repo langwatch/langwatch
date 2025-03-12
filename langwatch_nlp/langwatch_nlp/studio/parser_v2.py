@@ -1,4 +1,4 @@
-from typing import Tuple, Type
+from typing import Tuple, Type, cast
 from langwatch_nlp.studio.modules.registry import PROMPTING_TECHNIQUES
 from langwatch_nlp.studio.types.dsl import Node, Workflow
 from langwatch_nlp.studio.dspy.workflow_module import WorkflowModule
@@ -9,11 +9,17 @@ import dspy
 from langwatch_nlp.studio.utils import transpose_inline_dataset_to_object_list
 import black
 
+
+def raise_helper(msg):
+    raise Exception(msg)
+
+
 env = Environment(
     loader=FileSystemLoader("./langwatch_nlp/studio/templates"),
     trim_blocks=True,
     lstrip_blocks=True,
 )
+env.globals["raise"] = raise_helper
 env.keep_trailing_newline = True
 
 
@@ -26,14 +32,28 @@ def render_template(template_name: str, format=False, **kwargs) -> str:
     return code
 
 
-def parse_workflow(workflow: Workflow, format=False) -> WorkflowModule:
+def parse_workflow(workflow: Workflow, format=False) -> Tuple[str, str]:
+    node_templates = {
+        node.id: parse_component(node, workflow, format) for node in workflow.nodes
+    }
     module = render_template(
-        "workflow.py.jinja", format=format, workflow=workflow, debug_level=1
+        "workflow.py.jinja",
+        format=format,
+        workflow=workflow,
+        debug_level=1,
+        node_templates=node_templates,
     )
-    namespace = {}
-    exec(module, namespace)
-    WorkflowModule = namespace["WorkflowModule"]
-    return WorkflowModule
+
+    return "WorkflowModule", module
+
+
+def parse_and_instantiate_workflow(
+    workflow: Workflow, format=False
+) -> Type[WorkflowModule]:
+    class_name, module = parse_workflow(workflow, format)
+    Module = get_component_class(class_name, module)
+    # TODO: make this an interface
+    return cast(Type[WorkflowModule], Module)
 
 
 def parse_component(node: Node, workflow: Workflow, format=False) -> Tuple[str, str]:
