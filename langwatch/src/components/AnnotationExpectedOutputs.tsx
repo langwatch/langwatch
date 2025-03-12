@@ -27,8 +27,6 @@ export const AnnotationExpectedOutputs = ({
     }
   );
 
-  console.log(traceId);
-
   return (
     <VStack gap={3} align="start" paddingBottom={4} width="full">
       {commentState.expectedOutputAction === "new" &&

@@ -14,7 +14,7 @@ export function CheckStatusIcon({
     processed: evaluationPassed(check) === false ? XCircle : CheckCircle,
   };
 
-  const Icon = iconMap[check.status];
+  const Icon = iconMap[check.status] || Clock;
 
   return <Icon />;
 }
