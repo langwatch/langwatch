@@ -17,7 +17,6 @@ import { OrganizationUserRole } from "@prisma/client";
 import {
   Select as MultiSelect,
   chakraComponents,
-  components,
 } from "chakra-react-select";
 import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
 import { CopyInput } from "../../components/CopyInput";
@@ -29,8 +28,6 @@ import {
   useFieldArray,
   useForm,
   type SubmitHandler,
-  type Control,
-  type FieldArrayWithId,
 } from "react-hook-form";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
@@ -224,7 +221,6 @@ function MembersList({
   };
 
   const onRoleChange = (userId: string, value: OrganizationUserRole) => {
-    console.log("userId", userId, "value", value);
     updateOrganizationMemberRoleMutation.mutate(
       {
         userId: userId,
