@@ -236,10 +236,11 @@ function MembersList({
             duration: 5000,
           });
         },
-        onError: () => {
+        onError: (error) => {
           toaster.create({
-            title: "Sorry, something went wrong",
-            description: "Please try that again",
+            title: "Error updating member role",
+            type: "error",
+            description: error.message ?? "There was an error updating the member role",
           });
         },
       }
