@@ -371,55 +371,60 @@ function MembersList({
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {sortedMembers.map((member) => (
-                  <LinkBox as={Table.Row} key={member.userId}>
-                    <Table.Cell>{member.user.name}</Table.Cell>
-                    <Table.Cell>{member.user.email}</Table.Cell>
-                    <Table.Cell>
-                      <OrganizationMemberSelect
-                        defaultValue={member.role}
-                        memberId={member.userId}
-                        onRoleChange={(_, value) => {
-                          // Only update the role if it's different
-                          if (member.role !== value) {
-                            onRoleChange(member.userId, value);
-                          }
-                        }}
-                        loading={updateOrganizationMemberRoleMutation.isLoading}
-                        disabled={updateOrganizationMemberRoleMutation.isLoading}
-                      />
-                    </Table.Cell>
-                    <Table.Cell>
-                      {member.user.teamMemberships
-                        .flatMap((tmember) => tmember.team)
-                        .filter(
-                          (tmember) => tmember.organizationId == organization.id
-                        )
-                        .map((tmember) => tmember.name)
-                        .join(", ")}
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Menu.Root>
-                        <Menu.Trigger asChild>
-                          <Button variant={"ghost"}>
-                            <MoreVertical />
-                          </Button>
-                        </Menu.Trigger>
-                        <Menu.Content>
-                          <Menu.Item
-                            value="remove"
-                            color="red.600"
-                            disabled={organization.members.length === 1}
-                            onClick={() => deleteMember(member.userId)}
-                          >
-                            <Trash size={14} style={{ marginRight: "8px" }} />
-                            Remove Member
-                          </Menu.Item>
-                        </Menu.Content>
-                      </Menu.Root>
-                    </Table.Cell>
-                  </LinkBox>
-                ))}
+                {sortedMembers.map((member) => {
+                  const relevantUpdateRoleMutation = updateOrganizationMemberRoleMutation.variables?.userId === member.userId && updateOrganizationMemberRoleMutation.variables?.organizationId === organization.id;
+                  const roleUpdateLoading = updateOrganizationMemberRoleMutation.isLoading && relevantUpdateRoleMutation;
+
+                  return (
+                    <LinkBox as={Table.Row} key={member.userId}>
+                      <Table.Cell>{member.user.name}</Table.Cell>
+                      <Table.Cell>{member.user.email}</Table.Cell>
+                      <Table.Cell>
+                        <OrganizationMemberSelect
+                          defaultValue={member.role}
+                          memberId={member.userId}
+                          onRoleChange={(_, value) => {
+                            // Only update the role if it's different
+                            if (member.role !== value) {
+                              onRoleChange(member.userId, value);
+                            }
+                          }}
+                          loading={roleUpdateLoading}
+                          disabled={roleUpdateLoading}
+                        />
+                      </Table.Cell>
+                      <Table.Cell>
+                        {member.user.teamMemberships
+                          .flatMap((tmember) => tmember.team)
+                          .filter(
+                            (tmember) => tmember.organizationId == organization.id
+                          )
+                          .map((tmember) => tmember.name)
+                          .join(", ")}
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Menu.Root>
+                          <Menu.Trigger asChild>
+                            <Button variant={"ghost"}>
+                              <MoreVertical />
+                            </Button>
+                          </Menu.Trigger>
+                          <Menu.Content>
+                            <Menu.Item
+                              value="remove"
+                              color="red.600"
+                              disabled={organization.members.length === 1}
+                              onClick={() => deleteMember(member.userId)}
+                            >
+                              <Trash size={14} style={{ marginRight: "8px" }} />
+                              Remove Member
+                            </Menu.Item>
+                          </Menu.Content>
+                        </Menu.Root>
+                      </Table.Cell>
+                    </LinkBox>
+                  );
+                })}
               </Table.Body>
             </Table.Root>
 
