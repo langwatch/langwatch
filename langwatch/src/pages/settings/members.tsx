@@ -363,7 +363,7 @@ function MembersList({
                 <Table.Row>
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Email</Table.ColumnHeader>
-                  <Table.ColumnHeader>Role</Table.ColumnHeader>
+                  <Table.ColumnHeader w={'20%'}>Role</Table.ColumnHeader>
                   <Table.ColumnHeader>Teams</Table.ColumnHeader>
                   <Table.ColumnHeader>Actions</Table.ColumnHeader>
                 </Table.Row>
