@@ -1,4 +1,5 @@
 from typing import Tuple
+from langwatch_nlp.studio.modules.registry import PROMPTING_TECHNIQUES
 from langwatch_nlp.studio.types.dsl import Node, Workflow
 from langwatch_nlp.studio.dspy.workflow_module import WorkflowModule
 from jinja2 import Environment, FileSystemLoader
