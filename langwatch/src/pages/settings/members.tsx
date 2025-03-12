@@ -385,6 +385,8 @@ function MembersList({
                             onRoleChange(member.userId, value);
                           }
                         }}
+                        loading={updateOrganizationMemberRoleMutation.isLoading}
+                        disabled={updateOrganizationMemberRoleMutation.isLoading}
                       />
                     </Table.Cell>
                     <Table.Cell>
@@ -728,6 +730,8 @@ interface RoleSelectProps {
   defaultValue?: OrganizationUserRole;
   onRoleChange?: (userId: string, value: OrganizationUserRole) => void;
   memberId?: string;
+  loading?: boolean;
+  disabled?: boolean;
 }
 
 const selectOptions = [
@@ -752,9 +756,11 @@ const OrganizationMemberSelect = ({
   defaultValue,
   onRoleChange,
   memberId,
+  loading,
+  disabled,
 }: RoleSelectProps) => {
   return (
-    <MultiSelect
+    <MultiSelect size={'sm'}
       options={selectOptions}
       defaultValue={selectOptions.find(
         (option) => option.value === defaultValue
@@ -762,6 +768,8 @@ const OrganizationMemberSelect = ({
       onChange={(value) => {
         onRoleChange?.(memberId ?? "", value!.value as OrganizationUserRole);
       }}
+      isLoading={loading}
+      isDisabled={disabled}
       hideSelectedOptions={false}
       isSearchable={false}
       components={{
