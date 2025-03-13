@@ -74,6 +74,8 @@ export function PropertiesPanel() {
     };
   }, [propertiesExpanded, setPropertiesExpanded]);
 
+  const MotionDiv = motion.div;
+
   if (!selectedNode && workflowSelected) {
     return (
       <Box
@@ -105,14 +107,13 @@ export function PropertiesPanel() {
   const halfPanelWidth = Math.round(panelWidth / 2);
   const middlePoint = Math.round(width / 2 - halfPanelWidth);
   const topPanelHeight = 49;
-  const fullPanelHeight = height - topPanelHeight;
+  const fullPanelHeight = height - topPanelHeight - 1; // don't know why -1 is needed but if we don't take it creates a body scrollbar
 
   // TODO: close on X if expanded
 
   return (
     <Box>
-      <Box
-        as={motion.div}
+      <MotionDiv
         initial={{
           right: 0,
           height: `${fullPanelHeight}px`,
@@ -137,18 +138,22 @@ export function PropertiesPanel() {
             ? "0 0 10px rgba(0,0,0,0.1)"
             : "0 0 0 rgba(0,0,0,0)",
         }}
-        transition="0.05s ease-out"
-        ref={ref}
-        position={propertiesExpanded ? "absolute" : "relative"}
-        top={0}
-        right={0}
-        background="white"
-        border="1px solid"
-        borderColor="gray.350"
-        zIndex={100}
+        transition={{ duration: 0.4, ease: "easeInOut", delay: 0.1 }}
+        style={{
+          position: propertiesExpanded ? "absolute" : "relative",
+          top: 0,
+          right: 0,
+          background: "white",
+          border: "1px solid",
+          borderColor: "var(--chakra-colors-gray-350)",
+          zIndex: 100,
+          overflowY: "auto",
+        }}
       >
-        <PropertiesPanel key={selectedNode.id} node={selectedNode} />
-      </Box>
+        <Box ref={ref}>
+          <PropertiesPanel key={selectedNode.id} node={selectedNode} />
+        </Box>
+      </MotionDiv>
       {propertiesExpanded && (
         <>
           <Box
@@ -171,17 +176,20 @@ export function PropertiesPanel() {
             overflow="hidden"
             zIndex={99}
           >
-            <Box
-              as={motion.div}
-              width="100%"
-              height="100%"
+            <MotionDiv
+              style={{
+                width: "100%",
+                height: "100%",
+                paddingTop: "40px",
+                paddingBottom: "40px",
+                paddingLeft: "40px",
+              }}
               initial={{ x: "110%" }}
               animate={{ x: "0%" }}
-              transition="0.1s ease-out 0.05s"
-              paddingY="40px"
-              paddingLeft="40px"
+              transition={{ duration: 0.1, ease: "easeOut", delay: 0.5 }}
+              // @ts-ignore
               className="js-outer-box"
-              onClick={(e) => {
+              onClick={(e: React.MouseEvent<HTMLDivElement>) => {
                 if (
                   (e.target as HTMLElement).classList.contains("js-outer-box")
                 ) {
@@ -190,7 +198,7 @@ export function PropertiesPanel() {
               }}
             >
               <InputPanel node={selectedNode} />
-            </Box>
+            </MotionDiv>
           </Box>
           <Box
             position="absolute"
@@ -201,17 +209,20 @@ export function PropertiesPanel() {
             overflow="hidden"
             zIndex={99}
           >
-            <Box
-              as={motion.div}
-              width="100%"
-              height="100%"
+            <MotionDiv
+              style={{
+                width: "100%",
+                height: "100%",
+                paddingTop: "40px",
+                paddingBottom: "40px",
+                paddingRight: "40px",
+              }}
               initial={{ x: "-110%" }}
               animate={{ x: "0%" }}
-              transition="0.1s ease-out 0.05s"
-              paddingY="40px"
-              paddingRight="40px"
+              transition={{ duration: 0.1, ease: "easeOut", delay: 0.5 }}
+              // @ts-ignore
               className="js-outer-box"
-              onClick={(e) => {
+              onClick={(e: React.MouseEvent<HTMLDivElement>) => {
                 if (
                   (e.target as HTMLElement).classList.contains("js-outer-box")
                 ) {
@@ -220,7 +231,7 @@ export function PropertiesPanel() {
               }}
             >
               <OutputPanel node={selectedNode} />
-            </Box>
+            </MotionDiv>
           </Box>
         </>
       )}

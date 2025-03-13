@@ -4,18 +4,7 @@ import {
   Flex,
   HStack,
   Input,
-  InputGroup,
-  InputRightElement,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  Stack,
   Text,
-  Tooltip,
   VStack,
 } from "@chakra-ui/react";
 import { type Edge, type Node } from "@xyflow/react";
@@ -23,17 +12,19 @@ import { useCallback, useEffect, useState } from "react";
 import { Play, Send } from "react-feather";
 import { useForm } from "react-hook-form";
 import { SmallLabel } from "~/components/SmallLabel";
+import { Dialog } from "~/components/ui/dialog";
+import { InputGroup } from "~/components/ui/input-group";
+import { Tooltip } from "~/components/ui/tooltip";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useSocketClient } from "../hooks/useSocketClient";
 import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { getEntryInputs } from "../utils/nodeUtils";
 import { RunningStatus } from "./ExecutionState";
 
-import { useSocketClient } from "../hooks/useSocketClient";
-import { getEntryInputs } from "../utils/nodeUtils";
-
 interface ChatWindowProps {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
   useApi?: boolean;
   workflowId?: string;
@@ -52,9 +43,7 @@ export const PlaygroundButton = ({
   executionStatus: string;
 }) => {
   const { socketStatus } = useSocketClient();
-
   const isDisabled = socketStatus !== "connected";
-
   const { playgroundOpen, setPlaygroundOpen } = useWorkflowStore((state) => ({
     playgroundOpen: state.playgroundOpen,
     setPlaygroundOpen: state.setPlaygroundOpen,
@@ -62,22 +51,19 @@ export const PlaygroundButton = ({
 
   return (
     <>
-      <Tooltip label={isDisabled ? "Studio is not connected" : undefined}>
+      <Tooltip content={isDisabled ? "Studio is not connected" : undefined}>
         <Button
-          onClick={() => {
-            setPlaygroundOpen(true);
-          }}
-          rightIcon={<Play size={16} />}
-          isDisabled={isDisabled}
+          onClick={() => setPlaygroundOpen(true)}
           variant="outline"
           size="sm"
           background="white"
+          disabled={isDisabled}
         >
-          Playground
+          <Play size={16} /> Playground
         </Button>
       </Tooltip>
       <ChatWindow
-        isOpen={playgroundOpen}
+        open={playgroundOpen}
         onClose={() => setPlaygroundOpen(false)}
         nodes={nodes}
         edges={edges}
@@ -88,29 +74,37 @@ export const PlaygroundButton = ({
 };
 
 export const ChatWindow = ({
-  isOpen,
+  open,
   onClose,
   nodes,
   edges,
   executionStatus,
 }: ChatWindowProps) => {
   return (
-    <Modal onClose={onClose} size={"5xl"} isOpen={isOpen}>
-      <ModalOverlay />
-      <ModalContent height={"65vh"} overflowY="auto">
-        <ModalHeader>Test Message</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
+    <Dialog.Root
+      open={open}
+      onOpenChange={({ open }) => {
+        if (!open) onClose();
+      }}
+      size="5xl"
+    >
+      <Dialog.Backdrop />
+      <Dialog.Content height="65vh" overflowY="auto">
+        <Dialog.Header>
+          <Dialog.Title>Test Message</Dialog.Title>
+          <Dialog.CloseTrigger />
+        </Dialog.Header>
+        <Dialog.Body>
           <ChatBox
-            isOpen={isOpen}
+            isOpen={open}
             nodes={nodes}
             edges={edges}
             executionStatus={executionStatus}
           />
-        </ModalBody>
-        <ModalFooter></ModalFooter>
-      </ModalContent>
-    </Modal>
+        </Dialog.Body>
+        <Dialog.Footer />
+      </Dialog.Content>
+    </Dialog.Root>
   );
 };
 
@@ -233,7 +227,7 @@ export const ChatBox = ({
   };
 
   return (
-    <HStack align={"start"} spacing={1} height={"100%"}>
+    <HStack align="start" gap={1} height="100%">
       <MultipleInput
         inputs={inputs}
         handleInputChange={handleInputChange}
@@ -242,13 +236,13 @@ export const ChatBox = ({
         entryInputs={entryInputs}
       />
       <VStack
-        spacing={4}
+        gap={4}
         align="stretch"
         width="100%"
-        height={"100%"}
-        border={"1px"}
-        borderColor={"gray.200"}
-        borderRadius={"lg"}
+        height="100%"
+        border="1px"
+        borderColor="gray.200"
+        borderRadius="lg"
         padding={2}
       >
         <Box flexGrow={1} overflowY="auto">
@@ -336,14 +330,20 @@ const MultipleInput = ({
     (!isSingle && entryInputs.length === 1) ||
     (isSingle && entryInputs.length > 1)
   ) {
-    return;
+    return null;
   }
+
   if (entryInputs && entryInputs.length === 1) {
     return (
       <InputGroup
         as="form"
         // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onSubmit={handleSubmit(onSubmit)}
+        endElement={
+          <Button size="sm" padding={2} colorPalette="orange" type="submit">
+            <Send />
+          </Button>
+        }
       >
         <Input
           required
@@ -364,53 +364,46 @@ const MultipleInput = ({
             }
           }}
         />
-        <InputRightElement padding={2}>
-          <Button size="sm" padding={2} colorScheme="orange" type="submit">
-            <Send />
-          </Button>
-        </InputRightElement>
       </InputGroup>
     );
-  } else {
-    return (
-      <VStack
-        width={"xl"}
-        border={"1px"}
-        borderColor={"gray.200"}
-        borderRadius={"lg"}
-        height={"100%"}
-        padding={2}
-        justifyContent="space-between"
-        as="form"
-        // eslint-disable-next-line @typescript-eslint/no-misused-promises
-        onSubmit={handleSubmit(onSubmit)}
-      >
-        <Stack spacing={3} width={"full"}>
-          {entryInputs.map((edge, index) => {
-            return (
-              <Stack key={index}>
-                <SmallLabel>
-                  {edge.sourceHandle?.split(".")[1] ?? `Input ${index + 1}`}
-                </SmallLabel>
-                <Input
-                  key={index}
-                  value={inputs[index]}
-                  required
-                  onChange={(e) =>
-                    handleInputChange(
-                      edge.sourceHandle?.split(".")[1] ?? "",
-                      e.target.value
-                    )
-                  }
-                />
-              </Stack>
-            );
-          })}
-        </Stack>
-        <Button width="full" type="submit" colorScheme="orange">
-          Submit
-        </Button>
-      </VStack>
-    );
   }
+
+  return (
+    <VStack
+      width="xl"
+      border="1px"
+      borderColor="gray.200"
+      borderRadius="lg"
+      height="100%"
+      padding={2}
+      gap={4}
+      justifyContent="space-between"
+      as="form"
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises
+      onSubmit={handleSubmit(onSubmit)}
+    >
+      <VStack gap={3} width="full">
+        {entryInputs.map((edge, index) => (
+          <VStack key={index} gap={1}>
+            <SmallLabel>
+              {edge.sourceHandle?.split(".")[1] ?? `Input ${index + 1}`}
+            </SmallLabel>
+            <Input
+              value={inputs[index]}
+              required
+              onChange={(e) =>
+                handleInputChange(
+                  edge.sourceHandle?.split(".")[1] ?? "",
+                  e.target.value
+                )
+              }
+            />
+          </VStack>
+        ))}
+      </VStack>
+      <Button width="full" type="submit" colorPalette="orange">
+        Submit
+      </Button>
+    </VStack>
+  );
 };

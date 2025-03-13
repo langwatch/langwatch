@@ -1,26 +1,24 @@
-import { DownloadIcon } from "@chakra-ui/icons";
 import {
+  Alert,
   Box,
   Button,
   Card,
-  CardBody,
   Heading,
   HStack,
-  MenuItem,
-  MenuList,
-  MenuButton,
   Spacer,
   Text,
   useDisclosure,
-  useToast,
-  Menu,
-  AlertTitle,
-  AlertIcon,
-  Alert,
 } from "@chakra-ui/react";
 import Parse from "papaparse";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Edit2, Play, Plus, Upload } from "react-feather";
+import {
+  ChevronDown,
+  Download,
+  Edit2,
+  Play,
+  Plus,
+  Upload,
+} from "react-feather";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useDrawer } from "../CurrentDrawer";
@@ -33,13 +31,16 @@ import {
 
 import type { AgGridReact } from "@ag-grid-community/react";
 import { nanoid } from "nanoid";
+import { datasetDatabaseRecordsToInMemoryDataset } from "../../optimization_studio/utils/datasetUtils";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
 import { AddRowsFromCSVModal } from "./AddRowsFromCSVModal";
-import { datasetDatabaseRecordsToInMemoryDataset } from "../../optimization_studio/utils/datasetUtils";
+
+import { toaster } from "../ui/toaster";
+import { Menu } from "../ui/menu";
 
 export type InMemoryDataset = {
   datasetId?: string;
@@ -167,6 +168,7 @@ export function DatasetTable({
         rows: DatasetRecordEntry[] | undefined
       ) => DatasetRecordEntry[] | undefined
     ) => {
+      if (datasetId) return;
       setParentRowData_((rows) => {
         const rows_ = callback(rows);
         onUpdateDataset?.({
@@ -210,8 +212,6 @@ export function DatasetTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columnTypes, dataset?.datasetRecords]);
 
-  const toast = useToast();
-
   const downloadCSV = async (selectedOnly = false) => {
     let data: InMemoryDataset | undefined;
     if (databaseDataset.data && !selectedOnly) {
@@ -228,12 +228,12 @@ export function DatasetTable({
     }
 
     if (!data) {
-      toast({
+      toaster.create({
         title: "Error downloading dataset",
         description: "Please try again",
-        status: "error",
+        type: "error",
         duration: 5000,
-        isClosable: true,
+        meta: { closable: true },
       });
       return;
     }
@@ -330,12 +330,12 @@ export function DatasetTable({
             }, 3000);
           },
           onError: () => {
-            toast({
+            toaster.create({
               title: "Error updating record.",
               description: "Changes will be reverted, please try again",
-              status: "error",
+              type: "error",
               duration: 5000,
-              isClosable: true,
+              meta: { closable: true },
             });
             void databaseDataset.refetch();
             setSavingStatus("");
@@ -348,7 +348,6 @@ export function DatasetTable({
       datasetId,
       updateDatasetRecord,
       project?.id,
-      toast,
       databaseDataset,
     ]
   );
@@ -377,11 +376,11 @@ export function DatasetTable({
         {
           onSuccess: () => {
             setSelectedEntryIds(new Set());
-            toast({
+            toaster.create({
               title: `${recordIds.length} records deleted`,
-              status: "success",
+              type: "success",
               duration: 5000,
-              isClosable: true,
+              meta: { closable: true },
             });
             databaseDataset
               .refetch()
@@ -393,12 +392,12 @@ export function DatasetTable({
               });
           },
           onError: () => {
-            toast({
+            toaster.create({
               title: "Error deleting records.",
               description: "Changes will be reverted, please try again",
-              status: "error",
+              type: "error",
               duration: 5000,
-              isClosable: true,
+              meta: { closable: true },
             });
             void databaseDataset.refetch();
           },
@@ -411,7 +410,6 @@ export function DatasetTable({
     datasetId,
     deleteDatasetRecord,
     project?.id,
-    toast,
     databaseDataset,
   ]);
 
@@ -462,12 +460,7 @@ export function DatasetTable({
 
   return (
     <>
-      <HStack
-        width="full"
-        verticalAlign={"middle"}
-        paddingBottom={6}
-        spacing={6}
-      >
+      <HStack width="full" verticalAlign={"middle"} paddingBottom={6} gap={6}>
         <Heading as={"h1"} size="lg">
           {title ? (
             title
@@ -499,7 +492,7 @@ export function DatasetTable({
           <>
             {isEmbedded && (
               <Button
-                colorScheme="gray"
+                colorPalette="gray"
                 minWidth="fit-content"
                 onClick={() =>
                   openDrawer("uploadCSV", {
@@ -517,112 +510,106 @@ export function DatasetTable({
                     },
                   })
                 }
-                leftIcon={<Upload height={17} width={17} strokeWidth={2.5} />}
               >
+                <Upload height={17} width={17} strokeWidth={2.5} />
                 Upload or Create Dataset
               </Button>
             )}
             <Button
-              colorScheme="gray"
+              colorPalette="gray"
               minWidth="fit-content"
-              onClick={() => dataset && downloadCSV()}
-              leftIcon={<DownloadIcon />}
-              isLoading={downloadDataset.isLoading}
+              onClick={() => dataset && void downloadCSV()}
+              loading={downloadDataset.isLoading}
               loadingText="Downloading..."
             >
+              <Download />
               Export
             </Button>
             <Button
-              colorScheme="gray"
+              colorPalette="gray"
               onClick={() => editDataset.onOpen()}
               minWidth="fit-content"
-              leftIcon={<Edit2 height={16} />}
             >
+              <Edit2 />
               Edit Columns
             </Button>
             {datasetId && !isEmbedded && (
               <Button
-                colorScheme="blue"
+                colorPalette="blue"
                 onClick={() => {
                   openDrawer("batchEvaluation", {
                     datasetSlug: databaseDataset.data?.slug,
                   });
                 }}
                 minWidth="fit-content"
-                leftIcon={<Play height={16} />}
               >
+                <Play height={16} />
                 Batch Evaluation
               </Button>
             )}
           </>
         )}
       </HStack>
-      <Card>
-        <CardBody padding={0} position="relative">
+      <Card.Root>
+        <Card.Body padding={0} position="relative">
           <Box height={`calc(max(100vh - ${bottomSpace}, 500px))`}>
             {databaseDataset.data?.truncated && (
-              <Alert status="warning" variant="subtle">
-                <AlertIcon />
-                This dataset is too large to display all records. Displaying the
-                first 5mb of data.
-              </Alert>
+              <Alert.Root status="warning" variant="subtle">
+                <Alert.Indicator />
+                <Alert.Content>
+                  This dataset is too large to display all records. Displaying
+                  the first 5mb of data.
+                </Alert.Content>
+              </Alert.Root>
             )}
-            {databaseDataset.error ? (
-              <Alert status="error" variant="subtle">
-                <AlertIcon />
-                <Text>{databaseDataset.error.message}</Text>
-              </Alert>
-            ) : (
-              <DatasetGrid
-                columnDefs={columnDefs}
-                rowData={localRowData}
-                onCellValueChanged={onCellValueChanged}
-                ref={gridRef}
-                domLayout="normal"
-                {...(loadingOverlayComponent !== undefined
-                  ? { loadingOverlayComponent }
-                  : {})}
-              />
-            )}
+            <DatasetGrid
+              columnDefs={columnDefs}
+              rowData={localRowData}
+              onCellValueChanged={onCellValueChanged}
+              ref={gridRef}
+              domLayout="normal"
+              {...(loadingOverlayComponent !== undefined
+                ? { loadingOverlayComponent }
+                : {})}
+            />
           </Box>
-        </CardBody>
-      </Card>
-      <Menu autoSelect={false}>
-        <MenuButton
-          as={Button}
-          leftIcon={<Plus />}
-          rightIcon={<ChevronDown width={16} height={16} />}
-          position="sticky"
-          left="0"
-          bottom={isEmbedded ? "32px" : 6}
-          marginTop={6}
-          backgroundColor="#ffffff"
-          padding="8px"
-          paddingX="16px"
-          border="1px solid #ccc"
-          boxShadow="base"
-          borderRadius={"md"}
-          zIndex="100"
-        >
-          Add new record
-        </MenuButton>
-        <MenuList>
-          <MenuItem
-            icon={<Upload height={16} width={16} />}
+        </Card.Body>
+      </Card.Root>
+      <Menu.Root>
+        <Menu.Trigger asChild>
+          <Button
+            position="sticky"
+            left="0"
+            bottom={isEmbedded ? "32px" : 6}
+            marginTop={6}
+            marginLeft={6}
+            backgroundColor="#ffffff"
+            padding="8px"
+            paddingX="16px"
+            border="1px solid #ccc"
+            boxShadow="base"
+            borderRadius="md"
+            zIndex="100"
+          >
+            <Plus />
+            Add new record
+            <ChevronDown width={16} height={16} />
+          </Button>
+        </Menu.Trigger>
+        <Menu.Content zIndex="popover">
+          <Menu.Item
+            value="import-csv"
             onClick={() => addRowsFromCSVModal.onOpen()}
           >
-            Import from CSV
-          </MenuItem>
-          <MenuItem
-            icon={<Plus height={16} width={16} />}
-            onClick={onAddNewRow}
-          >
-            Add new line
-          </MenuItem>
-        </MenuList>
-      </Menu>
+            <Upload height={16} width={16} /> Import from CSV
+          </Menu.Item>
+          <Menu.Item value="add-line" onClick={onAddNewRow}>
+            <Plus height={16} width={16} /> Add new line
+          </Menu.Item>
+        </Menu.Content>
+      </Menu.Root>
       <AddRowsFromCSVModal
-        isOpen={addRowsFromCSVModal.isOpen}
+        isOpen={addRowsFromCSVModal.open}
         onClose={addRowsFromCSVModal.onClose}
         datasetId={datasetId}
         columnTypes={columnTypes}
@@ -654,17 +641,17 @@ export function DatasetTable({
           <HStack gap={3}>
             <Text>{selectedEntryIds.size} entries selected</Text>
             <Button
-              colorScheme="black"
+              colorPalette="black"
               minWidth="fit-content"
               variant="outline"
               onClick={() => void downloadCSV(true)}
             >
-              Export <DownloadIcon marginLeft={2} />
+              Export <Upload style={{ marginLeft: "8px" }} />
             </Button>
 
             <Text>or</Text>
             <Button
-              colorScheme="red"
+              colorPalette="red"
               type="submit"
               variant="outline"
               minWidth="fit-content"
@@ -675,7 +662,7 @@ export function DatasetTable({
           </HStack>
         </Box>
       )}
-      {editDataset.isOpen && (
+      {editDataset.open && (
         <AddOrEditDatasetDrawer
           datasetToSave={{
             datasetId,
@@ -683,7 +670,7 @@ export function DatasetTable({
             datasetRecords: datasetId ? undefined : parentRowData,
             columnTypes,
           }}
-          isOpen={editDataset.isOpen}
+          open={editDataset.open}
           onClose={editDataset.onClose}
           onSuccess={(updatedDataset) => {
             if (dataset?.datasetRecords) {
@@ -694,6 +681,7 @@ export function DatasetTable({
                 columnTypes: updatedDataset.columnTypes,
               });
             }
+            setDatasetId(updatedDataset.datasetId);
             setColumnTypes(updatedDataset.columnTypes);
             void databaseDataset.refetch();
             editDataset.onClose();

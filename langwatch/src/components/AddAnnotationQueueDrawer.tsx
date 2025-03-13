@@ -1,15 +1,7 @@
 import {
-  Avatar,
   Box,
   Button,
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  DrawerHeader,
-  FormControl,
-  FormHelperText,
-  FormLabel,
+  Field,
   HStack,
   Input,
   Spacer,
@@ -17,32 +9,33 @@ import {
   Textarea,
   VStack,
   useDisclosure,
-  useToast,
 } from "@chakra-ui/react";
+import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { useState } from "react";
 import { Plus } from "react-feather";
 import { useForm } from "react-hook-form";
 import slugify from "slugify";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { Drawer } from "../components/ui/drawer";
+import { toaster } from "../components/ui/toaster";
+import { AddAnnotationScore } from "./annotations/AddAnnotationScore";
 import { useDrawer } from "./CurrentDrawer";
 import { FullWidthFormControl } from "./FullWidthFormControl";
-
-import { AddAnnotationScoreDrawer } from "./AddAnnotationScoreDrawer";
-
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
+import { RandomColorAvatar } from "./RandomColorAvatar";
 
 export const AddAnnotationQueueDrawer = ({
+  open = true,
   onClose,
   onOverlayClick,
   queueId,
 }: {
+  open?: boolean;
   onClose?: () => void;
   onOverlayClick?: () => void;
   queueId?: string;
 }) => {
   const { project, organization } = useOrganizationTeamProject();
-  const toast = useToast();
   const createOrUpdateQueue = api.annotation.createOrUpdateQueue.useMutation();
 
   const queue = api.annotation.getQueueBySlugOrId.useQuery(
@@ -51,7 +44,7 @@ export const AddAnnotationQueueDrawer = ({
       projectId: project?.id ?? "",
     },
     {
-      enabled: !!project,
+      enabled: !!project && !!queueId,
     }
   );
 
@@ -92,7 +85,10 @@ export const AddAnnotationQueueDrawer = ({
     formState: { errors },
     reset,
     watch,
-  } = useForm({
+  } = useForm<{
+    name: string;
+    description?: string | null;
+  }>({
     defaultValues: {
       name: queue.data?.name ?? "",
       description: queue.data?.description ?? "",
@@ -124,10 +120,10 @@ export const AddAnnotationQueueDrawer = ({
 
   const onSubmit = (data: FormData) => {
     if (participants.length === 0 || scoreTypes.length === 0) {
-      toast({
+      toaster.create({
         title: "Error",
         description: "Please select at least one participant and score type",
-        status: "error",
+        type: "error",
       });
       return;
     }
@@ -144,27 +140,29 @@ export const AddAnnotationQueueDrawer = ({
         onSuccess: (data) => {
           void queryClient.annotation.getQueues.invalidate();
           void queryClient.annotation.getQueueBySlugOrId.invalidate();
-          toast({
+          toaster.create({
             title: `Annotation Queue ${queueId ? "Updated" : "Created"}`,
             description: `Successfully ${queueId ? "updated" : "created"} ${
               data.name
             } annotation queue`,
-            status: "success",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            type: "success",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
           handleClose();
           reset();
         },
         onError: (error) => {
-          toast({
+          toaster.create({
             title: "Error creating annotation score",
             description: error.message,
-            status: "error",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            type: "error",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
         },
       }
@@ -181,248 +179,239 @@ export const AddAnnotationQueueDrawer = ({
 
   return (
     <>
-      <Drawer
-        isOpen={true}
-        placement="right"
-        size={"lg"}
-        onClose={handleClose}
-        onOverlayClick={handleClose}
+      <Drawer.Root
+        open={open}
+        placement="end"
+        size="lg"
+        onOpenChange={({ open }) => {
+          if (!open) {
+            closeDrawer();
+          }
+        }}
       >
-        <DrawerContent>
-          <DrawerHeader>
+        <Drawer.Backdrop />
+        <Drawer.Content>
+          <Drawer.Header>
             <HStack>
-              <DrawerCloseButton />
+              <Drawer.CloseTrigger />
             </HStack>
             <HStack>
               <Text paddingTop={5} fontSize="2xl">
                 Create Annotation Queue
               </Text>
             </HStack>
-          </DrawerHeader>
-          <DrawerBody>
+          </Drawer.Header>
+          <Drawer.Body>
             {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
             <form onSubmit={handleSubmit(onSubmit)}>
               <VStack align="start">
-                <Box
-                  border="1px solid lightgray"
-                  borderRadius={5}
-                  paddingX={1}
-                  minWidth="300px"
-                >
-                  <MultiSelect
-                    options={users.data?.members.map((member) => ({
-                      label: member.user.name ?? "",
-                      value: member.user.id,
-                    }))}
-                    onChange={(newValue) => {
-                      setParticipants(
-                        newValue.map((v) => ({
-                          id: v.value,
-                          name: v.label,
-                        }))
-                      );
-                    }}
-                    value={participants.map((p) => ({
-                      value: p.id,
-                      label: p.name ?? "",
-                    }))}
-                    isMulti
-                    closeMenuOnSelect={false}
-                    selectedOptionStyle="check"
-                    hideSelectedOptions={true}
-                    useBasicStyles
-                    variant="unstyled"
-                    placeholder="Add Participants"
-                    components={{
-                      Menu: ({ children, ...props }) => (
-                        <chakraComponents.Menu
-                          {...props}
-                          innerProps={{
-                            ...props.innerProps,
-                            style: { width: "300px" },
-                          }}
-                        >
-                          {children}
-                        </chakraComponents.Menu>
-                      ),
-                      Option: ({ children, ...props }) => (
-                        <chakraComponents.Option {...props}>
-                          <VStack align="start">
-                            <HStack>
-                              <Avatar
-                                name={props.data.label}
-                                color="white"
-                                size="xs"
-                              />
-                              <Text>{children}</Text>
-                            </HStack>
-                          </VStack>
-                        </chakraComponents.Option>
-                      ),
-                      MultiValueLabel: ({ children, ...props }) => (
-                        <chakraComponents.MultiValueLabel {...props}>
-                          <VStack align="start" padding={1} paddingX={0}>
-                            <HStack>
-                              <Avatar
-                                name={props.data.label}
-                                color="white"
-                                size="xs"
-                              />
-                              <Text>{children}</Text>
-                            </HStack>
-                          </VStack>
-                        </chakraComponents.MultiValueLabel>
-                      ),
-                    }}
-                  />
-                </Box>
+                <MultiSelect
+                  options={users.data?.members.map((member) => ({
+                    label: member.user.name ?? "",
+                    value: member.user.id,
+                  }))}
+                  onChange={(newValue) => {
+                    setParticipants(
+                      newValue.map((v) => ({
+                        id: v.value,
+                        name: v.label,
+                      }))
+                    );
+                  }}
+                  value={participants.map((p) => ({
+                    value: p.id,
+                    label: p.name ?? "",
+                  }))}
+                  isMulti
+                  closeMenuOnSelect={false}
+                  selectedOptionStyle="check"
+                  hideSelectedOptions={true}
+                  placeholder="Add Participants"
+                  components={{
+                    Menu: ({ children, ...props }) => (
+                      <chakraComponents.Menu
+                        {...props}
+                        innerProps={{
+                          ...props.innerProps,
+                          style: { width: "300px" },
+                        }}
+                      >
+                        {children}
+                      </chakraComponents.Menu>
+                    ),
+                    Option: ({ children, ...props }) => (
+                      <chakraComponents.Option {...props}>
+                        <VStack align="start">
+                          <HStack>
+                            <RandomColorAvatar
+                              size="2xs"
+                              name={props.data.label}
+                            />
+                            <Text>{children}</Text>
+                          </HStack>
+                        </VStack>
+                      </chakraComponents.Option>
+                    ),
+                    MultiValueLabel: ({ children, ...props }) => (
+                      <chakraComponents.MultiValueLabel {...props}>
+                        <VStack align="start" padding={1} paddingX={0}>
+                          <HStack>
+                            <RandomColorAvatar
+                              size="2xs"
+                              name={props.data.label}
+                            />
+                            <Text>{children}</Text>
+                          </HStack>
+                        </VStack>
+                      </chakraComponents.MultiValueLabel>
+                    ),
+                  }}
+                />
 
                 <FullWidthFormControl
                   label="Name Annotation Queue"
                   helper="Give it a name to identify this annotation queue"
-                  isInvalid={!!errors.name}
+                  invalid={!!errors.name}
                 >
                   <Input {...register("name")} required />
-                  {slug && <FormHelperText>slug: {slug}</FormHelperText>}
+                  {slug && <Field.HelperText>slug: {slug}</Field.HelperText>}
                 </FullWidthFormControl>
 
                 <FullWidthFormControl
                   label="Description"
                   helper="Provide a description of the annotation"
-                  isInvalid={!!errors.description}
+                  invalid={!!errors.description}
                 >
                   <Textarea {...register("description")} required />
                 </FullWidthFormControl>
 
-                <FormControl>
-                  <VStack align="start" spacing={1}>
-                    <FormLabel margin={0}>Score Type</FormLabel>
-                    <FormHelperText margin={0}>
+                <Field.Root>
+                  <VStack align="start" gap={1}>
+                    <Field.Label margin={0}>Score Type</Field.Label>
+                    <Field.HelperText margin={0}>
                       Select the score type for this annotation queue
-                    </FormHelperText>
-                    <Box
-                      border="1px solid lightgray"
-                      borderRadius={5}
-                      paddingX={1}
-                      minWidth="300px"
-                      marginTop={3}
-                    >
-                      <MultiSelect
-                        options={annotationScores.data?.map((score) => ({
-                          label: score.name,
-                          value: score.id,
-                        }))}
-                        onChange={(newValue) => {
-                          setScoreTypes(
-                            newValue.map((v) => ({
-                              id: v.value,
-                              name: v.label,
-                            }))
-                          );
-                        }}
-                        value={scoreTypes.map((v) => ({
-                          value: v.id,
-                          label: v.name ?? "",
-                        }))}
-                        isMulti
-                        closeMenuOnSelect={false}
-                        selectedOptionStyle="check"
-                        hideSelectedOptions={true}
-                        useBasicStyles
-                        variant="unstyled"
-                        placeholder="Add Score Type"
-                        components={{
-                          Menu: ({ children, ...props }) => (
-                            <chakraComponents.Menu
-                              {...props}
-                              innerProps={{
-                                ...props.innerProps,
-                                style: { width: "300px" },
+                    </Field.HelperText>
+
+                    <MultiSelect
+                      options={annotationScores.data?.map((score) => ({
+                        label: score.name,
+                        value: score.id,
+                      }))}
+                      onChange={(newValue) => {
+                        setScoreTypes(
+                          newValue.map((v) => ({
+                            id: v.value,
+                            name: v.label,
+                          }))
+                        );
+                      }}
+                      value={scoreTypes.map((v) => ({
+                        value: v.id,
+                        label: v.name ?? "",
+                      }))}
+                      isMulti
+                      closeMenuOnSelect={false}
+                      selectedOptionStyle="check"
+                      hideSelectedOptions={true}
+                      placeholder="Add Score Type"
+                      components={{
+                        Menu: ({ children, ...props }) => (
+                          <chakraComponents.Menu
+                            {...props}
+                            innerProps={{
+                              ...props.innerProps,
+                              style: { width: "300px" },
+                            }}
+                          >
+                            {children}
+                          </chakraComponents.Menu>
+                        ),
+                        MultiValueLabel: ({ ...props }) => (
+                          <chakraComponents.MultiValueLabel {...props}>
+                            <VStack align="start" padding={1} paddingX={0}>
+                              <HStack>
+                                <Text>{props.data.label}</Text>
+                              </HStack>
+                            </VStack>
+                          </chakraComponents.MultiValueLabel>
+                        ),
+                        MenuList: (props) => (
+                          <chakraComponents.MenuList {...props} maxHeight={300}>
+                            <Box
+                              maxH="250px"
+                              overflowY="auto"
+                              css={{
+                                "&::-webkit-scrollbar": {
+                                  display: "none",
+                                },
+                                msOverflowStyle: "none", // IE and Edge
+                                scrollbarWidth: "none", // Firefox
                               }}
                             >
-                              {children}
-                            </chakraComponents.Menu>
-                          ),
-                          MultiValueLabel: ({ children, ...props }) => (
-                            <chakraComponents.MultiValueLabel {...props}>
-                              <VStack align="start" padding={1} paddingX={0}>
-                                <HStack>
-                                  <Text>{props.data.label}</Text>
-                                </HStack>
-                              </VStack>
-                            </chakraComponents.MultiValueLabel>
-                          ),
-                          MenuList: (props) => (
-                            <chakraComponents.MenuList
-                              {...props}
-                              maxHeight={300}
+                              {props.children}
+                            </Box>
+                            <Box
+                              p={2}
+                              position="sticky"
+                              bottom={0}
+                              bg="white"
+                              borderTop="1px solid"
+                              borderColor="gray.100"
                             >
-                              <Box
-                                maxH="250px"
-                                overflowY="auto"
-                                css={{
-                                  "&::-webkit-scrollbar": {
-                                    display: "none",
-                                  },
-                                  msOverflowStyle: "none", // IE and Edge
-                                  scrollbarWidth: "none", // Firefox
-                                }}
+                              <Button
+                                width="100%"
+                                colorPalette="blue"
+                                onClick={scoreTypeDrawerOpen.onOpen}
+                                variant="outline"
+                                size="sm"
                               >
-                                {props.children}
-                              </Box>
-                              <Box
-                                p={2}
-                                position="sticky"
-                                bottom={0}
-                                bg="white"
-                                borderTop="1px solid"
-                                borderColor="gray.100"
-                              >
-                                <Button
-                                  width="100%"
-                                  colorScheme="blue"
-                                  onClick={scoreTypeDrawerOpen.onOpen}
-                                  leftIcon={<Plus />}
-                                  variant="outline"
-                                  size="sm"
-                                >
-                                  Add New
-                                </Button>
-                              </Box>
-                            </chakraComponents.MenuList>
-                          ),
-                        }}
-                      />
-                    </Box>
+                                <Plus /> Add New
+                              </Button>
+                            </Box>
+                          </chakraComponents.MenuList>
+                        ),
+                      }}
+                    />
                   </VStack>
-                </FormControl>
+                </Field.Root>
                 <HStack width="full">
                   <Spacer />
                   <Button
-                    colorScheme="orange"
+                    colorPalette="orange"
                     type="submit"
                     minWidth="fit-content"
+                    loading={createOrUpdateQueue.isLoading}
                   >
                     Save
                   </Button>
                 </HStack>
               </VStack>
             </form>
-          </DrawerBody>
-        </DrawerContent>
-      </Drawer>
-      <Drawer
-        isOpen={scoreTypeDrawerOpen.isOpen}
-        placement="right"
-        size={"lg"}
-        onClose={scoreTypeDrawerOpen.onClose}
-        onOverlayClick={scoreTypeDrawerOpen.onClose}
+          </Drawer.Body>
+        </Drawer.Content>
+      </Drawer.Root>
+      <Drawer.Root
+        open={scoreTypeDrawerOpen.open}
+        placement="end"
+        size="lg"
+        onOpenChange={({ open }) => scoreTypeDrawerOpen.setOpen(open)}
       >
-        <AddAnnotationScoreDrawer
-          onClose={scoreTypeDrawerOpen.onClose}
-          onOverlayClick={scoreTypeDrawerOpen.onClose}
-        />
-      </Drawer>
+        <Drawer.Content>
+          <Drawer.Header>
+            <HStack>
+              <Drawer.CloseTrigger />
+            </HStack>
+            <HStack>
+              <Text paddingTop={5} fontSize="2xl">
+                Add Score Metric
+              </Text>
+            </HStack>
+          </Drawer.Header>
+          <Drawer.Body>
+            <AddAnnotationScore onClose={scoreTypeDrawerOpen.onClose} />
+          </Drawer.Body>
+        </Drawer.Content>
+      </Drawer.Root>
     </>
   );
 };

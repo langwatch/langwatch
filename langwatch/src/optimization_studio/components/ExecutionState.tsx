@@ -21,7 +21,7 @@ export function RunningStatus({ isLoading }: { isLoading?: boolean }) {
       {isRunning || isLoading ? (
         <HStack>
           <Spinner size="xs" />
-          <Text fontSize={13}>Running...</Text>
+          <Text fontSize="13px">Running...</Text>
           <Button
             size="xs"
             onClick={() =>
@@ -35,7 +35,7 @@ export function RunningStatus({ isLoading }: { isLoading?: boolean }) {
         </HStack>
       ) : isWaiting ? (
         <HStack>
-          <Text fontSize={13}>Waiting...</Text>
+          <Text fontSize="13px">Waiting...</Text>
         </HStack>
       ) : null}
     </Box>

@@ -3,7 +3,10 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
-import { AVAILABLE_EVALUATORS } from "../../evaluations/evaluators.generated";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorTypes,
+} from "../../evaluations/evaluators.generated";
 import { prisma } from "~/server/db";
 
 export const evaluationsRouter = createTRPCRouter({
@@ -37,7 +40,10 @@ export const evaluationsRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        evaluatorType: evaluatorsSchema.keyof(),
+        evaluatorType: z.union([
+          evaluatorsSchema.keyof(),
+          z.string().refine((val) => val.startsWith("custom/")),
+        ]),
         traceId: z.string(),
         settings: z.object({}).passthrough(),
         mappings: z.record(z.string(), z.string()).optional(),
@@ -48,7 +54,7 @@ export const evaluationsRouter = createTRPCRouter({
       const result = await runEvaluationForTrace({
         projectId: input.projectId,
         traceId: input.traceId,
-        evaluatorType: input.evaluatorType,
+        evaluatorType: input.evaluatorType as EvaluatorTypes,
         settings: input.settings,
         mappings: input.mappings ?? {},
       });

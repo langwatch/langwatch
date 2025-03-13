@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack, Spacer, Tooltip } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack, Spacer } from "@chakra-ui/react";
 import type { ElasticSearchEvaluation } from "../../server/tracer/types";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import numeral from "numeral";
@@ -8,12 +8,14 @@ import {
   CheckStatusIcon,
   evaluationStatusColor,
 } from "../checks/EvaluationStatus";
+import { Tooltip } from "../ui/tooltip";
 
 export function formatEvaluationSingleValue(evaluation: {
   score?: number | null;
   passed?: boolean | null;
   label?: string | null;
 }) {
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
   return evaluation.label !== undefined && evaluation.label !== null
     ? evaluation.label
     : evaluation.score !== undefined && evaluation.score !== null
@@ -50,19 +52,19 @@ export function EvaluationStatusItem({
       padding={6}
       borderRadius={"lg"}
     >
-      <HStack align="start" spacing={2}>
-        <HStack align="start" spacing={1}>
+      <HStack align="start" gap={2}>
+        <HStack align="start" gap={1}>
           <Box paddingRight={2} color={color}>
             <CheckStatusIcon check={check} />
           </Box>
-          <VStack alignItems="start" spacing={1}>
+          <VStack alignItems="start" gap={1}>
             <Text>
               <b>{check.name || evaluator?.name}</b>
             </Text>
             {evaluator && <Text fontSize={"sm"}>{evaluator.description}</Text>}
             <Text fontSize={"sm"}>
               {check.status == "processed" ? (
-                <VStack align="start" spacing={1}>
+                <VStack align="start" gap={1}>
                   {check.passed !== undefined && check.passed !== null && (
                     <HStack>
                       <Text>Result:</Text>
@@ -124,7 +126,7 @@ export function EvaluationStatusItem({
         <Text fontSize={"sm"}>
           {check.timestamps.finished_at && (
             <Tooltip
-              label={new Date(check.timestamps.finished_at).toLocaleString()}
+              content={new Date(check.timestamps.finished_at).toLocaleString()}
             >
               <Text
                 borderBottomWidth="1px"

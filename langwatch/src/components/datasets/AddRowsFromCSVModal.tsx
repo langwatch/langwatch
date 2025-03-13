@@ -2,17 +2,9 @@ import {
   Box,
   Button,
   HStack,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  Select,
+  NativeSelect,
   Spacer,
   Text,
-  useToast,
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
@@ -25,6 +17,8 @@ import {
 import { api } from "../../utils/api";
 
 import { nanoid } from "nanoid";
+import { Dialog } from "../../components/ui/dialog";
+import { toaster } from "../../components/ui/toaster";
 import { tryToConvertRowsToAppropriateType } from "../AddOrEditDatasetDrawer";
 import { CSVReaderComponent } from "./UploadCSVModal";
 
@@ -57,8 +51,6 @@ export function AddRowsFromCSVModal({
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [canUpload, setCanUpload] = useState(false);
   const uploadRecords = api.datasetRecord.create.useMutation();
-
-  const toast = useToast();
 
   const preprocessCSV = (csv: any) => {
     setCSVHeaders(csv.slice(0, 1)[0]);
@@ -119,11 +111,13 @@ export function AddRowsFromCSVModal({
       });
     } catch (error) {
       console.error(error);
-      toast({
+      toaster.create({
         title: "Error processing CSV",
-        status: "error",
+        type: "error",
         duration: 5000,
-        isClosable: true,
+        meta: {
+          closable: true,
+        },
       });
 
       return;
@@ -147,21 +141,25 @@ export function AddRowsFromCSVModal({
           setRecordEntries([]);
           setMapping({});
           onClose();
-          toast({
+          toaster.create({
             title: "CSV uploaded successfully",
-            status: "success",
+            type: "success",
             duration: 5000,
-            isClosable: true,
+            meta: {
+              closable: true,
+            },
           });
         },
         onError: () => {
-          toast({
+          toaster.create({
             title: "Error uploading CSV",
             description:
               "Please make sure you have the right formatting and that the columns are correct",
-            status: "error",
+            type: "error",
             duration: 5000,
-            isClosable: true,
+            meta: {
+              closable: true,
+            },
           });
         },
       }
@@ -182,20 +180,23 @@ export function AddRowsFromCSVModal({
       return (
         <HStack key={index} marginY={2}>
           <Box width={200}>
-            <Select
-              placeholder="Select column"
-              onChange={(e) => {
-                onSelectChange(option.value)(e.target.value);
-              }}
-              value={mapping[option.value]}
-            >
-              {CSVHeaders.map((column) => (
-                <option key={column} value={column}>
-                  {column}
-                </option>
-              ))}
-              <option value="">Set empty</option>
-            </Select>
+            <NativeSelect.Root>
+              <NativeSelect.Field
+                placeholder="Select column"
+                onChange={(e) => {
+                  onSelectChange(option.value)(e.target.value);
+                }}
+                value={mapping[option.value]}
+              >
+                {CSVHeaders.map((column) => (
+                  <option key={column} value={column}>
+                    {column}
+                  </option>
+                ))}
+                <option value="">Set empty</option>
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
           </Box>
 
           <ArrowRight />
@@ -217,12 +218,14 @@ export function AddRowsFromCSVModal({
   }, [isOpen]);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose}>
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>Add rows from CSV</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
+    <Dialog.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()}>
+      <Dialog.Backdrop />
+      <Dialog.Content>
+        <Dialog.Header>
+          <Dialog.Title>Add rows from CSV</Dialog.Title>
+          <Dialog.CloseTrigger />
+        </Dialog.Header>
+        <Dialog.Body>
           <CSVReaderComponent
             onUploadAccepted={({ data }: { data: string[][] }) => {
               preprocessCSV(data);
@@ -233,24 +236,24 @@ export function AddRowsFromCSVModal({
           {hasErrors.length > 0 && (
             <Text color="red">Please check columns have valid formatting</Text>
           )}
-        </ModalBody>
+        </Dialog.Body>
 
-        <ModalFooter>
+        <Dialog.Footer>
           <Button variant="ghost" mr={3} onClick={onClose}>
             Close
           </Button>
           <Button
-            colorScheme="blue"
-            isDisabled={
+            colorPalette="blue"
+            disabled={
               recordEntries.length === 0 || !canUpload || hasErrors.length > 0
             }
             onClick={uploadCSVData}
-            isLoading={uploadRecords.isLoading}
+            loading={uploadRecords.isLoading}
           >
             Upload
           </Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }

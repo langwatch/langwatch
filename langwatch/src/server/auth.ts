@@ -13,6 +13,7 @@ import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { dependencies } from "../injection/dependencies.server";
 import type { NextRequest } from "next/server";
+import { getNextAuthSessionToken } from "../utils/auth";
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -80,6 +81,23 @@ export const authOptions = (
           email: user.email,
         },
       };
+    },
+    signIn: async ({ user }) => {
+      const sessionToken = getNextAuthSessionToken(req as any);
+      if (!sessionToken) return true;
+
+      const dbSession = await prisma.session.findUnique({
+        where: { sessionToken },
+      });
+      const dbUser = await prisma.user.findUnique({
+        where: { id: dbSession?.userId },
+      });
+
+      if (dbUser?.email !== user.email) {
+        throw new Error("DIFFERENT_EMAIL_NOT_ALLOWED");
+      }
+
+      return true;
     },
   },
   adapter: PrismaAdapter(prisma),

@@ -5,7 +5,7 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  let cronApiKey = req.headers["authorization"];
+  let cronApiKey = req.headers.authorization;
   cronApiKey = cronApiKey?.startsWith("Bearer ")
     ? cronApiKey.slice(7)
     : cronApiKey;

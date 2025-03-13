@@ -1,29 +1,20 @@
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
+  Box,
   Button,
   Card,
-  CardBody,
-  FormErrorMessage,
+  Field,
   HStack,
   Heading,
+  Icon,
   Input,
   Spacer,
   Spinner,
   Table,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
   VStack,
 } from "@chakra-ui/react";
 import { TeamUserRole } from "@prisma/client";
 import { Select as MultiSelect } from "chakra-react-select";
-import NextLink from "next/link";
 import { ChevronRight, HelpCircle, Plus, Trash } from "react-feather";
 import {
   Controller,
@@ -31,6 +22,9 @@ import {
   type SubmitHandler,
   type UseFormReturn,
 } from "react-hook-form";
+import { Link } from "../../components/ui/link";
+import { Tooltip } from "../../components/ui/tooltip";
+import { TeamProjectsList } from "../../pages/settings/projects";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
@@ -39,8 +33,6 @@ import {
   teamRolesOptions,
   type TeamUserRoleForm,
 } from "./TeamUserRoleField";
-import { TeamProjectsList } from "../../pages/settings/projects";
-import React from "react";
 
 export type TeamFormData = {
   name: string;
@@ -80,22 +72,18 @@ export const TeamForm = ({
       <VStack
         paddingX={4}
         paddingY={6}
-        spacing={6}
+        gap={6}
         width="full"
         maxWidth="920px"
         align="start"
       >
-        <Breadcrumb spacing="8px" separator={<ChevronRight width="12" />}>
-          <BreadcrumbItem>
-            <BreadcrumbLink as={NextLink} href="/settings/teams">
-              Teams
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-
-          <BreadcrumbItem isCurrentPage>
-            <BreadcrumbLink>{team ? team.name : "New Team"}</BreadcrumbLink>
-          </BreadcrumbItem>
-        </Breadcrumb>
+        <HStack gap="8px">
+          <Link href="/settings/teams">Teams</Link>
+          <Icon>
+            <ChevronRight width="12" />
+          </Icon>
+          <Text>{team ? team.name : "New Team"}</Text>
+        </HStack>
         <HStack width="full">
           <Heading size="lg" as="h1">
             {team ? "Team Settings" : "Create New Team"}
@@ -103,13 +91,13 @@ export const TeamForm = ({
           <Spacer />
           {isLoading && team && <Spinner />}
         </HStack>
-        <Card width="full">
-          <CardBody width="full" paddingY={2}>
-            <VStack spacing={0}>
+        <Card.Root width="full">
+          <Card.Body width="full" paddingY={2}>
+            <VStack gap={0}>
               <HorizontalFormControl
                 label="Name"
                 helper="The name of your team"
-                isInvalid={!!getFieldState("name").error}
+                invalid={!!getFieldState("name").error}
               >
                 <Input
                   width="full"
@@ -121,7 +109,7 @@ export const TeamForm = ({
                     },
                   })}
                 />
-                <FormErrorMessage>Name is required</FormErrorMessage>
+                <Field.ErrorText>Name is required</Field.ErrorText>
               </HorizontalFormControl>
               {team && (
                 <HorizontalFormControl
@@ -132,38 +120,35 @@ export const TeamForm = ({
                 </HorizontalFormControl>
               )}
             </VStack>
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
         <HStack width="full" marginTop={2}>
           <Heading size="md" as="h2">
             Members
           </Heading>
           <Spacer />
           {team && (
-            <Button
-              as={NextLink}
-              href={`/settings/members`}
-              size="sm"
-              colorScheme="orange"
-            >
-              <Text>Manage organization members</Text>
-            </Button>
+            <Link href={`/settings/members`} asChild>
+              <Button size="sm" colorPalette="orange">
+                <Text>Manage organization members</Text>
+              </Button>
+            </Link>
           )}
         </HStack>
-        <Card width="full">
-          <CardBody width="full" paddingY={0} paddingX={0}>
-            <Table variant="simple" width="full">
-              <Thead>
-                <Tr>
-                  <Th width="48%">Name</Th>
-                  <Th>Role</Th>
-                  {!team && <Th />}
-                </Tr>
-              </Thead>
-              <Tbody>
+        <Card.Root width="full">
+          <Card.Body width="full" paddingY={0} paddingX={0}>
+            <Table.Root variant="line" width="full">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader width="48%">Name</Table.ColumnHeader>
+                  <Table.ColumnHeader>Team Role</Table.ColumnHeader>
+                  {!team && <Table.ColumnHeader />}
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
                 {members.fields.map((member, index) => (
-                  <Tr key={index}>
-                    <Td>
+                  <Table.Row key={index}>
+                    <Table.Cell>
                       <HStack width="full">
                         {member.saved ? (
                           <>
@@ -185,7 +170,6 @@ export const TeamForm = ({
                                     })) ?? []
                                   }
                                   hideSelectedOptions={false}
-                                  useBasicStyles
                                   chakraStyles={{
                                     container: (base) => ({
                                       ...base,
@@ -198,7 +182,7 @@ export const TeamForm = ({
                               )}
                             />
                             <Tooltip
-                              label={
+                              content={
                                 <>
                                   <Text>
                                     Those are existing members of your
@@ -211,35 +195,39 @@ export const TeamForm = ({
                                   </Text>
                                 </>
                               }
+                              positioning={{ placement: "top" }}
+                              showArrow
                             >
-                              <HelpCircle width="14px" />
+                              <Box>
+                                <HelpCircle width="14px" />
+                              </Box>
                             </Tooltip>
                           </>
                         )}
                       </HStack>
-                    </Td>
-                    <Td>
+                    </Table.Cell>
+                    <Table.Cell>
                       <Controller
                         control={control}
                         name={`members.${index}.role`}
                         rules={{ required: "User role is required" }}
                         render={({ field }) => <TeamRoleSelect field={field} />}
                       />
-                    </Td>
-                    <Td paddingLeft={0} paddingRight={0} paddingY={2}>
+                    </Table.Cell>
+                    <Table.Cell paddingLeft={0} paddingRight={0} paddingY={2}>
                       <Button
                         type="button"
-                        colorScheme="red"
-                        isDisabled={members.fields.length === 1}
+                        colorPalette="red"
+                        disabled={members.fields.length === 1}
                         onClick={() => members.remove(index)}
                       >
                         <Trash size={18} />
                       </Button>
-                    </Td>
-                  </Tr>
+                    </Table.Cell>
+                  </Table.Row>
                 ))}
-                <Tr>
-                  <Td colSpan={4}>
+                <Table.Row>
+                  <Table.Cell colSpan={4}>
                     <Button
                       type="button"
                       onClick={() => {
@@ -251,18 +239,18 @@ export const TeamForm = ({
                       }}
                       marginTop={2}
                     >
-                      + Add Another
+                      <Plus size={18} /> Add Another
                     </Button>
-                  </Td>
-                </Tr>
-              </Tbody>
-            </Table>
-          </CardBody>
-        </Card>
+                  </Table.Cell>
+                </Table.Row>
+              </Table.Body>
+            </Table.Root>
+          </Card.Body>
+        </Card.Root>
         {!team && (
           <HStack width="full">
             <Spacer />
-            <Button type="submit" colorScheme="orange" isLoading={isLoading}>
+            <Button type="submit" colorPalette="orange" loading={isLoading}>
               Create
             </Button>
           </HStack>
@@ -274,31 +262,26 @@ export const TeamForm = ({
                 Projects
               </Heading>
               <Spacer />
-              <Button
-                as={NextLink}
-                href={`/onboarding/${team.slug}/project`}
-                size="sm"
-                colorScheme="orange"
-              >
-                <HStack spacing={2}>
+              <Link href={`/onboarding/${team.slug}/project`} asChild>
+                <Button size="sm" colorPalette="orange">
                   <Plus size={20} />
                   <Text>Add new project</Text>
-                </HStack>
-              </Button>
+                </Button>
+              </Link>
             </HStack>
-            <Card width="full">
-              <CardBody width="full" paddingY={0} paddingX={0}>
-                <Table variant="simple" width="full">
-                  <Thead>
-                    <Tr>
-                      <Th>{team.name}</Th>
-                      <Td textAlign="right"></Td>
-                    </Tr>
-                  </Thead>
+            <Card.Root width="full">
+              <Card.Body width="full" paddingY={0} paddingX={0}>
+                <Table.Root variant="line" width="full">
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeader>{team.name}</Table.ColumnHeader>
+                      <Table.Cell textAlign="right"></Table.Cell>
+                    </Table.Row>
+                  </Table.Header>
                   <TeamProjectsList team={team} />
-                </Table>
-              </CardBody>
-            </Card>
+                </Table.Root>
+              </Card.Body>
+            </Card.Root>
           </>
         )}
       </VStack>

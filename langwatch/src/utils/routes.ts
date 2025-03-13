@@ -88,6 +88,26 @@ export const projectRoutes = {
     path: "/[project]/annotations",
     title: "Annotations",
   },
+  annotations_queues: {
+    path: "/[project]/annotations/[slug]",
+    title: "Annotations Queues",
+    parent: "annotations",
+  },
+  annotations_all: {
+    path: "/[project]/annotations/all",
+    title: "All Annotations",
+    parent: "annotations",
+  },
+  annotations_user_inbox: {
+    path: "/[project]/annotations/me",
+    title: "Annotations Inbox",
+    parent: "annotations",
+  },
+  annotations_my_queue: {
+    path: "/[project]/annotations/my-queue",
+    title: "My Queue",
+    parent: "annotations",
+  },
   triggers: {
     path: "/[project]/triggers",
     title: "Triggers",

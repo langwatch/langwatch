@@ -22,7 +22,7 @@ export default function SettingsLayout({
           fontSize="14px"
           minWidth="200px"
           height="full"
-          spacing={0}
+          gap={0}
           display={isSubscription ? "none" : "flex"}
         >
           <MenuLink href="/settings">General Settings</MenuLink>
@@ -36,7 +36,7 @@ export default function SettingsLayout({
           <MenuLink href="/settings/annotation-scores">
             Annotation Scores
           </MenuLink>
-
+          <MenuLink href="/settings/authentication">Authentication</MenuLink>
           <MenuLink href="/settings/usage">Usage & Billing</MenuLink>
           <MenuLink href="/settings/subscription">Subscription</MenuLink>
         </VStack>

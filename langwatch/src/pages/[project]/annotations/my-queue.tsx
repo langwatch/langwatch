@@ -1,14 +1,6 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Image,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Spacer, Text, VStack, HStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { DashboardLayout } from "../../../../components/DashboardLayout";
+import { DashboardLayout } from "../../../components/DashboardLayout";
 
 import { type AnnotationQueueItem } from "@prisma/client";
 import { Check, ChevronLeft, ChevronRight } from "react-feather";
@@ -16,8 +8,9 @@ import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { Conversation } from "../../messages/[trace]/index";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { TasksDone } from "../../../components/icons/TasksDone";
+import { Conversation } from "../../../components/messages/Conversation";
 
 export default function TraceAnnotations() {
   const router = useRouter();
@@ -27,6 +20,7 @@ export default function TraceAnnotations() {
     memberAccessibleQueueItemsWithTraces,
     queuesLoading,
   } = useAnnotationQueues();
+  const { project } = useOrganizationTeamProject();
 
   const allQueueItems = useMemo(() => {
     const items = [
@@ -36,12 +30,39 @@ export default function TraceAnnotations() {
     return items.filter((item) => !item.doneAt);
   }, [assignedQueueItemsWithTraces, memberAccessibleQueueItemsWithTraces]);
 
+  let currentQueueItem = allQueueItems
+    .filter((item) => !item.doneAt)
+    .find((item) => item.id === queueItem);
+
+  if (!currentQueueItem) {
+    currentQueueItem = allQueueItems[0];
+  }
+
   const queryClient = api.useContext();
 
   const refetchQueueItems = async () => {
     await queryClient.annotation.getQueueItems.invalidate();
     await queryClient.annotation.getQueues.invalidate();
   };
+  const traceDetails = api.traces.getById.useQuery(
+    {
+      projectId: project?.id ?? "",
+      traceId: currentQueueItem?.trace?.trace_id ?? "",
+    },
+    { enabled: !!project?.id }
+  );
+
+  const [threadId, setThreadId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (traceDetails.data?.metadata.thread_id) {
+      setThreadId(traceDetails.data?.metadata.thread_id);
+    }
+  }, [traceDetails.data?.metadata.thread_id]);
+
+  if (queuesLoading) {
+    return <AnnotationsLayout />;
+  }
 
   if (allQueueItems.length === 0 && !queuesLoading) {
     return (
@@ -51,8 +72,9 @@ export default function TraceAnnotations() {
           width="full"
           justify="center"
           backgroundColor="gray.100"
+          marginTop="-48px"
         >
-          <Image src="/images/tasks-done.png" alt="All Done" />
+          <TasksDone />
           <Text fontSize="xl" fontWeight="500">
             All tasks complete
           </Text>
@@ -62,36 +84,31 @@ export default function TraceAnnotations() {
     );
   }
 
-  let currentQueueItem = allQueueItems
-    .filter((item) => !item.doneAt)
-    .find((item) => item.id === queueItem);
-
-  if (!currentQueueItem) {
-    currentQueueItem = allQueueItems[0];
-  }
-
   return (
-    <DashboardLayout backgroundColor="white">
-      <VStack height="100%" width="full">
-        <Conversation traceId={currentQueueItem?.trace?.trace_id ?? ""} />
+    <DashboardLayout>
+      <VStack height="100%" width="full" padding={4}>
+        <Conversation
+          threadId={threadId ?? ""}
+          traceId={currentQueueItem?.trace?.trace_id ?? ""}
+        />
         <Spacer />
-        {currentQueueItem?.trace && (
-          <Box
-            position="sticky"
-            bottom={0}
-            left={0}
-            right={0}
-            width="100%"
-            backgroundColor="white"
-          >
-            <AnnotationQueuePicker
-              queueItems={allQueueItems}
-              currentQueueItem={currentQueueItem}
-              refetchQueueItems={refetchQueueItems}
-            />
-          </Box>
-        )}
       </VStack>
+      {currentQueueItem?.trace && (
+        <Box
+          position="sticky"
+          bottom={0}
+          left={0}
+          right={0}
+          width="100%"
+          backgroundColor="white"
+        >
+          <AnnotationQueuePicker
+            queueItems={allQueueItems}
+            currentQueueItem={currentQueueItem}
+            refetchQueueItems={refetchQueueItems}
+          />
+        </Box>
+      )}
     </DashboardLayout>
   );
 }
@@ -141,13 +158,13 @@ const AnnotationQueuePicker = ({
   };
 
   return (
-    <Box boxShadow="0px -3px 15px rgba(0, 0, 0, 0.1)" padding={4} width="full">
+    <Box boxShadow="0px -3px 10px rgba(0, 0, 0, 0.05)" padding={5} width="full">
       <VStack>
-        <HStack spacing={8}>
-          <HStack spacing={2}>
+        <HStack gap={8}>
+          <HStack gap={2}>
             <Button
               variant="outline"
-              isDisabled={currentQueueItemIndex === 0}
+              disabled={currentQueueItemIndex === 0}
               onClick={() => {
                 const previousItem = queueItems[currentQueueItemIndex - 1];
                 if (previousItem) {
@@ -159,7 +176,7 @@ const AnnotationQueuePicker = ({
             </Button>
             <Button
               variant="outline"
-              isDisabled={currentQueueItemIndex === queueItems.length - 1}
+              disabled={currentQueueItemIndex === queueItems.length - 1}
               onClick={() => {
                 const nextItem = queueItems[currentQueueItemIndex + 1];
                 if (nextItem) {
@@ -174,16 +191,15 @@ const AnnotationQueuePicker = ({
             {currentQueueItemIndex + 1} of {queueItems.length}
           </Text>
           <Button
-            rightIcon={<Check />}
-            colorScheme="blue"
-            isDisabled={
+            colorPalette="blue"
+            disabled={
               currentQueueItem.doneAt !== null || markQueueItemDone.isLoading
             }
             onClick={() => {
-              markQueueItemDoneMoveToNext();
+              void markQueueItemDoneMoveToNext();
             }}
           >
-            Done
+            <Check /> Done
           </Button>
         </HStack>
       </VStack>

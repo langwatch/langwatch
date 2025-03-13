@@ -1,12 +1,11 @@
-import { DragHandleIcon } from "@chakra-ui/icons";
 import {
   Box,
   Button,
   HStack,
+  Icon,
   Link,
   Spacer,
   Text,
-  Tooltip,
   VStack,
 } from "@chakra-ui/react";
 import { useReactFlow, type Node, type XYPosition } from "@xyflow/react";
@@ -14,12 +13,12 @@ import { useEffect, useMemo, useRef } from "react";
 import { useDrag, useDragLayer } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
 import { BookOpen, Box as BoxIcon, ChevronsLeft, GitHub } from "react-feather";
+import { LuGripVertical } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { HoverableBigText } from "../../components/HoverableBigText";
 import { IconWrapper } from "../../components/IconWrapper";
 import { DiscordOutlineIcon } from "../../components/icons/DiscordOutline";
-import { usePublicEnv } from "../../hooks/usePublicEnv";
 import {
   updateCodeClassName,
   useWorkflowStore,
@@ -39,6 +38,7 @@ import {
 import { ComponentIcon } from "./ColorfulBlockIcons";
 import { NodeComponents } from "./nodes";
 import { PromptingTechniqueDraggingNode } from "./nodes/PromptingTechniqueNode";
+import { Tooltip } from "../../components/ui/tooltip";
 
 export function NodeSelectionPanelButton({
   isOpen,
@@ -81,7 +81,6 @@ export const NodeSelectionPanel = ({
 
   const workflow = getWorkflow();
   const { project } = useOrganizationTeamProject();
-  const publicEnv = usePublicEnv();
 
   const { data: components } = api.optimization.getComponents.useQuery(
     {
@@ -134,11 +133,11 @@ export const NodeSelectionPanel = ({
       width="300px"
       minWidth="300px"
     >
-      <VStack width="full" height="full" spacing={0}>
+      <VStack width="full" height="full" gap={0}>
         <VStack
           width="full"
           height="full"
-          spacing={4}
+          gap={4}
           align="start"
           overflowY="auto"
           padding={3}
@@ -243,24 +242,24 @@ export const NodeSelectionPanel = ({
           width="full"
           padding={3}
           paddingLeft={5}
-          spacing={4}
+          gap={4}
           background="white"
         >
-          <Tooltip hasArrow gutter={16} label="Star us on GitHub">
+          <Tooltip showArrow content="Star us on GitHub">
             <Link href="https://github.com/langwatch/langwatch" target="_blank">
               <IconWrapper width="20px" height="20px">
                 <GitHub />
               </IconWrapper>
             </Link>
           </Tooltip>
-          <Tooltip hasArrow gutter={16} label="Join our community">
+          <Tooltip showArrow content="Join our community">
             <Link href="https://discord.gg/kT4PhDS2gH" target="_blank">
               <IconWrapper width="20px" height="20px">
                 <DiscordOutlineIcon />
               </IconWrapper>
             </Link>
           </Tooltip>
-          <Tooltip hasArrow gutter={16} label="Documentation">
+          <Tooltip showArrow content="Documentation">
             <Link
               href="https://docs.langwatch.ai/optimization-studio/llm-nodes"
               target="_blank"
@@ -399,10 +398,9 @@ export const NodeDraggable = (props: {
   return (
     <>
       <Tooltip
-        hasArrow
-        gutter={16}
-        placement="right"
-        label={
+        showArrow
+        positioning={{ gutter: 16, placement: "right" }}
+        content={
           props.disableDrag
             ? "You cannot add the same component as your workflow"
             : props.component.description ?? ""
@@ -424,11 +422,13 @@ export const NodeDraggable = (props: {
               behave_as={props.behave_as}
               size="md"
             />
-            <HoverableBigText noOfLines={1} expandable={false}>
+            <HoverableBigText lineClamp={1} expandable={false}>
               {props.component.name}
             </HoverableBigText>
             <Spacer />
-            <DragHandleIcon width="14px" height="14px" color="gray.350" />
+            <Box color="gray.350">
+              <LuGripVertical size={18} />
+            </Box>
           </HStack>
         </Box>
       </Tooltip>

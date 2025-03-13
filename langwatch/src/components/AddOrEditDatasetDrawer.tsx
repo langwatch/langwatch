@@ -1,29 +1,24 @@
 import {
   Box,
   Button,
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  DrawerHeader,
-  FormErrorMessage,
-  FormHelperText,
+  Field,
   HStack,
   Heading,
   Input,
-  Select,
+  NativeSelect,
   Text,
   VStack,
-  useToast,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useCallback, useEffect } from "react";
+import { useEffect } from "react";
 import { Trash2 } from "react-feather";
 import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
 import slugify from "slugify";
+import { Drawer } from "../components/ui/drawer";
+import { toaster } from "../components/ui/toaster";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { tryToMapPreviousColumnsToNewColumns } from "../optimization_studio/utils/datasetUtils";
 import type {
-  DatasetColumnType,
   DatasetColumns,
   DatasetRecordEntry,
   DatasetRecordForm,
@@ -40,7 +35,7 @@ interface AddDatasetDrawerProps {
     datasetId?: string;
     datasetRecords?: InMemoryDataset["datasetRecords"];
   };
-  isOpen?: boolean;
+  open?: boolean;
   onClose?: () => void;
   onSuccess: (dataset: {
     datasetId: string;
@@ -49,25 +44,19 @@ interface AddDatasetDrawerProps {
   }) => void;
 }
 
-type ColumnType = {
-  name: string;
-  type: DatasetColumnType;
-};
-
 type FormValues = {
   name: string;
-  columnTypes: ColumnType[];
+  columnTypes: DatasetColumns;
 };
 
 export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const toast = useToast();
   const upsertDataset = api.dataset.upsert.useMutation();
   const { closeDrawer } = useDrawer();
   const onClose = props.onClose ?? closeDrawer;
-  const isOpen = props.isOpen ?? true;
+  const isOpen = props.open ?? true;
 
-  const initialColumns: ColumnType[] = [
+  const initialColumns: DatasetColumns = [
     { name: "trace_id", type: "string" },
     { name: "timestamp", type: "date" },
     { name: "input", type: "string" },
@@ -151,7 +140,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!props.isOpen]);
+  }, [!!props.open]);
 
   const onSubmit = (data: DatasetRecordForm) => {
     upsertDataset.mutate(
@@ -163,7 +152,11 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
         ...(props.datasetToSave?.datasetRecords
           ? {
               datasetRecords: tryToConvertRowsToAppropriateType(
-                props.datasetToSave.datasetRecords,
+                tryToMapPreviousColumnsToNewColumns(
+                  props.datasetToSave.datasetRecords,
+                  props.datasetToSave.columnTypes,
+                  data.columnTypes
+                ),
                 data.columnTypes
               ),
             }
@@ -176,7 +169,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
             name: data.name,
             columnTypes: data.columnTypes as DatasetColumns,
           });
-          toast({
+          toaster.create({
             title: props.datasetToSave?.datasetId
               ? "Dataset Updated"
               : props.datasetToSave
@@ -185,55 +178,41 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
             description: props.datasetToSave?.datasetId
               ? `Successfully updated ${data.name} dataset`
               : `Successfully created ${data.name} dataset`,
-            status: "success",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            type: "success",
+            placement: "top-end",
+            meta: {
+              closable: true,
+            },
           });
           reset();
           onClose();
         },
         onError: (error) => {
-          toast({
+          toaster.create({
             title: props.datasetToSave?.datasetId
               ? "Error updating dataset"
               : "Error creating dataset",
             description: error.message,
-            status: "error",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            type: "error",
+            placement: "top-end",
+            meta: {
+              closable: true,
+            },
           });
         },
       }
     );
   };
 
-  const setColumn = useCallback(
-    (columnName: string, columnType: DatasetColumnType) =>
-      (e: React.ChangeEvent<HTMLInputElement>) => {
-        const currentColumnTypes = watch("columnTypes");
-        if (e.target.checked) {
-          append({ name: columnName, type: columnType });
-        } else {
-          const index = currentColumnTypes.findIndex(
-            (col) => col.name === columnName
-          );
-          if (index !== -1) {
-            remove(index);
-          }
-        }
-      },
-    [append, remove, watch]
-  );
-
   return (
-    <Drawer isOpen={isOpen} placement="right" size={"xl"} onClose={onClose}>
-      <DrawerContent>
-        <DrawerHeader>
-          <HStack>
-            <DrawerCloseButton />
-          </HStack>
+    <Drawer.Root
+      open={isOpen}
+      onOpenChange={({ open }) => !open && onClose()}
+      size="xl"
+    >
+      <Drawer.Content>
+        <Drawer.CloseTrigger />
+        <Drawer.Header>
           <HStack>
             <Text paddingTop={5} fontSize="2xl">
               {props.datasetToSave?.datasetId
@@ -243,56 +222,61 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                 : "New Dataset"}
             </Text>
           </HStack>
-        </DrawerHeader>
-        <DrawerBody>
+        </Drawer.Header>
+        <Drawer.Body>
           {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
           <form onSubmit={handleSubmit(onSubmit)}>
             <HorizontalFormControl
               label="Name"
               helper="Give it a name that identifies what this group of examples is
               going to focus on"
-              isInvalid={!!errors.name}
+              invalid={!!errors.name}
             >
               <Input {...register("name")} />
-              {slug && <FormHelperText>slug: {slug}</FormHelperText>}
-              <FormErrorMessage>{errors.name?.message}</FormErrorMessage>
+              {slug && <Field.HelperText>slug: {slug}</Field.HelperText>}
+              <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
             </HorizontalFormControl>
 
             <HorizontalFormControl
               label="Columns"
               helper="Which columns should be present in the dataset"
-              isInvalid={!!errors.columnTypes}
+              invalid={!!errors.columnTypes}
             >
               <VStack align="start">
                 <VStack align="start" width="full">
                   {fields.map((field, index) => (
-                    <HStack key={field.id} width="full">
+                    <HStack key={field.id} width="full" gap={2}>
                       <Input
                         {...register(`columnTypes.${index}.name`, {
                           required: "Column name cannot be empty",
                         })}
                         placeholder="Column name"
                       />
-                      <Select {...register(`columnTypes.${index}.type`)}>
-                        <option value="string">string</option>
-                        <option value="number">number</option>
-                        <option value="boolean">boolean</option>
-                        <option value="date">date</option>
-                        <option value="list">list</option>
-                        <option value="json">json</option>
-                        <option value="chat_messages">
-                          json chat messages (OpenAI format)
-                        </option>
-                        <option value="spans">json spans</option>
-                      </Select>
+                      <NativeSelect.Root>
+                        <NativeSelect.Field
+                          {...register(`columnTypes.${index}.type`)}
+                        >
+                          <option value="string">string</option>
+                          <option value="number">number</option>
+                          <option value="boolean">boolean</option>
+                          <option value="date">date</option>
+                          <option value="list">list</option>
+                          <option value="json">json</option>
+                          <option value="chat_messages">
+                            json chat messages (OpenAI format)
+                          </option>
+                          <option value="spans">json spans</option>
+                        </NativeSelect.Field>
+                        <NativeSelect.Indicator />
+                      </NativeSelect.Root>
                       <Button size="sm" onClick={() => remove(index)}>
                         <Trash2 size={32} />
                       </Button>
                     </HStack>
                   ))}
-                  <FormErrorMessage>
+                  <Field.ErrorText>
                     {errors.columnTypes?.message}
-                  </FormErrorMessage>
+                  </Field.ErrorText>
                   <Button onClick={() => append({ name: "", type: "string" })}>
                     Add Column
                   </Button>
@@ -300,10 +284,10 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               </VStack>
             </HorizontalFormControl>
             {props.datasetToSave?.datasetRecords && (
-              <VStack align="start" spacing={4} paddingY={6}>
-                <HStack>
+              <VStack align="start" gap={4} paddingY={6}>
+                <HStack gap={2}>
                   <Heading size="md">Preview</Heading>
-                  <Text size="13px" color="gray.500">
+                  <Text fontSize="13px" color="gray.500">
                     {props.datasetToSave.datasetRecords.length} rows,{" "}
                     {columnTypes.length} columns
                   </Text>
@@ -312,7 +296,11 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                   <Box width={`${Math.max(20 * columnTypes.length, 100)}%`}>
                     <DatasetPreview
                       rows={tryToConvertRowsToAppropriateType(
-                        props.datasetToSave.datasetRecords.slice(0, 5),
+                        tryToMapPreviousColumnsToNewColumns(
+                          props.datasetToSave.datasetRecords.slice(0, 5),
+                          props.datasetToSave.columnTypes,
+                          columnTypes
+                        ),
                         columnTypes
                       )}
                       columns={columnTypes.slice(0, 50)}
@@ -322,23 +310,23 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               </VStack>
             )}
             <Button
-              colorScheme="blue"
+              colorPalette="blue"
               type="submit"
               minWidth="fit-content"
-              isLoading={upsertDataset.isLoading}
+              loading={upsertDataset.isLoading}
             >
               {props.datasetToSave ? "Save" : "Create Dataset"}
             </Button>
           </form>
-        </DrawerBody>
-      </DrawerContent>
-    </Drawer>
+        </Drawer.Body>
+      </Drawer.Content>
+    </Drawer.Root>
   );
 }
 
 export const tryToConvertRowsToAppropriateType = (
   datasetRecords: DatasetRecordEntry[],
-  columnTypes: ColumnType[]
+  columnTypes: DatasetColumns
 ) => {
   const typeForColumn = Object.fromEntries(
     columnTypes.map((col) => [col.name, col.type])

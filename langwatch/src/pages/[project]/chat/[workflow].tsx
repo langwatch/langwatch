@@ -1,4 +1,4 @@
-import { Box, Card } from "@chakra-ui/react";
+import { Box, Card as ChakraCard } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { FullLogo } from "../../../components/icons/FullLogo";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
@@ -35,7 +35,7 @@ export default function ChatPage() {
     <Box height="100vh">
       <Box height="full" bg="gray.100" p={16} pt={4}>
         <FullLogo />
-        <Card height="90%" bg="white" p={5} mt={4}>
+        <ChakraCard.Root height="90%" bg="white" p={5} mt={4}>
           <ChatBox
             useApi={true}
             workflowId={workflowId}
@@ -48,7 +48,7 @@ export default function ChatPage() {
                 ?.edges as unknown as Edge[]
             }
           />
-        </Card>
+        </ChakraCard.Root>
       </Box>
     </Box>
   );

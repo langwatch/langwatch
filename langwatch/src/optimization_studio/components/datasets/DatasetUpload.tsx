@@ -32,7 +32,7 @@ export function DatasetUpload({
 
   return (
     <Center height="calc(100vh - 384px)">
-      <VStack spacing={4}>
+      <VStack gap={4}>
         <Heading size="md">Upload CSV</Heading>
         <CSVReaderComponent
           onUploadAccepted={({ data, acceptedFile }) => {
@@ -70,8 +70,8 @@ export function DatasetUpload({
             </Text>
           )}
         <Button
-          colorScheme="blue"
-          isDisabled={
+          colorPalette="blue"
+          disabled={
             !uploadedDataset ||
             uploadedDataset.datasetRecords.length === 0 ||
             uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT
@@ -83,7 +83,7 @@ export function DatasetUpload({
       </VStack>
       <AddOrEditDatasetDrawer
         datasetToSave={uploadedDataset}
-        isOpen={addDatasetDrawer.isOpen}
+        open={addDatasetDrawer.open}
         onClose={() => {
           addDatasetDrawer.onClose();
         }}

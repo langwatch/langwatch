@@ -7,6 +7,8 @@ import {
   HStack,
   Heading,
   SimpleGrid,
+  Text,
+  VStack,
 } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
 import GraphsLayout from "~/components/GraphsLayout";
@@ -190,127 +192,111 @@ export default function Users() {
   return (
     <GraphsLayout>
       <AnalyticsHeader title="Users" />
-      <HStack alignItems={"start"}>
-        <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width={"100%"}>
-          <GridItem colSpan={2} display={"inline-grid"}>
-            <Card overflow={"scroll"}>
-              <CardHeader>
+      <HStack alignItems="start" width="full" gap={6}>
+        <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
+          <GridItem colSpan={2} display="inline-grid">
+            <Card.Root overflow="scroll">
+              <Card.Header>
                 <Heading size="sm">User Messages</Heading>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <CustomGraph input={messagesCount as CustomGraphInput} />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
-          <GridItem colSpan={2} display={"inline-grid"}>
+          <GridItem colSpan={2} display="inline-grid">
             <SessionsSummary />
           </GridItem>
 
-          <GridItem colSpan={2} display={"inline-grid"}>
-            <Card>
-              <CardHeader>
-                <HStack>
+          <GridItem colSpan={2} display="inline-grid">
+            <Card.Root>
+              <Card.Header>
+                <HStack gap={2}>
                   <BarChart2 color="orange" />
                   <Heading size="sm">Daily Users</Heading>
                 </HStack>
-              </CardHeader>
-
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <CustomGraph input={userCountGrapgh as CustomGraphInput} />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
-          <GridItem colSpan={2} display={"inline-grid"}>
-            <Card>
-              <CardHeader>
+          <GridItem colSpan={2} display="inline-grid">
+            <Card.Root>
+              <Card.Header>
                 <HStack>
                   <BarChart2 color="orange" />
                   <Heading size="sm">Daily Threads</Heading>
                 </HStack>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <CustomGraph input={dailyActiveThreads as CustomGraphInput} />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
 
-          <GridItem colSpan={2} display={"inline-grid"}>
-            <Card>
-              <CardHeader>
+          <GridItem colSpan={2} display="inline-grid">
+            <Card.Root>
+              <Card.Header>
                 <HStack>
                   <BarChart2 color="orange" />
                   <Heading size="sm">User Satisfaction</Heading>
                 </HStack>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <CustomGraph input={messageSentiment as CustomGraphInput} />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
 
-          <GridItem colSpan={2} display={"inline-grid"}>
-            <Card>
-              <CardHeader>
+          <GridItem colSpan={2} display="inline-grid">
+            <Card.Root>
+              <Card.Header>
                 <HStack>
                   <BarChart2 color="orange" />
                   <Heading size="sm">Max Messages Per Thread</Heading>
                 </HStack>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <CustomGraph input={maxMessagePerThread as CustomGraphInput} />
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
-          <GridItem colSpan={2} display={"inline-grid"}>
-            <Card>
-              <CardHeader>
+          <GridItem colSpan={2} display="inline-grid">
+            <Card.Root>
+              <Card.Header>
                 <HStack>
                   <BarChart2 color="orange" />
                   <Heading size="sm">User Leaderboard</Heading>
                 </HStack>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 <CustomGraph input={powerUsers as CustomGraphInput} />
-              </CardBody>
-            </Card>
-            {/* <Card>
-              <CardHeader>
-                <HStack>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">Average Daily Threads per User</Heading>
-                </HStack>
-              </CardHeader>
-              <CardBody>
-                <CustomGraph
-                  input={averageDailyThreadsPerUser as CustomGraphInput}
-                />
-              </CardBody>
-            </Card> */}
+              </Card.Body>
+            </Card.Root>
           </GridItem>
-          <GridItem colSpan={2} display={"inline-grid"}>
+          <GridItem colSpan={2} display="inline-grid">
             <SatisfactionGraphs />
           </GridItem>
-          <GridItem colSpan={4} display={"inline-grid"}>
-            <Card>
-              <CardHeader>
+          <GridItem colSpan={4} display="inline-grid">
+            <Card.Root>
+              <Card.Header>
                 <HStack>
                   <BarChart2 color="orange" />
                   <Heading size="sm">User Feedbacks</Heading>
                 </HStack>
-              </CardHeader>
-              <CardBody>
+              </Card.Header>
+              <Card.Body>
                 {isNotQuickwit ? (
                   <FeedbacksTable />
                 ) : isQuickwit ? (
                   <QuickwitNote />
                 ) : null}
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
           </GridItem>
         </SimpleGrid>
-        <Box padding={3}>
-          <FilterSidebar hideTopics={true} />
-        </Box>
+        <FilterSidebar hideTopics={true} />
       </HStack>
     </GraphsLayout>
   );

@@ -1,37 +1,21 @@
 import {
   Box,
-  Card,
-  CardBody,
+  Button,
   Heading,
   HStack,
   VStack,
-  Link,
   Text,
   Spacer,
-} from "@chakra-ui/react";
-import { useEffect } from "react";
-import {
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
   useDisclosure,
-  Button,
-  List,
-  ListItem,
-  ListIcon,
-  OrderedList,
-  UnorderedList,
-  Image,
 } from "@chakra-ui/react";
+import { Dialog } from "../components/ui/dialog";
+import { Link } from "../components/ui/link";
+import { useEffect } from "react";
 import { trackEvent } from "../utils/tracking";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 
 export const IntroducingStudio = () => {
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { open, onOpen, onClose } = useDisclosure();
   const { project } = useOrganizationTeamProject();
 
   useEffect(() => {
@@ -52,12 +36,14 @@ export const IntroducingStudio = () => {
   }, []);
   return (
     <>
-      <Modal isOpen={isOpen} onClose={onClose} size="4xl">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Book a Meeting</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
+      <Dialog.Root open={open} onOpenChange={onClose} size="lg">
+        <Dialog.Backdrop />
+        <Dialog.Content>
+          <Dialog.Header>
+            <Dialog.Title>Book a Meeting</Dialog.Title>
+            <Dialog.CloseTrigger />
+          </Dialog.Header>
+          <Dialog.Body>
             <Box width="full" height="690px">
               <iframe
                 src="https://get.langwatch.ai/meetings/manouk-draisma/c-level?embed=true"
@@ -67,9 +53,9 @@ export const IntroducingStudio = () => {
                 allowFullScreen
               ></iframe>
             </Box>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
+          </Dialog.Body>
+        </Dialog.Content>
+      </Dialog.Root>
       <Box
         padding={6}
         borderRadius="lg"
@@ -77,7 +63,7 @@ export const IntroducingStudio = () => {
         border="1px solid"
         borderColor="green.300"
       >
-        <HStack align="stretch" height="full" spacing={8}>
+        <HStack align="stretch" height="full" gap={8}>
           <iframe
             width="500"
             height="280"
@@ -89,7 +75,7 @@ export const IntroducingStudio = () => {
             }}
           ></iframe>
 
-          <VStack align="start" minHeight="full" spacing={4}>
+          <VStack align="start" minHeight="full" gap={4}>
             <Heading as="h2" size="md">
               NEW! Introducing LangWatch Optimization Studio
             </Heading>
@@ -122,8 +108,9 @@ export const IntroducingStudio = () => {
                   });
                   onOpen();
                 }}
-                variant="link"
+                variant="plain"
                 color="black"
+                unstyled
               >
                 <Text>
                   📅{" "}
@@ -135,10 +122,10 @@ export const IntroducingStudio = () => {
               with one of our experts
             </Text>
             <Spacer />
-            <HStack spacing={4}>
-              <Link href="/settings/subscription">
+            <HStack gap={4}>
+              <Link href="/settings/subscription" asChild>
                 <Button
-                  colorScheme="green"
+                  colorPalette="green"
                   onClick={() => {
                     trackEvent("subscription_hook_click", {
                       project_id: project?.id,

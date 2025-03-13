@@ -7,8 +7,7 @@ import * as SentryNode from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
 
 Sentry.init({
-  dsn: "https://d2546d7792ca6b4416127840aa7ff323@o4506053863079936.ingest.sentry.io/4506061100154880",
-
+  dsn: process.env.SENTRY_DSN,
   enabled: process.env.NODE_ENV === "production",
 
   // Adjust this value in production, or use tracesSampler for greater control

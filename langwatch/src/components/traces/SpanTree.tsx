@@ -1,12 +1,4 @@
-import {
-  Alert,
-  AlertIcon,
-  Box,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import { useEffect, useState } from "react";
@@ -15,20 +7,18 @@ import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import type { ElasticSearchSpan } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import {
+  CheckStatusIcon,
+  evaluationStatusColor,
+} from "../checks/EvaluationStatus";
+import { HoverableBigText } from "../HoverableBigText";
+import { IconWrapper } from "../IconWrapper";
+import { formatEvaluationSingleValue } from "./EvaluationStatusItem";
+import {
   getEvaluationResult,
   SpanDetails,
   SpanDuration,
   SpanTypeTag,
 } from "./SpanDetails";
-import {
-  evaluationStatusColor,
-  CheckStatusIcon,
-} from "../checks/EvaluationStatus";
-import { IconWrapper } from "../IconWrapper";
-import {
-  formatEvaluationSingleValue,
-} from "./EvaluationStatusItem";
-import { HoverableBigText } from "../HoverableBigText";
 
 type SpanWithChildren = ElasticSearchSpan & { children: SpanWithChildren[] };
 
@@ -76,7 +66,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
       children: span.children.slice(0, span.children.length - 1),
     }) + Math.min(span.children.length, 1);
 
-  const lineHeight = `calc(100% - ${childrenInTheMiddleCount * 80}px - 14px)`;
+  const lineHeight = `calc(100% - ${childrenInTheMiddleCount * 76}px - 14px)`;
 
   const evaluationResult =
     span.type === "evaluation" ? getEvaluationResult(span) : undefined;
@@ -84,7 +74,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
   return (
     <VStack
       align="start"
-      spacing={2}
+      gap={2}
       marginLeft={level == 0 ? "0" : level == 1 ? "10px" : "26px"}
       position="relative"
     >
@@ -110,8 +100,8 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
                 borderBottomWidth: "1px",
                 borderBottomLeftRadius: "6px",
                 position: "absolute",
-                top: "-19px",
-                left: "-7px",
+                top: "-20px",
+                left: "-8px",
                 transform: "translateX(-100%)",
               }
             : undefined
@@ -143,7 +133,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
           );
         }}
       >
-        <HStack spacing={4}>
+        <HStack gap={4}>
           <Box
             background="white"
             borderColor={span.error ? "red.400" : "gray.400"}
@@ -161,7 +151,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
             <HoverableBigText
               color={!span.name && !span.model ? "gray.400" : undefined}
               maxWidth="180px"
-              noOfLines={1}
+              lineClamp={1}
               expandable={false}
             >
               {span.name ?? span.model ?? "(unnamed)"}
@@ -176,7 +166,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
               </IconWrapper>
             )}
           </HStack>
-          <HStack fontSize={13} color="gray.500">
+          <HStack fontSize="13px" color="gray.500">
             <SpanDuration span={span} />
             {(span.metrics?.prompt_tokens !== undefined ||
               span.metrics?.completion_tokens !== undefined) && (
@@ -193,7 +183,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
               span.metrics?.cost !== null && (
                 <>
                   <Text>·</Text>
-                  <Text fontSize={13} color="gray.500">
+                  <Text fontSize="13px" color="gray.500">
                     <SpanCost span={span} />
                   </Text>
                 </>
@@ -205,7 +195,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
               <>
                 <Text>·</Text>
                 <Text
-                  fontSize={13}
+                  fontSize="13px"
                   color={evaluationStatusColor(evaluationResult)}
                 >
                   {formatEvaluationSingleValue({
@@ -220,7 +210,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
                 <>
                   <Text>·</Text>
                   <Text
-                    fontSize={13}
+                    fontSize="13px"
                     color={evaluationStatusColor(evaluationResult)}
                   >
                     {evaluationResult.label}
@@ -252,7 +242,7 @@ const TreeRenderer: React.FC<{ spans: ElasticSearchSpan[] }> = ({ spans }) => {
   );
 
   return (
-    <VStack align="start" flexShrink={0} spacing={6}>
+    <VStack align="start" flexShrink={0} gap={6}>
       {rootSpans.map((rootSpan) => {
         const span = tree[rootSpan.span_id];
         if (!span) return null;
@@ -334,17 +324,21 @@ export function SpanTree(props: SpanTreeProps) {
         <HStack
           align="start"
           width="full"
-          spacing={10}
+          gap={10}
           flexDirection={{ base: "column", xl: "row" }}
         >
           <TreeRenderer spans={spans.data} />
           {project && span && <SpanDetails project={project} span={span} />}
         </HStack>
       ) : spans.isError ? (
-        <Alert status="error">
-          <AlertIcon />
-          An error has occurred trying to load the trace spans
-        </Alert>
+        <Alert.Root status="error">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description>
+              An error has occurred trying to load the trace spans
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
       ) : null}
     </VStack>
   );

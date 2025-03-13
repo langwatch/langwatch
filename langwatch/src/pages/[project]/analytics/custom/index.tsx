@@ -1,42 +1,22 @@
 import {
   Accordion,
-  AccordionButton,
-  AccordionIcon,
-  AccordionItem,
-  AccordionPanel,
   Box,
   Button,
   Card,
-  CardBody,
-  CardHeader,
   Center,
   Container,
-  Flex,
-  FormControl,
-  FormLabel,
+  Field,
   Grid,
   HStack,
   Heading,
   Input,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuList,
-  Select,
+  NativeSelect,
   Spacer,
-  Switch,
   Text,
-  VStack,
-  useTheme,
-  useDisclosure,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
   Textarea,
+  VStack,
+  createListCollection,
+  useDisclosure
 } from "@chakra-ui/react";
 
 import {
@@ -44,17 +24,19 @@ import {
   chakraComponents,
   type SingleValue,
 } from "chakra-react-select";
+import { useRouter } from "next/router";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import {
   AlignLeft,
   BarChart2,
   Check,
+  ChevronDown,
   GitBranch,
   MoreVertical,
   PieChart,
   Trash,
   TrendingUp,
-  Triangle,
+  Triangle
 } from "react-feather";
 import {
   Controller,
@@ -67,21 +49,28 @@ import {
   type UseFieldArrayReturn,
 } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
-import { DashboardLayout } from "../../../../components/DashboardLayout";
-import {
-  FilterToggle,
-  useFilterToggle,
-} from "../../../../components/filters/FilterToggle";
-import { FilterSidebar } from "../../../../components/filters/FilterSidebar";
-import {
-  PeriodSelector,
-  usePeriodSelector,
-} from "../../../../components/PeriodSelector";
+import { RenderCode } from "~/components/code/RenderCode";
+import { Dialog } from "~/components/ui/dialog";
+import { Menu } from "~/components/ui/menu";
+import { Select } from "~/components/ui/select";
+import { Switch } from "~/components/ui/switch";
+import { useFilterParams } from "~/hooks/useFilterParams";
 import {
   CustomGraph,
   summaryGraphTypes,
   type CustomGraphInput,
 } from "../../../../components/analytics/CustomGraph";
+import { DashboardLayout } from "../../../../components/DashboardLayout";
+import { FilterSidebar } from "../../../../components/filters/FilterSidebar";
+import {
+  FilterToggle,
+  useFilterToggle,
+} from "../../../../components/filters/FilterToggle";
+import {
+  PeriodSelector,
+  usePeriodSelector,
+} from "../../../../components/PeriodSelector";
+import { getRawColorValue } from "../../../../components/ui/color-mode";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import {
   analyticsGroups,
@@ -96,8 +85,6 @@ import {
 } from "../../../../server/analytics/registry";
 import type {
   AggregationTypes,
-  AnalyticsGroup,
-  AnalyticsMetric,
   PipelineAggregationTypes,
   PipelineFields,
   SharedFiltersInput,
@@ -112,9 +99,6 @@ import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,
 } from "../../../../utils/stringCasing";
-import { useRouter } from "next/router";
-import { useFilterParams } from "~/hooks/useFilterParams";
-import { RenderCode } from "~/components/code/RenderCode";
 
 export interface CustomGraphFormData {
   title?: string;
@@ -305,9 +289,9 @@ export default function AnalyticsCustomGraph({
   return (
     <DashboardLayout>
       <Container maxWidth="1600" padding={6}>
-        <VStack width="full" align="start" spacing={6}>
+        <VStack width="full" align="start" gap={6}>
           <HStack width="full" align="top">
-            <Heading as={"h1"} size="lg" paddingTop={1}>
+            <Heading as="h1" size="lg" paddingTop={1}>
               Custom Graph
             </Heading>
             <Spacer />
@@ -317,66 +301,80 @@ export default function AnalyticsCustomGraph({
               setPeriod={setPeriod}
             />
           </HStack>
-          <HStack width="full" align="start" minHeight="500px" spacing={8}>
-            <Card minWidth="480px" minHeight="560px">
-              <CardBody>
+          <HStack width="full" align="start" gap={8}>
+            <Card.Root minWidth="480px" minHeight="616px">
+              <Card.Body>
                 <CustomGraphForm
                   form={form}
                   seriesFields={seriesFields}
                   customId={customId}
                 />
-              </CardBody>
-            </Card>
-            <Card width="full">
-              <CardHeader paddingTop={3} paddingBottom={1} paddingX={3}>
-                <Flex>
+              </Card.Body>
+            </Card.Root>
+            <Card.Root width="full">
+              <Card.Header paddingTop={3} paddingBottom={1} paddingX={3}>
+                <HStack width="full" justify="space-between">
                   <Input
                     {...form.control.register(`title`)}
                     border="none"
                     paddingX={2}
                     fontWeight="bold"
+                    fontSize="16px"
                   />
-                  <Menu>
-                    <MenuButton as={Button} variant={"ghost"}>
-                      <MoreVertical />
-                    </MenuButton>
-                    <MenuList>
-                      {/* <MenuItem onClick={jsonModal.onOpen}>Show JSON</MenuItem> */}
-                      <MenuItem onClick={apiModal.onOpen}>Show API</MenuItem>
-                    </MenuList>
-                  </Menu>
-                </Flex>
-              </CardHeader>
-              <CardBody>
+                  <Menu.Root>
+                    <Menu.Trigger asChild>
+                      <Button variant="ghost" paddingX={0}>
+                        <MoreVertical />
+                      </Button>
+                    </Menu.Trigger>
+                    <Menu.Content>
+                      <Menu.Item value="api" onClick={apiModal.onOpen}>
+                        Show API
+                      </Menu.Item>
+                    </Menu.Content>
+                  </Menu.Root>
+                </HStack>
+              </Card.Header>
+              <Card.Body>
                 {debouncedCustomGraphInput && (
                   <CustomGraph input={debouncedCustomGraphInput} />
                 )}
-              </CardBody>
-            </Card>
+              </Card.Body>
+            </Card.Root>
             {showFilters && <FilterSidebar hideTopics={true} />}
           </HStack>
         </VStack>
       </Container>
-      <Modal isOpen={jsonModal.isOpen} onClose={jsonModal.onClose} size={"2xl"}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Graph JSON</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
+      <Dialog.Root
+        open={jsonModal.open}
+        onOpenChange={({ open }) => jsonModal.setOpen(open)}
+        size="lg"
+      >
+        <Dialog.Backdrop />
+        <Dialog.Content>
+          <Dialog.Header>
+            <Dialog.Title>Graph JSON</Dialog.Title>
+            <Dialog.CloseTrigger />
+          </Dialog.Header>
+          <Dialog.Body>
             <Textarea rows={16}>
               {JSON.stringify(debouncedCustomGraphInput, null, 2)}
             </Textarea>
-          </ModalBody>
-
-          <ModalFooter></ModalFooter>
-        </ModalContent>
-      </Modal>
-      <Modal isOpen={apiModal.isOpen} onClose={apiModal.onClose} size={"2xl"}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>JSON API</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
+          </Dialog.Body>
+        </Dialog.Content>
+      </Dialog.Root>
+      <Dialog.Root
+        open={apiModal.open}
+        onOpenChange={({ open }) => apiModal.setOpen(open)}
+        size="lg"
+      >
+        <Dialog.Backdrop />
+        <Dialog.Content>
+          <Dialog.Header>
+            <Dialog.Title>JSON API</Dialog.Title>
+            <Dialog.CloseTrigger />
+          </Dialog.Header>
+          <Dialog.Body>
             <Text paddingBottom={8}>
               Incorporate the following JSON payload within the body of your
               HTTP POST request to access identical data tailored for the custom
@@ -398,11 +396,9 @@ EOF`}
                 language="bash"
               />
             </Box>
-          </ModalBody>
-
-          <ModalFooter></ModalFooter>
-        </ModalContent>
-      </Modal>
+          </Dialog.Body>
+        </Dialog.Content>
+      </Dialog.Root>
     </DashboardLayout>
   );
 }
@@ -479,7 +475,7 @@ const customGraphFormToCustomGraphInput = (
     includePrevious: formData.includePrevious,
     timeScale: formData.timeScale,
     connected: formData.connected,
-    height: 550,
+    height: 517,
   };
 };
 
@@ -532,7 +528,7 @@ function CustomGraphForm({
   seriesFields: UseFieldArrayReturn<CustomGraphFormData, "series", "id">;
   customId?: string;
 }) {
-  const [expandedSeries, setExpandedSeries] = useState<number | number[]>([0]);
+  const [expandedSeries, setExpandedSeries] = useState<string[]>(["0"]);
   const groupByField = form.control.register("groupBy");
   const graphType = form.watch("graphType");
   const groupBy = form.watch("groupBy");
@@ -603,49 +599,54 @@ function CustomGraphForm({
   };
 
   return (
-    <VStack width="full" align="start" spacing={4} maxWidth="500px">
-      <FormControl>
-        <FormLabel>Graph Type</FormLabel>
+    <VStack width="full" align="start" gap={4} maxWidth="500px">
+      <Field.Root>
+        <Field.Label>Graph Type</Field.Label>
         <GraphTypeField form={form} />
-      </FormControl>
+      </Field.Root>
       {(!graphType || !summaryGraphTypes.includes(graphType.value)) && (
-        <FormControl>
-          <FormLabel>Time Scale</FormLabel>
-
-          <Select
-            {...form.control.register("timeScale")}
-            minWidth="fit-content"
-          >
-            <option value={"full"}>Full Period</option>
-            <option value={1}>Daily</option>
-            <option value={7}>7 days</option>
-            <option value={30}>30 days</option>
-            <option value={90}>90 days</option>
-            <option value={356}>365 days</option>
-          </Select>
-        </FormControl>
+        <Field.Root>
+          <Field.Label>Time Scale</Field.Label>
+          <Controller
+            control={form.control}
+            name="timeScale"
+            render={({ field }) => (
+              <NativeSelect.Root>
+                <NativeSelect.Field {...field}>
+                  <option value="full">Full Period</option>
+                  <option value="1">Daily</option>
+                  <option value="7">7 days</option>
+                  <option value="30">30 days</option>
+                  <option value="90">90 days</option>
+                  <option value="365">365 days</option>
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
+            )}
+          />
+        </Field.Root>
       )}
       {graphType?.value === "scatter" && (
-        <FormControl>
+        <Field.Root>
           <Controller
             control={form.control}
             name="connected"
             defaultValue={false}
             render={({ field: { onChange, value } }) => (
-              <Switch onChange={onChange} isChecked={value}>
+              <Switch onChange={onChange} checked={value}>
                 Connect dots
               </Switch>
             )}
           />
-        </FormControl>
+        </Field.Root>
       )}
-      <FormControl>
-        <FormLabel fontSize={16}>Series</FormLabel>
-        <Accordion
+      <Field.Root>
+        <Field.Label fontSize="16px">Series</Field.Label>
+        <Accordion.Root
           width="full"
-          allowMultiple={true}
-          index={expandedSeries}
-          onChange={(index) => setExpandedSeries(index)}
+          multiple
+          value={expandedSeries}
+          onValueChange={(change) => setExpandedSeries(change.value)}
         >
           {seriesFields.fields.map((field, index) => (
             <SeriesFieldItem
@@ -657,7 +658,7 @@ function CustomGraphForm({
               setExpandedSeries={setExpandedSeries}
             />
           ))}
-        </Accordion>
+        </Accordion.Root>
         <Button
           onClick={() => {
             const index = seriesFields.fields.length;
@@ -679,7 +680,9 @@ function CustomGraphForm({
                 defaultValue: "Users count",
               });
             }, 0);
-            setExpandedSeries([index]);
+            setTimeout(() => {
+              setExpandedSeries([index.toString()]);
+            }, 100);
             if (!form.getFieldState("includePrevious")?.isTouched) {
               form.setValue("includePrevious", false);
             }
@@ -687,63 +690,49 @@ function CustomGraphForm({
         >
           Add Series
         </Button>
-      </FormControl>
-      <FormControl>
-        <FormLabel>Group by</FormLabel>
-        <Select
-          {...groupByField}
-          onChange={(e) => {
-            if (!form.getFieldState("includePrevious")?.isTouched) {
-              form.setValue("includePrevious", false);
-            }
-
-            void groupByField.onChange(e);
-          }}
-          minWidth="fit-content"
-        >
-          <option value="">No grouping</option>
-          {Object.entries(analyticsGroups).map(([groupParent, metrics]) => (
-            <optgroup
-              key={groupParent}
-              label={camelCaseToTitleCase(groupParent)}
-            >
-              {Object.entries(metrics).map(
-                ([groupKey, group]: [string, AnalyticsGroup]) => (
+      </Field.Root>
+      <Field.Root>
+        <Field.Label>Group by</Field.Label>
+        <NativeSelect.Root>
+          <NativeSelect.Field {...groupByField}>
+            <option value="">No grouping</option>
+            {Object.entries(analyticsGroups).map(([groupParent, metrics]) => (
+              <optgroup
+                key={groupParent}
+                label={camelCaseToTitleCase(groupParent)}
+              >
+                {Object.entries(metrics).map(([groupKey, group]) => (
                   <option key={groupKey} value={`${groupParent}.${groupKey}`}>
                     {group.label}
                   </option>
-                )
-              )}
-            </optgroup>
-          ))}
-        </Select>
-      </FormControl>
+                ))}
+              </optgroup>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+      </Field.Root>
       {(!graphType || !summaryGraphTypes.includes(graphType.value)) && (
-        <FormControl>
+        <Field.Root>
           <Controller
             control={form.control}
             name="includePrevious"
             defaultValue={false}
             render={({ field: { onChange, value } }) => (
-              <Switch
-                onChange={onChange}
-                isChecked={value}
-                colorScheme="orange"
-              >
+              <Switch onChange={onChange} checked={value} colorPalette="orange">
                 Include previous period
               </Switch>
             )}
           />
-        </FormControl>
+        </Field.Root>
       )}
-      <HStack width="full" spacing={2}>
+      <HStack width="full" gap={2}>
         <Spacer />
-
         {customId ? (
           <Button
-            colorScheme="orange"
+            colorPalette="orange"
             onClick={updateGraph}
-            isLoading={updateGraphById.isLoading}
+            loading={updateGraphById.isLoading}
             marginX={2}
             minWidth="fit-content"
           >
@@ -751,8 +740,8 @@ function CustomGraphForm({
           </Button>
         ) : (
           <Button
-            colorScheme="orange"
-            isLoading={addNewGraph.isLoading}
+            colorPalette="orange"
+            loading={addNewGraph.isLoading}
             onClick={() => {
               addGraph();
             }}
@@ -778,13 +767,11 @@ function SeriesFieldItem({
   field: FieldArrayWithId<CustomGraphFormData, "series", "id">;
   index: number;
   seriesFields: UseFieldArrayReturn<CustomGraphFormData, "series", "id">;
-  setExpandedSeries: Dispatch<SetStateAction<number | number[]>>;
+  setExpandedSeries: Dispatch<SetStateAction<string[]>>;
 }) {
-  const theme = useTheme();
   const colorSet = form.watch(`series.${index}.colorSet`);
   const coneColors = rotatingColors[colorSet].map((color, i) => {
-    const [name, number] = color.color.split(".");
-    const color_ = theme.colors[name ?? ""][+(number ?? "")];
+    const color_ = getRawColorValue(color.color);
     const len = rotatingColors[colorSet].length;
 
     return `${color_} ${(i / len) * 100}%, ${color_} ${((i + 1) / len) * 100}%`;
@@ -807,75 +794,77 @@ function SeriesFieldItem({
   }, [form, groupBy, index, seriesLength]);
 
   return (
-    <AccordionItem
+    <Accordion.Item
       key={field.id}
+      value={index.toString()}
       border="1px solid"
       borderColor="gray.200"
       marginBottom={4}
     >
-      <AccordionButton
-        as={Box}
+      <Accordion.ItemTrigger
         cursor="pointer"
         role="button"
         background="gray.100"
         fontWeight="bold"
         paddingLeft={1}
+        paddingRight={3}
       >
-        <HStack width="full" spacing={4}>
-          <HStack width="full" spacing={1}>
-            <Menu>
-              <MenuButton
-                as={Button}
-                variant="unstyled"
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-              >
-                <Center>
-                  <Box
-                    width="32px"
-                    height="32px"
-                    borderRadius="100%"
-                    background={`conic-gradient(from -${
-                      360 / coneColors.length
-                    }deg, ${coneColors.join(", ")})`}
-                  ></Box>
-                </Center>
-              </MenuButton>
-              <MenuList>
+        <HStack width="full" gap={4}>
+          <HStack width="full" gap={1}>
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <Button
+                  variant="plain"
+                  padding={0}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Center>
+                    <Box
+                      width="32px"
+                      height="32px"
+                      borderRadius="100%"
+                      background={`conic-gradient(from -${
+                        360 / coneColors.length
+                      }deg, ${coneColors.join(", ")})`}
+                    />
+                  </Center>
+                </Button>
+              </Menu.Trigger>
+              <Menu.Content>
                 {Object.entries(rotatingColors).map(([key, colorSet]) => (
-                  <MenuItem
+                  <Menu.Item
                     key={key}
+                    value={key}
                     onClick={(e) => {
                       e.stopPropagation();
                       form.setValue(
                         `series.${index}.colorSet`,
                         key as RotatingColorSet,
-                        { shouldTouch: true }
+                        {
+                          shouldTouch: true,
+                        }
                       );
                     }}
                   >
-                    <VStack align="start" spacing={2}>
+                    <VStack align="start" gap={2}>
                       <Text>{camelCaseToTitleCase(key)}</Text>
-                      <HStack spacing={0} paddingLeft="12px">
-                        {colorSet.map((color, i) => {
-                          return (
-                            <Box
-                              key={i}
-                              width="32px"
-                              height="32px"
-                              borderRadius="100%"
-                              backgroundColor={color.color}
-                              marginLeft="-12px"
-                            ></Box>
-                          );
-                        })}
+                      <HStack gap={0} paddingLeft="12px">
+                        {colorSet.map((color, i) => (
+                          <Box
+                            key={i}
+                            width="32px"
+                            height="32px"
+                            borderRadius="100%"
+                            backgroundColor={color.color}
+                            marginLeft="-12px"
+                          />
+                        ))}
                       </HStack>
                     </VStack>
-                  </MenuItem>
+                  </Menu.Item>
                 ))}
-              </MenuList>
-            </Menu>
+              </Menu.Content>
+            </Menu.Root>
             <Input
               {...form.control.register(`series.${index}.name`)}
               border="none"
@@ -883,32 +872,45 @@ function SeriesFieldItem({
               onClick={(e) => {
                 e.stopPropagation();
               }}
+              fontSize="14px"
+              fontWeight="normal"
               onDoubleClick={() => {
                 setExpandedSeries((prev) => {
                   if (Array.isArray(prev)) {
-                    return prev.includes(index)
-                      ? prev.filter((i) => i !== index)
-                      : [...prev, index];
+                    return prev.includes(index.toString())
+                      ? prev.filter((i) => i.toString() !== index.toString())
+                      : [...prev, index.toString()];
                   }
                   return prev;
                 });
               }}
             />
           </HStack>
-          {seriesFields.fields.length > 1 && (
-            <Trash
-              role="button"
-              onClick={() => seriesFields.remove(index)}
-              width={16}
-            />
-          )}
-          <AccordionIcon />
+          <HStack gap={0}>
+            {seriesFields.fields.length > 1 && (
+              <Button
+                variant="plain"
+                padding={0}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  seriesFields.remove(index);
+                }}
+              >
+                <Trash width={16} />
+              </Button>
+            )}
+            <Accordion.ItemIndicator>
+              <ChevronDown />
+            </Accordion.ItemIndicator>
+          </HStack>
         </HStack>
-      </AccordionButton>
-      <AccordionPanel>
-        <SeriesField form={form} index={index} />
-      </AccordionPanel>
-    </AccordionItem>
+      </Accordion.ItemTrigger>
+      <Accordion.ItemContent>
+        <Box padding={3}>
+          <SeriesField form={form} index={index} />
+        </Box>
+      </Accordion.ItemContent>
+    </Accordion.Item>
   );
 }
 
@@ -969,37 +971,36 @@ function SeriesField({
   ]);
 
   return (
-    <VStack align="start" width="full" spacing={4}>
-      <FormControl>
-        <FormLabel>Metric</FormLabel>
+    <VStack align="start" width="full" gap={4}>
+      <Field.Root>
+        <Field.Label>Metric</Field.Label>
         <Grid width="full" gap={3} templateColumns="repeat(4, 1fr)">
-          <Select
-            {...metricField}
-            gridColumn="span 2"
-            onChange={(e) => {
-              const metric_ = getMetric(e.target.value as any);
-              if (!metric_.allowedAggregations.includes(aggregation)) {
-                form.setValue(
-                  `series.${index}.aggregation`,
-                  metric_.allowedAggregations[0]!
-                );
-              }
-
-              void metricField.onChange(e);
-            }}
-          >
-            {Object.entries(analyticsMetrics).map(([group, metrics]) => (
-              <optgroup key={group} label={camelCaseToTitleCase(group)}>
-                {Object.entries(metrics).map(
-                  ([metricKey, metric]: [string, AnalyticsMetric]) => (
+          <NativeSelect.Root gridColumn="span 2">
+            <NativeSelect.Field
+              {...metricField}
+              onChange={(e) => {
+                const metric_ = getMetric(e.target.value as any);
+                if (!metric_.allowedAggregations.includes(aggregation)) {
+                  form.setValue(
+                    `series.${index}.aggregation`,
+                    metric_.allowedAggregations[0]!
+                  );
+                }
+                void metricField.onChange(e);
+              }}
+            >
+              {Object.entries(analyticsMetrics).map(([group, metrics]) => (
+                <optgroup key={group} label={camelCaseToTitleCase(group)}>
+                  {Object.entries(metrics).map(([metricKey, metric]) => (
                     <option key={metricKey} value={`${group}.${metricKey}`}>
                       {metric.label}
                     </option>
-                  )
-                )}
-              </optgroup>
-            ))}
-          </Select>
+                  ))}
+                </optgroup>
+              ))}
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
           {metric_?.requiresKey && (
             <Box gridColumn="span 2">
               <Controller
@@ -1032,47 +1033,53 @@ function SeriesField({
               />
             </Box>
           )}
-          <Select
-            gridColumn="span 1"
-            {...form.control.register(`series.${index}.aggregation`)}
-          >
-            {getMetric(metric).allowedAggregations.map((agg) => (
-              <option key={agg} value={agg}>
-                {metricAggregations[agg]}
-              </option>
-            ))}
-          </Select>
-          <Select
-            gridColumn="span 1"
-            {...form.control.register(`series.${index}.pipeline.field`)}
-          >
-            <option value="">all</option>
-            {Object.entries(analyticsPipelines)
-              .filter(([key, _]) =>
-                metric.includes("trace_id") ? key !== "trace_id" : true
-              )
-              .map(([key, { label }]) => (
+          <NativeSelect.Root gridColumn="span 1">
+            <NativeSelect.Field
+              {...form.control.register(`series.${index}.aggregation`)}
+            >
+              {metric_?.allowedAggregations.map((agg) => (
+                <option key={agg} value={agg}>
+                  {metricAggregations[agg]}
+                </option>
+              ))}
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
+          <NativeSelect.Root gridColumn="span 1">
+            <NativeSelect.Field
+              {...form.control.register(`series.${index}.pipeline.field`)}
+            >
+              <option value="">all</option>
+              {Object.entries(analyticsPipelines)
+                .filter(([key]) =>
+                  metric.includes("trace_id") ? key !== "trace_id" : true
+                )
+                .map(([key, { label }]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
+        </Grid>
+      </Field.Root>
+      {pipelineField && (
+        <Field.Root>
+          <Field.Label>Aggregation</Field.Label>
+          <NativeSelect.Root>
+            <NativeSelect.Field
+              {...form.control.register(`series.${index}.pipeline.aggregation`)}
+            >
+              {Object.entries(pipelineAggregations).map(([key, label]) => (
                 <option key={key} value={key}>
                   {label}
                 </option>
               ))}
-          </Select>
-        </Grid>
-      </FormControl>
-      {pipelineField && (
-        <FormControl>
-          <FormLabel>Aggregation</FormLabel>
-          <Select
-            {...form.control.register(`series.${index}.pipeline.aggregation`)}
-            minWidth="fit-content"
-          >
-            {Object.entries(pipelineAggregations).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </Select>
-        </FormControl>
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
+        </Field.Root>
       )}
     </VStack>
   );
@@ -1143,7 +1150,7 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
       options={options as any}
       value={current}
       isSearchable={true}
-      useBasicStyles
+      // useBasicStyles
       components={{
         Option: ({ ...props }) => {
           let label = props.data.label;
@@ -1161,7 +1168,7 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
                 <Box width="16px">
                   {props.isSelected && <Check width="16px" />}
                 </Box>
-                <VStack align="start" spacing={"2px"}>
+                <VStack align="start" gap={"2px"}>
                   {details && (
                     <Text
                       fontSize="sm"
@@ -1186,41 +1193,57 @@ function GraphTypeField({
 }: {
   form: ReturnType<typeof useForm<CustomGraphFormData>>;
 }) {
+  const graphTypeCollection = createListCollection({
+    items: chartOptions.map((option) => ({
+      label: option.label,
+      value: option.value,
+      icon: option.icon,
+    })),
+  });
+
   return (
     <Controller
       control={form.control}
-      name={`graphType`}
+      name="graphType"
       render={({ field }) => (
-        <MultiSelect
+        <Select.Root
           {...field}
-          options={chartOptions}
-          placeholder="Select Graph Type"
-          isSearchable={false}
-          components={{
-            Option: ({ children, ...props }) => (
-              <chakraComponents.Option {...props}>
-                <HStack spacing={2}>
-                  {props.data.icon}
-                  <Text>{children}</Text>
-                </HStack>
-              </chakraComponents.Option>
-            ),
-            ValueContainer: ({ children, ...props }) => {
-              const { getValue } = props;
-              const value = getValue();
-              const icon = value.length > 0 ? value[0]?.icon : null;
-
-              return (
-                <chakraComponents.ValueContainer {...props}>
-                  <HStack spacing={2}>
-                    {icon}
-                    {children}
-                  </HStack>
-                </chakraComponents.ValueContainer>
-              );
-            },
+          onChange={undefined}
+          collection={graphTypeCollection}
+          value={[field.value!.value]}
+          onValueChange={(change) => {
+            const selectedOption = chartOptions.find(
+              (opt) => opt.value === change.value[0]
+            );
+            field.onChange(selectedOption);
           }}
-        />
+        >
+          <Select.Trigger>
+            <Select.ValueText>
+              {(items) => {
+                if (items.length === 0) {
+                  return <Text>Select graph type</Text>;
+                }
+                return (
+                  <HStack gap={2}>
+                    {items[0].icon}
+                    <Text>{items[0].label}</Text>
+                  </HStack>
+                );
+              }}
+            </Select.ValueText>
+          </Select.Trigger>
+          <Select.Content>
+            {graphTypeCollection.items.map((item) => (
+              <Select.Item key={item.value} item={item}>
+                <HStack gap={2}>
+                  {item.icon}
+                  <Text>{item.label}</Text>
+                </HStack>
+              </Select.Item>
+            ))}
+          </Select.Content>
+        </Select.Root>
       )}
     />
   );

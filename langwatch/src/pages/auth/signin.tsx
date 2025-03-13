@@ -1,31 +1,34 @@
 import {
   Alert,
+  Box,
   Button,
   Card,
-  CardBody,
-  CardHeader,
   Container,
-  HStack,
   Heading,
+  HStack,
   Input,
   Spacer,
   VStack,
-  useToast,
 } from "@chakra-ui/react";
-import { Link } from "@chakra-ui/next-js";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type GetServerSidePropsContext } from "next";
 import { type Session } from "next-auth";
 import { getSession, signIn } from "next-auth/react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
+import { toaster } from "../../components/ui/toaster";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { SignInError } from "./error";
 
 export default function SignIn({ session }: { session: Session | null }) {
+  const query = useSearchParams();
+  const error = query?.get("error");
+
   const publicEnv = usePublicEnv();
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
   const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
@@ -35,17 +38,26 @@ export default function SignIn({ session }: { session: Session | null }) {
       return;
     }
 
-    if (!session && isAuth0) {
-      void signIn("auth0", { callbackUrl });
+    if (error !== "OAuthAccountNotLinked" && !session && isAuth0) {
+      setTimeout(
+        () => {
+          void signIn("auth0", { callbackUrl });
+        },
+        error ? 2000 : 0
+      );
     }
-  }, [publicEnv.data, session, callbackUrl, isAuth0]);
+  }, [publicEnv.data, session, callbackUrl, isAuth0, error]);
+
+  if (error) {
+    return <SignInError error={error} />;
+  }
 
   if (!publicEnv.data) {
     return null;
   }
 
   return isAuth0 ? (
-    <div style={{ padding: "12px" }}>Redirecting to Sign in...</div>
+    <Box padding="12px">Redirecting to Sign in...</Box>
   ) : (
     <SignInForm />
   );
@@ -84,7 +96,6 @@ function SignInForm() {
   });
 
   const [signInLoading, setSignInLoading] = useState(false);
-  const toast = useToast();
 
   const onSubmit = async (values: z.infer<typeof schema>) => {
     try {
@@ -99,69 +110,78 @@ function SignInForm() {
         throw new Error("Network response was not ok");
       }
     } catch (e) {
-      toast({
+      toaster.create({
         title: "Error",
         description: "Failed to sign up",
-        status: "error",
-        duration: 5000,
+        type: "error",
+        placement: "top-end",
+        meta: {
+          closable: true,
+        },
       });
     }
   };
 
   return (
-    <Container maxW="container.md" marginTop="calc(40vh - 164px)">
+    <Container maxW="container.md" paddingTop="calc(40vh - 164px)">
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        <Card>
-          <CardHeader>
-            <HStack spacing={4}>
+        <Card.Root>
+          <Card.Header>
+            <HStack gap={4}>
               <LogoIcon width={30.69} height={42} />
               <Heading size="lg" as="h1">
                 Sign in
               </Heading>
             </HStack>
-          </CardHeader>
-          <CardBody>
+          </Card.Header>
+          <Card.Body>
             <VStack width="full">
               <HorizontalFormControl
                 label="Email"
                 helper="Enter your email"
-                isInvalid={form.formState.errors.email?.message !== undefined}
+                invalid={form.formState.errors.email?.message !== undefined}
               >
                 <Input type="email" {...form.register("email")} />
               </HorizontalFormControl>
               <HorizontalFormControl
                 label="Password"
                 helper="Enter your password"
-                isInvalid={
-                  form.formState.errors.password?.message !== undefined
-                }
+                invalid={form.formState.errors.password?.message !== undefined}
               >
                 <Input type="password" {...form.register("password")} />
               </HorizontalFormControl>
               {error && (
-                <Alert status="error">
-                  {error === "CredentialsSignin"
-                    ? "Invalid email or password"
-                    : error}
-                </Alert>
+                <Alert.Root status="error">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    {error === "CredentialsSignin"
+                      ? "Invalid email or password"
+                      : error}
+                  </Alert.Content>
+                </Alert.Root>
               )}
               <HStack width="full" paddingTop={4}>
-                <Link href="/auth/signup" textDecoration="underline">
-                  Register new account
-                </Link>
+                <Box asChild>
+                  <Link
+                    href="/auth/signup"
+                    style={{ textDecoration: "underline" }}
+                  >
+                    Register new account
+                  </Link>
+                </Box>
                 <Spacer />
                 <Button
-                  colorScheme="orange"
+                  colorPalette="orange"
                   type="submit"
-                  isLoading={signInLoading}
+                  loading={signInLoading}
                 >
                   Sign in
                 </Button>
               </HStack>
             </VStack>
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
       </form>
     </Container>
   );

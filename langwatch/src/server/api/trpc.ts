@@ -15,13 +15,14 @@ import {
   type Simplify,
 } from "@trpc/server";
 import { type CreateNextContextOptions } from "@trpc/server/adapters/next";
-import type { inferParser, Parser } from "@trpc/server/dist/core/parser";
+import type { inferParser } from "@trpc/server";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { type Session } from "next-auth";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
-import type { UnsetMarker } from "@trpc/server/dist/core/internals/utils";
+import type { Parser } from "@trpc-internal/parser";
+import type { UnsetMarker } from "@trpc-internal/utils";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { type PermissionMiddleware } from "./permission";

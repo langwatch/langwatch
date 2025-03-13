@@ -1503,7 +1503,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.1.39"
+version = "0.1.42"
 source = { editable = "../python-sdk" }
 dependencies = [
     { name = "coolname" },

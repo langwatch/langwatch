@@ -31,7 +31,9 @@ export const auditLog = async ({
       organizationId,
       projectId,
       action,
-      args: args ? safeTruncate(args, 4 * 1024) : undefined,
+      args: args
+        ? safeTruncate(JSON.parse(JSON.stringify(args)), 4 * 1024)
+        : undefined,
       error: error?.toString(),
       ipAddress,
       userAgent,

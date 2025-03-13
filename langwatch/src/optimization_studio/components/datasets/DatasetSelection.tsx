@@ -1,23 +1,10 @@
-import { DeleteIcon } from "@chakra-ui/icons";
-import {
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuList,
-  Text,
-  useToast,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { type Node, type NodeProps } from "@xyflow/react";
 import { useEffect, useState, useTransition } from "react";
-import { MoreHorizontal, Plus } from "react-feather";
+import { MoreHorizontal, Plus, Trash2 } from "react-feather";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
 import { DEFAULT_DATASET_NAME } from "../../../components/datasets/DatasetTable";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
@@ -26,6 +13,8 @@ import { api } from "../../../utils/api";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import type { Component, Entry } from "../../types/dsl";
 import { useDrawer } from "../../../components/CurrentDrawer";
+import { Menu } from "../../../components/ui/menu";
+import { toaster } from "../../../components/ui/toaster";
 
 export function DatasetSelection({
   node,
@@ -44,9 +33,9 @@ export function DatasetSelection({
   const { openDrawer } = useDrawer();
 
   return (
-    <VStack align="start" spacing={12}>
-      <VStack align="start" spacing={4}>
-        <HStack spacing={6}>
+    <VStack align="start" gap={12}>
+      <VStack align="start" gap={4}>
+        <HStack gap={6}>
           <Heading size="md">Current Dataset</Heading>
           <Button
             size="sm"
@@ -71,9 +60,8 @@ export function DatasetSelection({
                 },
               });
             }}
-            leftIcon={<Plus size={14} />}
           >
-            New dataset
+            <Plus size={14} /> New dataset
           </Button>
         </HStack>
         <DatasetSelectionItem
@@ -84,9 +72,9 @@ export function DatasetSelection({
           }}
         />
       </VStack>
-      <VStack align="start" spacing={4}>
+      <VStack align="start" gap={4}>
         <Heading size="md">Datasets</Heading>
-        <HStack spacing={4} wrap="wrap">
+        <HStack gap={4} wrap="wrap">
           {datasets.data?.map((storedDataset) => {
             const dataset = {
               id: storedDataset.id,
@@ -141,7 +129,6 @@ export function DatasetSelectionItem({
   }, []);
 
   const { project } = useOrganizationTeamProject();
-  const toast = useToast();
   const datasetDelete = api.dataset.deleteById.useMutation();
 
   const deleteDataset = (id: string, name: string) => {
@@ -150,16 +137,18 @@ export function DatasetSelectionItem({
       {
         onSuccess: () => {
           void query.refetch();
-          toast({
+          toaster.create({
             title: `Dataset ${name} deleted`,
             description: (
               <HStack>
                 <Button
-                  colorScheme="white"
-                  variant="link"
+                  colorPalette="white"
+                  variant="plain"
+                  paddingX={0}
+                  color="white"
                   textDecoration="underline"
                   onClick={() => {
-                    toast.close(`delete-dataset-${id}`);
+                    toaster.remove(`delete-dataset-${id}`);
                     setTimeout(() => {
                       void query.refetch();
                     }, 1000);
@@ -172,13 +161,15 @@ export function DatasetSelectionItem({
                       {
                         onSuccess: () => {
                           void query.refetch();
-                          toast({
+                          toaster.create({
                             title: "Dataset restored",
                             description: "The dataset has been restored.",
-                            status: "success",
+                            type: "success",
+                            meta: {
+                              closable: true,
+                            },
+                            placement: "top-end",
                             duration: 5000,
-                            isClosable: true,
-                            position: "top-right",
                           });
                         },
                       }
@@ -190,21 +181,25 @@ export function DatasetSelectionItem({
               </HStack>
             ),
             id: `delete-dataset-${id}`,
-            status: "success",
-            duration: 10_000,
-            isClosable: true,
-            position: "top-right",
+            type: "success",
+            duration: 10000,
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
         },
         onError: () => {
-          toast({
+          toaster.create({
             title: "Failed to delete dataset",
             description:
               "There was an error deleting the dataset. Please try again.",
-            status: "error",
+            type: "error",
             duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
         },
       }
@@ -224,36 +219,40 @@ export function DatasetSelectionItem({
     >
       {dataset?.id && (
         <Box position="absolute" top={0} right={0} zIndex={11}>
-          <Menu>
-            <MenuButton
-              as={Button}
-              paddingX={1}
-              paddingY={1}
-              minHeight="0"
-              height="auto"
-              minWidth="0"
-              // variant={"ghost"}
-              color="gray.400"
-              onClick={(event) => {
-                event.stopPropagation();
-              }}
-            >
-              <MoreHorizontal />
-            </MenuButton>
-            <MenuList>
-              <MenuItem
-                color="red.600"
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button
+                paddingX={1}
+                paddingY={1}
+                minHeight="0"
+                height="auto"
+                minWidth="0"
+                color="gray.400"
+                colorPalette="gray"
+                rounded="md"
                 onClick={(event) => {
                   event.stopPropagation();
-
+                }}
+                _hover={{
+                  backgroundColor: "gray.200",
+                }}
+              >
+                <MoreHorizontal />
+              </Button>
+            </Menu.Trigger>
+            <Menu.Content zIndex="popover">
+              <Menu.Item
+                value="delete"
+                css={{ color: "var(--chakra-colors-red-600)" }}
+                onClick={(event) => {
+                  event.stopPropagation();
                   deleteDataset(dataset?.id ?? "", dataset?.name ?? "");
                 }}
-                icon={<DeleteIcon />}
               >
-                Delete dataset
-              </MenuItem>
-            </MenuList>
-          </Menu>
+                <Trash2 size={14} /> Delete dataset
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Root>
         </Box>
       )}
       <Box

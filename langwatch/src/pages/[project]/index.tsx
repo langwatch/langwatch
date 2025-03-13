@@ -1,19 +1,10 @@
-import { Link } from "@chakra-ui/next-js";
+import { Link } from "../../components/ui/link";
 import {
   Alert,
-  AlertDescription,
-  AlertIcon,
-  AlertTitle,
   Box,
   Card,
-  CardBody,
   HStack,
   Heading,
-  Tab,
-  TabIndicator,
-  TabList,
-  TabPanel,
-  TabPanels,
   Tabs,
   Text,
   VStack,
@@ -31,8 +22,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { dependencies } from "../../injection/dependencies.client";
 import { dependencies as serverDependencies } from "../../injection/dependencies.server";
 import { api } from "../../utils/api";
-
-import GraphsLayout from "~/components/GraphsLayout";
+import GraphsLayout from "../../components/GraphsLayout";
 import { AnalyticsHeader } from "../../components/analytics/AnalyticsHeader";
 import { LLMMetrics } from "../../components/LLMMetrics";
 
@@ -85,30 +75,25 @@ function Index() {
   return (
     <GraphsLayout>
       {project && !project.firstMessage && (
-        <Alert status="warning" variant="left-accent" marginBottom={6}>
-          <AlertIcon alignSelf="start" />
-          <VStack align="start">
-            <AlertTitle>Setup pending</AlertTitle>
-            <AlertDescription>
+        <Alert.Root status="warning" marginBottom={6}>
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Setup pending</Alert.Title>
+            <Alert.Description>
               <Text as="span">
                 {
                   "Your project is not set up yet so you won't be able to see any data on the dashboard, please go to the "
                 }
               </Text>
-              <Link
-                textDecoration="underline"
-                href={`/${project.slug}/messages`}
-              >
-                setup
-              </Link>
+              <Link href={`/${project.slug}/messages`}>setup</Link>
               <Text as="span"> page to get started.</Text>
-            </AlertDescription>
-          </VStack>
-        </Alert>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
       )}
       <AnalyticsHeader title="Analytics" />
 
-      <HStack align="start" width="full" spacing={8}>
+      <HStack align="start" width="full" gap={8}>
         <VStack align="start" width="full">
           <UserMetrics />
           <LLMMetrics />
@@ -136,37 +121,39 @@ function DocumentsMetrics() {
   return (
     <>
       <HStack width="full" align="top">
-        <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={10}>
+        <Heading as="h1" size="lg" paddingTop={6} paddingBottom={2}>
           Documents
         </Heading>
       </HStack>
-      <Card>
-        <CardBody>
-          <Tabs variant="unstyled">
-            <TabList gap={12}>
-              <Tab paddingX={0} paddingBottom={4}>
+      <Card.Root width="full">
+        <Card.Body>
+          <Tabs.Root variant="plain" defaultValue="total-documents">
+            <Tabs.List gap={12}>
+              <Tabs.Trigger
+                value="total-documents"
+                paddingX={0}
+                paddingBottom={4}
+              >
                 <VStack align="start">
                   <Text color="black">Total documents</Text>
-                  <Box fontSize={24} color="black" fontWeight="bold">
+                  <Box fontSize="24px" color="black" fontWeight="bold">
                     <DocumentsCountsSummary />
                   </Box>
                 </VStack>
-              </Tab>
-            </TabList>
-            <TabIndicator
+              </Tabs.Trigger>
+            </Tabs.List>
+            <Tabs.Indicator
               mt="-1.5px"
               height="4px"
               bg="orange.400"
               borderRadius="1px"
             />
-            <TabPanels>
-              <TabPanel paddingX={0}>
-                <DocumentsCountsTable />
-              </TabPanel>
-            </TabPanels>
-          </Tabs>
-        </CardBody>
-      </Card>
+            <Tabs.Content value="total-documents">
+              <DocumentsCountsTable />
+            </Tabs.Content>
+          </Tabs.Root>
+        </Card.Body>
+      </Card.Root>
     </>
   );
 }

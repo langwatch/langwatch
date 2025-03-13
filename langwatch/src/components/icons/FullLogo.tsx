@@ -1,9 +1,15 @@
-export function FullLogo() {
+export function FullLogo({
+  width = 213,
+  height = 52,
+}: {
+  width?: number | string;
+  height?: number | string;
+}) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="213"
-      height="52"
+      width={width}
+      height={height}
       fill="none"
       viewBox="0 0 213 52"
     >

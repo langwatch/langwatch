@@ -135,9 +135,9 @@ export function useDrawer() {
     );
   };
 
-  const isDrawerOpen = (drawer: keyof typeof drawers) => {
+  const drawerOpen = (drawer: keyof typeof drawers) => {
     return router.query["drawer.open"] === drawer;
   };
 
-  return { openDrawer, closeDrawer, isDrawerOpen };
+  return { openDrawer, closeDrawer, drawerOpen };
 }

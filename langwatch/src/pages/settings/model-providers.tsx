@@ -1,25 +1,19 @@
 import {
   Alert,
-  AlertIcon,
   Box,
   Button,
   Card,
-  CardBody,
-  Checkbox,
-  FormControl,
-  FormErrorMessage,
+  Field,
   Grid,
   GridItem,
-  HStack,
   Heading,
+  HStack,
   Input,
   Skeleton,
   Spacer,
   Spinner,
-  Switch,
   Text,
   VStack,
-  useToast,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useCallback } from "react";
@@ -44,6 +38,9 @@ import { allowedTopicClusteringModels } from "../../server/topicClustering/types
 import { api } from "../../utils/api";
 
 import CreatableSelect from "react-select/creatable";
+import { Checkbox } from "../../components/ui/checkbox";
+import { Switch } from "../../components/ui/switch";
+import { toaster } from "../../components/ui/toaster";
 import {
   DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
@@ -60,7 +57,7 @@ export default function ModelsPage() {
   return (
     <SettingsLayout>
       <VStack
-        spacing={6}
+        gap={6}
         width="full"
         maxWidth="920px"
         align="start"
@@ -84,9 +81,9 @@ export default function ModelsPage() {
           project. <br />
           You can also use your own API keys.
         </Text>
-        <Card width="full">
-          <CardBody width="full" paddingY={4}>
-            <VStack spacing={0} width="full">
+        <Card.Root width="full">
+          <Card.Body width="full" paddingY={4}>
+            <VStack gap={0} width="full">
               {modelProviders.isLoading &&
                 Array.from({
                   length: Object.keys(modelProvidersRegistry).length,
@@ -111,8 +108,8 @@ export default function ModelsPage() {
                   />
                 ))}
             </VStack>
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
         <TopicClusteringModel />
         <EmbeddingsModel />
       </VStack>
@@ -221,8 +218,6 @@ function ModelProviderForm({
       },
     });
 
-  const toast = useToast();
-
   const onSubmit = useCallback(
     async (data: ModelProviderForm) => {
       await localUpdateMutation.mutateAsync({
@@ -236,29 +231,25 @@ function ModelProviderForm({
           (m) => m.value
         ),
       });
-      toast({
+      toaster.create({
         title: "API Keys Updated",
-        status: "success",
+        type: "success",
         duration: 3000,
-        isClosable: true,
+        meta: {
+          closable: true,
+        },
       });
       await refetch();
     },
-    [
-      localUpdateMutation,
-      provider.id,
-      provider.provider,
-      project?.id,
-      toast,
-      refetch,
-    ]
+    [localUpdateMutation, provider.id, provider.provider, project?.id, refetch]
   );
 
   const enabledField = register("enabled");
   const isEnabled = watch("enabled");
+
   const onEnableDisable = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      void enabledField.onChange(e);
+      setValue("enabled", e.target.checked);
       await updateMutation.mutateAsync({
         id: provider.id,
         projectId: project?.id ?? "",
@@ -291,9 +282,12 @@ function ModelProviderForm({
   );
 
   const useCustomKeysField = register("useCustomKeys");
+  const isUseCustomKeys = watch("useCustomKeys");
+
   const onUseCustomKeysChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      await useCustomKeysField.onChange(e);
+      console.log("e.target.checked", e.target.checked);
+      setValue("useCustomKeys", e.target.checked);
       if (!e.target.checked) {
         await deleteMutation.mutateAsync({
           id: provider.id ?? "",
@@ -312,11 +306,7 @@ function ModelProviderForm({
       }
       setValue(
         "customModels",
-        getStoredModelOptions(
-          provider.models ?? [],
-          provider.provider,
-          "chat"
-        )
+        getStoredModelOptions(provider.models ?? [], provider.provider, "chat")
       );
       setValue(
         "customEmbeddingsModels",
@@ -373,29 +363,32 @@ function ModelProviderForm({
           }
           helper={""}
         >
-          <VStack align="start" width="full" spacing={4} paddingRight={4}>
-            <HStack spacing={6}>
-              <Switch
-                {...enabledField}
-                // eslint-disable-next-line @typescript-eslint/no-misused-promises
-                onChange={onEnableDisable}
-                isChecked={isEnabled}
-              >
-                Enabled
-              </Switch>
-              <Checkbox
-                {...useCustomKeysField}
-                // eslint-disable-next-line @typescript-eslint/no-misused-promises
-                onChange={onUseCustomKeysChange}
-                isChecked={useCustomKeys}
-              >
-                Use custom settings
-              </Checkbox>
+          <VStack align="start" width="full" gap={4} paddingRight={4}>
+            <HStack gap={6}>
+              <Field.Root>
+                <Switch
+                  // eslint-disable-next-line @typescript-eslint/no-misused-promises
+                  onChange={onEnableDisable}
+                  checked={isEnabled}
+                >
+                  Enabled
+                </Switch>
+              </Field.Root>
+              <Field.Root>
+                <Checkbox
+                  onChange={onUseCustomKeysChange}
+                  checked={isUseCustomKeys}
+                  flexShrink={0}
+                  whiteSpace="nowrap"
+                >
+                  Use custom settings
+                </Checkbox>
+              </Field.Root>
             </HStack>
 
             {useCustomKeys && (
               <>
-                <FormControl isInvalid={!!formState.errors.customKeys}>
+                <Field.Root invalid={!!formState.errors.customKeys}>
                   <Grid
                     templateColumns="auto auto"
                     gap={4}
@@ -424,19 +417,18 @@ function ModelProviderForm({
                                 ? "optional"
                                 : undefined
                             }
-                            isInvalid={!!formState.errors.customKeys?.[key]}
                           />
                         </GridItem>
                       </React.Fragment>
                     ))}
                   </Grid>
-                  <FormErrorMessage>
+                  <Field.ErrorText>
                     {formState.errors.customKeys?.root?.message}
-                  </FormErrorMessage>
-                </FormControl>
+                  </Field.ErrorText>
+                </Field.Root>
 
-                <VStack width="full" spacing={4}>
-                  <Box width="full">
+                <VStack width="full" gap={4}>
+                  <Box width="full" maxWidth="408px">
                     <SmallLabel>Models</SmallLabel>
                     <Controller
                       name="customModels"
@@ -486,18 +478,20 @@ function ModelProviderForm({
                   <Button
                     type="submit"
                     size="sm"
-                    colorScheme="orange"
-                    isLoading={localUpdateMutation.isLoading}
+                    colorPalette="orange"
+                    loading={localUpdateMutation.isLoading}
                   >
                     Save
                   </Button>
                 </HStack>
                 {provider.provider === "custom" && (
-                  <Alert status="info">
-                    <AlertIcon />
-                    Custom provider supports only OpenAI compatible endpoints,
-                    contact support if you have a custom format.
-                  </Alert>
+                  <Alert.Root status="info">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      Custom provider supports only OpenAI compatible endpoints,
+                      contact support if you have a custom format.
+                    </Alert.Content>
+                  </Alert.Root>
                 )}
               </>
             )}
@@ -555,8 +549,8 @@ function TopicClusteringModel() {
         Select which model will be used to generate the topic names based on the
         messages
       </Text>
-      <Card width="full">
-        <CardBody width="full">
+      <Card.Root width="full">
+        <Card.Body width="full">
           <HorizontalFormControl label="Topic Clustering Model" helper="">
             <Controller
               name={topicClusteringModelField.name}
@@ -575,8 +569,8 @@ function TopicClusteringModel() {
               )}
             />
           </HorizontalFormControl>
-        </CardBody>
-      </Card>
+        </Card.Body>
+      </Card.Root>
     </>
   );
 }
@@ -615,8 +609,8 @@ function EmbeddingsModel() {
       <Text>
         Select which model will be used to generate embeddings for the messages
       </Text>
-      <Card width="full">
-        <CardBody width="full">
+      <Card.Root width="full">
+        <Card.Body width="full">
           <HorizontalFormControl label="Embeddings Model" helper="">
             <Controller
               name={embeddingsModelField.name}
@@ -637,8 +631,8 @@ function EmbeddingsModel() {
               )}
             />
           </HorizontalFormControl>
-        </CardBody>
-      </Card>
+        </Card.Body>
+      </Card.Root>
     </>
   );
 }

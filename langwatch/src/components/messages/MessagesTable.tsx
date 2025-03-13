@@ -1,52 +1,28 @@
 import {
-  ArrowUpDownIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  DownloadIcon,
-} from "@chakra-ui/icons";
-import {
+  Badge,
   Box,
   Button,
   Card,
-  CardBody,
-  Checkbox,
   Container,
   HStack,
   Heading,
-  Popover,
-  PopoverArrow,
-  PopoverBody,
-  PopoverCloseButton,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTrigger,
+  Icon,
   Progress,
-  Select,
   Skeleton,
   Spacer,
   Table,
-  TableContainer,
   Tag,
-  TagLabel,
-  TagLeftIcon,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
-  Tooltip,
-  Tr,
   VStack,
   useDisclosure,
-  useToast,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
+  ChevronUp,
+  Download,
   Edit,
   List,
   RefreshCw,
@@ -61,47 +37,61 @@ import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import { useFilterParams } from "../../hooks/useFilterParams";
 
 import Parse from "papaparse";
+import { LuChevronsUpDown } from "react-icons/lu";
 import { useLocalStorage } from "usehooks-ts";
+import { getColorForString } from "../../utils/rotatingColors";
 import { titleCase } from "../../utils/stringCasing";
 import { useDrawer } from "../CurrentDrawer";
+import { Delayed } from "../Delayed";
+import { HoverableBigText } from "../HoverableBigText";
+import { OverflownTextWithTooltip } from "../OverflownText";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { evaluationStatusColor } from "../checks/EvaluationStatus";
 import { FilterSidebar } from "../filters/FilterSidebar";
-import { FilterToggle } from "../filters/FilterToggle";
+import { FilterToggle, useFilterToggle } from "../filters/FilterToggle";
 import { formatEvaluationSingleValue } from "../traces/EvaluationStatusItem";
+import { Checkbox } from "../ui/checkbox";
+import { Popover } from "../ui/popover";
+import { toaster } from "../ui/toaster";
+import { Tooltip } from "../ui/tooltip";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import type { TraceWithGuardrail } from "./MessageCard";
-import { HoverableBigText } from "../HoverableBigText";
-import { getColorForString } from "../../utils/rotatingColors";
-import { Delayed } from "../Delayed";
+import {
+  MessagesNavigationFooter,
+  useMessagesNavigationFooter,
+} from "./MessagesNavigationFooter";
 
 export function MessagesTable() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
-  const [totalHits, setTotalHits] = useState<number>(0);
-  const [pageOffset, setPageOffset] = useState<number>(0);
-  const [pageSize, setPageSize] = useState<number>(25);
+
   const { filterParams, queryOpts } = useFilterParams();
   const [selectedTraceIds, setSelectedTraceIds] = useState<string[]>([]);
+
+  const { showFilters } = useFilterToggle();
 
   const {
     period: { startDate, endDate },
     setPeriod,
   } = usePeriodSelector();
 
+  const navigationFooter = useMessagesNavigationFooter();
+
   const traceGroups = api.traces.getAllForProject.useQuery(
     {
       ...filterParams,
       query: getSingleQueryParam(router.query.query),
       groupBy: "none",
-      pageOffset: pageOffset,
-      pageSize: pageSize,
+      pageOffset: navigationFooter.pageOffset,
+      pageSize: navigationFooter.pageSize,
       sortBy: getSingleQueryParam(router.query.sortBy),
       sortDirection: getSingleQueryParam(router.query.orderBy),
     },
     queryOpts
   );
+
+  navigationFooter.useUpdateTotalHits(traceGroups);
 
   const topics = api.topics.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -163,7 +153,7 @@ export function MessagesTable() {
     return (
       <Box position="relative">
         <Tooltip
-          label={`${annotations?.length} ${
+          content={`${annotations?.length} ${
             annotations?.length === 1 ? "annotation" : "annotations"
           }`}
         >
@@ -173,7 +163,7 @@ export function MessagesTable() {
             onClick={() =>
               openDrawer("traceDetails", {
                 traceId: traceId,
-                selectedTab: "annotations",
+                selectedTab: "messages",
               })
             }
           >
@@ -245,7 +235,7 @@ export function MessagesTable() {
         const evaluator = getEvaluatorDefinitions(traceCheck?.type ?? "");
 
         return (
-          <Td
+          <Table.Cell
             key={index}
             onClick={() =>
               openDrawer("traceDetails", {
@@ -253,7 +243,7 @@ export function MessagesTable() {
               })
             }
           >
-            <Tooltip label={traceCheck?.details}>
+            <Tooltip content={traceCheck?.details}>
               {traceCheck?.status === "processed" ? (
                 <Text color={evaluationStatusColor(traceCheck)}>
                   {evaluator?.isGuardrail
@@ -270,7 +260,7 @@ export function MessagesTable() {
                 </Text>
               )}
             </Tooltip>
-          </Td>
+          </Table.Cell>
         );
       },
       value: (_trace: Trace, evaluations: ElasticSearchEvaluation[]) => {
@@ -297,28 +287,29 @@ export function MessagesTable() {
       sortable: false,
       render: (trace, index) => {
         return (
-          <Td
+          <Table.Cell
             key={index}
             textAlign="right"
             position="sticky"
             left={0}
-            background="white"
             transition="box-shadow 0.3s ease-in-out"
             boxShadow={
               scrollXPosition > 0
                 ? "0 2px 5px rgba(0, 0, 0, 0.1)"
                 : "0 0 0 rgba(0, 0, 0, 0)"
             }
+            paddingX={4}
+            background="white"
           >
             <HStack>
               <Checkbox
-                colorScheme="blue"
-                isChecked={selectedTraceIds.includes(trace.trace_id)}
-                onChange={() => traceSelection(trace.trace_id)}
+                colorPalette="blue"
+                checked={selectedTraceIds.includes(trace.trace_id)}
+                onCheckedChange={() => traceSelection(trace.trace_id)}
               />
               {annotationCount(trace.trace_id)}
             </HStack>
-          </Td>
+          </Table.Cell>
         );
       },
       value: () => "",
@@ -328,7 +319,7 @@ export function MessagesTable() {
       sortable: true,
       width: 100,
       render: (trace: Trace, index: number) => (
-        <Td
+        <Table.Cell
           key={index}
           onClick={() =>
             openDrawer("traceDetails", {
@@ -337,12 +328,8 @@ export function MessagesTable() {
           }
           maxWidth="150px"
         >
-          <Tooltip label={trace.trace_id ?? ""}>
-            <Text noOfLines={1} display="block">
-              {trace.trace_id}
-            </Text>
-          </Tooltip>
-        </Td>
+          <OverflownTextWithTooltip>{trace.trace_id}</OverflownTextWithTooltip>
+        </Table.Cell>
       ),
       value: (trace: Trace) => trace.trace_id,
     },
@@ -351,7 +338,7 @@ export function MessagesTable() {
       sortable: true,
       width: 160,
       render: (trace: Trace, index: number) => (
-        <Td
+        <Table.Cell
           key={index}
           onClick={() =>
             openDrawer("traceDetails", {
@@ -360,7 +347,7 @@ export function MessagesTable() {
           }
         >
           {new Date(trace.timestamps.started_at).toLocaleString()}
-        </Td>
+        </Table.Cell>
       ),
       value: (trace: Trace) =>
         new Date(trace.timestamps.started_at).toISOString(),
@@ -370,7 +357,7 @@ export function MessagesTable() {
       sortable: false,
       width: 300,
       render: (trace, index) => (
-        <Td
+        <Table.Cell
           key={index}
           maxWidth="300px"
           onClick={() =>
@@ -379,12 +366,16 @@ export function MessagesTable() {
             })
           }
         >
-          <Tooltip label={trace.input?.value ?? ""}>
-            <Text noOfLines={1} wordBreak="break-all" display="block">
+          <Tooltip
+            content={
+              <Box whiteSpace="pre-wrap">{trace.input?.value ?? ""}</Box>
+            }
+          >
+            <Text truncate display="block">
               {trace.input?.value ? trace.input?.value : "<empty>"}
             </Text>
           </Tooltip>
-        </Td>
+        </Table.Cell>
       ),
       value: (trace: Trace) => trace.input?.value ?? "",
     },
@@ -394,7 +385,7 @@ export function MessagesTable() {
       width: 300,
       render: (trace, index) =>
         trace.error && !trace.output?.value ? (
-          <Td
+          <Table.Cell
             key={index}
             onClick={() =>
               openDrawer("traceDetails", {
@@ -402,17 +393,12 @@ export function MessagesTable() {
               })
             }
           >
-            <Text
-              noOfLines={1}
-              maxWidth="300px"
-              display="block"
-              color="red.400"
-            >
+            <OverflownTextWithTooltip color="red.400">
               {trace.error.message}
-            </Text>
-          </Td>
+            </OverflownTextWithTooltip>
+          </Table.Cell>
         ) : (
-          <Td
+          <Table.Cell
             key={index}
             onClick={() =>
               openDrawer("traceDetails", {
@@ -421,30 +407,32 @@ export function MessagesTable() {
             }
           >
             <Tooltip
-              label={
-                trace.output?.value
-                  ? trace.output?.value
-                  : trace.lastGuardrail
-                  ? [trace.lastGuardrail.name, trace.lastGuardrail.details]
-                      .filter((x) => x)
-                      .join(": ")
-                  : undefined
+              content={
+                <Box whiteSpace="pre-wrap">
+                  {trace.output?.value
+                    ? trace.output?.value
+                    : trace.lastGuardrail
+                    ? [trace.lastGuardrail.name, trace.lastGuardrail.details]
+                        .filter((x) => x)
+                        .join(": ")
+                    : undefined}
+                </Box>
               }
             >
               {trace.lastGuardrail ? (
-                <Tag colorScheme="blue" paddingLeft={2}>
-                  <TagLeftIcon boxSize="16px" as={Shield} />
-                  <TagLabel>Blocked by Guardrail</TagLabel>
-                </Tag>
+                <Tag.Root colorPalette="blue" paddingLeft={2}>
+                  <Shield size={16} />
+                  <Tag.Label>Blocked by Guardrail</Tag.Label>
+                </Tag.Root>
               ) : trace.output?.value ? (
-                <Text noOfLines={1} display="block" maxWidth="300px">
+                <Box lineClamp={1} maxWidth="300px">
                   {trace.output?.value}
-                </Text>
+                </Box>
               ) : (
-                <Text>{"<empty>"}</Text>
+                <Box>{"<empty>"}</Box>
               )}
             </Tooltip>
-          </Td>
+          </Table.Cell>
         ),
       value: (trace: Trace) => trace.output?.value ?? "",
     },
@@ -452,22 +440,22 @@ export function MessagesTable() {
       name: "Labels",
       sortable: true,
       render: (trace, index) => (
-        <Td key={index}>
-          <HStack spacing={1}>
+        <Table.Cell key={index}>
+          <HStack gap={1}>
             {(trace.metadata.labels ?? []).map((label) => (
-              <Tag
+              <Badge
                 key={label}
                 size="sm"
                 paddingX={2}
                 background={getColorForString("colors", label).background}
                 color={getColorForString("colors", label).color}
-                fontSize={12}
+                fontSize="12px"
               >
                 {label}
-              </Tag>
+              </Badge>
             ))}
           </HStack>
-        </Td>
+        </Table.Cell>
       ),
       value: (trace: Trace) => trace.metadata?.labels?.join(", ") ?? "",
     },
@@ -475,9 +463,8 @@ export function MessagesTable() {
       name: "First Token",
       sortable: true,
       render: (trace, index) => (
-        <Td
+        <Table.Cell
           key={index}
-          isNumeric
           onClick={() =>
             openDrawer("traceDetails", {
               traceId: trace.trace_id,
@@ -492,7 +479,7 @@ export function MessagesTable() {
                 "s"
               : "-"}
           </Text>
-        </Td>
+        </Table.Cell>
       ),
       value: (trace: Trace) => {
         return trace.metrics?.first_token_ms
@@ -504,9 +491,8 @@ export function MessagesTable() {
       name: "Completion Time",
       sortable: true,
       render: (trace, index) => (
-        <Td
+        <Table.Cell
           key={index}
-          isNumeric
           onClick={() =>
             openDrawer("traceDetails", {
               traceId: trace.trace_id,
@@ -521,7 +507,7 @@ export function MessagesTable() {
                 "s"
               : "-"}
           </Text>
-        </Td>
+        </Table.Cell>
       ),
       value: (trace: Trace) => {
         return trace.metrics?.total_time_ms
@@ -533,9 +519,8 @@ export function MessagesTable() {
       name: "Completion Token",
       sortable: true,
       render: (trace, index) => (
-        <Td
+        <Table.Cell
           key={index}
-          isNumeric
           onClick={() =>
             openDrawer("traceDetails", {
               traceId: trace.trace_id,
@@ -543,7 +528,7 @@ export function MessagesTable() {
           }
         >
           {trace.metrics?.completion_tokens}
-        </Td>
+        </Table.Cell>
       ),
       value: (trace: Trace) => trace.metrics?.completion_tokens ?? 0,
     },
@@ -551,9 +536,8 @@ export function MessagesTable() {
       name: "Prompt Tokens",
       sortable: true,
       render: (trace, index) => (
-        <Td
+        <Table.Cell
           key={index}
-          isNumeric
           onClick={() =>
             openDrawer("traceDetails", {
               traceId: trace.trace_id,
@@ -561,7 +545,7 @@ export function MessagesTable() {
           }
         >
           {trace.metrics?.prompt_tokens}
-        </Td>
+        </Table.Cell>
       ),
       value: (trace: Trace) => trace.metrics?.prompt_tokens ?? 0,
     },
@@ -569,9 +553,8 @@ export function MessagesTable() {
       name: "Total Cost",
       sortable: true,
       render: (trace, index) => (
-        <Td
+        <Table.Cell
           key={index}
-          isNumeric
           onClick={() =>
             openDrawer("traceDetails", {
               traceId: trace.trace_id,
@@ -579,7 +562,7 @@ export function MessagesTable() {
           }
         >
           <Text>{numeral(trace.metrics?.total_cost).format("$0.00[000]")}</Text>
-        </Td>
+        </Table.Cell>
       ),
       value: (trace: Trace) =>
         numeral(trace.metrics?.total_cost).format("$0.00[000]"),
@@ -588,7 +571,7 @@ export function MessagesTable() {
       name: "Metadata",
       sortable: true,
       render: (trace, index) => (
-        <Td
+        <Table.Cell
           key={index}
           minWidth="300px"
           maxWidth="300px"
@@ -598,12 +581,12 @@ export function MessagesTable() {
             })
           }
         >
-          <HoverableBigText noOfLines={1}>
+          <HoverableBigText lineClamp={1}>
             {trace.contexts
               ? JSON.stringify(trace.metadata, null, 2)
               : JSON.stringify(trace.metadata)}
           </HoverableBigText>
-        </Td>
+        </Table.Cell>
       ),
       value: (trace: Trace) => JSON.stringify(trace.metadata),
     },
@@ -611,7 +594,7 @@ export function MessagesTable() {
       name: "Contexts",
       sortable: true,
       render: (trace, index) => (
-        <Td
+        <Table.Cell
           key={index}
           minWidth="300px"
           maxWidth="300px"
@@ -622,14 +605,14 @@ export function MessagesTable() {
           }
         >
           <HoverableBigText
-            noOfLines={1}
+            lineClamp={1}
             expandedVersion={JSON.stringify(trace.contexts, null, 2)}
           >
             {trace.contexts
               ? JSON.stringify(trace.contexts.map((c) => c.content))
               : ""}
           </HoverableBigText>
-        </Td>
+        </Table.Cell>
       ),
       value: (trace: Trace) => JSON.stringify(trace.contexts),
     },
@@ -637,7 +620,7 @@ export function MessagesTable() {
       name: "Topic",
       sortable: true,
       render: (trace, index) => (
-        <Td
+        <Table.Cell
           key={index}
           onClick={() =>
             openDrawer("traceDetails", {
@@ -651,7 +634,7 @@ export function MessagesTable() {
                 ?.name
             }
           </Text>
-        </Td>
+        </Table.Cell>
       ),
       value: (trace: Trace) =>
         topics.data?.find((topic) => topic.id === trace.metadata.topic_id)
@@ -661,7 +644,7 @@ export function MessagesTable() {
       name: "Subtopic",
       sortable: true,
       render: (trace, index) => (
-        <Td
+        <Table.Cell
           key={index}
           onClick={() =>
             openDrawer("traceDetails", {
@@ -676,7 +659,7 @@ export function MessagesTable() {
               )?.name
             }
           </Text>
-        </Td>
+        </Table.Cell>
       ),
       value: (trace: Trace) =>
         topics.data?.find((topic) => topic.id === trace.metadata.subtopic_id)
@@ -685,7 +668,9 @@ export function MessagesTable() {
     events: {
       name: "Events",
       sortable: true,
-      render: (trace, index) => <Td key={index}>{trace.events?.length}</Td>,
+      render: (trace, index) => (
+        <Table.Cell key={index}>{trace.events?.length}</Table.Cell>
+      ),
       value: (trace: Trace) => trace.events?.length ?? 0,
     },
 
@@ -721,33 +706,6 @@ export function MessagesTable() {
         )
   );
 
-  const nextPage = () => {
-    setPageOffset(pageOffset + pageSize);
-  };
-
-  const prevPage = () => {
-    if (pageOffset > 0) {
-      setPageOffset(pageOffset - pageSize);
-    }
-  };
-
-  useEffect(() => {
-    setPageOffset(0);
-  }, [router.query.query]);
-
-  const changePageSize = (size: number) => {
-    setPageSize(size);
-    setPageOffset(0);
-  };
-
-  useEffect(() => {
-    if (traceGroups.isFetched) {
-      const totalHits: number = traceGroups.data?.totalHits ?? 0;
-
-      setTotalHits(totalHits);
-    }
-  }, [traceGroups.data?.totalHits, traceGroups.isFetched]);
-
   const isFirstRender = useRef(true);
 
   const sortBy = (columnKey: string) => {
@@ -768,30 +726,39 @@ export function MessagesTable() {
   const sortButton = (columnKey: string) => {
     if (getSingleQueryParam(router.query.sortBy) === columnKey) {
       return getSingleQueryParam(router.query.orderBy) === "asc" ? (
-        <ChevronUpIcon
-          width={5}
-          height={5}
-          color={"blue.500"}
-          cursor={"pointer"}
+        <Icon
+          width={4}
+          height={4}
+          color="blue.500"
+          cursor="pointer"
           onClick={() => sortBy(columnKey)}
-        />
+          marginTop="-5px"
+        >
+          <ChevronUp />
+        </Icon>
       ) : (
-        <ChevronDownIcon
-          width={5}
-          height={5}
-          color={"blue.500"}
-          cursor={"pointer"}
+        <Icon
+          width={4}
+          height={4}
+          color="blue.400"
+          cursor="pointer"
           onClick={() => sortBy(columnKey)}
-        />
+          marginTop="5px"
+        >
+          <ChevronDown />
+        </Icon>
       );
     }
     return (
-      <ArrowUpDownIcon
-        cursor={"pointer"}
-        marginLeft={1}
-        color={"gray.400"}
+      <Icon
+        width={4}
+        height={4}
+        cursor="pointer"
         onClick={() => sortBy(columnKey)}
-      />
+        color="gray.400"
+      >
+        <LuChevronsUpDown />
+      </Icon>
     );
   };
 
@@ -818,13 +785,12 @@ export function MessagesTable() {
     }
   }, [traceGroups, traceCheckColumnsAvailable, localStorageHeaderColumns]);
 
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { open, onOpen, onClose } = useDisclosure();
   const checkedHeaderColumnsEntries = Object.entries(
     selectedHeaderColumns
   ).filter(([_, { enabled }]) => enabled);
 
   const [downloadProgress, setDownloadProgress] = useState(0);
-  const toast = useToast();
 
   const fetchAllTraces = async () => {
     const allGroups = [];
@@ -838,8 +804,8 @@ export function MessagesTable() {
       ...filterParams,
       query: getSingleQueryParam(router.query.query),
       groupBy: "none",
-      pageOffset: currentOffset,
-      pageSize: batchSize,
+      pageOffset: navigationFooter.pageOffset,
+      pageSize: navigationFooter.pageSize,
       sortBy: getSingleQueryParam(router.query.sortBy),
       sortDirection: getSingleQueryParam(router.query.orderBy),
       includeContexts: checkedHeaderColumnsEntries.some(
@@ -894,11 +860,14 @@ export function MessagesTable() {
     try {
       await downloadCSV_(selection);
     } catch (error) {
-      toast({
+      toaster.create({
         title: "Error Downloading CSV",
-        status: "error",
         description: (error as any).toString(),
-        duration: null,
+        type: "error",
+        meta: {
+          closable: true,
+        },
+        placement: "top-end",
       });
       console.error(error);
     }
@@ -995,25 +964,28 @@ export function MessagesTable() {
     }
   };
 
+  const [isExpanded] = useLocalStorage("main-menu-expanded", false);
+
   return (
     <>
-      <Container maxW={"calc(100vw - 50px)"} padding={6}>
+      <Container
+        maxWidth={isExpanded ? "calc(100vw - 200px)" : "calc(100vw - 50px)"}
+        padding={6}
+      >
         <HStack width="full" align="top" paddingBottom={6}>
-          <HStack align="center" spacing={6}>
-            <Heading as={"h1"} size="lg" paddingTop={1}>
+          <HStack align="center" gap={6}>
+            <Heading as="h1" size="lg" paddingTop={1}>
               Messages
             </Heading>
             <ToggleAnalytics />
-            <Tooltip label="Refresh">
+            <Tooltip content="Refresh">
               <Button
                 variant="outline"
                 minWidth={0}
                 height="32px"
                 padding={2}
                 marginTop={2}
-                onClick={() => {
-                  void traceGroups.refetch();
-                }}
+                onClick={() => void traceGroups.refetch()}
               >
                 <RefreshCw
                   size="16"
@@ -1027,101 +999,125 @@ export function MessagesTable() {
             </Tooltip>
           </HStack>
           <Spacer />
-          <Tooltip label={totalHits >= 10_000 ? "Up to 10.000 items" : ""}>
-            <Button
-              colorScheme="black"
-              minWidth="fit-content"
-              variant={downloadTraces.isLoading ? "outline" : "ghost"}
-              onClick={() => void downloadCSV()}
-              isLoading={downloadTraces.isLoading}
-              loadingText="Downloading..."
+          <HStack gap={1} marginBottom="-8px">
+            <ToggleTableView />
+            <Tooltip
+              disabled={navigationFooter.totalHits < 10_000}
+              content={
+                navigationFooter.totalHits >= 10_000 ? "Up to 10.000 items" : ""
+              }
             >
-              Export all <DownloadIcon marginLeft={2} />
-            </Button>
-          </Tooltip>
-
-          <ToggleTableView />
-
-          <Popover isOpen={isOpen} onClose={onClose} placement="bottom-end">
-            <PopoverTrigger>
-              <Button variant="outline" onClick={onOpen} minWidth="fit-content">
-                <HStack spacing={2}>
-                  <List size={16} />
-                  <Text>Columns</Text>
-                  <Box>
-                    <ChevronDown width={14} />
-                  </Box>
-                </HStack>
+              <Button
+                colorPalette="black"
+                variant={downloadTraces.isLoading ? "outline" : "ghost"}
+                onClick={() => void downloadCSV()}
+                loading={downloadTraces.isLoading}
+                loadingText="Downloading..."
+              >
+                <Download size={16} />
+                Export all
               </Button>
-            </PopoverTrigger>
-            <PopoverContent width="fit-content">
-              <PopoverArrow />
-              <PopoverCloseButton />
-              <PopoverHeader>
-                <Heading size="sm">Filter Messages</Heading>
-              </PopoverHeader>
-              <PopoverBody padding={4}>
-                <VStack align="start" spacing={2}>
-                  {Object.entries({
-                    ...headerColumns,
-                    ...selectedHeaderColumns,
-                  }).map(([columnKey, column]) => {
-                    if (columnKey === "checked") {
-                      return null;
-                    }
-                    return (
-                      <Checkbox
-                        key={columnKey}
-                        isChecked={selectedHeaderColumns[columnKey]?.enabled}
-                        onChange={() => {
-                          setSelectedHeaderColumns({
-                            ...selectedHeaderColumns,
-                            [columnKey]: {
-                              enabled:
-                                !selectedHeaderColumns[columnKey]?.enabled,
-                              name: column.name,
-                            },
-                          });
+            </Tooltip>
+            <Popover.Root
+              open={open}
+              onOpenChange={({ open }) => (open ? onOpen() : onClose())}
+            >
+              <Popover.Trigger asChild>
+                <Button variant="ghost" minWidth="fit-content">
+                  <HStack gap={2}>
+                    <List size={16} />
+                    <Text>Columns</Text>
+                    <Box>
+                      <ChevronDown />
+                    </Box>
+                  </HStack>
+                </Button>
+              </Popover.Trigger>
+              <Popover.Content>
+                <Popover.Arrow />
+                <Popover.CloseTrigger />
+                <Popover.Header>
+                  <Heading size="sm">Filter Messages</Heading>
+                </Popover.Header>
+                <Popover.Body padding={4}>
+                  <VStack align="start" gap={2}>
+                    {Object.entries({
+                      ...headerColumns,
+                      ...selectedHeaderColumns,
+                    }).map(([columnKey, column]) => {
+                      if (columnKey === "checked") return null;
+                      return (
+                        <Checkbox
+                          key={columnKey}
+                          checked={selectedHeaderColumns[columnKey]?.enabled}
+                          onChange={() => {
+                            setSelectedHeaderColumns({
+                              ...selectedHeaderColumns,
+                              [columnKey]: {
+                                enabled:
+                                  !selectedHeaderColumns[columnKey]?.enabled,
+                                name: column.name,
+                              },
+                            });
 
-                          setLocalStorageHeaderColumns({
-                            ...selectedHeaderColumns,
-                            [columnKey]: {
-                              enabled:
-                                !selectedHeaderColumns[columnKey]?.enabled,
-                              name: column.name,
-                            },
-                          });
-                        }}
-                      >
-                        {column.name}
-                      </Checkbox>
-                    );
-                  })}
-                </VStack>
-              </PopoverBody>
-            </PopoverContent>
-          </Popover>
-          <PeriodSelector
-            period={{ startDate, endDate }}
-            setPeriod={setPeriod}
-          />
-          <FilterToggle />
+                            setLocalStorageHeaderColumns({
+                              ...selectedHeaderColumns,
+                              [columnKey]: {
+                                enabled:
+                                  !selectedHeaderColumns[columnKey]?.enabled,
+                                name: column.name,
+                              },
+                            });
+                          }}
+                        >
+                          {column.name}
+                        </Checkbox>
+                      );
+                    })}
+                  </VStack>
+                </Popover.Body>
+              </Popover.Content>
+            </Popover.Root>
+
+            <PeriodSelector
+              period={{ startDate, endDate }}
+              setPeriod={setPeriod}
+            />
+            <FilterToggle />
+          </HStack>
         </HStack>
 
-        <HStack align={"top"} gap={8}>
+        <HStack align="top" gap={8}>
           <Box flex="1" minWidth="0">
-            <VStack spacing={1} align="start">
-              <Card height="fit-content" width="100%">
-                <Progress
-                  colorScheme="orange"
-                  value={downloadProgress}
-                  size="xs"
-                />
-                <CardBody padding={0}>
+            <VStack gap={0} align="start">
+              <Card.Root height="fit-content">
+                <Card.Body
+                  padding={0}
+                  maxWidth={
+                    showFilters && isExpanded
+                      ? "calc(100vw - 580px)"
+                      : showFilters
+                      ? "calc(100vw - 450px)"
+                      : "50%"
+                  }
+                >
+                  {downloadProgress > 0 && (
+                    <Progress.Root
+                      colorPalette="orange"
+                      value={downloadProgress}
+                      size="xs"
+                      width="full"
+                      boxShadow="none"
+                    >
+                      <Progress.Track boxShadow="none" background="none">
+                        <Progress.Range />
+                      </Progress.Track>
+                    </Progress.Root>
+                  )}
                   {checkedHeaderColumnsEntries.length === 0 && (
                     <Text>No columns selected</Text>
                   )}
-                  <TableContainer
+                  <Table.ScrollArea
                     ref={scrollRef}
                     onScroll={() => {
                       if (scrollRef.current) {
@@ -1129,20 +1125,22 @@ export function MessagesTable() {
                       }
                     }}
                   >
-                    <Table size="sm" height="fit-content">
-                      <Thead>
-                        <Tr>
+                    <Table.Root size="sm" height="fit-content" variant="line">
+                      <Table.Header>
+                        <Table.Row background="transparent">
                           {checkedHeaderColumnsEntries
                             .filter(([_, { enabled }]) => enabled)
                             .map(([columnKey, { name }], index) => (
-                              <Th
+                              <Table.ColumnHeader
                                 key={index}
+                                paddingX={4}
                                 paddingY={4}
+                                background="white"
+                                borderRadius="4px 0 0 0"
                                 {...(columnKey === "checked"
                                   ? {
                                       position: "sticky",
                                       left: 0,
-                                      background: "white",
                                       transition: "box-shadow 0.3s ease-in-out",
                                       boxShadow:
                                         scrollXPosition > 0
@@ -1154,15 +1152,15 @@ export function MessagesTable() {
                                 {columnKey === "checked" ? (
                                   <HStack width="full">
                                     <Checkbox
-                                      isChecked={
+                                      checked={
                                         selectedTraceIds.length ===
                                         traceGroups.data?.groups.length
                                       }
-                                      onChange={() => toggleAllTraces()}
+                                      onCheckedChange={() => toggleAllTraces()}
                                     />
                                   </HStack>
                                 ) : (
-                                  <HStack spacing={1}>
+                                  <HStack gap={1}>
                                     <Text
                                       minWidth={headerColumns[columnKey]?.width}
                                       width="full"
@@ -1173,14 +1171,14 @@ export function MessagesTable() {
                                       sortButton(columnKey)}
                                   </HStack>
                                 )}
-                              </Th>
+                              </Table.ColumnHeader>
                             ))}
-                        </Tr>
-                      </Thead>
-                      <Tbody>
+                        </Table.Row>
+                      </Table.Header>
+                      <Table.Body>
                         {traceGroups.data?.groups.flatMap((traceGroup) =>
                           traceGroup.map((trace) => (
-                            <Tr
+                            <Table.Row
                               key={trace.trace_id}
                               role="button"
                               cursor="pointer"
@@ -1193,84 +1191,41 @@ export function MessagesTable() {
                                     checkName: name,
                                   })?.render(trace, index)
                               )}
-                            </Tr>
+                            </Table.Row>
                           ))
                         )}
                         {traceGroups.isLoading &&
                           Array.from({ length: 3 }).map((_, i) => (
-                            <Tr key={i}>
+                            <Table.Row key={i}>
                               {Array.from({
                                 length: checkedHeaderColumnsEntries.length,
                               }).map((_, i) => (
-                                <Td key={i}>
+                                <Table.Cell key={i}>
                                   <Delayed key={1} takeSpace>
                                     <Skeleton height="16px" />
                                   </Delayed>
-                                </Td>
+                                </Table.Cell>
                               ))}
-                            </Tr>
+                            </Table.Row>
                           ))}
                         {traceGroups.isFetched &&
                           traceGroups.data?.groups.length === 0 && (
-                            <Tr>
-                              <Td />
-                              <Td colSpan={checkedHeaderColumnsEntries.length}>
+                            <Table.Row>
+                              <Table.Cell />
+                              <Table.Cell
+                                colSpan={checkedHeaderColumnsEntries.length}
+                              >
                                 No messages found, try selecting different
                                 filters and dates
-                              </Td>
-                            </Tr>
+                              </Table.Cell>
+                            </Table.Row>
                           )}
-                      </Tbody>
-                    </Table>
-                  </TableContainer>
-                </CardBody>
-              </Card>
-              <HStack padding={6}>
-                <Text>Items per page </Text>
-
-                <Select
-                  defaultValue={"25"}
-                  placeholder=""
-                  maxW="70px"
-                  size="sm"
-                  onChange={(e) => changePageSize(parseInt(e.target.value))}
-                  borderColor={"black"}
-                  borderRadius={"lg"}
-                >
-                  <option value="10">10</option>
-                  <option value="25">25</option>
-                  <option value="50">50</option>
-                  <option value="100">100</option>
-                  <option value="250">250</option>
-                </Select>
-
-                <Text marginLeft={"20px"}>
-                  {" "}
-                  {`${pageOffset + 1}`} -{" "}
-                  {`${
-                    pageOffset + pageSize > totalHits
-                      ? totalHits
-                      : pageOffset + pageSize
-                  }`}{" "}
-                  of {`${totalHits}`} items
-                </Text>
-                <Button
-                  width={10}
-                  padding={0}
-                  onClick={prevPage}
-                  isDisabled={pageOffset === 0}
-                >
-                  <ChevronLeft />
-                </Button>
-                <Button
-                  width={10}
-                  padding={0}
-                  isDisabled={pageOffset + pageSize >= totalHits}
-                  onClick={nextPage}
-                >
-                  <ChevronRight />
-                </Button>
-              </HStack>
+                      </Table.Body>
+                    </Table.Root>
+                  </Table.ScrollArea>
+                </Card.Body>
+              </Card.Root>
+              <MessagesNavigationFooter {...navigationFooter} />
             </VStack>
           </Box>
 
@@ -1288,7 +1243,7 @@ export function MessagesTable() {
           paddingX="16px"
           border="1px solid #ccc"
           boxShadow="0 0 15px rgba(0, 0, 0, 0.2)"
-          borderRadius={"md"}
+          borderRadius="md"
         >
           <HStack gap={3}>
             <Text whiteSpace="nowrap">
@@ -1296,17 +1251,17 @@ export function MessagesTable() {
               {selectedTraceIds.length === 1 ? "trace" : "traces"} selected
             </Text>
             <Button
-              colorScheme="black"
+              colorPalette="black"
               minWidth="fit-content"
               variant="outline"
               onClick={() => void downloadCSV(true)}
             >
-              Export <DownloadIcon marginLeft={2} />
+              Export <Download size={16} style={{ marginLeft: 8 }} />
             </Button>
 
             <Text>or</Text>
             <Button
-              colorScheme="black"
+              colorPalette="black"
               type="submit"
               variant="outline"
               minWidth="fit-content"

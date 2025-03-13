@@ -1,32 +1,19 @@
 import {
   Alert,
-  AlertIcon,
   HStack,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuList,
   Skeleton,
   Spacer,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
   Table,
   Tabs,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
-  Tr,
   VStack,
-  useToast,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
 import Parse from "papaparse";
 import React, { useEffect, useState } from "react";
 import { Download, ExternalLink, MoreVertical } from "react-feather";
+import { Menu } from "../../../components/ui/menu";
+import { toaster } from "../../../components/ui/toaster";
 import type { ESBatchEvaluation } from "../../../server/experiments/types";
 import { api } from "../../../utils/api";
 import {
@@ -137,8 +124,6 @@ export const useBatchEvaluationDownloadCSV = ({
   runId: string | undefined;
   isFinished: boolean;
 }) => {
-  const toast = useToast();
-
   const {
     run,
     datasetByIndex,
@@ -156,11 +141,14 @@ export const useBatchEvaluationDownloadCSV = ({
     try {
       await downloadCSV_();
     } catch (error) {
-      toast({
+      toaster.create({
         title: "Error Downloading CSV",
-        status: "error",
         description: (error as any).toString(),
-        duration: null,
+        type: "error",
+        meta: {
+          closable: true,
+        },
+        placement: "top-end",
       });
       console.error(error);
     }
@@ -277,17 +265,17 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
 
     if (run.error) {
       return (
-        <Alert status="error">
-          <AlertIcon />
+        <Alert.Root status="error">
+          <Alert.Indicator />
           Error loading evaluation results
-        </Alert>
+        </Alert.Root>
       );
     }
 
     if (!resultsByEvaluator || !datasetByIndex) {
       return (
-        <VStack spacing={0} width="full" height="full" minWidth="0">
-          <Tabs
+        <VStack gap={0} width="full" height="full" minWidth="0">
+          <Tabs.Root
             size={size}
             width="full"
             height="full"
@@ -296,67 +284,68 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
             minHeight="0"
             overflowX="auto"
             padding={0}
+            colorPalette="blue"
           >
-            <TabList>
-              <Tab>
+            <Tabs.List>
+              <Tabs.Trigger value="skeleton">
                 <Skeleton width="60px" height="22px" />
-              </Tab>
-            </TabList>
-            <TabPanels
+              </Tabs.Trigger>
+            </Tabs.List>
+            <Tabs.Content
+              value="skeleton"
               minWidth="full"
               minHeight="0"
               overflowY="auto"
               onScroll={() => setHasScrolled(true)}
             >
-              <TabPanel padding={0}>
-                <Table size={size === "sm" ? "xs" : "sm"} variant="grid">
-                  <Thead>
-                    <Tr>
-                      <Th rowSpan={2} width="50px">
-                        <Skeleton width="100%" height="52px" />
-                      </Th>
-                      <Th>
-                        <Skeleton width="100%" height="18px" />
-                      </Th>
-                      <Th>
-                        <Skeleton width="100%" height="18px" />
-                      </Th>
-                      <Th>
-                        <Skeleton width="100%" height="18px" />
-                      </Th>
-                    </Tr>
-                    <Tr>
-                      <Th>
-                        <Skeleton width="100%" height="18px" />
-                      </Th>
-                      <Th>
-                        <Skeleton width="100%" height="18px" />
-                      </Th>
-                      <Th>
-                        <Skeleton width="100%" height="18px" />
-                      </Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    <Tr>
-                      <Td>
-                        <Skeleton width="100%" height="18px" />
-                      </Td>
-                      <Td>
-                        <Skeleton width="100%" height="18px" />
-                      </Td>
-                      <Td>
-                        <Skeleton width="100%" height="18px" />
-                      </Td>
-                      <Td>
-                        <Skeleton width="100%" height="18px" />
-                      </Td>
-                    </Tr>
-                  </Tbody>
-                </Table>
-              </TabPanel>
-            </TabPanels>
-          </Tabs>
+              {/* @ts-ignore */}
+              <Table.Root size={size === "sm" ? "xs" : "sm"} variant="grid">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader rowSpan={2} width="50px">
+                      <Skeleton width="100%" height="52px" />
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader>
+                      <Skeleton width="100%" height="18px" />
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader>
+                      <Skeleton width="100%" height="18px" />
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader>
+                      <Skeleton width="100%" height="18px" />
+                    </Table.ColumnHeader>
+                  </Table.Row>
+                  <Table.Row>
+                    <Table.ColumnHeader>
+                      <Skeleton width="100%" height="18px" />
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader>
+                      <Skeleton width="100%" height="18px" />
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader>
+                      <Skeleton width="100%" height="18px" />
+                    </Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  <Table.Row>
+                    <Table.Cell>
+                      <Skeleton width="100%" height="18px" />
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Skeleton width="100%" height="18px" />
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Skeleton width="100%" height="18px" />
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Skeleton width="100%" height="18px" />
+                    </Table.Cell>
+                  </Table.Row>
+                </Table.Body>
+              </Table.Root>
+            </Tabs.Content>
+          </Tabs.Root>
         </VStack>
       );
     }
@@ -372,43 +361,58 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
     }
 
     return (
-      <Tabs
+      <Tabs.Root
         size={size}
         width="full"
         height="full"
         display="flex"
         flexDirection="column"
         minHeight="0"
-        overflowX="hidden"
         position="relative"
-        onChange={(index) => setTabIndex(index)}
-        index={tabIndex}
+        onValueChange={(change) =>
+          setTabIndex(Object.keys(resultsByEvaluator).indexOf(change.value))
+        }
+        defaultValue={Object.keys(resultsByEvaluator)[0]}
+        colorPalette="blue"
       >
-        <HStack top={1} right={2}>
-          <TabList minWidth={0}>
-            {Object.entries(resultsByEvaluator).map(([evaluator, results]) => (
-              <Tab
-                key={evaluator}
-                noOfLines={1}
-                whiteSpace="nowrap"
-                minWidth={0}
-              >
-                {results.find((r) => r.name)?.name ?? evaluator}
-              </Tab>
-            ))}
-          </TabList>
+        <HStack
+          top={1}
+          right={2}
+          borderBottom="1px solid"
+          borderColor="gray.200"
+        >
+          <Tabs.List minWidth={0}>
+            {Object.entries(resultsByEvaluator).map(
+              ([evaluator, results], idx) => (
+                <Tabs.Trigger
+                  key={evaluator}
+                  value={evaluator}
+                  css={{
+                    "& span": {
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      minWidth: 0,
+                    },
+                  }}
+                >
+                  {results.find((r) => r.name)?.name ?? evaluator}
+                </Tabs.Trigger>
+              )
+            )}
+          </Tabs.List>
           <Spacer />
           <Text color="gray.400" fontSize="12px" flexShrink={0}>
             {runId}
           </Text>
           {size === "sm" && (
-            <Menu>
-              <MenuButton flexShrink={0} paddingRight={1} marginRight={1}>
+            <Menu.Root positioning={{ placement: "bottom-end" }}>
+              <Menu.Trigger flexShrink={0} paddingRight={1} marginRight={1}>
                 <MoreVertical size={16} />
-              </MenuButton>
-              <MenuList>
-                <MenuItem
-                  icon={<ExternalLink size={16} />}
+              </Menu.Trigger>
+              <Menu.Content>
+                <Menu.Item
+                  value="open-experiment"
                   onClick={() =>
                     void window.open(
                       `/${project.slug}/experiments/${experiment.slug}?runId=${runId}`,
@@ -416,49 +420,49 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
                     )
                   }
                 >
-                  Open Experiment Full Page
-                </MenuItem>
-                <MenuItem
-                  icon={<Download size={16} />}
+                  <ExternalLink size={16} /> Open Experiment Full Page
+                </Menu.Item>
+                <Menu.Item
+                  value="export-csv"
                   onClick={() => void downloadCSV()}
-                  isDisabled={!isDownloadCSVEnabled}
+                  disabled={!isDownloadCSVEnabled}
                 >
-                  Export to CSV
-                </MenuItem>
-              </MenuList>
-            </Menu>
+                  <Download size={16} /> Export to CSV
+                </Menu.Item>
+              </Menu.Content>
+            </Menu.Root>
           )}
         </HStack>
-        <TabPanels minWidth="full" minHeight="0" overflowY="auto">
-          {Object.entries(resultsByEvaluator).map(
-            ([evaluator, results], index) => {
-              return (
-                <TabPanel
-                  key={evaluator}
-                  padding={0}
-                  minWidth="full"
-                  width="fit-content"
-                  minHeight="0"
-                >
-                  {tabIndex === index ? (
-                    <BatchEvaluationV2EvaluationResult
-                      evaluator={evaluator}
-                      results={results}
-                      datasetByIndex={datasetByIndex}
-                      datasetColumns={datasetColumns}
-                      predictedColumns={predictedColumns}
-                      isFinished={isFinished}
-                      size={size}
-                      hasScrolled={hasScrolled}
-                      workflowId={experiment.workflowId}
-                    />
-                  ) : null}
-                </TabPanel>
-              );
-            }
-          )}
-        </TabPanels>
-      </Tabs>
+
+        {Object.entries(resultsByEvaluator).map(
+          ([evaluator, results], index) => {
+            return (
+              <Tabs.Content
+                key={evaluator}
+                value={evaluator}
+                padding={0}
+                minWidth="full"
+                minHeight="0"
+                overflow="auto"
+              >
+                {tabIndex === index ? (
+                  <BatchEvaluationV2EvaluationResult
+                    evaluator={evaluator}
+                    results={results}
+                    datasetByIndex={datasetByIndex}
+                    datasetColumns={datasetColumns}
+                    predictedColumns={predictedColumns}
+                    isFinished={isFinished}
+                    size={size}
+                    hasScrolled={hasScrolled}
+                    workflowId={experiment.workflowId}
+                  />
+                ) : null}
+              </Tabs.Content>
+            );
+          }
+        )}
+      </Tabs.Root>
     );
   }
 );

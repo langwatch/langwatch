@@ -35,7 +35,7 @@ const debug = getDebugger("langwatch:collector");
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: process.env.COLLECTOR_MAX_BODY_SIZE ?? "5mb",
+      sizeLimit: "10mb",
     },
   },
 };
@@ -358,8 +358,12 @@ export default async function handler(
         "Over 256 updates were sent for this trace already, no more updates will be accepted",
     });
   }
-
-  debug(`collecting traceId ${traceId}`);
+  if (existingTrace?.existing_metadata.custom) {
+    customMetadata = {
+      ...existingTrace.existing_metadata.custom,
+      ...customMetadata,
+    };
+  }
 
   const forceSync = req.query.force_sync === "true";
   await scheduleTraceCollectionWithFallback(

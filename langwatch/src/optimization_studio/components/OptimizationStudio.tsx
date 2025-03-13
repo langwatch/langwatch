@@ -5,8 +5,6 @@ import {
   Flex,
   HStack,
   Text,
-  Tooltip,
-  useTheme,
   VStack,
 } from "@chakra-ui/react";
 import {
@@ -21,7 +19,6 @@ import {
 import { DndProvider, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
-import { Link } from "@chakra-ui/next-js";
 import "@xyflow/react/dist/style.css";
 import Head from "next/head";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -35,6 +32,9 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
 import { LogoIcon } from "../../components/icons/LogoIcon";
+import { useColorRawValue } from "../../components/ui/color-mode";
+import { Link } from "../../components/ui/link";
+import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { titleCase } from "../../utils/stringCasing";
 import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
@@ -58,7 +58,6 @@ import { PropertiesPanel } from "./properties/PropertiesPanel";
 import { Publish } from "./Publish";
 import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
-import { setRecentMenuLinkClick } from "../../components/DashboardLayout";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {
   const [_, drop] = useDrop(() => ({
@@ -202,7 +201,7 @@ export default function OptimizationStudio() {
       <ReactFlowProvider>
         <DndProvider backend={HTML5Backend}>
           <CustomDragLayer />
-          <VStack width="full" height="full" spacing={0}>
+          <VStack width="full" height="full" gap={0}>
             <HStack
               width="full"
               background="white"
@@ -211,12 +210,7 @@ export default function OptimizationStudio() {
               borderColor="gray.350"
             >
               <HStack width="full">
-                <Link
-                  href={`/${project?.slug}/workflows`}
-                  onClick={() => {
-                    setRecentMenuLinkClick(true);
-                  }}
-                >
+                <Link href={`/${project?.slug}/workflows`}>
                   <LogoIcon width={24} height={24} />
                 </Link>
                 <RunningStatus />
@@ -225,7 +219,7 @@ export default function OptimizationStudio() {
                 )}
               </HStack>
               <HStack width="full" justify="center">
-                <Text noOfLines={1} fontSize="15px">
+                <Text lineClamp={1} fontSize="15px">
                   Optimization Studio - {name}
                 </Text>
                 <StatusCircle
@@ -233,7 +227,7 @@ export default function OptimizationStudio() {
                   tooltip={
                     socketStatus === "connecting-python" ||
                     socketStatus === "connecting-socket" ? (
-                      <VStack align="start" spacing={1} padding={2}>
+                      <VStack align="start" gap={1} padding={2}>
                         <HStack>
                           <StatusCircle
                             status={
@@ -390,9 +384,8 @@ export default function OptimizationStudio() {
 }
 
 function ReactFlowBackground() {
-  const theme = useTheme();
-  const gray100 = theme.colors.gray["100"];
-  const gray300 = theme.colors.gray["300"];
+  const gray100 = useColorRawValue("gray.100");
+  const gray300 = useColorRawValue("gray.300");
 
   return (
     <Background
@@ -410,11 +403,10 @@ function StatusCircle({
   tooltip,
 }: {
   status: string;
-  // For some misterious weird bug, we cannot wrap <StatusCircle /> in a <Tooltip />, the tooltip doesn't work, so we need to use it inside and pass the tooltip label as a prop.
   tooltip?: string | React.ReactNode;
 }) {
   return (
-    <Tooltip label={tooltip}>
+    <Tooltip content={tooltip}>
       <Box
         minWidth="12px"
         maxWidth="12px"

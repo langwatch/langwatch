@@ -1,30 +1,23 @@
 import {
   Button,
   Card,
-  CardBody,
   Container,
   HStack,
   Heading,
-  Link,
   Skeleton,
   Spacer,
-  Table,
-  TableContainer,
-  Tbody,
-  Td,
   Text,
-  Th,
-  Thead,
-  Tr,
 } from "@chakra-ui/react";
 import router from "next/router";
-
 import { Play } from "react-feather";
+
 import { useDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { Link } from "~/components/ui/link";
+import { Table } from "@chakra-ui/react";
 
 export default function Experiments() {
   const { project } = useOrganizationTeamProject();
@@ -46,20 +39,19 @@ export default function Experiments() {
           </Heading>
           <Spacer />
           <Button
-            colorScheme="blue"
+            colorPalette="blue"
             onClick={() => {
               openDrawer("batchEvaluation", {
                 selectDataset: true,
               });
             }}
             minWidth="fit-content"
-            leftIcon={<Play height={16} />}
           >
-            Batch Evaluation
+            <Play height={16} /> Batch Evaluation
           </Button>
         </HStack>
-        <Card>
-          <CardBody>
+        <Card.Root>
+          <Card.Body>
             {experiments.data && experiments.data.length == 0 ? (
               <NoDataInfoBlock
                 title="No experiments yet"
@@ -71,7 +63,7 @@ export default function Experiments() {
                     <Link
                       color="orange.400"
                       href="https://docs.langwatch.ai/evaluations/overview"
-                      target="_blank"
+                      isExternal
                     >
                       documentation
                     </Link>
@@ -81,49 +73,47 @@ export default function Experiments() {
                 icon={<Play />}
               />
             ) : (
-              <TableContainer>
-                <Table variant="simple">
-                  <Thead>
-                    <Tr>
-                      <Th>Experiment</Th>
-                      <Th>Type</Th>
-                      <Th>Created At</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {experiments.isLoading
-                      ? Array.from({ length: 3 }).map((_, i) => (
-                          <Tr key={i}>
-                            {Array.from({ length: 4 }).map((_, i) => (
-                              <Td key={i}>
-                                <Skeleton height="20px" />
-                              </Td>
-                            ))}
-                          </Tr>
-                        ))
-                      : experiments.data
-                      ? experiments.data?.map((experiment, i) => (
-                          <Tr
-                            cursor="pointer"
-                            onClick={() => {
-                              void router.push({
-                                pathname: `/${project?.slug}/experiments/${experiment.slug}`,
-                              });
-                            }}
-                            key={i}
-                          >
-                            <Td>{experiment.name ?? experiment.slug}</Td>
-                            <Td>{experiment.type}</Td>
-                            <Td>{experiment.createdAt.toLocaleString()}</Td>
-                          </Tr>
-                        ))
-                      : null}
-                  </Tbody>
-                </Table>
-              </TableContainer>
+              <Table.Root variant="line">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Experiment</Table.ColumnHeader>
+                    <Table.ColumnHeader>Type</Table.ColumnHeader>
+                    <Table.ColumnHeader>Created At</Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {experiments.isLoading
+                    ? Array.from({ length: 3 }).map((_, i) => (
+                        <Table.Row key={i}>
+                          {Array.from({ length: 4 }).map((_, i) => (
+                            <Table.Cell key={i}>
+                              <Skeleton height="20px" />
+                            </Table.Cell>
+                          ))}
+                        </Table.Row>
+                      ))
+                    : experiments.data
+                    ? experiments.data?.map((experiment, i) => (
+                        <Table.Row
+                          cursor="pointer"
+                          onClick={() => {
+                            void router.push({
+                              pathname: `/${project?.slug}/experiments/${experiment.slug}`,
+                            });
+                          }}
+                          key={i}
+                        >
+                          <Table.Cell>{experiment.name ?? experiment.slug}</Table.Cell>
+                          <Table.Cell>{experiment.type}</Table.Cell>
+                          <Table.Cell>{experiment.createdAt.toLocaleString()}</Table.Cell>
+                        </Table.Row>
+                      ))
+                    : null}
+                </Table.Body>
+              </Table.Root>
             )}
-          </CardBody>
-        </Card>
+          </Card.Body>
+        </Card.Root>
       </Container>
     </DashboardLayout>
   );

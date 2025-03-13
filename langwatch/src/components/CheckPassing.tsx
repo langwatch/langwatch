@@ -14,7 +14,7 @@ export function CheckPassing({ check }: { check: ElasticSearchEvaluation }) {
   const evaluator = getEvaluatorDefinitions(checkType);
 
   return (
-    <HStack align="start" spacing={2}>
+    <HStack align="start" gap={2}>
       <Box paddingRight={2} color={evaluationStatusColor(check)}>
         <CheckStatusIcon check={check} />
       </Box>
@@ -22,7 +22,7 @@ export function CheckPassing({ check }: { check: ElasticSearchEvaluation }) {
         <b>{check.name || evaluator?.name}:</b>
       </Text>
       {check.status == "processed" ? (
-        <Text noOfLines={1} maxWidth="400px">
+        <Text lineClamp={1} maxWidth="400px">
           {!!evaluator?.isGuardrail ||
           (typeof check.score !== "number" &&
             check.passed !== null &&
@@ -35,11 +35,11 @@ export function CheckPassing({ check }: { check: ElasticSearchEvaluation }) {
           {check.details ? `. Details: ${check.details}` : ""}
         </Text>
       ) : check.status == "skipped" ? (
-        <Text noOfLines={1} maxWidth="400px">
+        <Text lineClamp={1} maxWidth="400px">
           Skipped{check.details ? `: ${check.details}` : ""}
         </Text>
       ) : check.status == "error" ? (
-        <Text noOfLines={1} maxWidth="400px">
+        <Text lineClamp={1} maxWidth="400px">
           Error: {check.error?.message}
         </Text>
       ) : check.status == "in_progress" ? (

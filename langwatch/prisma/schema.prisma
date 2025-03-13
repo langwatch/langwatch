@@ -378,6 +378,7 @@ model BatchEvaluation {
 enum TriggerAction {
     SEND_EMAIL
     ADD_TO_DATASET
+    ADD_TO_ANNOTATION_QUEUE
     SEND_SLACK_MESSAGE
 }
 
@@ -432,18 +433,19 @@ model Experiment {
 }
 
 model Annotation {
-    id           String   @id @default(nanoid())
-    projectId    String
-    project      Project  @relation(fields: [projectId], references: [id])
-    traceId      String
-    comment      String?
-    isThumbsUp   Boolean?
-    userId       String?
-    user         User?    @relation(fields: [userId], references: [id])
-    createdAt    DateTime @default(now())
-    updatedAt    DateTime @default(now()) @updatedAt
-    email        String?
-    scoreOptions Json?
+    id             String   @id @default(nanoid())
+    projectId      String
+    project        Project  @relation(fields: [projectId], references: [id])
+    traceId        String
+    comment        String?
+    isThumbsUp     Boolean?
+    userId         String?
+    user           User?    @relation(fields: [userId], references: [id])
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @default(now()) @updatedAt
+    email          String?
+    scoreOptions   Json?
+    expectedOutput String?
 
     @@index([projectId])
     @@index([traceId])

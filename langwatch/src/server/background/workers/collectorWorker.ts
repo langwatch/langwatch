@@ -53,9 +53,93 @@ export const scheduleTraceCollectionWithFallback = async (
     return;
   }
 
-  await collectorQueue.add("collector", collectorJob, {
-    jobId: `collector_${collectorJob.traceId}_md5:${collectorJob.paramsMD5}`,
-  });
+  await scheduleTraceCollectionWithGrouping(collectorJob);
+};
+
+/**
+ * Schedules a trace collection job with grouping.
+ *
+ * The way this works is, we generate a job id that will be unique for a given trace for that minute
+ * so if another job comes along within the same minute, they will be merged together, instead of creating
+ * two jobs before processing. We then push the job forward by 10 seconds to wait for more possible spans to come in.
+ *
+ * If there is a job in the same minute, but it's already being processed, then nothing we can do, we increase an index
+ * to create another group, this one has 10s buffer for new spans to come in. This ensure smallest latency for single
+ * trace, while grouping efficiently for distributed tracing.
+ *
+ */
+const localLocks: Record<string, boolean> = {};
+export const scheduleTraceCollectionWithGrouping = async (
+  collectorJob: CollectorJob
+) => {
+  const yyyymmddhhmm = new Date()
+    .toISOString()
+    .replace(/[-:Z]/g, "")
+    .slice(0, 13);
+  const baseJobId = `collector_${collectorJob.projectId}_${collectorJob.traceId}_${yyyymmddhhmm}`;
+
+  while (localLocks[baseJobId]) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  localLocks[baseJobId] = true;
+
+  try {
+    let jobId = baseJobId;
+
+    let existingJob = await collectorQueue.getJob(jobId);
+    let index = 1;
+    while (existingJob && (await existingJob.isActive())) {
+      index++;
+      jobId = `${baseJobId}_${index}`;
+      existingJob = await collectorQueue.getJob(jobId);
+    }
+
+    if (existingJob && "spans" in existingJob.data) {
+      debug(`Found existing job for trace ${collectorJob.traceId}, merging...`);
+      const mergedJob = mergeCollectorJobs(existingJob.data, collectorJob);
+      await existingJob.remove();
+      await collectorQueue.add("collector", mergedJob, {
+        jobId,
+        delay: 10_000,
+      });
+    } else {
+      debug(`collecting traceId ${collectorJob.traceId}`);
+      await collectorQueue.add("collector", collectorJob, {
+        jobId,
+        delay: index > 1 ? 10_000 : 0,
+      });
+    }
+  } finally {
+    localLocks[baseJobId] = false;
+  }
+};
+
+const mergeCollectorJobs = (
+  job1: CollectorJob,
+  job2: CollectorJob
+): CollectorJob => {
+  return {
+    ...job1,
+    spans: [...(job1.spans ?? []), ...(job2.spans ?? [])],
+    evaluations: [...(job1.evaluations ?? []), ...(job2.evaluations ?? [])],
+    reservedTraceMetadata: {
+      ...job1.reservedTraceMetadata,
+      ...job2.reservedTraceMetadata,
+    },
+    customMetadata: {
+      ...job1.customMetadata,
+      ...job2.customMetadata,
+    },
+    existingTrace: {
+      ...job1.existingTrace,
+      ...job2.existingTrace,
+      indexing_md5s: [
+        ...(job1.existingTrace?.indexing_md5s ?? []),
+        ...(job2.existingTrace?.indexing_md5s ?? []),
+      ],
+    },
+    collectedAt: Math.min(job1.collectedAt, job2.collectedAt),
+  };
 };
 
 export async function processCollectorJob(
@@ -324,13 +408,17 @@ const updateTrace = async (
     });
   }
 
-  await esClient.update({
-    index: TRACE_INDEX.alias,
-    id: traceIndexId({ traceId: trace.trace_id, projectId: trace.project_id }),
-    retry_on_conflict: 10,
-    body: {
-      script: {
-        source: `
+  try {
+    await esClient.update({
+      index: TRACE_INDEX.alias,
+      id: traceIndexId({
+        traceId: trace.trace_id,
+        projectId: trace.project_id,
+      }),
+      retry_on_conflict: 10,
+      body: {
+        script: {
+          source: `
           // Update the document with the trace data
           if (ctx._source == null) {
             ctx._source = params.trace;
@@ -415,21 +503,30 @@ const updateTrace = async (
             );
           }
         `,
-        lang: "painless",
-        params: {
-          trace,
-          newSpans: esSpans,
-          newEvaluations: evaluations ?? [],
+          lang: "painless",
+          params: {
+            trace,
+            newSpans: esSpans,
+            newEvaluations: evaluations ?? [],
+          },
+        },
+        upsert: {
+          ...trace,
+          spans: esSpans,
+          ...(evaluations ? { evaluations } : {}),
         },
       },
-      upsert: {
-        ...trace,
-        spans: esSpans,
-        ...(evaluations ? { evaluations } : {}),
-      },
-    },
-    refresh: true,
-  });
+      refresh: true,
+    });
+  } catch (error) {
+    if (
+      (error as any).toString().includes("version_conflict_engine_exception")
+    ) {
+      debug("Version conflict, skipping update");
+      return;
+    }
+    throw error;
+  }
 };
 
 export const processCollectorCheckAndAdjustJob = async (

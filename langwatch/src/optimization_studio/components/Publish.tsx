@@ -1,30 +1,13 @@
-import { ChevronDownIcon } from "@chakra-ui/icons";
 import {
   Alert,
-  AlertIcon,
   Box,
   Button,
   HStack,
-  Link,
-  Menu,
-  MenuButton,
-  MenuDivider,
-  MenuItem,
-  MenuList,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
   Skeleton,
   Spacer,
   Spinner,
   Text,
-  Tooltip,
   useDisclosure,
-  useToast,
   VStack,
   type MenuItemProps,
 } from "@chakra-ui/react";
@@ -49,10 +32,17 @@ import type { Workflow } from "../types/dsl";
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
 
+import { Separator } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { type Edge } from "@xyflow/react";
+import { ChevronDown } from "react-feather";
 import { useForm } from "react-hook-form";
 import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
+import { Dialog } from "../../components/ui/dialog";
+import { Link } from "../../components/ui/link";
+import { Menu } from "../../components/ui/menu";
+import { toaster } from "../../components/ui/toaster";
+import { Tooltip } from "../../components/ui/tooltip";
 import { trackEvent } from "../../utils/tracking";
 import { checkIsEvaluator, getEntryInputs } from "../utils/nodeUtils";
 
@@ -63,48 +53,45 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
 
   return (
     <>
-      <Menu>
-        {({ isOpen }) => (
-          <>
-            <MenuButton
-              isActive={isOpen}
-              isDisabled={isDisabled}
-              as={Button}
-              size="sm"
-              rightIcon={<ChevronDownIcon />}
-              colorScheme="blue"
-            >
-              Publish
-            </MenuButton>
-            <MenuList zIndex={101}>
-              {isOpen && project && (
-                <PublishMenu
-                  project={project}
-                  onTogglePublish={publishModal.onToggle}
-                  onToggleApi={apiModal.onToggle}
-                />
-              )}
-            </MenuList>
-          </>
-        )}
-      </Menu>
-      <Modal
-        isOpen={publishModal.isOpen}
-        onClose={publishModal.onClose}
-        size={"xl"}
+      <Menu.Root>
+        <Menu.Trigger asChild>
+          <Button disabled={isDisabled} size="sm" colorPalette="blue">
+            Publish <ChevronDown />
+          </Button>
+        </Menu.Trigger>
+        <Menu.Content>
+          {project && (
+            <PublishMenu
+              project={project}
+              onTogglePublish={publishModal.onToggle}
+              onToggleApi={apiModal.onToggle}
+            />
+          )}
+        </Menu.Content>
+      </Menu.Root>
+
+      <Dialog.Root
+        open={publishModal.open}
+        onOpenChange={({ open }) => publishModal.setOpen(open)}
+        size="md"
       >
-        <ModalOverlay />
-        {publishModal.isOpen && (
+        <Dialog.Backdrop />
+        {publishModal.open && (
           <PublishModalContent
             onClose={publishModal.onClose}
             onApiToggle={apiModal.onToggle}
           />
         )}
-      </Modal>
-      <Modal isOpen={apiModal.isOpen} onClose={apiModal.onClose} size={"2xl"}>
-        <ModalOverlay />
-        {apiModal.isOpen && <ApiModalContent />}
-      </Modal>
+      </Dialog.Root>
+
+      <Dialog.Root
+        open={apiModal.open}
+        onOpenChange={({ open }) => apiModal.setOpen(open)}
+        size="lg"
+      >
+        <Dialog.Backdrop />
+        {apiModal.open && <ApiModalContent />}
+      </Dialog.Root>
     </>
   );
 }
@@ -133,7 +120,6 @@ function PublishMenu({
     allowSaveIfAutoSaveIsCurrentButNotLatest: false,
   });
   const router = useRouter();
-  const toast = useToast();
   const trpc = api.useContext();
 
   const publishedWorkflow = api.optimization.getPublishedWorkflow.useQuery(
@@ -151,24 +137,28 @@ function PublishMenu({
       onSuccess: () => {
         void trpc.optimization.getComponents.invalidate();
 
-        toast({
+        toaster.create({
           title: `Workflow ${
             !publishedWorkflow.data?.isComponent ? "saved" : "deleted"
           } as component`,
-          status: "success",
+          type: "success",
           duration: 5000,
-          isClosable: true,
-          position: "top-right",
+          meta: {
+            closable: true,
+          },
+          placement: "top-end",
         });
       },
       onError: (error) => {
-        toast({
+        toaster.create({
           title: "Error saving component",
           description: error.message,
-          status: "error",
+          type: "error",
           duration: 5000,
-          isClosable: true,
-          position: "top-right",
+          meta: {
+            closable: true,
+          },
+          placement: "top-end",
         });
       },
     });
@@ -178,24 +168,28 @@ function PublishMenu({
       onSuccess: () => {
         void trpc.optimization.getComponents.invalidate();
 
-        toast({
+        toaster.create({
           title: `Workflow ${
             !publishedWorkflow.data?.isEvaluator ? "saved" : "deleted"
           } as evaluator`,
-          status: "success",
+          type: "success",
           duration: 5000,
-          isClosable: true,
-          position: "top-right",
+          meta: {
+            closable: true,
+          },
+          placement: "top-end",
         });
       },
       onError: (error) => {
-        toast({
+        toaster.create({
           title: "Error saving evaluator",
           description: error.message,
-          status: "error",
+          type: "error",
           duration: 5000,
-          isClosable: true,
-          position: "top-right",
+          meta: {
+            closable: true,
+          },
+          placement: "top-end",
         });
       },
     });
@@ -251,13 +245,12 @@ function PublishMenu({
     if (!planAllowsToPublish) {
       return (
         <Tooltip
-          label="Subscribe to unlock publishing, click to continue"
-          placement="right"
+          content="Subscribe to unlock publishing, click to continue"
+          positioning={{ placement: "right" }}
         >
-          <MenuItem
+          <Menu.Item
             {...props}
-            icon={usage.data ? <Lock size={16} /> : <Spinner size="sm" />}
-            isDisabled={false}
+            disabled={false}
             color="gray.400"
             onClick={() => {
               trackEvent("subscription_hook_click", {
@@ -266,13 +259,16 @@ function PublishMenu({
               });
               void router.push("/settings/subscription");
             }}
-          />
+          >
+            {usage.data ? <Lock size={16} /> : <Spinner size="sm" />}
+            {props.children}
+          </Menu.Item>
         </Tooltip>
       );
     }
     return (
-      <Tooltip label={props.tooltip} placement="right">
-        <MenuItem {...props} />
+      <Tooltip content={props.tooltip} positioning={{ placement: "right" }}>
+        <Menu.Item {...props} />
       </Tooltip>
     );
   };
@@ -285,15 +281,16 @@ function PublishMenu({
             <SmallLabel color="gray.600">Published Version</SmallLabel>
             <Text fontSize="xs">{publishedWorkflow.data?.version}</Text>
           </HStack>
-          <MenuDivider />
+          <Separator />
         </>
       )}
       <SubscriptionMenuItem
         tooltip={canPublish}
         onClick={onTogglePublish}
-        icon={<ArrowUp size={16} />}
-        isDisabled={!!canPublish}
+        disabled={!!canPublish}
+        value="publish"
       >
+        <ArrowUp size={16} />{" "}
         {canSaveNewVersion || canPublish
           ? "Publish New Version"
           : "Publish Current Version"}
@@ -301,10 +298,11 @@ function PublishMenu({
 
       <SubscriptionMenuItem
         tooltip={publishDisabledLabel}
-        isDisabled={!!publishDisabledLabel || isEvaluator}
+        disabled={!!publishDisabledLabel || isEvaluator}
+        value="component"
         onClick={toggleSaveAsComponent}
-        icon={<BoxIcon size={16} />}
       >
+        <BoxIcon size={16} />{" "}
         {publishedWorkflow.data?.isComponent
           ? "Delete Component"
           : "Save as Component"}
@@ -318,10 +316,11 @@ function PublishMenu({
             ? "Toggle the end node's type to 'Evaluator' to enable this option"
             : undefined
         }
-        isDisabled={!!publishDisabledLabel || !isEvaluator}
+        disabled={!!publishDisabledLabel || !isEvaluator}
         onClick={toggleSaveAsEvaluator}
-        icon={<CheckCircle size={16} />}
+        value="evaluator"
       >
+        <CheckCircle size={16} />{" "}
         {publishedWorkflow.data?.isEvaluator
           ? "Delete Evaluator"
           : "Save as Evaluator"}
@@ -340,20 +339,20 @@ function PublishMenu({
       >
         <SubscriptionMenuItem
           tooltip={publishDisabledLabel}
-          isDisabled={!!publishDisabledLabel}
-          icon={<Play size={16} />}
+          disabled={!!publishDisabledLabel}
+          value="run-app"
         >
-          Run App
+          <Play size={16} /> Run App
         </SubscriptionMenuItem>
       </Link>
 
       <SubscriptionMenuItem
         tooltip={publishDisabledLabel}
         onClick={onToggleApi}
-        isDisabled={!!publishDisabledLabel}
-        icon={<Code size={16} />}
+        disabled={!!publishDisabledLabel}
+        value="api-reference"
       >
-        View API Reference
+        <Code size={16} /> View API Reference
       </SubscriptionMenuItem>
     </>
   );
@@ -397,7 +396,6 @@ function PublishModalContent({
       allowSaveIfAutoSaveIsCurrentButNotLatest: false,
     });
 
-  const toast = useToast();
   const publishWorkflow = api.workflow.publish.useMutation();
 
   const [isPublished, setIsPublished] = useState(false);
@@ -438,24 +436,28 @@ function PublishModalContent({
           });
           versionId = versionResponse.id;
         } catch (error) {
-          toast({
+          toaster.create({
             title: "Error saving version",
-            status: "error",
+            type: "error",
             duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
           throw error;
         }
       }
 
       if (!versionId) {
-        toast({
+        toaster.create({
           title: "Version ID not found for evaluation",
-          status: "error",
+          type: "error",
           duration: 5000,
-          isClosable: true,
-          position: "top-right",
+          meta: {
+            closable: true,
+          },
+          placement: "top-end",
         });
         return;
       }
@@ -474,12 +476,14 @@ function PublishModalContent({
             setIsPublished(true);
           },
           onError: () => {
-            toast({
+            toaster.create({
               title: "Error publishing workflow",
-              status: "error",
+              type: "error",
               duration: 5000,
-              isClosable: true,
-              position: "top-right",
+              meta: {
+                closable: true,
+              },
+              placement: "top-end",
             });
           },
         }
@@ -492,7 +496,6 @@ function PublishModalContent({
       project,
       publishWorkflow,
       publishedWorkflow,
-      toast,
       versionToBeEvaluated.id,
       versions,
       workflowId,
@@ -506,17 +509,19 @@ function PublishModalContent({
 
   if (!versions.data) {
     return (
-      <ModalContent borderTop="5px solid" borderColor="green.400">
-        <ModalHeader fontWeight={600}>Publish Workflow</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
+      <Dialog.Content borderTop="5px solid" borderColor="green.400">
+        <Dialog.Header>
+          <Dialog.Title fontWeight={600}>Publish Workflow</Dialog.Title>
+        </Dialog.Header>
+        <Dialog.CloseTrigger />
+        <Dialog.Body>
           <VStack align="start" width="full">
             <Skeleton width="full" height="20px" />
             <Skeleton width="full" height="20px" />
           </VStack>
-        </ModalBody>
-        <ModalFooter />
-      </ModalContent>
+        </Dialog.Body>
+        <Dialog.Footer />
+      </Dialog.Content>
     );
   }
 
@@ -525,17 +530,19 @@ function PublishModalContent({
     : false;
 
   return (
-    <ModalContent
+    <Dialog.Content
       as="form"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onSubmit={form.handleSubmit(onSubmit)}
       borderTop="5px solid"
       borderColor="green.400"
     >
-      <ModalHeader fontWeight={600}>Publish Workflow</ModalHeader>
-      <ModalCloseButton />
-      <ModalBody>
-        <VStack align="start" width="full" spacing={10}>
+      <Dialog.Header>
+        <Dialog.Title fontWeight={600}>Publish Workflow</Dialog.Title>
+      </Dialog.Header>
+      <Dialog.CloseTrigger />
+      <Dialog.Body>
+        <VStack align="start" width="full" gap={10}>
           <Text fontSize="15px" color="black">
             Publish your workflow to make it available via API, as a component
             to other workflows, or as a custom evaluator.
@@ -549,9 +556,9 @@ function PublishModalContent({
             />
           )}
         </VStack>
-      </ModalBody>
-      <ModalFooter borderTop="1px solid" borderColor="gray.200" marginTop={4}>
-        <VStack align="start" width="full" spacing={3}>
+      </Dialog.Body>
+      <Dialog.Footer borderTop="1px solid" borderColor="gray.200" marginTop={4}>
+        <VStack align="start" width="full" gap={3}>
           {hasProvidersWithoutCustomKeys && (
             <AddModelProviderKey
               runWhat="publish"
@@ -559,18 +566,16 @@ function PublishModalContent({
             />
           )}
           {!isPublished && (
-            <Tooltip label={isDisabled}>
+            <Tooltip content={isDisabled}>
               <HStack width="full">
                 <Spacer />
                 <Button
                   variant="outline"
                   type="submit"
-                  leftIcon={<ArrowUpCircle size={16} />}
-                  isLoading={
-                    commitVersion.isLoading || publishWorkflow.isLoading
-                  }
-                  isDisabled={!!isDisabled}
+                  loading={commitVersion.isLoading || publishWorkflow.isLoading}
+                  disabled={!!isDisabled}
                 >
+                  <ArrowUpCircle size={16} />{" "}
                   {isDisabled
                     ? "Publish"
                     : `Publish Version ${
@@ -584,10 +589,12 @@ function PublishModalContent({
           )}
           {isPublished && (
             <VStack align="start" width="full">
-              <Alert status="success">
-                <AlertIcon />
-                New version published
-              </Alert>
+              <Alert.Root status="success">
+                <Alert.Indicator />
+                <Alert.Content>
+                  <Alert.Description>New version published</Alert.Description>
+                </Alert.Content>
+              </Alert.Root>
               <VStack width="full" align="start">
                 <Link
                   href={`/${project?.slug}/chat/${
@@ -598,28 +605,23 @@ function PublishModalContent({
                     textDecoration: "none",
                   }}
                 >
-                  <Button
-                    colorScheme="green"
-                    leftIcon={<Play size={16} />}
-                    variant="outline"
-                  >
-                    Run App
+                  <Button colorPalette="green" variant="outline">
+                    <Play size={16} /> Run App
                   </Button>
                 </Link>
                 <Button
-                  colorScheme="green"
+                  colorPalette="green"
                   onClick={() => openApiModal()}
-                  leftIcon={<Code size={16} />}
                   variant="outline"
                 >
-                  View API Reference
+                  <Code size={16} /> View API Reference
                 </Button>
               </VStack>
             </VStack>
           )}
         </VStack>
-      </ModalFooter>
-    </ModalContent>
+      </Dialog.Footer>
+    </Dialog.Content>
   );
 }
 
@@ -662,10 +664,12 @@ export const ApiModalContent = () => {
     2
   );
   return (
-    <ModalContent>
-      <ModalHeader>Workflow API</ModalHeader>
-      <ModalCloseButton />
-      <ModalBody>
+    <Dialog.Content>
+      <Dialog.Header>
+        <Dialog.Title>Workflow API</Dialog.Title>
+      </Dialog.Header>
+      <Dialog.CloseTrigger />
+      <Dialog.Body>
         <Text paddingBottom={8}>
           Incorporate the following JSON payload within the body of your HTTP
           POST request to get the workflow result.
@@ -708,8 +712,8 @@ EOF`}
           </Link>
           .
         </Text>
-      </ModalBody>
-      <ModalFooter></ModalFooter>
-    </ModalContent>
+      </Dialog.Body>
+      <Dialog.Footer />
+    </Dialog.Content>
   );
 };

@@ -1,10 +1,19 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
-import React from "react";
+import {
+  Box,
+  createListCollection,
+  Field,
+  HStack,
+  Input,
+  Text,
+} from "@chakra-ui/react";
+import React, { useEffect, useState } from "react";
+import { Search } from "react-feather";
 import models from "../../models.json";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { api } from "../utils/api";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
+import { api } from "../utils/api";
+import { InputGroup } from "./ui/input-group";
+import { Select } from "./ui/select";
 
 export type ModelOption = {
   label: string;
@@ -83,59 +92,142 @@ export const ModelSelector = React.memo(function ModelSelector({
   size?: "sm" | "md" | "full";
   mode?: "chat" | "embedding" | "evaluator";
 }) {
-  const { modelOption, selectOptions } = useModelSelectionOptions(
-    options,
-    model,
-    mode
+  const { selectOptions } = useModelSelectionOptions(options, model, mode);
+
+  const [modelSearch, setModelSearch] = useState("");
+
+  const options_ = selectOptions.map((option) => ({
+    label: option.label,
+    value: option.value,
+    icon: option.icon,
+    isDisabled: option.isDisabled,
+    mode: option.mode,
+  }));
+
+  const modelCollection = createListCollection({
+    items: options_.filter(
+      (item) =>
+        item.label.toLowerCase().includes(modelSearch.toLowerCase()) ||
+        item.value.toLowerCase().includes(modelSearch.toLowerCase())
+    ),
+  });
+
+  const selectedItem = options_.find((option) => option.value === model);
+
+  const isDisabled = selectOptions.find(
+    (option) => option.value === selectedItem?.value
+  )?.isDisabled;
+
+  const isDeprecated = !selectedItem;
+
+  const selectValueText = (
+    <HStack
+      overflow="hidden"
+      gap={2}
+      align="center"
+      opacity={isDisabled ? 0.5 : 1}
+    >
+      {selectedItem?.icon && (
+        <Box minWidth={size === "sm" ? "14px" : "16px"}>
+          {selectedItem.icon}
+        </Box>
+      )}
+      <Box
+        fontSize={size === "sm" ? 12 : 14}
+        fontFamily="mono"
+        lineClamp={1}
+        wordBreak="break-all"
+      >
+        {selectedItem?.label ?? model}
+      </Box>
+      {(isDisabled || isDeprecated) && (
+        <Text
+          fontSize={size === "sm" ? 12 : 14}
+          fontFamily="mono"
+          color="gray.400"
+        >
+          {isDeprecated ? "(deprecated)" : "(disabled)"}
+        </Text>
+      )}
+    </HStack>
   );
 
+  const [highlightedValue, setHighlightedValue] = useState<string | null>(
+    model
+  );
+
+  useEffect(() => {
+    const highlightedItem = modelCollection.items.find(
+      (item) => item.value === highlightedValue
+    );
+    if (!highlightedItem) {
+      setHighlightedValue(modelCollection.items[0]?.value ?? null);
+    }
+  }, [highlightedValue, modelCollection.items]);
+
   return (
-    <MultiSelect
-      className="fix-hidden-inputs"
-      value={modelOption}
-      onChange={(option) => option && onChange(option.value)}
-      options={selectOptions}
-      isSearchable={false}
-      chakraStyles={{
-        container: (base) => ({
-          ...base,
-          background: "white",
-          width: size === "full" ? "100%" : "auto",
-          borderRadius: "5px",
-          padding: 0,
-        }),
-        valueContainer: (base) => ({
-          ...base,
-          padding: size === "sm" ? "0px 8px" : "0px 12px",
-        }),
-        control: (base) => ({
-          ...base,
-          minHeight: 0,
-          height: size === "sm" ? "32px" : "40px",
-        }),
-        dropdownIndicator: (provided) => ({
-          ...provided,
-          background: "white",
-          padding: 0,
-          paddingRight: 2,
-          width: "auto",
-          border: "none",
-        }),
-        indicatorSeparator: (provided) => ({
-          ...provided,
-          display: "none",
-        }),
+    <Select.Root
+      collection={modelCollection}
+      value={[model]}
+      onValueChange={(change) => {
+        const selectedValue = change.value[0];
+        if (selectedValue) {
+          onChange(selectedValue);
+        }
       }}
-      components={{
-        Option: ({ children, ...props }) => (
-          <chakraComponents.Option {...props}>
-            <HStack spacing={2} align="center">
-              <Box width="14px" minWidth="14px">
-                {props.data.icon}
+      loopFocus={true}
+      highlightedValue={highlightedValue}
+      onHighlightChange={(details) => {
+        setHighlightedValue(details.highlightedValue);
+      }}
+    >
+      <Select.Trigger
+        className="fix-hidden-inputs"
+        width={size === "full" ? "100%" : "auto"}
+        background="white"
+        borderRadius="5px"
+        padding={0}
+      >
+        <Select.ValueText
+          // @ts-ignore
+          placeholder={selectValueText}
+        >
+          {() => selectValueText}
+        </Select.ValueText>
+      </Select.Trigger>
+      <Select.Content zIndex="1600">
+        <Field.Root asChild>
+          <Box position="sticky" top={0} zIndex="1">
+            <InputGroup
+              startElement={<Search size={16} />}
+              startOffset="-4px"
+              background="white"
+              width="calc(100% - 9px)"
+            >
+              <Input
+                size="sm"
+                placeholder="Search models"
+                type="search"
+                value={modelSearch}
+                onChange={(e) => setModelSearch(e.target.value)}
+              />
+            </InputGroup>
+          </Box>
+        </Field.Root>
+        {modelCollection.items.map((item) => (
+          <Select.Item key={item.value} item={item}>
+            <HStack
+              gap={3}
+              align="center"
+              paddingY={size === "sm" ? 0 : "2px"}
+              alignItems="start"
+            >
+              <Box width="14px" minWidth="14px" paddingTop="3px">
+                {item.icon}
               </Box>
               <Box fontSize={size === "sm" ? 12 : 14} fontFamily="mono">
-                {children}
-                {props.data.isDisabled && (
+                {item.label}
+                {item.isDisabled && (
                   <>
                     {" "}
                     <Text
@@ -150,44 +242,10 @@ export const ModelSelector = React.memo(function ModelSelector({
                 )}
               </Box>
             </HStack>
-          </chakraComponents.Option>
-        ),
-        ValueContainer: ({ children, ...props }) => {
-          const { getValue } = props;
-          const value = getValue();
-          const icon = value.length > 0 ? value[0]?.icon : null;
-          const model = value.length > 0 ? value[0]?.value : null;
-          const isDisabled =
-            selectOptions.find((option) => option.value === model)
-              ?.isDisabled ?? true;
-
-          return (
-            <chakraComponents.ValueContainer {...props}>
-              <HStack
-                overflow="hidden"
-                spacing={2}
-                align="center"
-                opacity={isDisabled ? 0.5 : 1}
-              >
-                <Box minWidth={size === "sm" ? "14px" : "16px"}>{icon}</Box>
-                <Box fontSize={size === "sm" ? 12 : 14} fontFamily="mono">
-                  {children}
-                </Box>
-                {isDisabled && (
-                  <Text
-                    fontSize={size === "sm" ? 12 : 14}
-                    fontFamily="mono"
-                    color="gray.400"
-                  >
-                    (disabled)
-                  </Text>
-                )}
-              </HStack>
-            </chakraComponents.ValueContainer>
-          );
-        },
-      }}
-    />
+          </Select.Item>
+        ))}
+      </Select.Content>
+    </Select.Root>
   );
 });
 

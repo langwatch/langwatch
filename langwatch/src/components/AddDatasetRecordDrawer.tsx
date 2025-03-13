@@ -1,17 +1,7 @@
-import { Link } from "@chakra-ui/next-js";
-import {
-  Button,
-  Drawer,
-  DrawerBody,
-  DrawerCloseButton,
-  DrawerContent,
-  DrawerHeader,
-  HStack,
-  Text,
-  useDisclosure,
-  useToast,
-  VStack,
-} from "@chakra-ui/react";
+import { Link } from "./ui/link";
+import { Button, useDisclosure, VStack, HStack, Text } from "@chakra-ui/react";
+import { Drawer } from "./ui/drawer";
+import { toaster } from "./ui/toaster";
 import { useEffect, useRef, useState } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { useLocalStorage } from "usehooks-ts";
@@ -39,7 +29,6 @@ interface AddDatasetDrawerProps {
 export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const createDatasetRecord = api.datasetRecord.create.useMutation();
-  const toast = useToast();
   const editDataset = useDisclosure();
   const { closeDrawer } = useDrawer();
 
@@ -157,32 +146,35 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       {
         onSuccess: () => {
           closeDrawer();
-          toast({
-            duration: 3000,
-            isClosable: true,
-            position: "top-right",
+          toaster.create({
             title: "Succesfully added to dataset",
-            status: "success",
             description: (
               <Link
-                colorScheme="white"
+                colorPalette="white"
                 textDecoration={"underline"}
                 href={`/${project?.slug}/datasets/${datasetId}`}
+                isExternal={false}
               >
                 View the dataset
               </Link>
             ),
+            type: "success",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
         },
         onError: () => {
-          toast({
+          toaster.create({
             title: "Failed to add to the dataset",
             description:
               "Please check if the rows were not already inserted in the dataset",
-            status: "error",
-            duration: 5000,
-            isClosable: true,
-            position: "top-right",
+            type: "error",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
           });
         },
       }
@@ -213,14 +205,18 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   }, [rowDataFromDataset]);
 
   return (
-    <Drawer
-      isOpen={true}
-      placement="right"
+    <Drawer.Root
+      open={true}
+      placement="end"
       size="xl"
-      onClose={handleOnClose}
-      blockScrollOnMount={true}
+      onOpenChange={({ open }) => {
+        if (!open) {
+          handleOnClose();
+        }
+      }}
+      preventScroll={true}
     >
-      <DrawerContent
+      <Drawer.Content
         maxWidth="1400px"
         overflow="scroll"
         ref={scrollRef}
@@ -232,17 +228,17 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           )
         }
       >
-        <DrawerHeader>
+        <Drawer.Header>
           <HStack>
-            <DrawerCloseButton />
+            <Drawer.CloseTrigger />
           </HStack>
           <HStack>
             <Text paddingTop={5} fontSize="3xl">
               Add to Dataset
             </Text>
           </HStack>
-        </DrawerHeader>
-        <DrawerBody overflow="visible" paddingX={0}>
+        </Drawer.Header>
+        <Drawer.Body overflow="visible" paddingX={0}>
           {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
           <form onSubmit={handleSubmit(onSubmit)}>
             <VStack paddingX={6}>
@@ -279,11 +275,11 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             >
               <Button
                 type="submit"
-                colorScheme="blue"
+                colorPalette="blue"
                 marginTop={6}
                 marginBottom={4}
-                isLoading={createDatasetRecord.isLoading}
-                isDisabled={
+                loading={createDatasetRecord.isLoading}
+                disabled={
                   !selectedDataset ||
                   !tracesWithSpans.data ||
                   rowsToAdd.length === 0
@@ -299,8 +295,8 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
               </Button>
             </HStack>
           </form>
-        </DrawerBody>
-      </DrawerContent>
+        </Drawer.Body>
+      </Drawer.Content>
       <AddOrEditDatasetDrawer
         datasetToSave={
           selectedDataset
@@ -313,10 +309,10 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
               }
             : undefined
         }
-        isOpen={editDataset.isOpen}
+        open={editDataset.open}
         onClose={editDataset.onClose}
         onSuccess={onCreateDatasetSuccess}
       />
-    </Drawer>
+    </Drawer.Root>
   );
 }
