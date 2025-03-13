@@ -197,10 +197,10 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
         if (llmCall.response?.output) {
           delete llmCall.response.choices;
         }
-        totalSize += JSON.stringify(llmCall).length;
 
         if (llmCall.response) {
           llmCall.response = safeTruncate(llmCall.response);
+          totalSize = JSON.stringify(llmCall).length;
 
           if (totalSize >= 256_000) {
             llmCall.response.output = "[truncated]";
