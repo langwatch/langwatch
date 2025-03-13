@@ -1,12 +1,30 @@
-from typing import Tuple, Type, cast
+from typing import Tuple, Type, cast, List, Dict, Set
+import asyncio
+import time
+import importlib
+
 from langwatch_nlp.studio.modules.registry import (
     EVALUATORS_FOR_TEMPLATE,
     FIELD_TYPE_TO_DSPY_TYPE,
     PROMPTING_TECHNIQUES_FOR_TEMPLATE,
 )
 from langwatch_nlp.studio.parser import parse_fields
-from langwatch_nlp.studio.types.dsl import Node, Workflow
+from langwatch_nlp.studio.types.dsl import Node, Workflow, Edge
 from langwatch_nlp.studio.dspy.workflow_module import WorkflowModule
+from langwatch_nlp.studio.dspy.reporting_module import ReportingModule
+from langwatch_nlp.studio.dspy.llm_node import LLMNode
+from langwatch_nlp.studio.dspy.evaluation import (
+    EvaluationResultWithMetadata,
+    PredictionWithEvaluationAndMetadata,
+)
+from langwatch_nlp.studio.dspy.predict_with_metadata import PredictionWithMetadata
+from dspy.utils.asyncify import asyncify
+from langevals_core.base_evaluator import (
+    SingleEvaluationResult,
+    EvaluationResultError,
+    EvaluationResult,
+)
+import langwatch
 from jinja2 import Environment, FileSystemLoader
 import re
 import dspy
@@ -49,15 +67,20 @@ def render_template(template_name: str, format=False, **kwargs) -> str:
 
 
 def parse_workflow(workflow: Workflow, format=False) -> Tuple[str, str]:
+    # Find all reachable nodes from entry
+    nodes = find_reachable_nodes(workflow.nodes, workflow.edges)
+
     node_templates = {
-        node.id: parse_component(node, workflow, format) for node in workflow.nodes
+        node.id: parse_component(node, workflow, format) for node in nodes
     }
+
     module = render_template(
         "workflow.py.jinja",
         format=format,
         workflow=workflow,
         debug_level=1,
         node_templates=node_templates,
+        nodes=nodes,
     )
 
     return "WorkflowModule", module
@@ -139,3 +162,33 @@ def get_component_class(component_code: str, class_name: str) -> Type[dspy.Modul
     namespace = {}
     exec(component_code, namespace)
     return namespace[class_name]
+
+
+def find_reachable_nodes(nodes: List[Node], edges: List[Edge]) -> List[Node]:
+    # Build dependency graph and node lookup
+    dependency_graph: Dict[str, List[str]] = {node.id: [] for node in nodes}
+    node_lookup: Dict[str, Node] = {node.id: node for node in nodes}
+
+    for edge in edges:
+        dependency_graph[edge.target].append(edge.source)
+
+    # BFS to find all reachable nodes
+    reachable_node_ids = {"entry"}
+    queue = ["entry"]
+    visited = set()
+
+    while queue:
+        current = queue.pop(0)
+        if current not in visited:
+            visited.add(current)
+            reachable_node_ids.add(current)
+
+            # Find all nodes that have this node as a dependency
+            for node_id, deps in dependency_graph.items():
+                if current in deps and node_id not in visited and node_id not in queue:
+                    queue.append(node_id)
+
+    # Convert IDs to Node objects
+    reachable_nodes = [node_lookup[node_id] for node_id in reachable_node_ids if node_id in node_lookup]
+
+    return reachable_nodes
