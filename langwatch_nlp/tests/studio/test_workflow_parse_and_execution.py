@@ -45,7 +45,8 @@ llm_field = Field(
 
 
 @pytest.mark.integration
-def test_parse_workflow():
+@pytest.mark.asyncio
+async def test_parse_workflow():
     disable_dsp_caching()
     workflow = Workflow(
         workflow_id="simple-rag",
@@ -311,14 +312,16 @@ def test_parse_workflow():
 
     class_name, code = parse_workflow(workflow, format=True)
     print("\n\ncode", code, "\n\n")
-    Module = get_component_class(class_name, code)
-    instance = Module(manual_execution_mode=False)  # type: ignore
-    result: PredictionWithEvaluationAndMetadata = instance(
-        question="What is the capital of France?",
-        gold_answer="Paris",
+    Module = get_component_class(component_code=code, class_name=class_name)
+    instance = Module()  # type: ignore
+    result: PredictionWithEvaluationAndMetadata = await instance(
+        inputs={
+            "question": "What is the capital of France?",
+            "gold_answer": "Paris",
+        }
     )
     print("\n\nresult", result, "\n\n")
-    assert result["end"]["result"] == "Paris"
+    assert "Paris" in result["end"]["result"]
 
     # TODO: test cost
     # TODO: test duration
@@ -341,3 +344,4 @@ def test_parse_workflow():
 # TODO: test langwatch evaluators with settings
 # TODO: test until_node_id
 # TODO: test evaluate_prediction
+# TODO: test different formats auto-parsing

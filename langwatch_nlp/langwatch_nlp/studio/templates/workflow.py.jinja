@@ -35,7 +35,7 @@ patch_optional_image()
 class WorkflowModule(ReportingModule):
     def __init__(
         self,
-        {# TODO: rename this to run_evaluations #}
+        {# TODO: support this, and remove this into actual template logic #}
         manual_execution_mode: bool = False,
         {# TODO: support this, and remove this into actual template logic #}
         until_node_id: Optional[str] = None,
@@ -53,6 +53,7 @@ class WorkflowModule(ReportingModule):
         {% endif %}
         {% endfor %}
 
+    {# TODO: migrate from inputs: Dict to actual arguments #}
     async def forward(self, inputs: Dict[str, Any]) -> dspy.Prediction:
         try:
             langwatch.get_current_span().update(type="workflow")
@@ -151,28 +152,38 @@ class WorkflowModule(ReportingModule):
                 raise e
 
         {# Finally execute end node #}
+        {% set ns = namespace(end_node=None) %}
         {% for node in workflow.nodes %}
             {% if node.type == "end" %}
-        return PredictionWithEvaluationAndMetadata(
-                {% for edge in workflow.edges %}
-                    {% if edge.target == node.id %}
-                        {% set source_parts = edge.sourceHandle.split(".") %}
-                        {% set target_parts = edge.targetHandle.split(".") %}
-                        {{ edge_param(edge, source_parts, target_parts) }}
-                    {% endif %}
-                {% endfor %}
-                cost=cost,
-                duration=round((time.time() - start_time) * 1000),
-                error=error,
-                {# # TODO: rename this to evaluate #}
-                evaluation=self.evaluate_prediction,
-        )
+                {% set ns.end_node = node %}
             {% endif %}
         {% endfor %}
+        return PredictionWithEvaluationAndMetadata(
+            {% for edge in workflow.edges %}
+                {% if edge.target == ns.end_node.id %}
+                    {% set source_parts = edge.sourceHandle.split(".") %}
+                    {% set target_parts = edge.targetHandle.split(".") %}
+                    {% if edge.source == "entry" %}
+            end={"{{ target_parts[1] }}": inputs["{{ source_parts[1] }}"]},
+                    {% else %}
+            end={"{{ target_parts[1] }}": {{ edge.source }}.{{ source_parts[1] }}},
+                    {% endif %}
+                {% endif %}
+            {% endfor %}
+            {% for node in workflow.nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
+            {{ node.id }}={{ node.id }},
+            {% endfor %}
+            cost=cost,
+            duration=round((time.time() - start_time) * 1000),
+            error=error,
+            {# # TODO: rename this to evaluate #}
+            evaluation=self.evaluate_prediction,
+        )
 
     def evaluate_prediction(
         self,
         example: dspy.Example,
+        prediction: PredictionWithMetadata,
         trace: Optional[Any] = None,
         return_results: bool = False,
     ) -> float | tuple[float, dict[str, EvaluationResultWithMetadata]]:
