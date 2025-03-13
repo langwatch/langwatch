@@ -1,7 +1,9 @@
 import {
+  Badge,
   Button,
   Card,
   Field,
+  Flex,
   HStack,
   Heading,
   Input,
@@ -13,6 +15,7 @@ import {
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
+import { Link } from "../../components/ui/link";
 import { OrganizationUserRole } from "@prisma/client";
 import {
   Select as MultiSelect,
@@ -394,13 +397,18 @@ function MembersList({
                         />
                       </Table.Cell>
                       <Table.Cell>
-                        {member.user.teamMemberships
-                          .flatMap((tmember) => tmember.team)
-                          .filter(
-                            (tmember) => tmember.organizationId == organization.id
-                          )
-                          .map((tmember) => tmember.name)
-                          .join(", ")}
+                        <Flex gap={2} flexWrap="wrap">
+                          {member.user.teamMemberships
+                            .flatMap(m => m.team)
+                            .filter(m => m.organizationId == organization.id)
+                            .map(m => (
+                              <Link href={`/settings/teams/${m.slug}`} key={m.id}>
+                                <Badge size="xs" variant="surface">
+                                  {m.name}
+                                </Badge>
+                              </Link>
+                            ))}
+                        </Flex>
                       </Table.Cell>
                       <Table.Cell>
                         <Menu.Root>
@@ -449,13 +457,19 @@ function MembersList({
                         <Table.Cell>{invite.email}</Table.Cell>
                         <Table.Cell>{selectOptions.find(option => option.value === invite.role)?.label || invite.role}</Table.Cell>
                         <Table.Cell>
-                          {invite.teamIds
-                            .split(",")
-                            .map(
-                              (teamId) =>
-                                teams.find((team) => team.id == teamId)?.name
-                            )
-                            .join(", ")}
+                          <Flex gap={2} flexWrap="wrap">
+                            {invite.teamIds.split(",").map(teamId => {
+                              const team = teams.find(team => team.id === teamId);
+
+                              if (!team) return null;
+
+                              return (
+                                <Link href={`/settings/teams/${team.slug}`} key={teamId}>
+                                  <Badge size="xs" variant={"surface"}>{team.name}</Badge>
+                                </Link>
+                              );
+                            })}
+                          </Flex>
                         </Table.Cell>
                         <Table.Cell>
                           <Menu.Root>
