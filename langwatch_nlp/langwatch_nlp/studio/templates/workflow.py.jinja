@@ -45,7 +45,7 @@ class WorkflowModule(ReportingModule):
 
         self.manual_execution_mode = manual_execution_mode
 
-        {% for node in workflow.nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
+        {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
         {% if node.type == "evaluator" %}
         self.{{ node.id }} = asyncify(self.with_reporting({{ evaluator_instance(node) }}, "{{ node.id }}"))
         {% else %}
@@ -68,7 +68,7 @@ class WorkflowModule(ReportingModule):
 
             {# First build dependency graph #}
             {% set dependency_graph = {} %}
-            {% for node in workflow.nodes %}
+            {% for node in nodes %}
                 {% set _ = dependency_graph.update({node.id: []}) %}
             {% endfor %}
             {% for edge in workflow.edges %}
@@ -84,8 +84,8 @@ class WorkflowModule(ReportingModule):
             {% endif %}
 
             {# Build layers until all nodes are executed #}
-            {% set remaining_nodes = workflow.nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
-            {% for i in range(workflow.nodes|length) %}
+            {% set remaining_nodes = nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
+            {% for i in range(nodes|length) %}
                 {% set current_layer = [] %}
                 {% for node in remaining_nodes %}
                     {% set ns = namespace(can_execute=true) %}
@@ -129,7 +129,10 @@ class WorkflowModule(ReportingModule):
                 ),
                     {% endfor %}
             )
-            {# TODO: gather cost too #}
+            {% for node in layer %}
+            cost += {{ node.id }}.get_cost()
+            {% endfor %}
+
                 {% else %}
             {{ layer[0].id }} = await self.{{ layer[0].id }}(
                     {% for edge in workflow.edges %}
@@ -141,7 +144,7 @@ class WorkflowModule(ReportingModule):
                     {% endfor %}
             )
             {# TODO: move this to parent class probably #}
-            cost += {{ layer[0].id }}.get_cost() if hasattr({{ layer[0].id }}, "get_cost") else 0  # type: ignore
+            cost += {{ layer[0].id }}.get_cost()
 
                 {% endif %}
             {% endfor %}
@@ -158,19 +161,22 @@ class WorkflowModule(ReportingModule):
                 {% set ns.end_node = node %}
             {% endif %}
         {% endfor %}
+
         return PredictionWithEvaluationAndMetadata(
-            {% for edge in workflow.edges %}
-                {% if edge.target == ns.end_node.id %}
-                    {% set source_parts = edge.sourceHandle.split(".") %}
-                    {% set target_parts = edge.targetHandle.split(".") %}
-                    {% if edge.source == "entry" %}
-            end={"{{ target_parts[1] }}": inputs["{{ source_parts[1] }}"]},
-                    {% else %}
-            end={"{{ target_parts[1] }}": {{ edge.source }}.{{ source_parts[1] }}},
+            end={
+                {% for edge in workflow.edges %}
+                    {% if edge.target == ns.end_node.id %}
+                        {% set source_parts = edge.sourceHandle.split(".") %}
+                        {% set target_parts = edge.targetHandle.split(".") %}
+                        {% if edge.source == "entry" %}
+                "{{ target_parts[1] }}": inputs["{{ source_parts[1] }}"],
+                        {% else %}
+                "{{ target_parts[1] }}": {{ edge.source }}.{{ source_parts[1] }},
+                        {% endif %}
                     {% endif %}
-                {% endif %}
-            {% endfor %}
-            {% for node in workflow.nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
+                {% endfor %}
+            },
+            {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
             {{ node.id }}={{ node.id }},
             {% endfor %}
             cost=cost,
