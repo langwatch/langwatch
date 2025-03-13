@@ -5,7 +5,7 @@ import os
 from typing import Dict, Any, List, Optional, Union, cast
 from langwatch_nlp.studio.dspy.llm_node import LLMNode
 
-{% set class_name = component.name or "AnonymousSignature" %}
+{% set class_name = component.name or "Anonymous" %}
 {% set field_type_to_dspy_type = {
     "image": "dspy.Image",
     "str": "str",
