@@ -6,18 +6,14 @@ from typing import Dict, Any, List, Optional, Union, cast
 from langwatch_nlp.studio.dspy.llm_node import LLMNode
 
 {% set class_name = component.name or "Anonymous" %}
-{% set field_type_to_dspy_type = {
-    "image": "dspy.Image",
-    "str": "str",
-    "int": "int",
-    "float": "float",
-    "bool": "bool",
-    "list_str": "list[str]"
-} %}
 
-{% set prompting_technique_map = {
-    "ChainOfThought": "dspy.ChainOfThought",
-} %}
+{% set ns = namespace(decorator_node=None) %}
+{% for node in workflow.nodes %}
+    {% if node.id == prompting_technique.ref %}
+        {% set ns.decorator_node = node %}
+{{ PROMPTING_TECHNIQUES[node.data.cls]["import"] }}
+    {% endif %}
+{% endfor %}
 
 class {{ class_name }}Signature(dspy.Signature):
     {% if parameters.get('instructions', '') %}
@@ -25,10 +21,10 @@ class {{ class_name }}Signature(dspy.Signature):
 
     {% endif %}
     {% for input_field in component.inputs or [] %}
-    {{ input_field.identifier }}: {{ field_type_to_dspy_type[input_field.type.value] }} = dspy.InputField()
+    {{ input_field.identifier }}: {{ FIELD_TYPE_TO_DSPY_TYPE[input_field.type.value] }} = dspy.InputField()
     {% endfor %}
     {% for output_field in component.outputs or [] %}
-    {{ output_field.identifier }}: {{ field_type_to_dspy_type[output_field.type.value] }} = dspy.OutputField()
+    {{ output_field.identifier }}: {{ FIELD_TYPE_TO_DSPY_TYPE[output_field.type.value] }} = dspy.OutputField()
     {% endfor %}
     {% if not component.inputs and not component.outputs %}
     pass
@@ -37,16 +33,10 @@ class {{ class_name }}Signature(dspy.Signature):
 
 class {{ class_name }}(LLMNode):
     def __init__(self):
-        {% set ns = namespace(decorator_node=None) %}
         {% if prompting_technique %}
         {# Apply prompting technique decorator #}
-        {% for node in workflow.nodes %}
-            {% if node.id == prompting_technique.ref %}
-                {% set ns.decorator_node = node %}
-            {% endif %}
-        {% endfor %}
         {% if ns.decorator_node %}
-        predict = {{ prompting_technique_map[ns.decorator_node.data.cls] }}({{ class_name }}Signature)
+        predict = {{ PROMPTING_TECHNIQUES[ns.decorator_node.data.cls]["class"] }}({{ class_name }}Signature)
         {% else %}
         {# Decorator node {{ prompting_technique.ref }} not found #}
         predict = dspy.Predict({{ class_name }}Signature)
