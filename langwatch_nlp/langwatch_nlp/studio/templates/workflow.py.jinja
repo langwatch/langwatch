@@ -26,6 +26,16 @@ from dspy.utils.asyncify import asyncify
 
 patch_optional_image()
 
+{% macro edge_param(edge, source_parts, target_parts) %}
+{% if source_parts[0] == "outputs" %}
+    {% if edge.source == "entry" %}
+{{ target_parts[1] }}=inputs["{{ source_parts[1] }}"],
+    {% else %}
+{{ target_parts[1] }}={{ edge.source }}.{{ source_parts[1] }},
+    {% endif %}
+{% endif %}
+{% endmacro %}
+
 {% for node_id, node_template in node_templates.items() %}
 {{ node_template[1] }}
 {% endfor %}
@@ -40,24 +50,15 @@ class WorkflowModule(ReportingModule):
     ):
         super().__init__()
 
-        {% for node in workflow.nodes|selectattr("type", "ne", "end")|list %}
+        {% for node in workflow.nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
         self.{{ node.id }} = asyncify({{ node_templates[node.id][0] }}())
         {% endfor %}
 
-    async def forward(self, **kwargs):
+    async def forward(self, inputs: Dict[str, Any]) -> dspy.Prediction:
         try:
             langwatch.get_current_span().update(type="workflow")
         except Exception:
             pass
-
-        {# First find the entry node and execute it #}
-        {% for node in workflow.nodes %}
-            {% if node.type == "entry" %}
-        # Execute entry node
-        entry_instance = asyncify({{ node_templates[node.id][0] }}())
-        entry_result = await entry_instance(**kwargs)
-            {% endif %}
-        {% endfor %}
 
         {# First build dependency graph #}
         {% set dependency_graph = {} %}
@@ -109,7 +110,6 @@ class WorkflowModule(ReportingModule):
         {# Generate code for each layer #}
         {% for layer in layers %}
             {% if layer|length > 1 %}
-        # Execute parallel nodes
         {{ layer|map(attribute="id")|list|join(", ") }} = await asyncio.gather(
                 {% for node in layer %}
             self.{{ node.id }}(
@@ -117,24 +117,19 @@ class WorkflowModule(ReportingModule):
                         {% if edge.target == node.id %}
                             {% set source_parts = edge.sourceHandle.split(".") %}
                             {% set target_parts = edge.targetHandle.split(".") %}
-                            {% if source_parts[0] == "outputs" %}
-                {{ target_parts[1] }}={{ edge.source }}_result["{{ source_parts[1] }}"],
-                            {% endif %}
+                            {{ edge_param(edge, source_parts, target_parts) }}
                         {% endif %}
                     {% endfor %}
             ),
                 {% endfor %}
         )
             {% else %}
-        # Execute {{ layer[0].id }}
         {{ layer[0].id }} = await self.{{ layer[0].id }}(
                 {% for edge in workflow.edges %}
                     {% if edge.target == layer[0].id %}
                         {% set source_parts = edge.sourceHandle.split(".") %}
                         {% set target_parts = edge.targetHandle.split(".") %}
-                        {% if source_parts[0] == "outputs" %}
-            {{ target_parts[1] }}={{ edge.source }}["{{ source_parts[1] }}"],
-                        {% endif %}
+                        {{ edge_param(edge, source_parts, target_parts) }}
                     {% endif %}
                 {% endfor %}
         )
@@ -150,9 +145,7 @@ class WorkflowModule(ReportingModule):
                     {% if edge.target == node.id %}
                         {% set source_parts = edge.sourceHandle.split(".") %}
                         {% set target_parts = edge.targetHandle.split(".") %}
-                        {% if source_parts[0] == "outputs" %}
-            {{ target_parts[1] }}={{ edge.source }}["{{ source_parts[1] }}"],
-                        {% endif %}
+                        {{ edge_param(edge, source_parts, target_parts) }}
                     {% endif %}
                 {% endfor %}
         )
