@@ -200,7 +200,8 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                   paddingY={2}
                   width="80%"
                 >
-                  {commentState.action !== "new" && (
+                  {(commentState.action !== "new" ||
+                    trace.trace_id !== commentState.traceId) && (
                     <Box
                       onDoubleClick={() => {
                         setCommentState?.({
@@ -220,9 +221,6 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                       </Markdown>
                     </Box>
                   )}
-                  <Text>{trace.trace_id}</Text>
-                  <Text>{commentState.action}</Text>
-                  <Text>{commentState.traceId}</Text>
                   <AnnotationExpectedOutputs
                     traceId={trace.trace_id}
                     setHover={setHover}

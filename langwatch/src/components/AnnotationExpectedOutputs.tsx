@@ -3,6 +3,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
+import { useEffect, useState } from "react";
 
 export const AnnotationExpectedOutputs = ({
   traceId,
