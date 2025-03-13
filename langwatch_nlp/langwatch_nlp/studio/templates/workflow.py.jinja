@@ -35,18 +35,21 @@ patch_optional_image()
 class WorkflowModule(ReportingModule):
     def __init__(
         self,
-        manual_execution_mode: bool,
+        {# TODO: rename this to run_evaluations #}
+        manual_execution_mode: bool = False,
+        {# TODO: support this, and remove this into actual template logic #}
         until_node_id: Optional[str] = None,
         evaluation_weighting: Literal["mean"] = "mean",
-        inputs: Optional[Dict[str, str]] = None,
     ):
         super().__init__()
 
+        self.manual_execution_mode = manual_execution_mode
+
         {% for node in workflow.nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
         {% if node.type == "evaluator" %}
-        self.{{ node.id }} = asyncify({{ evaluator_instance(node) }})
+        self.{{ node.id }} = asyncify(self.with_reporting({{ evaluator_instance(node) }}, "{{ node.id }}"))
         {% else %}
-        self.{{ node.id }} = asyncify({{ node_templates[node.id][0] }}())
+        self.{{ node.id }} = asyncify(self.with_reporting({{ node_templates[node.id][0] }}(), "{{ node.id }}"))
         {% endif %}
         {% endfor %}
 
@@ -56,81 +59,96 @@ class WorkflowModule(ReportingModule):
         except Exception:
             pass
 
-        {# First build dependency graph #}
-        {% set dependency_graph = {} %}
-        {% for node in workflow.nodes %}
-            {% set _ = dependency_graph.update({node.id: []}) %}
-        {% endfor %}
-        {% for edge in workflow.edges %}
-            {% set _ = dependency_graph[edge.target].append(edge.source) %}
-        {% endfor %}
+        cost = 0
+        start_time = time.time()
+        error: Optional[Exception] = None
 
-        {# Now generate execution layers #}
-        {% set executed = {'nodes': ['entry']} %}
-        {% set layers = [] %}
+        try:
 
-        {% if debug_level > 1 %}
-        # Dependency graph: {{ dependency_graph }}
-        {% endif %}
+            {# First build dependency graph #}
+            {% set dependency_graph = {} %}
+            {% for node in workflow.nodes %}
+                {% set _ = dependency_graph.update({node.id: []}) %}
+            {% endfor %}
+            {% for edge in workflow.edges %}
+                {% set _ = dependency_graph[edge.target].append(edge.source) %}
+            {% endfor %}
 
-        {# Build layers until all nodes are executed #}
-        {% set remaining_nodes = workflow.nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
-        {% for i in range(workflow.nodes|length) %}
-            {% set current_layer = [] %}
-            {% for node in remaining_nodes %}
-                {% set ns = namespace(can_execute=true) %}
-                {% for dep in dependency_graph[node.id] %}
-                    {% if dep not in executed.nodes %}
-                        {% set ns.can_execute = false %}
+            {# Now generate execution layers #}
+            {% set executed = {'nodes': ['entry']} %}
+            {% set layers = [] %}
+
+            {% if debug_level > 1 %}
+            # Dependency graph: {{ dependency_graph }}
+            {% endif %}
+
+            {# Build layers until all nodes are executed #}
+            {% set remaining_nodes = workflow.nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
+            {% for i in range(workflow.nodes|length) %}
+                {% set current_layer = [] %}
+                {% for node in remaining_nodes %}
+                    {% set ns = namespace(can_execute=true) %}
+                    {% for dep in dependency_graph[node.id] %}
+                        {% if dep not in executed.nodes %}
+                            {% set ns.can_execute = false %}
+                        {% endif %}
+                    {% endfor %}
+                    {% if debug_level > 1 %}
+            # {{ i }}: Node: {{ node.id }}, can execute: {{ ns.can_execute }}, executed: {{ executed.nodes }}, dependencies: {{ dependency_graph[node.id] }}
+                    {% endif %}
+                    {% if ns.can_execute and node.id not in executed.nodes %}
+                        {% set _ = current_layer.append(node) %}
                     {% endif %}
                 {% endfor %}
-                {% if debug_level > 1 %}
-        # {{ i }}: Node: {{ node.id }}, can execute: {{ ns.can_execute }}, executed: {{ executed.nodes }}, dependencies: {{ dependency_graph[node.id] }}
-                {% endif %}
-                {% if ns.can_execute and node.id not in executed.nodes %}
-                    {% set _ = current_layer.append(node) %}
+                {% if current_layer %}
+                    {% set _ = layers.append(current_layer) %}
+                    {% for node in current_layer %}
+                        {% set _ = executed.nodes.append(node.id) %}
+                    {% endfor %}
                 {% endif %}
             {% endfor %}
-            {% if current_layer %}
-                {% set _ = layers.append(current_layer) %}
-                {% for node in current_layer %}
-                    {% set _ = executed.nodes.append(node.id) %}
-                {% endfor %}
-            {% endif %}
-        {% endfor %}
 
-        {% for layer in layers if debug_level > 0 %}
-        # Layer {{ loop.index }}: {{ layer|map(attribute="id")|list }}
-        {% endfor %}
+            {% for layer in layers if debug_level > 0 %}
+            # Layer {{ loop.index }}: {{ layer|map(attribute="id")|list }}
+            {% endfor %}
 
-        {# Generate code for each layer #}
-        {% for layer in layers %}
-            {% if layer|length > 1 %}
-        {{ layer|map(attribute="id")|list|join(", ") }} = await asyncio.gather(
-                {% for node in layer %}
-            self.{{ node.id }}(
+            {# Generate code for each layer #}
+            {% for layer in layers %}
+                {% if layer|length > 1 %}
+            {{ layer|map(attribute="id")|list|join(", ") }} = await asyncio.gather(
+                    {% for node in layer %}
+                self.{{ node.id }}(
+                        {% for edge in workflow.edges %}
+                            {% if edge.target == node.id %}
+                                {% set source_parts = edge.sourceHandle.split(".") %}
+                                {% set target_parts = edge.targetHandle.split(".") %}
+                                {{ edge_param(edge, source_parts, target_parts) }}
+                            {% endif %}
+                        {% endfor %}
+                ),
+                    {% endfor %}
+            )
+            {# TODO: gather cost too #}
+                {% else %}
+            {{ layer[0].id }} = await self.{{ layer[0].id }}(
                     {% for edge in workflow.edges %}
-                        {% if edge.target == node.id %}
+                        {% if edge.target == layer[0].id %}
                             {% set source_parts = edge.sourceHandle.split(".") %}
                             {% set target_parts = edge.targetHandle.split(".") %}
                             {{ edge_param(edge, source_parts, target_parts) }}
                         {% endif %}
                     {% endfor %}
-            ),
-                {% endfor %}
-        )
-            {% else %}
-        {{ layer[0].id }} = await self.{{ layer[0].id }}(
-                {% for edge in workflow.edges %}
-                    {% if edge.target == layer[0].id %}
-                        {% set source_parts = edge.sourceHandle.split(".") %}
-                        {% set target_parts = edge.targetHandle.split(".") %}
-                        {{ edge_param(edge, source_parts, target_parts) }}
-                    {% endif %}
-                {% endfor %}
-        )
-            {% endif %}
-        {% endfor %}
+            )
+            {# TODO: move this to parent class probably #}
+            cost += {{ layer[0].id }}.get_cost() if hasattr({{ layer[0].id }}, "get_cost") else 0  # type: ignore
+
+                {% endif %}
+            {% endfor %}
+
+        except Exception as e:
+            error = e
+            if self.manual_execution_mode:
+                raise e
 
         {# Finally execute end node #}
         {% for node in workflow.nodes %}
@@ -143,9 +161,22 @@ class WorkflowModule(ReportingModule):
                         {{ edge_param(edge, source_parts, target_parts) }}
                     {% endif %}
                 {% endfor %}
+                cost=cost,
+                duration=round((time.time() - start_time) * 1000),
+                error=error,
+                {# # TODO: rename this to evaluate #}
+                evaluation=self.evaluate_prediction,
         )
             {% endif %}
         {% endfor %}
+
+    def evaluate_prediction(
+        self,
+        example: dspy.Example,
+        trace: Optional[Any] = None,
+        return_results: bool = False,
+    ) -> float | tuple[float, dict[str, EvaluationResultWithMetadata]]:
+        pass
 
 {% for node_id, node_template in node_templates.items() %}
 {{ node_template[1] }}

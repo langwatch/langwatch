@@ -320,6 +320,9 @@ def test_parse_workflow():
     print("\n\nresult", result, "\n\n")
     assert result["end"]["result"] == "Paris"
 
+    # TODO: test cost
+    # TODO: test duration
+
     # evaluation, evaluation_results = result.evaluation(
     #     example=dspy.Example(
     #         question="What is the capital of France?", gold_answer="Paris"
@@ -332,7 +335,9 @@ def test_parse_workflow():
     # assert evaluation_results["exact_match_evaluator"].score == 1.0
 
 
-# TODO: test parallel execution
+# TODO: test parallel execution (check cost too)
 # TODO: test orphan nodes
 # TODO: test infinite loops
 # TODO: test langwatch evaluators with settings
+# TODO: test until_node_id
+# TODO: test evaluate_prediction
