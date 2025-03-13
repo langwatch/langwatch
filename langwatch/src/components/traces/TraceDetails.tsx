@@ -49,7 +49,7 @@ export function TraceDetails(props: {
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const router = useRouter();
 
-  const canViewMessages = props.showMessages ?? router.query.view == "table";
+  const canViewMessages = true;
 
   const { openDrawer, closeDrawer } = useDrawer();
 

@@ -54,9 +54,9 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
   ref
 ) {
   const { project } = useOrganizationTeamProject();
-  const { openDrawer, drawerOpen } = useDrawer();
 
   const [hover, setHover] = useState(false);
+  const [showTools, setShowTools] = useState(false);
 
   const {
     setCommentState,
@@ -89,6 +89,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
     };
   }, [annotations.data]);
 
+  const commentState = useAnnotationCommentStore();
   return (
     <VStack ref={ref as any} align="start" width="full" gap={0}>
       <Grid
@@ -105,15 +106,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
           maxWidth="1000px"
           width="100%"
           position="relative"
-          background={
-            hover
-              ? highlighted
-                ? "blue.50"
-                : "gray.50"
-              : highlighted
-              ? "blue.50"
-              : "white"
-          }
+          background={highlighted ? "blue.50" : hover ? "gray.50" : "white"}
           paddingLeft={10}
           paddingRight={10}
           paddingY={4}
@@ -137,9 +130,9 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
           }
           borderBottom={highlighted ?? index === "last" ? "1px solid" : "none"}
           borderColor={highlighted ? "blue.200" : "gray.200"}
-          onMouseEnter={() => setHover(true)}
-          onMouseMove={() => setHover(true)}
-          onMouseLeave={() => setHover(false)}
+          onMouseEnter={() => setShowTools(true)}
+          onMouseMove={() => setShowTools(true)}
+          onMouseLeave={() => setShowTools(false)}
         >
           <VStack gap={0} marginRight={5} width="100%" align="start">
             {loadingMore && (
@@ -148,7 +141,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                 <Text>Loading messages...</Text>
               </HStack>
             )}
-            {hover && (
+            {showTools && (
               <MessageHoverActions trace={trace} {...translationState} />
             )}
             <Message
@@ -207,7 +200,8 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                   paddingY={2}
                   width="80%"
                 >
-                  {expectedOutputAction !== "new" && (
+                  {(commentState.action !== "new" ||
+                    trace.trace_id !== commentState.traceId) && (
                     <Box
                       onDoubleClick={() => {
                         setCommentState?.({

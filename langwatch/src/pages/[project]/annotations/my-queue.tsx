@@ -8,7 +8,7 @@ import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TasksDone } from "../../../components/icons/TasksDone";
 import { Conversation } from "../../../components/messages/Conversation";
 
@@ -20,6 +20,7 @@ export default function TraceAnnotations() {
     memberAccessibleQueueItemsWithTraces,
     queuesLoading,
   } = useAnnotationQueues();
+  const { project } = useOrganizationTeamProject();
 
   const allQueueItems = useMemo(() => {
     const items = [
@@ -29,12 +30,35 @@ export default function TraceAnnotations() {
     return items.filter((item) => !item.doneAt);
   }, [assignedQueueItemsWithTraces, memberAccessibleQueueItemsWithTraces]);
 
+  let currentQueueItem = allQueueItems
+    .filter((item) => !item.doneAt)
+    .find((item) => item.id === queueItem);
+
+  if (!currentQueueItem) {
+    currentQueueItem = allQueueItems[0];
+  }
+
   const queryClient = api.useContext();
 
   const refetchQueueItems = async () => {
     await queryClient.annotation.getQueueItems.invalidate();
     await queryClient.annotation.getQueues.invalidate();
   };
+  const traceDetails = api.traces.getById.useQuery(
+    {
+      projectId: project?.id ?? "",
+      traceId: currentQueueItem?.trace?.trace_id ?? "",
+    },
+    { enabled: !!project?.id }
+  );
+
+  const [threadId, setThreadId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (traceDetails.data?.metadata.thread_id) {
+      setThreadId(traceDetails.data?.metadata.thread_id);
+    }
+  }, [traceDetails.data?.metadata.thread_id]);
 
   if (queuesLoading) {
     return <AnnotationsLayout />;
@@ -60,18 +84,13 @@ export default function TraceAnnotations() {
     );
   }
 
-  let currentQueueItem = allQueueItems
-    .filter((item) => !item.doneAt)
-    .find((item) => item.id === queueItem);
-
-  if (!currentQueueItem) {
-    currentQueueItem = allQueueItems[0];
-  }
-
   return (
     <DashboardLayout>
       <VStack height="100%" width="full" padding={4}>
-        <Conversation traceId={currentQueueItem?.trace?.trace_id ?? ""} />
+        <Conversation
+          threadId={threadId ?? ""}
+          traceId={currentQueueItem?.trace?.trace_id ?? ""}
+        />
         <Spacer />
       </VStack>
       {currentQueueItem?.trace && (

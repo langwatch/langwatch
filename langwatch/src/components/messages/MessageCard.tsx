@@ -142,9 +142,23 @@ export function MessageCard({
   };
 
   const evaluationsPopover = useDisclosure();
+  const { openDrawer } = useDrawer();
 
   return (
-    <VStack alignItems="flex-start" gap={4} width="fill">
+    <VStack
+      alignItems="flex-start"
+      gap={4}
+      width="fill"
+      onClick={(e) => {
+        if (!linkActive) e.preventDefault();
+        if (linkActive) {
+          openDrawer("traceDetails", {
+            traceId: trace.trace_id,
+            selectedTab: "messages",
+          });
+        }
+      }}
+    >
       <VStack alignItems="flex-start" gap={8}>
         <VStack alignItems="flex-start" gap={2}>
           <Box
@@ -156,24 +170,16 @@ export function MessageCard({
             Input
           </Box>
           <Box fontWeight="bold">
-            <LinkOverlay
-              as={NextLink}
-              href={`/${project.slug}/messages/${trace.trace_id}/spans`}
-              onClick={(e) => {
-                if (!linkActive) e.preventDefault();
-              }}
-            >
-              {isJson(trace.input?.value ?? "") ||
-              isPythonRepr(trace.input?.value ?? "") ? (
-                <MessageCardJsonOutput value={trace.input?.value ?? ""} />
-              ) : (
-                <Text lineClamp={1} wordBreak="break-all" lineHeight="2.1em">
-                  <Markdown className="markdown markdown-without-margin">
-                    {getExtractedInput(trace)}
-                  </Markdown>
-                </Text>
-              )}
-            </LinkOverlay>
+            {isJson(trace.input?.value ?? "") ||
+            isPythonRepr(trace.input?.value ?? "") ? (
+              <MessageCardJsonOutput value={trace.input?.value ?? ""} />
+            ) : (
+              <Text lineClamp={1} wordBreak="break-all" lineHeight="2.1em">
+                <Markdown className="markdown markdown-without-margin">
+                  {getExtractedInput(trace)}
+                </Markdown>
+              </Text>
+            )}
           </Box>
         </VStack>
         {trace.error && !trace.output?.value ? (
