@@ -32,6 +32,7 @@ import {
   type MaybeStoredLLMModelCost,
 } from "../../../server/modelProviders/llmModelCost";
 import { getPayloadSizeHistogram } from "../../../server/metrics";
+import { safeTruncate } from "../../../utils/truncate";
 
 export const debug = getDebugger("langwatch:dspy_log_steps");
 
@@ -197,10 +198,16 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
           delete llmCall.response.choices;
         }
         totalSize += JSON.stringify(llmCall).length;
-        if (totalSize >= 256_000 && llmCall.response) {
-          llmCall.response.output = "[truncated]";
-          llmCall.response.messages = [];
+
+        if (llmCall.response) {
+          llmCall.response = safeTruncate(llmCall.response);
+
+          if (totalSize >= 256_000) {
+            llmCall.response.output = "[truncated]";
+            llmCall.response.messages = [];
+          }
         }
+
         return llmCall;
       }),
   };
