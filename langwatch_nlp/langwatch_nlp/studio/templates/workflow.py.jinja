@@ -135,7 +135,6 @@ class WorkflowModule(ReportingModule):
         {# Finally execute end node #}
         {% for node in workflow.nodes %}
             {% if node.type == "end" %}
-        # Execute end node
         return PredictionWithEvaluationAndMetadata(
                 {% for edge in workflow.edges %}
                     {% if edge.target == node.id %}

@@ -12,6 +12,7 @@ import re
 import dspy
 
 from langwatch_nlp.studio.utils import transpose_inline_dataset_to_object_list
+import isort
 import black
 
 
@@ -36,13 +37,14 @@ def render_template(template_name: str, format=False, **kwargs) -> str:
     template = env.get_template(template_name)
     code = template.render(**kwargs)
     code = re.sub(r"\n{4,}", "\n\n", code)
-    if format:
-        try:
+    try:
+        code = isort.code(code, float_to_top=True)
+        if format:
             code = black.format_str(code, mode=black.Mode())
-        except Exception as e:
-            raise Exception(
-                f"Invalid syntax on the generated code: {e}\n\n{code}\n\nTemplate: {template_name}"
-            )
+    except Exception as e:
+        raise Exception(
+            f"Invalid syntax on the generated code: {e}\n\n{code}\n\nTemplate: {template_name}"
+        )
     return code
 
 
