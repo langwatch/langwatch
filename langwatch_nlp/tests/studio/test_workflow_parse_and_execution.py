@@ -335,3 +335,4 @@ def test_parse_workflow():
 # TODO: test parallel execution
 # TODO: test orphan nodes
 # TODO: test infinite loops
+# TODO: test langwatch evaluators with settings

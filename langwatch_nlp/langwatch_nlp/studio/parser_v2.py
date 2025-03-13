@@ -1,5 +1,10 @@
 from typing import Tuple, Type, cast
-from langwatch_nlp.studio.modules.registry import PROMPTING_TECHNIQUES
+from langwatch_nlp.studio.modules.registry import (
+    EVALUATORS_FOR_TEMPLATE,
+    FIELD_TYPE_TO_DSPY_TYPE,
+    PROMPTING_TECHNIQUES_FOR_TEMPLATE,
+)
+from langwatch_nlp.studio.parser import parse_fields
 from langwatch_nlp.studio.types.dsl import Node, Workflow
 from langwatch_nlp.studio.dspy.workflow_module import WorkflowModule
 from jinja2 import Environment, FileSystemLoader
@@ -20,6 +25,10 @@ env = Environment(
     lstrip_blocks=True,
 )
 env.globals["raise"] = raise_helper
+env.globals["PROMPTING_TECHNIQUES"] = PROMPTING_TECHNIQUES_FOR_TEMPLATE
+env.globals["FIELD_TYPE_TO_DSPY_TYPE"] = FIELD_TYPE_TO_DSPY_TYPE
+env.globals["EVALUATORS"] = EVALUATORS_FOR_TEMPLATE
+env.globals["parse_fields"] = parse_fields
 env.keep_trailing_newline = True
 
 
@@ -28,7 +37,12 @@ def render_template(template_name: str, format=False, **kwargs) -> str:
     code = template.render(**kwargs)
     code = re.sub(r"\n{4,}", "\n\n", code)
     if format:
-        code = black.format_str(code, mode=black.Mode())
+        try:
+            code = black.format_str(code, mode=black.Mode())
+        except Exception as e:
+            raise Exception(
+                f"Invalid syntax on the generated code: {e}\n\n{code}\n\nTemplate: {template_name}"
+            )
     return code
 
 
@@ -106,8 +120,16 @@ def parse_component(node: Node, workflow: Workflow, format=False) -> Tuple[str, 
                 ),
                 llm_config=llm_config.value if llm_config else None,
                 demonstrations=demonstrations_dict,
+                # PROMPTING_TECHNIQUES=PROMPTING_TECHNIQUES_FOR_TEMPLATE,
+                # FIELD_TYPE_TO_DSPY_TYPE=FIELD_TYPE_TO_DSPY_TYPE,
             )
+        case "prompting_technique":
+            raise NotImplementedError("Prompting techniques cannot be parsed directly")
+        case "evaluator":
+            # Evaluators are handled directly in the workflow template
+            return "None", ""
         case _:
+            # TODO: throw error for unknown node type
             return "None", ""
 
 

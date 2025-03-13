@@ -1,3 +1,5 @@
+{% from 'macros.jinja' import evaluator_instance, edge_param %}
+
 import time
 from typing import Callable, Dict, Any, Literal, Optional, Tuple, cast, overload
 import asyncio
@@ -24,21 +26,11 @@ from langevals_core.base_evaluator import (
 from langwatch_nlp.studio.dspy.patched_optional_image import patch_optional_image
 from dspy.utils.asyncify import asyncify
 
-patch_optional_image()
-
-{% macro edge_param(edge, source_parts, target_parts) %}
-{% if source_parts[0] == "outputs" %}
-    {% if edge.source == "entry" %}
-{{ target_parts[1] }}=inputs["{{ source_parts[1] }}"],
-    {% else %}
-{{ target_parts[1] }}={{ edge.source }}.{{ source_parts[1] }},
-    {% endif %}
-{% endif %}
-{% endmacro %}
-
-{% for node_id, node_template in node_templates.items() %}
-{{ node_template[1] }}
+{% for node in workflow.nodes|selectattr("type", "eq", "evaluator")|list %}
+{{ EVALUATORS[node.data.cls]["import"] }}
 {% endfor %}
+
+patch_optional_image()
 
 class WorkflowModule(ReportingModule):
     def __init__(
@@ -51,7 +43,11 @@ class WorkflowModule(ReportingModule):
         super().__init__()
 
         {% for node in workflow.nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
+        {% if node.type == "evaluator" %}
+        self.{{ node.id }} = asyncify({{ evaluator_instance(node) }})
+        {% else %}
         self.{{ node.id }} = asyncify({{ node_templates[node.id][0] }}())
+        {% endif %}
         {% endfor %}
 
     async def forward(self, inputs: Dict[str, Any]) -> dspy.Prediction:
@@ -151,3 +147,7 @@ class WorkflowModule(ReportingModule):
         )
             {% endif %}
         {% endfor %}
+
+{% for node_id, node_template in node_templates.items() %}
+{{ node_template[1] }}
+{% endfor %}
