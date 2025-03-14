@@ -1,16 +1,18 @@
 import {
   Badge,
+  Box,
   Button,
   Card,
   Heading,
   HStack,
+  Menu,
   Spacer,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { AnnotationScoreDataType } from "@prisma/client";
-import { Plus, ThumbsUp } from "react-feather";
+import { EyeOff, Filter, MoreVertical, Plus, ThumbsUp } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 
 import { useEffect } from "react";
@@ -36,7 +38,7 @@ const AnnotationScorePage = () => {
 
   const toggleAnnotationScore = api.annotationScore.toggle.useMutation();
 
-  const isAnnotationDrawerOpen = isDrawerOpen("addAnnotationScore");
+  const isAnnotationDrawerOpen = isDrawerOpen("addOrEditAnnotationScore");
 
   useEffect(() => {
     void getAllAnnotationScores.refetch();
@@ -82,7 +84,7 @@ const AnnotationScorePage = () => {
           <Button
             size="sm"
             colorPalette="orange"
-            onClick={() => openDrawer("addAnnotationScore")}
+            onClick={() => openDrawer("addOrEditAnnotationScore")}
           >
             <Plus size={20} /> Add new score metric
           </Button>
@@ -119,6 +121,7 @@ const AnnotationScorePage = () => {
                     <Table.ColumnHeader>Score Type</Table.ColumnHeader>
                     <Table.ColumnHeader>Score Options</Table.ColumnHeader>
                     <Table.ColumnHeader>Enabled</Table.ColumnHeader>
+                  <Table.ColumnHeader>Actions</Table.ColumnHeader>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -153,6 +156,59 @@ const AnnotationScorePage = () => {
                             handleToggleScore(score.id, !score.active);
                           }}
                         />
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Menu.Root>
+                          <Menu.Trigger asChild>
+                            <Button
+                              variant={"ghost"}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                              }}
+                            >
+                              <MoreVertical />
+                            </Button>
+                          </Menu.Trigger>
+                          <Menu.Content>
+                            <Menu.Item
+                              value="edit"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openDrawer("addOrEditAnnotationScore", {
+                                  annotationScoreId: score.id,
+                                  onClose: () => {},
+                                  onOverlayClick: () => {},
+                                });
+                              }}
+                            >
+                              <Box
+                                display="flex"
+                                alignItems="center"
+                                gap={2}
+                              >
+                                <Filter size={14} />
+                                Edit Filters
+                              </Box>
+                            </Menu.Item>
+                            <Menu.Item
+                              value="hide"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                // deleteTrigger(trigger.id);
+                              }}
+                            >
+                              <Box
+                                display="flex"
+                                alignItems="center"
+                                gap={2}
+                                color="red.600"
+                              >
+                                <EyeOff size={14} />
+                                Hide
+                              </Box>
+                            </Menu.Item>
+                          </Menu.Content>
+                        </Menu.Root>
                       </Table.Cell>
                     </Table.Row>
                   ))}
