@@ -10,7 +10,7 @@ This server facilitates communication with LangWatch's API, allowing you to retr
 2. Navigate to the MCP item in the sidebar
 3. Set the "name" as "LangWatch MCP"
 4. Set the "type" to `command`
-5. Set the "command" to `npx -y @langwatch/mcp-server --apiKey=ey....`
+5. Set the "command" to `npx -y @langwatch/mcp-server --apiKey=sk-lw-...`
 	- You **must** use `=` to join the command with the value!
 
 - `--apiKey`: Your LangWatch API key. This is mandatory and must be provided.
