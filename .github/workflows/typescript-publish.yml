@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  publish-npm:
+  publish-sdk-npm:
     if: startsWith(github.event.release.tag_name, 'typescript-sdk-') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     permissions:
@@ -33,6 +33,32 @@ jobs:
 
       - name: Publish to npm
         working-directory: ./typescript-sdk
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-mcp-server-npm:
+    if: startsWith(github.event.release.tag_name, 'typescript-mcp-server-') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install and build
+        working-directory: ./mcp-server
+        run: npm install
+
+      - name: Publish to npm
+        working-directory: ./mcp-server
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
