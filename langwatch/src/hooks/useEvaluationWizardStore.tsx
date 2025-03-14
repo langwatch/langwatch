@@ -38,6 +38,7 @@ export type State = {
     task?: "real-time" | "batch" | "prompt" | "custom" | "scan";
     dataSource?: "choose" | "from_production" | "manual" | "upload";
     evaluatorCategory?: EvaluatorCategory;
+    evaluatorMappings?: Record<string, string>;
   };
   dsl: Workflow;
 };
