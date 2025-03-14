@@ -38,7 +38,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-mcp-server-npm:
-    if: startsWith(github.event.release.tag_name, 'typescript-mcp-server-') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    if: startsWith(github.event.release.tag_name, 'typescript-mcp-server@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     permissions:
       contents: read
