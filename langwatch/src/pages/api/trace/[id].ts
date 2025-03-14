@@ -7,7 +7,8 @@ import {
   getSpansForTraceIds,
 } from "~/server/api/routers/traces";
 import { elasticSearchEvaluationsToEvaluations } from "../../../server/tracer/utils";
-import type { Span } from "../../../server/tracer/types";
+import type { LLMModeTrace, Span, Trace } from "../../../server/tracer/types";
+import { formatTimeAgo } from "../../../utils/formatTimeAgo";
 
 type SpanWithChildren = Span & { children: SpanWithChildren[] };
 
@@ -105,6 +106,7 @@ export default async function handler(
   }
 
   const traceId = req.query.id as string;
+  const llmMode = req.query.llmMode === "true" || req.query.llmMode === "1";
 
   const traceDetails = await getTraceById({
     projectId: project?.id,
@@ -129,9 +131,29 @@ export default async function handler(
   );
 
   return res.status(200).json({
-    ...traceDetails,
+    ...(llmMode
+      ? toLLMModeTrace(traceDetails as Trace & { spans: Span[] }, asciiTree)
+      : {}),
     spans,
     evaluations: evaluations_,
-    asciiTree,
+    ascii_tree: asciiTree,
   });
 }
+
+export const toLLMModeTrace = (
+  trace: Trace & { spans: Span[] },
+  asciiTree?: string
+): LLMModeTrace => {
+  return {
+    ...trace,
+    ascii_tree: asciiTree ?? generateAsciiTree(trace.spans),
+    timestamps: {
+      started_at:
+        formatTimeAgo(new Date(trace.timestamps?.started_at).getTime()) ?? "",
+      inserted_at:
+        formatTimeAgo(new Date(trace.timestamps?.inserted_at).getTime()) ?? "",
+      updated_at:
+        formatTimeAgo(new Date(trace.timestamps?.updated_at).getTime()) ?? "",
+    },
+  };
+};

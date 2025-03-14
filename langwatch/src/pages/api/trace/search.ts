@@ -1,15 +1,14 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "../../../server/db";
 
+import { z } from "zod";
+import { fromZodError, type ZodError } from "zod-validation-error";
 import {
   getAllForProjectInput,
   getAllTracesForProject,
 } from "../../../server/api/routers/traces";
-import { fromZodError, type ZodError } from "zod-validation-error";
-import { z } from "zod";
-import { generateAsciiTree } from "./[id]";
 import type { LLMModeTrace, Span, Trace } from "../../../server/tracer/types";
-import { formatTimeAgo } from "../../../utils/formatTimeAgo";
+import { toLLMModeTrace } from "./[id]";
 
 export const config = {
   api: {
@@ -93,23 +92,9 @@ export default async function handler(
 
   if (params.llmMode) {
     const llmModeTraces: LLMModeTrace[] = (traces as Trace[]).map((trace) => ({
-      ...trace,
+      ...toLLMModeTrace(trace as Trace & { spans: Span[] }),
       spans: undefined,
-      indexing_md5s: undefined,
       evaluations: undefined,
-      asciiTree:
-        "spans" in trace && Array.isArray(trace.spans as Span[])
-          ? generateAsciiTree(trace.spans as Span[])
-          : "",
-      timestamps: {
-        started_at:
-          formatTimeAgo(new Date(trace.timestamps?.started_at).getTime()) ?? "",
-        inserted_at:
-          formatTimeAgo(new Date(trace.timestamps?.inserted_at).getTime()) ??
-          "",
-        updated_at:
-          formatTimeAgo(new Date(trace.timestamps?.updated_at).getTime()) ?? "",
-      },
     }));
     traces = llmModeTraces;
   }

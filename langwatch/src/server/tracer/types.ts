@@ -305,14 +305,14 @@ export type Trace = {
 
 export type LLMModeTrace = Omit<
   Trace,
-  "spans" | "evaluations" | "timestamps"
+  "timestamps" | "indexing_md5s"
 > & {
   timestamps: {
     started_at: string;
     inserted_at: string;
     updated_at: string;
   };
-  asciiTree: string;
+  ascii_tree: string;
 };
 
 // TODO: kill this after previous todo is done
