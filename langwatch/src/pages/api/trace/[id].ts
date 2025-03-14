@@ -30,7 +30,7 @@ const buildTree = (spans: Span[]): Record<string, SpanWithChildren> => {
 };
 
 // Generate ASCII tree representation
-const generateAsciiTree = (spans: Span[]): string => {
+export const generateAsciiTree = (spans: Span[]): string => {
   const tree = buildTree(spans);
 
   // Find root spans (spans without parents or with parents not in the spans list)
