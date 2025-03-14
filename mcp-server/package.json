@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/mcp-server",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "An MCP server for Langwatch.",
   "type": "module",
   "main": "./dist/index.js",
@@ -19,7 +19,7 @@
   },
   "scripts": {
     "start": "tsx src/index.ts",
-    "build": "tsup && esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js",
+    "build": "tsup && node build.js",
     "prepublish": "npm run build"
   },
   "author": "",

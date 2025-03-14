@@ -10,13 +10,14 @@ This server facilitates communication with LangWatch's API, allowing you to retr
 2. Navigate to the MCP item in the sidebar
 3. Set the "name" as "LangWatch MCP"
 4. Set the "type" to `command`
-5. Set the "command" to `npx @langwatch/mcp-server`
-
-> [!TIP]
-> By default the environment variable `LANGWATCH_API_KEY` and `LANGWATCH_ENDPOINT` are pulled into the project. If that isn't an option for you, you can also use arguments in the command inside Cursor.
+5. Set the "command" to `npx -y @langwatch/mcp-server --apiKey=ey....`
+	- You **must** use `=` to join the command with the value!
 
 - `--apiKey`: Your LangWatch API key. This is mandatory and must be provided.
-- `--endpoint`: The endpoint for the LangWatch API. Defaults to `https://app.langwatch.ai` if not specified.
+- `--endpoint`: *Optional* The endpoint for the LangWatch API. Defaults to `https://app.langwatch.ai` if not specified.
+
+> [!TIP]
+> To aid in securing your keys, the MCP will first look at the global system environment variables `LANGWATCH_API_KEY` and `LANGWATCH_ENDPOINT` to check if they have values as well as looking at arguments passed into the server on start.
 
 <picture>
 <source media="(prefers-color-scheme: dark)" srcset="../assets/mcp-server/cursor-setup.dark.webp">
@@ -52,7 +53,8 @@ To use these tools within Cursor, follow these steps:
 
 3. **Interact with your Agent:**
     - Ask a question like the following to test the tools are accessible: *Note: When the tool is detected, you'll need to run `Run tool` in the chat view for it to be called.
-    - > "I just ran into an issue while debugging, show me the latest traces from the last 30 days"
+
+> "I just ran into an issue while debugging, show me the latest traces from the last 30 days"
 
 <picture>
 <source media="(prefers-color-scheme: dark)" srcset="../assets/mcp-server/cursor-example.dark.webp">
