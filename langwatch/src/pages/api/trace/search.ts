@@ -8,7 +8,7 @@ import {
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { z } from "zod";
 import { generateAsciiTree } from "./[id]";
-import type { LLMModeTrace, Trace } from "../../../server/tracer/types";
+import type { LLMModeTrace, Span, Trace } from "../../../server/tracer/types";
 import { formatTimeAgo } from "../../../utils/formatTimeAgo";
 
 export const config = {
@@ -86,7 +86,7 @@ export default async function handler(
           : params.endDate,
       pageSize,
     },
-    downloadMode: params.llmMode ? false : true,
+    downloadMode: !params.llmMode,
     scrollId: params.scrollId ?? undefined,
   });
   let traces: (Trace | LLMModeTrace)[] = results.groups.flat();
@@ -97,7 +97,10 @@ export default async function handler(
       spans: undefined,
       indexing_md5s: undefined,
       evaluations: undefined,
-      asciiTree: generateAsciiTree((trace as any).spans),
+      asciiTree:
+        "spans" in trace && Array.isArray(trace.spans as Span[])
+          ? generateAsciiTree(trace.spans as Span[])
+          : "",
       timestamps: {
         started_at:
           formatTimeAgo(new Date(trace.timestamps?.started_at).getTime()) ?? "",
