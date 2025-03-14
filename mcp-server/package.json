@@ -1,0 +1,48 @@
+{
+  "name": "@langwatch/mcp-server",
+  "version": "0.0.1",
+  "description": "",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/langwatch/langwatch.git",
+    "directory": "mcp-server"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsup && esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js",
+    "prepublish": "npm run build"
+  },
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.4.0",
+    "@types/debug": "^4.1.12",
+    "@types/eslint__js": "^8.42.3",
+    "@types/node": "^16.0.0",
+    "esbuild": "^0.21.5",
+    "eslint": "^8.57.0",
+    "tsup": "^8.1.0",
+    "typescript": "^4.9.5",
+    "typescript-eslint": "^7.11.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.7.0",
+    "date-fns": "^4.1.0",
+    "langwatch": "^0.1.6",
+    "zod": "^3.22.4",
+    "zod-validation-error": "^3.3.0"
+  }
+}
