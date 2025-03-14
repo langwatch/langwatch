@@ -19,7 +19,7 @@
   },
   "scripts": {
     "start": "tsx src/index.ts",
-    "build": "tsup && esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js",
+    "build": "tsup && esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js",
     "prepublish": "npm run build"
   },
   "author": "",
