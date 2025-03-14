@@ -422,6 +422,14 @@ const addOpenTelemetrySpanAsSpan = (
     };
   }
 
+  // logfire
+  if (!input && attributesMap.raw_input) {
+    input = {
+      type: "chat_messages",
+      value: attributesMap.raw_input as any,
+    };
+  }
+
   // Output
   if (
     attributesMap.llm?.output_messages &&
@@ -527,6 +535,21 @@ const addOpenTelemetrySpanAsSpan = (
           };
   }
   delete attributesMap.output;
+
+  // logfire
+  if (!output) {
+    const genAIChoice = (attributesMap?.events as unknown as any[])?.find(
+      (event) => event?.["event.name"] === "gen_ai.choice"
+    );
+    if (genAIChoice?.message) {
+      output = {
+        type: "chat_messages",
+        value: [
+          genAIChoice.message
+        ],
+      };
+    }
+  }
 
   // Metadata
   if (attributesMap.user?.id) {
