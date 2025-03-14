@@ -1,8 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { getLlmTraceById, listLlmTraces } from "./langwatch-api";
-import { version } from "../package.json" assert { type: "json" };
+import packageJson from "../package.json" assert { type: "json" };
 
 function loadAndValidateArgs() {
   const args = process.argv.slice(2);
@@ -34,7 +34,7 @@ const { apiKey, endpoint } = loadAndValidateArgs();
 
 const server = new McpServer({
   name: "LangWatch",
-  version,
+  version: packageJson.version,
 });
 
 server.tool(
