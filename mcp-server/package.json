@@ -44,5 +44,8 @@
     "langwatch": "^0.1.6",
     "zod": "^3.22.4",
     "zod-validation-error": "^3.3.0"
+  },
+  "bin": {
+    "langwatch-mcp-server": "./dist/index.js"
   }
 }
