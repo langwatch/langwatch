@@ -1,4 +1,4 @@
-import EventEmitter from 'eventemitter3';
+import EventEmitter from "eventemitter3";
 import { nanoid } from "nanoid";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -21,6 +21,7 @@ import {
   spanSchema,
 } from "./server/types/tracer.generated";
 import {
+  type Trace,
   type BaseSpan,
   type ChatMessage,
   type ChatRichContent,
@@ -32,6 +33,7 @@ import {
   type RAGSpan,
   type RESTEvaluation,
   type SpanInputOutput,
+  type LLMModeTrace,
 } from "./types";
 import { camelToSnakeCaseNested, type Strict } from "./typeUtils";
 import {
@@ -42,6 +44,7 @@ import {
 import { LangWatchExporter } from "./LangWatchExporter";
 
 export type {
+  Trace,
   BaseSpan,
   ChatMessage as ChatMessage,
   ChatRichContent,
@@ -52,6 +55,7 @@ export type {
   PendingRAGSpan,
   RAGSpan,
   SpanInputOutput,
+  LLMModeTrace,
 };
 
 export {

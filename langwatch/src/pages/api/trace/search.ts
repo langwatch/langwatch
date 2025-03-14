@@ -8,7 +8,7 @@ import {
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { z } from "zod";
 import { generateAsciiTree } from "./[id]";
-import type { Span } from "../../../server/tracer/types";
+import type { LLMModeTrace, Trace } from "../../../server/tracer/types";
 import { formatTimeAgo } from "../../../utils/formatTimeAgo";
 
 export const config = {
@@ -89,27 +89,30 @@ export default async function handler(
     downloadMode: params.llmMode ? false : true,
     scrollId: params.scrollId ?? undefined,
   });
-  const traces = results.groups.flat();
+  let traces: (Trace | LLMModeTrace)[] = results.groups.flat();
 
-  const formattedTraces = traces.map((trace) => ({
-    ...trace,
-    spans: undefined,
-    ...(params.llmMode &&
-      "spans" in trace && {
-        indexing_md5s: undefined,
-        evaluations: undefined,
-        asciiTree: generateAsciiTree(trace.spans as Span[]),
-        timestamps: Object.fromEntries(
-          Object.entries(trace.timestamps).map(([key, value]) => [
-            key,
-            formatTimeAgo(new Date(value).getTime()),
-          ])
-        ),
-      }),
-  }));
+  if (params.llmMode) {
+    const llmModeTraces: LLMModeTrace[] = (traces as Trace[]).map((trace) => ({
+      ...trace,
+      spans: undefined,
+      indexing_md5s: undefined,
+      evaluations: undefined,
+      asciiTree: generateAsciiTree((trace as any).spans),
+      timestamps: {
+        started_at:
+          formatTimeAgo(new Date(trace.timestamps?.started_at).getTime()) ?? "",
+        inserted_at:
+          formatTimeAgo(new Date(trace.timestamps?.inserted_at).getTime()) ??
+          "",
+        updated_at:
+          formatTimeAgo(new Date(trace.timestamps?.updated_at).getTime()) ?? "",
+      },
+    }));
+    traces = llmModeTraces;
+  }
 
   return res.status(200).json({
-    traces: formattedTraces,
+    traces,
     pagination: {
       totalHits: results.totalHits,
       scrollId: results.scrollId,
