@@ -5,9 +5,10 @@ import { nanoid } from "nanoid";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 
 export const annotationScoreRouter = createTRPCRouter({
-  create: protectedProcedure
+  upsert: protectedProcedure
     .input(
       z.object({
+        annotationScoreId: z.string().optional().nullable(),
         projectId: z.string(),
         name: z.string(),
         dataType: z.enum([
@@ -35,18 +36,29 @@ export const annotationScoreRouter = createTRPCRouter({
         options.push({ label: option, value: option });
       });
 
+      const data = {
+        projectId: input.projectId,
+        name: input.name,
+        dataType: input.dataType,
+        description: input.description ?? "",
+        options: options ?? {},
+        defaultValue: {
+          value: input.defaultRadioOption ?? null,
+          options: input.defaultCheckboxOption ?? null,
+        },
+      };
+
+      if (input.annotationScoreId) {
+        return ctx.prisma.annotationScore.update({
+          where: { id: input.annotationScoreId, projectId: input.projectId },
+          data,
+        });
+      }
+
       return ctx.prisma.annotationScore.create({
         data: {
           id: nanoid(),
-          projectId: input.projectId,
-          name: input.name,
-          dataType: input.dataType,
-          description: input.description ?? "",
-          options: options ?? {},
-          defaultValue: {
-            value: input.defaultRadioOption ?? null,
-            options: input.defaultCheckboxOption ?? null,
-          },
+          ...data,
         },
       });
     }),
@@ -65,6 +77,22 @@ export const annotationScoreRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.findMany({
         where: { projectId: input.projectId, active: true },
+      });
+    }),
+  getById: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        scoreId: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.annotationScore.findFirstOrThrow({
+        where: { 
+          id: input.scoreId,
+          projectId: input.projectId,
+        },
       });
     }),
   toggle: protectedProcedure
