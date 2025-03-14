@@ -1,18 +1,20 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "../../../server/db";
 
+import { z } from "zod";
+import { fromZodError, type ZodError } from "zod-validation-error";
 import {
   getAllForProjectInput,
   getAllTracesForProject,
 } from "../../../server/api/routers/traces";
-import { fromZodError, type ZodError } from "zod-validation-error";
-import { z } from "zod";
+import type { LLMModeTrace, Span, Trace } from "../../../server/tracer/types";
+import { toLLMModeTrace } from "./[id]";
 
 export const config = {
   api: {
     responseLimit: false,
   },
-}
+};
 
 const paramsSchema = getAllForProjectInput
   .omit({
@@ -34,6 +36,7 @@ const paramsSchema = getAllForProjectInput
       }),
     ]),
     scrollId: z.string().optional().nullable(),
+    llmMode: z.boolean().optional().default(false),
   });
 
 export default async function handler(
@@ -70,8 +73,8 @@ export default async function handler(
   const pageSize = Math.min(params.pageSize ?? 1000, 1000);
   const results = await getAllTracesForProject({
     input: {
-      projectId: project.id,
       ...params,
+      projectId: project.id,
       startDate:
         typeof params.startDate === "string"
           ? Date.parse(params.startDate)
@@ -82,10 +85,19 @@ export default async function handler(
           : params.endDate,
       pageSize,
     },
-    downloadMode: true,
+    downloadMode: !params.llmMode,
     scrollId: params.scrollId ?? undefined,
   });
-  const traces = results.groups.flat();
+  let traces: (Trace | LLMModeTrace)[] = results.groups.flat();
+
+  if (params.llmMode) {
+    const llmModeTraces: LLMModeTrace[] = (traces as Trace[]).map((trace) => ({
+      ...toLLMModeTrace(trace as Trace & { spans: Span[] }),
+      spans: undefined,
+      evaluations: undefined,
+    }));
+    traces = llmModeTraces;
+  }
 
   return res.status(200).json({
     traces,

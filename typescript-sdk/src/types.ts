@@ -8,9 +8,14 @@ import {
   type RAGSpan as ServerRAGSpan,
   type SpanInputOutput as ServerSpanInputOutput,
   type TypedValueChatMessages,
-  type Trace,
+  type Trace as ServerTrace,
   type RESTEvaluation as ServerRESTEvaluation,
+  type LLMModeTrace as ServerLLMModeTrace,
 } from "./server/types/tracer";
+
+export type Trace = ServerTrace;
+
+export type LLMModeTrace = ServerLLMModeTrace;
 
 export type Metadata = SnakeToCamelCaseNested<Trace["metadata"]>;
 

@@ -303,6 +303,18 @@ export type Trace = {
   // TODO: add spans here too
 };
 
+export type LLMModeTrace = Omit<
+  Trace,
+  "timestamps" | "indexing_md5s"
+> & {
+  timestamps: {
+    started_at: string;
+    inserted_at: string;
+    updated_at: string;
+  };
+  ascii_tree: string;
+};
+
 // TODO: kill this after previous todo is done
 export type TraceWithSpans = Trace & { spans: Span[] };
 

@@ -62,6 +62,9 @@ export function convertFromVercelAIMessages(
                       },
                     };
                   }
+                  default: {
+                    return part as any;
+                  }
                 }
               })
             : content,
