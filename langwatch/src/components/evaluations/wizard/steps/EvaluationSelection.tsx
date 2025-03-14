@@ -1,5 +1,6 @@
 import {
   Accordion,
+  Field,
   Grid,
   Heading,
   HStack,
@@ -34,6 +35,11 @@ import DynamicZodForm from "../../../checks/DynamicZodForm";
 import { FormProvider, useForm } from "react-hook-form";
 import { getEvaluatorDefaultSettings } from "../../../../server/evaluations/getEvaluator";
 import type { Field } from "../../../../optimization_studio/types/dsl";
+import {
+  DEFAULT_MAPPINGS,
+  MAPPING_OPTIONS,
+  MappingsFields,
+} from "../../../checks/CheckConfigForm";
 
 type EvaluationCategoryConfig = {
   id: string;
@@ -463,7 +469,8 @@ const EvaluatorSelectionAccordion = ({
 };
 
 const EvaluatorSettingsAccordion = () => {
-  const { getFirstEvaluator, setFirstEvaluator } = useEvaluationWizardStore();
+  const { wizardState, getFirstEvaluator, setFirstEvaluator } =
+    useEvaluationWizardStore();
 
   const evaluator = getFirstEvaluator();
   const evaluatorType = evaluator?.evaluator;
@@ -497,9 +504,13 @@ const EvaluatorSettingsAccordion = () => {
         )
       : undefined;
 
-  const form = useForm({
+  const form = useForm<{
+    settings: typeof defaultSettings;
+    customMapping: Record<string, string>;
+  }>({
     defaultValues: {
       settings: defaultSettings,
+      customMapping: {},
     },
   });
 
@@ -532,7 +543,6 @@ const EvaluatorSettingsAccordion = () => {
   );
 
   useEffect(() => {
-    console.log('evaluatorType', evaluatorType);
     form.watch(() => {
       console.log(form.getValues());
       void form.handleSubmit(onSubmit)();
@@ -557,12 +567,37 @@ const EvaluatorSettingsAccordion = () => {
       <Accordion.ItemContent paddingTop={2} paddingX="1px">
         <FormProvider {...form}>
           <VStack width="full" gap={3}>
+            <Field.Root borderBottomWidth="1px" paddingY={5}>
+              <VStack align="start" gap={4} width="full">
+                <Field.Label margin={0}>Dataset to Evaluator mapping</Field.Label>
+                <MappingsFields
+                  register={form.register}
+                  mappingOptions={MAPPING_OPTIONS}
+                  defaultValues={
+                    wizardState.evaluatorMappings
+                      ? {
+                          ...DEFAULT_MAPPINGS,
+                          ...(wizardState.evaluatorMappings ?? {}),
+                        }
+                      : DEFAULT_MAPPINGS
+                  }
+                  optionalFields={
+                    AVAILABLE_EVALUATORS[evaluatorType as keyof Evaluators]
+                      .optionalFields
+                  }
+                  requiredFields={
+                    AVAILABLE_EVALUATORS[evaluatorType as keyof Evaluators]
+                      .requiredFields
+                  }
+                />
+              </VStack>
+            </Field.Root>
             <DynamicZodForm
               schema={schema}
               evaluatorType={evaluatorType as keyof Evaluators}
               prefix="settings"
               errors={form.formState.errors.settings}
-              variant="studio"
+              variant="default"
             />
           </VStack>
         </FormProvider>
