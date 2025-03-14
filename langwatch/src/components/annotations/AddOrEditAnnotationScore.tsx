@@ -13,7 +13,7 @@ import {
 } from "@chakra-ui/react";
 import { useForm } from "react-hook-form";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, X } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -25,9 +25,31 @@ import { toaster } from "../ui/toaster";
 
 import { Checkbox, CheckboxGroup } from "../ui/checkbox";
 
-export const AddAnnotationScore = ({ onClose }: { onClose: () => void }) => {
+type FormData = {
+  name: string;
+  description?: string | null;
+  category?: string[] | null;
+  categoryExplanation?: string[] | null;
+  dataType: string;
+  options?: string[] | null;
+  checkbox?: string[] | null;
+  defaultRadioOption?: string | null;
+  defaultCheckboxOption?: string[] | null;
+};
+
+export const AddOrEditAnnotationScore = ({
+  onClose,
+  annotationScoreId,
+}: {
+  onClose: () => void,
+  annotationScoreId: string | undefined,
+}) => {
   const { project } = useOrganizationTeamProject();
-  const createAnnotationScore = api.annotationScore.create.useMutation();
+  const upsertAnnotationScore = api.annotationScore.upsert.useMutation();
+  const existingAnnotationScore = api.annotationScore.getById.useQuery({
+    projectId: project?.id ?? "",
+    scoreId: annotationScoreId ?? "",
+  }, { enabled: !!annotationScoreId && !!project?.id });
 
   const queryClient = api.useContext();
 
@@ -39,6 +61,7 @@ export const AddAnnotationScore = ({ onClose }: { onClose: () => void }) => {
     formState: { errors },
     reset,
   } = useForm({
+    disabled: existingAnnotationScore.isLoading,
     defaultValues: {
       name: "",
       dataType: "boolean",
@@ -48,30 +71,41 @@ export const AddAnnotationScore = ({ onClose }: { onClose: () => void }) => {
     },
   });
 
-  type FormData = {
-    name: string;
-    description?: string | null;
-    category?: string[] | null;
-    categoryExplanation?: string[] | null;
-    dataType: string;
-    options?: string[] | null;
-    checkbox?: string[] | null;
-    defaultRadioOption?: string | null;
-    defaultCheckboxOption?: string[] | null;
-  };
+  useEffect(() => {
+    if (!existingAnnotationScore.data) return;
 
-  const [radioCheckboxOptions, setRadioCheckboxOptions] = useState<string[]>([
-    "",
-  ]);
+    reset({
+      name: existingAnnotationScore.data.name,
+      dataType: existingAnnotationScore.data.dataType ?? "boolean",
+      description: existingAnnotationScore.data.description ?? "",
+      category: [],
+      categoryExplanation: [],
+    });
+
+    setDefaultRadioOption("");
+    setDefaultCheckboxOption([]);
+    if (existingAnnotationScore.data.options && Array.isArray(existingAnnotationScore.data.options)) {
+      setScoreTypeOptions(existingAnnotationScore.data.options.map(o => o.value) as string[]);
+    }
+
+    switch (existingAnnotationScore.data.dataType) {
+      case AnnotationScoreDataType.OPTION:
+        setDefaultRadioOption(existingAnnotationScore.data.defaultValue!.value as string);
+        break;
+        case AnnotationScoreDataType.CHECKBOX:
+        setDefaultCheckboxOption(existingAnnotationScore.data.defaultValue!.options as string[]);
+        break;
+    }
+  }, [existingAnnotationScore.data?.id, existingAnnotationScore.data?.updatedAt]);
+
+  const [scoreTypeOptions, setScoreTypeOptions] = useState<string[]>([""]);
   const [defaultRadioOption, setDefaultRadioOption] = useState<string>("");
-  const [defaultCheckboxOption, setDefaultCheckboxOption] = useState<string[]>(
-    []
-  );
+  const [defaultCheckboxOption, setDefaultCheckboxOption] = useState<string[]>([]);
 
   const onSubmit = (data: FormData) => {
     if (
-      radioCheckboxOptions.length === 0 ||
-      radioCheckboxOptions.every((opt) => !opt.trim())
+      scoreTypeOptions.length === 0 ||
+      scoreTypeOptions.every((opt) => !opt.trim())
     ) {
       toaster.create({
         title: "Error creating annotation score",
@@ -85,7 +119,7 @@ export const AddAnnotationScore = ({ onClose }: { onClose: () => void }) => {
       return;
     }
 
-    const trimmedRadioCheckboxOptions = radioCheckboxOptions.filter(
+    const trimmedRadioCheckboxOptions = scoreTypeOptions.filter(
       (opt) => opt.trim() !== ""
     );
 
@@ -105,8 +139,9 @@ export const AddAnnotationScore = ({ onClose }: { onClose: () => void }) => {
       return;
     }
 
-    createAnnotationScore.mutate(
+    upsertAnnotationScore.mutate(
       {
+        annotationScoreId: annotationScoreId,
         name: data.name,
         dataType: data.dataType as AnnotationScoreDataType,
         description: data.description,
@@ -121,22 +156,25 @@ export const AddAnnotationScore = ({ onClose }: { onClose: () => void }) => {
       {
         onSuccess: (data) => {
           toaster.create({
-            title: "Annotation Score Created",
-            description: `Successfully created ${data.name} annotation score`,
+            title: annotationScoreId ? "Annotation Score Updated" : "Annotation Score Created",
+            description: `Successfully ${annotationScoreId ? "updated" : "created"} ${data.name} annotation score`,
             type: "success",
             meta: {
               closable: true,
             },
             placement: "top-end",
           });
-          void queryClient.annotationScore.getAllActive.invalidate();
 
           onClose();
           reset();
+
+          void queryClient.annotationScore.getAllActive.invalidate();
+          void queryClient.annotationScore.getAll.invalidate();
+          void queryClient.annotationScore.getById.invalidate();
         },
         onError: (error) => {
           toaster.create({
-            title: "Error creating annotation score",
+            title: annotationScoreId ? "Error updating annotation score" : "Error creating annotation score",
             description: error.message,
             type: "error",
             meta: {
@@ -168,7 +206,12 @@ export const AddAnnotationScore = ({ onClose }: { onClose: () => void }) => {
             helper="Provide a description of the score metric"
             invalid={!!errors.description}
           >
-            <Textarea {...register("description")} required />
+            <Textarea
+              {...register("description")}
+              required
+              autoresize
+              // maxLines={6} TODO(afr): fix max lines not working
+            />
           </FullWidthFormControl>
           <FullWidthFormControl
             label="Score Type"
@@ -207,7 +250,7 @@ export const AddAnnotationScore = ({ onClose }: { onClose: () => void }) => {
                     value={defaultRadioOption}
                   >
                     <VStack align="start" width="full" gap={2}>
-                      {radioCheckboxOptions.map((option, index) => (
+                      {scoreTypeOptions.map((option, index) => (
                         <HStack key={index} gap={2} width="full">
                           <Radio
                             value={option}
@@ -229,21 +272,21 @@ export const AddAnnotationScore = ({ onClose }: { onClose: () => void }) => {
                               if (defaultRadioOption === option) {
                                 setDefaultRadioOption("");
                               }
-                              const newOptions = [...radioCheckboxOptions];
+                              const newOptions = [...scoreTypeOptions];
                               newOptions[index] = e.target.value;
-                              setRadioCheckboxOptions(newOptions);
+                              setScoreTypeOptions(newOptions);
                             }}
                           />
                           <IconButton
                             aria-label="Remove option"
                             colorPalette="gray"
                             onClick={() => {
-                              const newOptions = radioCheckboxOptions.filter(
+                              const newOptions = scoreTypeOptions.filter(
                                 (_, i) => i !== index
                               );
-                              setRadioCheckboxOptions(newOptions);
+                              setScoreTypeOptions(newOptions);
                             }}
-                            disabled={radioCheckboxOptions.length === 1}
+                            disabled={scoreTypeOptions.length === 1}
                           >
                             <X />
                           </IconButton>
@@ -254,7 +297,7 @@ export const AddAnnotationScore = ({ onClose }: { onClose: () => void }) => {
 
                   <Button
                     onClick={() =>
-                      setRadioCheckboxOptions([...radioCheckboxOptions, ""])
+                      setScoreTypeOptions([...scoreTypeOptions, ""])
                     }
                     size="sm"
                     colorPalette="orange"
@@ -280,7 +323,7 @@ export const AddAnnotationScore = ({ onClose }: { onClose: () => void }) => {
             {watchDataType === "CHECKBOX" && (
               <Field.Root mt={4}>
                 <VStack align="start" width="full">
-                  {radioCheckboxOptions.map((option, index) => (
+                  {scoreTypeOptions.map((option, index) => (
                     <HStack key={index} width="full">
                       <Box
                         onClick={(e) => {
@@ -312,21 +355,21 @@ export const AddAnnotationScore = ({ onClose }: { onClose: () => void }) => {
                         placeholder="value"
                         value={option}
                         onChange={(e) => {
-                          const newOptions = [...radioCheckboxOptions];
+                          const newOptions = [...scoreTypeOptions];
                           newOptions[index] = e.target.value;
-                          setRadioCheckboxOptions(newOptions);
+                          setScoreTypeOptions(newOptions);
                         }}
                       />
                       <IconButton
                         aria-label="Remove option"
                         colorPalette="gray"
                         onClick={() => {
-                          const newOptions = radioCheckboxOptions.filter(
+                          const newOptions = scoreTypeOptions.filter(
                             (_, i) => i !== index
                           );
-                          setRadioCheckboxOptions(newOptions);
+                          setScoreTypeOptions(newOptions);
                         }}
-                        disabled={radioCheckboxOptions.length === 1}
+                        disabled={scoreTypeOptions.length === 1}
                       >
                         <X />
                       </IconButton>
@@ -334,7 +377,7 @@ export const AddAnnotationScore = ({ onClose }: { onClose: () => void }) => {
                   ))}
                   <Button
                     onClick={() =>
-                      setRadioCheckboxOptions([...radioCheckboxOptions, ""])
+                      setScoreTypeOptions([...scoreTypeOptions, ""])
                     }
                     size="sm"
                     colorPalette="orange"
@@ -363,7 +406,7 @@ export const AddAnnotationScore = ({ onClose }: { onClose: () => void }) => {
           <HStack width="full">
             <Spacer />
             <Button colorPalette="orange" type="submit" minWidth="fit-content">
-              Add Score Metric
+              {annotationScoreId ? "Update Score Metric" : "Add Score Metric"}
             </Button>
           </HStack>
         </VStack>

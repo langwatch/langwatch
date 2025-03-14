@@ -19,7 +19,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
-import { AddAnnotationScore } from "./annotations/AddAnnotationScore";
+import { AddOrEditAnnotationScore } from "./annotations/AddOrEditAnnotationScore";
 import { useDrawer } from "./CurrentDrawer";
 import { FullWidthFormControl } from "./FullWidthFormControl";
 import { RandomColorAvatar } from "./RandomColorAvatar";
@@ -408,7 +408,7 @@ export const AddAnnotationQueueDrawer = ({
             </HStack>
           </Drawer.Header>
           <Drawer.Body>
-            <AddAnnotationScore onClose={scoreTypeDrawerOpen.onClose} />
+            <AddOrEditAnnotationScore onClose={scoreTypeDrawerOpen.onClose} />
           </Drawer.Body>
         </Drawer.Content>
       </Drawer.Root>
