@@ -18,5 +18,7 @@ module.exports = {
       "EvaluationRESTResult",
       "Json",
       "Literal",
+      "DatasetSpan",
+      "LLMModeTrace",
     ].includes(name),
 };
