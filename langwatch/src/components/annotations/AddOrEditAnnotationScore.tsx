@@ -209,7 +209,7 @@ export const AddOrEditAnnotationScore = ({
               {...register("description")}
               required
               autoresize
-              // maxLines={6} TODO(afr): fix max lines not working
+              maxHeight="6lh"
             />
           </FullWidthFormControl>
           <FullWidthFormControl
