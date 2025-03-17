@@ -484,13 +484,15 @@ export function BatchEvaluationV2EvaluationResult({
               borderTop="none"
             ></Table.ColumnHeader>
 
-            <Table.ColumnHeader
-              colSpan={datasetColumns.size}
-              paddingY={2}
-              borderTop="none"
-            >
-              <Box>Dataset</Box>
-            </Table.ColumnHeader>
+            {datasetColumns.size > 0 && (
+              <Table.ColumnHeader
+                colSpan={datasetColumns.size}
+                paddingY={2}
+                borderTop="none"
+              >
+                <Box>Dataset</Box>
+              </Table.ColumnHeader>
+            )}
 
             {predictedColumns.size > 0 && (
               <Table.ColumnHeader
