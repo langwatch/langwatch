@@ -15,7 +15,7 @@ import { AnnotationScoreDataType } from "@prisma/client";
 import { EyeOff, Filter, MoreVertical, Plus, ThumbsUp } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import SettingsLayout from "../../components/SettingsLayout";
@@ -23,6 +23,7 @@ import { Link } from "../../components/ui/link";
 import { Switch } from "../../components/ui/switch";
 import { toaster } from "../../components/ui/toaster";
 import { api } from "../../utils/api";
+import { DeleteConfirmationDialog } from "../../components/annotations/DeleteConfirmationDialog";
 
 const AnnotationScorePage = () => {
   const { project } = useOrganizationTeamProject();
@@ -39,6 +40,11 @@ const AnnotationScorePage = () => {
   const toggleAnnotationScore = api.annotationScore.toggle.useMutation();
 
   const isAnnotationDrawerOpen = isDrawerOpen("addOrEditAnnotationScore");
+
+  const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [scoreToDelete, setScoreToDelete] = useState<string | null>(null);
+
+  const deleteAnnotationScore = api.annotationScore.delete.useMutation();
 
   useEffect(() => {
     void getAllAnnotationScores.refetch();
@@ -64,6 +70,46 @@ const AnnotationScorePage = () => {
         },
       }
     );
+  };
+
+  const handleDeleteScore = (scoreId: string) => {
+    setScoreToDelete(scoreId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteScore = () => {
+    if (scoreToDelete) {
+      deleteAnnotationScore.mutate(
+        { scoreId: scoreToDelete, projectId: project?.id ?? "" },
+        {
+          onSuccess: () => {
+            void getAllAnnotationScores.refetch();
+
+            toaster.create({
+              title: "Delete score",
+              type: "success",
+              description: "Score deleted successfully",
+              duration: 6000,
+              meta: {
+                closable: true,
+              },
+            });
+          },
+          onError: () => {
+            toaster.create({
+              title: "Delete score",
+              type: "error",
+              description: "Failed to delete score",
+              duration: 6000,
+              meta: {
+                closable: true,
+              },
+            });
+          },
+        }
+      );
+    }
+    setDeleteDialogOpen(false);
   };
 
   return (
@@ -121,7 +167,7 @@ const AnnotationScorePage = () => {
                     <Table.ColumnHeader>Score Type</Table.ColumnHeader>
                     <Table.ColumnHeader>Score Options</Table.ColumnHeader>
                     <Table.ColumnHeader>Enabled</Table.ColumnHeader>
-                  <Table.ColumnHeader>Actions</Table.ColumnHeader>
+                    <Table.ColumnHeader>Actions</Table.ColumnHeader>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -191,10 +237,10 @@ const AnnotationScorePage = () => {
                               </Box>
                             </Menu.Item>
                             <Menu.Item
-                              value="hide"
+                              value="delete"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                // deleteTrigger(trigger.id);
+                                handleDeleteScore(score.id);
                               }}
                             >
                               <Box
@@ -204,7 +250,7 @@ const AnnotationScorePage = () => {
                                 color="red.600"
                               >
                                 <EyeOff size={14} />
-                                Hide
+                                Delete
                               </Box>
                             </Menu.Item>
                           </Menu.Content>
@@ -218,6 +264,11 @@ const AnnotationScorePage = () => {
           </Card.Body>
         </Card.Root>
       </VStack>
+      <DeleteConfirmationDialog
+        open={isDeleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={confirmDeleteScore}
+      />
     </SettingsLayout>
   );
 };

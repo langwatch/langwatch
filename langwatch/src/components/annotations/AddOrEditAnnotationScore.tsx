@@ -23,7 +23,7 @@ import { FullWidthFormControl } from "../FullWidthFormControl";
 import { Radio, RadioGroup } from "../ui/radio";
 import { toaster } from "../ui/toaster";
 
-import { Checkbox, CheckboxGroup } from "../ui/checkbox";
+import { Checkbox } from "../ui/checkbox";
 
 type FormData = {
   name: string;
@@ -57,11 +57,10 @@ export const AddOrEditAnnotationScore = ({
     register,
     handleSubmit,
     watch,
-    setValue,
     formState: { errors },
     reset,
   } = useForm({
-    disabled: existingAnnotationScore.isLoading,
+    disabled: Boolean(annotationScoreId && existingAnnotationScore.isLoading),
     defaultValues: {
       name: "",
       dataType: "boolean",
@@ -85,15 +84,15 @@ export const AddOrEditAnnotationScore = ({
     setDefaultRadioOption("");
     setDefaultCheckboxOption([]);
     if (existingAnnotationScore.data.options && Array.isArray(existingAnnotationScore.data.options)) {
-      setScoreTypeOptions(existingAnnotationScore.data.options.map(o => o.value) as string[]);
+      setScoreTypeOptions((existingAnnotationScore.data.options as { value: string }[]).map(o => o.value) as string[]);
     }
 
     switch (existingAnnotationScore.data.dataType) {
       case AnnotationScoreDataType.OPTION:
-        setDefaultRadioOption(existingAnnotationScore.data.defaultValue!.value as string);
+        setDefaultRadioOption((existingAnnotationScore.data.defaultValue as { value: string }).value);
         break;
         case AnnotationScoreDataType.CHECKBOX:
-        setDefaultCheckboxOption(existingAnnotationScore.data.defaultValue!.options as string[]);
+        setDefaultCheckboxOption((existingAnnotationScore.data.defaultValue as { options: string[] }).options);
         break;
     }
   }, [existingAnnotationScore.data?.id, existingAnnotationScore.data?.updatedAt]);

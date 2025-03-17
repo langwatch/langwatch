@@ -46,6 +46,7 @@ export const annotationScoreRouter = createTRPCRouter({
           value: input.defaultRadioOption ?? null,
           options: input.defaultCheckboxOption ?? null,
         },
+        deletedAt: null,
       };
 
       if (input.annotationScoreId) {
@@ -67,7 +68,10 @@ export const annotationScoreRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.findMany({
-        where: { projectId: input.projectId },
+        where: {
+          projectId: input.projectId,
+          deletedAt: null,
+        },
         orderBy: { createdAt: "desc" },
       });
     }),
@@ -76,7 +80,7 @@ export const annotationScoreRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.findMany({
-        where: { projectId: input.projectId, active: true },
+        where: { projectId: input.projectId, active: true, deletedAt: null },
       });
     }),
   getById: protectedProcedure
@@ -92,6 +96,7 @@ export const annotationScoreRouter = createTRPCRouter({
         where: { 
           id: input.scoreId,
           projectId: input.projectId,
+          deletedAt: null,
         },
       });
     }),
@@ -108,6 +113,20 @@ export const annotationScoreRouter = createTRPCRouter({
       return ctx.prisma.annotationScore.update({
         where: { id: input.scoreId, projectId: input.projectId },
         data: { active: input.active },
+      });
+    }),
+  delete: protectedProcedure
+    .input(
+      z.object({
+        scoreId: z.string(),
+        projectId: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.annotationScore.update({
+        where: { id: input.scoreId, projectId: input.projectId },
+        data: { deletedAt: new Date() },
       });
     }),
 });
