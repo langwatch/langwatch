@@ -5,14 +5,13 @@ import {
   Card,
   Heading,
   HStack,
-  Menu,
   Spacer,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { AnnotationScoreDataType } from "@prisma/client";
-import { EyeOff, Filter, MoreVertical, Plus, ThumbsUp } from "react-feather";
+import { Edit, EyeOff, MoreVertical, Plus, ThumbsUp } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 
 import { useEffect, useState } from "react";
@@ -20,6 +19,7 @@ import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
+import { Menu } from "../../components/ui/menu";
 import { Switch } from "../../components/ui/switch";
 import { toaster } from "../../components/ui/toaster";
 import { api } from "../../utils/api";
@@ -28,7 +28,11 @@ import { DeleteConfirmationDialog } from "../../components/annotations/DeleteCon
 const AnnotationScorePage = () => {
   const { project } = useOrganizationTeamProject();
 
-  const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
+  const {
+    openDrawer,
+    drawerOpen: isDrawerOpen,
+    closeDrawer,
+  } = useDrawer();
 
   const getAllAnnotationScores = api.annotationScore.getAll.useQuery(
     {
@@ -84,7 +88,6 @@ const AnnotationScorePage = () => {
         {
           onSuccess: () => {
             void getAllAnnotationScores.refetch();
-
             toaster.create({
               title: "Delete score",
               type: "success",
@@ -206,12 +209,7 @@ const AnnotationScorePage = () => {
                       <Table.Cell>
                         <Menu.Root>
                           <Menu.Trigger asChild>
-                            <Button
-                              variant={"ghost"}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                              }}
-                            >
+                            <Button variant={"ghost"}>
                               <MoreVertical />
                             </Button>
                           </Menu.Trigger>
@@ -222,8 +220,8 @@ const AnnotationScorePage = () => {
                                 event.stopPropagation();
                                 openDrawer("addOrEditAnnotationScore", {
                                   annotationScoreId: score.id,
-                                  onClose: () => {},
-                                  onOverlayClick: () => {},
+                                  onClose: () => closeDrawer(),
+                                  onOverlayClick: () => closeDrawer(),
                                 });
                               }}
                             >
@@ -232,8 +230,8 @@ const AnnotationScorePage = () => {
                                 alignItems="center"
                                 gap={2}
                               >
-                                <Filter size={14} />
-                                Edit Filters
+                                <Edit size={14} />
+                                Edit
                               </Box>
                             </Menu.Item>
                             <Menu.Item
