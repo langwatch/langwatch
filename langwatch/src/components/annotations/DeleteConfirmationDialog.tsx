@@ -2,6 +2,15 @@ import { Button, Input, VStack, Text, Code } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "../ui/dialog";
 
+/**
+ * Renders a dialog that prompts the user to confirm deletion by typing "delete".
+ *
+ * The dialog resets its input field each time it is opened. If the confirmation text matches "delete" (case-insensitive), pressing "Enter" or clicking the "Delete" button triggers the deletion process by calling the onConfirm callback followed by onClose. The "Cancel" button also calls onClose to dismiss the dialog.
+ *
+ * @param open - Whether the dialog is visible.
+ * @param onClose - Callback invoked when the dialog is closed.
+ * @param onConfirm - Callback invoked when the deletion is confirmed.
+ */
 export function DeleteConfirmationDialog({
   open,
   onClose,
