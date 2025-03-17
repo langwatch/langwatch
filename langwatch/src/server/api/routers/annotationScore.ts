@@ -50,9 +50,15 @@ export const annotationScoreRouter = createTRPCRouter({
       };
 
       if (input.annotationScoreId) {
-        return ctx.prisma.annotationScore.update({
-          where: { id: input.annotationScoreId, projectId: input.projectId },
-          data,
+        return ctx.prisma.annotationScore.upsert({
+          where: { 
+            id: input.annotationScoreId
+          },
+          update: data,
+          create: {
+            id: input.annotationScoreId,
+            ...data,
+          },
         });
       }
 
