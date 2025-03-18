@@ -16,7 +16,7 @@ import { EvaluationExecutionMode } from "@prisma/client";
 import type { JsonArray } from "@prisma/client/runtime/library";
 import type { Edge, Node } from "@xyflow/react";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Edit2, HelpCircle } from "react-feather";
 import {
   Controller,
@@ -296,7 +296,20 @@ export default function CheckConfigForm({
     queryOpts
   );
 
-  const evaluatorDefinition = checkType && availableEvaluators[checkType];
+  const evaluatorDefinition = useMemo(
+    () => checkType && availableEvaluators[checkType],
+    [checkType, availableEvaluators]
+  );
+
+  const mappingColumns = useMemo(() => {
+    return [
+      ...(evaluatorDefinition?.requiredFields ?? []),
+      ...(evaluatorDefinition?.optionalFields ?? []),
+    ].map((field) => ({
+      name: field,
+      type: "string",
+    }));
+  }, [evaluatorDefinition]);
 
   return (
     <FormProvider {...form}>
@@ -438,7 +451,6 @@ export default function CheckConfigForm({
                   <Accordion.Root
                     value={accordionValue}
                     onValueChange={({ value }) => {
-                      console.log("value", value);
                       setAccordionValue(value);
                     }}
                     multiple
@@ -472,13 +484,7 @@ export default function CheckConfigForm({
                               }}
                               traces={recentTraces.data ?? []}
                               // TODO: specify optional/required fields
-                              columnTypes={[
-                                ...(evaluatorDefinition?.requiredFields ?? []),
-                                ...(evaluatorDefinition?.optionalFields ?? []),
-                              ].map((field) => ({
-                                name: field,
-                                type: "string",
-                              }))}
+                              columnTypes={mappingColumns}
                               setDatasetMapping={(mapping) => {
                                 form.setValue("mappings", mapping);
                               }}
