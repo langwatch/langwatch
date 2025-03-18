@@ -371,7 +371,12 @@ export const AddOrEditAnnotationScore = ({
 
           <HStack width="full">
             <Spacer />
-            <Button colorPalette="orange" type="submit" minWidth="fit-content">
+            <Button
+              colorPalette="orange"
+              type="submit"
+              minWidth="fit-content"
+              loading={upsertAnnotationScore.isLoading}
+            >
               {annotationScoreId ? "Update Score Metric" : "Add Score Metric"}
             </Button>
           </HStack>
