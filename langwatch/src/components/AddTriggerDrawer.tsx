@@ -37,7 +37,7 @@ import type {
   Mapping,
   MappingState,
   TRACE_EXPANSIONS,
-} from "./datasets/DatasetMapping";
+} from "./traces/TracesMapping";
 import { AddParticipants } from "~/components/traces/AddParticipants";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 import { DatasetSelector } from "./datasets/DatasetSelector";

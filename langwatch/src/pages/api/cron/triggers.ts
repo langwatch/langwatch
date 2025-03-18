@@ -12,7 +12,7 @@ import {
   mapTraceToDatasetEntry,
   type Mapping,
   type TRACE_EXPANSIONS,
-} from "~/components/datasets/DatasetMapping";
+} from "~/components/traces/TracesMapping";
 
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord";
 
