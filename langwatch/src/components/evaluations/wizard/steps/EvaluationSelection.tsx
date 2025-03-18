@@ -263,6 +263,7 @@ export function EvaluationSelection() {
         <VStack width="full">
           <CategorySelectionAccordion setAccordeonValue={setAccordeonValue} />
           <EvaluatorSelectionAccordion setAccordeonValue={setAccordeonValue} />
+          <EvaluatorMappingAccordion />
           <EvaluatorSettingsAccordion />
         </VStack>
       </Accordion.Root>
@@ -298,7 +299,7 @@ const CategorySelectionAccordion = ({
           </Accordion.ItemIndicator>
         </Accordion.ItemTrigger>
       )}
-      <Accordion.ItemContent paddingTop={2} paddingX="1px">
+      <Accordion.ItemContent>
         <RadioCard.Root
           variant="outline"
           colorPalette="green"
@@ -306,11 +307,14 @@ const CategorySelectionAccordion = ({
           onValueChange={(e: { value: string }) =>
             handleCategorySelect(e.value as EvaluationCategory)
           }
+          paddingTop={2}
+          paddingBottom={5}
+          paddingX="1px"
         >
           <Grid width="full" gap={3}>
             {evaluatorCategories
               .sort((a, b) => {
-                if (wizardState.task === "real-time") {
+                if (wizardState.task === "real_time") {
                   if (a.realtime && !b.realtime) return -1;
                   if (!a.realtime && b.realtime) return 1;
                 }
@@ -318,7 +322,7 @@ const CategorySelectionAccordion = ({
               })
               .map((category) => {
                 const isDisabled =
-                  !category.realtime && wizardState.task === "real-time";
+                  !category.realtime && wizardState.task === "real_time";
                 return (
                   <Tooltip
                     key={category.id}
@@ -332,6 +336,15 @@ const CategorySelectionAccordion = ({
                       width="full"
                       minWidth={0}
                       disabled={isDisabled}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!isDisabled) {
+                          handleCategorySelect(
+                            category.id as EvaluationCategory
+                          );
+                        }
+                      }}
                     >
                       <RadioCard.ItemHiddenInput />
                       <RadioCard.ItemControl cursor="pointer" width="full">
@@ -382,13 +395,21 @@ const EvaluatorSelectionAccordion = ({
     setFirstEvaluator({
       evaluator: evaluatorType,
     });
-    setAccordeonValue(["settings"]);
+
+    const nextStep =
+      wizardState.task == "real_time" &&
+      wizardState.dataSource == "from_production"
+        ? ["settings"]
+        : ["mappings"];
+    setAccordeonValue(nextStep);
   };
 
-  if (!wizardState.evaluatorCategory) return null;
-
   return (
-    <Accordion.Item value="selection" width="full">
+    <Accordion.Item
+      value="selection"
+      width="full"
+      hidden={!wizardState.evaluatorCategory}
+    >
       <Accordion.ItemTrigger width="full">
         <HStack width="full" alignItems="center" paddingX={2} paddingY={3}>
           <VStack width="full" align="start" gap={1}>
@@ -399,7 +420,7 @@ const EvaluatorSelectionAccordion = ({
           </Accordion.ItemIndicator>
         </HStack>
       </Accordion.ItemTrigger>
-      <Accordion.ItemContent paddingTop={2} paddingX="1px">
+      <Accordion.ItemContent>
         <RadioCard.Root
           variant="outline"
           colorPalette="green"
@@ -407,6 +428,9 @@ const EvaluatorSelectionAccordion = ({
           onValueChange={(e: { value: string }) => {
             handleEvaluatorSelect(e.value);
           }}
+          paddingTop={2}
+          paddingBottom={5}
+          paddingX="1px"
         >
           <Grid width="full" gap={3}>
             {evaluatorCategories
@@ -417,11 +441,13 @@ const EvaluatorSelectionAccordion = ({
                   value={evaluator.id}
                   width="full"
                   minWidth={0}
-                  onClick={() =>
-                    !evaluator.future &&
-                    !evaluator.disabled &&
-                    handleEvaluatorSelect(evaluator.id)
-                  }
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!evaluator.future && !evaluator.disabled) {
+                      handleEvaluatorSelect(evaluator.id);
+                    }
+                  }}
                   opacity={evaluator.future ?? evaluator.disabled ? 0.5 : 1}
                   cursor={
                     evaluator.future ?? evaluator.disabled
@@ -463,6 +489,106 @@ const EvaluatorSelectionAccordion = ({
               ))}
           </Grid>
         </RadioCard.Root>
+      </Accordion.ItemContent>
+    </Accordion.Item>
+  );
+};
+
+const EvaluatorMappingAccordion = () => {
+  const { wizardState, getFirstEvaluator, setFirstEvaluator } =
+    useEvaluationWizardStore();
+
+  const evaluator = getFirstEvaluator();
+  const evaluatorType = evaluator?.evaluator;
+  const evaluatorDefinition =
+    evaluatorType && evaluatorType in AVAILABLE_EVALUATORS
+      ? AVAILABLE_EVALUATORS[evaluatorType as keyof Evaluators]
+      : undefined;
+
+  const form = useForm<{
+    customMapping: Record<string, string>;
+  }>({
+    defaultValues: {
+      customMapping: {},
+    },
+  });
+
+  return (
+    <Accordion.Item
+      value="mappings"
+      width="full"
+      hidden={!wizardState.evaluatorCategory}
+    >
+      <Accordion.ItemTrigger width="full">
+        <HStack width="full" alignItems="center" paddingX={2} paddingY={3}>
+          <VStack width="full" align="start" gap={1}>
+            <Text>Data Mapping</Text>
+          </VStack>
+          <Accordion.ItemIndicator>
+            <ChevronDown />
+          </Accordion.ItemIndicator>
+        </HStack>
+      </Accordion.ItemTrigger>
+      <Accordion.ItemContent>
+        <VStack
+          align="start"
+          padding={2}
+          paddingBottom={5}
+          width="full"
+          gap={8}
+        >
+          {wizardState.task == "real_time" && evaluatorDefinition ? (
+            <>
+              <Text>
+                What data from the real time traces will be used for evaluation?
+              </Text>
+              <Field.Root>
+                <VStack align="start" gap={4} width="full">
+                  <MappingsFields
+                    titles={["Dataset", "Evaluator"]}
+                    register={form.register}
+                    mappingOptions={MAPPING_OPTIONS}
+                    defaultValues={
+                      wizardState.evaluatorMappings
+                        ? {
+                            ...DEFAULT_MAPPINGS,
+                            ...(wizardState.evaluatorMappings ?? {}),
+                          }
+                        : DEFAULT_MAPPINGS
+                    }
+                    optionalFields={evaluatorDefinition.optionalFields}
+                    requiredFields={evaluatorDefinition.requiredFields}
+                  />
+                </VStack>
+              </Field.Root>
+            </>
+          ) : evaluatorDefinition ? (
+            <>
+              <Text>
+                What columns from the dataset should be used for evaluation?
+              </Text>
+              <Field.Root>
+                <VStack align="start" gap={4} width="full">
+                  <MappingsFields
+                    titles={["Dataset", "Evaluator"]}
+                    register={form.register}
+                    mappingOptions={MAPPING_OPTIONS}
+                    defaultValues={
+                      wizardState.evaluatorMappings
+                        ? {
+                            ...DEFAULT_MAPPINGS,
+                            ...(wizardState.evaluatorMappings ?? {}),
+                          }
+                        : DEFAULT_MAPPINGS
+                    }
+                    optionalFields={evaluatorDefinition.optionalFields}
+                    requiredFields={evaluatorDefinition.requiredFields}
+                  />
+                </VStack>
+              </Field.Root>
+            </>
+          ) : null}
+        </VStack>
       </Accordion.ItemContent>
     </Accordion.Item>
   );
@@ -550,10 +676,12 @@ const EvaluatorSettingsAccordion = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form]);
 
-  if (!hasEvaluatorFields) return null;
-
   return (
-    <Accordion.Item value="settings" width="full">
+    <Accordion.Item
+      value="settings"
+      width="full"
+      hidden={!wizardState.evaluatorCategory || !hasEvaluatorFields}
+    >
       <Accordion.ItemTrigger width="full">
         <HStack width="full" alignItems="center" paddingX={2} paddingY={3}>
           <VStack width="full" align="start" gap={1}>
@@ -564,41 +692,18 @@ const EvaluatorSettingsAccordion = () => {
           </Accordion.ItemIndicator>
         </HStack>
       </Accordion.ItemTrigger>
-      <Accordion.ItemContent paddingTop={2} paddingX="1px">
+      <Accordion.ItemContent padding={2}>
         <FormProvider {...form}>
           <VStack width="full" gap={3}>
-            <Field.Root borderBottomWidth="1px" paddingY={5}>
-              <VStack align="start" gap={4} width="full">
-                <Field.Label margin={0}>Dataset to Evaluator mapping</Field.Label>
-                <MappingsFields
-                  register={form.register}
-                  mappingOptions={MAPPING_OPTIONS}
-                  defaultValues={
-                    wizardState.evaluatorMappings
-                      ? {
-                          ...DEFAULT_MAPPINGS,
-                          ...(wizardState.evaluatorMappings ?? {}),
-                        }
-                      : DEFAULT_MAPPINGS
-                  }
-                  optionalFields={
-                    AVAILABLE_EVALUATORS[evaluatorType as keyof Evaluators]
-                      .optionalFields
-                  }
-                  requiredFields={
-                    AVAILABLE_EVALUATORS[evaluatorType as keyof Evaluators]
-                      .requiredFields
-                  }
-                />
-              </VStack>
-            </Field.Root>
-            <DynamicZodForm
-              schema={schema}
-              evaluatorType={evaluatorType as keyof Evaluators}
-              prefix="settings"
-              errors={form.formState.errors.settings}
-              variant="default"
-            />
+            {hasEvaluatorFields && (
+              <DynamicZodForm
+                schema={schema}
+                evaluatorType={evaluatorType as keyof Evaluators}
+                prefix="settings"
+                errors={form.formState.errors.settings}
+                variant="default"
+              />
+            )}
           </VStack>
         </FormProvider>
       </Accordion.ItemContent>

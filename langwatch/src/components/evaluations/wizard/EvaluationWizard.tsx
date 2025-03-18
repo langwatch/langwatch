@@ -98,15 +98,14 @@ export function EvaluationWizard() {
         <Spacer width="full" />
       </Dialog.Header>
       <Dialog.Body display="flex" height="fit-content" width="full" padding={0}>
-        <VStack height="fit-content" background="white">
-          <VStack
-            align="start"
-            minWidth="460px"
-            maxWidth="580px"
-            padding={6}
-            gap={8}
-            height="fit-content"
-          >
+        <VStack
+          height="fit-content"
+          background="white"
+          minWidth="500px"
+          width="full"
+          maxWidth="500px"
+        >
+          <VStack align="start" padding={6} gap={8} height="fit-content" width="full">
             <Steps.Root
               size="sm"
               count={5}

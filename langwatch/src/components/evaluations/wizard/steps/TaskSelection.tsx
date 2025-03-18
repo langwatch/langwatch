@@ -20,7 +20,7 @@ export function TaskSelection() {
         <StepButton
           title="Set up real-time evaluation"
           description="Evaluate messages as they arrive in production"
-          onClick={() => setWizardState({ step: "dataset", task: "real-time" })}
+          onClick={() => setWizardState({ step: "dataset", task: "real_time" })}
           icon={
             <ColorfulBlockIcon
               color="green.400"
