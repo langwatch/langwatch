@@ -14,7 +14,7 @@ import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import type { Dataset } from "@prisma/client";
 import { useMemo } from "react";
 import { Checkbox } from "../../components/ui/checkbox";
-import { TracesMapping, type MappingState } from "./DatasetMapping";
+import { TracesMapping, type MappingState } from "../traces/TracesMapping";
 
 interface DatasetMappingPreviewProps {
   traces: any[]; // Replace 'any' with your trace type
