@@ -41,15 +41,18 @@ export const AddOrEditAnnotationScore = ({
   onClose,
   annotationScoreId,
 }: {
-  onClose: () => void,
-  annotationScoreId: string | undefined,
+  onClose: () => void;
+  annotationScoreId: string | undefined;
 }) => {
   const { project } = useOrganizationTeamProject();
   const upsertAnnotationScore = api.annotationScore.upsert.useMutation();
-  const existingAnnotationScore = api.annotationScore.getById.useQuery({
-    projectId: project?.id ?? "",
-    scoreId: annotationScoreId ?? "",
-  }, { enabled: !!annotationScoreId && !!project?.id });
+  const existingAnnotationScore = api.annotationScore.getById.useQuery(
+    {
+      projectId: project?.id ?? "",
+      scoreId: annotationScoreId ?? "",
+    },
+    { enabled: !!annotationScoreId && !!project?.id }
+  );
 
   const queryClient = api.useContext();
 
@@ -84,15 +87,19 @@ export const AddOrEditAnnotationScore = ({
     setDefaultRadioOption("");
     setDefaultCheckboxOption([]);
     if (existingAnnotationScore.data.options && Array.isArray(existingAnnotationScore.data.options)) {
-      setScoreTypeOptions((existingAnnotationScore.data.options as { value: string }[]).map(o => o.value) as string[]);
+      setScoreTypeOptions(
+        existingAnnotationScore.data.options
+          .filter((o): o is { value: string } => o !== null && typeof o === "object" && "value" in o)
+          .map((o) => o.value)
+      );
     }
 
     switch (existingAnnotationScore.data.dataType) {
       case AnnotationScoreDataType.OPTION:
-        setDefaultRadioOption((existingAnnotationScore.data.defaultValue as { value: string }).value);
+        setDefaultRadioOption((existingAnnotationScore.data.defaultValue as { value: string })?.value);
         break;
-        case AnnotationScoreDataType.CHECKBOX:
-        setDefaultCheckboxOption((existingAnnotationScore.data.defaultValue as { options: string[] }).options);
+      case AnnotationScoreDataType.CHECKBOX:
+        setDefaultCheckboxOption((existingAnnotationScore.data.defaultValue as { options: string[] })?.options);
         break;
     }
   }, [existingAnnotationScore.data?.id, existingAnnotationScore.data?.updatedAt]);
@@ -102,10 +109,7 @@ export const AddOrEditAnnotationScore = ({
   const [defaultCheckboxOption, setDefaultCheckboxOption] = useState<string[]>([]);
 
   const onSubmit = (data: FormData) => {
-    if (
-      scoreTypeOptions.length === 0 ||
-      scoreTypeOptions.every((opt) => !opt.trim())
-    ) {
+    if (scoreTypeOptions.length === 0 || scoreTypeOptions.every((opt) => !opt.trim())) {
       toaster.create({
         title: "Error creating annotation score",
         description: "Please add at least one option",
@@ -118,13 +122,9 @@ export const AddOrEditAnnotationScore = ({
       return;
     }
 
-    const trimmedRadioCheckboxOptions = scoreTypeOptions.filter(
-      (opt) => opt.trim() !== ""
-    );
+    const trimmedRadioCheckboxOptions = scoreTypeOptions.filter((opt) => opt.trim() !== "");
 
-    const normalizedOptions = trimmedRadioCheckboxOptions.map((opt) =>
-      opt.toLowerCase()
-    );
+    const normalizedOptions = trimmedRadioCheckboxOptions.map((opt) => opt.toLowerCase());
     if (normalizedOptions.length !== new Set(normalizedOptions).size) {
       toaster.create({
         title: "Error creating annotation score",
@@ -205,12 +205,7 @@ export const AddOrEditAnnotationScore = ({
             helper="Provide a description of the score metric"
             invalid={!!errors.description}
           >
-            <Textarea
-              {...register("description")}
-              required
-              autoresize
-              maxHeight="6lh"
-            />
+            <Textarea {...register("description")} required autoresize maxHeight="6lh" />
           </FullWidthFormControl>
           <FullWidthFormControl
             label="Score Type"
@@ -227,12 +222,8 @@ export const AddOrEditAnnotationScore = ({
               <VStack align="start" width="full" gap={0}>
                 <NativeSelect.Root>
                   <NativeSelect.Field {...register("dataType")}>
-                    <option value={AnnotationScoreDataType.OPTION}>
-                      Multiple choice
-                    </option>
-                    <option value={AnnotationScoreDataType.CHECKBOX}>
-                      Checkboxes
-                    </option>
+                    <option value={AnnotationScoreDataType.OPTION}>Multiple choice</option>
+                    <option value={AnnotationScoreDataType.CHECKBOX}>Checkboxes</option>
                   </NativeSelect.Field>
                   <NativeSelect.Indicator />
                 </NativeSelect.Root>
@@ -280,9 +271,7 @@ export const AddOrEditAnnotationScore = ({
                             aria-label="Remove option"
                             colorPalette="gray"
                             onClick={() => {
-                              const newOptions = scoreTypeOptions.filter(
-                                (_, i) => i !== index
-                              );
+                              const newOptions = scoreTypeOptions.filter((_, i) => i !== index);
                               setScoreTypeOptions(newOptions);
                             }}
                             disabled={scoreTypeOptions.length === 1}
@@ -295,9 +284,7 @@ export const AddOrEditAnnotationScore = ({
                   </RadioGroup>
 
                   <Button
-                    onClick={() =>
-                      setScoreTypeOptions([...scoreTypeOptions, ""])
-                    }
+                    onClick={() => setScoreTypeOptions([...scoreTypeOptions, ""])}
                     size="sm"
                     colorPalette="orange"
                   >
@@ -307,11 +294,7 @@ export const AddOrEditAnnotationScore = ({
                   {defaultRadioOption !== "" && (
                     <Field.HelperText>
                       <HStack>
-                        <X
-                          size={16}
-                          cursor="pointer"
-                          onClick={() => setDefaultRadioOption("")}
-                        />
+                        <X size={16} cursor="pointer" onClick={() => setDefaultRadioOption("")} />
                         Default Option: <Text>{defaultRadioOption} </Text>
                       </HStack>
                     </Field.HelperText>
@@ -328,25 +311,18 @@ export const AddOrEditAnnotationScore = ({
                         onClick={(e) => {
                           if (defaultCheckboxOption.includes(option)) {
                             setTimeout(() => {
-                              setDefaultCheckboxOption(
-                                defaultCheckboxOption.filter(
-                                  (opt) => opt !== option
-                                )
-                              );
+                              setDefaultCheckboxOption(defaultCheckboxOption.filter((opt) => opt !== option));
                             }, 100);
                           } else {
                             if (option.trim() !== "") {
-                              setDefaultCheckboxOption([
-                                ...defaultCheckboxOption,
-                                option,
-                              ]);
+                              setDefaultCheckboxOption([...defaultCheckboxOption, option]);
                             }
                           }
                         }}
                       >
                         <Checkbox
                           value={option}
-                          checked={defaultCheckboxOption.includes(option)}
+                          checked={(defaultCheckboxOption || []).includes(option)}
                           disabled={!option.trim()}
                         />
                       </Box>
@@ -363,9 +339,7 @@ export const AddOrEditAnnotationScore = ({
                         aria-label="Remove option"
                         colorPalette="gray"
                         onClick={() => {
-                          const newOptions = scoreTypeOptions.filter(
-                            (_, i) => i !== index
-                          );
+                          const newOptions = scoreTypeOptions.filter((_, i) => i !== index);
                           setScoreTypeOptions(newOptions);
                         }}
                         disabled={scoreTypeOptions.length === 1}
@@ -375,25 +349,18 @@ export const AddOrEditAnnotationScore = ({
                     </HStack>
                   ))}
                   <Button
-                    onClick={() =>
-                      setScoreTypeOptions([...scoreTypeOptions, ""])
-                    }
+                    onClick={() => setScoreTypeOptions([...scoreTypeOptions, ""])}
                     size="sm"
                     colorPalette="orange"
                   >
                     <Plus />
                     Add Option
                   </Button>
-                  {defaultCheckboxOption.length > 0 && (
+                  {(defaultCheckboxOption || []).length > 0 && (
                     <Field.HelperText>
                       <HStack>
-                        <X
-                          size={16}
-                          cursor="pointer"
-                          onClick={() => setDefaultCheckboxOption([])}
-                        />
-                        Default Options:{" "}
-                        <Text>{defaultCheckboxOption.join(", ")}</Text>
+                        <X size={16} cursor="pointer" onClick={() => setDefaultCheckboxOption([])} />
+                        Default Options: <Text>{defaultCheckboxOption.join(", ")}</Text>
                       </HStack>
                     </Field.HelperText>
                   )}
