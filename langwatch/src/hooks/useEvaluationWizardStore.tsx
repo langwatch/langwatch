@@ -35,7 +35,7 @@ export type State = {
   experimentId?: string;
   wizardState: {
     step: Step;
-    task?: "real-time" | "batch" | "prompt" | "custom" | "scan";
+    task?: "real_time" | "batch" | "prompt" | "custom" | "scan";
     dataSource?: "choose" | "from_production" | "manual" | "upload";
     evaluatorCategory?: EvaluatorCategory;
     evaluatorMappings?: Record<string, string>;
@@ -140,7 +140,7 @@ const store = (
         const nextStep = steps[currentStepIndex + 1];
         if (
           nextStep === "executor" &&
-          current.wizardState.task === "real-time"
+          current.wizardState.task === "real_time"
         ) {
           return {
             ...current,
