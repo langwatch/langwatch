@@ -65,12 +65,12 @@ export const TRACE_MAPPINGS = {
   spans: {
     keys: (traces: TraceWithSpansAndAnnotations[]) => {
       return Array.from(new Set(traces.flatMap((trace) => trace.spans?.map((span) => span.name) ?? []))).map((key) => ({
-        key: key || "", // Ensure key is a string
-        label: key || "", // Ensure label is a string
+        key: key ?? "",
+        label: key ?? "",
       }));
     },
     subkeys: (traces: TraceWithSpansAndAnnotations[], key: string) => {
-      const spans = traces.flatMap((trace) => trace.spans ?? []).filter((span) => span.type === key);
+      const spans = traces.flatMap((trace) => trace.spans ?? []).filter((span) => span.name === key);
       return Object.keys(spans[0] ?? {})
         .filter((key) => ["input", "output", "generated", "params", "contexts"].includes(key))
         .map((key) => ({
@@ -79,16 +79,20 @@ export const TRACE_MAPPINGS = {
         }));
     },
     mapping: (trace: TraceWithSpansAndAnnotations, key: string, subkey: string) => {
+      console.log("key", key);
+      console.log("subkey", subkey);
+      console.log("trace", trace);
       const traceSpans = esSpansToDatasetSpans(trace.spans ?? []);
       if (!key) {
-        return traceSpans; // Return all spans if no key is provided
+        return traceSpans;
       }
-      const filteredSpans = traceSpans.filter((span) => span.type === key);
+      const filteredSpans = traceSpans.filter((span) => span.name === key);
       if (!subkey) {
         return filteredSpans; // Return filtered spans if no subkey is provided
       }
-      return filteredSpans.map((span) => span[subkey as keyof DatasetSpan]?.value); // Return the specific subkey value
+      return filteredSpans.map((span) => span[subkey as keyof DatasetSpan]); // Return the specific subkey value
     },
+    expandable_by: "spans.llm.span_id",
   },
   "spans.llm.input": {
     mapping: (trace: TraceWithSpansAndAnnotations) =>
