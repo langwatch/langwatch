@@ -454,13 +454,13 @@ export const TracesMapping = ({
   traces,
   columnTypes,
   setDatasetEntries,
-  setDatasetTriggerMapping,
+  setDatasetMapping,
 }: {
   dataset: Dataset;
   traces: TraceWithSpans[];
   columnTypes?: DatasetColumns;
   setDatasetEntries: (entries: DatasetRecordEntry[]) => void;
-  setDatasetTriggerMapping?: (mapping: MappingState) => void;
+  setDatasetMapping?: (mapping: MappingState) => void;
 }) => {
   const { project } = useOrganizationTeamProject();
 
@@ -494,29 +494,6 @@ export const TracesMapping = ({
     expansions: (keyof typeof TRACE_EXPANSIONS)[];
   }) ?? { mapping: {}, expansions: [] };
 
-  const trpc = api.useContext();
-  const updateStoredMapping_ = api.dataset.updateMapping.useMutation();
-  const updateStoredMapping = useCallback(
-    (mappingState: MappingState) => {
-      updateStoredMapping_.mutate(
-        {
-          projectId: project?.id ?? "",
-          datasetId: dataset.id,
-          mapping: {
-            mapping: mappingState.mapping,
-            expansions: Array.from(mappingState.expansions),
-          },
-        },
-        {
-          onSuccess: () => {
-            void trpc.dataset.getAll.invalidate();
-          },
-        }
-      );
-    },
-    [dataset.id, project?.id, trpc.dataset.getAll, updateStoredMapping_]
-  );
-
   const [mappingState, setMappingState_] = useState<MappingState>({
     mapping: {},
     expansions: new Set(),
@@ -525,10 +502,9 @@ export const TracesMapping = ({
     (callback: (mappingState: MappingState) => MappingState) => {
       const newMappingState = callback(mappingState);
       setMappingState_(newMappingState);
-      updateStoredMapping(newMappingState);
-      setDatasetTriggerMapping?.(newMappingState);
+      setDatasetMapping?.(newMappingState);
     },
-    [mappingState, updateStoredMapping, setDatasetTriggerMapping]
+    [mappingState, setDatasetMapping]
   );
   const mapping = mappingState.mapping;
 
@@ -575,7 +551,7 @@ export const TracesMapping = ({
     };
 
     setMappingState_(mappingState);
-    setDatasetTriggerMapping?.(mappingState);
+    setDatasetMapping?.(mappingState);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columnTypes]);
