@@ -42,7 +42,7 @@ export const AddOrEditAnnotationScore = ({
   annotationScoreId,
 }: {
   onClose: () => void;
-  annotationScoreId: string | undefined;
+  annotationScoreId?: string | undefined;
 }) => {
   const { project } = useOrganizationTeamProject();
   const upsertAnnotationScore = api.annotationScore.upsert.useMutation();
@@ -111,7 +111,7 @@ export const AddOrEditAnnotationScore = ({
   const onSubmit = (data: FormData) => {
     if (scoreTypeOptions.length === 0 || scoreTypeOptions.every((opt) => !opt.trim())) {
       toaster.create({
-        title: "Error creating annotation score",
+        title: annotationScoreId ? "Error updating annotation score" : "Error creating annotation score",
         description: "Please add at least one option",
         type: "error",
         meta: {
@@ -127,7 +127,7 @@ export const AddOrEditAnnotationScore = ({
     const normalizedOptions = trimmedRadioCheckboxOptions.map((opt) => opt.toLowerCase());
     if (normalizedOptions.length !== new Set(normalizedOptions).size) {
       toaster.create({
-        title: "Error creating annotation score",
+        title: annotationScoreId ? "Error updating annotation score" : "Error creating annotation score",
         description: "Duplicate options are not allowed (case-insensitive)",
         type: "error",
         meta: {

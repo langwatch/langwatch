@@ -10,8 +10,7 @@ export const AddOrEditAnnotationScoreDrawer = ({
   annotationScoreId,
 }: {
   onClose: () => void;
-  onOverlayClick: () => void;
-  annotationScoreId: string | undefined;
+  annotationScoreId?: string | undefined;
 }) => {
   const { closeDrawer } = useDrawer();
 
@@ -42,15 +41,12 @@ export const AddOrEditAnnotationScoreDrawer = ({
           </HStack>
           <HStack>
             <Text paddingTop={5} fontSize="2xl">
-              Add Score Metric
+              cc
             </Text>
           </HStack>
         </Drawer.Header>
         <Drawer.Body>
-          <AddOrEditAnnotationScore
-            onClose={handleClose}
-            annotationScoreId={annotationScoreId}
-          />
+          <AddOrEditAnnotationScore onClose={handleClose} annotationScoreId={annotationScoreId} />
         </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>
