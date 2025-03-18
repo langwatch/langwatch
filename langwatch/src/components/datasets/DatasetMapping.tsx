@@ -1,34 +1,12 @@
-import {
-  Box,
-  Field,
-  HStack,
-  NativeSelect,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Field, HStack, NativeSelect, Spacer, Text, VStack } from "@chakra-ui/react";
 
-import type {
-  Annotation,
-  AnnotationScore,
-  Dataset,
-  User,
-} from "@prisma/client";
+import type { Annotation, AnnotationScore, Dataset, User } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 import { z } from "zod";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type {
-  DatasetColumns,
-  DatasetRecordEntry,
-} from "../../server/datasets/types";
-import type {
-  DatasetSpan,
-  Evaluation,
-  Span,
-  Trace,
-  TraceWithSpans,
-} from "../../server/tracer/types";
+import type { DatasetColumns, DatasetRecordEntry } from "../../server/datasets/types";
+import type { DatasetSpan, Evaluation, Span, Trace, TraceWithSpans } from "../../server/tracer/types";
 import { datasetSpanSchema } from "../../server/tracer/types.generated";
 import { getRAGChunks, getRAGInfo } from "../../server/tracer/utils";
 import { api } from "../../utils/api";
@@ -45,8 +23,7 @@ export const TRACE_MAPPINGS = {
     mapping: (trace: TraceWithSpansAndAnnotations) => trace.trace_id,
   },
   timestamp: {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      new Date(trace.timestamps.started_at).toISOString(),
+    mapping: (trace: TraceWithSpansAndAnnotations) => new Date(trace.timestamps.started_at).toISOString(),
   },
   input: {
     mapping: (trace: TraceWithSpansAndAnnotations) => trace.input?.value ?? "",
@@ -55,8 +32,7 @@ export const TRACE_MAPPINGS = {
     mapping: (trace: TraceWithSpansAndAnnotations) => trace.output?.value ?? "",
   },
   contexts: {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      getRAGChunks(trace.spans ?? []),
+    mapping: (trace: TraceWithSpansAndAnnotations) => getRAGChunks(trace.spans ?? []),
   },
   "contexts.string_list": {
     mapping: (trace: TraceWithSpansAndAnnotations) => {
@@ -68,69 +44,80 @@ export const TRACE_MAPPINGS = {
     },
   },
   "metrics.total_cost": {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      trace.metrics?.total_cost ?? 0,
+    mapping: (trace: TraceWithSpansAndAnnotations) => trace.metrics?.total_cost ?? 0,
   },
   "metrics.first_token_ms": {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      trace.metrics?.first_token_ms ?? 0,
+    mapping: (trace: TraceWithSpansAndAnnotations) => trace.metrics?.first_token_ms ?? 0,
   },
   "metrics.total_time_ms": {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      trace.metrics?.total_time_ms ?? 0,
+    mapping: (trace: TraceWithSpansAndAnnotations) => trace.metrics?.total_time_ms ?? 0,
   },
   "metrics.prompt_tokens": {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      trace.metrics?.prompt_tokens ?? 0,
+    mapping: (trace: TraceWithSpansAndAnnotations) => trace.metrics?.prompt_tokens ?? 0,
   },
   "metrics.completion_tokens": {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      trace.metrics?.completion_tokens ?? 0,
+    mapping: (trace: TraceWithSpansAndAnnotations) => trace.metrics?.completion_tokens ?? 0,
   },
   "metrics.total_tokens": {
     mapping: (trace: TraceWithSpansAndAnnotations) =>
-      (trace.metrics?.prompt_tokens ?? 0) +
-      (trace.metrics?.completion_tokens ?? 0),
+      (trace.metrics?.prompt_tokens ?? 0) + (trace.metrics?.completion_tokens ?? 0),
   },
   spans: {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      esSpansToDatasetSpans(trace.spans ?? []),
+    keys: (traces: TraceWithSpansAndAnnotations[]) => {
+      return Array.from(new Set(traces.flatMap((trace) => trace.spans?.map((span) => span.name) ?? []))).map((key) => ({
+        key: key || "", // Ensure key is a string
+        label: key || "", // Ensure label is a string
+      }));
+    },
+    subkeys: (traces: TraceWithSpansAndAnnotations[], key: string) => {
+      const spans = traces.flatMap((trace) => trace.spans ?? []).filter((span) => span.type === key);
+      return Object.keys(spans[0] ?? {})
+        .filter((key) => ["input", "output", "generated", "params", "contexts"].includes(key))
+        .map((key) => ({
+          key,
+          label: key,
+        }));
+    },
+    mapping: (trace: TraceWithSpansAndAnnotations, key: string, subkey: string) => {
+      const traceSpans = esSpansToDatasetSpans(trace.spans ?? []);
+      if (!key) {
+        return traceSpans; // Return all spans if no key is provided
+      }
+      const filteredSpans = traceSpans.filter((span) => span.type === key);
+      if (!subkey) {
+        return filteredSpans; // Return filtered spans if no subkey is provided
+      }
+      return filteredSpans.map((span) => span[subkey as keyof DatasetSpan]?.value); // Return the specific subkey value
+    },
   },
   "spans.llm.input": {
     mapping: (trace: TraceWithSpansAndAnnotations) =>
-      trace.spans
-        ?.filter((span) => span.type === "llm")
-        ?.map((span) => span.input?.value) ?? [],
+      trace.spans?.filter((span) => span.type === "llm")?.map((span) => span.input?.value) ?? [],
     expandable_by: "spans.llm.span_id",
   },
   "spans.llm.output": {
     mapping: (trace: TraceWithSpansAndAnnotations) =>
-      trace.spans
-        ?.filter((span) => span.type === "llm")
-        ?.map((span) => span.output?.value) ?? [],
+      trace.spans?.filter((span) => span.type === "llm")?.map((span) => span.output?.value) ?? [],
     expandable_by: "spans.llm.span_id",
   },
   metadata: {
     keys: (traces: TraceWithSpansAndAnnotations[]) =>
-      Array.from(
-        new Set(traces.flatMap((trace) => Object.keys(trace.metadata ?? {})))
-      ).map((key) => ({ key, label: key })),
+      Array.from(new Set(traces.flatMap((trace) => Object.keys(trace.metadata ?? {})))).map((key) => ({
+        key,
+        label: key,
+      })),
     mapping: (trace: TraceWithSpansAndAnnotations, key: string) =>
       key ? (trace.metadata?.[key] as any) : JSON.stringify(trace.metadata),
   },
   evaluations: {
     keys: (traces: TraceWithSpansAndAnnotations[]) => {
       const evaluationsByEvaluatorId = Object.fromEntries(
-        traces
-          .flatMap((trace) => trace.evaluations ?? [])
-          .map((evaluation) => [evaluation.evaluator_id, evaluation])
+        traces.flatMap((trace) => trace.evaluations ?? []).map((evaluation) => [evaluation.evaluator_id, evaluation])
       );
-      return Object.entries(evaluationsByEvaluatorId).map(
-        ([evaluator_id, evaluation]) => ({
-          key: evaluator_id,
-          label: evaluation.name ?? "",
-        })
-      );
+      return Object.entries(evaluationsByEvaluatorId).map(([evaluator_id, evaluation]) => ({
+        key: evaluator_id,
+        label: evaluation.name ?? "",
+      }));
     },
     subkeys: (
       traces: TraceWithSpansAndAnnotations[],
@@ -141,27 +128,17 @@ export const TRACE_MAPPINGS = {
         .flatMap((trace) => trace.evaluations ?? [])
         .find((evaluation) => evaluation.evaluator_id === key);
       return Object.keys(evaluation ?? {})
-        .filter((key) =>
-          ["passed", "score", "label", "details", "status", "error"].includes(
-            key
-          )
-        )
+        .filter((key) => ["passed", "score", "label", "details", "status", "error"].includes(key))
         .map((key) => ({
           key,
           label: key,
         }));
     },
-    mapping: (
-      trace: TraceWithSpansAndAnnotations,
-      key: string,
-      subkey: string
-    ) => {
+    mapping: (trace: TraceWithSpansAndAnnotations, key: string, subkey: string) => {
       if (!key) {
         return trace.evaluations ?? [];
       }
-      const evaluation = trace.evaluations?.find(
-        (evaluation) => evaluation.evaluator_id === key
-      );
+      const evaluation = trace.evaluations?.find((evaluation) => evaluation.evaluator_id === key);
       if (!subkey) {
         return evaluation;
       }
@@ -170,14 +147,7 @@ export const TRACE_MAPPINGS = {
   },
   annotations: {
     keys: (_traces: TraceWithSpansAndAnnotations[]) => {
-      return [
-        "comment",
-        "is_thumbs_up",
-        "author",
-        "score",
-        "score.reason",
-        "expected_output",
-      ].map((key) => ({
+      return ["comment", "is_thumbs_up", "author", "score", "score.reason", "expected_output"].map((key) => ({
         key,
         label: key,
       }));
@@ -218,8 +188,7 @@ export const TRACE_MAPPINGS = {
           Object.fromEntries(
             Object.entries(annotation.scoreOptions ?? {})
               .map(([key, score]) => [
-                data.annotationScoreOptions?.find((score) => score.id === key)
-                  ?.name ?? key,
+                data.annotationScoreOptions?.find((score) => score.id === key)?.name ?? key,
                 score,
               ])
               .filter(([_key, score]) => score.value !== null)
@@ -240,41 +209,27 @@ export const TRACE_MAPPINGS = {
   events: {
     keys: (traces: TraceWithSpansAndAnnotations[]) => {
       return Array.from(
-        new Set(
-          traces.flatMap(
-            (trace) => trace.events?.flatMap((event) => event.event_type) ?? []
-          )
-        )
+        new Set(traces.flatMap((trace) => trace.events?.flatMap((event) => event.event_type) ?? []))
       ).map((key) => ({
         key,
         label: key,
       }));
     },
     subkeys: (traces: TraceWithSpansAndAnnotations[], key: string) => {
-      const events = traces
-        .flatMap((trace) => trace.events ?? [])
-        .filter((event) => event.event_type === key);
+      const events = traces.flatMap((trace) => trace.events ?? []).filter((event) => event.event_type === key);
 
-      const eventMetrics = events.flatMap((event) =>
-        Object.keys(event.metrics).map((key) => `metrics.${key}`)
-      );
+      const eventMetrics = events.flatMap((event) => Object.keys(event.metrics).map((key) => `metrics.${key}`));
 
       const eventDetails = events.flatMap((event) =>
         Object.keys(event.event_details).map((key) => `event_details.${key}`)
       );
 
-      return Array.from(new Set([...eventMetrics, ...eventDetails])).map(
-        (event) => ({
-          key: event,
-          label: event,
-        })
-      );
+      return Array.from(new Set([...eventMetrics, ...eventDetails])).map((event) => ({
+        key: event,
+        label: event,
+      }));
     },
-    mapping: (
-      trace: TraceWithSpansAndAnnotations,
-      key: string,
-      subkey: string
-    ) => {
+    mapping: (trace: TraceWithSpansAndAnnotations, key: string, subkey: string) => {
       if (!key) {
         return trace.events;
       }
@@ -291,9 +246,7 @@ export const TRACE_MAPPINGS = {
       if (subkey.startsWith("event_details.")) {
         return trace.events
           ?.filter((event) => event.event_type === key)
-          ?.map(
-            (event) => event.event_details[subkey.replace("event_details.", "")]
-          );
+          ?.map((event) => event.event_details[subkey.replace("event_details.", "")]);
       }
     },
     expandable_by: "events.event_id",
@@ -301,9 +254,7 @@ export const TRACE_MAPPINGS = {
 } satisfies Record<
   string,
   {
-    keys?: (
-      traces: TraceWithSpansAndAnnotations[]
-    ) => { key: string; label: string }[];
+    keys?: (traces: TraceWithSpansAndAnnotations[]) => { key: string; label: string }[];
     subkeys?: (
       traces: TraceWithSpansAndAnnotations[],
       key: string,
@@ -313,18 +264,9 @@ export const TRACE_MAPPINGS = {
       label: string;
     }[];
     mapping:
-      | ((
-          trace: TraceWithSpansAndAnnotations
-        ) => string | number | object | undefined)
-      | ((
-          trace: TraceWithSpansAndAnnotations,
-          key: string
-        ) => string | number | object | undefined)
-      | ((
-          trace: TraceWithSpansAndAnnotations,
-          key: string,
-          subkey: string
-        ) => string | number | object | undefined)
+      | ((trace: TraceWithSpansAndAnnotations) => string | number | object | undefined)
+      | ((trace: TraceWithSpansAndAnnotations, key: string) => string | number | object | undefined)
+      | ((trace: TraceWithSpansAndAnnotations, key: string, subkey: string) => string | number | object | undefined)
       | ((
           trace: TraceWithSpansAndAnnotations,
           key: string,
@@ -370,16 +312,11 @@ export const TRACE_EXPANSIONS = {
   string,
   {
     label: string;
-    expansion: (
-      trace: TraceWithSpansAndAnnotations
-    ) => TraceWithSpansAndAnnotations[];
+    expansion: (trace: TraceWithSpansAndAnnotations) => TraceWithSpansAndAnnotations[];
   }
 >;
 
-const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
-  string,
-  keyof typeof TRACE_MAPPINGS
-> = {
+const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<string, keyof typeof TRACE_MAPPINGS> = {
   trace_id: "trace_id",
   timestamp: "timestamp",
   input: "input",
@@ -436,9 +373,7 @@ export const TracesMapping = ({
     () =>
       traces.map((trace) => ({
         ...trace,
-        annotations: annotationScores.data?.filter(
-          (annotation) => annotation.traceId === trace.trace_id
-        ),
+        annotations: annotationScores.data?.filter((annotation) => annotation.traceId === trace.trace_id),
       })),
     [traces, annotationScores.data]
   );
@@ -503,12 +438,7 @@ export const TracesMapping = ({
     [mapping]
   );
   const expansions = useMemo(
-    () =>
-      new Set(
-        Array.from(mappingState.expansions).filter((x) =>
-          availableExpansions.has(x)
-        )
-      ),
+    () => new Set(Array.from(mappingState.expansions).filter((x) => availableExpansions.has(x))),
     [mappingState.expansions, availableExpansions]
   );
 
@@ -520,8 +450,7 @@ export const TracesMapping = ({
         columnTypes?.map(({ name }) => [
           name,
           datasetMapping.mapping[name] ?? {
-            source: (DATASET_INFERRED_MAPPINGS_BY_NAME[name] ??
-              "") as keyof typeof TRACE_MAPPINGS,
+            source: (DATASET_INFERRED_MAPPINGS_BY_NAME[name] ?? "") as keyof typeof TRACE_MAPPINGS,
           },
         ]) ?? []
       ),
@@ -539,12 +468,7 @@ export const TracesMapping = ({
     const entries: DatasetRecordEntry[] = [];
 
     for (const trace of traces_) {
-      const mappedEntries = mapTraceToDatasetEntry(
-        trace,
-        mapping,
-        expansions,
-        getAnnotationScoreOptions.data
-      );
+      const mappedEntries = mapTraceToDatasetEntry(trace, mapping, expansions, getAnnotationScoreOptions.data);
 
       // Add each expanded entry to the final results
       for (const entry of mappedEntries) {
@@ -558,187 +482,164 @@ export const TracesMapping = ({
     }
 
     setDatasetEntries(entries);
-  }, [
-    expansions,
-    getAnnotationScoreOptions.data,
-    mapping,
-    setDatasetEntries,
-    traces_,
-    dataset.id,
-    project?.id,
-    now,
-  ]);
+  }, [expansions, getAnnotationScoreOptions.data, mapping, setDatasetEntries, traces_, dataset.id, project?.id, now]);
 
   return (
     <VStack align="start" width="full" gap={2}>
-      {Object.entries(mapping).map(
-        ([column, { source, key, subkey }], index) => {
-          const mapping = source ? TRACE_MAPPINGS[source] : undefined;
+      {Object.entries(mapping).map(([column, { source, key, subkey }], index) => {
+        const mapping = source ? TRACE_MAPPINGS[source] : undefined;
 
-          const subkeys =
-            mapping && "subkeys" in mapping
-              ? mapping.subkeys(traces_, key!, {
-                  annotationScoreOptions: getAnnotationScoreOptions.data,
-                })
-              : undefined;
+        const subkeys =
+          mapping && "subkeys" in mapping
+            ? mapping.subkeys(traces_, key!, {
+                annotationScoreOptions: getAnnotationScoreOptions.data,
+              })
+            : undefined;
 
-          return (
-            <HStack key={index}>
-              <VStack align="start" gap={2}>
-                <NativeSelect.Root width="200px" flexShrink={0}>
-                  <NativeSelect.Field
-                    onChange={(e) => {
-                      setMappingState((prev) => {
-                        const targetMapping = e.target.value
-                          ? TRACE_MAPPINGS[
-                              e.target.value as keyof typeof TRACE_MAPPINGS
-                            ]
-                          : undefined;
+        return (
+          <HStack key={index}>
+            <VStack align="start" gap={2}>
+              <NativeSelect.Root width="200px" flexShrink={0}>
+                <NativeSelect.Field
+                  onChange={(e) => {
+                    setMappingState((prev) => {
+                      const targetMapping = e.target.value
+                        ? TRACE_MAPPINGS[e.target.value as keyof typeof TRACE_MAPPINGS]
+                        : undefined;
 
-                        let newExpansions = expansions;
-                        if (
-                          targetMapping &&
-                          "expandable_by" in targetMapping &&
-                          targetMapping.expandable_by &&
-                          !availableExpansions.has(targetMapping.expandable_by)
-                        ) {
-                          newExpansions = new Set([
-                            ...new Set(Array.from(newExpansions)),
-                            targetMapping.expandable_by,
-                          ]);
-                        }
+                      let newExpansions = expansions;
+                      if (
+                        targetMapping &&
+                        "expandable_by" in targetMapping &&
+                        targetMapping.expandable_by &&
+                        !availableExpansions.has(targetMapping.expandable_by)
+                      ) {
+                        newExpansions = new Set([...new Set(Array.from(newExpansions)), targetMapping.expandable_by]);
+                      }
 
-                        return {
+                      return {
+                        ...prev,
+                        mapping: {
+                          ...prev.mapping,
+                          [column]: {
+                            source: e.target.value as keyof typeof TRACE_MAPPINGS | "",
+                            key: undefined,
+                            subkey: undefined,
+                          },
+                        },
+                        expansions: newExpansions,
+                      };
+                    });
+                  }}
+                  value={source}
+                >
+                  <option value=""></option>
+                  {Object.keys(TRACE_MAPPINGS).map((key) => (
+                    <option key={key} value={key}>
+                      {key}
+                    </option>
+                  ))}
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
+              {mapping && "keys" in mapping && (
+                <HStack width="200px" flexShrink={0} align="start">
+                  <Box
+                    width="16px"
+                    minWidth="16px"
+                    height="24px"
+                    border="2px solid"
+                    borderRadius="0 0 0 6px"
+                    borderColor="gray.300"
+                    borderTop={0}
+                    borderRight={0}
+                    marginLeft="12px"
+                  />
+                  <NativeSelect.Root width="full">
+                    <NativeSelect.Field
+                      onChange={(e) => {
+                        setMappingState((prev) => ({
                           ...prev,
                           mapping: {
                             ...prev.mapping,
                             [column]: {
-                              source: e.target.value as
-                                | keyof typeof TRACE_MAPPINGS
-                                | "",
-                              key: undefined,
-                              subkey: undefined,
+                              ...(prev.mapping[column] as any),
+                              key: e.target.value,
                             },
                           },
-                          expansions: newExpansions,
-                        };
-                      });
-                    }}
-                    value={source}
-                  >
-                    <option value=""></option>
-                    {Object.keys(TRACE_MAPPINGS).map((key) => (
-                      <option key={key} value={key}>
-                        {key}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-                {mapping && "keys" in mapping && (
-                  <HStack width="200px" flexShrink={0} align="start">
-                    <Box
-                      width="16px"
-                      minWidth="16px"
-                      height="24px"
-                      border="2px solid"
-                      borderRadius="0 0 0 6px"
-                      borderColor="gray.300"
-                      borderTop={0}
-                      borderRight={0}
-                      marginLeft="12px"
-                    />
-                    <NativeSelect.Root width="full">
-                      <NativeSelect.Field
-                        onChange={(e) => {
-                          setMappingState((prev) => ({
-                            ...prev,
-                            mapping: {
-                              ...prev.mapping,
-                              [column]: {
-                                ...(prev.mapping[column] as any),
-                                key: e.target.value,
-                              },
+                        }));
+                      }}
+                      value={key}
+                    >
+                      <option value=""></option>
+                      {mapping.keys(traces_).map(({ key, label }) => (
+                        <option key={key} value={key}>
+                          {label}
+                        </option>
+                      ))}
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                </HStack>
+              )}
+              {subkeys && subkeys.length > 0 && (
+                <HStack width="200px" flexShrink={0} align="start">
+                  <Box
+                    width="16px"
+                    minWidth="16px"
+                    height="24px"
+                    border="2px solid"
+                    borderRadius="0 0 0 6px"
+                    borderColor="gray.300"
+                    borderTop={0}
+                    borderRight={0}
+                    marginLeft="12px"
+                  />
+                  <NativeSelect.Root width="full">
+                    <NativeSelect.Field
+                      onChange={(e) => {
+                        setMappingState((prev) => ({
+                          ...prev,
+                          mapping: {
+                            ...prev.mapping,
+                            [column]: {
+                              ...(prev.mapping[column] as any),
+                              subkey: e.target.value,
                             },
-                          }));
-                        }}
-                        value={key}
-                      >
-                        <option value=""></option>
-                        {mapping.keys(traces_).map(({ key, label }) => (
-                          <option key={key} value={key}>
-                            {label}
-                          </option>
-                        ))}
-                      </NativeSelect.Field>
-                      <NativeSelect.Indicator />
-                    </NativeSelect.Root>
-                  </HStack>
-                )}
-                {subkeys && subkeys.length > 0 && (
-                  <HStack width="200px" flexShrink={0} align="start">
-                    <Box
-                      width="16px"
-                      minWidth="16px"
-                      height="24px"
-                      border="2px solid"
-                      borderRadius="0 0 0 6px"
-                      borderColor="gray.300"
-                      borderTop={0}
-                      borderRight={0}
-                      marginLeft="12px"
-                    />
-                    <NativeSelect.Root width="full">
-                      <NativeSelect.Field
-                        onChange={(e) => {
-                          setMappingState((prev) => ({
-                            ...prev,
-                            mapping: {
-                              ...prev.mapping,
-                              [column]: {
-                                ...(prev.mapping[column] as any),
-                                subkey: e.target.value,
-                              },
-                            },
-                          }));
-                        }}
-                        value={subkey}
-                      >
-                        <option value=""></option>
-                        {subkeys.map(({ key, label }) => (
-                          <option key={key} value={key}>
-                            {label}
-                          </option>
-                        ))}
-                      </NativeSelect.Field>
-                      <NativeSelect.Indicator />
-                    </NativeSelect.Root>
-                  </HStack>
-                )}
-              </VStack>
+                          },
+                        }));
+                      }}
+                      value={subkey}
+                    >
+                      <option value=""></option>
+                      {subkeys.map(({ key, label }) => (
+                        <option key={key} value={key}>
+                          {label}
+                        </option>
+                      ))}
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                </HStack>
+              )}
+            </VStack>
 
-              <ArrowRight style={{ flexShrink: 0 }} />
-              <Spacer />
-              <Text flexShrink={0} whiteSpace="nowrap">
-                {column}
-              </Text>
-            </HStack>
-          );
-        }
-      )}
+            <ArrowRight style={{ flexShrink: 0 }} />
+            <Spacer />
+            <Text flexShrink={0} whiteSpace="nowrap">
+              {column}
+            </Text>
+          </HStack>
+        );
+      })}
 
       {availableExpansions.size > 0 && (
         <Field.Root width="full" paddingY={4} marginTop={2}>
           <VStack align="start">
             <Field.Label margin={0}>Expansions</Field.Label>
-            <Field.HelperText
-              margin={0}
-              fontSize="13px"
-              marginBottom={2}
-              maxWidth="600px"
-            >
-              Normalize the dataset to duplicate the rows and have one entry per
-              line instead of an array for the following mappings:
+            <Field.HelperText margin={0} fontSize="13px" marginBottom={2} maxWidth="600px">
+              Normalize the dataset to duplicate the rows and have one entry per line instead of an array for the
+              following mappings:
             </Field.HelperText>
           </VStack>
           <VStack align="start" paddingTop={2} gap={2}>
@@ -752,11 +653,7 @@ export const TracesMapping = ({
                     setMappingState((prev) => {
                       const newExpansions = isChecked
                         ? new Set([...prev.expansions, expansion])
-                        : new Set(
-                            Array.from(prev.expansions).filter(
-                              (x) => x !== expansion
-                            )
-                          );
+                        : new Set(Array.from(prev.expansions).filter((x) => x !== expansion));
 
                       return {
                         ...prev,
@@ -789,14 +686,10 @@ export const mapTraceToDatasetEntry = (
   expansions: Set<keyof typeof TRACE_EXPANSIONS>,
   annotationScoreOptions?: AnnotationScore[]
 ) => {
-  let expandedTraces: TraceWithSpansAndAnnotations[] = [
-    trace as TraceWithSpansAndAnnotations,
-  ];
+  let expandedTraces: TraceWithSpansAndAnnotations[] = [trace as TraceWithSpansAndAnnotations];
 
   for (const expansion of expansions) {
-    const expanded = expandedTraces.flatMap((trace) =>
-      TRACE_EXPANSIONS[expansion].expansion(trace)
-    );
+    const expanded = expandedTraces.flatMap((trace) => TRACE_EXPANSIONS[expansion].expansion(trace));
     // Only use expanded traces if we found some, otherwise keep original
     expandedTraces = expanded.length > 0 ? expanded : expandedTraces;
   }
@@ -810,21 +703,11 @@ export const mapTraceToDatasetEntry = (
           annotationScoreOptions,
         });
 
-        if (
-          source_ &&
-          "expandable_by" in source_ &&
-          source_?.expandable_by &&
-          expansions.has(source_?.expandable_by)
-        ) {
+        if (source_ && "expandable_by" in source_ && source_?.expandable_by && expansions.has(source_?.expandable_by)) {
           value = value?.[0];
         }
 
-        return [
-          column,
-          typeof value !== "string" && typeof value !== "number"
-            ? JSON.stringify(value)
-            : value,
-        ];
+        return [column, typeof value !== "string" && typeof value !== "number" ? JSON.stringify(value) : value];
       })
     )
   );
