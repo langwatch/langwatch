@@ -14,9 +14,10 @@ import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import type { Dataset } from "@prisma/client";
 import { useCallback, useMemo } from "react";
 import { Checkbox } from "../../components/ui/checkbox";
-import { TracesMapping, type MappingState } from "../traces/TracesMapping";
 import { api } from "../../utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { MappingState } from "../../server/tracer/tracesMapping";
+import { TracesMapping } from "../traces/TracesMapping";
 
 interface DatasetMappingPreviewProps {
   traces: any[]; // Replace 'any' with your trace type
@@ -118,7 +119,10 @@ export function DatasetMappingPreview({
           </Field.HelperText>
 
           <TracesMapping
-            dataset={selectedDataset}
+            dataset={{
+              id: selectedDataset.id,
+              mapping: selectedDataset.mapping as MappingState | undefined,
+            }}
             traces={traces}
             columnTypes={columnTypes}
             setDatasetEntries={onRowDataChange}
