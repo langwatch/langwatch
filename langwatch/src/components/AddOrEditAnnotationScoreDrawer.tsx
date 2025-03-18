@@ -41,7 +41,7 @@ export const AddOrEditAnnotationScoreDrawer = ({
           </HStack>
           <HStack>
             <Text paddingTop={5} fontSize="2xl">
-              cc
+              {annotationScoreId ? "Edit Score Metric" : "Add Score Metric"}
             </Text>
           </HStack>
         </Drawer.Header>
