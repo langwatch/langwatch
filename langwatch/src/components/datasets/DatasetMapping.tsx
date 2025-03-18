@@ -79,18 +79,15 @@ export const TRACE_MAPPINGS = {
         }));
     },
     mapping: (trace: TraceWithSpansAndAnnotations, key: string, subkey: string) => {
-      console.log("key", key);
-      console.log("subkey", subkey);
-      console.log("trace", trace);
       const traceSpans = esSpansToDatasetSpans(trace.spans ?? []);
       if (!key) {
         return traceSpans;
       }
       const filteredSpans = traceSpans.filter((span) => span.name === key);
       if (!subkey) {
-        return filteredSpans; // Return filtered spans if no subkey is provided
+        return filteredSpans;
       }
-      return filteredSpans.map((span) => span[subkey as keyof DatasetSpan]); // Return the specific subkey value
+      return filteredSpans.map((span) => span[subkey as keyof DatasetSpan]);
     },
     expandable_by: "spans.llm.span_id",
   },
