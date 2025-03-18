@@ -1,8 +1,6 @@
 import {
   Accordion,
-  AccordionItemIndicator,
   Alert,
-  Box,
   Button,
   Card,
   Field,
@@ -19,16 +17,16 @@ import type { JsonArray } from "@prisma/client/runtime/library";
 import type { Edge, Node } from "@xyflow/react";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { ArrowRight, ChevronDown, Edit2, HelpCircle } from "react-feather";
+import { ChevronDown, Edit2, HelpCircle } from "react-feather";
 import {
   Controller,
   FormProvider,
   useFieldArray,
   useForm,
-  type UseFormRegister,
 } from "react-hook-form";
 import slugify from "slugify";
 import { z } from "zod";
+import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { getInputsOutputs } from "../../optimization_studio/utils/nodeUtils";
 import {
@@ -44,10 +42,16 @@ import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
 } from "../../server/evaluations/getEvaluator";
+import { migrateLegacyMappings } from "../../server/evaluations/migrateLegacyMappings";
 import type { CheckPreconditions } from "../../server/evaluations/types";
 import { checkPreconditionsSchema } from "../../server/evaluations/types.generated";
+import {
+  mappingStateSchema,
+  type MappingState,
+} from "../../server/tracer/tracesMapping";
 import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
+import { TracesMapping } from "../traces/TracesMapping";
 import { Tooltip } from "../ui/tooltip";
 import DynamicZodForm from "./DynamicZodForm";
 import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
@@ -63,8 +67,7 @@ export interface CheckConfigFormData {
   settings: Evaluators[EvaluatorTypes]["settings"];
   executionMode: EvaluationExecutionMode;
   storeSettingsOnCode: boolean;
-  mappings: Record<string, string>;
-  customMapping: Record<string, string>;
+  mappings: MappingState;
 }
 
 interface CheckConfigFormProps {
@@ -97,32 +100,26 @@ export default function CheckConfigForm({
   };
 
   const DEFAULT_MAPPINGS: CheckConfigFormData["mappings"] = {
-    spans: "spans",
-    input: "trace.input",
-    output: "trace.output",
-    contexts: "trace.first_rag_context",
-    expected_output: "metadata.expected_output",
-    expected_contexts: "metadata.expected_contexts",
-  };
-
-  const MAPPING_OPTIONS = [
-    { value: "spans", label: "spans" },
-    { value: "trace.input", label: "trace.input" },
-    { value: "trace.output", label: "trace.output" },
-    { value: "trace.first_rag_context", label: "trace.first_rag_context" },
-    { value: "metadata.expected_output", label: "metadata.expected_output" },
-    {
-      value: "metadata.expected_contexts",
-      label: "metadata.expected_contexts",
+    mapping: {
+      spans: {
+        source: "spans",
+      },
+      input: {
+        source: "input",
+      },
+      output: {
+        source: "output",
+      },
+      contexts: {
+        source: "contexts",
+      },
+      expected_output: {
+        source: "metadata",
+        key: "expected_output",
+      },
     },
-  ];
-
-  if (defaultValues) {
-    defaultValues.mappings = {
-      ...DEFAULT_MAPPINGS,
-      ...(defaultValues.mappings ?? {}),
-    } as CheckConfigFormData["mappings"];
-  }
+    expansions: [],
+  };
 
   const form = useForm<CheckConfigFormData>({
     defaultValues,
@@ -144,8 +141,7 @@ export default function CheckConfigForm({
               EvaluationExecutionMode.MANUALLY,
             ])
             .optional(),
-          mappings: z.record(z.string(), z.string().optional()),
-          customMapping: z.record(z.string(), z.string().optional()),
+          mappings: mappingStateSchema,
         })
       )({ ...data, settings: data.settings || {} }, ...args);
     },
@@ -165,6 +161,13 @@ export default function CheckConfigForm({
   const sample = watch("sample");
   const executionMode = watch("executionMode");
   const storeSettingsOnCode = watch("storeSettingsOnCode");
+  const mappings = watch("mappings") ?? DEFAULT_MAPPINGS;
+
+  useEffect(() => {
+    if (mappings && !mappings.mapping) {
+      form.setValue("mappings", migrateLegacyMappings(mappings as any));
+    }
+  }, [form, mappings]);
 
   const {
     fields: fieldsPrecondition,
@@ -174,8 +177,6 @@ export default function CheckConfigForm({
     control,
     name: "preconditions",
   });
-  const evaluatorDefinition = checkType && getEvaluatorDefinitions(checkType);
-
   const slug = slugify(nameValue || "", {
     lower: true,
     strict: true,
@@ -289,12 +290,19 @@ export default function CheckConfigForm({
     </Text>
   );
 
+  const { filterParams, queryOpts } = useFilterParams();
+  const recentTraces = api.traces.getSampleTracesDataset.useQuery(
+    filterParams,
+    queryOpts
+  );
+
+  const evaluatorDefinition = checkType && availableEvaluators[checkType];
+
   return (
     <FormProvider {...form}>
-      {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onSubmit={handleSubmit((data) => {
-          data.mappings = data.customMapping;
           return onSubmit(data);
         })}
         style={{ width: "100%" }}
@@ -457,19 +465,25 @@ export default function CheckConfigForm({
                           label="Mappings"
                           helper="Map which fields from the trace will be used to run the evaluation"
                         >
-                          <MappingsFields
-                            register={register}
-                            mappingOptions={MAPPING_OPTIONS}
-                            defaultValues={
-                              defaultValues?.mappings ?? DEFAULT_MAPPINGS
-                            }
-                            optionalFields={
-                              availableEvaluators[checkType].optionalFields
-                            }
-                            requiredFields={
-                              availableEvaluators[checkType].requiredFields
-                            }
-                          />
+                          {mappings?.mapping && (
+                            <TracesMapping
+                              dataset={{
+                                mapping: mappings,
+                              }}
+                              traces={recentTraces.data ?? []}
+                              // TODO: specify optional/required fields
+                              columnTypes={[
+                                ...(evaluatorDefinition?.requiredFields ?? []),
+                                ...(evaluatorDefinition?.optionalFields ?? []),
+                              ].map((field) => ({
+                                name: field,
+                                type: "string",
+                              }))}
+                              setDatasetMapping={(mapping) => {
+                                form.setValue("mappings", mapping);
+                              }}
+                            />
+                          )}
                         </HorizontalFormControl>
                         <PreconditionsField
                           runOn={
@@ -568,71 +582,3 @@ export default function CheckConfigForm({
     </FormProvider>
   );
 }
-
-const MappingsFields = ({
-  register,
-  mappingOptions,
-  optionalFields,
-  requiredFields,
-  defaultValues,
-}: {
-  register: UseFormRegister<CheckConfigFormData>;
-  mappingOptions: { value: string; label: string }[];
-  optionalFields: string[];
-  requiredFields: string[];
-  defaultValues: CheckConfigFormData["mappings"];
-}) => {
-  return (
-    <>
-      <VStack gap={2} align="start" width="full">
-        {requiredFields.length > 0 && (
-          <>
-            {requiredFields.map((field) => (
-              <HStack width="full" key={field}>
-                <NativeSelect.Root maxWidth="50%">
-                  <NativeSelect.Field
-                    defaultValue={defaultValues[field]}
-                    {...register(`customMapping.${field}`)}
-                  >
-                    {mappingOptions.map(({ value, label }) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-                <ArrowRight />
-                <Text>{field} (required)</Text>
-              </HStack>
-            ))}
-          </>
-        )}
-        {optionalFields.length > 0 && (
-          <>
-            {optionalFields.map((field) => (
-              <HStack width="full" key={field}>
-                <NativeSelect.Root maxWidth="50%">
-                  <NativeSelect.Field
-                    defaultValue={defaultValues[field]}
-                    {...register(`customMapping.${field}`)}
-                  >
-                    <option value="">(empty)</option>
-                    {mappingOptions.map(({ value, label }) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-                <ArrowRight />
-                <Text>{field} (optional)</Text>
-              </HStack>
-            ))}
-          </>
-        )}
-      </VStack>
-    </>
-  );
-};

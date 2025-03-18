@@ -8,419 +8,24 @@ import {
   VStack,
 } from "@chakra-ui/react";
 
-import type {
-  Annotation,
-  AnnotationScore,
-  Dataset,
-  User,
-} from "@prisma/client";
+import type { AnnotationScore } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
-import { z } from "zod";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
-import type {
-  DatasetSpan,
-  Evaluation,
-  LLMSpan,
-  Span,
-  Trace,
-  TraceWithSpans,
-} from "../../server/tracer/types";
-import { datasetSpanSchema } from "../../server/tracer/types.generated";
-import { getRAGChunks, getRAGInfo } from "../../server/tracer/utils";
+import {
+  TRACE_EXPANSIONS,
+  TRACE_MAPPINGS,
+  type TraceMapping,
+  type MappingState,
+  type TraceWithSpansAndAnnotations,
+} from "../../server/tracer/tracesMapping";
+import type { Trace, TraceWithSpans } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { Switch } from "../ui/switch";
-import { getSpanNameOrModel } from "../../utils/trace";
-type TraceWithSpansAndAnnotations = TraceWithSpans & {
-  annotations?: (Annotation & {
-    user?: User | null;
-  })[];
-};
-
-export const TRACE_MAPPINGS = {
-  trace_id: {
-    mapping: (trace: TraceWithSpansAndAnnotations) => trace.trace_id,
-  },
-  timestamp: {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      new Date(trace.timestamps.started_at).toISOString(),
-  },
-  input: {
-    mapping: (trace: TraceWithSpansAndAnnotations) => trace.input?.value ?? "",
-  },
-  output: {
-    mapping: (trace: TraceWithSpansAndAnnotations) => trace.output?.value ?? "",
-  },
-  contexts: {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      getRAGChunks(trace.spans ?? []),
-  },
-  "contexts.string_list": {
-    mapping: (trace: TraceWithSpansAndAnnotations) => {
-      try {
-        return getRAGInfo(trace.spans ?? []).contexts ?? [];
-      } catch (e) {
-        return [];
-      }
-    },
-  },
-  "metrics.total_cost": {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      trace.metrics?.total_cost ?? 0,
-  },
-  "metrics.first_token_ms": {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      trace.metrics?.first_token_ms ?? 0,
-  },
-  "metrics.total_time_ms": {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      trace.metrics?.total_time_ms ?? 0,
-  },
-  "metrics.prompt_tokens": {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      trace.metrics?.prompt_tokens ?? 0,
-  },
-  "metrics.completion_tokens": {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      trace.metrics?.completion_tokens ?? 0,
-  },
-  "metrics.total_tokens": {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      (trace.metrics?.prompt_tokens ?? 0) +
-      (trace.metrics?.completion_tokens ?? 0),
-  },
-  spans: {
-    keys: (traces: TraceWithSpansAndAnnotations[]) => {
-      return Array.from(
-        new Set(
-          traces.flatMap(
-            (trace) =>
-              trace.spans?.map((span) => getSpanNameOrModel(span)) ?? []
-          )
-        )
-      ).map((key) => ({
-        key: key ?? "",
-        label: key ?? "",
-      }));
-    },
-    subkeys: (traces: TraceWithSpansAndAnnotations[], key: string) => {
-      const spans = traces
-        .flatMap((trace) => trace.spans ?? [])
-        .filter((span) => getSpanNameOrModel(span) === key);
-      return Object.keys(spans[0] ?? {})
-        .filter((key) =>
-          ["input", "output", "generated", "params", "contexts"].includes(key)
-        )
-        .map((key) => ({
-          key,
-          label: key,
-        }));
-    },
-    mapping: (
-      trace: TraceWithSpansAndAnnotations,
-      key: string,
-      subkey: string
-    ) => {
-      const traceSpans = esSpansToDatasetSpans(trace.spans ?? []);
-      if (!key) {
-        return traceSpans;
-      }
-      const filteredSpans = traceSpans.filter(
-        (span) => getSpanNameOrModel(span as Span) === key
-      );
-      if (!subkey) {
-        return filteredSpans;
-      }
-      return filteredSpans.map((span) => span[subkey as keyof DatasetSpan]);
-    },
-    expandable_by: "spans.llm.span_id",
-  },
-  "spans.llm.input": {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      trace.spans
-        ?.filter((span) => span.type === "llm")
-        ?.map((span) => span.input?.value) ?? [],
-    expandable_by: "spans.llm.span_id",
-  },
-  "spans.llm.output": {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      trace.spans
-        ?.filter((span) => span.type === "llm")
-        ?.map((span) => span.output?.value) ?? [],
-    expandable_by: "spans.llm.span_id",
-  },
-  metadata: {
-    keys: (traces: TraceWithSpansAndAnnotations[]) =>
-      Array.from(
-        new Set(traces.flatMap((trace) => Object.keys(trace.metadata ?? {})))
-      ).map((key) => ({
-        key,
-        label: key,
-      })),
-    mapping: (trace: TraceWithSpansAndAnnotations, key: string) =>
-      key ? (trace.metadata?.[key] as any) : JSON.stringify(trace.metadata),
-  },
-  evaluations: {
-    keys: (traces: TraceWithSpansAndAnnotations[]) => {
-      const evaluationsByEvaluatorId = Object.fromEntries(
-        traces
-          .flatMap((trace) => trace.evaluations ?? [])
-          .map((evaluation) => [evaluation.evaluator_id, evaluation])
-      );
-      return Object.entries(evaluationsByEvaluatorId).map(
-        ([evaluator_id, evaluation]) => ({
-          key: evaluator_id,
-          label: evaluation.name ?? "",
-        })
-      );
-    },
-    subkeys: (
-      traces: TraceWithSpansAndAnnotations[],
-      key: string,
-      _data: { annotationScoreOptions?: AnnotationScore[] }
-    ) => {
-      const evaluation = traces
-        .flatMap((trace) => trace.evaluations ?? [])
-        .find((evaluation) => evaluation.evaluator_id === key);
-      return Object.keys(evaluation ?? {})
-        .filter((key) =>
-          ["passed", "score", "label", "details", "status", "error"].includes(
-            key
-          )
-        )
-        .map((key) => ({
-          key,
-          label: key,
-        }));
-    },
-    mapping: (
-      trace: TraceWithSpansAndAnnotations,
-      key: string,
-      subkey: string
-    ) => {
-      if (!key) {
-        return trace.evaluations ?? [];
-      }
-      const evaluation = trace.evaluations?.find(
-        (evaluation) => evaluation.evaluator_id === key
-      );
-      if (!subkey) {
-        return evaluation;
-      }
-      return evaluation?.[subkey as keyof Evaluation] as string | number;
-    },
-  },
-  annotations: {
-    keys: (_traces: TraceWithSpansAndAnnotations[]) => {
-      return [
-        "comment",
-        "is_thumbs_up",
-        "author",
-        "score",
-        "score.reason",
-        "expected_output",
-      ].map((key) => ({
-        key,
-        label: key,
-      }));
-    },
-    subkeys: (
-      traces: TraceWithSpansAndAnnotations[],
-      key: string,
-      data: { annotationScoreOptions?: AnnotationScore[] }
-    ) => {
-      if (key !== "score" && key !== "score.reason") {
-        return [];
-      }
-
-      return (data.annotationScoreOptions ?? []).map((option) => ({
-        key: option.id,
-        label: option.name,
-      }));
-    },
-    mapping: (
-      trace: TraceWithSpansAndAnnotations,
-      key: string,
-      subkey: string,
-      data: { annotationScoreOptions?: AnnotationScore[] }
-    ) => {
-      if (!key) {
-        return trace.annotations;
-      }
-      return trace.annotations?.map((annotation) => {
-        if (subkey && typeof annotation.scoreOptions === "object") {
-          if (key === "score") {
-            return (annotation.scoreOptions as any)[subkey]?.value;
-          }
-          if (key === "score.reason") {
-            return (annotation.scoreOptions as any)[subkey]?.reason;
-          }
-        }
-        const scoreOptions = () =>
-          Object.fromEntries(
-            Object.entries(annotation.scoreOptions ?? {})
-              .map(([key, score]) => [
-                data.annotationScoreOptions?.find((score) => score.id === key)
-                  ?.name ?? key,
-                score,
-              ])
-              .filter(([_key, score]) => score.value !== null)
-          );
-        const keyMap = {
-          comment: () => annotation.comment,
-          is_thumbs_up: () => annotation.isThumbsUp,
-          author: () => annotation.user?.name ?? annotation.email ?? "",
-          score: scoreOptions,
-          "score.reason": scoreOptions,
-          expected_output: () => annotation.expectedOutput,
-        };
-        return keyMap[key as keyof typeof keyMap]();
-      });
-    },
-    expandable_by: "annotations.id",
-  },
-  events: {
-    keys: (traces: TraceWithSpansAndAnnotations[]) => {
-      return Array.from(
-        new Set(
-          traces.flatMap(
-            (trace) => trace.events?.flatMap((event) => event.event_type) ?? []
-          )
-        )
-      ).map((key) => ({
-        key,
-        label: key,
-      }));
-    },
-    subkeys: (traces: TraceWithSpansAndAnnotations[], key: string) => {
-      const events = traces
-        .flatMap((trace) => trace.events ?? [])
-        .filter((event) => event.event_type === key);
-
-      const eventMetrics = events.flatMap((event) =>
-        Object.keys(event.metrics).map((key) => `metrics.${key}`)
-      );
-
-      const eventDetails = events.flatMap((event) =>
-        Object.keys(event.event_details).map((key) => `event_details.${key}`)
-      );
-
-      return Array.from(new Set([...eventMetrics, ...eventDetails])).map(
-        (event) => ({
-          key: event,
-          label: event,
-        })
-      );
-    },
-    mapping: (
-      trace: TraceWithSpansAndAnnotations,
-      key: string,
-      subkey: string
-    ) => {
-      if (!key) {
-        return trace.events;
-      }
-      if (!subkey) {
-        return trace.events?.filter((event) => event.event_type === key);
-      }
-
-      if (subkey.startsWith("metrics.")) {
-        return trace.events
-          ?.filter((event) => event.event_type === key)
-          ?.map((event) => event.metrics[subkey.replace("metrics.", "")]);
-      }
-
-      if (subkey.startsWith("event_details.")) {
-        return trace.events
-          ?.filter((event) => event.event_type === key)
-          ?.map(
-            (event) => event.event_details[subkey.replace("event_details.", "")]
-          );
-      }
-    },
-    expandable_by: "events.event_id",
-  },
-} satisfies Record<
-  string,
-  {
-    keys?: (
-      traces: TraceWithSpansAndAnnotations[]
-    ) => { key: string; label: string }[];
-    subkeys?: (
-      traces: TraceWithSpansAndAnnotations[],
-      key: string,
-      data: { annotationScoreOptions?: AnnotationScore[] }
-    ) => {
-      key: string;
-      label: string;
-    }[];
-    mapping:
-      | ((
-          trace: TraceWithSpansAndAnnotations
-        ) => string | number | object | undefined)
-      | ((
-          trace: TraceWithSpansAndAnnotations,
-          key: string
-        ) => string | number | object | undefined)
-      | ((
-          trace: TraceWithSpansAndAnnotations,
-          key: string,
-          subkey: string
-        ) => string | number | object | undefined)
-      | ((
-          trace: TraceWithSpansAndAnnotations,
-          key: string,
-          subkey: string,
-          data: { annotationScoreOptions?: AnnotationScore[] }
-        ) => string | number | object | undefined);
-    expandable_by?: keyof typeof TRACE_EXPANSIONS;
-  }
->;
-
-export const TRACE_EXPANSIONS = {
-  "spans.llm.span_id": {
-    label: "LLM span",
-    expansion: (trace: TraceWithSpansAndAnnotations) => {
-      const spans = trace.spans?.filter((span) => span.type === "llm") ?? [];
-      return spans.map((span) => ({
-        ...trace,
-        spans: [span],
-      }));
-    },
-  },
-  "annotations.id": {
-    label: "annotation",
-    expansion: (trace: TraceWithSpansAndAnnotations) => {
-      const annotations = trace.annotations ?? [];
-      return annotations.map((annotation) => ({
-        ...trace,
-        annotations: [annotation],
-      }));
-    },
-  },
-  "events.event_id": {
-    label: "event",
-    expansion: (trace: TraceWithSpansAndAnnotations) => {
-      const events = trace.events ?? [];
-      return events.map((event) => ({
-        ...trace,
-        events: [event],
-      }));
-    },
-  },
-} satisfies Record<
-  string,
-  {
-    label: string;
-    expansion: (
-      trace: TraceWithSpansAndAnnotations
-    ) => TraceWithSpansAndAnnotations[];
-  }
->;
 
 const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   string,
@@ -436,19 +41,6 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   spans: "spans",
 };
 
-export type Mapping = Record<
-  string,
-  {
-    source: keyof typeof TRACE_MAPPINGS | "";
-    key?: string;
-    subkey?: string;
-  }
->;
-export type MappingState = {
-  mapping: Mapping;
-  expansions: Set<keyof typeof TRACE_EXPANSIONS>;
-};
-
 export const TracesMapping = ({
   dataset,
   traces,
@@ -456,10 +48,10 @@ export const TracesMapping = ({
   setDatasetEntries,
   setDatasetMapping,
 }: {
-  dataset: Dataset;
+  dataset: { id?: string; mapping?: MappingState };
   traces: TraceWithSpans[];
   columnTypes?: DatasetColumns;
-  setDatasetEntries: (entries: DatasetRecordEntry[]) => void;
+  setDatasetEntries?: (entries: DatasetRecordEntry[]) => void;
   setDatasetMapping?: (mapping: MappingState) => void;
 }) => {
   const { project } = useOrganizationTeamProject();
@@ -489,20 +81,24 @@ export const TracesMapping = ({
     [traces, annotationScores.data]
   );
 
-  const datasetMapping = (dataset.mapping as {
-    mapping: Mapping;
-    expansions: (keyof typeof TRACE_EXPANSIONS)[];
-  }) ?? { mapping: {}, expansions: [] };
+  const datasetMapping = dataset.mapping ?? { mapping: {}, expansions: [] };
 
-  const [mappingState, setMappingState_] = useState<MappingState>({
+  type LocalMappingState = Omit<MappingState, "expansions"> & {
+    expansions: Set<keyof typeof TRACE_EXPANSIONS>;
+  };
+
+  const [mappingState, setMappingState_] = useState<LocalMappingState>({
     mapping: {},
     expansions: new Set(),
   });
   const setMappingState = useCallback(
-    (callback: (mappingState: MappingState) => MappingState) => {
+    (callback: (mappingState: LocalMappingState) => LocalMappingState) => {
       const newMappingState = callback(mappingState);
       setMappingState_(newMappingState);
-      setDatasetMapping?.(newMappingState);
+      setDatasetMapping?.({
+        ...newMappingState,
+        expansions: Array.from(newMappingState.expansions),
+      });
     },
     [mappingState, setDatasetMapping]
   );
@@ -551,7 +147,10 @@ export const TracesMapping = ({
     };
 
     setMappingState_(mappingState);
-    setDatasetMapping?.(mappingState);
+    setDatasetMapping?.({
+      ...mappingState,
+      expansions: Array.from(mappingState.expansions),
+    });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columnTypes]);
@@ -579,14 +178,14 @@ export const TracesMapping = ({
       }
     }
 
-    setDatasetEntries(entries);
+    setDatasetEntries?.(entries);
   }, [
     expansions,
     getAnnotationScoreOptions.data,
     mapping,
     setDatasetEntries,
     traces_,
-    dataset.id,
+    dataset?.id,
     project?.id,
     now,
   ]);
@@ -797,17 +396,9 @@ export const TracesMapping = ({
   );
 };
 
-const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
-  try {
-    return z.array(datasetSpanSchema).parse(spans);
-  } catch (e) {
-    return spans as any;
-  }
-};
-
 export const mapTraceToDatasetEntry = (
   trace: TraceWithSpansAndAnnotations | Trace,
-  mapping: Mapping,
+  mapping: TraceMapping,
   expansions: Set<keyof typeof TRACE_EXPANSIONS>,
   annotationScoreOptions?: AnnotationScore[]
 ) => {

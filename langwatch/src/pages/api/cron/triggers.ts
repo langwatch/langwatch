@@ -7,16 +7,13 @@ import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
 import { prisma } from "../../../server/db";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { type Trace } from "~/server/tracer/types";
-
-import {
-  mapTraceToDatasetEntry,
-  type Mapping,
-  type TRACE_EXPANSIONS,
-} from "~/components/traces/TracesMapping";
-
+import { mapTraceToDatasetEntry } from "~/components/traces/TracesMapping";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord";
-
 import type { DatasetRecordEntry } from "~/server/datasets/types";
+import type {
+  TRACE_EXPANSIONS,
+  TraceMapping,
+} from "../../../server/tracer/tracesMapping";
 
 interface TraceGroups {
   groups: Trace[][];
@@ -232,7 +229,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
         for (const trace of rowsToAdd) {
           const mappedEntries = mapTraceToDatasetEntry(
             trace,
-            mapping as Mapping,
+            mapping as TraceMapping,
             expansions,
             undefined
           );
