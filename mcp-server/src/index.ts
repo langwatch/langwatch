@@ -107,10 +107,11 @@ server.tool(
 createListTracesByMetadataTool("list_traces_by_user_id", "userId", "metadata.user_id");
 createListTracesByMetadataTool("list_traces_by_customer_id", "customerId", "metadata.customer_id");
 createListTracesByMetadataTool("list_traces_by_thread_id", "threadId", "metadata.thread_id");
+createListTracesByMetadataTool("list_traces_by_session_id", "sessionId", "metadata.thread_id"); // We access the thread_id in the metadata, as that is our name for the session_id
 
 await server.connect(transport);
 
-function createListTracesByMetadataTool(name: string, argName: "userId" | "customerId" | "threadId", metadataKey: string) {
+function createListTracesByMetadataTool(name: string, argName: "userId" | "customerId" | "threadId" | "sessionId", metadataKey: string) {
   return server.tool(
     name,
     {
