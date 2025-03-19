@@ -1,13 +1,15 @@
 import {
   Box,
   Field,
+  Grid,
+  GridItem,
   HStack,
   NativeSelect,
   Text,
   VStack,
 } from "@chakra-ui/react";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { DatasetRecordEntry } from "../../server/datasets/types";
@@ -203,200 +205,217 @@ export const TracesMapping = ({
   ]);
 
   return (
-    <VStack align="start" width="full" gap={2}>
-      {titles && (
-        <HStack width="full" gap="44px" paddingBottom={2} fontWeight="semibold">
-          {titles.map((title) => (
-            <Text width="50%" key={title}>
-              {title}
-            </Text>
-          ))}
-        </HStack>
-      )}
+    <Grid
+      width="full"
+      templateColumns={
+        traceMapping && datasetFields ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr"
+      }
+      alignItems="center"
+      gap={2}
+    >
+      {titles?.map((title, idx) => (
+        <GridItem
+          key={title}
+          colSpan={idx == titles.length - 1 ? 1 : 2}
+          paddingBottom={2}
+        >
+          <Text fontWeight="semibold">{title}</Text>
+        </GridItem>
+      ))}
       {Object.entries(mapping).map(
         ([column, { source, key, subkey }], index) => {
-          const traceMapping = source ? TRACE_MAPPINGS[source] : undefined;
+          const traceMapping_ = source ? TRACE_MAPPINGS[source] : undefined;
           const datasetMappingKey = datasetFields?.[index] ?? "";
 
           const subkeys =
-            traceMapping && "subkeys" in traceMapping
-              ? traceMapping.subkeys(traces_, key!, {
+            traceMapping_ && "subkeys" in traceMapping_
+              ? traceMapping_.subkeys(traces_, key!, {
                   annotationScoreOptions: getAnnotationScoreOptions.data,
                 })
               : undefined;
 
           return (
-            <HStack key={index}>
+            <React.Fragment key={index}>
               {datasetFields && (
                 <>
-                  <NativeSelect.Root>
-                    <NativeSelect.Field
-                      value={datasetMappingKey}
-                      onChange={(e) => {
-                        setDatasetMapping?.({
-                          ...datasetMapping,
-                          [datasetMappingKey]: e.target.value,
-                        });
-                      }}
-                    >
-                      <option value=""></option>
-                      {datasetFields.map((field) => (
-                        <option key={field} value={field}>
-                          {field}
-                        </option>
-                      ))}
-                    </NativeSelect.Field>
-                    <NativeSelect.Indicator />
-                  </NativeSelect.Root>
-                  <ArrowRight style={{ flexShrink: 0 }} />
-                </>
-              )}
-              {traceMapping && (
-                <>
-                  <VStack align="start" gap={2}>
-                    <NativeSelect.Root>
+                  <GridItem>
+                    <NativeSelect.Root width="full">
                       <NativeSelect.Field
+                        value={datasetMappingKey}
                         onChange={(e) => {
-                          setTraceMappingState((prev) => {
-                            const targetMapping = e.target.value
-                              ? TRACE_MAPPINGS[
-                                  e.target.value as keyof typeof TRACE_MAPPINGS
-                                ]
-                              : undefined;
-
-                            let newExpansions = expansions;
-                            if (
-                              targetMapping &&
-                              "expandable_by" in targetMapping &&
-                              targetMapping.expandable_by &&
-                              !availableExpansions.has(
-                                targetMapping.expandable_by
-                              )
-                            ) {
-                              newExpansions = new Set([
-                                ...new Set(Array.from(newExpansions)),
-                                targetMapping.expandable_by,
-                              ]);
-                            }
-
-                            return {
-                              ...prev,
-                              mapping: {
-                                ...prev.mapping,
-                                [column]: {
-                                  source: e.target.value as
-                                    | keyof typeof TRACE_MAPPINGS
-                                    | "",
-                                  key: undefined,
-                                  subkey: undefined,
-                                },
-                              },
-                              expansions: newExpansions,
-                            };
+                          setDatasetMapping?.({
+                            ...datasetMapping,
+                            [datasetMappingKey]: e.target.value,
                           });
                         }}
-                        value={source}
                       >
                         <option value=""></option>
-                        {Object.keys(TRACE_MAPPINGS).map((key) => (
-                          <option key={key} value={key}>
-                            {key}
+                        {datasetFields.map((field) => (
+                          <option key={field} value={field}>
+                            {field}
                           </option>
                         ))}
                       </NativeSelect.Field>
                       <NativeSelect.Indicator />
                     </NativeSelect.Root>
-                    {traceMapping && "keys" in traceMapping && (
-                      <HStack align="start">
-                        <Box
-                          width="16px"
-                          minWidth="16px"
-                          height="24px"
-                          border="2px solid"
-                          borderRadius="0 0 0 6px"
-                          borderColor="gray.300"
-                          borderTop={0}
-                          borderRight={0}
-                          marginLeft="12px"
-                        />
-                        <NativeSelect.Root width="full">
-                          <NativeSelect.Field
-                            onChange={(e) => {
-                              setTraceMappingState((prev) => ({
+                  </GridItem>
+                  <GridItem>
+                    <ArrowRight style={{ flexShrink: 0 }} />
+                  </GridItem>
+                </>
+              )}
+              {traceMapping && (
+                <>
+                  <GridItem>
+                    <VStack align="start" width="full" gap={2}>
+                      <NativeSelect.Root width="full">
+                        <NativeSelect.Field
+                          onChange={(e) => {
+                            setTraceMappingState((prev) => {
+                              const targetMapping = e.target.value
+                                ? TRACE_MAPPINGS[
+                                    e.target
+                                      .value as keyof typeof TRACE_MAPPINGS
+                                  ]
+                                : undefined;
+
+                              let newExpansions = expansions;
+                              if (
+                                targetMapping &&
+                                "expandable_by" in targetMapping &&
+                                targetMapping.expandable_by &&
+                                !availableExpansions.has(
+                                  targetMapping.expandable_by
+                                )
+                              ) {
+                                newExpansions = new Set([
+                                  ...new Set(Array.from(newExpansions)),
+                                  targetMapping.expandable_by,
+                                ]);
+                              }
+
+                              return {
                                 ...prev,
                                 mapping: {
                                   ...prev.mapping,
                                   [column]: {
-                                    ...(prev.mapping[column] as any),
-                                    key: e.target.value,
+                                    source: e.target.value as
+                                      | keyof typeof TRACE_MAPPINGS
+                                      | "",
+                                    key: undefined,
+                                    subkey: undefined,
                                   },
                                 },
-                              }));
-                            }}
-                            value={key}
-                          >
-                            <option value=""></option>
-                            {traceMapping
-                              .keys(traces_)
-                              .map(({ key, label }) => (
+                                expansions: newExpansions,
+                              };
+                            });
+                          }}
+                          value={source}
+                        >
+                          <option value=""></option>
+                          {Object.keys(TRACE_MAPPINGS).map((key) => (
+                            <option key={key} value={key}>
+                              {key}
+                            </option>
+                          ))}
+                        </NativeSelect.Field>
+                        <NativeSelect.Indicator />
+                      </NativeSelect.Root>
+                      {traceMapping_ && "keys" in traceMapping_ && (
+                        <HStack align="start" width="full">
+                          <Box
+                            width="16px"
+                            minWidth="16px"
+                            height="24px"
+                            border="2px solid"
+                            borderRadius="0 0 0 6px"
+                            borderColor="gray.300"
+                            borderTop={0}
+                            borderRight={0}
+                            marginLeft="12px"
+                          />
+                          <NativeSelect.Root width="full">
+                            <NativeSelect.Field
+                              onChange={(e) => {
+                                setTraceMappingState((prev) => ({
+                                  ...prev,
+                                  mapping: {
+                                    ...prev.mapping,
+                                    [column]: {
+                                      ...(prev.mapping[column] as any),
+                                      key: e.target.value,
+                                    },
+                                  },
+                                }));
+                              }}
+                              value={key}
+                            >
+                              <option value=""></option>
+                              {traceMapping_
+                                .keys(traces_)
+                                .map(({ key, label }) => (
+                                  <option key={key} value={key}>
+                                    {label}
+                                  </option>
+                                ))}
+                            </NativeSelect.Field>
+                            <NativeSelect.Indicator />
+                          </NativeSelect.Root>
+                        </HStack>
+                      )}
+                      {subkeys && subkeys.length > 0 && (
+                        <HStack align="start" width="full">
+                          <Box
+                            width="16px"
+                            minWidth="16px"
+                            height="24px"
+                            border="2px solid"
+                            borderRadius="0 0 0 6px"
+                            borderColor="gray.300"
+                            borderTop={0}
+                            borderRight={0}
+                            marginLeft="12px"
+                          />
+                          <NativeSelect.Root width="full">
+                            <NativeSelect.Field
+                              onChange={(e) => {
+                                setTraceMappingState((prev) => ({
+                                  ...prev,
+                                  mapping: {
+                                    ...prev.mapping,
+                                    [column]: {
+                                      ...(prev.mapping[column] as any),
+                                      subkey: e.target.value,
+                                    },
+                                  },
+                                }));
+                              }}
+                              value={subkey}
+                            >
+                              <option value=""></option>
+                              {subkeys.map(({ key, label }) => (
                                 <option key={key} value={key}>
                                   {label}
                                 </option>
                               ))}
-                          </NativeSelect.Field>
-                          <NativeSelect.Indicator />
-                        </NativeSelect.Root>
-                      </HStack>
-                    )}
-                    {subkeys && subkeys.length > 0 && (
-                      <HStack align="start">
-                        <Box
-                          width="16px"
-                          minWidth="16px"
-                          height="24px"
-                          border="2px solid"
-                          borderRadius="0 0 0 6px"
-                          borderColor="gray.300"
-                          borderTop={0}
-                          borderRight={0}
-                          marginLeft="12px"
-                        />
-                        <NativeSelect.Root width="full">
-                          <NativeSelect.Field
-                            onChange={(e) => {
-                              setTraceMappingState((prev) => ({
-                                ...prev,
-                                mapping: {
-                                  ...prev.mapping,
-                                  [column]: {
-                                    ...(prev.mapping[column] as any),
-                                    subkey: e.target.value,
-                                  },
-                                },
-                              }));
-                            }}
-                            value={subkey}
-                          >
-                            <option value=""></option>
-                            {subkeys.map(({ key, label }) => (
-                              <option key={key} value={key}>
-                                {label}
-                              </option>
-                            ))}
-                          </NativeSelect.Field>
-                          <NativeSelect.Indicator />
-                        </NativeSelect.Root>
-                      </HStack>
-                    )}
-                  </VStack>
-
-                  <ArrowRight style={{ flexShrink: 0 }} />
+                            </NativeSelect.Field>
+                            <NativeSelect.Indicator />
+                          </NativeSelect.Root>
+                        </HStack>
+                      )}
+                    </VStack>
+                  </GridItem>
+                  <GridItem>
+                    <ArrowRight style={{ flexShrink: 0 }} />
+                  </GridItem>
                 </>
               )}
-              <Text flexShrink={0} whiteSpace="nowrap">
-                {column}
-              </Text>
-            </HStack>
+              <GridItem>
+                <Text flexShrink={0} whiteSpace="nowrap">
+                  {column}
+                </Text>
+              </GridItem>
+            </React.Fragment>
           );
         }
       )}
@@ -445,6 +464,6 @@ export const TracesMapping = ({
           </VStack>
         </Field.Root>
       )}
-    </VStack>
+    </Grid>
   );
 };
