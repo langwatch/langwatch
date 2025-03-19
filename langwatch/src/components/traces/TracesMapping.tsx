@@ -42,6 +42,19 @@ export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   contexts: "contexts.string_list",
   spans: "spans",
 };
+const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
+  DATASET_INFERRED_MAPPINGS_BY_NAME
+).reduce(
+  (acc, [key, value]) => {
+    if (acc[value]) {
+      acc[value].push(key);
+    } else {
+      acc[value] = [key];
+    }
+    return acc;
+  },
+  {} as Record<string, string[]>
+);
 
 export const TracesMapping = ({
   titles,
@@ -148,9 +161,9 @@ export const TracesMapping = ({
 
   const now = useMemo(() => new Date().getTime(), []);
 
+  // Try to set default for the mappings
   useEffect(() => {
-    // TODO: also have this default for the dataset mapping
-    const mappingState = {
+    const traceMappingStateWithDefaults = {
       mapping: Object.fromEntries(
         targetFields.map((name) => [
           name,
@@ -163,14 +176,74 @@ export const TracesMapping = ({
       expansions: new Set(currentMapping.expansions),
     };
 
-    setTraceMappingState_(mappingState);
+    setTraceMappingState_(traceMappingStateWithDefaults);
     setTraceMapping?.({
-      ...mappingState,
-      expansions: Array.from(mappingState.expansions),
+      ...traceMappingStateWithDefaults,
+      expansions: Array.from(traceMappingStateWithDefaults.expansions),
     });
 
+    if (!dsl) return;
+
+    const currentTargetEdges = Object.fromEntries(
+      dsl.targetEdges.map((edge) => [
+        edge.targetHandle?.split(".")[1] ?? "",
+        edge,
+      ])
+    );
+    const targetEdgesWithDefaults = [
+      ...dsl.targetEdges.filter(
+        (edge) =>
+          dsl.sourceOptions[edge.source]?.fields.includes(
+            edge.sourceHandle?.split(".")[1] ?? ""
+          )
+      ),
+      ...(targetFields
+        .map((targetField) => {
+          if (currentTargetEdges[targetField]) {
+            return;
+          }
+
+          const mappingOptions = [
+            DATASET_INFERRED_MAPPINGS_BY_NAME[targetField]!,
+            ...(DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED[targetField] ??
+              []),
+          ].filter((x) => x);
+
+          let inferredSource:
+            | { source: string; sourceHandle: string }
+            | undefined;
+          for (const [source, { fields }] of Object.entries(
+            dsl.sourceOptions
+          )) {
+            for (const option of mappingOptions) {
+              if (option && fields.includes(option)) {
+                inferredSource = { source, sourceHandle: `outputs.${option}` };
+                break;
+              }
+            }
+          }
+
+          if (!inferredSource) {
+            return;
+          }
+
+          const edge: Workflow["edges"][number] = {
+            id: `${Date.now()}-${targetField}`,
+            source: inferredSource.source,
+            sourceHandle: inferredSource.sourceHandle,
+            target: dsl.targetId,
+            targetHandle: `inputs.${targetField}`,
+            type: "default",
+          };
+
+          return edge;
+        })
+        .filter((x) => x) as Workflow["edges"]),
+    ];
+    dsl.setTargetEdges?.(targetEdgesWithDefaults);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetFields]);
+  }, [targetFields, dsl?.sourceOptions]);
 
   useEffect(() => {
     let index = 0;
@@ -209,9 +282,7 @@ export const TracesMapping = ({
   return (
     <Grid
       width="full"
-      templateColumns={
-        dsl ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr"
-      }
+      templateColumns={dsl ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr"}
       alignItems="center"
       gap={2}
     >
