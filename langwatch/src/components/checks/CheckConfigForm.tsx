@@ -452,9 +452,9 @@ export default function CheckConfigForm({
                           helper="Map which fields from the trace will be used to run the evaluation"
                         >
                           <EvaluatorTracesMapping
-                            fields={fields}
-                            mappings={mappings}
-                            setMapping={(mapping) => {
+                            targetFields={fields}
+                            traceMapping={mappings}
+                            setTraceMapping={(mapping) => {
                               form.setValue("mappings", mapping);
                             }}
                           />

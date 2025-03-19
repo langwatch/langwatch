@@ -9,10 +9,13 @@ import {
 import { EvaluatorTracesMapping } from "../../../EvaluatorTracesMapping";
 import { useMemo } from "react";
 import type { MappingState } from "../../../../../server/tracer/tracesMapping";
-import { DEFAULT_MAPPINGS } from "../../../../../server/evaluations/evaluationMappings";
+import { api } from "../../../../../utils/api";
+import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
+import type { DatasetColumns } from "../../../../../server/datasets/types";
 
 export const EvaluatorMappingAccordion = () => {
-  const { wizardState, getFirstEvaluator, setFirstEvaluator } =
+  const { project } = useOrganizationTeamProject();
+  const { wizardState, getFirstEvaluator, getDatasetId } =
     useEvaluationWizardStore();
 
   const evaluator = getFirstEvaluator();
@@ -37,12 +40,28 @@ export const EvaluatorMappingAccordion = () => {
 
   const mappings = form.watch("mappings");
 
-  const fields = useMemo(() => {
+  const targetFields = useMemo(() => {
     return [
       ...(evaluatorDefinition?.requiredFields ?? []),
       ...(evaluatorDefinition?.optionalFields ?? []),
     ];
   }, [evaluatorDefinition]);
+
+  const datasetId = getDatasetId();
+  const databaseDataset = api.datasetRecord.getAll.useQuery(
+    { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
+    {
+      enabled: !!project && !!datasetId,
+      refetchOnWindowFocus: false,
+    }
+  );
+  const datasetFields = useMemo(() => {
+    return (
+      (databaseDataset.data?.columnTypes as DatasetColumns)?.map(
+        ({ name }) => name
+      ) ?? []
+    );
+  }, [databaseDataset.data]);
 
   return (
     <Accordion.Item
@@ -68,37 +87,42 @@ export const EvaluatorMappingAccordion = () => {
           width="full"
           gap={8}
         >
-          {wizardState.task == "real_time" && evaluatorDefinition ? (
+          {evaluatorDefinition ? (
             <>
               <Text>
-                What data from the real time traces will be used for evaluation?
+                {wizardState.task == "real_time" &&
+                wizardState.dataSource !== "from_production"
+                  ? "From the dataset you chose, what columns are equivalent to the real time trace data which will be used for evaluation during monitoring?"
+                  : wizardState.task == "real_time"
+                  ? "What data from the real time traces will be used for evaluation?"
+                  : "What data from the dataset will be used for evaluation?"}
               </Text>
               <Field.Root>
                 <VStack align="start" gap={4} width="full">
                   <EvaluatorTracesMapping
-                    titles={["Trace", "Evaluator"]}
-                    fields={fields}
-                    mappings={mappings}
-                    setMapping={(mapping) => {
+                    titles={
+                      wizardState.task == "real_time" &&
+                      wizardState.dataSource !== "from_production"
+                        ? ["Dataset", "Trace", "Evaluator"]
+                        : wizardState.task == "real_time"
+                        ? ["Trace", "Evaluator"]
+                        : ["Dataset", "Evaluator"]
+                    }
+                    targetFields={targetFields}
+                    traceMapping={
+                      wizardState.task == "real_time" ? mappings : undefined
+                    }
+                    datasetFields={
+                      wizardState.dataSource == "from_production"
+                        ? undefined
+                        : datasetFields
+                    }
+                    setTraceMapping={(mapping) => {
+                      console.log("trace mapping", mapping);
                       form.setValue("mappings", mapping);
                     }}
-                  />
-                </VStack>
-              </Field.Root>
-            </>
-          ) : evaluatorDefinition ? (
-            <>
-              <Text>
-                What columns from the dataset should be used for evaluation?
-              </Text>
-              <Field.Root>
-                <VStack align="start" gap={4} width="full">
-                  <EvaluatorTracesMapping
-                    titles={["Dataset", "Evaluator"]}
-                    fields={fields}
-                    mappings={mappings}
-                    setMapping={(mapping) => {
-                      form.setValue("mappings", mapping);
+                    setDatasetMapping={(mapping) => {
+                      console.log("dataset mapping", mapping);
                     }}
                   />
                 </VStack>
