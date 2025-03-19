@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/mcp-server",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "An MCP server for Langwatch.",
   "type": "module",
   "main": "./dist/index.js",
