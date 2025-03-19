@@ -93,8 +93,45 @@ export const TRACE_MAPPINGS = {
       (trace.metrics?.completion_tokens ?? 0),
   },
   spans: {
-    mapping: (trace: TraceWithSpansAndAnnotations) =>
-      esSpansToDatasetSpans(trace.spans ?? []),
+    keys: (traces: TraceWithSpansAndAnnotations[]) => {
+      return Array.from(
+        new Set(
+          traces.flatMap((trace) => trace.spans?.map((span) => span.name) ?? [])
+        )
+      ).map((key) => ({
+        key: key ?? "",
+        label: key ?? "",
+      }));
+    },
+    subkeys: (traces: TraceWithSpansAndAnnotations[], key: string) => {
+      const spans = traces
+        .flatMap((trace) => trace.spans ?? [])
+        .filter((span) => span.name === key);
+      return Object.keys(spans[0] ?? {})
+        .filter((key) =>
+          ["input", "output", "generated", "params", "contexts"].includes(key)
+        )
+        .map((key) => ({
+          key,
+          label: key,
+        }));
+    },
+    mapping: (
+      trace: TraceWithSpansAndAnnotations,
+      key: string,
+      subkey: string
+    ) => {
+      const traceSpans = esSpansToDatasetSpans(trace.spans ?? []);
+      if (!key) {
+        return traceSpans;
+      }
+      const filteredSpans = traceSpans.filter((span) => span.name === key);
+      if (!subkey) {
+        return filteredSpans;
+      }
+      return filteredSpans.map((span) => span[subkey as keyof DatasetSpan]);
+    },
+    expandable_by: "spans.llm.span_id",
   },
   "spans.llm.input": {
     mapping: (trace: TraceWithSpansAndAnnotations) =>
@@ -114,7 +151,10 @@ export const TRACE_MAPPINGS = {
     keys: (traces: TraceWithSpansAndAnnotations[]) =>
       Array.from(
         new Set(traces.flatMap((trace) => Object.keys(trace.metadata ?? {})))
-      ).map((key) => ({ key, label: key })),
+      ).map((key) => ({
+        key,
+        label: key,
+      })),
     mapping: (trace: TraceWithSpansAndAnnotations, key: string) =>
       key ? (trace.metadata?.[key] as any) : JSON.stringify(trace.metadata),
   },
