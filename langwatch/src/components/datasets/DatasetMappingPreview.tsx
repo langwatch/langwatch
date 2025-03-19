@@ -119,11 +119,11 @@ export function DatasetMappingPreview({
           </Field.HelperText>
 
           <TracesMapping
-            mapping={selectedDataset.mapping as MappingState | undefined}
+            traceMapping={selectedDataset.mapping as MappingState | undefined}
             traces={traces}
-            fields={columnTypes.map(({ name }) => name)}
+            targetFields={columnTypes.map(({ name }) => name)}
             setDatasetEntries={onRowDataChange}
-            setDatasetMapping={(newMappingState) => {
+            setTraceMapping={(newMappingState) => {
               setDatasetTriggerMapping?.(newMappingState);
               updateStoredMapping(newMappingState);
             }}
