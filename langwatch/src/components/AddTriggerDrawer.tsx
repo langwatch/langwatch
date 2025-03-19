@@ -33,17 +33,17 @@ import type {
 import { api } from "~/utils/api";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
-import type {
-  Mapping,
-  MappingState,
-  TRACE_EXPANSIONS,
-} from "./datasets/DatasetMapping";
 import { AddParticipants } from "~/components/traces/AddParticipants";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 import { DatasetSelector } from "./datasets/DatasetSelector";
 
 import { CheckSquare } from "react-feather";
 import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
+import type {
+  MappingState,
+  TraceMapping,
+  TRACE_EXPANSIONS,
+} from "../server/tracer/tracesMapping";
 
 export function TriggerDrawer() {
   const { project, organization, team } = useOrganizationTeamProject();
@@ -147,7 +147,7 @@ export function TriggerDrawer() {
   const [datasetTriggerMapping, setDatasetTriggerMapping] =
     useState<MappingState>({
       mapping: {},
-      expansions: new Set(),
+      expansions: [],
     });
 
   type Trigger = {
@@ -165,8 +165,8 @@ export function TriggerDrawer() {
     annotators?: { id: string; name: string }[];
     datasetMapping?:
       | {
-          mapping: Mapping;
-          expansions: Set<keyof typeof TRACE_EXPANSIONS> | undefined;
+          mapping: TraceMapping;
+          expansions: (keyof typeof TRACE_EXPANSIONS)[];
         }
       | undefined;
   };

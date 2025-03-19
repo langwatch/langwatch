@@ -272,62 +272,59 @@ export default async function handler(
 export const getEvaluatorDataForParams = (
   checkType: string,
   params: Record<string, any>
-) => {
-  let data: DataForEvaluation;
+): DataForEvaluation => {
   if (checkType.startsWith("custom/")) {
-    data = {
+    return {
       type: "custom",
       data: params,
     };
-  } else {
-    const data_ = defaultEvaluatorInputSchema.parse(params);
-    const {
-      input,
-      output,
-      contexts,
-      expected_output,
-      conversation,
-      expected_contexts,
-    } = data_;
-
-    const contextList = contexts
-      ?.map((context) => {
-        if (typeof context === "string") {
-          return context;
-        } else {
-          return extractChunkTextualContent(context.content);
-        }
-      })
-      .filter((x) => x);
-
-    const expectedContextList = expected_contexts
-      ?.map((context) => {
-        if (typeof context === "string") {
-          return context;
-        } else {
-          return extractChunkTextualContent(context.content);
-        }
-      })
-      .filter((x) => x);
-
-    data = {
-      type: "default",
-      data: {
-        input: input ? input : undefined,
-        output: output ? output : undefined,
-        contexts: contextList,
-        expected_output: expected_output ? expected_output : undefined,
-        expected_contexts: expectedContextList,
-        conversation:
-          conversation?.map((message) => ({
-            input: message.input ?? undefined,
-            output: message.output ?? undefined,
-          })) ?? [],
-      },
-    };
   }
+  const data_ = defaultEvaluatorInputSchema.parse(params);
+  const {
+    input,
+    output,
+    contexts,
+    expected_output,
+    conversation,
+    expected_contexts,
+  } = data_;
 
-  return data;
+  const contextList = contexts
+    ?.map((context) => {
+      if (typeof context === "string") {
+        return context;
+      } else {
+        return extractChunkTextualContent(context.content);
+      }
+    })
+    .filter((x) => x);
+
+  const expectedContextList = expected_contexts
+    ?.map((context) => {
+      if (typeof context === "string") {
+        return context;
+      } else {
+        return extractChunkTextualContent(context.content);
+      }
+    })
+    .filter((x) => x);
+
+  return {
+    type: "default",
+    data: {
+      input: input ? input : undefined,
+      output: output ? output : undefined,
+      contexts: JSON.stringify(contextList),
+      expected_output: expected_output ? expected_output : undefined,
+      expected_contexts: JSON.stringify(expectedContextList),
+      conversation: JSON.stringify(
+        conversation?.map((message) => ({
+          input: message.input ?? undefined,
+          output: message.output ?? undefined,
+        })) ?? []
+      ),
+    },
+  };
 };
 
 export const getEvaluatorIncludingCustom = async (
