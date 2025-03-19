@@ -121,7 +121,7 @@ export function DatasetMappingPreview({
           <TracesMapping
             mapping={selectedDataset.mapping as MappingState | undefined}
             traces={traces}
-            columnTypes={columnTypes}
+            fields={columnTypes.map(({ name }) => name)}
             setDatasetEntries={onRowDataChange}
             setDatasetMapping={(newMappingState) => {
               setDatasetTriggerMapping?.(newMappingState);

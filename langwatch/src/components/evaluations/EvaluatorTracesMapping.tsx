@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import type { MappingState } from "../../server/tracer/tracesMapping";
 import { api } from "../../utils/api";
@@ -21,13 +20,6 @@ export function EvaluatorTracesMapping({
     queryOpts
   );
 
-  const mappingColumns = useMemo(() => {
-    return fields.map((field) => ({
-      name: field,
-      type: "string" as const,
-    }));
-  }, [fields]);
-
   if (!mappings?.mapping) {
     return null;
   }
@@ -38,7 +30,7 @@ export function EvaluatorTracesMapping({
       mapping={mappings}
       traces={recentTraces.data ?? []}
       // TODO: specify optional/required fields
-      columnTypes={mappingColumns}
+      fields={fields}
       setDatasetMapping={setMapping}
       disableExpansions
     />
