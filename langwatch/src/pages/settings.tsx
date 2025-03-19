@@ -182,7 +182,7 @@ function SettingsForm({
                   {hasOrganizationPermission(
                     OrganizationRoleGroup.ORGANIZATION_MANAGE
                   ) ? (
-                    <VStack width="full" align="start" spacing={3}>
+                    <VStack width="full" align="start" gap={3}>
                       <Input
                         width="full"
                         type="text"
@@ -424,7 +424,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
               label="S3 Storage"
               helper="Configure project-specific S3 storage settings for datasets. If left empty, organization-level settings will be used."
             >
-              <VStack width="full" align="start" spacing={3}>
+              <VStack width="full" align="start" gap={3}>
                 <Input
                   width="full"
                   type="text"

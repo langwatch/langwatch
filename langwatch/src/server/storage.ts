@@ -7,6 +7,7 @@ import fs from "fs/promises";
 import path from "path";
 import { prisma } from "./db";
 import { env } from "../env.mjs";
+import { decrypt } from "~/utils/encryption";
 
 export class StorageService {
   private async getLocalStoragePath(projectId: string, key: string) {
@@ -120,16 +121,21 @@ export const createS3Client = async (projectId: string) => {
   }
 
   const s3Config = {
-    endpoint:
-      project.s3Endpoint ?? organization?.s3Endpoint ?? env.S3_ENDPOINT!,
-    accessKeyId:
-      project.s3AccessKeyId ??
-      organization?.s3AccessKeyId ??
-      env.S3_ACCESS_KEY_ID!,
-    secretAccessKey:
-      project.s3SecretAccessKey ??
-      organization?.s3SecretAccessKey ??
-      env.S3_SECRET_ACCESS_KEY!,
+    endpoint: project.s3Endpoint
+      ? decrypt(project.s3Endpoint)
+      : organization?.s3Endpoint
+      ? decrypt(organization.s3Endpoint)
+      : env.S3_ENDPOINT!,
+    accessKeyId: project.s3AccessKeyId
+      ? decrypt(project.s3AccessKeyId)
+      : organization?.s3AccessKeyId
+      ? decrypt(organization.s3AccessKeyId)
+      : env.S3_ACCESS_KEY_ID!,
+    secretAccessKey: project.s3SecretAccessKey
+      ? decrypt(project.s3SecretAccessKey)
+      : organization?.s3SecretAccessKey
+      ? decrypt(organization.s3SecretAccessKey)
+      : env.S3_SECRET_ACCESS_KEY!,
   };
 
   const s3Client = new S3Client({

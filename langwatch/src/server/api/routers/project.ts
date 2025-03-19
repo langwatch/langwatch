@@ -21,6 +21,7 @@ import { getOrganizationProjectsCount } from "./limits";
 import { dependencies } from "../../../injection/dependencies.server";
 import { allowedTopicClusteringModels } from "../../topicClustering/types";
 import type { Project } from "@prisma/client";
+import { encrypt } from "~/utils/encryption";
 
 export const projectRouter = createTRPCRouter({
   publicGetById: publicProcedure
@@ -271,9 +272,13 @@ export const projectRouter = createTRPCRouter({
           framework: input.framework,
           piiRedactionLevel: input.piiRedactionLevel,
           userLinkTemplate: input.userLinkTemplate,
-          s3Endpoint: input.s3Endpoint,
-          s3AccessKeyId: input.s3AccessKeyId,
-          s3SecretAccessKey: input.s3SecretAccessKey,
+          s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null,
+          s3AccessKeyId: input.s3AccessKeyId
+            ? encrypt(input.s3AccessKeyId)
+            : null,
+          s3SecretAccessKey: input.s3SecretAccessKey
+            ? encrypt(input.s3SecretAccessKey)
+            : null,
         },
       });
 

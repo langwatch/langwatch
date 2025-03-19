@@ -24,6 +24,7 @@ import {
 import { dependencies } from "../../../injection/dependencies.server";
 import * as Sentry from "@sentry/nextjs";
 import { env } from "~/env.mjs";
+import { decrypt, encrypt } from "~/utils/encryption";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
@@ -231,10 +232,40 @@ export const organizationRouter = createTRPCRouter({
         });
 
       for (const organization of organizations) {
+        for (const project of organization.teams.flatMap(
+          (team) => team.projects
+        )) {
+          if (project.s3AccessKeyId) {
+            project.s3AccessKeyId = decrypt(project.s3AccessKeyId);
+          }
+          if (project.s3SecretAccessKey) {
+            project.s3SecretAccessKey = decrypt(project.s3SecretAccessKey);
+          }
+          if (project.s3Endpoint) {
+            project.s3Endpoint = decrypt(project.s3Endpoint);
+          }
+        }
+      }
+      for (const organization of organizations) {
         organization.members = organization.members.filter(
           (member) =>
             member.userId === userId || member.userId === demoProjectUserId
         );
+        if (organization.s3AccessKeyId) {
+          organization.s3AccessKeyId = decrypt(organization.s3AccessKeyId);
+        }
+        if (organization.s3SecretAccessKey) {
+          console.log(
+            "organization.s3SecretAccessKey",
+            organization.s3SecretAccessKey
+          );
+          organization.s3SecretAccessKey = decrypt(
+            organization.s3SecretAccessKey
+          );
+        }
+        if (organization.s3Endpoint) {
+          organization.s3Endpoint = decrypt(organization.s3Endpoint);
+        }
         const isExternal =
           organization.members[0]?.role !== "ADMIN" &&
           organization.members[0]?.role !== "MEMBER";
@@ -293,9 +324,13 @@ export const organizationRouter = createTRPCRouter({
         },
         data: {
           name: input.name,
-          s3Endpoint: input.s3Endpoint,
-          s3AccessKeyId: input.s3AccessKeyId,
-          s3SecretAccessKey: input.s3SecretAccessKey,
+          s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null,
+          s3AccessKeyId: input.s3AccessKeyId
+            ? encrypt(input.s3AccessKeyId)
+            : null,
+          s3SecretAccessKey: input.s3SecretAccessKey
+            ? encrypt(input.s3SecretAccessKey)
+            : null,
         },
       });
 
@@ -666,22 +701,22 @@ export const organizationRouter = createTRPCRouter({
             userId_organizationId: {
               userId: input.userId,
               organizationId: input.organizationId,
-            }
-          }
+            },
+          },
         });
 
         if (currentMember?.role === OrganizationUserRole.ADMIN) {
           const adminCount = await prisma.organizationUser.count({
             where: {
               organizationId: input.organizationId,
-              role: OrganizationUserRole.ADMIN
-            }
+              role: OrganizationUserRole.ADMIN,
+            },
           });
-          
+
           if (adminCount <= 1) {
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message: "Cannot remove the last admin from an organization"
+              message: "Cannot remove the last admin from an organization",
             });
           }
         }
