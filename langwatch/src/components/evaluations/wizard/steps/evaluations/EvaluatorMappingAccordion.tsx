@@ -1,44 +1,41 @@
 import { Accordion, Field, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useMemo } from "react";
 import { useEvaluationWizardStore } from "~/hooks/useEvaluationWizardStore";
 import {
   AVAILABLE_EVALUATORS,
   type Evaluators,
 } from "~/server/evaluations/evaluators.generated";
-import { EvaluatorTracesMapping } from "../../../EvaluatorTracesMapping";
-import { useMemo } from "react";
-import type { MappingState } from "../../../../../server/tracer/tracesMapping";
-import { api } from "../../../../../utils/api";
 import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
 import type { DatasetColumns } from "../../../../../server/datasets/types";
+import { api } from "../../../../../utils/api";
+import { EvaluatorTracesMapping } from "../../../EvaluatorTracesMapping";
 
 export const EvaluatorMappingAccordion = () => {
   const { project } = useOrganizationTeamProject();
-  const { wizardState, getFirstEvaluator, getDatasetId } =
-    useEvaluationWizardStore();
+  const {
+    wizardState,
+    getFirstEvaluatorNode: getFirstEvaluator,
+    getDatasetId,
+    setWizardState,
+    getFirstEvaluatorEdges,
+    setFirstEvaluatorEdges,
+  } = useEvaluationWizardStore();
 
   const evaluator = getFirstEvaluator();
-  const evaluatorType = evaluator?.evaluator;
+  const evaluatorEdges = getFirstEvaluatorEdges();
+  const evaluatorType = evaluator?.data.evaluator;
   const evaluatorDefinition = useMemo(() => {
     return evaluatorType && evaluatorType in AVAILABLE_EVALUATORS
       ? AVAILABLE_EVALUATORS[evaluatorType as keyof Evaluators]
       : undefined;
   }, [evaluatorType]);
 
-  const form = useForm<{
-    mappings: MappingState;
-  }>({
-    defaultValues: {
-      // It's okay to be empty, TracesMapping will fill it up with default mappings on first render
-      mappings: {
-        mapping: {},
-        expansions: [],
-      },
-    },
-  });
-
-  const mappings = form.watch("mappings");
+  const traceMappings = wizardState.realTimeTraceMappings ?? {
+    // It's okay to be empty, TracesMapping will fill it up with default mappings on first render
+    mapping: {},
+    expansions: [],
+  };
 
   const targetFields = useMemo(() => {
     return [
@@ -110,19 +107,28 @@ export const EvaluatorMappingAccordion = () => {
                     }
                     targetFields={targetFields}
                     traceMapping={
-                      wizardState.task == "real_time" ? mappings : undefined
+                      wizardState.task == "real_time"
+                        ? traceMappings
+                        : undefined
                     }
-                    datasetFields={
-                      wizardState.dataSource == "from_production"
-                        ? undefined
-                        : datasetFields
-                    }
+                    dsl={evaluator?.id ?{
+                      sourceOptions: {
+                        entry: {
+                          label: "Dataset",
+                          fields: datasetFields,
+                        },
+                      },
+                      targetId: evaluator?.id ?? "",
+                      targetEdges: evaluatorEdges ?? [],
+                      setTargetEdges: (mapping) => {
+                        console.log('source mapping', mapping);
+                        setFirstEvaluatorEdges(mapping);
+                      },
+                    } : undefined}
                     setTraceMapping={(mapping) => {
-                      console.log("trace mapping", mapping);
-                      form.setValue("mappings", mapping);
-                    }}
-                    setDatasetMapping={(mapping) => {
-                      console.log("dataset mapping", mapping);
+                      setWizardState({
+                        realTimeTraceMappings: mapping,
+                      });
                     }}
                   />
                 </VStack>

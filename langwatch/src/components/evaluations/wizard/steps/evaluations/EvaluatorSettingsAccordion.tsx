@@ -14,11 +14,11 @@ import DynamicZodForm from "../../../../checks/DynamicZodForm";
 import type { Field } from "../../../../../optimization_studio/types/dsl";
 
 export const EvaluatorSettingsAccordion = () => {
-  const { wizardState, getFirstEvaluator, setFirstEvaluator } =
+  const { wizardState, getFirstEvaluatorNode, setFirstEvaluator } =
     useEvaluationWizardStore();
 
-  const evaluator = getFirstEvaluator();
-  const evaluatorType = evaluator?.evaluator;
+  const evaluator = getFirstEvaluatorNode();
+  const evaluatorType = evaluator?.data.evaluator;
 
   const schema =
     evaluatorType && evaluatorType in AVAILABLE_EVALUATORS
@@ -32,7 +32,7 @@ export const EvaluatorSettingsAccordion = () => {
     Object.keys(schema.shape).length > 0;
 
   const settingsFromParameters = Object.fromEntries(
-    (evaluator?.parameters ?? []).map(({ identifier, value }) => [
+    (evaluator?.data.parameters ?? []).map(({ identifier, value }) => [
       identifier,
       value,
     ])
