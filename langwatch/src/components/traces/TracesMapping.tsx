@@ -48,7 +48,7 @@ export const TracesMapping = ({
   titles,
   mapping: mapping_,
   traces,
-  columnTypes,
+  fields,
   setDatasetEntries,
   setDatasetMapping,
   disableExpansions,
@@ -56,7 +56,7 @@ export const TracesMapping = ({
   titles?: string[];
   mapping?: MappingState;
   traces: TraceWithSpans[];
-  columnTypes?: DatasetColumns;
+  fields: string[];
   setDatasetEntries?: (entries: DatasetRecordEntry[]) => void;
   setDatasetMapping?: (mapping: MappingState) => void;
   disableExpansions?: boolean;
@@ -142,7 +142,7 @@ export const TracesMapping = ({
   useEffect(() => {
     const mappingState = {
       mapping: Object.fromEntries(
-        columnTypes?.map(({ name }) => [
+        fields.map((name) => [
           name,
           currentMapping.mapping[name] ?? {
             source: (DATASET_INFERRED_MAPPINGS_BY_NAME[name] ??
@@ -160,7 +160,7 @@ export const TracesMapping = ({
     });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [columnTypes]);
+  }, [fields]);
 
   useEffect(() => {
     let index = 0;
