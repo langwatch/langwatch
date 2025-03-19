@@ -6,20 +6,19 @@ interface SearchTrace {
 }
 
 interface GetLlmTraceByIdOptions {
-	langWatchEndpoint?: string;
+	endpoint: string;
 }
 
 interface ListLLmTracesOptions {
 	pageSize?: number;
 	pageOffset?: number;
 	timeTravelDays?: number;
-	langWatchEndpoint?: string;
+	endpoint: string;
 }
 
-export const getLlmTraceById = async (authToken: string, id: string, opts?: GetLlmTraceByIdOptions): Promise<LLMModeTrace> => {
-	const { langWatchEndpoint } = opts ?? {};
 
-	const endpoint = langWatchEndpoint ?? "https://app.langwatch.ai";
+export const getLlmTraceById = async (authToken: string, id: string, opts?: GetLlmTraceByIdOptions): Promise<LLMModeTrace> => {
+	const { endpoint } = opts ?? {};
 
 	const url = new URL(`${endpoint}/api/trace/${id}`);
 	url.searchParams.set("llmMode", "true");
@@ -48,10 +47,8 @@ export const listLlmTraces = async (authToken: string, opts?: ListLLmTracesOptio
 		pageSize = 10,
 		pageOffset = 0,
 		timeTravelDays = 1,
-		langWatchEndpoint,
+		endpoint,
 	} = opts ?? {};
-
-	const endpoint = langWatchEndpoint ?? "https://app.langwatch.ai";
 
 	const response = await fetch(`${endpoint}/api/trace/search`, {
 		method: "POST",

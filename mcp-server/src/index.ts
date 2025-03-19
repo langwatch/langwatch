@@ -1,13 +1,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { getLlmTraceById, listLlmTraces } from "./langwatch-api";
-import packageJson from "../package.json" assert { type: "json" };
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
+import { getLlmTraceById, listLlmTraces, searchTraces } from "./langwatch-api";
+import packageJson from "../package.json" assert { type: "json" };
+
 function loadAndValidateArgs(): { apiKey: string; endpoint: string } {
-  // Parse command line arguments with yargs
   const argv = yargs(hideBin(process.argv))
     .option("apiKey", {
       type: "string",
@@ -23,15 +23,12 @@ function loadAndValidateArgs(): { apiKey: string; endpoint: string } {
     .parseSync();
 
   // Use environment variables as fallback
-  const apiKey = argv.apiKey || process.env.LANGWATCH_API_KEY;
-  const endpoint =
-    argv.endpoint ||
-    process.env.LANGWATCH_ENDPOINT ||
-    "https://app.langwatch.ai";
+  const apiKey = argv.apiKey ?? process.env.LANGWATCH_API_KEY;
+  const endpoint = argv.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
 
   if (!apiKey) {
     throw new Error(
-      "API key is required. Please provide it using --apiKey=<your_api_key> or set LANGWATCH_API_KEY environment variable"
+      "API key is required. Please provide it using --apiKey <your_api_key> or set LANGWATCH_API_KEY environment variable"
     );
   }
 
@@ -41,7 +38,6 @@ function loadAndValidateArgs(): { apiKey: string; endpoint: string } {
   };
 }
 
-// Use the function to get apiKey and endpoint
 const { apiKey, endpoint } = loadAndValidateArgs();
 
 const server = new McpServer({
@@ -59,7 +55,7 @@ server.tool(
     const response = await listLlmTraces(apiKey, {
       pageOffset,
       timeTravelDays: daysBackToSearch ?? 1,
-      langWatchEndpoint: endpoint,
+      endpoint,
     });
 
     return {
@@ -75,13 +71,11 @@ server.tool(
 
 server.tool(
   "get_trace_by_id",
-  {
-    id: z.string(),
-  },
+  { id: z.string() },
   async ({ id }) => {
     try {
       const response = await getLlmTraceById(apiKey, id, {
-        langWatchEndpoint: endpoint,
+        endpoint,
       });
 
       return {
