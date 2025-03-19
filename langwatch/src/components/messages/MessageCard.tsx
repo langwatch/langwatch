@@ -391,33 +391,35 @@ export function MessageCard({
                 borderRadius="full"
               >
                 <Tag.Label>
-                  {allGuardrailsSkipped ? (
-                    <>
-                      <Box paddingRight={2}>
-                        <MinusCircle />
-                      </Box>
-                      Guardrails skipped
-                    </>
-                  ) : guardrailsPasses == totalGuardrails ? (
-                    <>
-                      <Box paddingRight={2}>
-                        <CheckCircle />
-                      </Box>
-                      {guardrailsPasses}/{totalGuardrails} guardrails
-                    </>
-                  ) : (
-                    <>
-                      <Box paddingRight={2}>
-                        <Shield />
-                      </Box>
-                      {totalGuardrails - guardrailsPasses}{" "}
-                      {pluralize(
-                        totalGuardrails - guardrailsPasses,
-                        "guardrail block",
-                        "guardrail blocks"
-                      )}
-                    </>
-                  )}
+                  <HStack gap={2}>
+                    {allGuardrailsSkipped ? (
+                      <>
+                        <Box>
+                          <MinusCircle />
+                        </Box>
+                        Guardrails skipped
+                      </>
+                    ) : guardrailsPasses == totalGuardrails ? (
+                      <>
+                        <Box>
+                          <CheckCircle />
+                        </Box>
+                        {guardrailsPasses}/{totalGuardrails} guardrails
+                      </>
+                    ) : (
+                      <>
+                        <Box>
+                          <Shield />
+                        </Box>
+                        {totalGuardrails - guardrailsPasses}{" "}
+                        {pluralize(
+                          totalGuardrails - guardrailsPasses,
+                          "guardrail block",
+                          "guardrail blocks"
+                        )}
+                      </>
+                    )}
+                  </HStack>
                 </Tag.Label>
               </Tag.Root>
             </Popover.Trigger>
