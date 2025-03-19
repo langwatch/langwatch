@@ -80,27 +80,6 @@ interface CheckConfigFormProps {
   loading: boolean;
 }
 
-export const DEFAULT_MAPPINGS: CheckConfigFormData["mappings"] = {
-  spans: "spans",
-  input: "trace.input",
-  output: "trace.output",
-  contexts: "trace.first_rag_context",
-  expected_output: "metadata.expected_output",
-  expected_contexts: "metadata.expected_contexts",
-};
-
-export const MAPPING_OPTIONS = [
-  { value: "spans", label: "spans" },
-  { value: "trace.input", label: "trace.input" },
-  { value: "trace.output", label: "trace.output" },
-  { value: "trace.first_rag_context", label: "trace.first_rag_context" },
-  { value: "metadata.expected_output", label: "metadata.expected_output" },
-  {
-    value: "metadata.expected_contexts",
-    label: "metadata.expected_contexts",
-  },
-];
-
 export default function CheckConfigForm({
   checkId,
   defaultValues,
