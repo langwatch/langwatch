@@ -7,7 +7,7 @@ import { EvaluatorSelectionAccordion } from "./evaluations/EvaluatorSelectionAcc
 import { EvaluatorSettingsAccordion } from "./evaluations/EvaluatorSettingsAccordion";
 
 export function EvaluationSelection() {
-  const { wizardState, getFirstEvaluator } = useEvaluationWizardStore();
+  const { wizardState, getFirstEvaluatorNode: getFirstEvaluator } = useEvaluationWizardStore();
   const [accordeonValue, setAccordeonValue] = useState<string[]>(
     wizardState.evaluatorCategory
       ? getFirstEvaluator()

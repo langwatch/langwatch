@@ -15,7 +15,7 @@ export const EvaluatorSelectionAccordion = ({
 }: {
   setAccordeonValue: (value: string[]) => void;
 }) => {
-  const { wizardState, getFirstEvaluator, setFirstEvaluator } =
+  const { wizardState, getFirstEvaluatorNode, setFirstEvaluator } =
     useEvaluationWizardStore();
 
   const handleEvaluatorSelect = (evaluatorType: string) => {
@@ -51,7 +51,7 @@ export const EvaluatorSelectionAccordion = ({
         <RadioCard.Root
           variant="outline"
           colorPalette="green"
-          value={getFirstEvaluator()?.evaluator}
+          value={getFirstEvaluatorNode()?.data.evaluator}
           onValueChange={(e: { value: string }) => {
             handleEvaluatorSelect(e.value);
           }}

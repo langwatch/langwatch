@@ -9,10 +9,11 @@ import type {
   Workflow,
 } from "../optimization_studio/types/dsl";
 import { initialDSL } from "../optimization_studio/hooks/useWorkflowStore";
-import type { Node } from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
 import { entryNode } from "../optimization_studio/templates/blank";
 import { nameToId } from "../optimization_studio/utils/nodeUtils";
 import { convertEvaluator } from "../optimization_studio/utils/registryUtils";
+import type { MappingState } from "../server/tracer/tracesMapping";
 
 export type EvaluatorCategory =
   | "expected_answer"
@@ -29,7 +30,12 @@ export const steps = [
   "configuration",
   "finalize",
 ] as const;
+
 export type Step = (typeof steps)[number];
+
+export type PartialEdge = Omit<Workflow["edges"][number], "target"> & {
+  target?: string;
+};
 
 export type State = {
   experimentId?: string;
@@ -38,7 +44,7 @@ export type State = {
     task?: "real_time" | "batch" | "prompt" | "custom" | "scan";
     dataSource?: "choose" | "from_production" | "manual" | "upload";
     evaluatorCategory?: EvaluatorCategory;
-    evaluatorMappings?: Record<string, string>;
+    realTimeTraceMappings?: MappingState;
   };
   dsl: Workflow;
 };
@@ -65,7 +71,9 @@ type EvaluationWizardStore = State & {
   setFirstEvaluator: (
     evaluator: Partial<Evaluator> & { evaluator: string }
   ) => void;
-  getFirstEvaluator: () => Evaluator | undefined;
+  getFirstEvaluatorNode: () => Node<Evaluator> | undefined;
+  setFirstEvaluatorEdges: (edges: Workflow["edges"]) => void;
+  getFirstEvaluatorEdges: () => Workflow["edges"] | undefined;
 };
 
 const initialState: State = {
@@ -226,6 +234,12 @@ const store = (
         data: {
           ...(firstEvaluator.data as Evaluator),
           ...evaluator,
+          parameters:
+            evaluator.parameters ??
+            // Reset parameters if not given the evaluator is not the same as the current evaluator
+            (firstEvaluator.data.cls !== evaluator.cls
+              ? []
+              : firstEvaluator.data.parameters ?? []),
         },
       };
 
@@ -244,13 +258,40 @@ const store = (
       };
     });
   },
-  getFirstEvaluator() {
-    const nodeData = get().dsl.nodes.find((node) => node.type === "evaluator")
-      ?.data;
-    if (nodeData && "evaluator" in nodeData) {
-      return nodeData;
+  getFirstEvaluatorNode() {
+    const node = get().dsl.nodes.find((node) => node.type === "evaluator");
+    if (node?.data && "evaluator" in node.data) {
+      return node as Node<Evaluator>;
     }
     return undefined;
+  },
+  setFirstEvaluatorEdges(edges: Edge[]) {
+    get().setDSL((current) => {
+      const firstEvaluator = get().getFirstEvaluatorNode();
+
+      if (!firstEvaluator?.id) {
+        return current;
+      }
+
+      return {
+        ...current,
+        edges: [
+          ...current.edges.filter((edge) => edge.target !== firstEvaluator.id),
+          ...edges.map((edge) => ({
+            ...edge,
+            target: firstEvaluator.id,
+          })),
+        ],
+      };
+    });
+  },
+  getFirstEvaluatorEdges() {
+    const firstEvaluator = get().getFirstEvaluatorNode();
+    if (!firstEvaluator) {
+      return undefined;
+    }
+
+    return get().dsl.edges.filter((edge) => edge.target === firstEvaluator.id);
   },
 });
 

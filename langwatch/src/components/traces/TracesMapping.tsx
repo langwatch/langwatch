@@ -22,6 +22,7 @@ import {
 import type { TraceWithSpans } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { Switch } from "../ui/switch";
+import type { Workflow } from "../../optimization_studio/types/dsl";
 
 export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   string,
@@ -46,23 +47,24 @@ export const TracesMapping = ({
   titles,
   traces,
   traceMapping,
-  datasetFields,
-  datasetMapping,
+  dsl,
   targetFields,
   setDatasetEntries,
   setTraceMapping,
-  setDatasetMapping,
   disableExpansions,
 }: {
   titles?: string[];
-  traceMapping?: MappingState;
-  datasetFields?: string[];
-  datasetMapping?: Record<string, string>;
   traces: TraceWithSpans[];
+  traceMapping?: MappingState;
+  dsl?: {
+    sourceOptions: Record<string, { label: string; fields: string[] }>;
+    targetId: string;
+    targetEdges: Workflow["edges"];
+    setTargetEdges?: (edges: Workflow["edges"]) => void;
+  };
   targetFields: string[];
   setDatasetEntries?: (entries: DatasetRecordEntry[]) => void;
   setTraceMapping?: (mapping: MappingState) => void;
-  setDatasetMapping?: (mapping: Record<string, string>) => void;
   disableExpansions?: boolean;
 }) => {
   const { project } = useOrganizationTeamProject();
@@ -208,7 +210,7 @@ export const TracesMapping = ({
     <Grid
       width="full"
       templateColumns={
-        traceMapping && datasetFields ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr"
+        dsl ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr"
       }
       alignItems="center"
       gap={2}
@@ -223,38 +225,77 @@ export const TracesMapping = ({
         </GridItem>
       ))}
       {Object.entries(mapping).map(
-        ([column, { source, key, subkey }], index) => {
-          const traceMapping_ = source ? TRACE_MAPPINGS[source] : undefined;
-          const datasetMappingKey = datasetFields?.[index] ?? "";
+        ([targetField, { source, key, subkey }], index) => {
+          const traceMappingDefinition = source
+            ? TRACE_MAPPINGS[source]
+            : undefined;
 
           const subkeys =
-            traceMapping_ && "subkeys" in traceMapping_
-              ? traceMapping_.subkeys(traces_, key!, {
+            traceMappingDefinition && "subkeys" in traceMappingDefinition
+              ? traceMappingDefinition.subkeys(traces_, key!, {
                   annotationScoreOptions: getAnnotationScoreOptions.data,
                 })
               : undefined;
 
+          const targetHandle = `inputs.${targetField}`;
+          const currentSourceMapping = dsl?.targetEdges
+            ?.filter((edge) => edge.targetHandle === `inputs.${targetField}`)
+            .map((edge) => `${edge.source}.${edge.sourceHandle}`)[0];
+
           return (
             <React.Fragment key={index}>
-              {datasetFields && (
+              {dsl && (
                 <>
                   <GridItem>
                     <NativeSelect.Root width="full">
                       <NativeSelect.Field
-                        value={datasetMappingKey}
+                        value={currentSourceMapping ?? ""}
                         onChange={(e) => {
-                          setDatasetMapping?.({
-                            ...datasetMapping,
-                            [datasetMappingKey]: e.target.value,
-                          });
+                          const [source, sourceGroup, sourceField] =
+                            e.target.value.split(".");
+
+                          dsl.setTargetEdges?.([
+                            ...(dsl.targetEdges?.filter(
+                              (edge) => edge.targetHandle !== targetHandle
+                            ) ?? []),
+                            {
+                              id: `${Date.now()}-${index}`,
+                              source: source ?? "",
+                              target: dsl.targetId,
+                              sourceHandle: `${sourceGroup}.${sourceField}`,
+                              targetHandle: `inputs.${targetField}`,
+                              type: "default",
+                            },
+                          ]);
                         }}
                       >
                         <option value=""></option>
-                        {datasetFields.map((field) => (
-                          <option key={field} value={field}>
-                            {field}
-                          </option>
-                        ))}
+                        {Object.entries(dsl.sourceOptions).map(
+                          ([key, { label, fields }]) => {
+                            const options = fields.map((field) => (
+                              <option
+                                key={field}
+                                value={`${key}.outputs.${field}`}
+                              >
+                                {field}
+                              </option>
+                            ));
+
+                            if (options.length === 0) {
+                              return null;
+                            }
+
+                            if (Object.keys(dsl.sourceOptions).length === 1) {
+                              return options;
+                            }
+
+                            return (
+                              <optgroup key={key} label={label}>
+                                {options}
+                              </optgroup>
+                            );
+                          }
+                        )}
                       </NativeSelect.Field>
                       <NativeSelect.Indicator />
                     </NativeSelect.Root>
@@ -298,7 +339,7 @@ export const TracesMapping = ({
                                 ...prev,
                                 mapping: {
                                   ...prev.mapping,
-                                  [column]: {
+                                  [targetField]: {
                                     source: e.target.value as
                                       | keyof typeof TRACE_MAPPINGS
                                       | "",
@@ -321,48 +362,49 @@ export const TracesMapping = ({
                         </NativeSelect.Field>
                         <NativeSelect.Indicator />
                       </NativeSelect.Root>
-                      {traceMapping_ && "keys" in traceMapping_ && (
-                        <HStack align="start" width="full">
-                          <Box
-                            width="16px"
-                            minWidth="16px"
-                            height="24px"
-                            border="2px solid"
-                            borderRadius="0 0 0 6px"
-                            borderColor="gray.300"
-                            borderTop={0}
-                            borderRight={0}
-                            marginLeft="12px"
-                          />
-                          <NativeSelect.Root width="full">
-                            <NativeSelect.Field
-                              onChange={(e) => {
-                                setTraceMappingState((prev) => ({
-                                  ...prev,
-                                  mapping: {
-                                    ...prev.mapping,
-                                    [column]: {
-                                      ...(prev.mapping[column] as any),
-                                      key: e.target.value,
+                      {traceMappingDefinition &&
+                        "keys" in traceMappingDefinition && (
+                          <HStack align="start" width="full">
+                            <Box
+                              width="16px"
+                              minWidth="16px"
+                              height="24px"
+                              border="2px solid"
+                              borderRadius="0 0 0 6px"
+                              borderColor="gray.300"
+                              borderTop={0}
+                              borderRight={0}
+                              marginLeft="12px"
+                            />
+                            <NativeSelect.Root width="full">
+                              <NativeSelect.Field
+                                onChange={(e) => {
+                                  setTraceMappingState((prev) => ({
+                                    ...prev,
+                                    mapping: {
+                                      ...prev.mapping,
+                                      [targetField]: {
+                                        ...(prev.mapping[targetField] as any),
+                                        key: e.target.value,
+                                      },
                                     },
-                                  },
-                                }));
-                              }}
-                              value={key}
-                            >
-                              <option value=""></option>
-                              {traceMapping_
-                                .keys(traces_)
-                                .map(({ key, label }) => (
-                                  <option key={key} value={key}>
-                                    {label}
-                                  </option>
-                                ))}
-                            </NativeSelect.Field>
-                            <NativeSelect.Indicator />
-                          </NativeSelect.Root>
-                        </HStack>
-                      )}
+                                  }));
+                                }}
+                                value={key}
+                              >
+                                <option value=""></option>
+                                {traceMappingDefinition
+                                  .keys(traces_)
+                                  .map(({ key, label }) => (
+                                    <option key={key} value={key}>
+                                      {label}
+                                    </option>
+                                  ))}
+                              </NativeSelect.Field>
+                              <NativeSelect.Indicator />
+                            </NativeSelect.Root>
+                          </HStack>
+                        )}
                       {subkeys && subkeys.length > 0 && (
                         <HStack align="start" width="full">
                           <Box
@@ -383,8 +425,8 @@ export const TracesMapping = ({
                                   ...prev,
                                   mapping: {
                                     ...prev.mapping,
-                                    [column]: {
-                                      ...(prev.mapping[column] as any),
+                                    [targetField]: {
+                                      ...(prev.mapping[targetField] as any),
                                       subkey: e.target.value,
                                     },
                                   },
@@ -412,7 +454,7 @@ export const TracesMapping = ({
               )}
               <GridItem>
                 <Text flexShrink={0} whiteSpace="nowrap">
-                  {column}
+                  {targetField}
                 </Text>
               </GridItem>
             </React.Fragment>
