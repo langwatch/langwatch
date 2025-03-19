@@ -58,6 +58,7 @@ export const env = createEnv({
     S3_SECRET_ACCESS_KEY: z.string().optional(),
     S3_BUCKET_NAME: z.string().optional(),
     DATASET_STORAGE_LOCAL: z.boolean().optional(),
+    CREDENTIALS_SECRET: z.string().optional(),
   },
 
   /**
@@ -126,6 +127,7 @@ export const env = createEnv({
     DATASET_STORAGE_LOCAL:
       process.env.DATASET_STORAGE_LOCAL === "1" ||
       process.env.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",
+    CREDENTIALS_SECRET: process.env.CREDENTIALS_SECRET,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
