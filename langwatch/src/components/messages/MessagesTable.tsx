@@ -1098,7 +1098,9 @@ export function MessagesTable() {
                       ? "calc(100vw - 580px)"
                       : showFilters
                       ? "calc(100vw - 450px)"
-                      : "50%"
+                      : isExpanded
+                      ? "calc(100vw - 260px)"
+                      : "calc(100vw - 130px)"
                   }
                 >
                   {downloadProgress > 0 && (
