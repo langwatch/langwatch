@@ -46,18 +46,20 @@ export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
 
 export const TracesMapping = ({
   titles,
-  dataset,
+  mapping: mapping_,
   traces,
   columnTypes,
   setDatasetEntries,
   setDatasetMapping,
+  disableExpansions,
 }: {
   titles?: string[];
-  dataset: { id?: string; mapping?: MappingState };
+  mapping?: MappingState;
   traces: TraceWithSpans[];
   columnTypes?: DatasetColumns;
   setDatasetEntries?: (entries: DatasetRecordEntry[]) => void;
   setDatasetMapping?: (mapping: MappingState) => void;
+  disableExpansions?: boolean;
 }) => {
   const { project } = useOrganizationTeamProject();
 
@@ -86,7 +88,7 @@ export const TracesMapping = ({
     [traces, annotationScores.data]
   );
 
-  const datasetMapping = dataset.mapping ?? { mapping: {}, expansions: [] };
+  const currentMapping = mapping_ ?? { mapping: {}, expansions: [] };
 
   type LocalMappingState = Omit<MappingState, "expansions"> & {
     expansions: Set<keyof typeof TRACE_EXPANSIONS>;
@@ -142,13 +144,13 @@ export const TracesMapping = ({
       mapping: Object.fromEntries(
         columnTypes?.map(({ name }) => [
           name,
-          datasetMapping.mapping[name] ?? {
+          currentMapping.mapping[name] ?? {
             source: (DATASET_INFERRED_MAPPINGS_BY_NAME[name] ??
               "") as keyof typeof TRACE_MAPPINGS,
           },
         ]) ?? []
       ),
-      expansions: new Set(datasetMapping.expansions),
+      expansions: new Set(currentMapping.expansions),
     };
 
     setMappingState_(mappingState);
@@ -190,7 +192,6 @@ export const TracesMapping = ({
     mapping,
     setDatasetEntries,
     traces_,
-    dataset?.id,
     project?.id,
     now,
   ]);
@@ -362,7 +363,7 @@ export const TracesMapping = ({
         }
       )}
 
-      {availableExpansions.size > 0 && (
+      {!disableExpansions && availableExpansions.size > 0 && (
         <Field.Root width="full" paddingY={4} marginTop={2}>
           <VStack align="start">
             <Field.Label margin={0}>Expansions</Field.Label>

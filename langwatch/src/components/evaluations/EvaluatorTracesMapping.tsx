@@ -35,13 +35,12 @@ export function EvaluatorTracesMapping({
   return (
     <TracesMapping
       titles={titles}
-      dataset={{
-        mapping: mappings,
-      }}
+      mapping={mappings}
       traces={recentTraces.data ?? []}
       // TODO: specify optional/required fields
       columnTypes={mappingColumns}
       setDatasetMapping={setMapping}
+      disableExpansions
     />
   );
 }

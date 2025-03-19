@@ -119,10 +119,7 @@ export function DatasetMappingPreview({
           </Field.HelperText>
 
           <TracesMapping
-            dataset={{
-              id: selectedDataset.id,
-              mapping: selectedDataset.mapping as MappingState | undefined,
-            }}
+            mapping={selectedDataset.mapping as MappingState | undefined}
             traces={traces}
             columnTypes={columnTypes}
             setDatasetEntries={onRowDataChange}
