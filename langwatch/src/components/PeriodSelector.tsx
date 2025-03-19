@@ -3,7 +3,6 @@ import {
   Button,
   Field,
   HStack,
-  Heading,
   Input,
   Text,
   VStack,
@@ -12,7 +11,6 @@ import {
 import {
   addDays,
   differenceInCalendarDays,
-  endOfDay,
   format,
   startOfDay,
   subDays,
@@ -161,26 +159,18 @@ export function PeriodSelector({
               <Field.Root>
                 <Field.Label>Start Date</Field.Label>
                 <Input
-                  type="date"
-                  value={format(startDate, "yyyy-MM-dd")}
-                  onChange={(e) =>
-                    setPeriod(
-                      startOfDay(new Date(e.target.value + "T00:00:00")),
-                      endDate
-                    )
-                  }
+                  type="datetime-local"
+                  value={format(startDate, "yyyy-MM-dd'T'HH:mm")}
+                  onChange={(e) => setPeriod(new Date(e.target.value), endDate)}
                 />
               </Field.Root>
               <Field.Root>
                 <Field.Label>End Date</Field.Label>
                 <Input
-                  type="date"
-                  value={format(endDate, "yyyy-MM-dd")}
+                  type="datetime-local"
+                  value={format(endDate, "yyyy-MM-dd'T'HH:mm")}
                   onChange={(e) =>
-                    setPeriod(
-                      startDate,
-                      endOfDay(new Date(e.target.value + "T00:00:00"))
-                    )
+                    setPeriod(startDate, new Date(e.target.value))
                   }
                 />
               </Field.Root>
