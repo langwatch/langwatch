@@ -8,7 +8,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 
-import type { AnnotationScore } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -17,13 +16,12 @@ import type {
   DatasetRecordEntry,
 } from "../../server/datasets/types";
 import {
+  type MappingState,
   TRACE_EXPANSIONS,
   TRACE_MAPPINGS,
-  type TraceMapping,
-  type MappingState,
-  type TraceWithSpansAndAnnotations,
+  mapTraceToDatasetEntry,
 } from "../../server/tracer/tracesMapping";
-import type { Trace, TraceWithSpans } from "../../server/tracer/types";
+import type { TraceWithSpans } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { Switch } from "../ui/switch";
 
@@ -393,52 +391,5 @@ export const TracesMapping = ({
         </Field.Root>
       )}
     </VStack>
-  );
-};
-
-export const mapTraceToDatasetEntry = (
-  trace: TraceWithSpansAndAnnotations | Trace,
-  mapping: TraceMapping,
-  expansions: Set<keyof typeof TRACE_EXPANSIONS>,
-  annotationScoreOptions?: AnnotationScore[]
-) => {
-  let expandedTraces: TraceWithSpansAndAnnotations[] = [
-    trace as TraceWithSpansAndAnnotations,
-  ];
-
-  for (const expansion of expansions) {
-    const expanded = expandedTraces.flatMap((trace) =>
-      TRACE_EXPANSIONS[expansion].expansion(trace)
-    );
-    // Only use expanded traces if we found some, otherwise keep original
-    expandedTraces = expanded.length > 0 ? expanded : expandedTraces;
-  }
-
-  return expandedTraces.map((trace) =>
-    Object.fromEntries(
-      Object.entries(mapping).map(([column, { source, key, subkey }]) => {
-        const source_ = source ? TRACE_MAPPINGS[source] : undefined;
-
-        let value = source_?.mapping(trace, key!, subkey!, {
-          annotationScoreOptions,
-        });
-
-        if (
-          source_ &&
-          "expandable_by" in source_ &&
-          source_?.expandable_by &&
-          expansions.has(source_?.expandable_by)
-        ) {
-          value = value?.[0];
-        }
-
-        return [
-          column,
-          typeof value !== "string" && typeof value !== "number"
-            ? JSON.stringify(value)
-            : value,
-        ];
-      })
-    )
   );
 };

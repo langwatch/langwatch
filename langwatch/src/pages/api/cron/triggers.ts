@@ -7,12 +7,12 @@ import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
 import { prisma } from "../../../server/db";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { type Trace } from "~/server/tracer/types";
-import { mapTraceToDatasetEntry } from "~/components/traces/TracesMapping";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord";
 import type { DatasetRecordEntry } from "~/server/datasets/types";
-import type {
-  TRACE_EXPANSIONS,
-  TraceMapping,
+import {
+  mapTraceToDatasetEntry,
+  type TRACE_EXPANSIONS,
+  type TraceMapping,
 } from "../../../server/tracer/tracesMapping";
 
 interface TraceGroups {

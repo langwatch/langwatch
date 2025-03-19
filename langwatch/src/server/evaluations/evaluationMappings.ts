@@ -1,5 +1,27 @@
 import type { MappingState } from "../tracer/tracesMapping";
 
+export const DEFAULT_MAPPINGS: MappingState = {
+  mapping: {
+    spans: {
+      source: "spans",
+    },
+    input: {
+      source: "input",
+    },
+    output: {
+      source: "output",
+    },
+    contexts: {
+      source: "contexts",
+    },
+    expected_output: {
+      source: "metadata",
+      key: "expected_output",
+    },
+  },
+  expansions: [],
+};
+
 export const migrateLegacyMappings = (
   mappings: Record<string, string>
 ): MappingState => {
