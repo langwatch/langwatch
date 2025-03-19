@@ -65,12 +65,22 @@ export const usePeriodSelector = (defaultNDays = 30) => {
 
   const setPeriod = useCallback(
     (startDate: Date, endDate: Date) => {
+      const validEndDate =
+        endDate instanceof Date && !isNaN(endDate.getTime())
+          ? endDate
+          : new Date();
+
+      const validStartDate =
+        startDate instanceof Date && !isNaN(startDate.getTime())
+          ? startDate
+          : new Date();
+
       void router.push(
         {
           query: {
             ...router.query,
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
+            startDate: validStartDate.toISOString(),
+            endDate: validEndDate.toISOString(),
           },
         },
         undefined,
