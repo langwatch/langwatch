@@ -16,6 +16,14 @@ interface ListLLmTracesOptions {
 	endpoint: string;
 }
 
+interface SearchTracesOptions {
+	pageSize?: number;
+	pageOffset?: number;
+	timeTravelDays?: number;
+	endpoint: string;
+
+	filters: Record<string, string[] | Record<string, string[]>>;
+}
 
 export const getLlmTraceById = async (authToken: string, id: string, opts?: GetLlmTraceByIdOptions): Promise<LLMModeTrace> => {
 	const { endpoint } = opts ?? {};
@@ -60,6 +68,33 @@ export const listLlmTraces = async (authToken: string, opts?: ListLLmTracesOptio
 			startDate: addDays(new Date(), -timeTravelDays).toISOString(),
 			endDate: addDays(new Date(), 1).toISOString(),
 			llmMode: true,
+			pageOffset,
+			pageSize,
+		}),
+	});
+
+	return await response.json() as Promise<SearchTrace>;
+}
+
+export const searchTraces = async (authToken: string, opts: SearchTracesOptions): Promise<SearchTrace> => {
+	const {
+		pageSize = 10,
+		pageOffset = 0,
+		timeTravelDays = 1,
+		endpoint,
+		filters,
+	} = opts;
+
+	const response = await fetch(`${endpoint}/api/trace/search`, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			"X-Auth-Token": authToken,
+		},
+		body: JSON.stringify({
+			startDate: addDays(new Date(), -timeTravelDays).toISOString(),
+			endDate: addDays(new Date(), 1).toISOString(),
+			filters: filters,
 			pageOffset,
 			pageSize,
 		}),
