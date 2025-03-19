@@ -79,7 +79,7 @@ export const Guardrails = (trace: TraceEval) => {
 };
 
 export const EvaluationsCount = (
-  trace: TraceEval & { countGuardrails: boolean }
+  trace: TraceEval & { countGuardrails?: boolean }
 ) => {
   const evaluations = trace.countGuardrails
     ? trace.evaluations?.filter((x) => x.is_guardrail)
