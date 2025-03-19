@@ -40,6 +40,7 @@ function loadAndValidateArgs(): { apiKey: string; endpoint: string } {
 
 const { apiKey, endpoint } = loadAndValidateArgs();
 
+const transport = new StdioServerTransport();
 const server = new McpServer({
   name: "LangWatch",
   version: packageJson.version,
@@ -103,5 +104,37 @@ server.tool(
   }
 );
 
-const transport = new StdioServerTransport();
+createListTracesByMetadataTool("list_traces_by_user_id", "userId", "metadata.user_id");
+createListTracesByMetadataTool("list_traces_by_customer_id", "customerId", "metadata.customer_id");
+createListTracesByMetadataTool("list_traces_by_thread_id", "threadId", "metadata.thread_id");
+
 await server.connect(transport);
+
+function createListTracesByMetadataTool(name: string, argName: "userId" | "customerId" | "threadId", metadataKey: string) {
+  return server.tool(
+    name,
+    {
+      [argName]: z.string(),
+      pageSize: z.number().optional(),
+      pageOffset: z.number().optional(),
+      daysBackToSearch: z.number().optional(),
+    },
+    async ({ pageSize, pageOffset, daysBackToSearch, ...restArgs }) => {
+      const response = await searchTraces(apiKey, {
+        endpoint,
+        pageSize: pageSize as number | undefined,
+        pageOffset: pageOffset as number | undefined,
+        timeTravelDays: (daysBackToSearch ?? 1) as number,
+        filters: {
+          [metadataKey]: [restArgs[argName] as string],
+        },
+      });
+  
+      return {
+        content: [
+          { type: "text", text: JSON.stringify(response, null, 2) },
+        ],
+      };
+    }
+  );
+}
