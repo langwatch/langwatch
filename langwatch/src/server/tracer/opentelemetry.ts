@@ -572,10 +572,26 @@ const addOpenTelemetrySpanAsSpan = (
     typeof attributesMap.metadata === "object" &&
     !Array.isArray(attributesMap.metadata)
   ) {
-    trace.customMetadata = {
-      ...trace.customMetadata,
-      ...(attributesMap.metadata as Record<string, any>),
-    };
+    // @ts-ignore
+    const metadata = attributesMap.metadata;
+    const { reservedTraceMetadata, customMetadata } =
+      extractReservedAndCustomMetadata(metadata);
+
+    if (Object.keys(reservedTraceMetadata).length > 0) {
+      trace.reservedTraceMetadata = {
+        ...trace.reservedTraceMetadata,
+        ...reservedTraceMetadata,
+      };
+    }
+
+    if (Object.keys(customMetadata).length > 0) {
+      trace.customMetadata = {
+        ...trace.customMetadata,
+        ...customMetadata,
+      };
+    }
+
+    // @ts-ignore
     delete attributesMap.metadata;
   }
 
