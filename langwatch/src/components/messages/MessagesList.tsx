@@ -15,7 +15,7 @@ import {
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
-import React, { createRef, useEffect, useRef, useState } from "react";
+import React, { createRef, useEffect, useState } from "react";
 import {
   ChevronDown,
   ChevronUp,

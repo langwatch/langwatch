@@ -42,7 +42,10 @@ import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
 } from "../../server/evaluations/getEvaluator";
-import { migrateLegacyMappings } from "../../server/evaluations/migrateLegacyMappings";
+import {
+  DEFAULT_MAPPINGS,
+  migrateLegacyMappings,
+} from "../../server/evaluations/evaluationMappings";
 import type { CheckPreconditions } from "../../server/evaluations/types";
 import { checkPreconditionsSchema } from "../../server/evaluations/types.generated";
 import {
@@ -97,28 +100,6 @@ export default function CheckConfigForm({
     setIsNameAlreadyInUse(!result.available);
 
     return result.available;
-  };
-
-  const DEFAULT_MAPPINGS: CheckConfigFormData["mappings"] = {
-    mapping: {
-      spans: {
-        source: "spans",
-      },
-      input: {
-        source: "input",
-      },
-      output: {
-        source: "output",
-      },
-      contexts: {
-        source: "contexts",
-      },
-      expected_output: {
-        source: "metadata",
-        key: "expected_output",
-      },
-    },
-    expansions: [],
   };
 
   const form = useForm<CheckConfigFormData>({
@@ -191,35 +172,38 @@ export default function CheckConfigForm({
       { enabled: !!project }
     );
 
-  const availableEvaluators = {
-    ...AVAILABLE_EVALUATORS,
-    ...Object.fromEntries(
-      (availableCustomEvaluators.data ?? []).map((evaluator) => {
-        const { inputs, outputs } = getInputsOutputs(
-          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-            ?.edges as Edge[],
-          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-            ?.nodes as JsonArray as unknown[] as Node[]
-        );
-        const requiredFields = inputs.map((input) => input.identifier);
+  const availableEvaluators = useMemo(
+    () => ({
+      ...AVAILABLE_EVALUATORS,
+      ...Object.fromEntries(
+        (availableCustomEvaluators.data ?? []).map((evaluator) => {
+          const { inputs } = getInputsOutputs(
+            JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
+              ?.edges as Edge[],
+            JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
+              ?.nodes as JsonArray as unknown[] as Node[]
+          );
+          const requiredFields = inputs.map((input) => input.identifier);
 
-        return [
-          `custom/${evaluator.id}`,
-          {
-            name: evaluator.name,
-            description: evaluator.description,
-            category: "custom",
-            isGuardrail: false,
-            requiredFields: requiredFields,
-            optionalFields: [],
-            settings: {},
-            result: {},
-            envVars: [],
-          },
-        ];
-      })
-    ),
-  };
+          return [
+            `custom/${evaluator.id}`,
+            {
+              name: evaluator.name,
+              description: evaluator.description,
+              category: "custom",
+              isGuardrail: false,
+              requiredFields: requiredFields,
+              optionalFields: [],
+              settings: {},
+              result: {},
+              envVars: [],
+            },
+          ];
+        })
+      ),
+    }),
+    [availableCustomEvaluators.data]
+  );
 
   useEffect(() => {
     if (!checkType && !isChoosing) {
@@ -307,7 +291,7 @@ export default function CheckConfigForm({
       ...(evaluatorDefinition?.optionalFields ?? []),
     ].map((field) => ({
       name: field,
-      type: "string",
+      type: "string" as const,
     }));
   }, [evaluatorDefinition]);
 

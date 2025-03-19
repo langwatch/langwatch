@@ -1,7 +1,13 @@
 import type { Annotation, AnnotationScore, User } from "@prisma/client";
 import { getRAGChunks, getRAGInfo } from "./utils";
 import { z } from "zod";
-import type { DatasetSpan, Evaluation, Span, TraceWithSpans } from "./types";
+import type {
+  DatasetSpan,
+  Evaluation,
+  Span,
+  Trace,
+  TraceWithSpans,
+} from "./types";
 import { datasetSpanSchema } from "./types.generated";
 
 export type TraceWithSpansAndAnnotations = TraceWithSpans & {
@@ -379,4 +385,100 @@ const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
   } catch (e) {
     return spans as any;
   }
+};
+
+export const mapTraceToDatasetEntry = (
+  trace: TraceWithSpansAndAnnotations | Trace,
+  mapping: TraceMapping,
+  expansions: Set<keyof typeof TRACE_EXPANSIONS>,
+  annotationScoreOptions?: AnnotationScore[]
+): Record<string, string | number>[] => {
+  let expandedTraces: TraceWithSpansAndAnnotations[] = [
+    trace as TraceWithSpansAndAnnotations,
+  ];
+
+  for (const expansion of expansions) {
+    const expanded = expandedTraces.flatMap((trace) =>
+      TRACE_EXPANSIONS[expansion].expansion(trace)
+    );
+    // Only use expanded traces if we found some, otherwise keep original
+    expandedTraces = expanded.length > 0 ? expanded : expandedTraces;
+  }
+
+  return expandedTraces.map((trace) =>
+    Object.fromEntries(
+      Object.entries(mapping).map(([column, { source, key, subkey }]) => {
+        const source_ = source ? TRACE_MAPPINGS[source] : undefined;
+
+        let value = source_?.mapping(trace, key!, subkey!, {
+          annotationScoreOptions,
+        });
+
+        if (
+          source_ &&
+          "expandable_by" in source_ &&
+          source_?.expandable_by &&
+          expansions.has(source_?.expandable_by)
+        ) {
+          value = value?.[0];
+        }
+
+        return [
+          column,
+          typeof value !== "string" && typeof value !== "number"
+            ? JSON.stringify(value)
+            : value,
+        ];
+      })
+    )
+  );
+};
+
+type StringTypeToType = {
+  string: string;
+  number: number;
+  "string[]": string[];
+  object: Record<string, any>;
+  array: any[];
+};
+
+export const tryAndConvertTo = <T extends keyof StringTypeToType>(
+  value: any,
+  type: T
+): StringTypeToType[T] | undefined => {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+  if (type === "string") {
+    return value.toString();
+  }
+  if (type === "number") {
+    return Number(value) as StringTypeToType[T];
+  }
+  if (
+    typeof value === "string" &&
+    (type === "object" || type === "string[]" || type === "array")
+  ) {
+    try {
+      const parsed = JSON.parse(value);
+      if (!Array.isArray(parsed) && typeof parsed === "object") {
+        return parsed as unknown as StringTypeToType[T];
+      }
+      if (Array.isArray(parsed)) {
+        return parsed as unknown as StringTypeToType[T];
+      }
+      throw new Error("Failed to parse to a valid type, falling back");
+    } catch (e) {
+      if (type === "string[]") {
+        return [value.toString()] as unknown as StringTypeToType[T];
+      }
+      if (type === "array") {
+        return [value.toString()] as unknown as StringTypeToType[T];
+      }
+      if (type === "object") {
+        return { _json: value } as unknown as StringTypeToType[T];
+      }
+    }
+  }
+  return value as unknown as StringTypeToType[T];
 };
