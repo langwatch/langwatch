@@ -25,14 +25,19 @@ import type { TraceWithSpans } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { Switch } from "../ui/switch";
 
-const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
+export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   string,
   keyof typeof TRACE_MAPPINGS
 > = {
   trace_id: "trace_id",
   timestamp: "timestamp",
   input: "input",
+  question: "input",
+  user_input: "input",
   output: "output",
+  answer: "output",
+  response: "output",
+  result: "output",
   expected_output: "output",
   total_cost: "metrics.total_cost",
   contexts: "contexts.string_list",
@@ -40,12 +45,14 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
 };
 
 export const TracesMapping = ({
+  titles,
   dataset,
   traces,
   columnTypes,
   setDatasetEntries,
   setDatasetMapping,
 }: {
+  titles?: string[];
   dataset: { id?: string; mapping?: MappingState };
   traces: TraceWithSpans[];
   columnTypes?: DatasetColumns;
@@ -190,6 +197,15 @@ export const TracesMapping = ({
 
   return (
     <VStack align="start" width="full" gap={2}>
+      {titles && (
+        <HStack width="full" gap="60px" paddingBottom={2} fontWeight="semibold">
+          {titles.map((title) => (
+            <Text width="50%" key={title}>
+              {title}
+            </Text>
+          ))}
+        </HStack>
+      )}
       {Object.entries(mapping).map(
         ([column, { source, key, subkey }], index) => {
           const mapping = source ? TRACE_MAPPINGS[source] : undefined;
