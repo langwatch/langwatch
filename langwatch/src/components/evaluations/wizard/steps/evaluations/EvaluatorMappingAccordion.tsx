@@ -60,6 +60,15 @@ export const EvaluatorMappingAccordion = () => {
     );
   }, [databaseDataset.data]);
 
+  const sourceOptions = useMemo(() => {
+    return {
+      entry: {
+        label: "Dataset",
+        fields: datasetFields,
+      },
+    };
+  }, [datasetFields]);
+
   return (
     <Accordion.Item
       value="mappings"
@@ -111,20 +120,18 @@ export const EvaluatorMappingAccordion = () => {
                         ? traceMappings
                         : undefined
                     }
-                    dsl={evaluator?.id ?{
-                      sourceOptions: {
-                        entry: {
-                          label: "Dataset",
-                          fields: datasetFields,
-                        },
-                      },
-                      targetId: evaluator?.id ?? "",
-                      targetEdges: evaluatorEdges ?? [],
-                      setTargetEdges: (mapping) => {
-                        console.log('source mapping', mapping);
-                        setFirstEvaluatorEdges(mapping);
-                      },
-                    } : undefined}
+                    dsl={
+                      evaluator?.id
+                        ? {
+                            sourceOptions,
+                            targetId: evaluator?.id ?? "",
+                            targetEdges: evaluatorEdges ?? [],
+                            setTargetEdges: (mapping) => {
+                              setFirstEvaluatorEdges(mapping);
+                            },
+                          }
+                        : undefined
+                    }
                     setTraceMapping={(mapping) => {
                       setWizardState({
                         realTimeTraceMappings: mapping,

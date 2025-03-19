@@ -1,16 +1,9 @@
-import { create } from "zustand";
-import type {
-  AVAILABLE_EVALUATORS,
-  Evaluators,
-} from "~/server/evaluations/evaluators.generated";
-import type {
-  Entry,
-  Evaluator,
-  Workflow,
-} from "../optimization_studio/types/dsl";
-import { initialDSL } from "../optimization_studio/hooks/useWorkflowStore";
 import type { Edge, Node } from "@xyflow/react";
+import { create } from "zustand";
+import type { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
+import { initialDSL } from "../optimization_studio/hooks/useWorkflowStore";
 import { entryNode } from "../optimization_studio/templates/blank";
+import type { Evaluator, Workflow } from "../optimization_studio/types/dsl";
 import { nameToId } from "../optimization_studio/utils/nodeUtils";
 import { convertEvaluator } from "../optimization_studio/utils/registryUtils";
 import type { MappingState } from "../server/tracer/tracesMapping";
