@@ -1,4 +1,13 @@
-import type { Edge, Node } from "@xyflow/react";
+import {
+  addEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
+  type Connection,
+  type Edge,
+  type EdgeChange,
+  type Node,
+  type NodeChange,
+} from "@xyflow/react";
 import { create } from "zustand";
 import type { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 import { initialDSL } from "../optimization_studio/hooks/useWorkflowStore";
@@ -7,6 +16,8 @@ import type { Evaluator, Workflow } from "../optimization_studio/types/dsl";
 import { nameToId } from "../optimization_studio/utils/nodeUtils";
 import { convertEvaluator } from "../optimization_studio/utils/registryUtils";
 import type { MappingState } from "../server/tracer/tracesMapping";
+import { datasetColumnsToFields } from "../optimization_studio/utils/datasetUtils";
+import type { DatasetColumns } from "../server/datasets/types";
 
 export type EvaluatorCategory =
   | "expected_answer"
@@ -34,10 +45,16 @@ export type State = {
   experimentId?: string;
   wizardState: {
     step: Step;
-    task?: "real_time" | "batch" | "prompt_creation" | "custom_evaluator" | "scan";
+    task?:
+      | "real_time"
+      | "batch"
+      | "prompt_creation"
+      | "custom_evaluator"
+      | "scan";
     dataSource?: "choose" | "from_production" | "manual" | "upload";
     evaluatorCategory?: EvaluatorCategory;
     realTimeTraceMappings?: MappingState;
+    workspaceTab?: "dataset" | "workflow" | "results";
   };
   dsl: Workflow;
 };
@@ -58,8 +75,11 @@ type EvaluationWizardStore = State & {
       | ((state: State["dsl"]) => Partial<State["dsl"]>)
   ) => void;
   getDSL: () => State["dsl"];
+  onNodesChange: (changes: NodeChange[]) => void;
+  onEdgesChange: (changes: EdgeChange[]) => void;
+  onConnect: (connection: Connection) => void;
   nextStep: () => void;
-  setDatasetId: (datasetId: string) => void;
+  setDatasetId: (datasetId: string, columnTypes: DatasetColumns) => void;
   getDatasetId: () => string | undefined;
   setFirstEvaluator: (
     evaluator: Partial<Evaluator> & { evaluator: string }
@@ -73,6 +93,7 @@ const initialState: State = {
   experimentId: undefined,
   wizardState: {
     step: "task",
+    workspaceTab: "dataset",
   },
   dsl: initialDSL,
 };
@@ -134,6 +155,27 @@ const store = (
   getDSL() {
     return get().dsl;
   },
+  onNodesChange: (changes: NodeChange[]) => {
+    set({
+      dsl: { ...get().dsl, nodes: applyNodeChanges(changes, get().dsl.nodes) },
+    });
+  },
+  onEdgesChange: (changes: EdgeChange[]) => {
+    set({
+      dsl: { ...get().dsl, edges: applyEdgeChanges(changes, get().dsl.edges) },
+    });
+  },
+  onConnect: (connection: Connection) => {
+    set({
+      dsl: {
+        ...get().dsl,
+        edges: addEdge(connection, get().dsl.edges).map((edge) => ({
+          ...edge,
+          type: edge.type ?? "default",
+        })),
+      },
+    });
+  },
   nextStep() {
     set((current) => {
       const currentStepIndex = steps.indexOf(current.wizardState.step);
@@ -157,7 +199,7 @@ const store = (
       return current;
     });
   },
-  setDatasetId(datasetId) {
+  setDatasetId(datasetId, columnTypes) {
     get().setDSL((current) => {
       const hasEntryNode = current.nodes.some((node) => node.type === "entry");
 
@@ -187,6 +229,7 @@ const store = (
               data: {
                 ...newEntryNode.data,
                 dataset: { id: datasetId },
+                outputs: datasetColumnsToFields(columnTypes),
               },
             },
           ],
@@ -219,7 +262,7 @@ const store = (
         id: nameToId(initialEvaluator.name ?? initialEvaluator.cls),
         type: "evaluator",
         data: initialEvaluator,
-        position: { x: 1200, y: 130 },
+        position: { x: 600, y: 0 },
       };
 
       const evaluatorNode: Node<Evaluator> = {

@@ -23,8 +23,9 @@ import {
 } from "~/hooks/useEvaluationWizardStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { StepButton, StepRadio } from "../../StepButton";
+import { StepRadio } from "../../StepButton";
 import { OverflownTextWithTooltip } from "../../../OverflownText";
+import type { DatasetColumns } from "../../../../server/datasets/types";
 
 export function DatasetSelection() {
   const { setWizardState, wizardState, setDatasetId, getDatasetId } =
@@ -51,7 +52,11 @@ export function DatasetSelection() {
   };
 
   const handleDatasetSelect = (datasetId: string) => {
-    setDatasetId(datasetId);
+    const dataset = datasets.data?.find((d) => d.id === datasetId);
+    if (!dataset) {
+      return;
+    }
+    setDatasetId(datasetId, dataset.columnTypes as DatasetColumns);
   };
 
   const handleContinue = (
