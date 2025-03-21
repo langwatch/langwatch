@@ -26,32 +26,49 @@ export type EvaluatorCategory =
   | "rag"
   | "safety";
 
-export const steps = [
+export const STEPS = [
   "task",
   "dataset",
-  "executor",
-  "evaluator",
-  "configuration",
-  "finalize",
+  "execution",
+  "evaluation",
+  "results",
 ] as const;
 
-export type Step = (typeof steps)[number];
+export type Step = (typeof STEPS)[number];
 
 export type PartialEdge = Omit<Workflow["edges"][number], "target"> & {
   target?: string;
 };
 
+export const TASK_TYPES = {
+  real_time: "Set up real-time evaluation",
+  llm_app: "Evaluate your LLM app",
+  prompt_creation: "Prompt Creation",
+  custom_evaluator: "Create Custom Evaluator",
+  scan: "Scan for Vulnerabilities (Coming Soon)",
+} as const;
+
+export const DATA_SOURCE_TYPES = {
+  choose: "Choose existing dataset",
+  from_production: "Import from Production",
+  manual: "Create manually",
+  upload: "Upload CSV",
+} as const;
+
+export const EXECUTION_METHODS = {
+  prompt: "Create a prompt",
+  http_endpoint: "Call an HTTP endpoint",
+  create_a_workflow: "Create a Workflow",
+  api: "Run on Notebook or CI/CD Pipeline",
+} as const;
+
 export type State = {
   experimentId?: string;
   wizardState: {
     step: Step;
-    task?:
-      | "real_time"
-      | "batch"
-      | "prompt_creation"
-      | "custom_evaluator"
-      | "scan";
-    dataSource?: "choose" | "from_production" | "manual" | "upload";
+    task?: keyof typeof TASK_TYPES;
+    dataSource?: keyof typeof DATA_SOURCE_TYPES;
+    executionMethod?: keyof typeof EXECUTION_METHODS;
     evaluatorCategory?: EvaluatorCategory;
     realTimeTraceMappings?: MappingState;
     workspaceTab?: "dataset" | "workflow" | "results";
@@ -178,16 +195,16 @@ const store = (
   },
   nextStep() {
     set((current) => {
-      const currentStepIndex = steps.indexOf(current.wizardState.step);
-      if (currentStepIndex < steps.length - 1) {
-        const nextStep = steps[currentStepIndex + 1];
+      const currentStepIndex = STEPS.indexOf(current.wizardState.step);
+      if (currentStepIndex < STEPS.length - 1) {
+        const nextStep = STEPS[currentStepIndex + 1];
         if (
-          nextStep === "executor" &&
+          nextStep === "execution" &&
           current.wizardState.task === "real_time"
         ) {
           return {
             ...current,
-            wizardState: { ...current.wizardState, step: "evaluator" },
+            wizardState: { ...current.wizardState, step: "evaluation" },
           };
         } else {
           return {

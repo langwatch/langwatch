@@ -6,7 +6,7 @@ import { EvaluatorMappingAccordion } from "./evaluations/EvaluatorMappingAccordi
 import { EvaluatorSelectionAccordion } from "./evaluations/EvaluatorSelectionAccordion";
 import { EvaluatorSettingsAccordion } from "./evaluations/EvaluatorSettingsAccordion";
 
-export function EvaluationSelection() {
+export function EvaluationStep() {
   const { wizardState, getFirstEvaluatorNode: getFirstEvaluator } = useEvaluationWizardStore();
   const [accordeonValue, setAccordeonValue] = useState<string[]>(
     wizardState.evaluatorCategory
@@ -33,7 +33,7 @@ export function EvaluationSelection() {
         width="full"
         variant="plain"
       >
-        <VStack width="full">
+        <VStack width="full" gap={3}>
           <CategorySelectionAccordion setAccordeonValue={setAccordeonValue} />
           <EvaluatorSelectionAccordion setAccordeonValue={setAccordeonValue} />
           <EvaluatorMappingAccordion />

@@ -12,6 +12,7 @@ import { evaluatorsSchema } from "../../../../../server/evaluations/evaluators.z
 import { getEvaluatorDefaultSettings } from "../../../../../server/evaluations/getEvaluator";
 import DynamicZodForm from "../../../../checks/DynamicZodForm";
 import type { Field } from "../../../../../optimization_studio/types/dsl";
+import { StepAccordion } from "../../components/StepAccordion";
 
 export const EvaluatorSettingsAccordion = () => {
   const { wizardState, getFirstEvaluatorNode, setFirstEvaluator } =
@@ -96,36 +97,26 @@ export const EvaluatorSettingsAccordion = () => {
   }, [form]);
 
   return (
-    <Accordion.Item
+    <StepAccordion
       value="settings"
       width="full"
-      hidden={!wizardState.evaluatorCategory || !hasEvaluatorFields}
+      borderColor="green.400"
+      title="Evaluator Settings"
+      showTrigger={!!wizardState.evaluatorCategory && !!hasEvaluatorFields}
     >
-      <Accordion.ItemTrigger width="full">
-        <HStack width="full" alignItems="center" paddingX={2} paddingY={3}>
-          <VStack width="full" align="start" gap={1}>
-            <Text>Evaluator Settings</Text>
-          </VStack>
-          <Accordion.ItemIndicator>
-            <ChevronDown />
-          </Accordion.ItemIndicator>
-        </HStack>
-      </Accordion.ItemTrigger>
-      <Accordion.ItemContent padding={2}>
-        <FormProvider {...form}>
-          <VStack width="full" gap={3}>
-            {hasEvaluatorFields && (
-              <DynamicZodForm
-                schema={schema}
-                evaluatorType={evaluatorType as keyof Evaluators}
-                prefix="settings"
-                errors={form.formState.errors.settings}
-                variant="default"
-              />
-            )}
-          </VStack>
-        </FormProvider>
-      </Accordion.ItemContent>
-    </Accordion.Item>
+      <FormProvider {...form}>
+        <VStack width="full" gap={3}>
+          {hasEvaluatorFields && (
+            <DynamicZodForm
+              schema={schema}
+              evaluatorType={evaluatorType as keyof Evaluators}
+              prefix="settings"
+              errors={form.formState.errors.settings}
+              variant="default"
+            />
+          )}
+        </VStack>
+      </FormProvider>
+    </StepAccordion>
   );
 };

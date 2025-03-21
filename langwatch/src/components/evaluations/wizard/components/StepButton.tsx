@@ -9,7 +9,7 @@ import {
   type ButtonProps,
 } from "@chakra-ui/react";
 import { LuChevronRight } from "react-icons/lu";
-import { OverflownTextWithTooltip } from "../OverflownText";
+import { OverflownTextWithTooltip } from "../../../OverflownText";
 
 export function StepButton({
   title,

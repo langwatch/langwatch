@@ -2,13 +2,14 @@ import { Heading, RadioCard, Text, VStack } from "@chakra-ui/react";
 import { Activity, Edit3 } from "react-feather";
 import { LuBadgeCheck, LuListChecks, LuShield } from "react-icons/lu";
 import {
+  TASK_TYPES,
   useEvaluationWizardStore,
   type State,
 } from "~/hooks/useEvaluationWizardStore";
 import { ColorfulBlockIcon } from "../../../../optimization_studio/components/ColorfulBlockIcons";
-import { StepButton } from "../../StepButton";
+import { StepButton } from "../components/StepButton";
 
-export function TaskSelection() {
+export function TaskStep() {
   const { wizardState, setWizardState } = useEvaluationWizardStore();
 
   const handleTaskSelection = (task: State["wizardState"]["task"]) => {
@@ -36,7 +37,7 @@ export function TaskSelection() {
           <StepButton
             colorPalette="green"
             value="real_time"
-            title="Set up real-time evaluation"
+            title={TASK_TYPES.real_time}
             description="Evaluate messages as they arrive in production"
             onClick={() => handleTaskSelection("real_time")}
             icon={
@@ -50,11 +51,11 @@ export function TaskSelection() {
           />
           <StepButton
             colorPalette="blue"
-            value="batch"
-            title="Evaluate your LLM pipeline"
+            value="llm_app"
+            title={TASK_TYPES.llm_app}
             description="Run a batch evaluation of dataset examples against your existing LLM application"
             // Disabled for now
-            // onClick={() => handleTaskSelection("batch")}
+            // onClick={() => handleTaskSelection("llm_app")}
             disabled
             icon={
               <ColorfulBlockIcon
@@ -68,7 +69,7 @@ export function TaskSelection() {
           <StepButton
             colorPalette="purple"
             value="prompt_creation"
-            title="Prompt Creation"
+            title={TASK_TYPES.prompt_creation}
             description="Build a new prompt and evaluate the quality of the outputs, iteratively improving it"
             // Disabled for now
             // onClick={() => handleTaskSelection("prompt_creation")}
@@ -85,7 +86,7 @@ export function TaskSelection() {
           <StepButton
             colorPalette="orange"
             value="custom_evaluator"
-            title="Create Custom Evaluator"
+            title={TASK_TYPES.custom_evaluator}
             description="Build your own reliable evaluator to be used by other flows, measuring and ensuring its accuracy"
             // Disabled for now
             // onClick={() => handleTaskSelection("custom_evaluator")}
@@ -102,7 +103,7 @@ export function TaskSelection() {
           <StepButton
             colorPalette="teal"
             value="scan"
-            title="Scan for Vulnerabilities (Coming Soon)"
+            title={TASK_TYPES.scan}
             description="Run malicious datasets and adversarial attacks against your LLM application for Red Teaming"
             // Disabled for now
             // onClick={() => handleTaskSelection("scan")}
