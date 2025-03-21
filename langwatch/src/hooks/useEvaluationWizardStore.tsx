@@ -34,7 +34,7 @@ export type State = {
   experimentId?: string;
   wizardState: {
     step: Step;
-    task?: "real_time" | "batch" | "prompt" | "custom" | "scan";
+    task?: "real_time" | "batch" | "prompt_creation" | "custom_evaluator" | "scan";
     dataSource?: "choose" | "from_production" | "manual" | "upload";
     evaluatorCategory?: EvaluatorCategory;
     realTimeTraceMappings?: MappingState;
