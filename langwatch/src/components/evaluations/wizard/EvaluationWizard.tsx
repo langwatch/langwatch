@@ -24,23 +24,22 @@ import { ExecutionStep } from "./steps/ExecutionStep";
 import { EvaluationStep } from "./steps/EvaluationStep";
 import { useShallow } from "zustand/react/shallow";
 import { WizardWorkspace } from "./WizardWorkspace";
-import { ResultsStep } from "./steps/ResultsStep";
+import { ResultsStep, useStepCompletedValue } from "./steps/ResultsStep";
 
 export function EvaluationWizard() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const [isSticky, setIsSticky] = useState(false);
   const stickyRef = useRef<HTMLDivElement>(null);
-  const { wizardState, setWizardState, nextStep } =
-    useEvaluationWizardStore(
-      useShallow((state) => {
-        if (typeof window !== "undefined") {
-          // @ts-ignore
-          window.state = state;
-        }
-        return state;
-      })
-    );
+  const { wizardState, setWizardState, nextStep } = useEvaluationWizardStore(
+    useShallow((state) => {
+      if (typeof window !== "undefined") {
+        // @ts-ignore
+        window.state = state;
+      }
+      return state;
+    })
+  );
   const { step } = wizardState;
 
   useEffect(() => {
@@ -70,6 +69,8 @@ export function EvaluationWizard() {
       unmount?.();
     };
   }, []);
+
+  const stepCompletedValue = useStepCompletedValue();
 
   return (
     <Dialog.Content width="full" height="full" minHeight="fit-content">
@@ -123,11 +124,31 @@ export function EvaluationWizard() {
               }
             >
               <Steps.List>
-                <Steps.Item index={0} title="Task" />
-                <Steps.Item index={1} title="Dataset" />
-                <Steps.Item index={2} title="Execution" />
-                <Steps.Item index={3} title="Evaluation" />
-                <Steps.Item index={4} title="Results" />
+                <Steps.Item
+                  index={0}
+                  title="Task"
+                  isCompleted={!!stepCompletedValue("task")}
+                />
+                <Steps.Item
+                  index={1}
+                  title="Dataset"
+                  isCompleted={!!stepCompletedValue("dataset")}
+                />
+                <Steps.Item
+                  index={2}
+                  title="Execution"
+                  isCompleted={!!stepCompletedValue("execution")}
+                />
+                <Steps.Item
+                  index={3}
+                  title="Evaluation"
+                  isCompleted={!!stepCompletedValue("evaluation")}
+                />
+                <Steps.Item
+                  index={4}
+                  title="Results"
+                  isCompleted={!!stepCompletedValue("results")}
+                />
               </Steps.List>
             </Steps.Root>
             {step === "task" && <TaskStep />}

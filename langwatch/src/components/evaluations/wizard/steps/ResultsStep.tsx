@@ -1,43 +1,17 @@
-import {
-  Button,
-  Circle,
-  Heading,
-  HStack,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Heading, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { useForm } from "react-hook-form";
+import { LuCircleAlert, LuCircleCheck } from "react-icons/lu";
 import {
-  DATA_SOURCE_TYPES,
   EXECUTION_METHODS,
   TASK_TYPES,
   useEvaluationWizardStore,
   type Step,
 } from "~/hooks/useEvaluationWizardStore";
-import { HorizontalFormControl } from "../../../HorizontalFormControl";
-import { FullWidthFormControl } from "../../../FullWidthFormControl";
-import { LuCircleAlert, LuCircleCheck } from "react-icons/lu";
-import { api } from "../../../../utils/api";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
+import { api } from "../../../../utils/api";
+import { FullWidthFormControl } from "../../../FullWidthFormControl";
 
 export function ResultsStep() {
-  const { project } = useOrganizationTeamProject();
-  const { wizardState, setWizardState, datasetId, evaluator } =
-    useEvaluationWizardStore(
-      ({
-        wizardState,
-        setWizardState,
-        getDatasetId,
-        getFirstEvaluatorNode,
-      }) => ({
-        wizardState,
-        setWizardState,
-        datasetId: getDatasetId(),
-        evaluator: getFirstEvaluatorNode(),
-      })
-    );
-
   const form = useForm<{
     name: string;
   }>({
@@ -45,14 +19,6 @@ export function ResultsStep() {
       name: "",
     },
   });
-
-  const databaseDataset = api.datasetRecord.getAll.useQuery(
-    { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
-    {
-      enabled: !!project && !!datasetId,
-      refetchOnWindowFocus: false,
-    }
-  );
 
   const onSubmit = (data: { name: string }) => {
     console.log(data);
@@ -80,56 +46,79 @@ export function ResultsStep() {
           Configuration Summary
         </Heading>
         <VStack width="full" align="start" gap={4}>
-          <StepStatus
-            name="Task"
-            action="task"
-            step="task"
-            value={wizardState.task ? TASK_TYPES[wizardState.task] : undefined}
-          />
-          <StepStatus
-            name="Dataset"
-            action="dataset"
-            step="dataset"
-            value={databaseDataset?.data?.name}
-          />
+          <StepStatus name="Task" step="task" />
+          <StepStatus name="Dataset" step="dataset" />
           <StepStatus
             name="Execution"
-            action="execution method"
             step="execution"
-            value={
-              wizardState.task === "real_time"
-                ? "When message arrives"
-                : wizardState.executionMethod
-                ? EXECUTION_METHODS[wizardState.executionMethod]
-                : undefined
-            }
+            action="execution method"
           />
-          <StepStatus
-            name="Evaluation"
-            action="evaluation"
-            step="evaluation"
-            value={evaluator?.data?.name}
-          />
+          <StepStatus name="Evaluation" step="evaluation" />
         </VStack>
       </VStack>
     </>
   );
 }
 
+export const useStepCompletedValue = () => {
+  const { project } = useOrganizationTeamProject();
+
+  const { wizardState, datasetId, evaluator } = useEvaluationWizardStore(
+    ({ wizardState, setWizardState, getDatasetId, getFirstEvaluatorNode }) => ({
+      wizardState,
+      setWizardState,
+      datasetId: getDatasetId(),
+      evaluator: getFirstEvaluatorNode(),
+    })
+  );
+
+  const databaseDataset = api.datasetRecord.getAll.useQuery(
+    { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
+    {
+      enabled: !!project && !!datasetId,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  return (step: Step) => {
+    switch (step) {
+      case "task":
+        return wizardState.task ? TASK_TYPES[wizardState.task] : undefined;
+      case "dataset":
+        return databaseDataset?.data?.name;
+      case "execution":
+        return wizardState.task === "real_time"
+          ? "When message arrives"
+          : wizardState.executionMethod
+          ? EXECUTION_METHODS[wizardState.executionMethod]
+          : undefined;
+      case "evaluation":
+        return evaluator?.data?.name;
+      case "results":
+        return true;
+      default:
+        step satisfies never;
+        return undefined;
+    }
+  };
+};
+
 function StepStatus({
   name,
-  action,
+  action: action_,
   step,
-  value,
 }: {
   name: string;
-  action: string;
+  action?: string;
   step: Step;
-  value?: string;
 }) {
   const { setWizardState } = useEvaluationWizardStore(({ setWizardState }) => ({
     setWizardState,
   }));
+
+  const stepCompletedValue = useStepCompletedValue();
+  const value = stepCompletedValue(step);
+  const action = action_ ?? step;
 
   return (
     <Button
