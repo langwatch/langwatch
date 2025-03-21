@@ -9,6 +9,7 @@ import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { ReactFlowProvider, useUpdateNodeInternals } from "@xyflow/react";
 import { useEffect } from "react";
+import { EvaluationResults } from "../../../optimization_studio/components/ResultsPanel";
 
 export function WizardWorkspace() {
   const { getDatasetId, wizardState, setWizardState, dsl } =
@@ -49,6 +50,7 @@ export function WizardWorkspace() {
             alignSelf="center"
             position="sticky"
             top="16px"
+            flexShrink={0}
           >
             {hasDataset && <Tabs.Trigger value="dataset">Dataset</Tabs.Trigger>}
             {hasWorkflow && (
@@ -91,6 +93,24 @@ export function WizardWorkspace() {
               </ReactFlowProvider>
             </Tabs.Content>
           )}
+          {hasResults && (
+            <Tabs.Content
+              value="results"
+              width="full"
+              height="full"
+              position="sticky"
+              top="58px"
+            >
+              <Card.Root width="full" height="full" position="sticky" top={6}>
+                <Card.Body width="full" height="full" paddingBottom={6}>
+                  <EvaluationResults
+                    workflowId={dsl.workflow_id}
+                    evaluationState={dsl.state.evaluation}
+                  />
+                </Card.Body>
+              </Card.Root>
+            </Tabs.Content>
+          )}
         </Tabs.Root>
       )}
     </VStack>
@@ -107,7 +127,6 @@ function WizardOptimizationStudioCanvas() {
     for (const node of dsl.nodes) {
       updateNodeInternals(node.id);
     }
-    console.log("updating node internals");
   }, [dsl, updateNodeInternals]);
 
   return (

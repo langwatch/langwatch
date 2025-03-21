@@ -12,19 +12,21 @@ export function FullWidthFormControl({
   ...props
 }: PropsWithChildren<{
   label: string | ReactNode;
-  helper: string;
+  helper?: string;
   invalid?: boolean;
   inputWidth?: string;
 }> &
   StackProps) {
   return (
     <Field.Root paddingY={2} invalid={invalid} {...props}>
-      <VStack width="full" align={align} gap={2}>
+      <VStack width="full" align={align} gap={helper ? 2 : 1}>
         <VStack align="start" gap={1} width="full" minWidth={minWidth}>
           <Field.Label margin={0}>{label}</Field.Label>
-          <Field.HelperText margin={0} fontSize="13px">
-            {helper}
-          </Field.HelperText>
+          {helper && (
+            <Field.HelperText margin={0} fontSize="13px">
+              {helper}
+            </Field.HelperText>
+          )}
         </VStack>
         <Spacer />
         <Spacer />

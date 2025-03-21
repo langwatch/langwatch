@@ -1,7 +1,7 @@
-import { EmptyState, Icon, Text, VStack } from "@chakra-ui/react";
+import { EmptyState, Text, VStack } from "@chakra-ui/react";
 import { LuRabbit } from "react-icons/lu";
 
-export function ExecutorSelection() {
+export function ExecutionStep() {
   return (
     <EmptyState.Root size="md" paddingBottom={0}>
       <EmptyState.Content>

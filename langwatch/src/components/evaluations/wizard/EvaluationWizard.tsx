@@ -15,23 +15,23 @@ import { LogoIcon } from "../../icons/LogoIcon";
 import { Dialog } from "../../ui/dialog";
 import { Steps } from "../../ui/steps";
 import {
-  steps,
+  STEPS,
   useEvaluationWizardStore,
 } from "~/hooks/useEvaluationWizardStore";
-import { TaskSelection } from "./steps/TaskSelection";
-import { DatasetSelection } from "./steps/DatasetSelection";
-import { DatasetTable } from "../../datasets/DatasetTable";
-import { ExecutorSelection } from "./steps/ExecutorSelection";
-import { EvaluationSelection } from "./steps/EvaluationSelection";
+import { TaskStep } from "./steps/TaskStep";
+import { DatasetStep } from "./steps/DatasetStep";
+import { ExecutionStep } from "./steps/ExecutionStep";
+import { EvaluationStep } from "./steps/EvaluationStep";
 import { useShallow } from "zustand/react/shallow";
 import { WizardWorkspace } from "./WizardWorkspace";
+import { ResultsStep } from "./steps/ResultsStep";
 
 export function EvaluationWizard() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const [isSticky, setIsSticky] = useState(false);
   const stickyRef = useRef<HTMLDivElement>(null);
-  const { wizardState, setWizardState, nextStep, getDatasetId } =
+  const { wizardState, setWizardState, nextStep } =
     useEvaluationWizardStore(
       useShallow((state) => {
         if (typeof window !== "undefined") {
@@ -117,23 +117,24 @@ export function EvaluationWizard() {
               size="sm"
               count={5}
               width="full"
-              step={steps.indexOf(step)}
+              step={STEPS.indexOf(step)}
               onStepChange={(event) =>
-                setWizardState({ step: steps[event.step] })
+                setWizardState({ step: STEPS[event.step] })
               }
             >
               <Steps.List>
                 <Steps.Item index={0} title="Task" />
                 <Steps.Item index={1} title="Dataset" />
-                <Steps.Item index={2} title="Executor" />
-                <Steps.Item index={3} title="Evaluator" />
+                <Steps.Item index={2} title="Execution" />
+                <Steps.Item index={3} title="Evaluation" />
                 <Steps.Item index={4} title="Results" />
               </Steps.List>
             </Steps.Root>
-            {step === "task" && <TaskSelection />}
-            {step === "dataset" && <DatasetSelection />}
-            {step === "executor" && <ExecutorSelection />}
-            {step === "evaluator" && <EvaluationSelection />}
+            {step === "task" && <TaskStep />}
+            {step === "dataset" && <DatasetStep />}
+            {step === "execution" && <ExecutionStep />}
+            {step === "evaluation" && <EvaluationStep />}
+            {step === "results" && <ResultsStep />}
           </VStack>
           <HStack
             ref={stickyRef}

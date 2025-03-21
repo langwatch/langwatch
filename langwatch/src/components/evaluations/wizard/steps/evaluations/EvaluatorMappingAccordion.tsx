@@ -10,6 +10,7 @@ import { useOrganizationTeamProject } from "../../../../../hooks/useOrganization
 import type { DatasetColumns } from "../../../../../server/datasets/types";
 import { api } from "../../../../../utils/api";
 import { EvaluatorTracesMapping } from "../../../EvaluatorTracesMapping";
+import { StepAccordion } from "../../components/StepAccordion";
 
 export const EvaluatorMappingAccordion = () => {
   const { project } = useOrganizationTeamProject();
@@ -70,80 +71,62 @@ export const EvaluatorMappingAccordion = () => {
   }, [datasetFields]);
 
   return (
-    <Accordion.Item
+    <StepAccordion
       value="mappings"
       width="full"
-      hidden={!wizardState.evaluatorCategory}
+      borderColor="green.400"
+      title="Data Mapping"
+      showTrigger={!!wizardState.evaluatorCategory}
     >
-      <Accordion.ItemTrigger width="full">
-        <HStack width="full" alignItems="center" paddingX={2} paddingY={3}>
-          <VStack width="full" align="start" gap={1}>
-            <Text>Data Mapping</Text>
-          </VStack>
-          <Accordion.ItemIndicator>
-            <ChevronDown />
-          </Accordion.ItemIndicator>
-        </HStack>
-      </Accordion.ItemTrigger>
-      <Accordion.ItemContent>
-        <VStack
-          align="start"
-          padding={2}
-          paddingBottom={5}
-          width="full"
-          gap={8}
-        >
-          {evaluatorDefinition ? (
-            <>
-              <Text>
-                {wizardState.task == "real_time" &&
-                wizardState.dataSource !== "from_production"
-                  ? "From the dataset you chose, what columns are equivalent to the real time trace data which will be used for evaluation during monitoring?"
-                  : wizardState.task == "real_time"
-                  ? "What data from the real time traces will be used for evaluation?"
-                  : "What data from the dataset will be used for evaluation?"}
-              </Text>
-              <Field.Root>
-                <VStack align="start" gap={4} width="full">
-                  <EvaluatorTracesMapping
-                    titles={
-                      wizardState.task == "real_time" &&
-                      wizardState.dataSource !== "from_production"
-                        ? ["Dataset", "Trace", "Evaluator"]
-                        : wizardState.task == "real_time"
-                        ? ["Trace", "Evaluator"]
-                        : ["Dataset", "Evaluator"]
-                    }
-                    targetFields={targetFields}
-                    traceMapping={
-                      wizardState.task == "real_time"
-                        ? traceMappings
-                        : undefined
-                    }
-                    dsl={
-                      evaluator?.id
-                        ? {
-                            sourceOptions,
-                            targetId: evaluator?.id ?? "",
-                            targetEdges: evaluatorEdges ?? [],
-                            setTargetEdges: (mapping) => {
-                              setFirstEvaluatorEdges(mapping);
-                            },
-                          }
-                        : undefined
-                    }
-                    setTraceMapping={(mapping) => {
-                      setWizardState({
-                        realTimeTraceMappings: mapping,
-                      });
-                    }}
-                  />
-                </VStack>
-              </Field.Root>
-            </>
-          ) : null}
-        </VStack>
-      </Accordion.ItemContent>
-    </Accordion.Item>
+      <VStack align="start" padding={2} paddingBottom={5} width="full" gap={8}>
+        {evaluatorDefinition ? (
+          <>
+            <Text>
+              {wizardState.task == "real_time" &&
+              wizardState.dataSource !== "from_production"
+                ? "From the dataset you chose, what columns are equivalent to the real time trace data which will be used for evaluation during monitoring?"
+                : wizardState.task == "real_time"
+                ? "What data from the real time traces will be used for evaluation?"
+                : "What data from the dataset will be used for evaluation?"}
+            </Text>
+            <Field.Root>
+              <VStack align="start" gap={4} width="full">
+                <EvaluatorTracesMapping
+                  titles={
+                    wizardState.task == "real_time" &&
+                    wizardState.dataSource !== "from_production"
+                      ? ["Dataset", "Trace", "Evaluator"]
+                      : wizardState.task == "real_time"
+                      ? ["Trace", "Evaluator"]
+                      : ["Dataset", "Evaluator"]
+                  }
+                  targetFields={targetFields}
+                  traceMapping={
+                    wizardState.task == "real_time" ? traceMappings : undefined
+                  }
+                  dsl={
+                    evaluator?.id
+                      ? {
+                          sourceOptions,
+                          targetId: evaluator?.id ?? "",
+                          targetEdges: evaluatorEdges ?? [],
+                          setTargetEdges: (mapping) => {
+                            setFirstEvaluatorEdges(mapping);
+                          },
+                        }
+                      : undefined
+                  }
+                  setTraceMapping={(mapping) => {
+                    setWizardState({
+                      realTimeTraceMappings: mapping,
+                    });
+                  }}
+                />
+              </VStack>
+            </Field.Root>
+          </>
+        ) : null}
+      </VStack>
+    </StepAccordion>
   );
 };

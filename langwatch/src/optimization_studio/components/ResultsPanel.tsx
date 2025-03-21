@@ -2,6 +2,8 @@ import {
   Alert,
   Box,
   Button,
+  Center,
+  EmptyState,
   Heading,
   HStack,
   Skeleton,
@@ -37,9 +39,10 @@ import { api } from "../../utils/api";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import type { Field, Signature } from "../types/dsl";
+import type { Field, Signature, Workflow } from "../types/dsl";
 import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
 import { OptimizationProgressBar } from "./ProgressToast";
+import { LuSquareCheckBig } from "react-icons/lu";
 
 export function ResultsPanel({
   isCollapsed,
@@ -55,6 +58,13 @@ export function ResultsPanel({
   useEffect(() => {
     setTabIndex(defaultTab);
   }, [defaultTab]);
+
+  const { workflowId, evaluationState } = useWorkflowStore(
+    ({ workflow_id: workflowId, state }) => ({
+      workflowId,
+      evaluationState: state.evaluation,
+    })
+  );
 
   return (
     <HStack
@@ -100,7 +110,12 @@ export function ResultsPanel({
           padding={0}
           height="calc(100% - 32px)"
         >
-          {!isCollapsed && tabIndex === "evaluations" && <EvaluationResults />}
+          {!isCollapsed && tabIndex === "evaluations" && (
+            <EvaluationResults
+              workflowId={workflowId}
+              evaluationState={evaluationState}
+            />
+          )}
         </Tabs.Content>
         <Tabs.Content
           value="optimizations"
@@ -116,14 +131,13 @@ export function ResultsPanel({
   );
 }
 
-export function EvaluationResults() {
-  const { workflowId, evaluationState } = useWorkflowStore(
-    ({ workflow_id: workflowId, state }) => ({
-      workflowId,
-      evaluationState: state.evaluation,
-    })
-  );
-
+export function EvaluationResults({
+  workflowId,
+  evaluationState,
+}: {
+  workflowId?: string;
+  evaluationState: Workflow["state"]["evaluation"];
+}) {
   const { project } = useOrganizationTeamProject();
 
   const [keepFetching, setKeepFetching] = useState(false);
@@ -188,7 +202,21 @@ export function EvaluationResults() {
   }
 
   if (!experiment.data || !project) {
-    return <Text padding={4}>Loading...</Text>;
+    return (
+      <Center width="full" height="full">
+        <EmptyState.Root marginTop="-60px">
+          <EmptyState.Content>
+            <EmptyState.Indicator>
+              <LuSquareCheckBig />
+            </EmptyState.Indicator>
+            <EmptyState.Title>Waiting for evaluation results</EmptyState.Title>
+            <EmptyState.Description>
+              Run your first evaluation to see the results here
+            </EmptyState.Description>
+          </EmptyState.Content>
+        </EmptyState.Root>
+      </Center>
+    );
   }
 
   const evaluationStateRunId = evaluationState?.run_id;

@@ -21,6 +21,7 @@ import {
 import { OverflownTextWithTooltip } from "../../../../OverflownText";
 import { Tooltip } from "../../../../ui/tooltip";
 import type { AVAILABLE_EVALUATORS } from "../../../../../server/evaluations/evaluators.generated";
+import { StepAccordion } from "../../components/StepAccordion";
 
 type EvaluationCategoryConfig = {
   id: string;
@@ -229,99 +230,89 @@ export const CategorySelectionAccordion = ({
   };
 
   return (
-    <Accordion.Item value="category" width="full">
-      {wizardState.evaluatorCategory && (
-        <Accordion.ItemTrigger width="full" paddingX={2} paddingY={3}>
-          <HStack width="full" alignItems="center">
-            <VStack width="full" align="start" gap={1}>
-              Evaluation Category
-            </VStack>
-          </HStack>
-          <Accordion.ItemIndicator>
-            <ChevronDown />
-          </Accordion.ItemIndicator>
-        </Accordion.ItemTrigger>
-      )}
-      <Accordion.ItemContent>
-        <RadioCard.Root
-          variant="outline"
-          colorPalette="green"
-          value={wizardState.evaluatorCategory}
-          onValueChange={(e: { value: string }) =>
-            handleCategorySelect(e.value as EvaluationCategory)
-          }
-          paddingTop={2}
-          paddingBottom={5}
-          paddingX="1px"
-        >
-          <Grid width="full" gap={3}>
-            {evaluatorCategories
-              .sort((a, b) => {
-                if (wizardState.task === "real_time") {
-                  if (a.realtime && !b.realtime) return -1;
-                  if (!a.realtime && b.realtime) return 1;
-                }
-                return 0;
-              })
-              .map((category) => {
-                const isDisabled =
-                  !category.realtime && wizardState.task === "real_time";
-                return (
-                  <Tooltip
-                    key={category.id}
-                    content={`${category.name} is not available for real-time evaluations`}
-                    disabled={!isDisabled}
-                    showArrow
-                    positioning={{ placement: "right" }}
+    <StepAccordion
+      value="category"
+      width="full"
+      borderColor="green.400"
+      title="Evaluation Category"
+      showTrigger={!!wizardState.evaluatorCategory}
+    >
+      <RadioCard.Root
+        variant="outline"
+        colorPalette="green"
+        value={wizardState.evaluatorCategory}
+        onValueChange={(e: { value: string }) =>
+          handleCategorySelect(e.value as EvaluationCategory)
+        }
+        paddingTop={2}
+        paddingBottom={5}
+        paddingX="1px"
+      >
+        <Grid width="full" gap={3}>
+          {evaluatorCategories
+            .sort((a, b) => {
+              if (wizardState.task === "real_time") {
+                if (a.realtime && !b.realtime) return -1;
+                if (!a.realtime && b.realtime) return 1;
+              }
+              return 0;
+            })
+            .map((category) => {
+              const isDisabled =
+                !category.realtime && wizardState.task === "real_time";
+              return (
+                <Tooltip
+                  key={category.id}
+                  content={`${category.name} is not available for real-time evaluations`}
+                  disabled={!isDisabled}
+                  showArrow
+                  positioning={{ placement: "right" }}
+                >
+                  <RadioCard.Item
+                    value={category.id}
+                    width="full"
+                    minWidth={0}
+                    disabled={isDisabled}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (!isDisabled) {
+                        handleCategorySelect(category.id as EvaluationCategory);
+                      }
+                    }}
                   >
-                    <RadioCard.Item
-                      value={category.id}
-                      width="full"
-                      minWidth={0}
-                      disabled={isDisabled}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (!isDisabled) {
-                          handleCategorySelect(
-                            category.id as EvaluationCategory
-                          );
-                        }
-                      }}
-                    >
-                      <RadioCard.ItemHiddenInput />
-                      <RadioCard.ItemControl cursor="pointer" width="full">
-                        <RadioCard.ItemContent width="full">
-                          <HStack
-                            align="start"
-                            gap={3}
-                            _icon={{ color: "green.300" }}
-                            width="full"
-                          >
-                            {category.icon}
-                            <VStack align="start" gap={1} width="full">
-                              <OverflownTextWithTooltip>
-                                {category.name}
-                              </OverflownTextWithTooltip>
-                              <Text
-                                fontSize="sm"
-                                color="gray.500"
-                                fontWeight="normal"
-                              >
-                                {category.description}
-                              </Text>
-                            </VStack>
-                          </HStack>
-                        </RadioCard.ItemContent>
-                        <RadioCard.ItemIndicator />
-                      </RadioCard.ItemControl>
-                    </RadioCard.Item>
-                  </Tooltip>
-                );
-              })}
-          </Grid>
-        </RadioCard.Root>
-      </Accordion.ItemContent>
-    </Accordion.Item>
+                    <RadioCard.ItemHiddenInput />
+                    <RadioCard.ItemControl cursor="pointer" width="full">
+                      <RadioCard.ItemContent width="full">
+                        <HStack
+                          align="start"
+                          gap={3}
+                          _icon={{ color: "green.300" }}
+                          width="full"
+                        >
+                          {category.icon}
+                          <VStack align="start" gap={1} width="full">
+                            <OverflownTextWithTooltip>
+                              {category.name}
+                            </OverflownTextWithTooltip>
+                            <Text
+                              fontSize="sm"
+                              color="gray.500"
+                              fontWeight="normal"
+                            >
+                              {category.description}
+                            </Text>
+                          </VStack>
+                        </HStack>
+                      </RadioCard.ItemContent>
+                      <RadioCard.ItemIndicator />
+                    </RadioCard.ItemControl>
+                  </RadioCard.Item>
+                </Tooltip>
+              );
+            })}
+        </Grid>
+      </RadioCard.Root>
+    </StepAccordion>
   );
 };
