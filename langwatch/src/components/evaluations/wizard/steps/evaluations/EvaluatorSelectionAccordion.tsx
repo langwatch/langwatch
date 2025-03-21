@@ -15,12 +15,19 @@ export const EvaluatorSelectionAccordion = ({
 }: {
   setAccordeonValue: (value: string[]) => void;
 }) => {
-  const { wizardState, getFirstEvaluatorNode, setFirstEvaluator } =
-    useEvaluationWizardStore();
+  const {
+    wizardState,
+    setWizardState,
+    getFirstEvaluatorNode,
+    setFirstEvaluator,
+  } = useEvaluationWizardStore();
 
   const handleEvaluatorSelect = (evaluatorType: string) => {
     setFirstEvaluator({
       evaluator: evaluatorType,
+    });
+    setWizardState({
+      workspaceTab: "workflow",
     });
 
     const nextStep =

@@ -24,6 +24,7 @@ import { DatasetTable } from "../../datasets/DatasetTable";
 import { ExecutorSelection } from "./steps/ExecutorSelection";
 import { EvaluationSelection } from "./steps/EvaluationSelection";
 import { useShallow } from "zustand/react/shallow";
+import { WizardWorkspace } from "./WizardWorkspace";
 
 export function EvaluationWizard() {
   const router = useRouter();
@@ -105,7 +106,13 @@ export function EvaluationWizard() {
           width="full"
           maxWidth="500px"
         >
-          <VStack align="start" padding={6} gap={8} height="fit-content" width="full">
+          <VStack
+            align="start"
+            padding={6}
+            gap={8}
+            height="fit-content"
+            width="full"
+          >
             <Steps.Root
               size="sm"
               count={5}
@@ -148,25 +155,7 @@ export function EvaluationWizard() {
             </Button>
           </HStack>
         </VStack>
-        <VStack
-          background="url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjRjJGNEY4Ii8+CjxyZWN0IHg9IjE0IiB5PSIxNCIgd2lkdGg9IjIiIGhlaWdodD0iMiIgZmlsbD0iI0U1RTdFQiIvPgo8L3N2Zz4K)"
-          padding={6}
-          width="full"
-          height="100%"
-          minHeight="calc(100vh - 50px)"
-          borderLeft="1px solid"
-          borderLeftColor="gray.200"
-        >
-          {getDatasetId() && (
-            <Card.Root width="full" position="sticky" top={6}>
-              <Card.Body width="full" paddingBottom={6}>
-                <Box width="full" position="relative">
-                  <DatasetTable datasetId={getDatasetId()} insideWizard />
-                </Box>
-              </Card.Body>
-            </Card.Root>
-          )}
-        </VStack>
+        <WizardWorkspace />
       </Dialog.Body>
     </Dialog.Content>
   );
