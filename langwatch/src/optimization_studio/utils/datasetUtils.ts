@@ -163,21 +163,33 @@ export const tryToMapPreviousColumnsToNewColumns = (
   previousColumns: DatasetColumns,
   newColumns: DatasetColumns
 ): DatasetRecordEntry[] => {
+  const columnNameMap: Record<string, string | undefined> = {};
+
+  previousColumns.forEach((prevCol) => {
+    const matchingNewCol = newColumns.find(
+      (newCol) => newCol.name === prevCol.name
+    );
+    if (matchingNewCol) {
+      columnNameMap[prevCol.name] = matchingNewCol.name;
+    }
+  });
+
   const res = datasetRecords.map((record) => {
     const convertedRecord: DatasetRecordEntry = {
       id: record.id,
     };
+
     for (const [key, value] of Object.entries(record)) {
-      const index = previousColumns.findIndex((col) => col.name === key);
-      if (index !== -1) {
-        const newColumn = newColumns[index];
-        if (newColumn) {
-          convertedRecord[newColumn.name] = value;
+      if (key === "id") continue; // Skip id as it's already added
+
+      if (key in columnNameMap) {
+        const newColumnName = columnNameMap[key];
+        if (newColumnName) {
+          convertedRecord[newColumnName] = value;
         }
-      } else {
-        convertedRecord[key] = value;
       }
     }
+
     return convertedRecord;
   });
 
