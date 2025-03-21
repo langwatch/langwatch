@@ -428,6 +428,7 @@ export function OptimizationStudioCanvas({
     <ReactFlow
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
+      fitView={true}
       defaultViewport={{
         zoom: defaultZoom,
         x: 100,

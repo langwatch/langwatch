@@ -7,7 +7,7 @@ import {
 import { OptimizationStudioCanvas } from "../../../optimization_studio/components/OptimizationStudio";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { ReactFlowProvider, useUpdateNodeInternals } from "@xyflow/react";
+import { Controls, ReactFlowProvider, useUpdateNodeInternals } from "@xyflow/react";
 import { useEffect } from "react";
 import { EvaluationResults } from "../../../optimization_studio/components/ResultsPanel";
 
@@ -142,6 +142,8 @@ function WizardOptimizationStudioCanvas() {
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
-    />
+    >
+      <Controls position="bottom-center" orientation="horizontal" />
+    </OptimizationStudioCanvas>
   );
 }

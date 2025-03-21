@@ -152,6 +152,16 @@ const store = (
         wizardState: { ...current.wizardState, ...state },
       }));
     }
+
+    set((current) => {
+      if (current.wizardState.step === "dataset") {
+        return {
+          ...current,
+          wizardState: { ...current.wizardState, workspaceTab: "dataset" },
+        };
+      }
+      return current;
+    });
   },
   getWizardState() {
     return get().wizardState;
@@ -230,7 +240,11 @@ const store = (
 
             return {
               ...node,
-              data: { ...node.data, dataset: { id: datasetId } },
+              data: {
+                ...node.data,
+                dataset: { id: datasetId },
+                outputs: datasetColumnsToFields(columnTypes),
+              },
             };
           }),
         };
