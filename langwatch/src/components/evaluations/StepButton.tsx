@@ -13,48 +13,37 @@ import { OverflownTextWithTooltip } from "../OverflownText";
 
 export function StepButton({
   title,
+  value,
   description,
   icon,
   indicator,
   ...props
 }: {
   title: string;
+  value: string;
   description: string;
   icon: React.ReactNode;
   indicator?: React.ReactNode | null;
-} & ButtonProps) {
+} & RadioCard.ItemProps) {
   return (
-    <Button
-      variant="outline"
-      size="lg"
-      width="full"
-      padding={2}
-      paddingY={3}
-      height="auto"
-      {...props}
-    >
-      <HStack width="full" alignItems="stretch">
-        <Box paddingX={2} paddingY={1}>
-          {icon}
-        </Box>
-        <VStack width="full" align="start" gap={1}>
-          <Text>{title}</Text>
-          <Text
-            fontSize="sm"
-            fontWeight="normal"
-            lineClamp={2}
-            textAlign="left"
-            lineHeight="1.3"
-            color="gray.600"
-          >
-            {description}
-          </Text>
-        </VStack>
-        {indicator !== null && (
-          <Center>{indicator ?? <LuChevronRight />}</Center>
-        )}
-      </HStack>
-    </Button>
+    <RadioCard.Item value={value} width="full" minWidth={0} {...props}>
+      <RadioCard.ItemHiddenInput />
+      <RadioCard.ItemControl cursor="pointer" width="full" alignItems="center">
+        <RadioCard.ItemContent width="full">
+          <HStack align="start" gap={3} width="full">
+            {icon}
+            <VStack align="start" gap={1} width="full">
+              <OverflownTextWithTooltip>{title}</OverflownTextWithTooltip>
+              <Text fontSize="sm" color="gray.500" fontWeight="normal">
+                {description}
+              </Text>
+            </VStack>
+          </HStack>
+        </RadioCard.ItemContent>
+        <RadioCard.ItemIndicator opacity={0} />
+        {indicator ?? <LuChevronRight size={20} />}
+      </RadioCard.ItemControl>
+    </RadioCard.Item>
   );
 }
 
