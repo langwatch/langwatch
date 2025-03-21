@@ -1,6 +1,6 @@
 import { Box, Steps as ChakraSteps, VStack } from "@chakra-ui/react";
 import * as React from "react";
-import { LuCheck } from "react-icons/lu";
+import { LuCheck, LuCircleAlert } from "react-icons/lu";
 
 interface StepInfoProps {
   title?: React.ReactNode;
@@ -14,29 +14,48 @@ export interface StepsItemProps
   icon?: React.ReactNode;
 }
 
-export const StepsItem = React.forwardRef<HTMLDivElement, StepsItemProps>(
-  function StepsItem(props, ref) {
-    const { title, description, completedIcon, icon, ...rest } = props;
-    return (
-      <ChakraSteps.Item {...rest} ref={ref} marginBottom="28px">
-        <ChakraSteps.Trigger position="relative">
-          <VStack gap={0}>
-            <ChakraSteps.Indicator>
-              <ChakraSteps.Status
-                complete={completedIcon ?? <LuCheck />}
-                incomplete={icon ?? <ChakraSteps.Number />}
-              />
-            </ChakraSteps.Indicator>
-            <Box position="absolute" bottom="-28px">
-              <StepInfo title={title} description={description} />
-            </Box>
-          </VStack>
-        </ChakraSteps.Trigger>
-        <ChakraSteps.Separator />
-      </ChakraSteps.Item>
-    );
+export const StepsItem = React.forwardRef<
+  HTMLDivElement,
+  StepsItemProps & {
+    isCompleted?: boolean;
   }
-);
+>(function StepsItem(props, ref) {
+  const { title, description, completedIcon, icon, isCompleted, ...rest } =
+    props;
+  return (
+    <ChakraSteps.Item {...rest} ref={ref} marginBottom="28px">
+      <ChakraSteps.Trigger position="relative">
+        <VStack gap={0}>
+          <ChakraSteps.Indicator
+            cursor="pointer"
+            _complete={
+              !isCompleted
+                ? {
+                    background: "transparent",
+                    borderColor: "gray.200",
+                    borderWidth: "2px",
+                    color: "fg"
+                  }
+                : {}
+            }
+          >
+            <ChakraSteps.Status
+              complete={
+                completedIcon ??
+                (isCompleted ? <LuCheck /> : <ChakraSteps.Number />)
+              }
+              incomplete={icon ?? <ChakraSteps.Number />}
+            />
+          </ChakraSteps.Indicator>
+          <Box position="absolute" bottom="-28px">
+            <StepInfo title={title} description={description} />
+          </Box>
+        </VStack>
+      </ChakraSteps.Trigger>
+      <ChakraSteps.Separator />
+    </ChakraSteps.Item>
+  );
+});
 
 const StepInfo = (props: StepInfoProps) => {
   const { title, description } = props;
@@ -44,7 +63,7 @@ const StepInfo = (props: StepInfoProps) => {
   if (title && description) {
     return (
       <Box>
-        <ChakraSteps.Title>{title}</ChakraSteps.Title>
+        <ChakraSteps.Title cursor="pointer">{title}</ChakraSteps.Title>
         <ChakraSteps.Description>{description}</ChakraSteps.Description>
       </Box>
     );
@@ -52,7 +71,7 @@ const StepInfo = (props: StepInfoProps) => {
 
   return (
     <>
-      {title && <ChakraSteps.Title>{title}</ChakraSteps.Title>}
+      {title && <ChakraSteps.Title cursor="pointer">{title}</ChakraSteps.Title>}
       {description && (
         <ChakraSteps.Description>{description}</ChakraSteps.Description>
       )}
