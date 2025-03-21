@@ -1,5 +1,5 @@
 import { Accordion, Heading, Text, VStack } from "@chakra-ui/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useEvaluationWizardStore } from "~/hooks/useEvaluationWizardStore";
 import { CategorySelectionAccordion } from "./evaluations/CategorySelectionAccordion";
 import { EvaluatorMappingAccordion } from "./evaluations/EvaluatorMappingAccordion";
@@ -7,7 +7,17 @@ import { EvaluatorSelectionAccordion } from "./evaluations/EvaluatorSelectionAcc
 import { EvaluatorSettingsAccordion } from "./evaluations/EvaluatorSettingsAccordion";
 
 export function EvaluationStep() {
-  const { wizardState, getFirstEvaluatorNode: getFirstEvaluator } = useEvaluationWizardStore();
+  const {
+    wizardState,
+    setWizardState,
+    getFirstEvaluatorNode: getFirstEvaluator,
+  } = useEvaluationWizardStore(
+    ({ wizardState, setWizardState, getFirstEvaluatorNode }) => ({
+      wizardState,
+      setWizardState,
+      getFirstEvaluatorNode,
+    })
+  );
   const [accordeonValue, setAccordeonValue] = useState<string[]>(
     wizardState.evaluatorCategory
       ? getFirstEvaluator()
@@ -15,6 +25,14 @@ export function EvaluationStep() {
         : ["settings"]
       : ["category"]
   );
+
+  useEffect(() => {
+    if (accordeonValue[0] === "mappings") {
+      setWizardState({
+        workspaceTab: "workflow",
+      });
+    }
+  }, [accordeonValue, setWizardState]);
 
   return (
     <VStack width="full" align="start" gap={4}>
