@@ -138,30 +138,27 @@ const store = (
     return get().experimentId;
   },
   setWizardState(state) {
-    if (typeof state === "function") {
-      set((current) => ({
+    const applyChanges = (
+      current: State,
+      next: Partial<State["wizardState"]>
+    ) => {
+      return {
         ...current,
         wizardState: {
           ...current.wizardState,
-          ...state(current.wizardState),
+          ...next,
+          ...(next.step === "dataset"
+            ? { workspaceTab: "dataset" as const }
+            : {}),
         },
-      }));
-    } else {
-      set((current) => ({
-        ...current,
-        wizardState: { ...current.wizardState, ...state },
-      }));
-    }
+      };
+    };
 
-    set((current) => {
-      if (current.wizardState.step === "dataset") {
-        return {
-          ...current,
-          wizardState: { ...current.wizardState, workspaceTab: "dataset" },
-        };
-      }
-      return current;
-    });
+    if (typeof state === "function") {
+      set((current) => applyChanges(current, state(current.wizardState)));
+    } else {
+      set((current) => applyChanges(current, state));
+    }
   },
   getWizardState() {
     return get().wizardState;

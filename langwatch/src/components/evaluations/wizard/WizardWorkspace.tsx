@@ -97,7 +97,8 @@ export function WizardWorkspace() {
             <Tabs.Content
               value="results"
               width="full"
-              height="full"
+              height="fit-content"
+              minHeight="calc(100vh - 150px)"
               position="sticky"
               top="58px"
             >
@@ -142,6 +143,7 @@ function WizardOptimizationStudioCanvas() {
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
+      fitView={dsl.nodes.length > 1}
     >
       <Controls position="bottom-center" orientation="horizontal" />
     </OptimizationStudioCanvas>
