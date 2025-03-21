@@ -169,6 +169,10 @@ export const ModelSelector = React.memo(function ModelSelector({
     <Select.Root
       collection={modelCollection}
       value={[model]}
+      onChange={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
       onValueChange={(change) => {
         const selectedValue = change.value[0];
         if (selectedValue) {
