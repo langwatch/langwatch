@@ -9,8 +9,9 @@ import type { Workflow } from "../../../optimization_studio/types/dsl";
 import type { Unpacked } from "../../../utils/types";
 import { migrateDSLVersion } from "../../../optimization_studio/types/migrate";
 
-const workflowJsonSchema = z
+export const workflowJsonSchema = z
   .object({
+    workflow_id: z.string().optional(),
     spec_version: z.string(),
     name: z.string(),
     icon: z.string(),
@@ -18,9 +19,10 @@ const workflowJsonSchema = z
     version: z
       .string()
       .regex(
-        /^\d+\.\d+$/,
+        /^\d+(\.\d+)?$/,
         "Version must be in the format 'number.number' (e.g. 1.0)"
       ),
+    nodes: z.array(z.any()),
   })
   .passthrough();
 
@@ -335,7 +337,7 @@ export const workflowRouter = createTRPCRouter({
     }),
 });
 
-const saveOrCommitWorkflowVersion = async ({
+export const saveOrCommitWorkflowVersion = async ({
   ctx,
   input,
   autoSaved,

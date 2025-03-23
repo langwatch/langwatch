@@ -143,7 +143,10 @@ function WizardOptimizationStudioCanvas() {
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
-      fitView={dsl.nodes.length > 1}
+      fitView
+      fitViewOptions={{
+        maxZoom: 1.5,
+      }}
     >
       <Controls position="bottom-center" orientation="horizontal" />
     </OptimizationStudioCanvas>

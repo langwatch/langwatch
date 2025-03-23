@@ -5,6 +5,7 @@ import {
   Heading,
   HStack,
   Spacer,
+  Spinner,
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
@@ -25,13 +26,21 @@ import { EvaluationStep } from "./steps/EvaluationStep";
 import { useShallow } from "zustand/react/shallow";
 import { WizardWorkspace } from "./WizardWorkspace";
 import { ResultsStep, useStepCompletedValue } from "./steps/ResultsStep";
+import useAutosaveWizard from "../../../optimization_studio/hooks/useAutosaveWizard";
+import { Tooltip } from "../../ui/tooltip";
 
 export function EvaluationWizard() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const [isSticky, setIsSticky] = useState(false);
   const stickyRef = useRef<HTMLDivElement>(null);
-  const { wizardState, setWizardState, nextStep } = useEvaluationWizardStore(
+  const {
+    wizardState,
+    setWizardState,
+    nextStep,
+    setExperimentSlug,
+    isAutosaving,
+  } = useEvaluationWizardStore(
     useShallow((state) => {
       if (typeof window !== "undefined") {
         // @ts-ignore
@@ -83,7 +92,7 @@ export function EvaluationWizard() {
         borderBottomColor="gray.200"
         display="flex"
       >
-        <HStack width="full">
+        <HStack width="full" justifyContent="start">
           <Box
             role="button"
             onClick={() => void router.push(`/${project?.slug}/evaluations_v2`)}
@@ -91,13 +100,20 @@ export function EvaluationWizard() {
           >
             <LogoIcon width={24} height={24} />
           </Box>
+          {isAutosaving && (
+            <Tooltip content="Saving changes...">
+              <Box>
+                <Spinner size="sm" />
+              </Box>
+            </Tooltip>
+          )}
         </HStack>
-        <HStack width="full">
+        <HStack width="full" justifyContent="center">
           <Heading as="h1" size="sm" fontWeight="normal">
             Evaluation Wizard
           </Heading>
         </HStack>
-        <Spacer width="full" />
+        <HStack width="full" justifyContent="end" paddingRight={10} />
       </Dialog.Header>
       <Dialog.Body display="flex" height="fit-content" width="full" padding={0}>
         <VStack

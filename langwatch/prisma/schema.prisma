@@ -418,6 +418,7 @@ model Experiment {
     createdAt        DateTime          @default(now())
     updatedAt        DateTime          @default(now()) @updatedAt
     batchEvaluations BatchEvaluation[]
+    wizardState      Json?
 
     @@unique([projectId, slug])
     @@index([projectId])

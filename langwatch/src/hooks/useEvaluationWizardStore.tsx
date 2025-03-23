@@ -15,16 +15,20 @@ import { entryNode } from "../optimization_studio/templates/blank";
 import type { Evaluator, Workflow } from "../optimization_studio/types/dsl";
 import { nameToId } from "../optimization_studio/utils/nodeUtils";
 import { convertEvaluator } from "../optimization_studio/utils/registryUtils";
-import type { MappingState } from "../server/tracer/tracesMapping";
+import { mappingStateSchema } from "../server/tracer/tracesMapping";
 import { datasetColumnsToFields } from "../optimization_studio/utils/datasetUtils";
 import type { DatasetColumns } from "../server/datasets/types";
+import { z } from "zod";
 
-export type EvaluatorCategory =
-  | "expected_answer"
-  | "llm_judge"
-  | "quality"
-  | "rag"
-  | "safety";
+export const EVALUATOR_CATEGORIES = [
+  "expected_answer",
+  "llm_judge",
+  "quality",
+  "rag",
+  "safety",
+] as const;
+
+export type EvaluatorCategory = (typeof EVALUATOR_CATEGORIES)[number];
 
 export const STEPS = [
   "task",
@@ -62,24 +66,35 @@ export const EXECUTION_METHODS = {
   api: "Run on Notebook or CI/CD Pipeline",
 } as const;
 
+export const wizardStateSchema = z.object({
+  name: z.string().optional(),
+  step: z.enum(STEPS),
+  task: z.enum(Object.keys(TASK_TYPES) as [keyof typeof TASK_TYPES]).optional(),
+  dataSource: z
+    .enum(Object.keys(DATA_SOURCE_TYPES) as [keyof typeof DATA_SOURCE_TYPES])
+    .optional(),
+  executionMethod: z
+    .enum(Object.keys(EXECUTION_METHODS) as [keyof typeof EXECUTION_METHODS])
+    .optional(),
+  evaluatorCategory: z.enum(EVALUATOR_CATEGORIES).optional(),
+  realTimeTraceMappings: mappingStateSchema.optional(),
+  workspaceTab: z.enum(["dataset", "workflow", "results"]).optional(),
+});
+
+export type WizardState = z.infer<typeof wizardStateSchema>;
+
 export type State = {
-  experimentId?: string;
-  wizardState: {
-    step: Step;
-    task?: keyof typeof TASK_TYPES;
-    dataSource?: keyof typeof DATA_SOURCE_TYPES;
-    executionMethod?: keyof typeof EXECUTION_METHODS;
-    evaluatorCategory?: EvaluatorCategory;
-    realTimeTraceMappings?: MappingState;
-    workspaceTab?: "dataset" | "workflow" | "results";
-  };
+  experimentSlug?: string;
+  wizardState: z.infer<typeof wizardStateSchema>;
   dsl: Workflow;
+  isAutosaving: boolean;
+  autosaveDisabled: boolean;
 };
 
 type EvaluationWizardStore = State & {
   reset: () => void;
-  setExperimentId: (experiment_id: string) => void;
-  getExperimentId: () => string | undefined;
+  setExperimentSlug: (experiment_slug: string) => void;
+  getExperimentSlug: () => string | undefined;
   setWizardState: (
     state:
       | Partial<State["wizardState"]>
@@ -92,6 +107,8 @@ type EvaluationWizardStore = State & {
       | ((state: State["dsl"]) => Partial<State["dsl"]>)
   ) => void;
   getDSL: () => State["dsl"];
+  setIsAutosaving: (isAutosaving: boolean) => void;
+  skipNextAutosave: () => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
@@ -106,13 +123,15 @@ type EvaluationWizardStore = State & {
   getFirstEvaluatorEdges: () => Workflow["edges"] | undefined;
 };
 
-const initialState: State = {
-  experimentId: undefined,
+export const initialState: State = {
+  experimentSlug: undefined,
   wizardState: {
     step: "task",
     workspaceTab: "dataset",
   },
   dsl: initialDSL,
+  isAutosaving: false,
+  autosaveDisabled: false,
 };
 
 const store = (
@@ -131,11 +150,11 @@ const store = (
   reset() {
     set(initialState);
   },
-  setExperimentId(experiment_id) {
-    set((current) => ({ ...current, experimentId: experiment_id }));
+  setExperimentSlug(experiment_slug) {
+    set((current) => ({ ...current, experimentSlug: experiment_slug }));
   },
-  getExperimentId() {
-    return get().experimentId;
+  getExperimentSlug() {
+    return get().experimentSlug;
   },
   setWizardState(state) {
     const applyChanges = (
@@ -178,6 +197,15 @@ const store = (
   },
   getDSL() {
     return get().dsl;
+  },
+  setIsAutosaving(isAutosaving) {
+    set((current) => ({ ...current, isAutosaving }));
+  },
+  skipNextAutosave() {
+    set((current) => ({ ...current, autosaveDisabled: true }));
+    setTimeout(() => {
+      set((current) => ({ ...current, autosaveDisabled: false }));
+    }, 100);
   },
   onNodesChange: (changes: NodeChange[]) => {
     set({
