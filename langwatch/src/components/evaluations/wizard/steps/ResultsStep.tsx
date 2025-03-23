@@ -12,16 +12,23 @@ import { api } from "../../../../utils/api";
 import { FullWidthFormControl } from "../../../FullWidthFormControl";
 
 export function ResultsStep() {
+  const { name, setWizardState } = useEvaluationWizardStore(
+    ({ wizardState, setWizardState }) => ({
+      name: wizardState.name,
+      setWizardState,
+    })
+  );
+
   const form = useForm<{
     name: string;
   }>({
     defaultValues: {
-      name: "",
+      name: name ?? "",
     },
   });
 
   const onSubmit = (data: { name: string }) => {
-    console.log(data);
+    setWizardState({ name: data.name });
   };
 
   return (
@@ -39,7 +46,11 @@ export function ResultsStep() {
             label="Evaluation Name"
             invalid={form.formState.errors.name !== undefined}
           >
-            <Input {...form.register("name")} />
+            <Input
+              {...form.register("name")}
+              // eslint-disable-next-line @typescript-eslint/no-misused-promises
+              onBlur={form.handleSubmit(onSubmit)}
+            />
           </FullWidthFormControl>
         </form>
         <Heading as="h2" size="md">
