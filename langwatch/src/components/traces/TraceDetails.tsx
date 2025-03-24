@@ -140,7 +140,7 @@ export function TraceDetails(props: {
     queueItem.mutate(
       {
         projectId: project?.id ?? "",
-        traceId: props.traceId,
+        traceIds: [props.traceId],
         annotators: annotators.map((p) => p.id),
       },
       {
