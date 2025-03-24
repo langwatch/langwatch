@@ -8,7 +8,7 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 import { api } from "../../../utils/api";
 import { isNotFound } from "../../../utils/trpcError";
 import ErrorPage from "next/error";
-import { useEvaluationWizardStore } from "../../../hooks/useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "../../../components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import { useShallow } from "zustand/react/shallow";
 import { LoadingScreen } from "../../../components/LoadingScreen";
 import useAutosaveWizard from "../../../optimization_studio/hooks/useAutosaveWizard";
@@ -68,7 +68,12 @@ export default function EvaluationWizard() {
         projectId: project?.id ?? "",
         experimentSlug: initialLoadExperimentSlug ?? "",
       },
-      { enabled: !!project && !!initialLoadExperimentSlug }
+      {
+        enabled: !!project && !!initialLoadExperimentSlug,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        staleTime: Infinity,
+      }
     );
 
   useAutosaveWizard();
@@ -90,7 +95,7 @@ export default function EvaluationWizard() {
 
   if (
     !project ||
-    (initialLoadExperimentSlug && initialLoadExperiment.isFetching)
+    (initialLoadExperimentSlug && initialLoadExperiment.isLoading)
   ) {
     return <LoadingScreen />;
   }

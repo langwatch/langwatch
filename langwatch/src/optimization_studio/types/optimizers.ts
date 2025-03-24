@@ -1,4 +1,14 @@
-import type { LLMConfig } from "./dsl";
+import { z } from "zod";
+import { llmConfigSchema, type LLMConfig } from "./dsl";
+
+export const optimizerParamsSchema = z.object({
+  llm: llmConfigSchema.optional().nullable(),
+  num_candidates: z.number().optional(),
+  max_bootstrapped_demos: z.number().optional(),
+  max_labeled_demos: z.number().optional(),
+  max_rounds: z.number().optional(),
+  num_candidate_programs: z.number().optional(),
+});
 
 export const OPTIMIZERS = {
   MIPROv2ZeroShot: {
@@ -35,4 +45,12 @@ export const OPTIMIZERS = {
       num_candidate_programs: 10,
     },
   },
-};
+} satisfies Record<
+  string,
+  {
+    name: string;
+    description: string;
+    minimum_train_set: number;
+    params: z.infer<typeof optimizerParamsSchema>;
+  }
+>;

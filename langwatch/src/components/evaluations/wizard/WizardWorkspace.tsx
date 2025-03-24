@@ -3,7 +3,7 @@ import { DatasetTable } from "../../datasets/DatasetTable";
 import {
   useEvaluationWizardStore,
   type State,
-} from "~/hooks/useEvaluationWizardStore";
+} from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import { OptimizationStudioCanvas } from "../../../optimization_studio/components/OptimizationStudio";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";

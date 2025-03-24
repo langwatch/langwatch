@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import {
   initialState,
   useEvaluationWizardStore,
-} from "../../hooks/useEvaluationWizardStore";
+} from "../../components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import { api } from "../../utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRouter } from "next/router";

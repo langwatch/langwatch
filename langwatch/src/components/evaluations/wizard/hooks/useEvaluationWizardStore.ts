@@ -7,14 +7,17 @@ import {
   type WorkflowStore,
   store as workflowStore,
   type State as WorkflowStoreState,
-} from "../optimization_studio/hooks/useWorkflowStore";
-import { entryNode } from "../optimization_studio/templates/blank";
-import type { Evaluator, Workflow } from "../optimization_studio/types/dsl";
-import { datasetColumnsToFields } from "../optimization_studio/utils/datasetUtils";
-import { nameToId } from "../optimization_studio/utils/nodeUtils";
-import { convertEvaluator } from "../optimization_studio/utils/registryUtils";
-import type { DatasetColumns } from "../server/datasets/types";
-import { mappingStateSchema } from "../server/tracer/tracesMapping";
+} from "../../../../optimization_studio/hooks/useWorkflowStore";
+import { entryNode } from "../../../../optimization_studio/templates/blank";
+import type {
+  Evaluator,
+  Workflow,
+} from "../../../../optimization_studio/types/dsl";
+import { datasetColumnsToFields } from "../../../../optimization_studio/utils/datasetUtils";
+import { nameToId } from "../../../../optimization_studio/utils/nodeUtils";
+import { convertEvaluator } from "../../../../optimization_studio/utils/registryUtils";
+import type { DatasetColumns } from "../../../../server/datasets/types";
+import { mappingStateSchema } from "../../../../server/tracer/tracesMapping";
 
 export const EVALUATOR_CATEGORIES = [
   "expected_answer",

@@ -7,7 +7,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
-import { useEvaluationWizardStore } from "~/hooks/useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import { evaluatorCategories } from "./CategorySelectionAccordion";
 import { StepAccordion } from "../../components/StepAccordion";
 

@@ -99,6 +99,8 @@ export type WorkflowStore = State & {
     request: "evaluations" | "optimizations" | "closed" | undefined
   ) => void;
   setPlaygroundOpen: (open: boolean) => void;
+  stopWorkflowIfRunning: (message: string | undefined) => void;
+  checkIfUnreachableErrorMessage: (message: string | undefined) => void;
 };
 
 const DEFAULT_LLM_CONFIG: LLMConfig = {
@@ -484,6 +486,30 @@ export const store = (
   },
   setPlaygroundOpen: (open: boolean) => {
     set({ playgroundOpen: open });
+  },
+  stopWorkflowIfRunning: (message: string | undefined) => {
+    get().setWorkflowExecutionState({
+      status: "error",
+      error: message,
+      timestamps: { finished_at: Date.now() },
+    });
+    for (const node of get().nodes) {
+      if (node.data.execution_state?.status === "running") {
+        get().setComponentExecutionState(node.id, {
+          status: "error",
+          error: message,
+          timestamps: { finished_at: Date.now() },
+        });
+      }
+    }
+  },
+  checkIfUnreachableErrorMessage: (message: string | undefined) => {
+    if (
+      get().socketStatus === "connected" &&
+      message?.toLowerCase().includes("runtime is unreachable")
+    ) {
+      get().setSocketStatus("connecting-python");
+    }
   },
 });
 

@@ -1,7 +1,7 @@
 import { Accordion, Field, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { useMemo } from "react";
-import { useEvaluationWizardStore } from "~/hooks/useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import {
   AVAILABLE_EVALUATORS,
   type Evaluators,

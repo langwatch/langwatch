@@ -1,23 +1,32 @@
-import { Button, Heading, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { useForm } from "react-hook-form";
-import { LuCircleAlert, LuCircleCheck } from "react-icons/lu";
 import {
-  EXECUTION_METHODS,
-  TASK_TYPES,
+  Alert,
+  Button,
+  Heading,
+  HStack,
+  Input,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { useForm } from "react-hook-form";
+import { LuCircleAlert, LuCircleCheck, LuCirclePlay } from "react-icons/lu";
+import {
   useEvaluationWizardStore,
   type Step,
-} from "~/hooks/useEvaluationWizardStore";
-import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
-import { api } from "../../../../utils/api";
+} from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import { FullWidthFormControl } from "../../../FullWidthFormControl";
+import { useRunEvalution } from "../hooks/useRunEvalution";
+import { useStepCompletedValue } from "../hooks/useStepCompletedValue";
 
 export function ResultsStep() {
-  const { name, setWizardState } = useEvaluationWizardStore(
+  const { name, wizardState, setWizardState } = useEvaluationWizardStore(
     ({ wizardState, setWizardState }) => ({
       name: wizardState.name,
+      wizardState,
       setWizardState,
     })
   );
+
+  const { runEvaluation } = useRunEvalution();
 
   const form = useForm<{
     name: string;
@@ -66,53 +75,33 @@ export function ResultsStep() {
           />
           <StepStatus name="Evaluation" step="evaluation" />
         </VStack>
+        {wizardState.task === "real_time" && (
+          <Alert.Root colorPalette="blue">
+            <Alert.Content>
+              <Alert.Description>
+                <VStack align="start" gap={4}>
+                  Try out your real-time evaluation with the sample before
+                  enabling monitoring.
+                  <Button
+                    colorPalette="blue"
+                    _icon={{
+                      minWidth: "18px",
+                      minHeight: "18px",
+                    }}
+                    onClick={runEvaluation}
+                  >
+                    <LuCirclePlay />
+                    Run Trial Evaluation
+                  </Button>
+                </VStack>
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+        )}
       </VStack>
     </>
   );
 }
-
-export const useStepCompletedValue = () => {
-  const { project } = useOrganizationTeamProject();
-
-  const { wizardState, datasetId, evaluator } = useEvaluationWizardStore(
-    ({ wizardState, setWizardState, getDatasetId, getFirstEvaluatorNode }) => ({
-      wizardState,
-      setWizardState,
-      datasetId: getDatasetId(),
-      evaluator: getFirstEvaluatorNode(),
-    })
-  );
-
-  const databaseDataset = api.datasetRecord.getAll.useQuery(
-    { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
-    {
-      enabled: !!project && !!datasetId,
-      refetchOnWindowFocus: false,
-    }
-  );
-
-  return (step: Step) => {
-    switch (step) {
-      case "task":
-        return wizardState.task ? TASK_TYPES[wizardState.task] : undefined;
-      case "dataset":
-        return databaseDataset?.data?.name;
-      case "execution":
-        return wizardState.task === "real_time"
-          ? "When message arrives"
-          : wizardState.executionMethod
-          ? EXECUTION_METHODS[wizardState.executionMethod]
-          : undefined;
-      case "evaluation":
-        return evaluator?.data?.name;
-      case "results":
-        return true;
-      default:
-        step satisfies never;
-        return undefined;
-    }
-  };
-};
 
 function StepStatus({
   name,

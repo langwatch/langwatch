@@ -1,6 +1,6 @@
 import { Accordion, Heading, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
-import { useEvaluationWizardStore } from "~/hooks/useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import { CategorySelectionAccordion } from "./evaluations/CategorySelectionAccordion";
 import { EvaluatorMappingAccordion } from "./evaluations/EvaluatorMappingAccordion";
 import { EvaluatorSelectionAccordion } from "./evaluations/EvaluatorSelectionAccordion";

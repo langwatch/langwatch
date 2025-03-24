@@ -3,7 +3,7 @@ import { ChevronDown } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { z } from "zod";
-import { useEvaluationWizardStore } from "~/hooks/useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import {
   AVAILABLE_EVALUATORS,
   type Evaluators,

@@ -1,0 +1,101 @@
+import { Hono } from "hono";
+import { handle } from "hono/vercel";
+import { loadDatasets } from "../../../../optimization_studio/server/loadDatasets";
+import { addEnvs } from "../../../../optimization_studio/server/addEnvs";
+import { z } from "zod";
+import { zValidator } from "@hono/zod-validator";
+import { prisma } from "../../../../server/db";
+import { backendHasTeamProjectPermission } from "../../../../server/api/permission";
+import { authOptions } from "../../../../server/auth";
+import { getServerSession } from "next-auth";
+import { studioBackendPostEvent } from "../../../../optimization_studio/server/socketServer";
+import { streamSSE } from "hono/streaming";
+import {
+  studioClientEventSchema,
+  type StudioServerEvent,
+} from "../../../../optimization_studio/types/events";
+import { getDebugger } from "../../../../utils/logger";
+import type { NextRequest } from "next/server";
+
+const debug = getDebugger("langwatch:post_message");
+
+const app = new Hono().basePath("/api/workflows");
+
+app.post(
+  "/post_event",
+  zValidator(
+    "json",
+    z.object({
+      projectId: z.string(),
+      event: studioClientEventSchema,
+    })
+  ),
+  async (c) => {
+    const { event: eventWithoutEnvs, projectId } = await c.req.json();
+    debug("post_event", eventWithoutEnvs.type, projectId);
+
+    const session = await getServerSession(
+      authOptions(c.req.raw as NextRequest)
+    );
+    if (!session) {
+      return c.json(
+        { error: "You must be logged in to access this endpoint." },
+        { status: 401 }
+      );
+    }
+
+    const hasPermission = await backendHasTeamProjectPermission(
+      { prisma, session },
+      { projectId },
+      "WORKFLOWS_MANAGE"
+    );
+    if (!hasPermission) {
+      return c.json(
+        { error: "You do not have permission to access this endpoint." },
+        { status: 403 }
+      );
+    }
+
+    const message = await loadDatasets(
+      await addEnvs(eventWithoutEnvs, projectId),
+      projectId
+    );
+
+    // Use streamSSE to create an SSE stream response
+    return streamSSE(c, async (stream) => {
+      // Create a promise that will resolve when the stream should end
+      const streamDone = new Promise<void>((resolve) => {
+        void studioBackendPostEvent({
+          projectId,
+          message,
+          onEvent: (serverEvent: StudioServerEvent) => {
+            console.log("serverEvent", serverEvent);
+            // Write each event to the SSE stream
+            void stream.writeSSE({
+              data: JSON.stringify(serverEvent),
+            });
+
+            // If we receive a "done" event, resolve the promise to end the stream
+            if (serverEvent.type === "done") {
+              resolve();
+            }
+          },
+        }).catch((error) => {
+          console.error("error", error);
+          void stream.writeSSE({
+            data: JSON.stringify({
+              type: "error",
+              payload: { message: error.message },
+            }),
+          });
+        });
+      });
+
+      // Wait for the stream to be done
+      await streamDone;
+    });
+  }
+);
+
+export const GET = handle(app);
+export const POST = handle(app);

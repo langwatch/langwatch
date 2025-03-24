@@ -16,15 +16,18 @@ import type {
 } from "../../experiments/types";
 import { checkUserPermissionForProject, TeamRoleGroup } from "../permission";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { saveOrCommitWorkflowVersion, workflowJsonSchema } from "./workflows";
+import { saveOrCommitWorkflowVersion } from "./workflows";
 import {
   wizardStateSchema,
   type WizardState,
-} from "../../../hooks/useEvaluationWizardStore";
+} from "../../../components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import { nanoid } from "nanoid";
 import { ExperimentType, type Workflow } from "@prisma/client";
 import { slugify } from "../../../utils/slugify";
-import type { Entry } from "../../../optimization_studio/types/dsl";
+import {
+  workflowJsonSchema,
+  type Entry,
+} from "../../../optimization_studio/types/dsl";
 import type { Node } from "@xyflow/react";
 
 export const experimentsRouter = createTRPCRouter({

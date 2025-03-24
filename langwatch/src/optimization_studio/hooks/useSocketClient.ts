@@ -1,15 +1,11 @@
+import { useCallback, useEffect, useRef } from "react";
 import { toaster } from "../../components/ui/toaster";
-import { Component, useCallback, useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { getDebugger } from "../../utils/logger";
+import type { BaseComponent } from "../types/dsl";
 import type { StudioClientEvent, StudioServerEvent } from "../types/events";
 import { useAlertOnComponent } from "./useAlertOnComponent";
-import {
-  useWorkflowStore,
-  type SocketStatus,
-  type WorkflowStore,
-} from "./useWorkflowStore";
-import type { BaseComponent, Workflow } from "../types/dsl";
+import { useWorkflowStore, type WorkflowStore } from "./useWorkflowStore";
 
 const DEBUGGING_ENABLED = true;
 
@@ -32,131 +28,23 @@ export const useSocketClient = () => {
   const { project } = useOrganizationTeamProject();
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const {
-    socketStatus,
-    setSocketStatus,
-    setComponentExecutionState,
-    setWorkflowExecutionState,
-    setEvaluationState,
-    setOptimizationState,
-    getWorkflow,
-    setSelectedNode,
-    setPropertiesExpanded,
-    setOpenResultsPanelRequest,
-    playgroundOpen,
-  } = useWorkflowStore((state) => ({
-    socketStatus: state.socketStatus,
-    setSocketStatus: state.setSocketStatus,
-    setComponentExecutionState: state.setComponentExecutionState,
-    setWorkflowExecutionState: state.setWorkflowExecutionState,
-    setEvaluationState: state.setEvaluationState,
-    setOptimizationState: state.setOptimizationState,
-    getWorkflow: state.getWorkflow,
-    setSelectedNode: state.setSelectedNode,
-    setPropertiesExpanded: state.setPropertiesExpanded,
-    setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
-    playgroundOpen: state.playgroundOpen,
-  }));
-
+  const workflowStore = useWorkflowStore();
+  const { socketStatus, setSocketStatus } = workflowStore;
   const alertOnComponent = useAlertOnComponent();
 
-  const checkIfUnreachableErrorMessage = useCallback(
-    (message: string | undefined) => {
-      if (
-        socketStatus === "connected" &&
-        message?.toLowerCase().includes("runtime is unreachable")
-      ) {
-        setSocketStatus("connecting-python");
-      }
-    },
-    [socketStatus, setSocketStatus]
-  );
-
-  const stopWorkflowIfRunning = useCallback(
-    (message: string | undefined) => {
-      setWorkflowExecutionState({
-        status: "error",
-        error: message,
-        timestamps: { finished_at: Date.now() },
-      });
-      for (const node of getWorkflow().nodes) {
-        if (node.data.execution_state?.status === "running") {
-          setComponentExecutionState(node.id, {
-            status: "error",
-            error: message,
-            timestamps: { finished_at: Date.now() },
-          });
-        }
-      }
-    },
-    [setWorkflowExecutionState, getWorkflow, setComponentExecutionState]
-  );
-
-  const alertOnError = useCallback((message: string | undefined) => {
-    if (
-      !!message?.toLowerCase().includes("stopped") ||
-      !!message?.toLowerCase().includes("interrupted")
-    ) {
-      toaster.create({
-        title: "Stopped",
-        description: message?.slice(0, 140),
-        type: "info",
-        meta: {
-          closable: true,
-        },
-        duration: 3000,
-      });
-    } else {
-      toaster.create({
-        title: "Error",
-        description: message?.slice(0, 140),
-        type: "error",
-        meta: {
-          closable: true,
-        },
-        duration: 5000,
-      });
-    }
-  }, []);
+  const handleServerMessage = useHandleServerMessage({
+    workflowStore,
+    alertOnComponent,
+  });
 
   const handleMessage = useCallback(
     (event: MessageEvent) => {
       const data: StudioServerEvent = JSON.parse(event.data);
       debug(data.type, "payload" in data ? data.payload : undefined);
 
-      return handleServerMessage({
-        setSocketStatus,
-        getWorkflow,
-        setComponentExecutionState,
-        playgroundOpen,
-        setWorkflowExecutionState,
-        setEvaluationState,
-        setOptimizationState,
-        checkIfUnreachableErrorMessage,
-        stopWorkflowIfRunning,
-        alertOnError,
-        alertOnComponent,
-        setSelectedNode,
-        setPropertiesExpanded,
-        setOpenResultsPanelRequest,
-      })(data);
+      handleServerMessage(data);
     },
-    [
-      alertOnComponent,
-      alertOnError,
-      checkIfUnreachableErrorMessage,
-      getWorkflow,
-      playgroundOpen,
-      setComponentExecutionState,
-      setEvaluationState,
-      setOpenResultsPanelRequest,
-      setOptimizationState,
-      setPropertiesExpanded,
-      setSelectedNode,
-      setSocketStatus,
-      setWorkflowExecutionState,
-      stopWorkflowIfRunning,
-    ]
+    [handleServerMessage]
   );
 
   const connect = useCallback(() => {
@@ -290,8 +178,20 @@ export const useSocketClient = () => {
   };
 };
 
-export const handleServerMessage =
-  ({
+export const useHandleServerMessage = ({
+  workflowStore,
+  alertOnComponent,
+}: {
+  workflowStore: WorkflowStore;
+  alertOnComponent: ({
+    componentId,
+    execution_state,
+  }: {
+    componentId: string;
+    execution_state: BaseComponent["execution_state"];
+  }) => void;
+}) => {
+  const {
     setSocketStatus,
     getWorkflow,
     setComponentExecutionState,
@@ -300,127 +200,151 @@ export const handleServerMessage =
     setOptimizationState,
     checkIfUnreachableErrorMessage,
     stopWorkflowIfRunning,
-    alertOnError,
-    alertOnComponent,
     setSelectedNode,
     setPropertiesExpanded,
     setOpenResultsPanelRequest,
     playgroundOpen,
-  }: {
-    setSocketStatus: WorkflowStore["setSocketStatus"];
-    getWorkflow: WorkflowStore["getWorkflow"];
-    setComponentExecutionState: WorkflowStore["setComponentExecutionState"];
-    setWorkflowExecutionState: WorkflowStore["setWorkflowExecutionState"];
-    setEvaluationState: WorkflowStore["setEvaluationState"];
-    setOptimizationState: WorkflowStore["setOptimizationState"];
-    checkIfUnreachableErrorMessage: (message: string | undefined) => void;
-    stopWorkflowIfRunning: (message: string | undefined) => void;
-    alertOnError: (message: string | undefined) => void;
-    alertOnComponent: ({
-      componentId,
-      execution_state,
-    }: {
-      componentId: string;
-      execution_state: BaseComponent["execution_state"];
-    }) => void;
-    setSelectedNode: WorkflowStore["setSelectedNode"];
-    setPropertiesExpanded: WorkflowStore["setPropertiesExpanded"];
-    setOpenResultsPanelRequest: (
-      panel: "evaluations" | "optimizations"
-    ) => void;
-    playgroundOpen: boolean;
-  }) =>
-  (message: StudioServerEvent) => {
-    switch (message.type) {
-      case "is_alive_response":
-        if (pythonDisconnectedTimeout) {
-          clearTimeout(pythonDisconnectedTimeout);
-          pythonDisconnectedTimeout = null;
-        }
-        debug("Python is alive, setting status to connected");
-        setSocketStatus("connected");
-        break;
-      case "component_state_change":
-        const currentComponentState = getWorkflow().nodes.find(
-          (node) => node.id === message.payload.component_id
-        )?.data.execution_state;
-        setComponentExecutionState(
-          message.payload.component_id,
-          message.payload.execution_state
-        );
+  } = workflowStore;
 
-        if (message.payload.execution_state?.status === "error") {
-          checkIfUnreachableErrorMessage(message.payload.execution_state.error);
-          alertOnComponent({
-            componentId: message.payload.component_id,
-            execution_state: message.payload.execution_state,
-          });
-        }
-
-        if (
-          !playgroundOpen &&
-          message.payload.execution_state?.status !== "running" &&
-          currentComponentState?.status !== "success" &&
-          ((getWorkflow().state.execution?.status === "running" &&
-            getWorkflow().state.execution?.until_node_id ===
-              message.payload.component_id) ||
-            getWorkflow().state.execution?.status !== "running")
-        ) {
-          setSelectedNode(message.payload.component_id);
-          setPropertiesExpanded(true);
-        }
-        break;
-      case "execution_state_change":
-        setWorkflowExecutionState(message.payload.execution_state);
-        if (message.payload.execution_state?.status === "error") {
-          alertOnError(message.payload.execution_state.error);
-          stopWorkflowIfRunning(message.payload.execution_state.error);
-        }
-        break;
-      case "evaluation_state_change":
-        const currentEvaluationState = getWorkflow().state.evaluation;
-        setEvaluationState(message.payload.evaluation_state);
-        if (message.payload.evaluation_state?.status === "error") {
-          alertOnError(message.payload.evaluation_state.error);
-          if (currentEvaluationState?.status !== "waiting") {
-            setTimeout(() => {
-              setOpenResultsPanelRequest("evaluations");
-            }, 500);
-          }
-        }
-        break;
-      case "optimization_state_change":
-        const currentOptimizationState = getWorkflow().state.optimization;
-        setOptimizationState(message.payload.optimization_state);
-        if (message.payload.optimization_state?.status === "error") {
-          alertOnError(message.payload.optimization_state.error);
-          if (currentOptimizationState?.status !== "waiting") {
-            setTimeout(() => {
-              setOpenResultsPanelRequest("optimizations");
-            }, 500);
-          }
-        }
-        break;
-      case "error":
-        checkIfUnreachableErrorMessage(message.payload.message);
-        stopWorkflowIfRunning(message.payload.message);
-        alertOnError(message.payload.message);
-        break;
-      case "debug":
-        break;
-      case "done":
-        break;
-      default:
-        toaster.create({
-          title: "Unknown message type on client",
-          //@ts-expect-error
-          description: message.type,
-          type: "warning",
-          meta: {
-            closable: true,
-          },
-          duration: 5000,
-        });
-        break;
+  const alertOnError = useCallback((message: string | undefined) => {
+    if (
+      !!message?.toLowerCase().includes("stopped") ||
+      !!message?.toLowerCase().includes("interrupted")
+    ) {
+      toaster.create({
+        title: "Stopped",
+        description: message?.slice(0, 140),
+        type: "info",
+        meta: {
+          closable: true,
+        },
+        duration: 3000,
+      });
+    } else {
+      toaster.create({
+        title: "Error",
+        description: message?.slice(0, 140),
+        type: "error",
+        meta: {
+          closable: true,
+        },
+        duration: 5000,
+      });
     }
-  };
+  }, []);
+
+  return useCallback(
+    (message: StudioServerEvent) => {
+      switch (message.type) {
+        case "is_alive_response":
+          if (pythonDisconnectedTimeout) {
+            clearTimeout(pythonDisconnectedTimeout);
+            pythonDisconnectedTimeout = null;
+          }
+          debug("Python is alive, setting status to connected");
+          setSocketStatus("connected");
+          break;
+        case "component_state_change":
+          const currentComponentState = getWorkflow().nodes.find(
+            (node) => node.id === message.payload.component_id
+          )?.data.execution_state;
+          setComponentExecutionState(
+            message.payload.component_id,
+            message.payload.execution_state
+          );
+
+          if (message.payload.execution_state?.status === "error") {
+            checkIfUnreachableErrorMessage(
+              message.payload.execution_state.error
+            );
+            alertOnComponent({
+              componentId: message.payload.component_id,
+              execution_state: message.payload.execution_state,
+            });
+          }
+
+          if (
+            !playgroundOpen &&
+            message.payload.execution_state?.status !== "running" &&
+            currentComponentState?.status !== "success" &&
+            ((getWorkflow().state.execution?.status === "running" &&
+              getWorkflow().state.execution?.until_node_id ===
+                message.payload.component_id) ||
+              getWorkflow().state.execution?.status !== "running")
+          ) {
+            setSelectedNode(message.payload.component_id);
+            setPropertiesExpanded(true);
+          }
+          break;
+        case "execution_state_change":
+          setWorkflowExecutionState(message.payload.execution_state);
+          if (message.payload.execution_state?.status === "error") {
+            alertOnError(message.payload.execution_state.error);
+            stopWorkflowIfRunning(message.payload.execution_state.error);
+          }
+          break;
+        case "evaluation_state_change":
+          const currentEvaluationState = getWorkflow().state.evaluation;
+          setEvaluationState(message.payload.evaluation_state);
+          if (message.payload.evaluation_state?.status === "error") {
+            alertOnError(message.payload.evaluation_state.error);
+            if (currentEvaluationState?.status !== "waiting") {
+              setTimeout(() => {
+                setOpenResultsPanelRequest("evaluations");
+              }, 500);
+            }
+          }
+          break;
+        case "optimization_state_change":
+          const currentOptimizationState = getWorkflow().state.optimization;
+          setOptimizationState(message.payload.optimization_state);
+          if (message.payload.optimization_state?.status === "error") {
+            alertOnError(message.payload.optimization_state.error);
+            if (currentOptimizationState?.status !== "waiting") {
+              setTimeout(() => {
+                setOpenResultsPanelRequest("optimizations");
+              }, 500);
+            }
+          }
+          break;
+        case "error":
+          checkIfUnreachableErrorMessage(message.payload.message);
+          stopWorkflowIfRunning(message.payload.message);
+          alertOnError(message.payload.message);
+          break;
+        case "debug":
+          break;
+        case "done":
+          break;
+        default:
+          toaster.create({
+            title: "Unknown message type on client",
+            //@ts-expect-error
+            description: message.type,
+            type: "warning",
+            meta: {
+              closable: true,
+            },
+            duration: 5000,
+          });
+          break;
+      }
+    },
+    [
+      alertOnComponent,
+      alertOnError,
+      checkIfUnreachableErrorMessage,
+      getWorkflow,
+      playgroundOpen,
+      setComponentExecutionState,
+      setEvaluationState,
+      setOpenResultsPanelRequest,
+      setOptimizationState,
+      setPropertiesExpanded,
+      setSelectedNode,
+      setSocketStatus,
+      setWorkflowExecutionState,
+      stopWorkflowIfRunning,
+    ]
+  );
+};

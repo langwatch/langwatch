@@ -17,7 +17,7 @@ import {
 import {
   useEvaluationWizardStore,
   type EvaluatorCategory as EvaluationCategory,
-} from "~/hooks/useEvaluationWizardStore";
+} from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import { OverflownTextWithTooltip } from "../../../../OverflownText";
 import { Tooltip } from "../../../../ui/tooltip";
 import type { AVAILABLE_EVALUATORS } from "../../../../../server/evaluations/evaluators.generated";

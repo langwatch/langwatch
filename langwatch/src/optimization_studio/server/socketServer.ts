@@ -59,7 +59,7 @@ const handleClientMessage = async (
       case "stop_evaluation_execution":
       case "execute_optimization":
       case "stop_optimization_execution":
-        await callPython({
+        await studioBackendPostEvent({
           projectId,
           message,
           onEvent: (event) => sendMessageToClient(ws, event),
@@ -104,7 +104,7 @@ const handleComponentError = (
   });
 };
 
-const callPython = async ({
+export const studioBackendPostEvent = async ({
   projectId,
   message: message,
   onEvent,

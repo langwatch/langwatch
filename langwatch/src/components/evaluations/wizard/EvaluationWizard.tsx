@@ -18,37 +18,32 @@ import { Steps } from "../../ui/steps";
 import {
   STEPS,
   useEvaluationWizardStore,
-} from "~/hooks/useEvaluationWizardStore";
+} from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import { TaskStep } from "./steps/TaskStep";
 import { DatasetStep } from "./steps/DatasetStep";
 import { ExecutionStep } from "./steps/ExecutionStep";
 import { EvaluationStep } from "./steps/EvaluationStep";
 import { useShallow } from "zustand/react/shallow";
 import { WizardWorkspace } from "./WizardWorkspace";
-import { ResultsStep, useStepCompletedValue } from "./steps/ResultsStep";
-import useAutosaveWizard from "../../../optimization_studio/hooks/useAutosaveWizard";
+import { ResultsStep } from "./steps/ResultsStep";
 import { Tooltip } from "../../ui/tooltip";
+import { useStepCompletedValue } from "./hooks/useStepCompletedValue";
 
 export function EvaluationWizard() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const [isSticky, setIsSticky] = useState(false);
   const stickyRef = useRef<HTMLDivElement>(null);
-  const {
-    wizardState,
-    setWizardState,
-    nextStep,
-    setExperimentSlug,
-    isAutosaving,
-  } = useEvaluationWizardStore(
-    useShallow((state) => {
-      if (typeof window !== "undefined") {
-        // @ts-ignore
-        window.state = state;
-      }
-      return state;
-    })
-  );
+  const { wizardState, setWizardState, nextStep, isAutosaving } =
+    useEvaluationWizardStore(
+      useShallow((state) => {
+        if (typeof window !== "undefined") {
+          // @ts-ignore
+          window.state = state;
+        }
+        return state;
+      })
+    );
   const { step } = wizardState;
 
   useEffect(() => {
