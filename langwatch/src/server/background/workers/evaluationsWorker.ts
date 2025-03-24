@@ -2,7 +2,12 @@ import { CostReferenceType, CostType } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { Worker, type Job } from "bullmq";
 import { nanoid } from "nanoid";
-import type { Mappings, EvaluationJob } from "~/server/background/types";
+import type { EvaluationJob } from "~/server/background/types";
+import type {
+  ElasticSearchSpan,
+  Trace,
+  TraceWithSpans,
+} from "~/server/tracer/types";
 import { env } from "../../../env.mjs";
 import {
   AVAILABLE_EVALUATORS,
@@ -20,28 +25,31 @@ import {
   prepareEnvKeys,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders";
-import {
-  esGetSpansByTraceId,
-  getTraceById,
-  getTracesByThreadId,
-} from "../../api/routers/traces";
+import { esGetSpansByTraceId, getTraceById } from "../../api/routers/traces";
 import { prisma } from "../../db";
-import { connection } from "../../redis";
-import { getRAGInfo } from "../../tracer/utils";
-import {
-  EVALUATIONS_QUEUE_NAME,
-  updateEvaluationStatusInES,
-} from "../queues/evaluationsQueue";
-import type { Conversation } from "../../../server/evaluations/types";
 import {
   evaluationDurationHistogram,
   getEvaluationStatusCounter,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
-import type { ElasticSearchSpan, Trace } from "~/server/tracer/types";
+import { connection } from "../../redis";
+import {
+  EVALUATIONS_QUEUE_NAME,
+  updateEvaluationStatusInES,
+} from "../queues/evaluationsQueue";
 
+import {
+  DEFAULT_MAPPINGS,
+  migrateLegacyMappings,
+} from "../../evaluations/evaluationMappings";
+import {
+  mapTraceToDatasetEntry,
+  tryAndConvertTo,
+  type MappingState,
+} from "../../tracer/tracesMapping";
 import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
+import { elasticSearchSpanToSpan } from "../../tracer/utils";
 
 const debug = getDebugger("langwatch:workers:evaluationsWorker");
 
@@ -63,57 +71,32 @@ export async function runEvaluationJob(
     traceId: job.data.trace.trace_id,
     evaluatorType: job.data.check.type,
     settings: check.parameters,
-    mappings: check.mappings as Record<Mappings, string>,
+    mappings: check.mappings as MappingState,
   });
 }
 
 const switchMapping = (
   trace: Trace,
-  spans: ElasticSearchSpan[],
-  mapping: Mappings
-): string | string[] | ElasticSearchSpan[] | undefined => {
-  if (mapping === "trace.input") {
-    return trace.input?.value?.toString();
-  }
-  if (mapping === "trace.output") {
-    return trace.output?.value?.toString();
-  }
-  if (mapping === "trace.first_rag_context") {
-    const ragInfo = getRAGInfo(spans);
-    return ragInfo.contexts;
-  }
-  if (mapping === "metadata.expected_output") {
-    return (
-      trace.expected_output?.value ?? trace.metadata.expected_output
-    )?.toString();
-  }
-  if (mapping === "metadata.expected_contexts") {
-    return trace.metadata.expected_contexts
-      ? Array.isArray(trace.metadata.expected_contexts)
-        ? (trace.metadata.expected_contexts as string[])
-        : [trace.metadata.expected_contexts as string]
-      : undefined;
-  }
-  if (mapping === "spans") {
-    return spans;
-  }
-  // Use typescript to ensure all cases are handled
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _: never = mapping;
-  throw new Error(`Unknown mapping: ${String(mapping)}`);
+  mapping_: MappingState
+): Record<string, string | number> | undefined => {
+  const mapping = !mapping_
+    ? DEFAULT_MAPPINGS
+    : "mapping" in mapping_
+    ? mapping_
+    : migrateLegacyMappings(mapping_ as any);
+
+  return mapTraceToDatasetEntry(
+    trace,
+    mapping.mapping,
+    new Set(),
+    undefined
+  )[0];
 };
 
 export type DataForEvaluation =
   | {
       type: "default";
-      data: {
-        input?: string;
-        output?: string;
-        contexts?: string[];
-        expected_output?: string;
-        expected_contexts?: string[];
-        conversation?: Conversation;
-      };
+      data: Record<string, string | number | undefined | null>;
     }
   | {
       type: "custom";
@@ -123,104 +106,39 @@ export type DataForEvaluation =
 const buildDataForEvaluation = async (
   evaluatorType: EvaluatorTypes,
   trace: Trace,
-  mappings: Record<string, string>
+  mappings: MappingState
 ): Promise<DataForEvaluation> => {
   const spans = await esGetSpansByTraceId({
     traceId: trace.trace_id,
     projectId: trace.project_id,
   });
 
-  const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
+  const traceWithSpans: TraceWithSpans = {
+    ...trace,
+    spans: spans.map(elasticSearchSpanToSpan),
+  };
+
+  const data = switchMapping(traceWithSpans, mappings);
+
+  if (!data) {
+    throw new Error("No mapped data found to run evaluator");
+  }
+
   if (evaluatorType.startsWith("custom/")) {
     return {
       type: "custom",
-      data: Object.fromEntries(
-        Object.entries(mappings).map(([key, mapping]) => [
-          key,
-          switchMapping(trace, spans, mapping as Mappings),
-        ])
-      ),
+      data,
     };
   } else {
-    const inputMapping = (mappings ?? {})?.input;
-    const outputMapping = (mappings ?? {})?.output;
-    const ragContextMapping = (mappings ?? {})?.contexts;
-    const expectedOutputMapping = (mappings ?? {})?.expected_output;
-
-    let input;
-    let output;
-    let expected_output;
-
-    if (inputMapping) {
-      input = switchMapping(trace, spans, inputMapping as Mappings);
-    } else {
-      input = trace.input?.value;
-    }
-
-    if (outputMapping) {
-      output = switchMapping(trace, spans, outputMapping as Mappings);
-    } else {
-      output = trace.output?.value;
-    }
-
-    if (expectedOutputMapping) {
-      expected_output = switchMapping(
-        trace,
-        spans,
-        expectedOutputMapping as Mappings
-      );
-    } else {
-      expected_output = trace.expected_output?.value;
-    }
-
-    let contexts = undefined;
-
-    if (evaluator?.requiredFields?.includes("contexts")) {
-      const ragInfo = getRAGInfo(spans);
-      if (ragContextMapping) {
-        contexts = switchMapping(trace, spans, ragContextMapping as Mappings);
-      } else {
-        contexts = ragInfo.contexts;
-      }
-    }
-
-    const threadId = trace.metadata.thread_id;
-    const fullThread = threadId
-      ? await getTracesByThreadId({
-          threadId: threadId,
-          projectId: trace.project_id,
-        })
-      : undefined;
-    const currentMessageIndex = fullThread?.findIndex(
-      (message) => message.trace_id === trace.trace_id
+    const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
+    const fields = [...evaluator.requiredFields, ...evaluator.optionalFields];
+    const data_ = Object.fromEntries(
+      fields.map((field) => [field, data[field] ?? ""])
     );
-    const conversation: Conversation = fullThread
-      ?.slice(0, currentMessageIndex)
-      .map((message) => ({
-        input: message.input?.value,
-        output: message.output?.value,
-      })) ?? [
-      {
-        input: trace.input?.value,
-        output: trace.output?.value,
-      },
-    ];
 
     return {
       type: "default",
-      data: {
-        input: input as string | undefined,
-        output: output as string | undefined,
-        contexts: Array.isArray(contexts)
-          ? contexts.map((context) =>
-              typeof context === "string" ? context : JSON.stringify(context)
-            )
-          : contexts
-          ? [contexts]
-          : [],
-        expected_output: expected_output as string | undefined,
-        conversation,
-      },
+      data: data_,
     };
   }
 };
@@ -236,7 +154,7 @@ export const runEvaluationForTrace = async ({
   traceId: string;
   evaluatorType: EvaluatorTypes;
   settings: Record<string, any> | string | number | boolean | null;
-  mappings: Record<string, string>;
+  mappings: MappingState;
 }): Promise<SingleEvaluationResult> => {
   const trace = await getTraceById({
     projectId,
@@ -386,12 +304,18 @@ export const runEvaluation = async ({
         body: JSON.stringify({
           data: [
             {
-              input: data.data.input ?? "",
-              output: data.data.output ?? "",
-              contexts: data.data.contexts ?? [],
-              expected_contexts: data.data.expected_contexts ?? [],
-              expected_output: data.data.expected_output ?? "",
-              conversation: data.data.conversation ?? [],
+              input: tryAndConvertTo(data.data.input, "string"),
+              output: tryAndConvertTo(data.data.output, "string"),
+              contexts: tryAndConvertTo(data.data.contexts, "array"),
+              expected_contexts: tryAndConvertTo(
+                data.data.expected_contexts,
+                "array"
+              ),
+              expected_output: tryAndConvertTo(
+                data.data.expected_output,
+                "string"
+              ),
+              conversation: tryAndConvertTo(data.data.conversation, "array"),
             },
           ],
           settings: settings && typeof settings === "object" ? settings : {},

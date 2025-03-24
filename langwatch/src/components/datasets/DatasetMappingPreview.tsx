@@ -12,9 +12,12 @@ import {
 
 import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import type { Dataset } from "@prisma/client";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Checkbox } from "../../components/ui/checkbox";
-import { TracesMapping, type MappingState } from "./DatasetMapping";
+import { api } from "../../utils/api";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { MappingState } from "../../server/tracer/tracesMapping";
+import { TracesMapping } from "../traces/TracesMapping";
 
 interface DatasetMappingPreviewProps {
   traces: any[]; // Replace 'any' with your trace type
@@ -81,6 +84,31 @@ export function DatasetMappingPreview({
     return headers;
   }, [selectedDataset]);
 
+  const { project } = useOrganizationTeamProject();
+
+  const trpc = api.useContext();
+  const updateStoredMapping_ = api.dataset.updateMapping.useMutation();
+  const updateStoredMapping = useCallback(
+    (mappingState: MappingState) => {
+      updateStoredMapping_.mutate(
+        {
+          projectId: project?.id ?? "",
+          datasetId: selectedDataset.id,
+          mapping: {
+            mapping: mappingState.mapping,
+            expansions: Array.from(mappingState.expansions),
+          },
+        },
+        {
+          onSuccess: () => {
+            void trpc.dataset.getAll.invalidate();
+          },
+        }
+      );
+    },
+    [selectedDataset.id, project?.id, trpc.dataset.getAll, updateStoredMapping_]
+  );
+
   return (
     <Field.Root width="full" paddingY={4}>
       <HStack width="full" gap="64px" align="start">
@@ -91,11 +119,17 @@ export function DatasetMappingPreview({
           </Field.HelperText>
 
           <TracesMapping
-            dataset={selectedDataset}
+            dataset={{
+              id: selectedDataset.id,
+              mapping: selectedDataset.mapping as MappingState | undefined,
+            }}
             traces={traces}
             columnTypes={columnTypes}
             setDatasetEntries={onRowDataChange}
-            setDatasetTriggerMapping={setDatasetTriggerMapping}
+            setDatasetMapping={(newMappingState) => {
+              setDatasetTriggerMapping?.(newMappingState);
+              updateStoredMapping(newMappingState);
+            }}
           />
         </VStack>
         <VStack align="start" width="full" height="full">

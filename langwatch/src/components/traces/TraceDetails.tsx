@@ -300,6 +300,12 @@ export function TraceDetails(props: {
             {anyGuardrails && (
               <Tabs.Trigger value="guardrails">
                 Guardrails
+                <EvaluationsCount
+                  project={project}
+                  traceId={props.traceId}
+                  evaluations={evaluations.data}
+                  countGuardrails
+                />
                 <Blocked
                   project={project}
                   traceId={props.traceId}
