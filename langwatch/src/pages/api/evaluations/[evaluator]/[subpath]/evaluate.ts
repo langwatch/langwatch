@@ -102,6 +102,7 @@ export async function handleEvaluatorCall(
   }
 
   let params: EvaluationRESTParams;
+
   try {
     params = evaluationInputSchema.parse(req.body);
   } catch (error) {
