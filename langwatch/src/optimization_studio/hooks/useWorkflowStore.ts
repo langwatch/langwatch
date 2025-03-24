@@ -29,7 +29,7 @@ export type SocketStatus =
   | "connecting-python"
   | "connected";
 
-type State = Workflow & {
+export type State = Workflow & {
   workflow_id?: string;
   hoveredNodeId?: string;
   socketStatus: SocketStatus;
@@ -45,12 +45,16 @@ type State = Workflow & {
   playgroundOpen: boolean;
 };
 
-type WorkflowStore = State & {
+export type WorkflowStore = State & {
   reset: () => void;
   getWorkflow: () => Workflow;
   getPreviousWorkflow: () => Workflow | undefined;
   hasPendingChanges: () => boolean;
-  setWorkflow: (workflow: Partial<Workflow> & { workflowId?: string }) => void;
+  setWorkflow: (
+    workflow:
+      | (Partial<Workflow> & { workflowId?: string })
+      | ((current: Workflow) => Partial<Workflow> & { workflowId?: string })
+  ) => void;
   setPreviousWorkflow: (workflow: Workflow | undefined) => void;
   setSocketStatus: (
     status: SocketStatus | ((status: SocketStatus) => SocketStatus)
@@ -117,7 +121,7 @@ export const initialDSL: Workflow = {
   state: {},
 };
 
-const initialState: State = {
+export const initialState: State = {
   ...initialDSL,
 
   hoveredNodeId: undefined,
@@ -130,7 +134,24 @@ const initialState: State = {
   playgroundOpen: false,
 };
 
-const store = (
+export const getWorkflow = (state: State) => {
+  // Keep only the keys present on Workflow type
+  return {
+    workflow_id: state.workflow_id,
+    spec_version: state.spec_version,
+    name: state.name,
+    icon: state.icon,
+    description: state.description,
+    version: state.version,
+    default_llm: state.default_llm,
+    enable_tracing: state.enable_tracing,
+    nodes: state.nodes,
+    edges: state.edges,
+    state: state.state,
+  };
+};
+
+export const store = (
   set: (
     partial:
       | WorkflowStore
@@ -146,21 +167,7 @@ const store = (
   },
   getWorkflow: () => {
     const state = get();
-
-    // Keep only the keys present on Workflow type
-    return {
-      workflow_id: state.workflow_id,
-      spec_version: state.spec_version,
-      name: state.name,
-      icon: state.icon,
-      description: state.description,
-      version: state.version,
-      default_llm: state.default_llm,
-      enable_tracing: state.enable_tracing,
-      nodes: state.nodes,
-      edges: state.edges,
-      state: state.state,
-    };
+    return getWorkflow(state);
   },
   getPreviousWorkflow: () => {
     return get().previousWorkflow;
@@ -173,7 +180,9 @@ const store = (
     }
     return hasDSLChange(previousWorkflow, currentWorkflow, true);
   },
-  setWorkflow: (workflow: Partial<Workflow>) => {
+  setWorkflow: (
+    workflow: Partial<Workflow> | ((current: Workflow) => Partial<Workflow>)
+  ) => {
     set(workflow);
   },
   setPreviousWorkflow: (workflow: Workflow | undefined) => {

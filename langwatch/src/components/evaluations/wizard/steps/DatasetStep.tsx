@@ -65,7 +65,7 @@ export function DatasetStep() {
     dataSource: "from_production" | "manual" | "upload"
   ) => {
     setWizardState({
-      step: "executor",
+      step: "execution",
       dataSource,
     });
   };

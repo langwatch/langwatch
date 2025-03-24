@@ -7,13 +7,25 @@ import {
 import { OptimizationStudioCanvas } from "../../../optimization_studio/components/OptimizationStudio";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { Controls, ReactFlowProvider, useUpdateNodeInternals } from "@xyflow/react";
+import {
+  Controls,
+  ReactFlowProvider,
+  useUpdateNodeInternals,
+} from "@xyflow/react";
 import { useEffect } from "react";
 import { EvaluationResults } from "../../../optimization_studio/components/ResultsPanel";
+import { useShallow } from "zustand/react/shallow";
 
 export function WizardWorkspace() {
   const { getDatasetId, wizardState, setWizardState, dsl } =
-    useEvaluationWizardStore();
+    useEvaluationWizardStore(
+      useShallow((state) => ({
+        getDatasetId: state.getDatasetId,
+        wizardState: state.wizardState,
+        setWizardState: state.setWizardState,
+        dsl: state.getDSL(),
+      }))
+    );
 
   const hasDataset = !!getDatasetId();
   const hasWorkflow = dsl.nodes.length > 0;
@@ -120,7 +132,14 @@ export function WizardWorkspace() {
 
 function WizardOptimizationStudioCanvas() {
   const { dsl, onNodesChange, onEdgesChange, onConnect } =
-    useEvaluationWizardStore();
+    useEvaluationWizardStore(
+      useShallow((state) => ({
+        dsl: state.getDSL(),
+        onNodesChange: state.workflowStore.onNodesChange,
+        onEdgesChange: state.workflowStore.onEdgesChange,
+        onConnect: state.workflowStore.onConnect,
+      }))
+    );
 
   const updateNodeInternals = useUpdateNodeInternals();
 

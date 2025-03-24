@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   initialState,
   useEvaluationWizardStore,
@@ -7,10 +7,11 @@ import { api } from "../../utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRouter } from "next/router";
 import { useShallow } from "zustand/react/shallow";
+import { getWorkflow } from "./useWorkflowStore";
 
 const stringifiedInitialState = JSON.stringify({
   wizardState: initialState.wizardState,
-  dsl: initialState.dsl,
+  dsl: getWorkflow(initialState.workflowStore),
 });
 
 const useAutosaveWizard = () => {
@@ -29,7 +30,7 @@ const useAutosaveWizard = () => {
       ({
         experimentSlug,
         wizardState,
-        dsl,
+        getDSL,
         autosaveDisabled,
         setExperimentSlug,
         setIsAutosaving,
@@ -38,7 +39,7 @@ const useAutosaveWizard = () => {
       }) => ({
         experimentSlug,
         wizardState,
-        dsl,
+        dsl: getDSL(),
         autosaveDisabled,
         setExperimentSlug,
         setIsAutosaving,

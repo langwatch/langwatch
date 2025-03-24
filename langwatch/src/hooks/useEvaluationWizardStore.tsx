@@ -1,24 +1,20 @@
-import {
-  addEdge,
-  applyEdgeChanges,
-  applyNodeChanges,
-  type Connection,
-  type Edge,
-  type EdgeChange,
-  type Node,
-  type NodeChange,
-} from "@xyflow/react";
+import { type Edge, type Node } from "@xyflow/react";
+import { z } from "zod";
 import { create } from "zustand";
 import type { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
-import { initialDSL } from "../optimization_studio/hooks/useWorkflowStore";
+import {
+  initialState as initialWorkflowStore,
+  type WorkflowStore,
+  store as workflowStore,
+  type State as WorkflowStoreState,
+} from "../optimization_studio/hooks/useWorkflowStore";
 import { entryNode } from "../optimization_studio/templates/blank";
 import type { Evaluator, Workflow } from "../optimization_studio/types/dsl";
+import { datasetColumnsToFields } from "../optimization_studio/utils/datasetUtils";
 import { nameToId } from "../optimization_studio/utils/nodeUtils";
 import { convertEvaluator } from "../optimization_studio/utils/registryUtils";
-import { mappingStateSchema } from "../server/tracer/tracesMapping";
-import { datasetColumnsToFields } from "../optimization_studio/utils/datasetUtils";
 import type { DatasetColumns } from "../server/datasets/types";
-import { z } from "zod";
+import { mappingStateSchema } from "../server/tracer/tracesMapping";
 
 export const EVALUATOR_CATEGORIES = [
   "expected_answer",
@@ -86,9 +82,9 @@ export type WizardState = z.infer<typeof wizardStateSchema>;
 export type State = {
   experimentSlug?: string;
   wizardState: z.infer<typeof wizardStateSchema>;
-  dsl: Workflow;
   isAutosaving: boolean;
   autosaveDisabled: boolean;
+  workflowStore: WorkflowStoreState;
 };
 
 type EvaluationWizardStore = State & {
@@ -103,15 +99,14 @@ type EvaluationWizardStore = State & {
   getWizardState: () => State["wizardState"];
   setDSL: (
     dsl:
-      | Partial<State["dsl"]>
-      | ((state: State["dsl"]) => Partial<State["dsl"]>)
+      | Partial<Workflow & { workflowId?: string }>
+      | ((
+          state: Workflow & { workflowId?: string }
+        ) => Partial<Workflow & { workflowId?: string }>)
   ) => void;
-  getDSL: () => State["dsl"];
+  getDSL: () => Workflow & { workflowId?: string };
   setIsAutosaving: (isAutosaving: boolean) => void;
   skipNextAutosave: () => void;
-  onNodesChange: (changes: NodeChange[]) => void;
-  onEdgesChange: (changes: EdgeChange[]) => void;
-  onConnect: (connection: Connection) => void;
   nextStep: () => void;
   setDatasetId: (datasetId: string, columnTypes: DatasetColumns) => void;
   getDatasetId: () => string | undefined;
@@ -121,6 +116,8 @@ type EvaluationWizardStore = State & {
   getFirstEvaluatorNode: () => Node<Evaluator> | undefined;
   setFirstEvaluatorEdges: (edges: Workflow["edges"]) => void;
   getFirstEvaluatorEdges: () => Workflow["edges"] | undefined;
+
+  workflowStore: WorkflowStore;
 };
 
 export const initialState: State = {
@@ -129,9 +126,9 @@ export const initialState: State = {
     step: "task",
     workspaceTab: "dataset",
   },
-  dsl: initialDSL,
   isAutosaving: false,
   autosaveDisabled: false,
+  workflowStore: initialWorkflowStore,
 };
 
 const store = (
@@ -148,7 +145,11 @@ const store = (
 ): EvaluationWizardStore => ({
   ...initialState,
   reset() {
-    set(initialState);
+    set((current) => ({
+      ...current,
+      ...initialState,
+      workflowStore: { ...current.workflowStore, ...initialWorkflowStore },
+    }));
   },
   setExperimentSlug(experiment_slug) {
     set((current) => ({ ...current, experimentSlug: experiment_slug }));
@@ -158,7 +159,7 @@ const store = (
   },
   setWizardState(state) {
     const applyChanges = (
-      current: State,
+      current: EvaluationWizardStore,
       next: Partial<State["wizardState"]>
     ) => {
       return {
@@ -183,20 +184,10 @@ const store = (
     return get().wizardState;
   },
   setDSL(dsl) {
-    if (typeof dsl === "function") {
-      set((current) => ({
-        ...current,
-        dsl: { ...current.dsl, ...dsl(current.dsl) },
-      }));
-    } else {
-      set((current) => ({
-        ...current,
-        dsl: { ...current.dsl, ...dsl },
-      }));
-    }
+    get().workflowStore.setWorkflow(dsl);
   },
   getDSL() {
-    return get().dsl;
+    return get().workflowStore.getWorkflow();
   },
   setIsAutosaving(isAutosaving) {
     set((current) => ({ ...current, isAutosaving }));
@@ -206,27 +197,6 @@ const store = (
     setTimeout(() => {
       set((current) => ({ ...current, autosaveDisabled: false }));
     }, 100);
-  },
-  onNodesChange: (changes: NodeChange[]) => {
-    set({
-      dsl: { ...get().dsl, nodes: applyNodeChanges(changes, get().dsl.nodes) },
-    });
-  },
-  onEdgesChange: (changes: EdgeChange[]) => {
-    set({
-      dsl: { ...get().dsl, edges: applyEdgeChanges(changes, get().dsl.edges) },
-    });
-  },
-  onConnect: (connection: Connection) => {
-    set({
-      dsl: {
-        ...get().dsl,
-        edges: addEdge(connection, get().dsl.edges).map((edge) => ({
-          ...edge,
-          type: edge.type ?? "default",
-        })),
-      },
-    });
   },
   nextStep() {
     set((current) => {
@@ -252,7 +222,7 @@ const store = (
     });
   },
   setDatasetId(datasetId, columnTypes) {
-    get().setDSL((current) => {
+    get().workflowStore.setWorkflow((current) => {
       const hasEntryNode = current.nodes.some((node) => node.type === "entry");
 
       if (hasEntryNode) {
@@ -294,15 +264,16 @@ const store = (
     });
   },
   getDatasetId() {
-    const entryNodeData = get().dsl.nodes.find((node) => node.type === "entry")
-      ?.data;
+    const entryNodeData = get()
+      .workflowStore.getWorkflow()
+      .nodes.find((node) => node.type === "entry")?.data;
     if (entryNodeData && "dataset" in entryNodeData) {
       return entryNodeData.dataset?.id;
     }
     return undefined;
   },
   setFirstEvaluator(evaluator: Partial<Evaluator> & { evaluator: string }) {
-    get().setDSL((current) => {
+    get().workflowStore.setWorkflow((current) => {
       if (evaluator.evaluator.startsWith("custom/")) {
         throw new Error("Custom evaluators are not supported yet");
       }
@@ -351,14 +322,16 @@ const store = (
     });
   },
   getFirstEvaluatorNode() {
-    const node = get().dsl.nodes.find((node) => node.type === "evaluator");
+    const node = get()
+      .workflowStore.getWorkflow()
+      .nodes.find((node) => node.type === "evaluator");
     if (node?.data && "evaluator" in node.data) {
       return node as Node<Evaluator>;
     }
     return undefined;
   },
   setFirstEvaluatorEdges(edges: Edge[]) {
-    get().setDSL((current) => {
+    get().workflowStore.setWorkflow((current) => {
       const firstEvaluator = get().getFirstEvaluatorNode();
 
       if (!firstEvaluator?.id) {
@@ -383,8 +356,26 @@ const store = (
       return undefined;
     }
 
-    return get().dsl.edges.filter((edge) => edge.target === firstEvaluator.id);
+    return get()
+      .workflowStore.getWorkflow()
+      .edges.filter((edge) => edge.target === firstEvaluator.id);
   },
+  workflowStore: workflowStore(
+    (
+      partial:
+        | WorkflowStore
+        | Partial<WorkflowStore>
+        | ((state: WorkflowStore) => WorkflowStore | Partial<WorkflowStore>)
+    ) =>
+      set((current) => ({
+        ...current,
+        workflowStore:
+          typeof partial === "function"
+            ? { ...current.workflowStore, ...partial(current.workflowStore) }
+            : { ...current.workflowStore, ...partial },
+      })),
+    () => get().workflowStore
+  ),
 });
 
 export const useEvaluationWizardStore = create<EvaluationWizardStore>()(store);
