@@ -359,7 +359,7 @@ const createQueueItems = async (
   await Promise.all(
     triggerData.map((data) =>
       createOrUpdateQueueItems({
-        traceId: data.traceId,
+        traceIds: [data.traceId],
         projectId: data.projectId,
         annotators: annotators.map((annotator) => annotator.id),
         userId: createdByUserId ?? "",
