@@ -329,7 +329,7 @@ export const annotationRouter = createTRPCRouter({
   createQueueItem: protectedProcedure
     .input(
       z.object({
-        traceId: z.string(),
+        traceIds: z.array(z.string()),
         projectId: z.string(),
         annotators: z.array(z.string()),
       })
@@ -337,7 +337,7 @@ export const annotationRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       await createOrUpdateQueueItems({
-        traceId: input.traceId,
+        traceIds: input.traceIds,
         projectId: input.projectId,
         annotators: input.annotators,
         userId: ctx.session.user.id,
@@ -388,61 +388,63 @@ export const annotationRouter = createTRPCRouter({
 });
 
 export async function createOrUpdateQueueItems({
-  traceId,
+  traceIds,
   projectId,
   annotators,
   userId,
   prisma,
 }: {
-  traceId: string;
+  traceIds: string[];
   projectId: string;
   annotators: string[];
   userId: string;
   prisma: any;
 }) {
-  for (const annotator of annotators) {
-    if (annotator.startsWith("queue")) {
-      await prisma.annotationQueueItem.upsert({
-        where: {
-          projectId: projectId,
-          traceId_annotationQueueId_projectId: {
-            traceId: traceId,
+  for (const traceId of traceIds) {
+    for (const annotator of annotators) {
+      if (annotator.startsWith("queue")) {
+        await prisma.annotationQueueItem.upsert({
+          where: {
+            projectId: projectId,
+            traceId_annotationQueueId_projectId: {
+              traceId: traceId,
+              annotationQueueId: annotator.replace("queue-", ""),
+              projectId: projectId,
+            },
+          },
+          create: {
             annotationQueueId: annotator.replace("queue-", ""),
-            projectId: projectId,
-          },
-        },
-        create: {
-          annotationQueueId: annotator.replace("queue-", ""),
-          traceId: traceId,
-          projectId: projectId,
-          createdByUserId: userId,
-        },
-        update: {
-          annotationQueueId: annotator.replace("queue-", ""),
-          doneAt: null,
-        },
-      });
-    } else {
-      await prisma.annotationQueueItem.upsert({
-        where: {
-          projectId: projectId,
-          traceId_userId_projectId: {
             traceId: traceId,
-            userId: annotator.replace("user-", ""),
             projectId: projectId,
+            createdByUserId: userId,
           },
-        },
-        create: {
-          userId: annotator.replace("user-", ""),
-          traceId: traceId,
-          projectId: projectId,
-          createdByUserId: userId,
-        },
-        update: {
-          userId: annotator.replace("user-", ""),
-          doneAt: null,
-        },
-      });
+          update: {
+            annotationQueueId: annotator.replace("queue-", ""),
+            doneAt: null,
+          },
+        });
+      } else {
+        await prisma.annotationQueueItem.upsert({
+          where: {
+            projectId: projectId,
+            traceId_userId_projectId: {
+              traceId: traceId,
+              userId: annotator.replace("user-", ""),
+              projectId: projectId,
+            },
+          },
+          create: {
+            userId: annotator.replace("user-", ""),
+            traceId: traceId,
+            projectId: projectId,
+            createdByUserId: userId,
+          },
+          update: {
+            userId: annotator.replace("user-", ""),
+            doneAt: null,
+          },
+        });
+      }
     }
   }
 }

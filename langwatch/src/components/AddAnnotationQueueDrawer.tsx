@@ -1,4 +1,15 @@
-import { Box, Button, Field, HStack, Input, Spacer, Text, Textarea, VStack, useDisclosure } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Spacer,
+  Text,
+  Textarea,
+  VStack,
+  useDisclosure,
+} from "@chakra-ui/react";
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { useState } from "react";
 import { Plus } from "react-feather";
@@ -59,14 +70,20 @@ export const AddAnnotationQueueDrawer = ({
 
   const { closeDrawer } = useDrawer();
 
-  const users = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    {
-      organizationId: organization?.id ?? "",
-    },
-    {
-      enabled: !!organization,
-    }
-  );
+  const closeAll = () => {
+    closeDrawer();
+    onClose?.();
+  };
+
+  const users =
+    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+      {
+        organizationId: organization?.id ?? "",
+      },
+      {
+        enabled: !!organization,
+      }
+    );
   const {
     register,
     handleSubmit,
@@ -88,14 +105,18 @@ export const AddAnnotationQueueDrawer = ({
     description?: string | null;
   };
 
-  const [participants, setParticipants] = useState<{ id: string; name: string | null }[]>(
+  const [participants, setParticipants] = useState<
+    { id: string; name: string | null }[]
+  >(
     queue.data?.members.map((member) => ({
       id: member.user.id,
       name: member.user.name,
     })) ?? []
   );
 
-  const [scoreTypes, setScoreTypes] = useState<{ id: string; name: string | null }[]>(
+  const [scoreTypes, setScoreTypes] = useState<
+    { id: string; name: string | null }[]
+  >(
     queue.data?.AnnotationQueueScores.map((score) => ({
       id: score.annotationScore.id,
       name: score.annotationScore.name,
@@ -126,7 +147,9 @@ export const AddAnnotationQueueDrawer = ({
           void queryClient.annotation.getQueueBySlugOrId.invalidate();
           toaster.create({
             title: `Annotation Queue ${queueId ? "Updated" : "Created"}`,
-            description: `Successfully ${queueId ? "updated" : "created"} ${data.name} annotation queue`,
+            description: `Successfully ${queueId ? "updated" : "created"} ${
+              data.name
+            } annotation queue`,
             type: "success",
             meta: {
               closable: true,
@@ -167,7 +190,7 @@ export const AddAnnotationQueueDrawer = ({
         size="lg"
         onOpenChange={({ open }) => {
           if (!open) {
-            closeDrawer();
+            closeAll();
           }
         }}
       >
@@ -175,7 +198,7 @@ export const AddAnnotationQueueDrawer = ({
         <Drawer.Content>
           <Drawer.Header>
             <HStack>
-              <Drawer.CloseTrigger />
+              <Drawer.CloseTrigger onClick={() => closeAll()} />
             </HStack>
             <HStack>
               <Text paddingTop={5} fontSize="2xl">
@@ -225,7 +248,10 @@ export const AddAnnotationQueueDrawer = ({
                       <chakraComponents.Option {...props}>
                         <VStack align="start">
                           <HStack>
-                            <RandomColorAvatar size="2xs" name={props.data.label} />
+                            <RandomColorAvatar
+                              size="2xs"
+                              name={props.data.label}
+                            />
                             <Text>{children}</Text>
                           </HStack>
                         </VStack>
@@ -235,7 +261,10 @@ export const AddAnnotationQueueDrawer = ({
                       <chakraComponents.MultiValueLabel {...props}>
                         <VStack align="start" padding={1} paddingX={0}>
                           <HStack>
-                            <RandomColorAvatar size="2xs" name={props.data.label} />
+                            <RandomColorAvatar
+                              size="2xs"
+                              name={props.data.label}
+                            />
                             <Text>{children}</Text>
                           </HStack>
                         </VStack>
@@ -264,7 +293,9 @@ export const AddAnnotationQueueDrawer = ({
                 <Field.Root>
                   <VStack align="start" gap={1}>
                     <Field.Label margin={0}>Score Type</Field.Label>
-                    <Field.HelperText margin={0}>Select the score type for this annotation queue</Field.HelperText>
+                    <Field.HelperText margin={0}>
+                      Select the score type for this annotation queue
+                    </Field.HelperText>
 
                     <MultiSelect
                       options={annotationScores.data?.map((score) => ({
