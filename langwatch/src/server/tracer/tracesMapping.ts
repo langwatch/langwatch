@@ -9,6 +9,7 @@ import type {
   TraceWithSpans,
 } from "./types";
 import { datasetSpanSchema } from "./types.generated";
+import { getSpanNameOrModel } from "../../utils/trace";
 
 export type TraceWithSpansAndAnnotations = TraceWithSpans & {
   annotations?: (Annotation & {
@@ -72,7 +73,10 @@ export const TRACE_MAPPINGS = {
     keys: (traces: TraceWithSpansAndAnnotations[]) => {
       return Array.from(
         new Set(
-          traces.flatMap((trace) => trace.spans?.map((span) => span.name) ?? [])
+          traces.flatMap(
+            (trace) =>
+              trace.spans?.map((span) => getSpanNameOrModel(span)) ?? []
+          )
         )
       ).map((key) => ({
         key: key ?? "",
@@ -82,7 +86,7 @@ export const TRACE_MAPPINGS = {
     subkeys: (traces: TraceWithSpansAndAnnotations[], key: string) => {
       const spans = traces
         .flatMap((trace) => trace.spans ?? [])
-        .filter((span) => span.name === key);
+        .filter((span) => getSpanNameOrModel(span) === key);
       return Object.keys(spans[0] ?? {})
         .filter((key) =>
           ["input", "output", "generated", "params", "contexts"].includes(key)
@@ -101,7 +105,9 @@ export const TRACE_MAPPINGS = {
       if (!key) {
         return traceSpans;
       }
-      const filteredSpans = traceSpans.filter((span) => span.name === key);
+      const filteredSpans = traceSpans.filter(
+        (span) => getSpanNameOrModel(span as Span) === key
+      );
       if (!subkey) {
         return filteredSpans;
       }
