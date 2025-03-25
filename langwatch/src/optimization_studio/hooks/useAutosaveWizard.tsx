@@ -25,6 +25,7 @@ const useAutosaveWizard = () => {
     setIsAutosaving,
     setWizardState,
     skipNextAutosave,
+    setWorkflow,
   } = useEvaluationWizardStore(
     useShallow(
       ({
@@ -36,6 +37,7 @@ const useAutosaveWizard = () => {
         setIsAutosaving,
         setWizardState,
         skipNextAutosave,
+        workflowStore,
       }) => ({
         experimentSlug,
         wizardState,
@@ -45,6 +47,7 @@ const useAutosaveWizard = () => {
         setIsAutosaving,
         setWizardState,
         skipNextAutosave,
+        setWorkflow: workflowStore.setWorkflow,
       })
     )
   );
@@ -97,6 +100,7 @@ const useAutosaveWizard = () => {
         skipNextAutosave();
         setExperimentSlug(updatedExperiment.slug);
         setWizardState({ name: updatedExperiment.name ?? undefined });
+        setWorkflow({ workflow_id: updatedExperiment.workflowId ?? undefined });
       })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

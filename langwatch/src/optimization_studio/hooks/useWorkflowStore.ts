@@ -52,8 +52,8 @@ export type WorkflowStore = State & {
   hasPendingChanges: () => boolean;
   setWorkflow: (
     workflow:
-      | (Partial<Workflow> & { workflowId?: string })
-      | ((current: Workflow) => Partial<Workflow> & { workflowId?: string })
+      | (Partial<Workflow> & { workflow_id?: string })
+      | ((current: Workflow) => Partial<Workflow> & { workflow_id?: string })
   ) => void;
   setPreviousWorkflow: (workflow: Workflow | undefined) => void;
   setSocketStatus: (
