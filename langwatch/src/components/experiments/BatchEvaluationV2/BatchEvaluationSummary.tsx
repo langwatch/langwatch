@@ -1,11 +1,4 @@
-import {
-  Box,
-  Separator,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Separator, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "../../../components/ui/tooltip";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
@@ -94,7 +87,7 @@ export function BatchEvaluationV2EvaluationSummary({
           <HoverableBigText fontWeight="500" lineClamp={2} expandable={false}>
             Mean Cost
           </HoverableBigText>
-          <Text lineClamp={1} whiteSpace="nowrap">
+          <Box lineClamp={1} whiteSpace="nowrap">
             <FormatMoney
               amount={
                 (run.summary.dataset_average_cost ?? 0) +
@@ -131,7 +124,7 @@ export function BatchEvaluationV2EvaluationSummary({
                 </VStack>
               }
             />
-          </Text>
+          </Box>
         </VStack>
         <Separator orientation="vertical" height="48px" />
         <VStack align="start" gap={1}>
@@ -172,7 +165,7 @@ export function BatchEvaluationV2EvaluationSummary({
           <HoverableBigText fontWeight="500" lineClamp={1} expandable={false}>
             Total Cost
           </HoverableBigText>
-          <Text lineClamp={1} whiteSpace="nowrap">
+          <Box lineClamp={1} whiteSpace="nowrap">
             <FormatMoney
               amount={
                 (run.summary.dataset_cost ?? 0) +
@@ -209,7 +202,7 @@ export function BatchEvaluationV2EvaluationSummary({
                 </VStack>
               }
             />
-          </Text>
+          </Box>
         </VStack>
         <Separator orientation="vertical" height="48px" />
         <VStack align="start" gap={1}>

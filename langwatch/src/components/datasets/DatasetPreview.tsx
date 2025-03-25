@@ -6,6 +6,7 @@ import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
+import { ErrorBoundary } from "react-error-boundary";
 
 export function DatasetPreview({
   rows,
@@ -92,7 +93,15 @@ export function DatasetPreview({
           </HStack>
         </Center>
       )}
-      <DatasetGrid columnDefs={columnDefs} rowData={rows} />
+      <ErrorBoundary
+        fallback={
+          <Center width="full" height="full">
+            Error rendering the dataset, please refresh the page
+          </Center>
+        }
+      >
+        <DatasetGrid columnDefs={columnDefs} rowData={rows} />
+      </ErrorBoundary>
     </Box>
   );
 }

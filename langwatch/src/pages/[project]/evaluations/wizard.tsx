@@ -29,6 +29,23 @@ export default function EvaluationWizard() {
   const { initialLoadExperiment, initialLoadExperimentSlug } =
     useInitialLoadExperiment();
 
+  const { skipNextAutosave, reset } = useEvaluationWizardStore(
+    useShallow((state) => {
+      return {
+        skipNextAutosave: state.skipNextAutosave,
+        reset: state.reset,
+      };
+    })
+  );
+
+  useEffect(() => {
+    return () => {
+      skipNextAutosave();
+      reset();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (isNotFound(initialLoadExperiment.error)) {
     return <ErrorPage statusCode={404} />;
   }

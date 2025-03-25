@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Card,
+  Center,
   Heading,
   HStack,
   Spacer,
@@ -41,6 +42,7 @@ import { AddRowsFromCSVModal } from "./AddRowsFromCSVModal";
 
 import { toaster } from "../ui/toaster";
 import { Menu } from "../ui/menu";
+import { ErrorBoundary } from "react-error-boundary";
 
 export type InMemoryDataset = {
   datasetId?: string;
@@ -562,16 +564,24 @@ export function DatasetTable({
                 </Alert.Content>
               </Alert.Root>
             )}
-            <DatasetGrid
-              columnDefs={columnDefs}
-              rowData={localRowData}
-              onCellValueChanged={onCellValueChanged}
-              ref={gridRef}
-              domLayout="normal"
-              {...(loadingOverlayComponent !== undefined
-                ? { loadingOverlayComponent }
-                : {})}
-            />
+            <ErrorBoundary
+              fallback={
+                <Center width="full" height="full">
+                  Error rendering the dataset, please refresh the page
+                </Center>
+              }
+            >
+              <DatasetGrid
+                columnDefs={columnDefs}
+                rowData={localRowData}
+                onCellValueChanged={onCellValueChanged}
+                ref={gridRef}
+                domLayout="normal"
+                {...(loadingOverlayComponent !== undefined
+                  ? { loadingOverlayComponent }
+                  : {})}
+              />
+            </ErrorBoundary>
           </Box>
         </Card.Body>
       </Card.Root>

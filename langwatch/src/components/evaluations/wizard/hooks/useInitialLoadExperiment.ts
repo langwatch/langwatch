@@ -4,10 +4,6 @@ import { useRouter } from "next/router";
 import { useShallow } from "zustand/react/shallow";
 import { useEvaluationWizardStore } from "../hooks/useEvaluationWizardStore";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
-import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
-import type { TRPCClientErrorLike } from "@trpc/react-query";
-import type { AppRouter } from "../../../../server/api/root";
-import type { inferRouterOutputs } from "@trpc/server";
 
 export const useInitialLoadExperiment = () => {
   const { project } = useOrganizationTeamProject();
@@ -45,46 +41,44 @@ export const useInitialLoadExperiment = () => {
     ? (router.query.slug as string)
     : undefined;
 
+  const [randomSeed] = useState<number | undefined>(Math.random());
+  const initialLoadExperiment =
+    api.experiments.getExperimentWithDSLBySlug.useQuery(
+      {
+        projectId: project?.id ?? "",
+        experimentSlug: initialLoadExperimentSlug ?? "",
+        randomSeed,
+      },
+      {
+        enabled: !!project && !!initialLoadExperimentSlug,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        staleTime: Infinity,
+      }
+    );
+
   useEffect(() => {
-    // For some reason it starts as undefined, so we need to set it here
-    if (!initialLoadExperimentSlug && !experimentSlug) {
+    if (
+      // First load with id
+      !initialLoadExperimentSlug &&
+      !experimentSlug
+    ) {
       setInitialLoadExperimentSlug(router.query.slug as string);
     }
-  }, [experimentSlug, initialLoadExperimentSlug, router.query.slug]);
-
-  const experiment = api.experiments.getExperimentWithDSLBySlug.useQuery(
-    {
-      projectId: project?.id ?? "",
-      experimentSlug: initialLoadExperimentSlug ?? "",
-    },
-    {
-      enabled: !!project && !!initialLoadExperimentSlug,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
-    }
-  );
-
-  const [initialLoadExperiment, setInitialLoadExperiment] =
-    useState<
-      UseTRPCQueryResult<
-        inferRouterOutputs<AppRouter>["experiments"]["getExperimentWithDSLBySlug"],
-        TRPCClientErrorLike<AppRouter>
-      >
-    >(experiment);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [experimentSlug, initialLoadExperimentSlug]);
 
   useEffect(() => {
-    if (experiment.data && !initialLoadExperiment.data) {
-      console.log("effect?");
-      setInitialLoadExperiment(experiment);
+    if (initialLoadExperiment.data) {
       // Prevent autosave from being called on initial load
       skipNextAutosave();
-      setWizardState(experiment.data.wizardState ?? {});
-      setDSL(experiment.data.dsl ?? {});
-      setExperimentSlug(experiment.data.slug);
+      setWizardState(initialLoadExperiment.data.wizardState ?? {});
+      setDSL(initialLoadExperiment.data.dsl ?? {});
+      setExperimentSlug(initialLoadExperiment.data.slug);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [experiment.data]);
+  }, [initialLoadExperiment.data]);
 
   return {
     initialLoadExperiment,

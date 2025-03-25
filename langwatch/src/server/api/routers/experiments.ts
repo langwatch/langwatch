@@ -66,7 +66,7 @@ export const experimentsRouter = createTRPCRouter({
         if (currentExperiment.workflowId) {
           const workflow = await prisma.workflow.findUnique({
             where: {
-              id: workflowId,
+              id: currentExperiment.workflowId,
               projectId: input.projectId,
             },
           });
@@ -170,7 +170,7 @@ export const experimentsRouter = createTRPCRouter({
     }),
 
   getExperimentWithDSLBySlug: protectedProcedure
-    .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
+    .input(z.object({ projectId: z.string(), experimentSlug: z.string(), randomSeed: z.number().optional() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
     .query(async ({ input }) => {
       const experiment = await getExperimentBySlug(
@@ -656,19 +656,28 @@ const findNextDraftName = async (projectId: string) => {
   const drafts = await prisma.experiment.findMany({
     select: {
       name: true,
+      slug: true,
     },
     where: {
       projectId: projectId,
     },
   });
 
-  const names = drafts
-    .map((draft) => draft.name)
-    .filter((name) => name?.startsWith("Draft"));
+  const slugs = new Set(
+    drafts
+      .filter((draft) => draft.name?.startsWith("Draft"))
+      .map((draft) => draft.slug)
+  );
 
-  if (names.length === 0) {
-    return "Draft Evaluation";
+  let draftName;
+  let index = slugs.size + 1;
+  while (true) {
+    draftName = `Draft Evaluation (${index})`;
+    if (!slugs.has(slugify(draftName))) {
+      break;
+    }
+    index++;
   }
 
-  return `Draft Evaluation (${names.length + 1})`;
+  return draftName;
 };

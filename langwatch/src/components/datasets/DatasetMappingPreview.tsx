@@ -1,4 +1,12 @@
-import { Box, Button, Field, HStack, Spacer, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Center,
+  Field,
+  HStack,
+  Spacer,
+  VStack,
+} from "@chakra-ui/react";
 import { Edit2 } from "react-feather";
 import type {
   DatasetColumns,
@@ -18,6 +26,7 @@ import { api } from "../../utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { MappingState } from "../../server/tracer/tracesMapping";
 import { TracesMapping } from "../traces/TracesMapping";
+import { ErrorBoundary } from "react-error-boundary";
 
 interface DatasetMappingPreviewProps {
   traces: any[]; // Replace 'any' with your trace type
@@ -150,15 +159,27 @@ export function DatasetMappingPreview({
             </Button>
           </HStack>
           <Box width="full" display="block" paddingTop={2}>
-            <DatasetGrid
-              columnDefs={columnDefs}
-              rowData={rowData}
-              onCellValueChanged={({ data }: { data: DatasetRecordEntry }) => {
-                onRowDataChange(
-                  rowData.map((row) => (row.id === data.id ? data : row))
-                );
-              }}
-            />
+            <ErrorBoundary
+              fallback={
+                <Center width="full" height="full">
+                  Error rendering the dataset, please refresh the page
+                </Center>
+              }
+            >
+              <DatasetGrid
+                columnDefs={columnDefs}
+                rowData={rowData}
+                onCellValueChanged={({
+                  data,
+                }: {
+                  data: DatasetRecordEntry;
+                }) => {
+                  onRowDataChange(
+                    rowData.map((row) => (row.id === data.id ? data : row))
+                  );
+                }}
+              />
+            </ErrorBoundary>
           </Box>
         </VStack>
       </HStack>
