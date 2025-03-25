@@ -12,11 +12,13 @@ import {
   Text,
   useDisclosure,
   VStack,
+  type StackProps,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
 import type { Node } from "@xyflow/react";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, X } from "react-feather";
+import { LuSquareCheckBig } from "react-icons/lu";
 import {
   BatchEvaluationV2RunList,
   useBatchEvaluationState,
@@ -42,7 +44,6 @@ import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Field, Signature, Workflow } from "../types/dsl";
 import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
 import { OptimizationProgressBar } from "./ProgressToast";
-import { LuSquareCheckBig } from "react-icons/lu";
 
 export function ResultsPanel({
   isCollapsed,
@@ -134,9 +135,11 @@ export function ResultsPanel({
 export function EvaluationResults({
   workflowId,
   evaluationState,
+  sidebarProps,
 }: {
   workflowId?: string;
   evaluationState: Workflow["state"]["evaluation"];
+  sidebarProps?: StackProps;
 }) {
   const { project } = useOrganizationTeamProject();
 
@@ -170,6 +173,10 @@ export function EvaluationResults({
   const [selectedRunId, setSelectedRunId] = useState<string | undefined>(
     evaluationState?.run_id
   );
+
+  useEffect(() => {
+    setSelectedRunId(evaluationState?.run_id);
+  }, [evaluationState?.run_id]);
 
   const { stopEvaluationExecution } = useEvaluationExecution();
 
@@ -229,6 +236,7 @@ export function EvaluationResults({
         selectedRunId={selectedRunId_}
         setSelectedRunId={setSelectedRunId}
         size="sm"
+        {...sidebarProps}
       />
       <VStack gap={0} width="full" height="full" minWidth="0">
         <BatchEvaluationV2EvaluationResults

@@ -26,7 +26,7 @@ export function ResultsStep() {
     })
   );
 
-  const { runEvaluation } = useRunEvalution();
+  const { runEvaluation, isLoading } = useRunEvalution();
 
   const form = useForm<{
     name: string;
@@ -89,6 +89,7 @@ export function ResultsStep() {
                       minHeight: "18px",
                     }}
                     onClick={runEvaluation}
+                    loading={isLoading}
                   >
                     <LuCirclePlay />
                     Run Trial Evaluation

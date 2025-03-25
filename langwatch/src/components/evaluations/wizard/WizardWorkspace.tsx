@@ -12,23 +12,31 @@ import {
   ReactFlowProvider,
   useUpdateNodeInternals,
 } from "@xyflow/react";
-import { useEffect } from "react";
+import { memo, useEffect } from "react";
 import { EvaluationResults } from "../../../optimization_studio/components/ResultsPanel";
 import { useShallow } from "zustand/react/shallow";
 
-export function WizardWorkspace() {
-  const { getDatasetId, wizardState, setWizardState, dsl } =
-    useEvaluationWizardStore(
-      useShallow((state) => ({
-        getDatasetId: state.getDatasetId,
-        wizardState: state.wizardState,
-        setWizardState: state.setWizardState,
-        dsl: state.getDSL(),
-      }))
-    );
+export const WizardWorkspace = memo(function WizardWorkspace() {
+  const {
+    getDatasetId,
+    workspaceTab,
+    setWizardState,
+    workflowId,
+    evaluationState,
+    hasWorkflow,
+  } = useEvaluationWizardStore(
+    useShallow((state) => ({
+      getDatasetId: state.getDatasetId,
+      workspaceTab: state.wizardState.workspaceTab,
+      setWizardState: state.setWizardState,
+      workflowId: state.workflowStore.workflow_id,
+      evaluationState: state.workflowStore.state.evaluation,
+      nodes: state.workflowStore.nodes,
+      hasWorkflow: state.workflowStore.nodes.length > 0,
+    }))
+  );
 
   const hasDataset = !!getDatasetId();
-  const hasWorkflow = dsl.nodes.length > 0;
   const hasResults = hasDataset && hasWorkflow;
 
   return (
@@ -48,7 +56,7 @@ export function WizardWorkspace() {
           display="flex"
           flexDirection="column"
           variant="enclosed"
-          value={wizardState.workspaceTab}
+          value={workspaceTab}
           onValueChange={(e) => {
             setWizardState({
               workspaceTab: e.value as State["wizardState"]["workspaceTab"],
@@ -98,7 +106,7 @@ export function WizardWorkspace() {
             >
               <ReactFlowProvider>
                 <DndProvider backend={HTML5Backend}>
-                  {wizardState.workspaceTab === "workflow" && (
+                  {workspaceTab === "workflow" && (
                     <WizardOptimizationStudioCanvas />
                   )}
                 </DndProvider>
@@ -115,10 +123,14 @@ export function WizardWorkspace() {
               top="58px"
             >
               <Card.Root width="full" height="full" position="sticky" top={6}>
-                <Card.Body width="full" height="full" paddingBottom={6}>
+                <Card.Body width="full" height="full" padding={0}>
                   <EvaluationResults
-                    workflowId={dsl.workflow_id}
-                    evaluationState={dsl.state.evaluation}
+                    workflowId={workflowId}
+                    evaluationState={evaluationState}
+                    sidebarProps={{
+                      padding: 2,
+                      borderRadius: "6px 0 0 6px",
+                    }}
                   />
                 </Card.Body>
               </Card.Root>
@@ -128,46 +140,48 @@ export function WizardWorkspace() {
       )}
     </VStack>
   );
-}
+});
 
-function WizardOptimizationStudioCanvas() {
-  const { dsl, onNodesChange, onEdgesChange, onConnect } =
-    useEvaluationWizardStore(
-      useShallow((state) => ({
-        dsl: state.getDSL(),
-        onNodesChange: state.workflowStore.onNodesChange,
-        onEdgesChange: state.workflowStore.onEdgesChange,
-        onConnect: state.workflowStore.onConnect,
-      }))
+const WizardOptimizationStudioCanvas = memo(
+  function WizardOptimizationStudioCanvas() {
+    const { dsl, onNodesChange, onEdgesChange, onConnect } =
+      useEvaluationWizardStore(
+        useShallow((state) => ({
+          dsl: state.getDSL(),
+          onNodesChange: state.workflowStore.onNodesChange,
+          onEdgesChange: state.workflowStore.onEdgesChange,
+          onConnect: state.workflowStore.onConnect,
+        }))
+      );
+
+    const updateNodeInternals = useUpdateNodeInternals();
+
+    useEffect(() => {
+      for (const node of dsl.nodes) {
+        updateNodeInternals(node.id);
+      }
+    }, [dsl, updateNodeInternals]);
+
+    return (
+      <OptimizationStudioCanvas
+        nodes={dsl.nodes}
+        edges={dsl.edges}
+        defaultZoom={1}
+        yAdjust={560}
+        style={{
+          border: "1px solid #DDD",
+          borderRadius: "8px",
+        }}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        fitView
+        fitViewOptions={{
+          maxZoom: 1.5,
+        }}
+      >
+        <Controls position="bottom-center" orientation="horizontal" />
+      </OptimizationStudioCanvas>
     );
-
-  const updateNodeInternals = useUpdateNodeInternals();
-
-  useEffect(() => {
-    for (const node of dsl.nodes) {
-      updateNodeInternals(node.id);
-    }
-  }, [dsl, updateNodeInternals]);
-
-  return (
-    <OptimizationStudioCanvas
-      nodes={dsl.nodes}
-      edges={dsl.edges}
-      defaultZoom={1}
-      yAdjust={560}
-      style={{
-        border: "1px solid #DDD",
-        borderRadius: "8px",
-      }}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onConnect={onConnect}
-      fitView
-      fitViewOptions={{
-        maxZoom: 1.5,
-      }}
-    >
-      <Controls position="bottom-center" orientation="horizontal" />
-    </OptimizationStudioCanvas>
-  );
-}
+  }
+);

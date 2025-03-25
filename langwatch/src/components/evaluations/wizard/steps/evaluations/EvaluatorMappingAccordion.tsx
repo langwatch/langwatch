@@ -1,29 +1,53 @@
-import { Accordion, Field, HStack, Text, VStack } from "@chakra-ui/react";
-import { ChevronDown } from "lucide-react";
+import { Field, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import {
   AVAILABLE_EVALUATORS,
   type Evaluators,
 } from "~/server/evaluations/evaluators.generated";
-import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
-import type { DatasetColumns } from "../../../../../server/datasets/types";
-import { api } from "../../../../../utils/api";
+import type { Entry } from "../../../../../optimization_studio/types/dsl";
 import { EvaluatorTracesMapping } from "../../../EvaluatorTracesMapping";
 import { StepAccordion } from "../../components/StepAccordion";
 
 export const EvaluatorMappingAccordion = () => {
-  const { project } = useOrganizationTeamProject();
   const {
-    wizardState,
-    getFirstEvaluatorNode: getFirstEvaluator,
-    getDatasetId,
+    realTimeTraceMappings,
+    task,
+    dataSource,
+    evaluatorCategory,
+    getFirstEvaluatorNode,
     setWizardState,
     getFirstEvaluatorEdges,
     setFirstEvaluatorEdges,
-  } = useEvaluationWizardStore();
+    datasetFields,
+  } = useEvaluationWizardStore(
+    useShallow(
+      ({
+        wizardState,
+        getFirstEvaluatorNode,
+        setWizardState,
+        getFirstEvaluatorEdges,
+        setFirstEvaluatorEdges,
+        getDSL,
+      }) => ({
+        realTimeTraceMappings: wizardState.realTimeTraceMappings,
+        task: wizardState.task,
+        dataSource: wizardState.dataSource,
+        evaluatorCategory: wizardState.evaluatorCategory,
+        getFirstEvaluatorNode,
+        setWizardState,
+        getFirstEvaluatorEdges,
+        setFirstEvaluatorEdges,
+        datasetFields:
+          (
+            getDSL().nodes.find((node) => node.type === "entry")?.data as Entry
+          )?.outputs?.map((field) => field.identifier) ?? [],
+      })
+    )
+  );
 
-  const evaluator = getFirstEvaluator();
+  const evaluator = getFirstEvaluatorNode();
   const evaluatorEdges = getFirstEvaluatorEdges();
   const evaluatorType = evaluator?.data.evaluator;
   const evaluatorDefinition = useMemo(() => {
@@ -32,8 +56,7 @@ export const EvaluatorMappingAccordion = () => {
       : undefined;
   }, [evaluatorType]);
 
-  const traceMappings = wizardState.realTimeTraceMappings ?? {
-    // It's okay to be empty, TracesMapping will fill it up with default mappings on first render
+  const traceMappings = realTimeTraceMappings ?? {
     mapping: {},
     expansions: [],
   };
@@ -45,22 +68,6 @@ export const EvaluatorMappingAccordion = () => {
     ];
   }, [evaluatorDefinition]);
 
-  const datasetId = getDatasetId();
-  const databaseDataset = api.datasetRecord.getAll.useQuery(
-    { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
-    {
-      enabled: !!project && !!datasetId,
-      refetchOnWindowFocus: false,
-    }
-  );
-  const datasetFields = useMemo(() => {
-    return (
-      (databaseDataset.data?.columnTypes as DatasetColumns)?.map(
-        ({ name }) => name
-      ) ?? []
-    );
-  }, [databaseDataset.data]);
-
   const sourceOptions = useMemo(() => {
     return {
       entry: {
@@ -68,7 +75,8 @@ export const EvaluatorMappingAccordion = () => {
         fields: datasetFields,
       },
     };
-  }, [datasetFields]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(datasetFields)]);
 
   return (
     <StepAccordion
@@ -76,16 +84,15 @@ export const EvaluatorMappingAccordion = () => {
       width="full"
       borderColor="green.400"
       title="Data Mapping"
-      showTrigger={!!wizardState.evaluatorCategory}
+      showTrigger={!!evaluatorCategory}
     >
       <VStack align="start" padding={2} paddingBottom={5} width="full" gap={8}>
         {evaluatorDefinition ? (
           <>
             <Text>
-              {wizardState.task == "real_time" &&
-              wizardState.dataSource !== "from_production"
+              {task == "real_time" && dataSource !== "from_production"
                 ? "From the dataset you chose, what columns are equivalent to the real time trace data which will be used for evaluation during monitoring?"
-                : wizardState.task == "real_time"
+                : task == "real_time"
                 ? "What data from the real time traces will be used for evaluation?"
                 : "What data from the dataset will be used for evaluation?"}
             </Text>
@@ -93,17 +100,14 @@ export const EvaluatorMappingAccordion = () => {
               <VStack align="start" gap={4} width="full">
                 <EvaluatorTracesMapping
                   titles={
-                    wizardState.task == "real_time" &&
-                    wizardState.dataSource !== "from_production"
+                    task == "real_time" && dataSource !== "from_production"
                       ? ["Dataset", "Trace", "Evaluator"]
-                      : wizardState.task == "real_time"
+                      : task == "real_time"
                       ? ["Trace", "Evaluator"]
                       : ["Dataset", "Evaluator"]
                   }
                   targetFields={targetFields}
-                  traceMapping={
-                    wizardState.task == "real_time" ? traceMappings : undefined
-                  }
+                  traceMapping={task == "real_time" ? traceMappings : undefined}
                   dsl={
                     evaluator?.id
                       ? {

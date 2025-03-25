@@ -10,6 +10,7 @@ import {
 } from "../../../../optimization_studio/hooks/useWorkflowStore";
 import { entryNode } from "../../../../optimization_studio/templates/blank";
 import type {
+  Entry,
   Evaluator,
   Workflow,
 } from "../../../../optimization_studio/types/dsl";

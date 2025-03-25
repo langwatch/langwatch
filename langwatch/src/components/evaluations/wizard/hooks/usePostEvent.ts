@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { toaster } from "../../../ui/toaster";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useHandleServerMessage } from "../../../../optimization_studio/hooks/useSocketClient";
@@ -7,6 +7,16 @@ import type {
   StudioServerEvent,
 } from "../../../../optimization_studio/types/events";
 import { useEvaluationWizardStore } from "./useEvaluationWizardStore";
+import { getDebugger } from "../../../../utils/logger";
+
+const DEBUGGING_ENABLED = true;
+
+if (DEBUGGING_ENABLED) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require("debug").enable("langwatch:wizard:*");
+}
+
+const debug = getDebugger("langwatch:wizard:usePostEvent");
 
 export const usePostEvent = () => {
   const { project } = useOrganizationTeamProject();
@@ -19,7 +29,9 @@ export const usePostEvent = () => {
     alertOnComponent: () => void 0,
   });
 
-  return useCallback(
+  const [isLoading, setIsLoading] = useState(false);
+
+  const postEvent = useCallback(
     (event: StudioClientEvent) => {
       if (!project) {
         return;
@@ -39,6 +51,8 @@ export const usePostEvent = () => {
               },
             });
           }, 20_000);
+
+          setIsLoading(true);
 
           // Using post_event endpoint which returns an SSE stream
           const response = await fetch("/api/workflows/post_event", {
@@ -66,12 +80,11 @@ export const usePostEvent = () => {
           const processChunk = (chunk: string) => {
             const events = chunk.split("\n\n").filter(Boolean);
             for (const event of events) {
-              console.log("received event", event);
               if (event.startsWith("data: ")) {
                 const serverEvent: StudioServerEvent = JSON.parse(
                   event.slice(6)
                 );
-                console.log("Received SSE event:", serverEvent);
+                debug("Received SSE event:", serverEvent);
 
                 handleServerMessage(serverEvent);
               }
@@ -112,9 +125,12 @@ export const usePostEvent = () => {
           if (timeout) {
             clearTimeout(timeout);
           }
+          setIsLoading(false);
         }
       })();
     },
     [project]
   );
+
+  return { postEvent, isLoading };
 };

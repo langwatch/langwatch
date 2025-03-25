@@ -26,7 +26,7 @@ export const useRunEvalution = () => {
     }))
   );
 
-  const postEvent = usePostEvent();
+  const { postEvent, isLoading } = usePostEvent();
 
   const runEvaluation = useCallback(() => {
     if (!completedStepValue("all")) {
@@ -73,5 +73,5 @@ export const useRunEvalution = () => {
     postEvent,
   ]);
 
-  return { runEvaluation };
+  return { runEvaluation, isLoading };
 };

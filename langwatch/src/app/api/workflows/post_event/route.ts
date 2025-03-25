@@ -16,6 +16,7 @@ import {
 } from "../../../../optimization_studio/types/events";
 import { getDebugger } from "../../../../utils/logger";
 import type { NextRequest } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 
 const debug = getDebugger("langwatch:post_message");
 
@@ -69,7 +70,6 @@ app.post(
           projectId,
           message,
           onEvent: (serverEvent: StudioServerEvent) => {
-            console.log("serverEvent", serverEvent);
             // Write each event to the SSE stream
             void stream.writeSSE({
               data: JSON.stringify(serverEvent),
@@ -77,11 +77,19 @@ app.post(
 
             // If we receive a "done" event, resolve the promise to end the stream
             if (serverEvent.type === "done") {
-              resolve();
+              setTimeout(() => {
+                resolve();
+              }, 1000);
             }
           },
         }).catch((error) => {
           console.error("error", error);
+          Sentry.captureException(error, {
+            extra: {
+              projectId,
+              message,
+            },
+          });
           void stream.writeSSE({
             data: JSON.stringify({
               type: "error",

@@ -19,6 +19,7 @@ import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
 import { EvaluationProgressBar } from "./EvaluationProgressBar";
 import { HoverableBigText } from "../../HoverableBigText";
+import React from "react";
 
 export function BatchEvaluationV2EvaluationSummary({
   run,
@@ -72,7 +73,7 @@ export function BatchEvaluationV2EvaluationSummary({
       <HStack width="100%" paddingY={4} paddingX={6} gap={5}>
         {Object.entries(run.summary.evaluations).map(([_, evaluation]) => {
           return (
-            <>
+            <React.Fragment key={evaluation.name}>
               <VStack align="start" gap={1}>
                 <HoverableBigText
                   fontWeight="500"
@@ -86,7 +87,7 @@ export function BatchEvaluationV2EvaluationSummary({
                 </HoverableBigText>
               </VStack>
               <Separator orientation="vertical" height="48px" />
-            </>
+            </React.Fragment>
           );
         })}
         <VStack align="start" gap={1}>

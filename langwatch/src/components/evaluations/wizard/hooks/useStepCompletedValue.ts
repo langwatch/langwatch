@@ -8,14 +8,21 @@ import { useEvaluationWizardStore } from "./useEvaluationWizardStore";
 export const useStepCompletedValue = () => {
   const { project } = useOrganizationTeamProject();
 
-  const { wizardState, datasetId, evaluator } = useEvaluationWizardStore(
-    ({ wizardState, setWizardState, getDatasetId, getFirstEvaluatorNode }) => ({
-      wizardState,
-      setWizardState,
-      datasetId: getDatasetId(),
-      evaluator: getFirstEvaluatorNode(),
-    })
-  );
+  const { task, executionMethod, datasetId, evaluator } =
+    useEvaluationWizardStore(
+      ({
+        wizardState,
+        setWizardState,
+        getDatasetId,
+        getFirstEvaluatorNode,
+      }) => ({
+        task: wizardState.task,
+        executionMethod: wizardState.executionMethod,
+        setWizardState,
+        datasetId: getDatasetId(),
+        evaluator: getFirstEvaluatorNode(),
+      })
+    );
 
   const databaseDataset = api.datasetRecord.getAll.useQuery(
     { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
@@ -32,14 +39,14 @@ export const useStepCompletedValue = () => {
           (getStepValue as (step: Step) => boolean)(step)
         );
       case "task":
-        return wizardState.task ? TASK_TYPES[wizardState.task] : undefined;
+        return task ? TASK_TYPES[task] : undefined;
       case "dataset":
         return databaseDataset?.data?.name;
       case "execution":
-        return wizardState.task === "real_time"
+        return task === "real_time"
           ? "When message arrives"
-          : wizardState.executionMethod
-          ? EXECUTION_METHODS[wizardState.executionMethod]
+          : executionMethod
+          ? EXECUTION_METHODS[executionMethod]
           : undefined;
       case "evaluation":
         return evaluator?.data?.name;
