@@ -5,24 +5,9 @@ import { nanoid } from "nanoid";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import type { PrismaClient, WorkflowVersion } from "@prisma/client";
 import { type Session } from "next-auth";
-import type { Workflow } from "../../../optimization_studio/types/dsl";
+import { workflowJsonSchema, type Workflow } from "../../../optimization_studio/types/dsl";
 import type { Unpacked } from "../../../utils/types";
 import { migrateDSLVersion } from "../../../optimization_studio/types/migrate";
-
-const workflowJsonSchema = z
-  .object({
-    spec_version: z.string(),
-    name: z.string(),
-    icon: z.string(),
-    description: z.string(),
-    version: z
-      .string()
-      .regex(
-        /^\d+\.\d+$/,
-        "Version must be in the format 'number.number' (e.g. 1.0)"
-      ),
-  })
-  .passthrough();
 
 export const workflowRouter = createTRPCRouter({
   create: protectedProcedure
@@ -335,7 +320,7 @@ export const workflowRouter = createTRPCRouter({
     }),
 });
 
-const saveOrCommitWorkflowVersion = async ({
+export const saveOrCommitWorkflowVersion = async ({
   ctx,
   input,
   autoSaved,

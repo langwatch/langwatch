@@ -26,9 +26,12 @@ import {
 } from "react-hook-form";
 import slugify from "slugify";
 import { z } from "zod";
-import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { getInputsOutputs } from "../../optimization_studio/utils/nodeUtils";
+import {
+  DEFAULT_MAPPINGS,
+  migrateLegacyMappings,
+} from "../../server/evaluations/evaluationMappings";
 import {
   AVAILABLE_EVALUATORS,
   type Evaluators,
@@ -42,10 +45,6 @@ import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
 } from "../../server/evaluations/getEvaluator";
-import {
-  DEFAULT_MAPPINGS,
-  migrateLegacyMappings,
-} from "../../server/evaluations/evaluationMappings";
 import type { CheckPreconditions } from "../../server/evaluations/types";
 import { checkPreconditionsSchema } from "../../server/evaluations/types.generated";
 import {
@@ -53,8 +52,8 @@ import {
   type MappingState,
 } from "../../server/tracer/tracesMapping";
 import { api } from "../../utils/api";
+import { EvaluatorTracesMapping } from "../evaluations/EvaluatorTracesMapping";
 import { HorizontalFormControl } from "../HorizontalFormControl";
-import { TracesMapping } from "../traces/TracesMapping";
 import { Tooltip } from "../ui/tooltip";
 import DynamicZodForm from "./DynamicZodForm";
 import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
@@ -274,25 +273,16 @@ export default function CheckConfigForm({
     </Text>
   );
 
-  const { filterParams, queryOpts } = useFilterParams();
-  const recentTraces = api.traces.getSampleTracesDataset.useQuery(
-    filterParams,
-    queryOpts
-  );
-
   const evaluatorDefinition = useMemo(
     () => checkType && availableEvaluators[checkType],
     [checkType, availableEvaluators]
   );
 
-  const mappingColumns = useMemo(() => {
+  const fields = useMemo(() => {
     return [
       ...(evaluatorDefinition?.requiredFields ?? []),
       ...(evaluatorDefinition?.optionalFields ?? []),
-    ].map((field) => ({
-      name: field,
-      type: "string" as const,
-    }));
+    ];
   }, [evaluatorDefinition]);
 
   return (
@@ -461,19 +451,13 @@ export default function CheckConfigForm({
                           label="Mappings"
                           helper="Map which fields from the trace will be used to run the evaluation"
                         >
-                          {mappings?.mapping && (
-                            <TracesMapping
-                              dataset={{
-                                mapping: mappings,
-                              }}
-                              traces={recentTraces.data ?? []}
-                              // TODO: specify optional/required fields
-                              columnTypes={mappingColumns}
-                              setDatasetMapping={(mapping) => {
-                                form.setValue("mappings", mapping);
-                              }}
-                            />
-                          )}
+                          <EvaluatorTracesMapping
+                            targetFields={fields}
+                            traceMapping={mappings}
+                            setTraceMapping={(mapping) => {
+                              form.setValue("mappings", mapping);
+                            }}
+                          />
                         </HorizontalFormControl>
                         <PreconditionsField
                           runOn={

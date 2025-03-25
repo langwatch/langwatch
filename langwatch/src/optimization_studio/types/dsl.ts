@@ -1,5 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { DatasetColumns } from "../../server/datasets/types";
+import { z } from "zod";
 
 export type Field = {
   identifier: string;
@@ -72,12 +73,14 @@ export type BaseComponent = {
   };
 };
 
-export type LLMConfig = {
-  model: string;
-  temperature?: number;
-  max_tokens?: number;
-  litellm_params?: Record<string, string>;
-};
+export const llmConfigSchema = z.object({
+  model: z.string(),
+  temperature: z.number().optional(),
+  max_tokens: z.number().optional(),
+  litellm_params: z.record(z.string()).optional(),
+});
+
+export type LLMConfig = z.infer<typeof llmConfigSchema>;
 
 export type Signature = BaseComponent;
 
@@ -140,6 +143,24 @@ type Flow = {
   nodes: Node<Component>[];
   edges: Edge[];
 };
+
+export const workflowJsonSchema = z
+  .object({
+    workflow_id: z.string().optional(),
+    spec_version: z.string(),
+    name: z.string(),
+    icon: z.string(),
+    description: z.string(),
+    version: z
+      .string()
+      .regex(
+        /^\d+(\.\d+)?$/,
+        "Version must be in the format 'number.number' (e.g. 1.0)"
+      ),
+    nodes: z.array(z.any()),
+  })
+  .passthrough();
+
 
 export type Workflow = {
   spec_version: "1.3";

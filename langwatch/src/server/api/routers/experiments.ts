@@ -16,8 +16,147 @@ import type {
 } from "../../experiments/types";
 import { checkUserPermissionForProject, TeamRoleGroup } from "../permission";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { saveOrCommitWorkflowVersion } from "./workflows";
+import {
+  wizardStateSchema,
+  type WizardState,
+} from "../../../components/evaluations/wizard/hooks/useEvaluationWizardStore";
+import { nanoid } from "nanoid";
+import { ExperimentType, type Workflow } from "@prisma/client";
+import { slugify } from "../../../utils/slugify";
+import {
+  workflowJsonSchema,
+  type Entry,
+} from "../../../optimization_studio/types/dsl";
+import type { Node } from "@xyflow/react";
 
 export const experimentsRouter = createTRPCRouter({
+  saveExperiment: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        experimentId: z.string().optional(),
+        wizardState: wizardStateSchema,
+        dsl: workflowJsonSchema,
+        commitMessage: z.string().optional(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      let workflowId = input.dsl.workflow_id;
+      const name =
+        input.wizardState.name ?? (await findNextDraftName(input.projectId));
+      const slug = slugify(name);
+
+      if (input.experimentId) {
+        const currentExperiment = await prisma.experiment.findUnique({
+          where: {
+            id: input.experimentId,
+            projectId: input.projectId,
+          },
+        });
+
+        if (!currentExperiment) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Experiment not found",
+          });
+        }
+
+        if (currentExperiment.workflowId) {
+          const workflow = await prisma.workflow.findUnique({
+            where: {
+              id: currentExperiment.workflowId,
+              projectId: input.projectId,
+            },
+          });
+
+          if (!workflow) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Workflow not found",
+            });
+          }
+
+          workflowId = workflow.id;
+        }
+
+        // Update dataset names as well if experiment name changes
+        if (currentExperiment.name && currentExperiment.name !== name) {
+          const datasetIds = input.dsl.nodes
+            .filter((node: Node<Entry>) => node.type === "dataset")
+            .map((node: Node<Entry>) => node.data.dataset?.id)
+            .filter(Boolean) as string[];
+
+          const datasets = await prisma.dataset.findMany({
+            where: { id: { in: datasetIds }, projectId: input.projectId },
+          });
+
+          for (const dataset of datasets) {
+            if (dataset.name.startsWith(currentExperiment.name)) {
+              await prisma.dataset.update({
+                where: { id: dataset.id, projectId: input.projectId },
+                data: { name: dataset.name.replace(currentExperiment.name, name) },
+              });
+            }
+          }
+        }
+      }
+
+      const workflowName = `${name} - Workflow`;
+      if (!workflowId) {
+        const workflow = await ctx.prisma.workflow.create({
+          data: {
+            id: `workflow_${nanoid()}`,
+            projectId: input.projectId,
+            name: workflowName,
+            icon: input.dsl.icon,
+            description: input.dsl.description,
+          },
+        });
+
+        workflowId = workflow.id;
+      }
+
+      await saveOrCommitWorkflowVersion({
+        ctx,
+        input: {
+          projectId: input.projectId,
+          workflowId: workflowId,
+          dsl: {
+            ...input.dsl,
+            workflow_id: workflowId,
+            name: workflowName,
+          },
+        },
+        autoSaved: !input.commitMessage,
+        commitMessage: input.commitMessage ?? "Autosaved",
+        setAsLatestVersion: true,
+      });
+
+      const experimentId = input.experimentId ?? `experiment_${nanoid()}`;
+      const experimentData = {
+        id: experimentId,
+        name,
+        slug,
+        projectId: input.projectId,
+        type: ExperimentType.BATCH_EVALUATION_V2,
+        workflowId,
+        wizardState: input.wizardState,
+      };
+
+      const experiment = await prisma.experiment.upsert({
+        where: {
+          id: experimentId,
+          projectId: input.projectId,
+        },
+        update: experimentData,
+        create: experimentData,
+      });
+
+      return experiment;
+    }),
+
   getExperimentBySlug: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
@@ -28,6 +167,33 @@ export const experimentsRouter = createTRPCRouter({
       );
 
       return experiment;
+    }),
+
+  getExperimentWithDSLBySlug: protectedProcedure
+    .input(z.object({ projectId: z.string(), experimentSlug: z.string(), randomSeed: z.number().optional() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .query(async ({ input }) => {
+      const experiment = await getExperimentBySlug(
+        input.projectId,
+        input.experimentSlug
+      );
+
+      const workflow = experiment.workflowId
+        ? await prisma.workflow.findUnique({
+            where: {
+              id: experiment.workflowId,
+              projectId: input.projectId,
+              archivedAt: null,
+            },
+            include: { currentVersion: true },
+          })
+        : undefined;
+
+      return {
+        ...experiment,
+        wizardState: experiment.wizardState as WizardState | undefined,
+        dsl: workflow?.currentVersion?.dsl as Workflow | undefined,
+      };
     }),
 
   getAllByProjectId: protectedProcedure
@@ -484,4 +650,34 @@ const getVersionMap = async (projectId: string, versionIds: string[]) => {
   );
 
   return versionsMap;
+};
+
+const findNextDraftName = async (projectId: string) => {
+  const drafts = await prisma.experiment.findMany({
+    select: {
+      name: true,
+      slug: true,
+    },
+    where: {
+      projectId: projectId,
+    },
+  });
+
+  const slugs = new Set(
+    drafts
+      .filter((draft) => draft.name?.startsWith("Draft"))
+      .map((draft) => draft.slug)
+  );
+
+  let draftName;
+  let index = slugs.size + 1;
+  while (true) {
+    draftName = `Draft Evaluation (${index})`;
+    if (!slugs.has(slugify(draftName))) {
+      break;
+    }
+    index++;
+  }
+
+  return draftName;
 };

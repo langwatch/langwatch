@@ -2,6 +2,8 @@ import {
   Alert,
   Box,
   Button,
+  Center,
+  EmptyState,
   Heading,
   HStack,
   Skeleton,
@@ -10,11 +12,13 @@ import {
   Text,
   useDisclosure,
   VStack,
+  type StackProps,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
 import type { Node } from "@xyflow/react";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, X } from "react-feather";
+import { LuSquareCheckBig } from "react-icons/lu";
 import {
   BatchEvaluationV2RunList,
   useBatchEvaluationState,
@@ -37,7 +41,7 @@ import { api } from "../../utils/api";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import type { Field, Signature } from "../types/dsl";
+import type { Field, Signature, Workflow } from "../types/dsl";
 import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
 import { OptimizationProgressBar } from "./ProgressToast";
 
@@ -55,6 +59,13 @@ export function ResultsPanel({
   useEffect(() => {
     setTabIndex(defaultTab);
   }, [defaultTab]);
+
+  const { workflowId, evaluationState } = useWorkflowStore(
+    ({ workflow_id: workflowId, state }) => ({
+      workflowId,
+      evaluationState: state.evaluation,
+    })
+  );
 
   return (
     <HStack
@@ -100,7 +111,12 @@ export function ResultsPanel({
           padding={0}
           height="calc(100% - 32px)"
         >
-          {!isCollapsed && tabIndex === "evaluations" && <EvaluationResults />}
+          {!isCollapsed && tabIndex === "evaluations" && (
+            <EvaluationResults
+              workflowId={workflowId}
+              evaluationState={evaluationState}
+            />
+          )}
         </Tabs.Content>
         <Tabs.Content
           value="optimizations"
@@ -116,14 +132,15 @@ export function ResultsPanel({
   );
 }
 
-export function EvaluationResults() {
-  const { workflowId, evaluationState } = useWorkflowStore(
-    ({ workflow_id: workflowId, state }) => ({
-      workflowId,
-      evaluationState: state.evaluation,
-    })
-  );
-
+export function EvaluationResults({
+  workflowId,
+  evaluationState,
+  sidebarProps,
+}: {
+  workflowId?: string;
+  evaluationState: Workflow["state"]["evaluation"];
+  sidebarProps?: StackProps;
+}) {
   const { project } = useOrganizationTeamProject();
 
   const [keepFetching, setKeepFetching] = useState(false);
@@ -157,6 +174,10 @@ export function EvaluationResults() {
     evaluationState?.run_id
   );
 
+  useEffect(() => {
+    setSelectedRunId(evaluationState?.run_id);
+  }, [evaluationState?.run_id]);
+
   const { stopEvaluationExecution } = useEvaluationExecution();
 
   const {
@@ -188,7 +209,21 @@ export function EvaluationResults() {
   }
 
   if (!experiment.data || !project) {
-    return <Text padding={4}>Loading...</Text>;
+    return (
+      <Center width="full" height="full">
+        <EmptyState.Root marginTop="-60px">
+          <EmptyState.Content>
+            <EmptyState.Indicator>
+              <LuSquareCheckBig />
+            </EmptyState.Indicator>
+            <EmptyState.Title>Waiting for evaluation results</EmptyState.Title>
+            <EmptyState.Description>
+              Run your first evaluation to see the results here
+            </EmptyState.Description>
+          </EmptyState.Content>
+        </EmptyState.Root>
+      </Center>
+    );
   }
 
   const evaluationStateRunId = evaluationState?.run_id;
@@ -201,6 +236,7 @@ export function EvaluationResults() {
         selectedRunId={selectedRunId_}
         setSelectedRunId={setSelectedRunId}
         size="sm"
+        {...sidebarProps}
       />
       <VStack gap={0} width="full" height="full" minWidth="0">
         <BatchEvaluationV2EvaluationResults
