@@ -6,7 +6,7 @@ export const slugify = (
   options: Parameters<typeof originalSlugify>[1] = {}
 ) => {
   return originalSlugify(
-    str.replace("_", "-"),
+    str.replaceAll("_", "-"),
     typeof options === "object"
       ? {
           lower: true,

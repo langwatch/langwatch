@@ -96,7 +96,7 @@ export const experimentsRouter = createTRPCRouter({
             if (dataset.name.startsWith(currentExperiment.name)) {
               await prisma.dataset.update({
                 where: { id: dataset.id, projectId: input.projectId },
-                data: { name: name.replace(currentExperiment.name, name) },
+                data: { name: dataset.name.replace(currentExperiment.name, name) },
               });
             }
           }
