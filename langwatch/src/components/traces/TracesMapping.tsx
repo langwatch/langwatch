@@ -47,7 +47,7 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
 ).reduce(
   (acc, [key, value]) => {
     if (acc[value]) {
-      acc[value].push(key);
+      acc[value]!.push(key);
     } else {
       acc[value] = [key];
     }
