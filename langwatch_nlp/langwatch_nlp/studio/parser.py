@@ -187,7 +187,7 @@ def parse_code(node_id: str, component: Code, workflow: Workflow) -> dspy.Module
 
     namespace = {}
     try:
-        exec(code, None, namespace)
+        exec(code, namespace)
     except Exception as e:
         raise ValueError(f"Error parsing code for component {component.name}: {e}")
 
