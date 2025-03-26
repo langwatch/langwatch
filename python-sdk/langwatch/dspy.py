@@ -16,7 +16,6 @@ from dspy.teleprompt import (
     BootstrapFewShot,
     BootstrapFewShotWithRandomSearch,
     COPRO,
-    MIPRO,
     MIPROv2,
 )
 from dspy.signatures.signature import SignatureMeta
@@ -212,7 +211,6 @@ class LangWatchDSPy:
             BootstrapFewShot: LangWatchTrackedBootstrapFewShot,
             BootstrapFewShotWithRandomSearch: LangWatchTrackedBootstrapFewShotWithRandomSearch,
             COPRO: LangWatchTrackedCOPRO,
-            MIPRO: LangWatchTrackedMIPRO,
             MIPROv2: LangWatchTrackedMIPROv2,
         }
 
@@ -233,12 +231,6 @@ class LangWatchDSPy:
         self.steps_buffer = []
 
     def patch_llms(self):
-        if not hasattr(dspy.OpenAI, "_original_request"):
-            dspy.OpenAI._original_request = dspy.OpenAI.request  # type: ignore
-
-        if not hasattr(dspy.AzureOpenAI, "_original_request"):
-            dspy.AzureOpenAI._original_request = dspy.AzureOpenAI.request  # type: ignore
-
         if not hasattr(dspy.LM, "_original_call"):
             dspy.LM._original_call = dspy.LM.__call__  # type: ignore
 
@@ -298,8 +290,6 @@ class LangWatchDSPy:
                 this.llm_calls_buffer.append(llm_call)
             return outputs
 
-        dspy.OpenAI.request = patched_request
-        dspy.AzureOpenAI.request = patched_request
         dspy.LM.__call__ = patched_call
 
     def track_metric(
@@ -578,69 +568,6 @@ class LangWatchTrackedCOPRO(COPRO):
             Evaluate.__call__ = original_evaluate_call
 
 
-class LangWatchTrackedMIPRO(MIPRO):
-    def patch(self):
-        self.metric = langwatch_dspy.track_metric(self.metric)
-
-    def compile(self, student, **kwargs):
-        with self._patch_print_and_evaluate():
-            return super().compile(student, **kwargs)
-
-    @contextmanager
-    def _patch_print_and_evaluate(self):
-        original_evaluate_call = Evaluate.__call__
-        step = 0
-        substep = 0
-        scores = []
-
-        this = self
-
-        last_candidate_program: Optional[int] = None
-
-        def patched_evaluate_call(self, program: dspy.Module, *args, **kwargs):
-            nonlocal step, scores, substep, last_candidate_program
-
-            if last_candidate_program != id(program):
-                step += 1
-                substep = 0
-                scores = []
-                last_candidate_program = id(program)
-
-            step_ = str(step) if substep == 0 else f"{step}.{substep}"
-            substep += 1
-
-            score: float = original_evaluate_call(self, program, *args, **kwargs)  # type: ignore
-
-            scores.append(score)
-
-            if max(scores) == score:
-                langwatch_dspy.log_step(
-                    optimizer=DSPyOptimizer(
-                        name=MIPRO.__name__,
-                        parameters={
-                            "num_candidates": this.num_candidates,
-                            "init_temperature": this.init_temperature,
-                        },
-                    ),
-                    index=step_,
-                    score=score,
-                    label="score",
-                    predictors=[
-                        DSPyPredictor(name=name, predictor=predictor)
-                        for name, predictor in program.named_predictors()
-                    ],
-                )
-
-            return score
-
-        Evaluate.__call__ = patched_evaluate_call
-
-        try:
-            yield
-        finally:
-            Evaluate.__call__ = original_evaluate_call
-
-
 class LangWatchTrackedMIPROv2(MIPROv2):
     def patch(self):
         self.metric = langwatch_dspy.track_metric(self.metric)
@@ -672,7 +599,11 @@ class LangWatchTrackedMIPROv2(MIPROv2):
             step_ = str(step) if substep == 0 else f"{step}.{substep}"
             substep += 1
 
-            score: float = original_evaluate_call(self, program, *args, **kwargs)  # type: ignore
+            result = original_evaluate_call(self, program, *args, **kwargs)  # type: ignore
+            if isinstance(result, tuple):
+                score : float = result[0]
+            else:
+                score : float = result
 
             scores.append(score)
 
@@ -698,7 +629,7 @@ class LangWatchTrackedMIPROv2(MIPROv2):
                     ],
                 )
 
-            return score
+            return result
 
         Evaluate.__call__ = patched_evaluate_call
 
@@ -723,7 +654,7 @@ class DSPyTracer:
             dspy.Predict.__original_forward__ = dspy.Predict.forward  # type: ignore
             dspy.Predict.forward = self.patched_predict_forward()
 
-        language_model_classes = dspy.OpenAI.__subclasses__() + dspy.LM.__subclasses__()
+        language_model_classes = dspy.LM.__subclasses__()
         for lm in language_model_classes:
             if not hasattr(lm, "__original_basic_request__") and hasattr(
                 lm, "basic_request"
