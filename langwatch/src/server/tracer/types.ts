@@ -426,12 +426,12 @@ export type DatasetSpan =
   | (Omit<
       BaseSpan,
       "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"
-    > & { params: Record<string, any>; model?: string })
+    > & { params: Record<string, any>; model?: string | null })
   | (Omit<
       LLMSpan,
       "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"
-    > & { params: Record<string, any>; model?: string })
+    > & { params: Record<string, any>; model?: string | null })
   | (Omit<
       RAGSpan,
       "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"
-    > & { params: Record<string, any>; model?: string });
+    > & { params: Record<string, any>; model?: string | null });

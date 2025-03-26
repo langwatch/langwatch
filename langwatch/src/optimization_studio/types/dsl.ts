@@ -144,6 +144,7 @@ type Flow = {
   edges: Edge[];
 };
 
+// TODO: make this a complete replacement for Workflow below
 export const workflowJsonSchema = z
   .object({
     workflow_id: z.string().optional(),
@@ -158,6 +159,7 @@ export const workflowJsonSchema = z
         "Version must be in the format 'number.number' (e.g. 1.0)"
       ),
     nodes: z.array(z.any()),
+    default_llm: llmConfigSchema,
   })
   .passthrough();
 
