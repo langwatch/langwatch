@@ -520,8 +520,6 @@ export class LangWatchSpan implements PendingBaseSpan {
       this.update(params);
     }
 
-    Object.freeze(this);
-
     try {
       const finalSpan = spanSchema.parse(
         camelToSnakeCaseNested({
