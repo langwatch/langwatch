@@ -93,10 +93,6 @@ export function Header() {
         <Button variant="plain" asChild className="-ml-2">
           <Link href="/manual">Manual Tracing</Link>
         </Button>
-        <IconSeparator className="size-6 text-muted-foreground/50" />
-        <Button variant="plain" asChild className="-ml-2">
-          <Link href="/late-update">Late Update Tracing</Link>
-        </Button>
       </div>
       <div className="flex items-center justify-end space-x-2">
         <a
