@@ -176,11 +176,16 @@ export const TracesMapping = ({
       expansions: new Set(currentMapping.expansions),
     };
 
-    setTraceMappingState_(traceMappingStateWithDefaults);
-    setTraceMapping?.({
-      ...traceMappingStateWithDefaults,
-      expansions: Array.from(traceMappingStateWithDefaults.expansions),
-    });
+    if (
+      JSON.stringify(traceMappingState) !==
+      JSON.stringify(traceMappingStateWithDefaults)
+    ) {
+      setTraceMappingState_(traceMappingStateWithDefaults);
+      setTraceMapping?.({
+        ...traceMappingStateWithDefaults,
+        expansions: Array.from(traceMappingStateWithDefaults.expansions),
+      });
+    }
 
     if (!dsl) return;
 
