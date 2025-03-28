@@ -1,6 +1,6 @@
 import os
 
-from typing import Any, Dict, Optional, Sequence
+from typing import Dict, Optional, Sequence
 
 from opentelemetry import trace
 from opentelemetry.sdk import trace as trace_api
@@ -10,26 +10,28 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
 from .typings import Instrumentor
+from .types import LangWatchClientProtocol, BaseAttributes
 
-class Client:
+class Client(LangWatchClientProtocol):
 	"""
 	Client for the LangWatch tracing SDK.
 	"""
 
 	tracer_provider: Optional[TracerProvider] = None
-
+	debug: bool = False
 	api_key: str
-	endpoint_url: str
+	_endpoint_url: str
 	instrumentors: Sequence[Instrumentor] = []
-	base_attributes: Dict[str, Any] = {}
+	base_attributes: BaseAttributes = {}
 
 	def __init__(
 		self,
-		api_key: Optional[str] = None,
+		api_key: Optional[str] = None,	
 		endpoint_url: Optional[str] = None,
-		base_attributes: Optional[Dict[str, Any]] = None,
+		base_attributes: Optional[BaseAttributes] = None,
 		instrumentors: Optional[Sequence[Instrumentor]] = None,
 		tracer_provider: Optional[TracerProvider] = None,
+		debug: bool = False,
 	):
 		"""
 		Initialize the LangWatch tracing client.
@@ -44,14 +46,20 @@ class Client:
 		"""
 
 		self.api_key = api_key or os.getenv("LANGWATCH_API_KEY")
-		self.endpoint_url = endpoint_url or os.getenv("LANGWATCH_ENDPOINT_URL") or "https://app.langwatch.ai"
+		self._endpoint_url = endpoint_url or os.getenv("LANGWATCH_ENDPOINT_URL") or "https://app.langwatch.ai"
 		self.base_attributes = base_attributes or {}
+		self.debug = debug
 
-		self.tracer_provider = self.__ensure_otel_setup(self.endpoint_url, tracer_provider)
+		self.tracer_provider = self.__ensure_otel_setup(self._endpoint_url, tracer_provider)
 
 		self.instrumentors = instrumentors or []
 		for instrumentor in self.instrumentors:
 			instrumentor.instrument(tracer_provider=tracer_provider)
+
+	@property
+	def endpoint_url(self) -> str:
+		"""Get the endpoint URL for the client."""
+		return self._endpoint_url
 
 	# TODO(afr): How do we handle merging the tracer provider if one exists, with the
 	# base attributes?
@@ -78,4 +86,3 @@ class Client:
 		trace.set_tracer_provider(tracer_provider)
 
 		return tracer_provider
-
