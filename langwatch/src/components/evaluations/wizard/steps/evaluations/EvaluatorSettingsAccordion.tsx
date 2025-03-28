@@ -90,7 +90,6 @@ export const EvaluatorSettingsAccordion = () => {
 
   useEffect(() => {
     form.watch(() => {
-      console.log(form.getValues());
       void form.handleSubmit(onSubmit)();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
