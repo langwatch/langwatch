@@ -606,7 +606,7 @@ export const analyticsMetrics = {
       },
       aggregation: (aggregation, key) => {
         return {
-          [`evaluation_score_${aggregation}_${key}`]: {
+          [`evaluation_pass_rate_${aggregation}_${key}`]: {
             nested: {
               path: "evaluations",
             },
@@ -644,7 +644,7 @@ export const analyticsMetrics = {
         };
       },
       extractionPath: (aggregation: AggregationTypes, key) => {
-        return `evaluation_score_${aggregation}_${key}>child>child`;
+        return `evaluation_pass_rate_${aggregation}_${key}>child>child`;
       },
       quickwitSupport: false,
     },
