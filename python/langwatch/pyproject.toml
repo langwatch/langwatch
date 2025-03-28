@@ -20,9 +20,13 @@ classifiers = [
 ]
 
 dependencies = [
+    "httpx>=0.28.1",
+    "openinference-instrumentation-litellm>=0.1.14",
+    "openinference-instrumentation-openai>=0.1.22",
     "opentelemetry-api>=1.27.0",
     "opentelemetry-exporter-otlp-proto-http>=1.31.1",
     "opentelemetry-sdk>=1.27.0",
+    "pydantic>=2.10.1",
 ]
 
 [project.optional-dependencies]
@@ -38,17 +42,17 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["langwatch"]
+packages = ["src/langwatch"]
 
 [dependency-groups]
 examples = [
-    "chainlit>=2.4.301",
+    "chainlit>=1.3.0,<2",
     "fastapi>=0.115.12",
     "nanoid>=2.0.0",
     "openai>=1.68.2",
     "openinference-instrumentation-openai>=0.1.22",
     "opentelemetry-instrumentation-fastapi>=0.52b1",
-    "pydantic>=2.10.6",
+    "pydantic>=1,<2.10.2",                                      # v2.10.2 is broken for chainlit
     "python-dotenv>=1.0.1",
-    "uvicorn>=0.34.0",
+    "uvicorn>=0.25.0,<0.26.0",
 ]
