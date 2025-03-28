@@ -132,7 +132,7 @@ export default function OrganizationOnboarding() {
       : undefined;
 
   const publicEnv = usePublicEnv();
-  const isSaaS = publicEnv.data?.IS_SAAS || true;
+  const isSaaS = publicEnv.data?.IS_SAAS;
 
   const createOrganization = api.organization.createAndAssign.useMutation();
   const apiContext = api.useContext();
