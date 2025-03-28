@@ -47,51 +47,6 @@ export default function EvaluationsV2() {
     void router.push(`/${project.slug}/evaluations/${monitorId}/edit`);
   };
 
-  // Transform checks data into monitor format
-  const guardrails =
-    checks.data
-      ?.filter((check) => check.executionMode === "AS_GUARDRAIL")
-      .map((check) => ({
-        id: check.id,
-        name: check.name,
-        type: "boolean",
-        metric: "Pass Rate",
-        value: 0.95, // TODO: Get real value from metrics
-        status: "healthy" as const,
-        lastUpdated: "2 min ago", // TODO: Get real timestamp
-        history: [
-          { time: "1", value: 0.92 },
-          { time: "2", value: 0.95 },
-          { time: "3", value: 0.97 },
-          { time: "4", value: 0.96 },
-          { time: "5", value: 0.95 },
-          { time: "6", value: 0.99 },
-          { time: "7", value: 0.95 },
-        ],
-      })) ?? [];
-
-  const monitors =
-    checks.data
-      ?.filter((check) => check.executionMode !== "AS_GUARDRAIL")
-      .map((check) => ({
-        id: check.id,
-        name: check.name,
-        type: "boolean",
-        metric: "Pass Rate",
-        value: 0.87, // TODO: Get real value from metrics
-        status: "healthy" as const,
-        lastUpdated: "5 min ago", // TODO: Get real timestamp
-        history: [
-          { time: "1", value: 0.82 },
-          { time: "2", value: 0.84 },
-          { time: "3", value: 0.81 },
-          { time: "4", value: 0.85 },
-          { time: "5", value: 0.86 },
-          { time: "6", value: 0.87 },
-          { time: "7", value: 0.87 },
-        ],
-      })) ?? [];
-
   return (
     <DashboardLayout>
       <Container maxWidth="1200" padding={6}>
@@ -138,16 +93,8 @@ export default function EvaluationsV2() {
           ) : (
             <>
               <MonitorsSection
-                title="Active Guardrails"
-                description="Real-time evaluation systems that block or flag messages"
-                monitors={guardrails}
-                onEditMonitor={handleEditMonitor}
-              />
-
-              <MonitorsSection
                 title="Active Monitors"
-                description="Post-execution evaluation systems that analyze results"
-                monitors={monitors}
+                evaluations={checks.data}
                 onEditMonitor={handleEditMonitor}
               />
 

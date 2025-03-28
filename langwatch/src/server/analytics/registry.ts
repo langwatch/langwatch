@@ -558,7 +558,7 @@ export const analyticsMetrics = {
       format: "0.00a",
       increaseIs: "neutral",
       allowedAggregations: allAggregationTypes.filter(
-        (agg) => agg != "cardinality"
+        (agg) => agg != "cardinality" && agg != "terms"
       ),
       requiresKey: {
         filter: "evaluations.evaluator_id",
@@ -593,8 +593,63 @@ export const analyticsMetrics = {
       },
       quickwitSupport: false,
     },
+    evaluation_pass_rate: {
+      label: "Evaluation Pass Rate",
+      colorSet: "tealTones",
+      format: "0.00a",
+      increaseIs: "good",
+      allowedAggregations: allAggregationTypes.filter(
+        (agg) => agg != "cardinality" && agg != "terms"
+      ),
+      requiresKey: {
+        filter: "evaluations.evaluator_id",
+      },
+      aggregation: (aggregation, key) => {
+        return {
+          [`evaluation_score_${aggregation}_${key}`]: {
+            nested: {
+              path: "evaluations",
+            },
+            aggs: {
+              child: {
+                filter: {
+                  bool: {
+                    must: [{ term: { "evaluations.evaluator_id": key } }],
+                  } as any,
+                },
+                aggs: {
+                  child: {
+                    [aggregation]: {
+                      script: {
+                        source: `
+                          double result = 0.0;
+                          try {
+                            if (doc.containsKey('evaluations.passed') && doc['evaluations.passed'].size() > 0) {
+                              result = doc['evaluations.passed'].value ? 1.0 : 0.0;
+                            } else if (doc.containsKey('evaluations.score') && doc['evaluations.score'].size() > 0) {
+                              result = doc['evaluations.score'].value;
+                            }
+                          } catch (Exception e) {
+                            // Ignore exceptions and return default value
+                          }
+                          return result;
+                        `,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+      },
+      extractionPath: (aggregation: AggregationTypes, key) => {
+        return `evaluation_score_${aggregation}_${key}>child>child`;
+      },
+      quickwitSupport: false,
+    },
     evaluation_runs: {
-      label: "Evaluation Execution",
+      label: "Evaluation Runs",
       colorSet: "tealTones",
       format: "0.[00]a",
       increaseIs: "neutral",
@@ -620,8 +675,8 @@ export const analyticsMetrics = {
                 } as any,
               },
               aggs: {
-                cardinality: {
-                  cardinality: {
+                child: {
+                  [aggregation]: {
                     script: {
                       source: `return doc['evaluations.evaluation_id'].value`,
                     },
@@ -633,7 +688,7 @@ export const analyticsMetrics = {
         },
       }),
       extractionPath: (aggregation: AggregationTypes) => {
-        return `checks_${aggregation}>child>cardinality`;
+        return `checks_${aggregation}>child>child`;
       },
       quickwitSupport: false,
     },
