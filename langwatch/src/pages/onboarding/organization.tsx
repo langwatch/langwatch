@@ -131,8 +131,6 @@ export default function OrganizationOnboarding() {
       ? router.query.return_to
       : undefined;
 
-  console.log(errors);
-  
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS || true;
 
@@ -364,43 +362,41 @@ export default function OrganizationOnboarding() {
                     </Field.Root>
 
                     {getValues("usage") !== "For myself" && getValues("usage") && (
-                      <>
-                        <Field.Root>
-                          <Field.Label>
-                            Phone number
-                            <Text fontSize={"x-small"} color={"GrayText"}>optional</Text>
-                          </Field.Label>
-                          <PhoneInput
-                            {...phoneNumber}
-                            autoFocus
-                            countries={defaultCountries.map((country) => {
-                              const country_ = parseCountry(country);
-                              if (country_.iso2 === "nl") {
-                                return buildCountryData({
-                                  ...country_,
-                                  format: ". ........",
-                                });
-                              }
-                              return country;
-                            })}
-                            inputStyle={{ width: "100%", border: "1px solid #e6e9f0" }}
-                            countrySelectorStyleProps={{
-                              buttonStyle: {
-                                borderColor: "#e6e9f0",
-                                paddingLeft: "8px",
-                                paddingRight: "8px",
-                              },
-                            }}
-                            onChange={(phone) => {
-                              void phoneNumber.onChange({
-                                target: {
-                                  value: phone,
-                                },
+                      <Field.Root>
+                        <Field.Label>
+                          Phone number
+                          <Text fontSize={"x-small"} color={"GrayText"}>optional</Text>
+                        </Field.Label>
+                        <PhoneInput
+                          {...phoneNumber}
+                          autoFocus
+                          countries={defaultCountries.map((country) => {
+                            const country_ = parseCountry(country);
+                            if (country_.iso2 === "nl") {
+                              return buildCountryData({
+                                ...country_,
+                                format: ". ........",
                               });
-                            }}
-                          />
-                        </Field.Root>
-                      </>
+                            }
+                            return country;
+                          })}
+                          inputStyle={{ width: "100%", border: "1px solid #e6e9f0" }}
+                          countrySelectorStyleProps={{
+                            buttonStyle: {
+                              borderColor: "#e6e9f0",
+                              paddingLeft: "8px",
+                              paddingRight: "8px",
+                            },
+                          }}
+                          onChange={(phone) => {
+                            void phoneNumber.onChange({
+                              target: {
+                                value: phone,
+                              },
+                            });
+                          }}
+                        />
+                      </Field.Root>
                     )}
 
                     <Field.Root invalid={!!errors.solution}>
@@ -546,7 +542,7 @@ export default function OrganizationOnboarding() {
                         {errors.featureUsage?.message}
                       </Field.ErrorText>
                     </Field.Root>
-                    <Field.Root invalid={!!errors.featureUsage}>
+                    <Field.Root invalid={!!errors.yourRole}>
                       <Field.Label>What is your role?</Field.Label>
                       <RadioGroup
                         value={selectedValueYourRole || ""}
