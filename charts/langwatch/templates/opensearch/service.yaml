@@ -1,0 +1,20 @@
+# Service for OpenSearch
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-opensearch
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-opensearch
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  type: {{ .Values.opensearch.service.type }}
+  ports:
+    {{- range .Values.opensearch.service.ports }}
+    - port: {{ .port }}
+      targetPort: {{ .name }}
+      protocol: TCP
+      name: {{ .name }}
+    {{- end }}
+  selector:
+    app.kubernetes.io/name: {{ .Release.Name }}-opensearch
+    app.kubernetes.io/instance: {{ .Release.Name }}

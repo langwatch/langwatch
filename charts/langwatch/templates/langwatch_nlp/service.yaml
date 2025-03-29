@@ -1,0 +1,18 @@
+# Service for the LangWatch NLP component
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-langwatch-nlp
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  type: {{ .Values.langwatch_nlp.service.type }}
+  ports:
+    - port: {{ .Values.langwatch_nlp.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
+    app.kubernetes.io/instance: {{ .Release.Name }}
