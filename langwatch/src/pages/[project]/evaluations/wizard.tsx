@@ -50,10 +50,7 @@ export default function EvaluationWizard() {
     return <ErrorPage statusCode={404} />;
   }
 
-  if (
-    !project ||
-    (initialLoadExperimentSlug && initialLoadExperiment.isLoading)
-  ) {
+  if (!project) {
     return <LoadingScreen />;
   }
 
@@ -68,7 +65,11 @@ export default function EvaluationWizard() {
         }}
         size="full"
       >
-        <EvaluationWizardComponent />
+        <EvaluationWizardComponent
+          isLoading={
+            initialLoadExperimentSlug && initialLoadExperiment.isLoading
+          }
+        />
       </Dialog.Root>
     </>
   );
