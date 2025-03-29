@@ -67,7 +67,7 @@ export default function EvaluationWizard() {
       >
         <EvaluationWizardComponent
           isLoading={
-            initialLoadExperimentSlug && initialLoadExperiment.isLoading
+            !!initialLoadExperimentSlug && initialLoadExperiment.isLoading
           }
         />
       </Dialog.Root>

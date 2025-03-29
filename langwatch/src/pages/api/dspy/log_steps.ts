@@ -147,13 +147,14 @@ export default async function handler(
 }
 
 const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
-  const { run_id, index, experiment_slug } = param;
+  const { run_id, index, experiment_id, experiment_slug } = param;
 
-  const experiment = await findOrCreateExperiment(
+  const experiment = await findOrCreateExperiment({
     project,
+    experiment_id,
     experiment_slug,
-    ExperimentType.DSPY
-  );
+    experiment_type: ExperimentType.DSPY,
+  });
 
   const id = dspyStepIndexId({
     projectId: project.id,

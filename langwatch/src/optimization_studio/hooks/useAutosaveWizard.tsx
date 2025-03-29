@@ -100,7 +100,10 @@ const useAutosaveWizard = () => {
         skipNextAutosave();
         setExperimentSlug(updatedExperiment.slug);
         setWizardState({ name: updatedExperiment.name ?? undefined });
-        setWorkflow({ workflow_id: updatedExperiment.workflowId ?? undefined });
+        setWorkflow({
+          workflow_id: updatedExperiment.workflowId ?? undefined,
+          experiment_id: updatedExperiment.id,
+        });
       })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

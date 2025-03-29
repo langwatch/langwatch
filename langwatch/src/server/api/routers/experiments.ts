@@ -1,9 +1,20 @@
-import type {
-  QueryDslBoolQuery,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
+import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
+import { ExperimentType } from "@prisma/client";
+import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
+import type { Node } from "@xyflow/react";
+import { nanoid } from "nanoid";
 import { z } from "zod";
+import {
+  wizardStateSchema,
+  type WizardState,
+} from "../../../components/evaluations/wizard/hooks/useEvaluationWizardStore";
+import {
+  workflowJsonSchema,
+  type Entry,
+  type Workflow,
+} from "../../../optimization_studio/types/dsl";
+import { slugify } from "../../../utils/slugify";
 import { prisma } from "../../db";
 import {
   BATCH_EVALUATION_INDEX,
@@ -20,20 +31,6 @@ import type {
 import { checkUserPermissionForProject, TeamRoleGroup } from "../permission";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { saveOrCommitWorkflowVersion } from "./workflows";
-import {
-  wizardStateSchema,
-  type WizardState,
-} from "../../../components/evaluations/wizard/hooks/useEvaluationWizardStore";
-import { nanoid } from "nanoid";
-import { ExperimentType } from "@prisma/client";
-import { slugify } from "../../../utils/slugify";
-import {
-  workflowJsonSchema,
-  type Entry,
-  type Workflow,
-} from "../../../optimization_studio/types/dsl";
-import type { Node } from "@xyflow/react";
-import type { JsonValue } from "@prisma/client/runtime/library";
 
 export const experimentsRouter = createTRPCRouter({
   saveExperiment: protectedProcedure
@@ -164,16 +161,45 @@ export const experimentsRouter = createTRPCRouter({
       return experiment;
     }),
 
-  getExperimentBySlug: protectedProcedure
-    .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
+  getExperimentBySlugOrId: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        experimentId: z.string().optional(),
+        experimentSlug: z.string().optional(),
+      })
+    )
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
     .query(async ({ input }) => {
-      const experiment = await getExperimentBySlug(
-        input.projectId,
-        input.experimentSlug
-      );
+      if (input.experimentId) {
+        const experiment = await prisma.experiment.findFirst({
+          where: {
+            id: input.experimentId,
+            projectId: input.projectId,
+          },
+        });
 
-      return experiment;
+        if (!experiment) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Experiment not found",
+          });
+        }
+
+        return experiment;
+      } else if (input.experimentSlug) {
+        const experiment = await getExperimentBySlug(
+          input.projectId,
+          input.experimentSlug
+        );
+
+        return experiment;
+      }
+
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Either experimentId or experimentSlug must be provided",
+      });
     }),
 
   getExperimentWithDSLBySlug: protectedProcedure
@@ -673,7 +699,7 @@ const getVersionMap = async (projectId: string, versionIds: string[]) => {
 };
 
 const findNextDraftName = async (projectId: string) => {
-  const drafts = await prisma.experiment.findMany({
+  const experiments = await prisma.experiment.findMany({
     select: {
       name: true,
       slug: true,
@@ -683,14 +709,14 @@ const findNextDraftName = async (projectId: string) => {
     },
   });
 
-  const slugs = new Set(
-    drafts
-      .filter((draft) => draft.name?.startsWith("Draft"))
-      .map((draft) => draft.slug)
-  );
+  const draftCount = experiments.filter(
+    (draft) => draft.name?.startsWith("Draft")
+  ).length;
+
+  const slugs = new Set(experiments.map((draft) => draft.slug));
 
   let draftName;
-  let index = slugs.size + 1;
+  let index = draftCount + 1;
   while (true) {
     draftName = `Draft Evaluation (${index})`;
     if (!slugs.has(slugify(draftName))) {

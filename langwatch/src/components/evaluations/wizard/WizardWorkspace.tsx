@@ -22,6 +22,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
     workspaceTab,
     setWizardState,
     workflowId,
+    experimentId,
     evaluationState,
     hasWorkflow,
   } = useEvaluationWizardStore(
@@ -30,6 +31,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
       workspaceTab: state.wizardState.workspaceTab,
       setWizardState: state.setWizardState,
       workflowId: state.workflowStore.workflow_id,
+      experimentId: state.workflowStore.experiment_id,
       evaluationState: state.workflowStore.state.evaluation,
       nodes: state.workflowStore.nodes,
       hasWorkflow: state.workflowStore.nodes.length > 0,
@@ -126,6 +128,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
                 <Card.Body width="full" height="full" padding={0}>
                   <EvaluationResults
                     workflowId={workflowId}
+                    experimentId={experimentId}
                     evaluationState={evaluationState}
                     sidebarProps={{
                       padding: 2,
