@@ -1,6 +1,7 @@
 import {
   Badge,
   Box,
+  Button,
   Card,
   HStack,
   Heading,
@@ -10,10 +11,19 @@ import {
 } from "@chakra-ui/react";
 import type { Check } from "@prisma/client";
 import { useState } from "react";
-import { ChevronDown, ChevronUp, MoreHorizontal } from "react-feather";
 import { Menu } from "../../components/ui/menu";
 import { CustomGraph } from "../analytics/CustomGraph";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
+import {
+  LuChevronDown,
+  LuChevronUp,
+  LuEllipsis,
+  LuPencil,
+  LuPlus,
+} from "react-icons/lu";
+import { TeamRoleGroup } from "../../server/api/permission";
+import { Link } from "../ui/link";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
 type MonitorsSectionProps = {
   title: string;
@@ -27,6 +37,8 @@ export const MonitorsSection = ({
   onEditMonitor,
 }: MonitorsSectionProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const { project, hasTeamPermission } = useOrganizationTeamProject();
 
   return (
     <Card.Root mb={8}>
@@ -44,7 +56,11 @@ export const MonitorsSection = ({
             size="sm"
             onClick={() => setIsCollapsed(!isCollapsed)}
           >
-            {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+            {isCollapsed ? (
+              <LuChevronDown size={16} />
+            ) : (
+              <LuChevronUp size={16} />
+            )}
           </IconButton>
         </HStack>
 
@@ -72,7 +88,7 @@ export const MonitorsSection = ({
                           size="sm"
                           aria-label="More options"
                         >
-                          <MoreHorizontal size={16} />
+                          <LuEllipsis size={16} />
                         </IconButton>
                       </Menu.Trigger>
                       <Menu.Content>
@@ -80,6 +96,7 @@ export const MonitorsSection = ({
                           value="edit"
                           onClick={() => onEditMonitor(evaluation.id)}
                         >
+                          <LuPencil size={16} />
                           Edit
                         </Menu.Item>
                       </Menu.Content>
@@ -109,6 +126,25 @@ export const MonitorsSection = ({
                 );
               })}
             </SimpleGrid>
+            {evaluations.length === 0 && (
+              <Text color="gray.600">
+                No real-time monitors or guardrails set up yet.
+                {project &&
+                  hasTeamPermission(TeamRoleGroup.GUARDRAILS_MANAGE) && (
+                    <>
+                      {" "}
+                      Click on{" "}
+                      <Link
+                        textDecoration="underline"
+                        href={`/${project.slug}/evaluations/wizard`}
+                      >
+                        New Evaluation
+                      </Link>{" "}
+                      to get started.
+                    </>
+                  )}
+              </Text>
+            )}
           </>
         )}
       </Card.Body>

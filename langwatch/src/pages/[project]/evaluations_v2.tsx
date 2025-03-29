@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   Container,
+  EmptyState,
   Heading,
   HStack,
   Skeleton,
@@ -21,6 +22,7 @@ import { Link } from "../../components/ui/link";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
+import { LuSquareCheckBig } from "react-icons/lu";
 
 export default function EvaluationsV2() {
   const { project, hasTeamPermission } = useOrganizationTeamProject();
@@ -98,18 +100,43 @@ export default function EvaluationsV2() {
                 onEditMonitor={handleEditMonitor}
               />
 
+              <VStack align="start" gap={1}>
+                <Heading as="h1">Evaluations</Heading>
+                <Text color="gray.600">
+                  View and analyze your evaluation results
+                </Text>
+              </VStack>
+
               <Card.Root>
                 <Card.Body>
-                  <VStack align="start" gap={4}>
-                    <HStack width="full" justify="space-between">
-                      <VStack align="start" gap={1}>
-                        <Heading size="md">Experiments</Heading>
-                        <Text color="gray.600">
-                          View and analyze your model evaluation results
-                        </Text>
-                      </VStack>
-                    </HStack>
-
+                  {experiments.data && experiments.data.length == 0 ? (
+                    <EmptyState.Root>
+                      <EmptyState.Content>
+                        <EmptyState.Indicator>
+                          <LuSquareCheckBig size={32} />
+                        </EmptyState.Indicator>
+                        <EmptyState.Title>No evaluations yet</EmptyState.Title>
+                        <EmptyState.Description>
+                          {project &&
+                            hasTeamPermission(
+                              TeamRoleGroup.GUARDRAILS_MANAGE
+                            ) && (
+                              <>
+                                {" "}
+                                Click on{" "}
+                                <Link
+                                  textDecoration="underline"
+                                  href={`/${project.slug}/evaluations/wizard`}
+                                >
+                                  New Evaluation
+                                </Link>{" "}
+                                to get started.
+                              </>
+                            )}
+                        </EmptyState.Description>
+                      </EmptyState.Content>
+                    </EmptyState.Root>
+                  ) : (
                     <Table.Root variant="line" width="full">
                       <Table.Header>
                         <Table.Row>
@@ -152,7 +179,7 @@ export default function EvaluationsV2() {
                           : null}
                       </Table.Body>
                     </Table.Root>
-                  </VStack>
+                  )}
                 </Card.Body>
               </Card.Root>
             </>
