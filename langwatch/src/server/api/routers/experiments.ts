@@ -22,13 +22,15 @@ import {
   type WizardState,
 } from "../../../components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import { nanoid } from "nanoid";
-import { ExperimentType, type Workflow } from "@prisma/client";
+import { ExperimentType } from "@prisma/client";
 import { slugify } from "../../../utils/slugify";
 import {
   workflowJsonSchema,
   type Entry,
+  type Workflow,
 } from "../../../optimization_studio/types/dsl";
 import type { Node } from "@xyflow/react";
+import type { JsonValue } from "@prisma/client/runtime/library";
 
 export const experimentsRouter = createTRPCRouter({
   saveExperiment: protectedProcedure
@@ -96,7 +98,9 @@ export const experimentsRouter = createTRPCRouter({
             if (dataset.name.startsWith(currentExperiment.name)) {
               await prisma.dataset.update({
                 where: { id: dataset.id, projectId: input.projectId },
-                data: { name: dataset.name.replace(currentExperiment.name, name) },
+                data: {
+                  name: dataset.name.replace(currentExperiment.name, name),
+                },
               });
             }
           }
@@ -170,7 +174,13 @@ export const experimentsRouter = createTRPCRouter({
     }),
 
   getExperimentWithDSLBySlug: protectedProcedure
-    .input(z.object({ projectId: z.string(), experimentSlug: z.string(), randomSeed: z.number().optional() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        experimentSlug: z.string(),
+        randomSeed: z.number().optional(),
+      })
+    )
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
     .query(async ({ input }) => {
       const experiment = await getExperimentBySlug(
@@ -207,6 +217,64 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       return experiments;
+    }),
+
+  getAllForEvaluationsList: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .query(async ({ input }) => {
+      const experiments = await prisma.experiment.findMany({
+        where: { projectId: input.projectId },
+        include: {
+          workflow: {
+            include: {
+              currentVersion: true,
+            },
+          },
+        },
+        orderBy: {
+          updatedAt: "desc",
+        },
+      });
+
+      const getDatasetId = (dsl: JsonValue | undefined) => {
+        return (
+          (dsl as Workflow | undefined)?.nodes.find(
+            (node) => node.type === "entry"
+          ) as Node<Entry>
+        )?.data.dataset?.id;
+      };
+
+      const datasetIds = experiments
+        .map((experiment) => {
+          return getDatasetId(experiment.workflow?.currentVersion?.dsl);
+        })
+        .filter(Boolean) as string[];
+
+      const datasetsById = Object.fromEntries(
+        (
+          await prisma.dataset.findMany({
+            select: {
+              id: true,
+              name: true,
+            },
+            where: { projectId: input.projectId, id: { in: datasetIds } },
+          })
+        ).map((dataset) => [dataset.id, dataset])
+      );
+
+      const experimentsWithDatasets = experiments.map((experiment) => {
+        return {
+          ...experiment,
+          wizardState: experiment.wizardState as WizardState | undefined,
+          dataset:
+            datasetsById[
+              getDatasetId(experiment.workflow?.currentVersion?.dsl) ?? ""
+            ],
+        };
+      });
+
+      return experimentsWithDatasets;
     }),
 
   getExperimentDSPyRuns: protectedProcedure

@@ -23,6 +23,8 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
 import { LuSquareCheckBig } from "react-icons/lu";
+import type { TASK_TYPES } from "../../components/evaluations/wizard/hooks/useEvaluationWizardStore";
+import type { ExperimentType } from "@prisma/client";
 
 export default function EvaluationsV2() {
   const { project, hasTeamPermission } = useOrganizationTeamProject();
@@ -36,7 +38,7 @@ export default function EvaluationsV2() {
     { enabled: !!project }
   );
 
-  const experiments = api.experiments.getAllByProjectId.useQuery(
+  const experiments = api.experiments.getAllForEvaluationsList.useQuery(
     {
       projectId: project?.id ?? "",
     },
@@ -47,6 +49,20 @@ export default function EvaluationsV2() {
 
   const handleEditMonitor = (monitorId: string) => {
     void router.push(`/${project.slug}/evaluations/${monitorId}/edit`);
+  };
+
+  const taskTypeToLabel: Record<keyof typeof TASK_TYPES, string> = {
+    real_time: "Real-Time Evaluation",
+    llm_app: "LLM App Evaluation",
+    prompt_creation: "Prompt Creation",
+    custom_evaluator: "Custom Evaluator",
+    scan: "Scan for Vulnerabilities",
+  };
+
+  const experimentTypeToLabel: Record<ExperimentType, string> = {
+    BATCH_EVALUATION_V2: "API Batch Evaluation",
+    BATCH_EVALUATION: "Batch Evaluation",
+    DSPY: "DSPy Optimization",
   };
 
   return (
@@ -140,9 +156,18 @@ export default function EvaluationsV2() {
                     <Table.Root variant="line" width="full">
                       <Table.Header>
                         <Table.Row>
-                          <Table.ColumnHeader>Experiment</Table.ColumnHeader>
-                          <Table.ColumnHeader>Type</Table.ColumnHeader>
-                          <Table.ColumnHeader>Created At</Table.ColumnHeader>
+                          <Table.ColumnHeader width="20%">
+                            Evaluation
+                          </Table.ColumnHeader>
+                          <Table.ColumnHeader width="20%">
+                            Task
+                          </Table.ColumnHeader>
+                          <Table.ColumnHeader width="20%">
+                            Dataset
+                          </Table.ColumnHeader>
+                          <Table.ColumnHeader width="20%">
+                            Last Updated
+                          </Table.ColumnHeader>
                         </Table.Row>
                       </Table.Header>
                       <Table.Body>
@@ -161,18 +186,33 @@ export default function EvaluationsV2() {
                               <Table.Row
                                 cursor="pointer"
                                 onClick={() => {
-                                  void router.push({
-                                    pathname: `/${project?.slug}/experiments/${experiment.slug}`,
-                                  });
+                                  if (experiment.wizardState) {
+                                    void router.push({
+                                      pathname: `/${project?.slug}/evaluations/wizard/${experiment.slug}`,
+                                    });
+                                  } else {
+                                    void router.push({
+                                      pathname: `/${project?.slug}/experiments/${experiment.slug}`,
+                                    });
+                                  }
                                 }}
                                 key={i}
                               >
                                 <Table.Cell>
                                   {experiment.name ?? experiment.slug}
                                 </Table.Cell>
-                                <Table.Cell>{experiment.type}</Table.Cell>
                                 <Table.Cell>
-                                  {experiment.createdAt.toLocaleString()}
+                                  {experiment.wizardState?.task
+                                    ? taskTypeToLabel[
+                                        experiment.wizardState.task
+                                      ]
+                                    : experimentTypeToLabel[experiment.type]}
+                                </Table.Cell>
+                                <Table.Cell>
+                                  {experiment.dataset?.name ?? "-"}
+                                </Table.Cell>
+                                <Table.Cell>
+                                  {experiment.updatedAt.toLocaleString()}
                                 </Table.Cell>
                               </Table.Row>
                             ))
