@@ -1,4 +1,5 @@
 import {
+  Badge,
   Box,
   Button,
   Card,
@@ -22,9 +23,20 @@ import { Link } from "../../components/ui/link";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
-import { LuSquareCheckBig } from "react-icons/lu";
+import {
+  LuCircleCheckBig,
+  LuCircleX,
+  LuClock,
+  LuSquareCheckBig,
+} from "react-icons/lu";
 import type { TASK_TYPES } from "../../components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import type { ExperimentType } from "@prisma/client";
+import {
+  formatEvaluationSummary,
+  getFinishedAt,
+} from "../../components/experiments/BatchEvaluationV2/BatchEvaluationSummary";
+import { HoverableBigText } from "../../components/HoverableBigText";
+import { OverflownTextWithTooltip } from "../../components/OverflownText";
 
 export default function EvaluationsV2() {
   const { project, hasTeamPermission } = useOrganizationTeamProject();
@@ -124,7 +136,7 @@ export default function EvaluationsV2() {
               </VStack>
 
               <Card.Root>
-                <Card.Body>
+                <Card.Body overflowX="auto">
                   {experiments.data && experiments.data.length == 0 ? (
                     <EmptyState.Root>
                       <EmptyState.Content>
@@ -159,13 +171,22 @@ export default function EvaluationsV2() {
                           <Table.ColumnHeader width="20%">
                             Evaluation
                           </Table.ColumnHeader>
-                          <Table.ColumnHeader width="20%">
-                            Task
+                          <Table.ColumnHeader width="15%">
+                            Type
                           </Table.ColumnHeader>
-                          <Table.ColumnHeader width="20%">
+                          <Table.ColumnHeader width="10%">
                             Dataset
                           </Table.ColumnHeader>
                           <Table.ColumnHeader width="20%">
+                            Primary Metric
+                          </Table.ColumnHeader>
+                          <Table.ColumnHeader width="10%">
+                            Runs
+                          </Table.ColumnHeader>
+                          <Table.ColumnHeader width="10%">
+                            Status
+                          </Table.ColumnHeader>
+                          <Table.ColumnHeader width="15%">
                             Last Updated
                           </Table.ColumnHeader>
                         </Table.Row>
@@ -199,20 +220,93 @@ export default function EvaluationsV2() {
                                 key={i}
                               >
                                 <Table.Cell>
-                                  {experiment.name ?? experiment.slug}
+                                  <OverflownTextWithTooltip
+                                    lineClamp={1}
+                                    wordBreak="break-word"
+                                  >
+                                    {experiment.name ?? experiment.slug}
+                                  </OverflownTextWithTooltip>
+                                </Table.Cell>
+                                <Table.Cell whiteSpace="nowrap">
+                                  <Badge
+                                    colorPalette="gray"
+                                    variant="outline"
+                                  >
+                                    {experiment.wizardState?.task
+                                      ? taskTypeToLabel[
+                                          experiment.wizardState.task
+                                        ]
+                                      : experimentTypeToLabel[experiment.type]}
+                                  </Badge>
                                 </Table.Cell>
                                 <Table.Cell>
-                                  {experiment.wizardState?.task
-                                    ? taskTypeToLabel[
-                                        experiment.wizardState.task
-                                      ]
-                                    : experimentTypeToLabel[experiment.type]}
+                                  <OverflownTextWithTooltip
+                                    lineClamp={1}
+                                    wordBreak="break-word"
+                                  >
+                                    {experiment.dataset?.name ?? "-"}
+                                  </OverflownTextWithTooltip>
                                 </Table.Cell>
                                 <Table.Cell>
-                                  {experiment.dataset?.name ?? "-"}
+                                  {experiment.runsSummary.primaryMetric ? (
+                                    <>
+                                      <Text
+                                        as="span"
+                                        fontSize="xs"
+                                        color="gray.600"
+                                      >
+                                        {
+                                          experiment.runsSummary.primaryMetric
+                                            .name
+                                        }
+                                        : &nbsp;
+                                      </Text>
+                                      <Text as="span" fontWeight="semibold">
+                                        {formatEvaluationSummary(
+                                          experiment.runsSummary.primaryMetric,
+                                          true
+                                        )}
+                                      </Text>
+                                    </>
+                                  ) : (
+                                    "-"
+                                  )}
                                 </Table.Cell>
                                 <Table.Cell>
-                                  {experiment.updatedAt.toLocaleString()}
+                                  {experiment.runsSummary.count || ""}
+                                </Table.Cell>
+                                <Table.Cell>
+                                  {experiment.runsSummary.latestRun
+                                    ?.timestamps && (
+                                    <>
+                                      {getFinishedAt(
+                                        experiment.runsSummary.latestRun
+                                          .timestamps,
+                                        new Date().getTime()
+                                      ) ? (
+                                        <HStack color="green.500">
+                                          <LuCircleCheckBig size={16} />
+                                          Completed
+                                        </HStack>
+                                      ) : experiment.runsSummary.latestRun
+                                          .timestamps.stopped_at ? (
+                                        <HStack color="red.500">
+                                          <LuCircleX size={16} />
+                                          Stopped
+                                        </HStack>
+                                      ) : (
+                                        <HStack color="blue.500">
+                                          <LuClock size={16} />
+                                          Running
+                                        </HStack>
+                                      )}
+                                    </>
+                                  )}
+                                </Table.Cell>
+                                <Table.Cell whiteSpace="nowrap">
+                                  {new Date(
+                                    experiment.updatedAt
+                                  ).toLocaleString()}
                                 </Table.Cell>
                               </Table.Row>
                             ))

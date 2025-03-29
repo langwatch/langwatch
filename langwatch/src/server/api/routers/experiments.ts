@@ -263,18 +263,43 @@ export const experimentsRouter = createTRPCRouter({
         ).map((dataset) => [dataset.id, dataset])
       );
 
-      const experimentsWithDatasets = experiments.map((experiment) => {
-        return {
-          ...experiment,
-          wizardState: experiment.wizardState as WizardState | undefined,
-          dataset:
-            datasetsById[
-              getDatasetId(experiment.workflow?.currentVersion?.dsl) ?? ""
-            ],
-        };
-      });
+      const runsByExperimentId = await getExperimentBatchEvaluationRuns(
+        input.projectId,
+        experiments.map((experiment) => experiment.id)
+      );
 
-      return experimentsWithDatasets;
+      const experimentsWithDatasetsAndRuns = experiments
+        .map((experiment) => {
+          const runs = runsByExperimentId[experiment.id] ?? [];
+          const latestRun = runs.sort(
+            (a, b) => b.timestamps.created_at - a.timestamps.created_at
+          )[0];
+          const primaryMetric = latestRun
+            ? Object.values(latestRun?.summary.evaluations)[0]
+            : undefined;
+
+          return {
+            ...experiment,
+            wizardState: experiment.wizardState as WizardState | undefined,
+            runsSummary: {
+              count: runs.length,
+              primaryMetric,
+              latestRun: {
+                timestamps: latestRun?.timestamps,
+              }
+            },
+            dataset:
+              datasetsById[
+                getDatasetId(experiment.workflow?.currentVersion?.dsl) ?? ""
+              ],
+            updatedAt:
+              latestRun?.timestamps.created_at ??
+              experiment.updatedAt.getTime(),
+          };
+        })
+        .sort((a, b) => b.updatedAt - a.updatedAt);
+
+      return experimentsWithDatasetsAndRuns;
     }),
 
   getExperimentDSPyRuns: protectedProcedure
@@ -441,192 +466,12 @@ export const experimentsRouter = createTRPCRouter({
         input.experimentSlug
       );
 
-      type ESBatchEvaluationRunInfo = Pick<
-        ESBatchEvaluation,
-        "run_id" | "workflow_version_id" | "timestamps" | "progress" | "total"
-      >;
+      const runsByExperimentId = await getExperimentBatchEvaluationRuns(
+        input.projectId,
+        [experiment.id]
+      );
 
-      const batchEvaluationRuns =
-        await esClient.search<ESBatchEvaluationRunInfo>({
-          index: BATCH_EVALUATION_INDEX.alias,
-          size: 10_000,
-          body: {
-            _source: [
-              "run_id",
-              "workflow_version_id",
-              "timestamps.created_at",
-              "timestamps.updated_at",
-              "timestamps.finished_at",
-              "timestamps.stopped_at",
-              "progress",
-              "total",
-            ],
-            query: {
-              bool: {
-                must: [
-                  { term: { experiment_id: experiment.id } },
-                  { term: { project_id: input.projectId } },
-                ] as QueryDslBoolQuery["must"],
-              } as QueryDslBoolQuery,
-            },
-            sort: [{ "timestamps.created_at": "desc" }],
-            aggs: {
-              runs: {
-                terms: { field: "run_id", size: 1_000 },
-                aggs: {
-                  dataset_cost: {
-                    sum: {
-                      field: "dataset.cost",
-                    },
-                  },
-                  evaluations_cost: {
-                    nested: {
-                      path: "evaluations",
-                    },
-                    aggs: {
-                      cost: {
-                        sum: {
-                          field: "evaluations.cost",
-                        },
-                      },
-                      average_cost: {
-                        avg: {
-                          field: "evaluations.cost",
-                        },
-                      },
-                      average_duration: {
-                        avg: {
-                          field: "evaluations.duration",
-                        },
-                      },
-                    },
-                  },
-                  dataset_average_cost: {
-                    avg: {
-                      field: "dataset.cost",
-                    },
-                  },
-                  dataset_average_duration: {
-                    avg: {
-                      field: "dataset.duration",
-                    },
-                  },
-                  evaluations: {
-                    nested: {
-                      path: "evaluations",
-                    },
-                    aggs: {
-                      child: {
-                        terms: { field: "evaluations.evaluator", size: 100 },
-                        aggs: {
-                          name: {
-                            terms: { field: "evaluations.name", size: 100 },
-                          },
-                          processed_evaluations: {
-                            filter: {
-                              term: { "evaluations.status": "processed" },
-                            },
-                            aggs: {
-                              average_score: {
-                                avg: {
-                                  field: "evaluations.score",
-                                },
-                              },
-                              has_passed: {
-                                filter: {
-                                  bool: {
-                                    should: [
-                                      { term: { "evaluations.passed": true } },
-                                      { term: { "evaluations.passed": false } },
-                                    ],
-                                  },
-                                },
-                              },
-                              average_passed: {
-                                avg: {
-                                  field: "evaluations.passed",
-                                },
-                              },
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        });
-
-      const versionIds = batchEvaluationRuns.hits.hits
-        .map((hit) => {
-          return hit._source!.workflow_version_id!;
-        })
-        .filter(Boolean);
-
-      const versionsMap = await getVersionMap(input.projectId, versionIds);
-
-      const runs = batchEvaluationRuns.hits.hits.map((hit) => {
-        const source = hit._source!;
-
-        const runAgg = (
-          batchEvaluationRuns.aggregations!.runs as any
-        ).buckets.find((bucket: any) => bucket.key === source.run_id);
-
-        return {
-          run_id: source.run_id,
-          workflow_version: source.workflow_version_id
-            ? versionsMap[source.workflow_version_id]
-            : null,
-          timestamps: source.timestamps,
-          progress: source.progress,
-          total: source.total,
-          summary: {
-            dataset_cost: runAgg?.dataset_cost.value as number | undefined,
-            evaluations_cost: runAgg?.evaluations_cost.cost.value as
-              | number
-              | undefined,
-            dataset_average_cost: runAgg?.dataset_average_cost.value as
-              | number
-              | undefined,
-            dataset_average_duration: runAgg?.dataset_average_duration.value as
-              | number
-              | undefined,
-            evaluations_average_cost: runAgg?.evaluations_cost.average_cost
-              .value as number | undefined,
-            evaluations_average_duration: runAgg?.evaluations_cost
-              .average_duration.value as number | undefined,
-            evaluations: Object.fromEntries(
-              runAgg?.evaluations.child.buckets.map((bucket: any) => {
-                return [
-                  bucket.key,
-                  {
-                    name: bucket.name.buckets[0].key ?? bucket.key,
-                    average_score:
-                      bucket.processed_evaluations.average_score.value,
-                    ...(bucket.processed_evaluations.has_passed.doc_count > 0
-                      ? {
-                          average_passed:
-                            bucket.processed_evaluations.average_passed.value,
-                        }
-                      : {}),
-                  },
-                ];
-              })
-            ) as Record<
-              string,
-              {
-                name: string;
-                average_score: number;
-                average_passed?: number;
-              }
-            >,
-          },
-        };
-      });
-
-      return { runs };
+      return { runs: runsByExperimentId[experiment.id] ?? [] };
     }),
 
   getExperimentBatchEvaluationRun: protectedProcedure
@@ -748,4 +593,212 @@ const findNextDraftName = async (projectId: string) => {
   }
 
   return draftName;
+};
+
+const getExperimentBatchEvaluationRuns = async (
+  projectId: string,
+  experimentIds: string[]
+) => {
+  type ESBatchEvaluationRunInfo = Pick<
+    ESBatchEvaluation,
+    | "experiment_id"
+    | "run_id"
+    | "workflow_version_id"
+    | "timestamps"
+    | "progress"
+    | "total"
+  >;
+
+  const batchEvaluationRuns = await esClient.search<ESBatchEvaluationRunInfo>({
+    index: BATCH_EVALUATION_INDEX.alias,
+    size: 10_000,
+    body: {
+      _source: [
+        "experiment_id",
+        "run_id",
+        "workflow_version_id",
+        "timestamps.created_at",
+        "timestamps.updated_at",
+        "timestamps.finished_at",
+        "timestamps.stopped_at",
+        "progress",
+        "total",
+      ],
+      query: {
+        bool: {
+          must: [
+            { terms: { experiment_id: experimentIds } },
+            { term: { project_id: projectId } },
+          ] as QueryDslBoolQuery["must"],
+        } as QueryDslBoolQuery,
+      },
+      sort: [{ "timestamps.created_at": "desc" }],
+      aggs: {
+        runs: {
+          terms: { field: "run_id", size: 1_000 },
+          aggs: {
+            dataset_cost: {
+              sum: {
+                field: "dataset.cost",
+              },
+            },
+            evaluations_cost: {
+              nested: {
+                path: "evaluations",
+              },
+              aggs: {
+                cost: {
+                  sum: {
+                    field: "evaluations.cost",
+                  },
+                },
+                average_cost: {
+                  avg: {
+                    field: "evaluations.cost",
+                  },
+                },
+                average_duration: {
+                  avg: {
+                    field: "evaluations.duration",
+                  },
+                },
+              },
+            },
+            dataset_average_cost: {
+              avg: {
+                field: "dataset.cost",
+              },
+            },
+            dataset_average_duration: {
+              avg: {
+                field: "dataset.duration",
+              },
+            },
+            evaluations: {
+              nested: {
+                path: "evaluations",
+              },
+              aggs: {
+                child: {
+                  terms: { field: "evaluations.evaluator", size: 100 },
+                  aggs: {
+                    name: {
+                      terms: { field: "evaluations.name", size: 100 },
+                    },
+                    processed_evaluations: {
+                      filter: {
+                        term: { "evaluations.status": "processed" },
+                      },
+                      aggs: {
+                        average_score: {
+                          avg: {
+                            field: "evaluations.score",
+                          },
+                        },
+                        has_passed: {
+                          filter: {
+                            bool: {
+                              should: [
+                                { term: { "evaluations.passed": true } },
+                                { term: { "evaluations.passed": false } },
+                              ],
+                            },
+                          },
+                        },
+                        average_passed: {
+                          avg: {
+                            field: "evaluations.passed",
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const versionIds = batchEvaluationRuns.hits.hits
+    .map((hit) => {
+      return hit._source!.workflow_version_id!;
+    })
+    .filter(Boolean);
+
+  const versionsMap = await getVersionMap(projectId, versionIds);
+
+  const runs = batchEvaluationRuns.hits.hits.map((hit) => {
+    const source = hit._source!;
+
+    const runAgg = (batchEvaluationRuns.aggregations!.runs as any).buckets.find(
+      (bucket: any) => bucket.key === source.run_id
+    );
+
+    return {
+      experiment_id: source.experiment_id,
+      run_id: source.run_id,
+      workflow_version: source.workflow_version_id
+        ? versionsMap[source.workflow_version_id]
+        : null,
+      timestamps: source.timestamps,
+      progress: source.progress,
+      total: source.total,
+      summary: {
+        dataset_cost: runAgg?.dataset_cost.value as number | undefined,
+        evaluations_cost: runAgg?.evaluations_cost.cost.value as
+          | number
+          | undefined,
+        dataset_average_cost: runAgg?.dataset_average_cost.value as
+          | number
+          | undefined,
+        dataset_average_duration: runAgg?.dataset_average_duration.value as
+          | number
+          | undefined,
+        evaluations_average_cost: runAgg?.evaluations_cost.average_cost
+          .value as number | undefined,
+        evaluations_average_duration: runAgg?.evaluations_cost.average_duration
+          .value as number | undefined,
+        evaluations: Object.fromEntries(
+          runAgg?.evaluations.child.buckets.map((bucket: any) => {
+            return [
+              bucket.key,
+              {
+                name: bucket.name.buckets[0].key ?? bucket.key,
+                average_score: bucket.processed_evaluations.average_score.value,
+                ...(bucket.processed_evaluations.has_passed.doc_count > 0
+                  ? {
+                      average_passed:
+                        bucket.processed_evaluations.average_passed.value,
+                    }
+                  : {}),
+              },
+            ];
+          })
+        ) as Record<
+          string,
+          {
+            name: string;
+            average_score: number;
+            average_passed?: number;
+          }
+        >,
+      },
+    };
+  });
+
+  const runsByExperimentId = runs.reduce(
+    (acc, run) => {
+      if (!(run.experiment_id in acc)) {
+        acc[run.experiment_id] = [];
+      }
+      acc[run.experiment_id]!.push(run);
+      return acc;
+    },
+    {} as Record<string, (typeof runs)[number][]>
+  );
+
+  return runsByExperimentId;
 };
