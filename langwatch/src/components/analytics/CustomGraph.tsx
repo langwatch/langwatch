@@ -8,6 +8,7 @@ import {
   Text,
   VStack,
   Skeleton,
+  Badge,
 } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
@@ -53,6 +54,7 @@ import { QuickwitNote } from "./QuickwitNote";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { Delayed } from "../Delayed";
 import { useColorRawValue } from "../../components/ui/color-mode";
+import { LuShield } from "react-icons/lu";
 
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
@@ -82,7 +84,10 @@ export type CustomGraphInput = {
   timeScale: "full" | number;
   connected?: boolean;
   height?: number;
-  disabled?: boolean;
+  monitorGraph?: {
+    disabled?: boolean;
+    isGuardrail?: boolean;
+  };
 };
 
 export const summaryGraphTypes: CustomGraphInput["graphType"][] = [
@@ -919,8 +924,12 @@ function MonitorGraph({
   const name = nameForSeries(firstKey);
   const isPassRate = firstKey.includes("pass_rate");
   const allValues = isPassRate
-    ? currentAndPreviousDataFilled?.map((entry) => entry[firstKey]!).filter(x => x !== undefined && x !== null)
-    : currentAndPreviousData?.map((entry) => entry[firstKey]!).filter(x => x !== undefined && x !== null);
+    ? currentAndPreviousDataFilled
+        ?.map((entry) => entry[firstKey]!)
+        .filter((x) => x !== undefined && x !== null)
+    : currentAndPreviousData
+        ?.map((entry) => entry[firstKey]!)
+        .filter((x) => x !== undefined && x !== null);
   const total =
     allValues?.reduce((acc, curr) => {
       return acc + curr;
@@ -930,7 +939,7 @@ function MonitorGraph({
   const gray400 = useColorRawValue("gray.400");
 
   // TODO: allow user to define the thresholds instead of hardcoded amounts
-  const colorSet: RotatingColorSet = input.disabled
+  const colorSet: RotatingColorSet = input.monitorGraph?.disabled
     ? "grayTones"
     : average > 0.8 || !hasLoaded
     ? "greenTones"
@@ -963,10 +972,18 @@ function MonitorGraph({
         align="start"
         color={getColor(colorSet, 0, 300)}
       >
-        <Text fontSize="sm" fontWeight="medium" paddingBottom={1}>
-          {name}
-          {input.disabled && " (disabled)"}
-        </Text>
+        <HStack>
+          {input.monitorGraph?.isGuardrail && (
+            <Badge colorPalette="blue" variant="solid" size="sm" marginTop="-3px">
+              <LuShield size={16} />
+              Guardrail
+            </Badge>
+          )}
+          <Text fontSize="sm" fontWeight="medium" paddingBottom={1}>
+            {name}
+            {input.monitorGraph?.disabled && " (disabled)"}
+          </Text>
+        </HStack>
         <HStack gap={2}>
           <Text fontSize="2xl" fontWeight="bold">
             {hasLoaded ? (

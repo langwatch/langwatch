@@ -119,7 +119,11 @@ export const MonitorsSection = ({
                         includePrevious: false,
                         timeScale: 1,
                         height: 140,
-                        disabled: !evaluation.enabled,
+                        monitorGraph: {
+                          disabled: !evaluation.enabled,
+                          isGuardrail:
+                            evaluation.executionMode === "AS_GUARDRAIL",
+                        },
                       }}
                     />
                   </Box>
