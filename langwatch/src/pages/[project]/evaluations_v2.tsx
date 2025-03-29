@@ -15,7 +15,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { Play, Plus } from "react-feather";
+import { MoreVertical, Play, Plus } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { MonitorsSection } from "../../components/evaluations/MonitorsSection";
@@ -28,6 +28,7 @@ import {
   LuCircleX,
   LuClock,
   LuSquareCheckBig,
+  LuTrash,
 } from "react-icons/lu";
 import type { TASK_TYPES } from "../../components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import type { ExperimentType } from "@prisma/client";
@@ -37,6 +38,8 @@ import {
 } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationSummary";
 import { HoverableBigText } from "../../components/HoverableBigText";
 import { OverflownTextWithTooltip } from "../../components/OverflownText";
+import { Menu } from "../../components/ui/menu";
+import { toaster } from "../../components/ui/toaster";
 
 export default function EvaluationsV2() {
   const { project, hasTeamPermission } = useOrganizationTeamProject();
@@ -56,6 +59,51 @@ export default function EvaluationsV2() {
     },
     { enabled: !!project }
   );
+
+  const deleteExperimentMutation = api.experiments.deleteExperiment.useMutation(
+    {
+      onSuccess: () => {
+        void experiments.refetch();
+        toaster.create({
+          title: "Experiment deleted",
+          description: "The experiment was successfully deleted",
+          type: "success",
+          placement: "top-end",
+          meta: {
+            closable: true,
+          },
+        });
+      },
+      onError: (error) => {
+        toaster.create({
+          title: "Error deleting experiment",
+          description:
+            "Please try again. If the problem persists, contact support.",
+          type: "error",
+          placement: "top-end",
+          meta: {
+            closable: true,
+          },
+        });
+      },
+    }
+  );
+
+  const handleDeleteExperiment = (
+    experimentId: string,
+    experimentName: string
+  ) => {
+    if (
+      confirm(
+        `Are you sure you want to delete the evaluation "${experimentName}"? This will also delete the workflow and prompts associated with it. Datasets will be kept.`
+      )
+    ) {
+      deleteExperimentMutation.mutate({
+        projectId: project?.id ?? "",
+        experimentId,
+      });
+    }
+  };
 
   if (!project) return null;
 
@@ -186,9 +234,10 @@ export default function EvaluationsV2() {
                           <Table.ColumnHeader width="10%">
                             Status
                           </Table.ColumnHeader>
-                          <Table.ColumnHeader width="15%">
+                          <Table.ColumnHeader width="10%">
                             Last Updated
                           </Table.ColumnHeader>
+                          <Table.ColumnHeader width="5%"></Table.ColumnHeader>
                         </Table.Row>
                       </Table.Header>
                       <Table.Body>
@@ -228,10 +277,7 @@ export default function EvaluationsV2() {
                                   </OverflownTextWithTooltip>
                                 </Table.Cell>
                                 <Table.Cell whiteSpace="nowrap">
-                                  <Badge
-                                    colorPalette="gray"
-                                    variant="outline"
-                                  >
+                                  <Badge colorPalette="gray" variant="outline">
                                     {experiment.wizardState?.task
                                       ? taskTypeToLabel[
                                           experiment.wizardState.task
@@ -307,6 +353,33 @@ export default function EvaluationsV2() {
                                   {new Date(
                                     experiment.updatedAt
                                   ).toLocaleString()}
+                                </Table.Cell>
+                                <Table.Cell display="flex" justifyContent="end">
+                                  <Menu.Root>
+                                    <Menu.Trigger
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                      }}
+                                    >
+                                      <MoreVertical size={16} />
+                                    </Menu.Trigger>
+                                    <Menu.Content>
+                                      <Menu.Item
+                                        value="delete"
+                                        color="red.500"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteExperiment(
+                                            experiment.id,
+                                            experiment.name ?? experiment.slug
+                                          );
+                                        }}
+                                      >
+                                        <LuTrash size={16} />
+                                        Delete
+                                      </Menu.Item>
+                                    </Menu.Content>
+                                  </Menu.Root>
                                 </Table.Cell>
                               </Table.Row>
                             ))

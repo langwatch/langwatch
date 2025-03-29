@@ -1,4 +1,7 @@
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
+import type {
+  QueryDslBoolQuery,
+  QueryDslQueryContainer,
+} from "@elastic/elasticsearch/lib/api/types";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { prisma } from "../../db";
@@ -286,7 +289,7 @@ export const experimentsRouter = createTRPCRouter({
               primaryMetric,
               latestRun: {
                 timestamps: latestRun?.timestamps,
-              }
+              },
             },
             dataset:
               datasetsById[
@@ -509,6 +512,110 @@ export const experimentsRouter = createTRPCRouter({
       }
 
       return result;
+    }),
+
+  deleteExperiment: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        experimentId: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .mutation(async ({ input }) => {
+      // Verify the experiment exists and belongs to the project
+      const experiment = await prisma.experiment.findUnique({
+        where: {
+          id: input.experimentId,
+          projectId: input.projectId,
+        },
+      });
+
+      if (!experiment) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Experiment not found",
+        });
+      }
+
+      // Perform the deletion in a transaction to ensure consistency
+      await prisma.$transaction(async (tx) => {
+        // Delete experiment-related data in Elasticsearch
+        try {
+          await esClient.deleteByQuery({
+            index: BATCH_EVALUATION_INDEX.alias,
+            body: {
+              query: {
+                bool: {
+                  must: [
+                    { term: { experiment_id: input.experimentId } },
+                    { term: { project_id: input.projectId } },
+                  ] as QueryDslBoolQuery["must"],
+                } as QueryDslBoolQuery,
+              },
+            },
+          });
+
+          // Delete DSPy steps in ES if applicable
+          await esClient.deleteByQuery({
+            index: DSPY_STEPS_INDEX.alias,
+            body: {
+              query: {
+                bool: {
+                  must: [
+                    { term: { experiment_id: input.experimentId } },
+                    { term: { project_id: input.projectId } },
+                  ] as QueryDslBoolQuery["must"],
+                } as QueryDslBoolQuery,
+              },
+            },
+          });
+        } catch (error) {
+          console.error("Error deleting Elasticsearch data:", error);
+          // Continue with deletion even if ES deletion fails
+        }
+
+        // Delete workflow versions if a workflow exists
+        if (experiment.workflowId) {
+          // First, update the workflow to null out the reference fields
+          await tx.workflow.update({
+            where: {
+              id: experiment.workflowId,
+              projectId: input.projectId,
+            },
+            data: {
+              currentVersionId: null,
+              latestVersionId: null,
+            },
+          });
+
+          // Now we can safely delete the workflow versions
+          await tx.workflowVersion.deleteMany({
+            where: {
+              workflowId: experiment.workflowId,
+              projectId: input.projectId,
+            },
+          });
+
+          // Delete the workflow itself
+          await tx.workflow.delete({
+            where: {
+              id: experiment.workflowId,
+              projectId: input.projectId,
+            },
+          });
+        }
+
+        // Finally, delete the experiment
+        await tx.experiment.delete({
+          where: {
+            id: input.experimentId,
+            projectId: input.projectId,
+          },
+        });
+      });
+
+      return { success: true };
     }),
 });
 
