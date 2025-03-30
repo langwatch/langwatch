@@ -54,9 +54,11 @@ export function RealTimeExecutionStep() {
     setWizardState({
       executionMethod,
     });
-    if (executionMethod === "realtime_on_message") {
-      setAccordeonValue(["execution-settings"]);
-    }
+    setTimeout(() => {
+      if (executionMethod === "realtime_on_message") {
+        setAccordeonValue(["execution-settings"]);
+      }
+    }, 300);
   };
 
   const form = useForm<CheckConfigFormData>({

@@ -226,7 +226,9 @@ export const CategorySelectionAccordion = ({
     setWizardState({
       evaluatorCategory: categoryId,
     });
-    setAccordeonValue(["selection"]);
+    setTimeout(() => {
+      setAccordeonValue(["selection"]);
+    }, 300);
   };
 
   return (

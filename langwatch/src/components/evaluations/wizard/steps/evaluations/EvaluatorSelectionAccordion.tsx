@@ -28,7 +28,9 @@ export const EvaluatorSelectionAccordion = ({
       wizardState.dataSource == "from_production"
         ? ["settings"]
         : ["mappings"];
-    setAccordeonValue(nextStep);
+    setTimeout(() => {
+      setAccordeonValue(nextStep);
+    }, 300);
   };
 
   return (
