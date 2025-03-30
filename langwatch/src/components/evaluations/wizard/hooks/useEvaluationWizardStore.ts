@@ -123,6 +123,7 @@ type EvaluationWizardStore = State & {
   setIsAutosaving: (isAutosaving: boolean) => void;
   skipNextAutosave: () => void;
   nextStep: () => void;
+  previousStep: () => void;
   setDatasetId: (datasetId: string, columnTypes: DatasetColumns) => void;
   getDatasetId: () => string | undefined;
   setFirstEvaluator: (
@@ -221,6 +222,19 @@ const store = (
         return {
           ...current,
           wizardState: { ...current.wizardState, step: nextStep! },
+        };
+      }
+      return current;
+    });
+  },
+  previousStep() {
+    set((current) => {
+      const currentStepIndex = STEPS.indexOf(current.wizardState.step);
+      if (currentStepIndex > 0) {
+        const previousStep = STEPS[currentStepIndex - 1];
+        return {
+          ...current,
+          wizardState: { ...current.wizardState, step: previousStep! },
         };
       }
       return current;

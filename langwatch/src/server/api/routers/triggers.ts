@@ -170,7 +170,7 @@ export const triggerRouter = createTRPCRouter({
         }
       });
 
-      const allChecks = await ctx.prisma.check.findMany({
+      const allChecks = await ctx.prisma.monitor.findMany({
         where: {
           id: {
             in: allCheckIds,

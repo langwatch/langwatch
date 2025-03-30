@@ -5,7 +5,7 @@ import { teamRouter } from "./routers/team";
 import { tracesRouter } from "./routers/traces";
 import { spansRouter } from "./routers/spans";
 import { analyticsRouter } from "./routers/analytics";
-import { checksRouter } from "./routers/checks";
+import { monitorsRouter } from "./routers/monitors";
 import { costsRouter } from "./routers/costs";
 import { planRouter } from "./routers/plan";
 import { topicsRouter } from "./routers/topics";
@@ -41,7 +41,7 @@ export const appRouter = createTRPCRouter({
   traces: tracesRouter,
   spans: spansRouter,
   analytics: analyticsRouter,
-  checks: checksRouter,
+  monitors: monitorsRouter,
   costs: costsRouter,
   plan: planRouter,
   topics: topicsRouter,

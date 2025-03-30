@@ -86,7 +86,7 @@ export default function CheckConfigForm({
   loading,
 }: CheckConfigFormProps) {
   const { project } = useOrganizationTeamProject();
-  const isNameAvailable = api.checks.isNameAvailable.useMutation();
+  const isNameAvailable = api.monitors.isNameAvailable.useMutation();
   const [isNameAlreadyInUse, setIsNameAlreadyInUse] = useState(false);
 
   const validateNameUniqueness = async (name: string) => {

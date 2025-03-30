@@ -46,7 +46,7 @@ export default function EvaluationsV2() {
   const router = useRouter();
   const { openDrawer } = useDrawer();
 
-  const checks = api.checks.getAllForProject.useQuery(
+  const checks = api.monitors.getAllForProject.useQuery(
     {
       projectId: project?.id ?? "",
     },

@@ -25,12 +25,12 @@ export default function EditTraceCheck() {
   const router = useRouter();
 
   const checkId = typeof router.query.id == "string" ? router.query.id : "";
-  const check = api.checks.getById.useQuery(
+  const check = api.monitors.getById.useQuery(
     { id: checkId, projectId: project?.id ?? "" },
     { enabled: !!project }
   );
-  const updateCheck = api.checks.update.useMutation();
-  const deleteCheck = api.checks.delete.useMutation();
+  const updateCheck = api.monitors.update.useMutation();
+  const deleteCheck = api.monitors.delete.useMutation();
 
   const onSubmit = async (data: CheckConfigFormData) => {
     if (!project || !data.checkType) return;

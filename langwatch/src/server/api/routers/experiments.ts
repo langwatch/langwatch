@@ -12,6 +12,7 @@ import {
 import {
   workflowJsonSchema,
   type Entry,
+  type Evaluator,
   type Workflow,
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
@@ -159,6 +160,61 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       return experiment;
+    }),
+
+  saveAsMonitor: protectedProcedure
+    .input(z.object({
+      projectId: z.string(),
+      experimentId: z.string(),
+    }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      const experiment = await prisma.experiment.findUnique({
+        where: {
+          id: input.experimentId,
+          projectId: input.projectId,
+        },
+        include: {
+          workflow: {
+            include: {
+              currentVersion: true,
+            },
+          },
+        },
+      });
+
+      if (!experiment) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Experiment not found",
+        });
+      }
+
+      const wizardState = experiment.wizardState as WizardState | undefined;
+      const dsl = experiment.workflow?.currentVersion?.dsl as Workflow | undefined;
+      const evaluator = dsl?.nodes.find((node) => node.type === "evaluator") as Node<Evaluator> | undefined;
+
+      if (!wizardState || !dsl || !evaluator || !evaluator.data.evaluator) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Experiment is not ready to be saved as a monitor",
+        });
+      }
+
+      // const newCheck = await prisma.monitor.create({
+      //   data: {
+      //     id: `monitor_${nanoid()}`,
+      //     projectId: input.projectId,
+      //     name: `${experiment.name ?? "Unknown"} - Monitor`,
+      //     checkType: evaluator.data.evaluator,
+      //     slug: experiment.slug,
+      //     preconditions: [],
+      //     parameters: {},
+      //     sample,
+      //     enabled: true,
+      //     executionMode,
+      //   },
+      // });
     }),
 
   getExperimentBySlugOrId: protectedProcedure

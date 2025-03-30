@@ -1,7 +1,6 @@
 import {
   Box,
   Button,
-  Card,
   Center,
   Heading,
   HStack,
@@ -10,25 +9,25 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { useEffect, useRef, useState, memo } from "react";
-import { LuChevronRight } from "react-icons/lu";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { LogoIcon } from "../../icons/LogoIcon";
-import { Dialog } from "../../ui/dialog";
-import { Steps } from "../../ui/steps";
+import { memo, useEffect, useRef, useState } from "react";
+import { LuActivity, LuChevronLeft, LuChevronRight } from "react-icons/lu";
+import { useShallow } from "zustand/react/shallow";
 import {
   STEPS,
   useEvaluationWizardStore,
 } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
-import { TaskStep } from "./steps/TaskStep";
-import { DatasetStep } from "./steps/DatasetStep";
-import { ExecutionStep } from "./steps/ExecutionStep";
-import { EvaluationStep } from "./steps/EvaluationStep";
-import { useShallow } from "zustand/react/shallow";
-import { WizardWorkspace } from "./WizardWorkspace";
-import { ResultsStep } from "./steps/ResultsStep";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { LogoIcon } from "../../icons/LogoIcon";
+import { Dialog } from "../../ui/dialog";
+import { Steps } from "../../ui/steps";
 import { Tooltip } from "../../ui/tooltip";
+import { WizardWorkspace } from "./WizardWorkspace";
 import { useStepCompletedValue } from "./hooks/useStepCompletedValue";
+import { DatasetStep } from "./steps/DatasetStep";
+import { EvaluationStep } from "./steps/EvaluationStep";
+import { ExecutionStep } from "./steps/ExecutionStep";
+import { ResultsStep } from "./steps/ResultsStep";
+import { TaskStep } from "./steps/TaskStep";
 
 export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
   const router = useRouter();
@@ -101,24 +100,32 @@ const WizardSidebar = memo(function WizardSidebar({
 }: {
   isLoading: boolean;
 }) {
+  const isTallScreen =
+    typeof window !== "undefined" && window.innerHeight > 900;
   const [isSticky, setIsSticky] = useState(false);
   const stickyRef = useRef<HTMLDivElement>(null);
-  const { setWizardState, nextStep, step } = useEvaluationWizardStore(
-    useShallow((state) => {
-      return {
-        setWizardState: state.setWizardState,
-        nextStep: state.nextStep,
-        step: state.wizardState.step,
-      };
-    })
-  );
+  const { setWizardState, nextStep, step, previousStep, task } =
+    useEvaluationWizardStore(
+      useShallow((state) => {
+        return {
+          setWizardState: state.setWizardState,
+          nextStep: state.nextStep,
+          step: state.wizardState.step,
+          previousStep: state.previousStep,
+          task: state.wizardState.task,
+        };
+      })
+    );
 
   const [showSpinner, setShowSpinner] = useState(false);
 
   useEffect(() => {
-    setTimeout(() => {
-      setShowSpinner(isLoading);
-    }, isLoading ? 400 : 0);
+    setTimeout(
+      () => {
+        setShowSpinner(isLoading);
+      },
+      isLoading ? 400 : 0
+    );
   }, [isLoading]);
 
   useEffect(() => {
@@ -150,10 +157,11 @@ const WizardSidebar = memo(function WizardSidebar({
   }, []);
 
   const stepCompletedValue = useStepCompletedValue();
+  const evaluationDisabled = !stepCompletedValue("all");
 
   return (
     <VStack
-      height={isLoading ? "full" : "fit-content"}
+      height={isLoading || !isTallScreen ? "full" : "fit-content"}
       minWidth="500px"
       width="full"
       maxWidth="500px"
@@ -170,7 +178,7 @@ const WizardSidebar = memo(function WizardSidebar({
             align="start"
             padding={6}
             gap={8}
-            height="fit-content"
+            height={isTallScreen ? "fit-content" : "full"}
             width="full"
           >
             <Steps.Root
@@ -229,11 +237,40 @@ const WizardSidebar = memo(function WizardSidebar({
             borderTopColor="gray.200"
             bottom="-1px"
           >
+            {step !== "task" && (
+              <Button
+                variant="ghost"
+                onClick={() => previousStep()}
+                marginLeft={-2}
+              >
+                <LuChevronLeft />
+                Back
+              </Button>
+            )}
             <Spacer />
-            <Button variant="outline" onClick={() => nextStep()}>
-              Next
-              <LuChevronRight />
-            </Button>
+            {step !== "results" && (
+              <Button variant="outline" onClick={() => nextStep()}>
+                Next
+                <LuChevronRight />
+              </Button>
+            )}
+            {step === "results" && task === "real_time" && (
+              <Tooltip
+                content={
+                  evaluationDisabled
+                    ? "Complete all the steps to enable monitoring"
+                    : ""
+                }
+                positioning={{
+                  placement: "top",
+                }}
+              >
+                <Button colorPalette="green" disabled={evaluationDisabled}>
+                  <LuActivity />
+                  Enable Monitoring
+                </Button>
+              </Tooltip>
+            )}
           </HStack>
         </>
       )}

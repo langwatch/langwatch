@@ -9,7 +9,7 @@ import {
   SimpleGrid,
   Text,
 } from "@chakra-ui/react";
-import type { Check } from "@prisma/client";
+import type { Monitor } from "@prisma/client";
 import { useState } from "react";
 import { Menu } from "../../components/ui/menu";
 import { CustomGraph } from "../analytics/CustomGraph";
@@ -27,7 +27,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 
 type MonitorsSectionProps = {
   title: string;
-  evaluations: Check[];
+  evaluations: Monitor[];
   onEditMonitor: (monitorId: string) => void;
 };
 
