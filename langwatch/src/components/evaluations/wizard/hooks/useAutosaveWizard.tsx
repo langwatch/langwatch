@@ -91,6 +91,7 @@ const useAutosaveWizard = () => {
     if (!project) return;
     if ((!!experimentSlug || !!routerSlug) && !experiment.data) return;
     if (autosaveDisabled) return;
+    if (experimentSlug && !wizardState.name) return;
 
     const now = Date.now();
     if (now - lastAutosave < 100) return;

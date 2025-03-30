@@ -3,7 +3,6 @@ import { useCallback } from "react";
 export const useAnimatedFocusElementById = () => {
   return useCallback((id: string) => {
     const element = document.getElementById(id);
-    console.log("element", element);
     if (element) {
       element.focus();
       element.setAttribute("data-focus", "true");

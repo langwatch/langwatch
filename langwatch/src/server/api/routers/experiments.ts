@@ -734,12 +734,21 @@ export const experimentsRouter = createTRPCRouter({
         }
 
         // Delete the monitor if it exists
-        await tx.monitor.delete({
+        const monitor = await tx.monitor.findFirst({
           where: {
             experimentId: input.experimentId,
             projectId: input.projectId,
           },
         });
+
+        if (monitor) {
+          await tx.monitor.delete({
+            where: {
+              experimentId: input.experimentId,
+              projectId: input.projectId,
+            },
+          });
+        }
 
         // Finally, delete the experiment
         await tx.experiment.delete({
