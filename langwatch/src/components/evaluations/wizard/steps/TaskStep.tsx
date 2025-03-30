@@ -38,7 +38,7 @@ export function TaskStep() {
             colorPalette="green"
             value="real_time"
             title={TASK_TYPES.real_time}
-            description="Evaluate messages as they arrive in production"
+            description="Evaluate messages as they arrive in production or as a guardrail to protect your application"
             onClick={() => handleTaskSelection("real_time")}
             icon={
               <ColorfulBlockIcon

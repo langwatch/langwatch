@@ -19,6 +19,7 @@ import { nameToId } from "../../../../optimization_studio/utils/nodeUtils";
 import { convertEvaluator } from "../../../../optimization_studio/utils/registryUtils";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { mappingStateSchema } from "../../../../server/tracer/tracesMapping";
+import { checkPreconditionsSchema } from "../../../../server/evaluations/types.generated";
 
 export const EVALUATOR_CATEGORIES = [
   "expected_answer",
@@ -60,6 +61,10 @@ export const DATA_SOURCE_TYPES = {
 } as const;
 
 export const EXECUTION_METHODS = {
+  realtime_on_message: "When a message arrives",
+  realtime_guardrail: "As a guardrail",
+  realtime_manually: "Manually",
+
   prompt: "Create a prompt",
   http_endpoint: "Call an HTTP endpoint",
   create_a_workflow: "Create a Workflow",
@@ -78,6 +83,12 @@ export const wizardStateSchema = z.object({
     .optional(),
   evaluatorCategory: z.enum(EVALUATOR_CATEGORIES).optional(),
   realTimeTraceMappings: mappingStateSchema.optional(),
+  realTimeExecution: z
+    .object({
+      sample: z.number().min(0).max(1).optional(),
+      preconditions: checkPreconditionsSchema.optional(),
+    })
+    .optional(),
   workspaceTab: z.enum(["dataset", "workflow", "results"]).optional(),
 });
 
@@ -207,20 +218,10 @@ const store = (
       const currentStepIndex = STEPS.indexOf(current.wizardState.step);
       if (currentStepIndex < STEPS.length - 1) {
         const nextStep = STEPS[currentStepIndex + 1];
-        if (
-          nextStep === "execution" &&
-          current.wizardState.task === "real_time"
-        ) {
-          return {
-            ...current,
-            wizardState: { ...current.wizardState, step: "evaluation" },
-          };
-        } else {
-          return {
-            ...current,
-            wizardState: { ...current.wizardState, step: nextStep! },
-          };
-        }
+        return {
+          ...current,
+          wizardState: { ...current.wizardState, step: nextStep! },
+        };
       }
       return current;
     });

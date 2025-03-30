@@ -76,7 +76,11 @@ export function DatasetStep() {
         <Heading as="h2" size="md">
           Datasets
         </Heading>
-        <Text>Choose where your evaluation data will come from</Text>
+        <Text>
+          {wizardState.task === "real_time"
+            ? "Choose some sample data to test the evaluation before setting it up in production"
+            : "Choose where your evaluation data will come from"}
+        </Text>
       </VStack>
 
       <Accordion.Root

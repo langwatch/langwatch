@@ -8,11 +8,10 @@ export function FullWidthFormControl({
   children,
   align,
   minWidth,
-  inputWidth,
   ...props
 }: PropsWithChildren<{
   label: string | ReactNode;
-  helper?: string;
+  helper?: string | ReactNode;
   invalid?: boolean;
   inputWidth?: string;
 }> &

@@ -34,11 +34,15 @@ export const PreconditionsField = ({
   append,
   remove,
   fields,
+  label = "Preconditions",
+  helper = "Conditions that must be met for this check to run",
 }: {
   runOn: React.ReactNode | null;
   append: (value: any) => void;
   remove: (index: number) => void;
   fields: Record<"id", string>[];
+  label?: string | React.ReactNode;
+  helper?: string | React.ReactNode;
 }) => {
   const { control, watch } = useFormContext();
   const preconditions = watch("preconditions");
@@ -47,10 +51,7 @@ export const PreconditionsField = ({
   const evaluator = getEvaluatorDefinitions(checkType);
 
   return (
-    <HorizontalFormControl
-      label="Preconditions"
-      helper="Conditions that must be met for this check to run"
-    >
+    <HorizontalFormControl label={label} helper={helper}>
       <VStack align="start" gap={4}>
         {evaluator?.requiredFields.includes("contexts") && (
           <Box borderLeft="4px solid" borderLeftColor="blue.400" width="full">
@@ -128,7 +129,7 @@ export const PreconditionsField = ({
                 <X />
               </Button>
               <SmallLabel>{index == 0 ? "When" : "and"}</SmallLabel>
-              <HStack gap={4}>
+              <HStack gap={2} flexWrap="wrap">
                 <NativeSelect.Root minWidth="fit-content">
                   <NativeSelect.Field
                     {...control.register(`preconditions.${index}.field`)}
