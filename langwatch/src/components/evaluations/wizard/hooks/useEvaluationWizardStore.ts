@@ -10,7 +10,6 @@ import {
 } from "../../../../optimization_studio/hooks/useWorkflowStore";
 import { entryNode } from "../../../../optimization_studio/templates/blank";
 import type {
-  Entry,
   Evaluator,
   Workflow,
 } from "../../../../optimization_studio/types/dsl";
@@ -19,6 +18,7 @@ import { nameToId } from "../../../../optimization_studio/utils/nodeUtils";
 import { convertEvaluator } from "../../../../optimization_studio/utils/registryUtils";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { mappingStateSchema } from "../../../../server/tracer/tracesMapping";
+import { checkPreconditionsSchema } from "../../../../server/evaluations/types.generated";
 
 export const EVALUATOR_CATEGORIES = [
   "expected_answer",
@@ -60,6 +60,10 @@ export const DATA_SOURCE_TYPES = {
 } as const;
 
 export const EXECUTION_METHODS = {
+  realtime_on_message: "When a message arrives",
+  realtime_guardrail: "As a guardrail",
+  realtime_manually: "Manually",
+
   prompt: "Create a prompt",
   http_endpoint: "Call an HTTP endpoint",
   create_a_workflow: "Create a Workflow",
@@ -78,12 +82,21 @@ export const wizardStateSchema = z.object({
     .optional(),
   evaluatorCategory: z.enum(EVALUATOR_CATEGORIES).optional(),
   realTimeTraceMappings: mappingStateSchema.optional(),
-  workspaceTab: z.enum(["dataset", "workflow", "results"]).optional(),
+  realTimeExecution: z
+    .object({
+      sample: z.number().min(0).max(1).optional(),
+      preconditions: checkPreconditionsSchema.optional(),
+    })
+    .optional(),
+  workspaceTab: z
+    .enum(["dataset", "workflow", "results", "code-implementation"])
+    .optional(),
 });
 
 export type WizardState = z.infer<typeof wizardStateSchema>;
 
 export type State = {
+  experimentId?: string;
   experimentSlug?: string;
   wizardState: z.infer<typeof wizardStateSchema>;
   isAutosaving: boolean;
@@ -93,8 +106,8 @@ export type State = {
 
 type EvaluationWizardStore = State & {
   reset: () => void;
-  setExperimentSlug: (experiment_slug: string) => void;
-  getExperimentSlug: () => string | undefined;
+  setExperimentId: (experimentId: string) => void;
+  setExperimentSlug: (experimentSlug: string) => void;
   setWizardState: (
     state:
       | Partial<State["wizardState"]>
@@ -112,6 +125,7 @@ type EvaluationWizardStore = State & {
   setIsAutosaving: (isAutosaving: boolean) => void;
   skipNextAutosave: () => void;
   nextStep: () => void;
+  previousStep: () => void;
   setDatasetId: (datasetId: string, columnTypes: DatasetColumns) => void;
   getDatasetId: () => string | undefined;
   setFirstEvaluator: (
@@ -152,14 +166,14 @@ const store = (
     set((current) => ({
       ...current,
       ...initialState,
-      workflowStore: { ...current.workflowStore, ...initialWorkflowStore },
+      workflowStore: createWorkflowStore(set, get),
     }));
   },
-  setExperimentSlug(experiment_slug) {
-    set((current) => ({ ...current, experimentSlug: experiment_slug }));
+  setExperimentId(experimentId) {
+    set((current) => ({ ...current, experimentId }));
   },
-  getExperimentSlug() {
-    return get().experimentSlug;
+  setExperimentSlug(experimentSlug) {
+    set((current) => ({ ...current, experimentSlug }));
   },
   setWizardState(state) {
     const applyChanges = (
@@ -207,20 +221,23 @@ const store = (
       const currentStepIndex = STEPS.indexOf(current.wizardState.step);
       if (currentStepIndex < STEPS.length - 1) {
         const nextStep = STEPS[currentStepIndex + 1];
-        if (
-          nextStep === "execution" &&
-          current.wizardState.task === "real_time"
-        ) {
-          return {
-            ...current,
-            wizardState: { ...current.wizardState, step: "evaluation" },
-          };
-        } else {
-          return {
-            ...current,
-            wizardState: { ...current.wizardState, step: nextStep! },
-          };
-        }
+        return {
+          ...current,
+          wizardState: { ...current.wizardState, step: nextStep! },
+        };
+      }
+      return current;
+    });
+  },
+  previousStep() {
+    set((current) => {
+      const currentStepIndex = STEPS.indexOf(current.wizardState.step);
+      if (currentStepIndex > 0) {
+        const previousStep = STEPS[currentStepIndex - 1];
+        return {
+          ...current,
+          wizardState: { ...current.wizardState, step: previousStep! },
+        };
       }
       return current;
     });
@@ -364,7 +381,22 @@ const store = (
       .workflowStore.getWorkflow()
       .edges.filter((edge) => edge.target === firstEvaluator.id);
   },
-  workflowStore: workflowStore(
+  workflowStore: createWorkflowStore(set, get),
+});
+
+const createWorkflowStore = (
+  set: (
+    partial:
+      | EvaluationWizardStore
+      | Partial<EvaluationWizardStore>
+      | ((
+          state: EvaluationWizardStore
+        ) => EvaluationWizardStore | Partial<EvaluationWizardStore>),
+    replace?: boolean | undefined
+  ) => void,
+  get: () => EvaluationWizardStore
+) => {
+  return workflowStore(
     (
       partial:
         | WorkflowStore
@@ -379,7 +411,7 @@ const store = (
             : { ...current.workflowStore, ...partial },
       })),
     () => get().workflowStore
-  ),
-});
+  );
+};
 
 export const useEvaluationWizardStore = create<EvaluationWizardStore>()(store);

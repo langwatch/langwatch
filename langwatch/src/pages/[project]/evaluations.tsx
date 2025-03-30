@@ -28,12 +28,12 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
-import { EvaluationExecutionMode, type Check } from "@prisma/client";
+import { EvaluationExecutionMode, type Monitor } from "@prisma/client";
 import NextLink from "next/link";
 
 export default function Checks() {
   const { project, hasTeamPermission } = useOrganizationTeamProject();
-  const checks = api.checks.getAllForProject.useQuery(
+  const checks = api.monitors.getAllForProject.useQuery(
     {
       projectId: project?.id ?? "",
     },
@@ -41,10 +41,10 @@ export default function Checks() {
   );
 
   const utils = api.useContext();
-  const toggleConfig = api.checks.toggle.useMutation({
+  const toggleConfig = api.monitors.toggle.useMutation({
     onMutate: async (newConfig) => {
-      await utils.checks.getAllForProject.cancel();
-      const previousConfigs = utils.checks.getAllForProject.getData({
+      await utils.monitors.getAllForProject.cancel();
+      const previousConfigs = utils.monitors.getAllForProject.getData({
         projectId: project?.id ?? "",
       });
       const newConfigs = previousConfigs?.map((config) =>
@@ -52,7 +52,7 @@ export default function Checks() {
           ? { ...config, enabled: newConfig.enabled }
           : config
       );
-      utils.checks.getAllForProject.setData(
+      utils.monitors.getAllForProject.setData(
         { projectId: project?.id ?? "" },
         newConfigs
       );
@@ -72,7 +72,7 @@ export default function Checks() {
       {
         onError: (_error, _newConfig, context) => {
           if (context?.previousConfigs) {
-            utils.checks.getAllForProject.setData(
+            utils.monitors.getAllForProject.setData(
               { projectId: project?.id ?? "" },
               context.previousConfigs
             );
@@ -100,7 +100,7 @@ export default function Checks() {
     (check) => check.executionMode === EvaluationExecutionMode.AS_GUARDRAIL
   );
 
-  const renderEvaluation = (check: Check) => {
+  const renderEvaluation = (check: Monitor) => {
     const preconditions = check.preconditions as CheckPreconditions | undefined;
 
     const sample =

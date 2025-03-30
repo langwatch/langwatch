@@ -140,6 +140,7 @@ export const getWorkflow = (state: State) => {
   // Keep only the keys present on Workflow type
   return {
     workflow_id: state.workflow_id,
+    experiment_id: state.experiment_id,
     spec_version: state.spec_version,
     name: state.name,
     icon: state.icon,

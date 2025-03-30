@@ -148,6 +148,7 @@ type Flow = {
 export const workflowJsonSchema = z
   .object({
     workflow_id: z.string().optional(),
+    experiment_id: z.string().optional(),
     spec_version: z.string(),
     name: z.string(),
     icon: z.string(),
@@ -163,10 +164,10 @@ export const workflowJsonSchema = z
   })
   .passthrough();
 
-
 export type Workflow = {
   spec_version: "1.3";
   workflow_id?: string;
+  experiment_id?: string;
   name: string;
   icon: string;
   description: string;
@@ -190,7 +191,6 @@ export type Workflow = {
       };
     };
     evaluation?: {
-      experiment_slug?: string;
       run_id?: string;
       status?: ExecutionStatus;
       error?: string;
@@ -203,7 +203,6 @@ export type Workflow = {
       };
     };
     optimization?: {
-      experiment_slug?: string;
       run_id?: string;
       status?: ExecutionStatus;
       stdout?: string;

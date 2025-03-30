@@ -22,6 +22,14 @@ import { OverflownTextWithTooltip } from "../../../../OverflownText";
 import { Tooltip } from "../../../../ui/tooltip";
 import type { AVAILABLE_EVALUATORS } from "../../../../../server/evaluations/evaluators.generated";
 import { StepAccordion } from "../../components/StepAccordion";
+import { StepRadio } from "../../components/StepButton";
+import {
+  LuBrain,
+  LuDatabase,
+  LuShield,
+  LuSquareCheckBig,
+  LuStar,
+} from "react-icons/lu";
 
 type EvaluationCategoryConfig = {
   id: string;
@@ -46,7 +54,7 @@ export const evaluatorCategories: EvaluationCategoryConfig[] = [
     name: "Expected Answer Evaluation",
     description:
       "For when you have the golden answer and want to measure how correct can the LLM get it",
-    icon: <CheckSquare />,
+    icon: <LuSquareCheckBig />,
     evaluators: [
       // {
       //   id: "langevals/exact_match",
@@ -88,7 +96,7 @@ export const evaluatorCategories: EvaluationCategoryConfig[] = [
     name: "LLM-as-a-Judge",
     description:
       "For when you don't have a golden answer, but have a set of rules for another LLM to evaluate quality",
-    icon: <Brain />,
+    icon: <LuBrain />,
     evaluators: [
       // {
       //   id: "llm_boolean",
@@ -122,7 +130,7 @@ export const evaluatorCategories: EvaluationCategoryConfig[] = [
     name: "Quality Aspects Evaluation",
     description:
       "For when you want to check the language, structure, style and other general quality metrics",
-    icon: <Star />,
+    icon: <LuStar />,
     evaluators: [
       // {
       //   id: "language_detection",
@@ -155,7 +163,7 @@ export const evaluatorCategories: EvaluationCategoryConfig[] = [
     name: "RAG Quality",
     description:
       "For measuring the quality of your RAG, check for hallucinations with faithfulness and precision/recall",
-    icon: <Database />,
+    icon: <LuDatabase />,
     evaluators: [
       // {
       //   id: "faithfulness",
@@ -187,7 +195,7 @@ export const evaluatorCategories: EvaluationCategoryConfig[] = [
     id: "safety",
     name: "Safety",
     description: "Check for PII, prompt injection attempts and toxic content",
-    icon: <Shield />,
+    icon: <LuShield />,
     evaluators: [
       {
         id: "presidio/pii_detection",
@@ -226,7 +234,9 @@ export const CategorySelectionAccordion = ({
     setWizardState({
       evaluatorCategory: categoryId,
     });
-    setAccordeonValue(["selection"]);
+    setTimeout(() => {
+      setAccordeonValue(["selection"]);
+    }, 300);
   };
 
   return (
@@ -268,10 +278,11 @@ export const CategorySelectionAccordion = ({
                   showArrow
                   positioning={{ placement: "right" }}
                 >
-                  <RadioCard.Item
+                  <StepRadio
+                    title={category.name}
+                    description={category.description}
+                    icon={category.icon}
                     value={category.id}
-                    width="full"
-                    minWidth={0}
                     disabled={isDisabled}
                     onClick={(e) => {
                       e.preventDefault();
@@ -280,34 +291,7 @@ export const CategorySelectionAccordion = ({
                         handleCategorySelect(category.id as EvaluationCategory);
                       }
                     }}
-                  >
-                    <RadioCard.ItemHiddenInput />
-                    <RadioCard.ItemControl cursor="pointer" width="full">
-                      <RadioCard.ItemContent width="full">
-                        <HStack
-                          align="start"
-                          gap={3}
-                          _icon={{ color: "green.300" }}
-                          width="full"
-                        >
-                          {category.icon}
-                          <VStack align="start" gap={1} width="full">
-                            <OverflownTextWithTooltip>
-                              {category.name}
-                            </OverflownTextWithTooltip>
-                            <Text
-                              fontSize="sm"
-                              color="gray.500"
-                              fontWeight="normal"
-                            >
-                              {category.description}
-                            </Text>
-                          </VStack>
-                        </HStack>
-                      </RadioCard.ItemContent>
-                      <RadioCard.ItemIndicator />
-                    </RadioCard.ItemControl>
-                  </RadioCard.Item>
+                  />
                 </Tooltip>
               );
             })}

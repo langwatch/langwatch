@@ -93,6 +93,12 @@ export default async function handler(
     return res.status(400).json({ error: validationError.message });
   }
 
+  if (!params.experiment_id && !params.experiment_slug) {
+    return res.status(400).json({
+      error: "Either experiment_id or experiment_slug is required",
+    });
+  }
+
   if (
     params.timestamps?.created_at &&
     params.timestamps.created_at.toString().length === 10
@@ -101,7 +107,7 @@ export default async function handler(
       "Timestamps not in milliseconds for batch evaluation run",
       params.run_id,
       "on experiment",
-      params.experiment_slug
+      params.experiment_slug ?? params.experiment_id
     );
     return res.status(400).json({
       error:
@@ -145,15 +151,16 @@ const processBatchEvaluation = async (
   project: Project,
   param: ESBatchEvaluationRESTParams
 ) => {
-  const { run_id, experiment_slug } = param;
+  const { run_id, experiment_id, experiment_slug } = param;
 
-  const experiment = await findOrCreateExperiment(
+  const experiment = await findOrCreateExperiment({
     project,
+    experiment_id,
     experiment_slug,
-    ExperimentType.BATCH_EVALUATION_V2,
-    param.name ?? undefined,
-    param.workflow_id ?? undefined
-  );
+    experiment_type: ExperimentType.BATCH_EVALUATION_V2,
+    experiment_name: param.name ?? undefined,
+    workflowId: param.workflow_id ?? undefined,
+  });
 
   const id = batchEvaluationId({
     projectId: project.id,

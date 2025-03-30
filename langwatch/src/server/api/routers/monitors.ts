@@ -1,5 +1,5 @@
 import { ZodError, z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../../api/trpc";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import slugify from "slugify";
 import { TRPCError } from "@trpc/server";
@@ -9,10 +9,10 @@ import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-} from "../../../server/evaluations/evaluators.generated";
+} from "../../evaluations/evaluators.generated";
 import { EvaluationExecutionMode } from "@prisma/client";
 
-export const checksRouter = createTRPCRouter({
+export const monitorsRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_VIEW))
@@ -20,7 +20,7 @@ export const checksRouter = createTRPCRouter({
       const { projectId } = input;
       const prisma = ctx.prisma;
 
-      const checks = await prisma.check.findMany({
+      const checks = await prisma.monitor.findMany({
         where: { projectId },
         orderBy: { createdAt: "asc" },
       });
@@ -36,7 +36,7 @@ export const checksRouter = createTRPCRouter({
       const { id, enabled, projectId } = input;
       const prisma = ctx.prisma;
 
-      await prisma.check.update({
+      await prisma.monitor.update({
         where: { id, projectId },
         data: { enabled },
       });
@@ -75,7 +75,7 @@ export const checksRouter = createTRPCRouter({
 
       validateCheckSettings(checkType, parameters);
 
-      const newCheck = await prisma.check.create({
+      const newCheck = await prisma.monitor.create({
         data: {
           id: `eval_${nanoid()}`,
           projectId,
@@ -130,7 +130,7 @@ export const checksRouter = createTRPCRouter({
 
       validateCheckSettings(checkType, parameters);
 
-      const updatedCheck = await prisma.check.update({
+      const updatedCheck = await prisma.monitor.update({
         where: { id, projectId },
         data: {
           name,
@@ -154,7 +154,7 @@ export const checksRouter = createTRPCRouter({
       const { id, projectId } = input;
       const prisma = ctx.prisma;
 
-      const check = await prisma.check.findUnique({
+      const check = await prisma.monitor.findUnique({
         where: { id, projectId },
       });
 
@@ -174,7 +174,7 @@ export const checksRouter = createTRPCRouter({
       const { id, projectId } = input;
       const prisma = ctx.prisma;
 
-      await prisma.check.delete({
+      await prisma.monitor.delete({
         where: { id, projectId },
       });
 
@@ -193,7 +193,7 @@ export const checksRouter = createTRPCRouter({
       const { projectId, name } = input;
       const prisma = ctx.prisma;
 
-      const check = await prisma.check.findFirst({
+      const check = await prisma.monitor.findFirst({
         where: { projectId, name },
       });
 

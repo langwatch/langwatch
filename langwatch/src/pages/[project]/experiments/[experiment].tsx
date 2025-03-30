@@ -14,7 +14,7 @@ export default function ExperimentPage() {
   const { project } = useOrganizationTeamProject();
   const { experiment: experimentSlug } = router.query;
 
-  const experiment = api.experiments.getExperimentBySlug.useQuery(
+  const experiment = api.experiments.getExperimentBySlugOrId.useQuery(
     {
       projectId: project?.id ?? "",
       experimentSlug: experimentSlug as string,

@@ -417,7 +417,7 @@ export function BatchEvaluationV2RunList({
                           </Tooltip>
                         </React.Fragment>
                       ))}
-                    {runCost && (
+                    {!!runCost && (
                       <>
                         {Object.keys(run.summary.evaluations).length > 0 && (
                           <Text>·</Text>

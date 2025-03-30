@@ -94,7 +94,12 @@ async def handle_interruption(event: StudioClientEvent):
         EvaluationReporting.post_results(
             event.payload.workflow.api_key,
             {
-                "experiment_slug": event.payload.workflow.workflow_id,
+                "experiment_id": event.payload.workflow.experiment_id,
+                "experiment_slug": (
+                    None
+                    if event.payload.workflow.experiment_id
+                    else event.payload.workflow.workflow_id
+                ),
                 "run_id": event.payload.run_id,
                 "timestamps": {
                     "finished_at": int(time.time() * 1000),

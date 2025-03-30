@@ -268,6 +268,7 @@ class WorkflowState(BaseModel):
 class Workflow(BaseModel):
     api_key: str
     workflow_id: str
+    experiment_id: Optional[str] = None
     spec_version: str
     name: str
     icon: str

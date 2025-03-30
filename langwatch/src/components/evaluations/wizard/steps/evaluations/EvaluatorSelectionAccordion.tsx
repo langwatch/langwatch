@@ -10,6 +10,9 @@ import { ChevronDown } from "lucide-react";
 import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import { evaluatorCategories } from "./CategorySelectionAccordion";
 import { StepAccordion } from "../../components/StepAccordion";
+import { useAnimatedFocusElementById } from "../../../../../hooks/useAnimatedFocusElementById";
+import { LuChevronRight } from "react-icons/lu";
+import { StepRadio } from "../../components/StepButton";
 
 export const EvaluatorSelectionAccordion = ({
   setAccordeonValue,
@@ -18,6 +21,8 @@ export const EvaluatorSelectionAccordion = ({
 }) => {
   const { wizardState, getFirstEvaluatorNode, setFirstEvaluator } =
     useEvaluationWizardStore();
+
+  const focusElementById = useAnimatedFocusElementById();
 
   const handleEvaluatorSelect = (evaluatorType: string) => {
     setFirstEvaluator({
@@ -28,7 +33,14 @@ export const EvaluatorSelectionAccordion = ({
       wizardState.dataSource == "from_production"
         ? ["settings"]
         : ["mappings"];
-    setAccordeonValue(nextStep);
+    setTimeout(() => {
+      setAccordeonValue(nextStep);
+      if (nextStep.includes("settings")) {
+        focusElementById("js-next-step-button");
+      } else {
+        focusElementById("js-expand-settings-button");
+      }
+    }, 300);
   };
 
   return (
@@ -54,11 +66,13 @@ export const EvaluatorSelectionAccordion = ({
           {evaluatorCategories
             .find((c) => c.id === wizardState.evaluatorCategory)
             ?.evaluators.map((evaluator) => (
-              <RadioCard.Item
+              <StepRadio
                 key={evaluator.id}
                 value={evaluator.id}
-                width="full"
-                minWidth={0}
+                title={
+                  evaluator.name + (evaluator.future ? " (Coming Soon)" : "")
+                }
+                description={evaluator.description}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -72,34 +86,7 @@ export const EvaluatorSelectionAccordion = ({
                     ? "not-allowed"
                     : "pointer"
                 }
-              >
-                <RadioCard.ItemHiddenInput />
-                <RadioCard.ItemControl
-                  cursor={
-                    evaluator.future ?? evaluator.disabled
-                      ? "not-allowed"
-                      : "pointer"
-                  }
-                  width="full"
-                >
-                  <RadioCard.ItemContent width="full">
-                    <VStack align="start" gap={1} width="full">
-                      <HStack>
-                        <Text fontWeight="semibold">{evaluator.name}</Text>
-                        {evaluator.future && (
-                          <Text as="span" fontSize="xs" color="gray.500">
-                            (Coming Soon)
-                          </Text>
-                        )}
-                      </HStack>
-                      <Text fontSize="sm" color="gray.500" fontWeight="normal">
-                        {evaluator.description}
-                      </Text>
-                    </VStack>
-                  </RadioCard.ItemContent>
-                  <RadioCard.ItemIndicator />
-                </RadioCard.ItemControl>
-              </RadioCard.Item>
+              />
             ))}
         </Grid>
       </RadioCard.Root>

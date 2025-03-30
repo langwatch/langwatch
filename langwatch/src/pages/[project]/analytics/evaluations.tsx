@@ -149,7 +149,7 @@ const creatChecks = (checks: any) => {
 
 export default function Evaluations() {
   const { project } = useOrganizationTeamProject();
-  const checks = api.checks.getAllForProject.useQuery(
+  const checks = api.monitors.getAllForProject.useQuery(
     {
       projectId: project?.id ?? "",
     },

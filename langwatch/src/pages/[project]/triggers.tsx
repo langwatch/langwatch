@@ -14,7 +14,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { Check, TriggerAction } from "@prisma/client";
+import type { Monitor, TriggerAction } from "@prisma/client";
 import { type AlertType } from "@prisma/client";
 import { Bell, Edit2, Filter, MoreVertical, Trash } from "react-feather";
 import {
@@ -281,7 +281,7 @@ export default function Members() {
     return result;
   };
 
-  const applyChecks = (checks: Check[]) => {
+  const applyChecks = (checks: Monitor[]) => {
     if (!checks || checks.length === 0) {
       return null;
     }
@@ -369,7 +369,7 @@ export default function Members() {
                             <VStack gap={2}>
                               {applyChecks(
                                 trigger.checks?.filter(
-                                  (check): check is Check => !!check
+                                  (check): check is Monitor => !!check
                                 ) ?? []
                               )}
 

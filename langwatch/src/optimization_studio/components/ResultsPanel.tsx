@@ -60,9 +60,10 @@ export function ResultsPanel({
     setTabIndex(defaultTab);
   }, [defaultTab]);
 
-  const { workflowId, evaluationState } = useWorkflowStore(
-    ({ workflow_id: workflowId, state }) => ({
+  const { workflowId, experimentId, evaluationState } = useWorkflowStore(
+    ({ workflow_id: workflowId, experiment_id: experimentId, state }) => ({
       workflowId,
+      experimentId,
       evaluationState: state.evaluation,
     })
   );
@@ -114,6 +115,7 @@ export function ResultsPanel({
           {!isCollapsed && tabIndex === "evaluations" && (
             <EvaluationResults
               workflowId={workflowId}
+              experimentId={experimentId}
               evaluationState={evaluationState}
             />
           )}
@@ -134,10 +136,12 @@ export function ResultsPanel({
 
 export function EvaluationResults({
   workflowId,
+  experimentId,
   evaluationState,
   sidebarProps,
 }: {
   workflowId?: string;
+  experimentId?: string;
   evaluationState: Workflow["state"]["evaluation"];
   sidebarProps?: StackProps;
 }) {
@@ -145,10 +149,13 @@ export function EvaluationResults({
 
   const [keepFetching, setKeepFetching] = useState(false);
 
-  const experiment = api.experiments.getExperimentBySlug.useQuery(
+  const experiment = api.experiments.getExperimentBySlugOrId.useQuery(
     {
       projectId: project?.id ?? "",
-      experimentSlug: experimentSlugify(workflowId ?? ""),
+      experimentId: experimentId,
+      experimentSlug: experimentId
+        ? undefined
+        : experimentSlugify(workflowId ?? ""),
     },
     {
       enabled: !!project && !!workflowId,
@@ -300,7 +307,7 @@ export function OptimizationResults() {
 
   const [keepFetching, setKeepFetching] = useState(false);
 
-  const experiment = api.experiments.getExperimentBySlug.useQuery(
+  const experiment = api.experiments.getExperimentBySlugOrId.useQuery(
     {
       projectId: project?.id ?? "",
       experimentSlug: experimentSlugify(`${workflowId ?? ""}-optimizations`),

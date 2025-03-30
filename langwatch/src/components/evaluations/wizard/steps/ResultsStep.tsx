@@ -16,6 +16,8 @@ import {
 import { FullWidthFormControl } from "../../../FullWidthFormControl";
 import { useRunEvalution } from "../hooks/useRunEvalution";
 import { useStepCompletedValue } from "../hooks/useStepCompletedValue";
+import { Tooltip } from "../../../ui/tooltip";
+import { useEffect } from "react";
 
 export function ResultsStep() {
   const { name, wizardState, setWizardState } = useEvaluationWizardStore(
@@ -40,6 +42,14 @@ export function ResultsStep() {
     setWizardState({ name: data.name });
   };
 
+  const stepCompletedValue = useStepCompletedValue();
+  const trialDisabled = !stepCompletedValue("all");
+
+  useEffect(() => {
+    setWizardState({ workspaceTab: "results" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <>
       <VStack align="start" paddingTop={6}>
@@ -59,6 +69,7 @@ export function ResultsStep() {
               {...form.register("name")}
               // eslint-disable-next-line @typescript-eslint/no-misused-promises
               onBlur={form.handleSubmit(onSubmit)}
+              autoFocus
             />
           </FullWidthFormControl>
         </form>
@@ -82,18 +93,30 @@ export function ResultsStep() {
                 <VStack align="start" gap={4}>
                   Try out your real-time evaluation with the sample before
                   enabling monitoring.
-                  <Button
-                    colorPalette="blue"
-                    _icon={{
-                      minWidth: "18px",
-                      minHeight: "18px",
+                  <Tooltip
+                    content={
+                      trialDisabled
+                        ? "Select a dataset and evaluation to run a trial"
+                        : ""
+                    }
+                    positioning={{
+                      placement: "top",
                     }}
-                    onClick={runEvaluation}
-                    loading={isLoading}
                   >
-                    <LuCirclePlay />
-                    Run Trial Evaluation
-                  </Button>
+                    <Button
+                      colorPalette="blue"
+                      _icon={{
+                        minWidth: "18px",
+                        minHeight: "18px",
+                      }}
+                      onClick={runEvaluation}
+                      loading={isLoading}
+                      disabled={trialDisabled}
+                    >
+                      <LuCirclePlay />
+                      Run Trial Evaluation
+                    </Button>
+                  </Tooltip>
                 </VStack>
               </Alert.Description>
             </Alert.Content>

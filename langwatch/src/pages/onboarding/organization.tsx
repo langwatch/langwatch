@@ -469,7 +469,7 @@ export default function OrganizationOnboarding() {
                     loading={createOrganization.isLoading}
                     onClick={() => {
                       if (isSaaS) {
-                        checkFirstStep();
+                        void checkFirstStep();
                       }
                     }}
                   >

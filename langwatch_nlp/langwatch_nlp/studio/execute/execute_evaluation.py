@@ -112,7 +112,7 @@ async def execute_evaluation(
         )
         # Send initial empty batch to create the experiment in LangWatch
         reporting.send_batch()
-        await asyncify(evaluator)(module, metric=reporting.evaluate_and_report)
+        await asyncify(evaluator)(module, metric=reporting.evaluate_and_report) # type: ignore
         await reporting.wait_for_completion()
     except Exception as e:
         yield error_evaluation_event(run_id, str(e), stopped_at=int(time.time() * 1000))
@@ -128,7 +128,10 @@ async def execute_evaluation(
             EvaluationReporting.post_results(
                 workflow.api_key,
                 {
-                    "experiment_slug": workflow.workflow_id,
+                    "experiment_id": workflow.experiment_id,
+                    "experiment_slug": (
+                        None if workflow.experiment_id else workflow.workflow_id
+                    ),
                     "run_id": run_id,
                     "timestamps": {
                         "finished_at": int(time.time() * 1000),

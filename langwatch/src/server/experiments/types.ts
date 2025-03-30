@@ -60,7 +60,8 @@ export type DSPyStepRESTParams = Omit<
   DSPyStep,
   "timestamps" | "project_id" | "experiment_id" | "examples" | "llm_calls"
 > & {
-  experiment_slug: string;
+  experiment_id?: string | null;
+  experiment_slug?: string | null;
   timestamps: {
     created_at: number;
   };
@@ -134,7 +135,8 @@ export type ESBatchEvaluationRESTParams = Omit<
   Partial<ESBatchEvaluation>,
   "project_id" | "experiment_id" | "timestamps"
 > & {
-  experiment_slug: string;
+  experiment_id?: string | null;
+  experiment_slug?: string | null;
   run_id: string | null;
   workflow_id?: string | null;
   name?: string | null;
