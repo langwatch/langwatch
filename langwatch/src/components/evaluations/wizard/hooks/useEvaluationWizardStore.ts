@@ -88,7 +88,7 @@ export const wizardStateSchema = z.object({
       preconditions: checkPreconditionsSchema.optional(),
     })
     .optional(),
-  workspaceTab: z.enum(["dataset", "workflow", "results"]).optional(),
+  workspaceTab: z.enum(["dataset", "workflow", "results", "code-implementation"]).optional(),
 });
 
 export type WizardState = z.infer<typeof wizardStateSchema>;

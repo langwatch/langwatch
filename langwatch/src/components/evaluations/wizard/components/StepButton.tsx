@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  Center,
-  HStack,
-  RadioCard,
-  Text,
-  VStack,
-  type ButtonProps,
-} from "@chakra-ui/react";
+import { HStack, RadioCard, Text, VStack } from "@chakra-ui/react";
 import { LuChevronRight } from "react-icons/lu";
 import { OverflownTextWithTooltip } from "../../../OverflownText";
 
@@ -60,7 +51,14 @@ export function StepRadio({
   value: string;
 } & RadioCard.ItemProps) {
   return (
-    <RadioCard.Item value={value} width="full" minWidth={0} {...props}>
+    <RadioCard.Item
+      value={value}
+      width="full"
+      minWidth={0}
+      _active={{ background: "colorPalette.muted/20" }}
+      _icon={{ color: "colorPalette.solid" }}
+      {...props}
+    >
       <RadioCard.ItemHiddenInput />
       <RadioCard.ItemControl cursor="pointer" width="full">
         <RadioCard.ItemContent width="full">

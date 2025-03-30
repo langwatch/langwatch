@@ -10,6 +10,7 @@ import { ChevronDown } from "lucide-react";
 import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import { evaluatorCategories } from "./CategorySelectionAccordion";
 import { StepAccordion } from "../../components/StepAccordion";
+import { useAnimatedFocusElementById } from "../../../../../hooks/useAnimatedFocusElementById";
 
 export const EvaluatorSelectionAccordion = ({
   setAccordeonValue,
@@ -18,6 +19,8 @@ export const EvaluatorSelectionAccordion = ({
 }) => {
   const { wizardState, getFirstEvaluatorNode, setFirstEvaluator } =
     useEvaluationWizardStore();
+
+  const focusElementById = useAnimatedFocusElementById();
 
   const handleEvaluatorSelect = (evaluatorType: string) => {
     setFirstEvaluator({
@@ -30,6 +33,11 @@ export const EvaluatorSelectionAccordion = ({
         : ["mappings"];
     setTimeout(() => {
       setAccordeonValue(nextStep);
+      if (nextStep.includes("settings")) {
+        focusElementById("js-next-step-button");
+      } else {
+        focusElementById("js-expand-settings-button");
+      }
     }, 300);
   };
 

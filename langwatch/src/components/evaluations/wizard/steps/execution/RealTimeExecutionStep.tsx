@@ -32,6 +32,7 @@ import {
   EXECUTION_METHODS,
   useEvaluationWizardStore,
 } from "../../hooks/useEvaluationWizardStore";
+import { useAnimatedFocusElementById } from "../../../../../hooks/useAnimatedFocusElementById";
 
 export function RealTimeExecutionStep() {
   const { executionMethod, setWizardState, realTimeExecution } =
@@ -44,6 +45,8 @@ export function RealTimeExecutionStep() {
     );
 
   const [accordeonValue, setAccordeonValue] = useState(["execution-method"]);
+
+  const focusElementById = useAnimatedFocusElementById();
 
   const handleRealTimeExecutionMethodSelect = (
     executionMethod:
@@ -59,6 +62,7 @@ export function RealTimeExecutionStep() {
         setAccordeonValue(["execution-settings"]);
       }
     }, 300);
+    focusElementById("js-next-step-button");
   };
 
   const form = useForm<CheckConfigFormData>({
@@ -170,12 +174,12 @@ export function RealTimeExecutionStep() {
                   | "realtime_manually"
               )
             }
+            paddingBottom={1}
           >
             <StepRadio
               value="realtime_on_message"
               title={EXECUTION_METHODS.realtime_on_message}
               description="Run the evaluation as a monitoring system, as soon as a new trace is received"
-              _icon={{ color: "orange.400" }}
               icon={<LuActivity />}
               onClick={() =>
                 handleRealTimeExecutionMethodSelect("realtime_on_message")
@@ -185,7 +189,6 @@ export function RealTimeExecutionStep() {
               value="realtime_guardrail"
               title={EXECUTION_METHODS.realtime_guardrail}
               description="Run the evaluation as a guardrail in the middle of the workflow, stopping harmful messages"
-              _icon={{ color: "orange.400" }}
               icon={<LuShield />}
               onClick={() =>
                 handleRealTimeExecutionMethodSelect("realtime_guardrail")
@@ -195,7 +198,6 @@ export function RealTimeExecutionStep() {
               value="realtime_manually"
               title={EXECUTION_METHODS.realtime_manually}
               description="Integrate the evaluation manually in your code, so you can decide when and where to run it"
-              _icon={{ color: "orange.400" }}
               icon={<LuCode />}
               onClick={() =>
                 handleRealTimeExecutionMethodSelect("realtime_manually")

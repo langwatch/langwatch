@@ -14,9 +14,13 @@ export function TaskStep() {
 
   const handleTaskSelection = (task: State["wizardState"]["task"]) => {
     setWizardState({
-      step: "dataset",
       task,
     });
+    setTimeout(() => {
+      setWizardState({
+        step: "dataset",
+      });
+    }, 48);
   };
 
   return (

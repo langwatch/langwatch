@@ -10,7 +10,12 @@ import {
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { memo, useEffect, useRef, useState } from "react";
-import { LuActivity, LuChevronLeft, LuChevronRight } from "react-icons/lu";
+import {
+  LuActivity,
+  LuChevronLeft,
+  LuChevronRight,
+  LuCode,
+} from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 import {
   STEPS,
@@ -267,7 +272,7 @@ const WizardSidebar = memo(function WizardSidebar({
             )}
             <Spacer />
             {step !== "results" && (
-              <Button variant="outline" onClick={() => nextStep()}>
+              <Button id="js-next-step-button" variant="outline" onClick={() => nextStep()}>
                 Next
                 <LuChevronRight />
               </Button>
@@ -340,6 +345,28 @@ const WizardSidebar = memo(function WizardSidebar({
                     Enable Monitoring
                   </Button>
                 </Tooltip>
+              )}
+            {step === "results" &&
+              task === "real_time" &&
+              (executionMethod === "realtime_guardrail" ||
+                executionMethod === "realtime_manually") && (
+                <Button
+                  variant="outline"
+                  background="black"
+                  color="white"
+                  borderColor="black"
+                  _hover={{
+                    background: "gray.700",
+                  }}
+                  onClick={() =>
+                    setWizardState({
+                      workspaceTab: "code-implementation",
+                    })
+                  }
+                >
+                  <LuCode />
+                  Show Code
+                </Button>
               )}
           </HStack>
         </>

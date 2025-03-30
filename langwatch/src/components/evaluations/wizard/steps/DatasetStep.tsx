@@ -3,14 +3,12 @@ import {
   Button,
   Grid,
   Heading,
-  HStack,
   RadioCard,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { useState } from "react";
 import {
-  ChevronDown,
   Database,
   FilePlus,
   FileText,
@@ -28,6 +26,7 @@ import { StepRadio } from "../components/StepButton";
 import { OverflownTextWithTooltip } from "../../../OverflownText";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { StepAccordion } from "../components/StepAccordion";
+import { useAnimatedFocusElementById } from "../../../../hooks/useAnimatedFocusElementById";
 
 export function DatasetStep() {
   const { setWizardState, wizardState, setDatasetId, getDatasetId } =
@@ -53,12 +52,16 @@ export function DatasetStep() {
     setAccordeonValue(["configuration"]);
   };
 
+  const focusElementById = useAnimatedFocusElementById();
+
   const handleDatasetSelect = (datasetId: string) => {
     const dataset = datasets.data?.find((d) => d.id === datasetId);
     if (!dataset) {
       return;
     }
     setDatasetId(datasetId, dataset.columnTypes as DatasetColumns);
+
+    focusElementById("js-next-step-button");
   };
 
   const handleContinue = (
@@ -120,6 +123,7 @@ export function DatasetStep() {
                   description="Select from your previously created datasets"
                   _icon={{ color: "blue.400" }}
                   icon={<Database />}
+                  onClick={() => handleDataSourceSelect("choose")}
                 />
 
                 <StepRadio
@@ -129,6 +133,7 @@ export function DatasetStep() {
                   _icon={{ color: "blue.400" }}
                   icon={<FileText />}
                   disabled
+                  onClick={() => handleDataSourceSelect("from_production")}
                 />
 
                 <StepRadio
@@ -138,6 +143,7 @@ export function DatasetStep() {
                   _icon={{ color: "blue.400" }}
                   icon={<FilePlus />}
                   disabled
+                  onClick={() => handleDataSourceSelect("manual")}
                 />
 
                 <StepRadio
@@ -147,6 +153,7 @@ export function DatasetStep() {
                   _icon={{ color: "blue.400" }}
                   icon={<UploadCloud />}
                   disabled
+                  onClick={() => handleDataSourceSelect("upload")}
                 />
               </VStack>
             </RadioCard.Root>
@@ -195,6 +202,7 @@ export function DatasetStep() {
                           width="full"
                           minWidth={0}
                           onClick={() => handleDatasetSelect(dataset.id)}
+                          _active={{ background: "blue.50" }}
                         >
                           <RadioCard.ItemHiddenInput />
                           <RadioCard.ItemControl cursor="pointer" width="full">
