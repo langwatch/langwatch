@@ -10,7 +10,6 @@ import {
 } from "../../../../optimization_studio/hooks/useWorkflowStore";
 import { entryNode } from "../../../../optimization_studio/templates/blank";
 import type {
-  Entry,
   Evaluator,
   Workflow,
 } from "../../../../optimization_studio/types/dsl";
@@ -95,6 +94,7 @@ export const wizardStateSchema = z.object({
 export type WizardState = z.infer<typeof wizardStateSchema>;
 
 export type State = {
+  experimentId?: string;
   experimentSlug?: string;
   wizardState: z.infer<typeof wizardStateSchema>;
   isAutosaving: boolean;
@@ -104,8 +104,8 @@ export type State = {
 
 type EvaluationWizardStore = State & {
   reset: () => void;
-  setExperimentSlug: (experiment_slug: string) => void;
-  getExperimentSlug: () => string | undefined;
+  setExperimentId: (experimentId: string) => void;
+  setExperimentSlug: (experimentSlug: string) => void;
   setWizardState: (
     state:
       | Partial<State["wizardState"]>
@@ -167,11 +167,11 @@ const store = (
       workflowStore: { ...current.workflowStore, ...initialWorkflowStore },
     }));
   },
-  setExperimentSlug(experiment_slug) {
-    set((current) => ({ ...current, experimentSlug: experiment_slug }));
+  setExperimentId(experimentId) {
+    set((current) => ({ ...current, experimentId }));
   },
-  getExperimentSlug() {
-    return get().experimentSlug;
+  setExperimentSlug(experimentSlug) {
+    set((current) => ({ ...current, experimentSlug }));
   },
   setWizardState(state) {
     const applyChanges = (

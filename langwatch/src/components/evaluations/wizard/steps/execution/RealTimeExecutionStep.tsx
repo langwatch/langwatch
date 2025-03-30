@@ -43,11 +43,7 @@ export function RealTimeExecutionStep() {
       }))
     );
 
-  const [accordeonValue, setAccordeonValue] = useState(
-    executionMethod === "realtime_on_message"
-      ? ["execution-settings"]
-      : ["execution-method"]
-  );
+  const [accordeonValue, setAccordeonValue] = useState(["execution-method"]);
 
   const handleRealTimeExecutionMethodSelect = (
     executionMethod:
@@ -106,7 +102,7 @@ export function RealTimeExecutionStep() {
 
   const runOn = (
     <Text color="gray.500" fontStyle="italic">
-      This check will run on{" "}
+      This evaluation will run on{" "}
       {sample >= 1
         ? "every message"
         : `${+(sample * 100).toFixed(2)}% of messages`}

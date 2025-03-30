@@ -28,6 +28,8 @@ import { EvaluationStep } from "./steps/EvaluationStep";
 import { ExecutionStep } from "./steps/ExecutionStep";
 import { ResultsStep } from "./steps/ResultsStep";
 import { TaskStep } from "./steps/TaskStep";
+import { api } from "../../../utils/api";
+import { toaster } from "../../ui/toaster";
 
 export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
   const router = useRouter();
@@ -100,22 +102,35 @@ const WizardSidebar = memo(function WizardSidebar({
 }: {
   isLoading: boolean;
 }) {
+  const { project } = useOrganizationTeamProject();
+
   const isTallScreen =
     typeof window !== "undefined" && window.innerHeight > 900;
   const [isSticky, setIsSticky] = useState(false);
   const stickyRef = useRef<HTMLDivElement>(null);
-  const { setWizardState, nextStep, step, previousStep, task } =
-    useEvaluationWizardStore(
-      useShallow((state) => {
-        return {
-          setWizardState: state.setWizardState,
-          nextStep: state.nextStep,
-          step: state.wizardState.step,
-          previousStep: state.previousStep,
-          task: state.wizardState.task,
-        };
-      })
-    );
+  const {
+    setWizardState,
+    nextStep,
+    step,
+    previousStep,
+    task,
+    executionMethod,
+    isAutosaving,
+    experimentId,
+  } = useEvaluationWizardStore(
+    useShallow((state) => {
+      return {
+        setWizardState: state.setWizardState,
+        nextStep: state.nextStep,
+        step: state.wizardState.step,
+        previousStep: state.previousStep,
+        task: state.wizardState.task,
+        executionMethod: state.wizardState.executionMethod,
+        isAutosaving: state.isAutosaving,
+        experimentId: state.experimentId,
+      };
+    })
+  );
 
   const [showSpinner, setShowSpinner] = useState(false);
 
@@ -157,7 +172,10 @@ const WizardSidebar = memo(function WizardSidebar({
   }, []);
 
   const stepCompletedValue = useStepCompletedValue();
-  const evaluationDisabled = !stepCompletedValue("all");
+  const evaluationDisabled =
+    !stepCompletedValue("all") || isAutosaving || !experimentId || !project;
+  const saveAsMonitor = api.experiments.saveAsMonitor.useMutation();
+  const router = useRouter();
 
   return (
     <VStack
@@ -254,23 +272,75 @@ const WizardSidebar = memo(function WizardSidebar({
                 <LuChevronRight />
               </Button>
             )}
-            {step === "results" && task === "real_time" && (
-              <Tooltip
-                content={
-                  evaluationDisabled
-                    ? "Complete all the steps to enable monitoring"
-                    : ""
-                }
-                positioning={{
-                  placement: "top",
-                }}
-              >
-                <Button colorPalette="green" disabled={evaluationDisabled}>
-                  <LuActivity />
-                  Enable Monitoring
-                </Button>
-              </Tooltip>
-            )}
+            {step === "results" &&
+              task === "real_time" &&
+              executionMethod === "realtime_on_message" && (
+                <Tooltip
+                  content={
+                    evaluationDisabled
+                      ? "Complete all the steps to enable monitoring"
+                      : ""
+                  }
+                  positioning={{
+                    placement: "top",
+                  }}
+                >
+                  <Button
+                    colorPalette="green"
+                    disabled={evaluationDisabled}
+                    loading={saveAsMonitor.isLoading}
+                    onClick={() => {
+                      if (evaluationDisabled) {
+                        return;
+                      }
+
+                      saveAsMonitor.mutate(
+                        {
+                          projectId: project.id,
+                          experimentId: experimentId,
+                        },
+                        {
+                          onSuccess: () => {
+                            void router.push(`/${project.slug}/evaluations_v2`);
+
+                            const body =
+                              document.getElementsByTagName("body")[0];
+                            if (body) {
+                              // Workaround for fixing the scroll getting locked for some reason when moving back to evaluations list page
+                              body.style.overflow = "auto";
+                            }
+
+                            toaster.create({
+                              title: "Monitor saved successfully",
+                              description:
+                                "Incoming messages will now be evaluated",
+                              type: "success",
+                              placement: "top-end",
+                              meta: {
+                                closable: true,
+                              },
+                            });
+                          },
+                          onError: () => {
+                            toaster.create({
+                              title: "Error creating monitor",
+                              description: "Please try again",
+                              type: "error",
+                              placement: "top-end",
+                              meta: {
+                                closable: true,
+                              },
+                            });
+                          },
+                        }
+                      );
+                    }}
+                  >
+                    <LuActivity />
+                    Enable Monitoring
+                  </Button>
+                </Tooltip>
+              )}
           </HStack>
         </>
       )}

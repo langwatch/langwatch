@@ -12,6 +12,7 @@ export const useInitialLoadExperiment = () => {
     setWizardState,
     setDSL,
     experimentSlug,
+    setExperimentId,
     setExperimentSlug,
     skipNextAutosave,
   } = useEvaluationWizardStore(
@@ -21,12 +22,14 @@ export const useInitialLoadExperiment = () => {
         setDSL,
         experimentSlug,
         setExperimentSlug,
+        setExperimentId,
         skipNextAutosave,
       }) => ({
         setWizardState,
         setDSL,
         experimentSlug,
         setExperimentSlug,
+        setExperimentId,
         skipNextAutosave,
       })
     )
@@ -75,6 +78,7 @@ export const useInitialLoadExperiment = () => {
       skipNextAutosave();
       setWizardState(initialLoadExperiment.data.wizardState ?? {});
       setDSL(initialLoadExperiment.data.dsl ?? {});
+      setExperimentId(initialLoadExperiment.data.id);
       setExperimentSlug(initialLoadExperiment.data.slug);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

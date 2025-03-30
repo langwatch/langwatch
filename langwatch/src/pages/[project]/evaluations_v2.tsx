@@ -14,39 +14,37 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { ExperimentType } from "@prisma/client";
 import { useRouter } from "next/router";
-import { MoreVertical, Play, Plus } from "react-feather";
-import { useDrawer } from "~/components/CurrentDrawer";
-import { DashboardLayout } from "../../components/DashboardLayout";
-import { MonitorsSection } from "../../components/evaluations/MonitorsSection";
-import { Link } from "../../components/ui/link";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { TeamRoleGroup } from "../../server/api/permission";
-import { api } from "../../utils/api";
+import { MoreVertical, Plus } from "react-feather";
 import {
   LuCircleCheckBig,
   LuCircleX,
   LuClock,
+  LuPencil,
   LuSquareCheckBig,
   LuTrash,
 } from "react-icons/lu";
+import { DashboardLayout } from "../../components/DashboardLayout";
+import { MonitorsSection } from "../../components/evaluations/MonitorsSection";
 import type { TASK_TYPES } from "../../components/evaluations/wizard/hooks/useEvaluationWizardStore";
-import type { ExperimentType } from "@prisma/client";
 import {
   formatEvaluationSummary,
   getFinishedAt,
 } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationSummary";
-import { HoverableBigText } from "../../components/HoverableBigText";
 import { OverflownTextWithTooltip } from "../../components/OverflownText";
+import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { TeamRoleGroup } from "../../server/api/permission";
+import { api } from "../../utils/api";
 
 export default function EvaluationsV2() {
   const { project, hasTeamPermission } = useOrganizationTeamProject();
   const router = useRouter();
-  const { openDrawer } = useDrawer();
 
-  const checks = api.monitors.getAllForProject.useQuery(
+  const monitors = api.monitors.getAllForProject.useQuery(
     {
       projectId: project?.id ?? "",
     },
@@ -64,9 +62,9 @@ export default function EvaluationsV2() {
     {
       onSuccess: () => {
         void experiments.refetch();
+        void monitors.refetch();
         toaster.create({
           title: "Experiment deleted",
-          description: "The experiment was successfully deleted",
           type: "success",
           placement: "top-end",
           meta: {
@@ -74,7 +72,7 @@ export default function EvaluationsV2() {
           },
         });
       },
-      onError: (error) => {
+      onError: () => {
         toaster.create({
           title: "Error deleting experiment",
           description:
@@ -95,7 +93,7 @@ export default function EvaluationsV2() {
   ) => {
     if (
       confirm(
-        `Are you sure you want to delete the evaluation "${experimentName}"? This will also delete the workflow and prompts associated with it. Datasets will be kept.`
+        `Are you sure you want to delete the evaluation "${experimentName}"? This will also delete the workflow, monitor, and prompts associated with it. Datasets will be kept.`
       )
     ) {
       deleteExperimentMutation.mutate({
@@ -106,10 +104,6 @@ export default function EvaluationsV2() {
   };
 
   if (!project) return null;
-
-  const handleEditMonitor = (monitorId: string) => {
-    void router.push(`/${project.slug}/evaluations/${monitorId}/edit`);
-  };
 
   const taskTypeToLabel: Record<keyof typeof TASK_TYPES, string> = {
     real_time: "Real-Time Evaluation",
@@ -146,35 +140,20 @@ export default function EvaluationsV2() {
                   </Button>
                 </Link>
               )}
-              <Button
-                colorPalette="blue"
-                onClick={() => {
-                  openDrawer("batchEvaluation", {
-                    selectDataset: true,
-                  });
-                }}
-                minWidth="fit-content"
-              >
-                <Play size={16} /> Batch Evaluation
-              </Button>
             </HStack>
           </HStack>
 
-          {checks.isLoading ? (
+          {monitors.isLoading ? (
             <Box display="flex" justifyContent="center" py={8}>
               <Spinner />
             </Box>
-          ) : checks.isError ? (
+          ) : monitors.isError ? (
             <Box>
               <Text color="red.500">Error loading evaluations</Text>
             </Box>
           ) : (
             <>
-              <MonitorsSection
-                title="Active Monitors"
-                evaluations={checks.data}
-                onEditMonitor={handleEditMonitor}
-              />
+              <MonitorsSection title="Active Monitors" monitors={monitors} />
 
               <VStack align="start" gap={1}>
                 <Heading as="h1">Evaluations</Heading>
@@ -364,6 +343,18 @@ export default function EvaluationsV2() {
                                       <MoreVertical size={16} />
                                     </Menu.Trigger>
                                     <Menu.Content>
+                                      <Menu.Item
+                                        value="edit"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          void router.push(
+                                            `/${project?.slug}/evaluations/wizard/${experiment.slug}`
+                                          );
+                                        }}
+                                      >
+                                        <LuPencil size={16} />
+                                        Edit
+                                      </Menu.Item>
                                       <Menu.Item
                                         value="delete"
                                         color="red.500"

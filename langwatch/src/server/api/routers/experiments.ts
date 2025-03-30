@@ -1,5 +1,9 @@
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
-import { ExperimentType } from "@prisma/client";
+import {
+  EvaluationExecutionMode,
+  ExperimentType,
+  type Monitor,
+} from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import type { Node } from "@xyflow/react";
@@ -141,7 +145,6 @@ export const experimentsRouter = createTRPCRouter({
 
       const experimentId = input.experimentId ?? `experiment_${nanoid()}`;
       const experimentData = {
-        id: experimentId,
         name,
         slug,
         projectId: input.projectId,
@@ -150,25 +153,45 @@ export const experimentsRouter = createTRPCRouter({
         wizardState: input.wizardState,
       };
 
-      const experiment = await prisma.experiment.upsert({
+      await prisma.experiment.upsert({
         where: {
           id: experimentId,
           projectId: input.projectId,
         },
         update: experimentData,
-        create: experimentData,
+        create: {
+          ...experimentData,
+          id: experimentId,
+        },
       });
 
-      return experiment;
+      // For some reason, prisma upsert sometimes return not an experiment but {count: 0}, so we need to refetch it
+      const updatedExperiment = await prisma.experiment.findUnique({
+        where: {
+          id: experimentId,
+          projectId: input.projectId,
+        },
+      });
+
+      if (!updatedExperiment) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Experiment not found",
+        });
+      }
+
+      return updatedExperiment;
     }),
 
   saveAsMonitor: protectedProcedure
-    .input(z.object({
-      projectId: z.string(),
-      experimentId: z.string(),
-    }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        experimentId: z.string(),
+      })
+    )
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ input }) => {
       const experiment = await prisma.experiment.findUnique({
         where: {
           id: input.experimentId,
@@ -191,8 +214,12 @@ export const experimentsRouter = createTRPCRouter({
       }
 
       const wizardState = experiment.wizardState as WizardState | undefined;
-      const dsl = experiment.workflow?.currentVersion?.dsl as Workflow | undefined;
-      const evaluator = dsl?.nodes.find((node) => node.type === "evaluator") as Node<Evaluator> | undefined;
+      const dsl = experiment.workflow?.currentVersion?.dsl as
+        | Workflow
+        | undefined;
+      const evaluator = dsl?.nodes.find((node) => node.type === "evaluator") as
+        | Node<Evaluator>
+        | undefined;
 
       if (!wizardState || !dsl || !evaluator || !evaluator.data.evaluator) {
         throw new TRPCError({
@@ -201,20 +228,38 @@ export const experimentsRouter = createTRPCRouter({
         });
       }
 
-      // const newCheck = await prisma.monitor.create({
-      //   data: {
-      //     id: `monitor_${nanoid()}`,
-      //     projectId: input.projectId,
-      //     name: `${experiment.name ?? "Unknown"} - Monitor`,
-      //     checkType: evaluator.data.evaluator,
-      //     slug: experiment.slug,
-      //     preconditions: [],
-      //     parameters: {},
-      //     sample,
-      //     enabled: true,
-      //     executionMode,
-      //   },
-      // });
+      const monitorData = {
+        name: `${experiment.name ?? "Unknown"} - Monitor`,
+        checkType: evaluator.data.evaluator,
+        slug: experiment.slug,
+        preconditions: wizardState.realTimeExecution?.preconditions ?? [],
+        parameters: Object.fromEntries(
+          (evaluator.data.parameters ?? []).map((param) => [
+            param.identifier,
+            param.value,
+          ])
+        ) as Record<string, any>,
+        mappings: wizardState.realTimeTraceMappings ?? {},
+        sample: wizardState.realTimeExecution?.sample ?? 1,
+        enabled: true,
+        executionMode: EvaluationExecutionMode.ON_MESSAGE,
+      };
+
+      const monitor = await prisma.monitor.upsert({
+        where: {
+          experimentId: input.experimentId,
+          projectId: input.projectId,
+        },
+        update: monitorData,
+        create: {
+          ...monitorData,
+          id: `monitor_${nanoid()}`,
+          projectId: input.projectId,
+          experimentId: input.experimentId,
+        },
+      });
+
+      return monitor;
     }),
 
   getExperimentBySlugOrId: protectedProcedure
@@ -688,6 +733,14 @@ export const experimentsRouter = createTRPCRouter({
           });
         }
 
+        // Delete the monitor if it exists
+        await tx.monitor.delete({
+          where: {
+            experimentId: input.experimentId,
+            projectId: input.projectId,
+          },
+        });
+
         // Finally, delete the experiment
         await tx.experiment.delete({
           where: {
@@ -769,7 +822,7 @@ const findNextDraftName = async (projectId: string) => {
     (draft) => draft.name?.startsWith("Draft")
   ).length;
 
-  const slugs = new Set(experiments.map((draft) => draft.slug));
+  const slugs = new Set(experiments.map((experiment) => experiment.slug));
 
   let draftName;
   let index = draftCount + 1;

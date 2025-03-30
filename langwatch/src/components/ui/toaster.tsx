@@ -20,6 +20,7 @@ export const toaster = {
   ...toaster_,
   create: (args: Parameters<typeof toaster_.create>[0]) => {
     return toaster_.create({
+      duration: 5000,
       ...args,
       placement: "top-end",
     });
