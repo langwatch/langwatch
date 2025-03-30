@@ -14,6 +14,8 @@ const stringifiedInitialState = JSON.stringify({
   dsl: getWorkflow(initialState.workflowStore),
 });
 
+let lastAutosave = 0;
+
 const useAutosaveWizard = () => {
   const { project } = useOrganizationTeamProject();
   const {
@@ -90,6 +92,10 @@ const useAutosaveWizard = () => {
     if ((!!experimentSlug || !!routerSlug) && !experiment.data) return;
     if (autosaveDisabled) return;
 
+    const now = Date.now();
+    if (now - lastAutosave < 100) return;
+    lastAutosave = now;
+
     if (!!experiment.data?.id || stringifiedState !== stringifiedInitialState) {
       void (async () => {
         const updatedExperiment = await saveExperiment.mutateAsync({
@@ -98,6 +104,9 @@ const useAutosaveWizard = () => {
           wizardState,
           dsl,
         });
+
+        // Sometimes autosave would keep true even after the mutation is done, this ensures it's set to false
+        setIsAutosaving(false);
 
         // Prevent re-triggering autosave on name changes
         skipNextAutosave();

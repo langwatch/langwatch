@@ -88,7 +88,9 @@ export const wizardStateSchema = z.object({
       preconditions: checkPreconditionsSchema.optional(),
     })
     .optional(),
-  workspaceTab: z.enum(["dataset", "workflow", "results", "code-implementation"]).optional(),
+  workspaceTab: z
+    .enum(["dataset", "workflow", "results", "code-implementation"])
+    .optional(),
 });
 
 export type WizardState = z.infer<typeof wizardStateSchema>;
@@ -164,7 +166,7 @@ const store = (
     set((current) => ({
       ...current,
       ...initialState,
-      workflowStore: { ...current.workflowStore, ...initialWorkflowStore },
+      workflowStore: createWorkflowStore(set, get),
     }));
   },
   setExperimentId(experimentId) {
@@ -379,7 +381,22 @@ const store = (
       .workflowStore.getWorkflow()
       .edges.filter((edge) => edge.target === firstEvaluator.id);
   },
-  workflowStore: workflowStore(
+  workflowStore: createWorkflowStore(set, get),
+});
+
+const createWorkflowStore = (
+  set: (
+    partial:
+      | EvaluationWizardStore
+      | Partial<EvaluationWizardStore>
+      | ((
+          state: EvaluationWizardStore
+        ) => EvaluationWizardStore | Partial<EvaluationWizardStore>),
+    replace?: boolean | undefined
+  ) => void,
+  get: () => EvaluationWizardStore
+) => {
+  return workflowStore(
     (
       partial:
         | WorkflowStore
@@ -394,7 +411,7 @@ const store = (
             : { ...current.workflowStore, ...partial },
       })),
     () => get().workflowStore
-  ),
-});
+  );
+};
 
 export const useEvaluationWizardStore = create<EvaluationWizardStore>()(store);
