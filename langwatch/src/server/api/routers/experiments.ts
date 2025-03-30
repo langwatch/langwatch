@@ -229,7 +229,7 @@ export const experimentsRouter = createTRPCRouter({
       }
 
       const monitorData = {
-        name: `${experiment.name ?? "Unknown"} - Monitor`,
+        name: experiment.name ?? "Unknown",
         checkType: evaluator.data.evaluator,
         slug: experiment.slug,
         preconditions: wizardState.realTimeExecution?.preconditions ?? [],

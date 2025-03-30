@@ -173,6 +173,12 @@ const WizardSidebar = memo(function WizardSidebar({
 
     return () => {
       unmount?.();
+
+      const body = document.getElementsByTagName("body")[0];
+      if (body) {
+        // Workaround for fixing the scroll getting locked for some reason when moving back to evaluations list page
+        body.style.overflow = "auto";
+      }
     };
   }, []);
 
@@ -272,7 +278,11 @@ const WizardSidebar = memo(function WizardSidebar({
             )}
             <Spacer />
             {step !== "results" && (
-              <Button id="js-next-step-button" variant="outline" onClick={() => nextStep()}>
+              <Button
+                id="js-next-step-button"
+                variant="outline"
+                onClick={() => nextStep()}
+              >
                 Next
                 <LuChevronRight />
               </Button>
@@ -307,13 +317,6 @@ const WizardSidebar = memo(function WizardSidebar({
                         {
                           onSuccess: () => {
                             void router.push(`/${project.slug}/evaluations_v2`);
-
-                            const body =
-                              document.getElementsByTagName("body")[0];
-                            if (body) {
-                              // Workaround for fixing the scroll getting locked for some reason when moving back to evaluations list page
-                              body.style.overflow = "auto";
-                            }
 
                             toaster.create({
                               title: "Monitor saved successfully",

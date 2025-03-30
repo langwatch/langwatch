@@ -47,7 +47,7 @@ export function StepRadio({
 }: {
   title: string;
   description: string;
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   value: string;
 } & RadioCard.ItemProps) {
   return (
