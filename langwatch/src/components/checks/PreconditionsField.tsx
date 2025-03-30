@@ -44,7 +44,7 @@ export const PreconditionsField = ({
   label?: string | React.ReactNode;
   helper?: string | React.ReactNode;
 }) => {
-  const { control, watch } = useFormContext();
+  const { control, watch, formState } = useFormContext();
   const preconditions = watch("preconditions");
   const checkType = watch("checkType");
 
@@ -173,6 +173,14 @@ export const PreconditionsField = ({
                 )}
               </HStack>
             </VStack>
+            {(formState.errors.preconditions as any)?.[index]?.value && (
+              <Text color="red.500" fontSize="12px" paddingLeft={4}>
+                {
+                  (formState.errors.preconditions as any)?.[index]?.value
+                    .message
+                }
+              </Text>
+            )}
           </Box>
         ))}
         {runOn}

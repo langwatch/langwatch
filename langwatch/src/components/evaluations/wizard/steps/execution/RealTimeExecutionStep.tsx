@@ -5,7 +5,6 @@ import {
   HStack,
   Input,
   RadioCard,
-  Separator,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -19,6 +18,7 @@ import {
   useForm,
 } from "react-hook-form";
 import { LuActivity, LuCode, LuShield } from "react-icons/lu";
+import { useDebounceCallback } from "usehooks-ts";
 import { z } from "zod";
 import { useShallow } from "zustand/react/shallow";
 import type { CheckPreconditions } from "../../../../../server/evaluations/types";
@@ -32,7 +32,6 @@ import {
   EXECUTION_METHODS,
   useEvaluationWizardStore,
 } from "../../hooks/useEvaluationWizardStore";
-import { FullWidthFormControl } from "../../../../FullWidthFormControl";
 
 export function RealTimeExecutionStep() {
   const { executionMethod, setWizardState, realTimeExecution } =
@@ -76,17 +75,31 @@ export function RealTimeExecutionStep() {
           sample: z.number().min(0.01).max(1),
           preconditions: checkPreconditionsSchema,
         })
-      )({ ...data, settings: data.settings || {} }, ...args);
+      )(data, ...args);
     },
   });
+
+  const [skipSubmit, setSkipSubmit] = useState(false);
+
   const {
     fields: fieldsPrecondition,
-    append: appendPrecondition,
+    append: appendPrecondition_,
     remove: removePrecondition,
   } = useFieldArray({
     control: form.control,
     name: "preconditions",
   });
+
+  const appendPrecondition = useCallback(
+    (value: any) => {
+      setSkipSubmit(true);
+      appendPrecondition_(value);
+      setTimeout(() => {
+        setSkipSubmit(false);
+      }, 500);
+    },
+    [appendPrecondition_, setSkipSubmit]
+  );
 
   const preconditions = form.watch("preconditions");
   const sample = form.watch("sample");
@@ -115,12 +128,20 @@ export function RealTimeExecutionStep() {
     [executionMethod, setWizardState]
   );
 
+  const debouncedSubmit = useDebounceCallback(() => {
+    void form.handleSubmit(onSubmit)();
+  }, 500);
+
   useEffect(() => {
-    form.watch(() => {
-      void form.handleSubmit(onSubmit)();
+    const subscription = form.watch(() => {
+      if (!skipSubmit) {
+        debouncedSubmit();
+      }
     });
+
+    return () => subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form]);
+  }, [form, skipSubmit]);
 
   return (
     <Accordion.Root
@@ -165,7 +186,7 @@ export function RealTimeExecutionStep() {
             <StepRadio
               value="realtime_guardrail"
               title={EXECUTION_METHODS.realtime_guardrail}
-              description="As a guardrail"
+              description="Run the evaluation as a guardrail in the middle of the workflow, stopping harmful messages"
               _icon={{ color: "orange.400" }}
               icon={<LuShield />}
               onClick={() =>
@@ -175,7 +196,7 @@ export function RealTimeExecutionStep() {
             <StepRadio
               value="realtime_manually"
               title={EXECUTION_METHODS.realtime_manually}
-              description="Manually"
+              description="Integrate the evaluation manually in your code, so you can decide when and where to run it"
               _icon={{ color: "orange.400" }}
               icon={<LuCode />}
               onClick={() =>
