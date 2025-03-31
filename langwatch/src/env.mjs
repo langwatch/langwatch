@@ -52,6 +52,13 @@ export const env = createEnv({
     EMAIL_DEFAULT_FROM: z.string().optional(),
     S3_KEY_SALT: z.string().optional(),
     IS_SAAS: z.boolean().optional(),
+    USE_S3_STORAGE: z.boolean().optional(),
+    S3_ENDPOINT: z.string().optional(),
+    S3_ACCESS_KEY_ID: z.string().optional(),
+    S3_SECRET_ACCESS_KEY: z.string().optional(),
+    S3_BUCKET_NAME: z.string().optional(),
+    DATASET_STORAGE_LOCAL: z.boolean().optional(),
+    CREDENTIALS_SECRET: z.string().optional(),
   },
 
   /**
@@ -110,6 +117,17 @@ export const env = createEnv({
     IS_SAAS:
       process.env.IS_SAAS === "1" ||
       process.env.IS_SAAS?.toLowerCase() === "true",
+    USE_S3_STORAGE:
+      process.env.USE_S3_STORAGE === "1" ||
+      process.env.USE_S3_STORAGE?.toLowerCase() === "true",
+    S3_ENDPOINT: process.env.S3_ENDPOINT,
+    S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
+    S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
+    S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
+    DATASET_STORAGE_LOCAL:
+      process.env.DATASET_STORAGE_LOCAL === "1" ||
+      process.env.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",
+    CREDENTIALS_SECRET: process.env.CREDENTIALS_SECRET,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

@@ -90,8 +90,18 @@ export function DatasetTable({
     {
       enabled: !!project && !!datasetId,
       refetchOnWindowFocus: false,
+      onError: (error) => {
+        toast({
+          title: "Error fetching dataset",
+          description: error.message,
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+      },
     }
   );
+
   const dataset = useMemo(
     () =>
       databaseDataset.data
