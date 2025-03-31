@@ -960,7 +960,8 @@ function MonitorGraph({
       borderColor={getColor(colorSet, 0, -200)}
       backgroundColor={getColor(colorSet, 0, -400)}
       borderRadius="lg"
-      padding={2}
+      paddingTop={2}
+      overflow="hidden"
     >
       <VStack
         position="absolute"
