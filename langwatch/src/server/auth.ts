@@ -93,6 +93,9 @@ export const authOptions = (
         where: { id: dbSession?.userId },
       });
 
+      console.log("dbUser", dbUser);
+      console.log("user", user);
+
       if (dbUser?.email !== user.email) {
         throw new Error("DIFFERENT_EMAIL_NOT_ALLOWED");
       }
