@@ -64,15 +64,22 @@ class Client(LangWatchClientProtocol):
 	# TODO(afr): How do we handle merging the tracer provider if one exists, with the
 	# base attributes?
 	def __ensure_otel_setup(self, endpoint_url: str, tracer_provider: Optional[TracerProvider] = None) -> TracerProvider:
+		print("DEBUG: Ensuring OTLP setup tracer provider:", tracer_provider)
+
 		# Check provided tracer provider
 		if tracer_provider is not None:
 			trace.set_tracer_provider(tracer_provider)
 			return tracer_provider
+		
+		print("DEBUG: No tracer provider provided, checking global tracer provider")
 
 		# Check global tracer provider
 		global_provider = trace.get_tracer_provider()
 		if global_provider is not None and not isinstance(global_provider, trace.ProxyTracerProvider):
+			print("DEBUG: Global tracer provider found and is not a ProxyTracerProvider")
 			return global_provider
+
+		print("DEBUG: No global tracer provider found, creating new tracer provider")
 
 		# Setup new tracer provider and set globally
 		resource = Resource.create(self.base_attributes)
@@ -84,5 +91,7 @@ class Client(LangWatchClientProtocol):
 			},
 		)))
 		trace.set_tracer_provider(tracer_provider)
+
+		print("DEBUG: New tracer provider created and set globally")
 
 		return tracer_provider
