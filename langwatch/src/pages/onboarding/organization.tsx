@@ -134,7 +134,7 @@ export default function OrganizationOnboarding() {
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS;
 
-  const createFullOnboarding = api.onboarding.createFullOnboarding.useMutation();
+  const initializeOrganization = api.onboarding.initializeOrganization.useMutation();
   const apiContext = api.useContext();
   const [activeStep, setActiveStep] = React.useState(0);
 
@@ -146,25 +146,15 @@ export default function OrganizationOnboarding() {
       terms: Boolean(data.terms),
     };
 
-    createFullOnboarding.mutate(
+    initializeOrganization.mutate(
       {
         orgName: formattedData.organizationName,
         phoneNumber: formattedData.phoneNumber,
         signUpData: formattedData,
       },
       {
-        onSuccess: (response: { success: boolean; teamSlug: string; projectSlug: string }) => {
-          void (async () => {
-            await apiContext.organization.getAll.invalidate();
-            await apiContext.organization.getAll.refetch();
-            setTimeout(() => {
-              void router.push(
-                `/onboarding/${response.teamSlug}/select${
-                  returnTo ? `?return_to=${returnTo}` : ""
-                }`
-              );
-            });
-          })();
+        onSuccess: (response) => {
+          window.location.href = `/${response.projectSlug}/messages`;
         },
         onError: () => {
           toaster.create({
@@ -183,14 +173,14 @@ export default function OrganizationOnboarding() {
   };
 
   useEffect(() => {
-    if (organization && !createFullOnboarding.isSuccess) {
+    if (organization && !initializeOrganization.isSuccess) {
       void router.push(`/`);
     }
-  }, [organization, router, createFullOnboarding.isSuccess]);
+  }, [organization, router, initializeOrganization.isSuccess]);
 
   if (
     !session ||
-    (!createFullOnboarding.isSuccess && (!!organization || organizationIsLoading))
+    (!initializeOrganization.isSuccess && (!!organization || organizationIsLoading))
   ) {
     return <LoadingScreen />;
   }
@@ -458,10 +448,10 @@ export default function OrganizationOnboarding() {
                     colorPalette="orange"
                     type={isSaaS ? "button" : "submit"}
                     disabled={
-                      createFullOnboarding.isLoading ||
-                      createFullOnboarding.isSuccess
+                      initializeOrganization.isLoading ||
+                      initializeOrganization.isSuccess
                     }
-                    loading={createFullOnboarding.isLoading}
+                    loading={initializeOrganization.isLoading}
                     onClick={() => {
                       if (isSaaS) {
                         void checkFirstStep();
@@ -571,7 +561,7 @@ export default function OrganizationOnboarding() {
                         <Button
                           variant="outline"
                           type="button"
-                          disabled={createFullOnboarding.isLoading}
+                          disabled={initializeOrganization.isLoading}
                         >
                           Back
                         </Button>
@@ -586,12 +576,12 @@ export default function OrganizationOnboarding() {
                           }
                         }}
                         disabled={
-                          createFullOnboarding.isLoading ||
-                          createFullOnboarding.isSuccess
+                          initializeOrganization.isLoading ||
+                          initializeOrganization.isSuccess
                         }
                       >
-                        {createFullOnboarding.isLoading ||
-                          createFullOnboarding.isSuccess
+                        {initializeOrganization.isLoading ||
+                          initializeOrganization.isSuccess
                           ? "Loading..."
                           : "Next"}
                       </Button>
@@ -602,7 +592,7 @@ export default function OrganizationOnboarding() {
             )}
           </Steps.Root>
 
-          {createFullOnboarding.error && <p>Something went wrong!</p>}
+          {initializeOrganization.error && <p>Something went wrong!</p>}
         </VStack>
       </form>
     </SetupLayout>
