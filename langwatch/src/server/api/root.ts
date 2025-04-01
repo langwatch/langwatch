@@ -29,6 +29,7 @@ import { translateRouter } from "./routers/translate";
 import { workflowRouter } from "./routers/workflows";
 import { optimizationRouter } from "./routers/optimization";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
+import { onboardingRouter } from "./routers/onboarding";
 /**
  * This is the primary router for your server.
  *
@@ -64,6 +65,7 @@ export const appRouter = createTRPCRouter({
   workflow: workflowRouter,
   optimization: optimizationRouter,
   integrationsChecks: integrationsChecksRouter,
+  onboarding: onboardingRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),
 });
 

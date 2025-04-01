@@ -134,7 +134,7 @@ export default function OrganizationOnboarding() {
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS;
 
-  const createOrganization = api.organization.createAndAssign.useMutation();
+  const createFullOnboarding = api.onboarding.createFullOnboarding.useMutation();
   const apiContext = api.useContext();
   const [activeStep, setActiveStep] = React.useState(0);
 
@@ -146,21 +146,20 @@ export default function OrganizationOnboarding() {
       terms: Boolean(data.terms),
     };
 
-    createOrganization.mutate(
+    createFullOnboarding.mutate(
       {
         orgName: formattedData.organizationName,
         phoneNumber: formattedData.phoneNumber,
         signUpData: formattedData,
       },
       {
-        onSuccess: (data) => {
+        onSuccess: (response: { success: boolean; teamSlug: string; projectSlug: string }) => {
           void (async () => {
             await apiContext.organization.getAll.invalidate();
             await apiContext.organization.getAll.refetch();
-            // For some reason even though we await for the refetch it's not done yet when we move pages
             setTimeout(() => {
               void router.push(
-                `/onboarding/${data.teamSlug}/select${
+                `/onboarding/${response.teamSlug}/select${
                   returnTo ? `?return_to=${returnTo}` : ""
                 }`
               );
@@ -184,14 +183,14 @@ export default function OrganizationOnboarding() {
   };
 
   useEffect(() => {
-    if (organization && !createOrganization.isSuccess) {
+    if (organization && !createFullOnboarding.isSuccess) {
       void router.push(`/`);
     }
-  }, [organization, router, createOrganization.isSuccess]);
+  }, [organization, router, createFullOnboarding.isSuccess]);
 
   if (
     !session ||
-    (!createOrganization.isSuccess && (!!organization || organizationIsLoading))
+    (!createFullOnboarding.isSuccess && (!!organization || organizationIsLoading))
   ) {
     return <LoadingScreen />;
   }
@@ -211,9 +210,6 @@ export default function OrganizationOnboarding() {
     const usage = getValues("usage");
     const solution = getValues("solution");
 
-    // If the user is using LangWatch for themselves we don't collect a phone number. This
-    // ensures there is no value in the phone number field if the user set one and then
-    // changed the usage.
     if (myselfSelected) {
       setValue("phoneNumber", "");
     }
@@ -277,7 +273,6 @@ export default function OrganizationOnboarding() {
 
   return (
     <SetupLayout>
-      {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={handleSubmit(onSubmit)}>
         <VStack gap={4} alignItems="left">
           <Steps.Root
@@ -463,10 +458,10 @@ export default function OrganizationOnboarding() {
                     colorPalette="orange"
                     type={isSaaS ? "button" : "submit"}
                     disabled={
-                      createOrganization.isLoading ||
-                      createOrganization.isSuccess
+                      createFullOnboarding.isLoading ||
+                      createFullOnboarding.isSuccess
                     }
-                    loading={createOrganization.isLoading}
+                    loading={createFullOnboarding.isLoading}
                     onClick={() => {
                       if (isSaaS) {
                         void checkFirstStep();
@@ -576,7 +571,7 @@ export default function OrganizationOnboarding() {
                         <Button
                           variant="outline"
                           type="button"
-                          disabled={createOrganization.isLoading}
+                          disabled={createFullOnboarding.isLoading}
                         >
                           Back
                         </Button>
@@ -591,12 +586,12 @@ export default function OrganizationOnboarding() {
                           }
                         }}
                         disabled={
-                          createOrganization.isLoading ||
-                          createOrganization.isSuccess
+                          createFullOnboarding.isLoading ||
+                          createFullOnboarding.isSuccess
                         }
                       >
-                        {createOrganization.isLoading ||
-                          createOrganization.isSuccess
+                        {createFullOnboarding.isLoading ||
+                          createFullOnboarding.isSuccess
                           ? "Loading..."
                           : "Next"}
                       </Button>
@@ -607,7 +602,7 @@ export default function OrganizationOnboarding() {
             )}
           </Steps.Root>
 
-          {createOrganization.error && <p>Something went wrong!</p>}
+          {createFullOnboarding.error && <p>Something went wrong!</p>}
         </VStack>
       </form>
     </SetupLayout>
@@ -621,7 +616,7 @@ const CustomRadio = ({
   icon,
 }: {
   value: string;
-  registerProps: ReturnType<UseFormRegister<OrganizationFormData>>; // Updated type
+  registerProps: ReturnType<UseFormRegister<OrganizationFormData>>;
   selectedValue: string;
   icon: React.ReactNode;
 }) => {
@@ -641,8 +636,8 @@ const CustomRadio = ({
         type="radio"
         value={value}
         {...registerProps}
-        checked={selectedValue === value} // Add checked prop
-        style={{ display: "none" }} // Hide default radio button
+        checked={selectedValue === value}
+        style={{ display: "none" }}
       />
       <Box
         cursor="pointer"
