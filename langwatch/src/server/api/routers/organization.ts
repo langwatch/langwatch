@@ -87,6 +87,8 @@ export const organizationRouter = createTRPCRouter({
             otherCompanyType: z.string().optional().nullable(),
             otherProjectType: z.string().optional().nullable(),
             otherHowDidYouHearAboutUs: z.string().optional().nullable(),
+            yourRole: z.string().optional().nullable(),
+            featureUsage: z.string().optional().nullable(),
             utmCampaign: z.string().optional().nullable(),
           })
           .optional(),
@@ -660,22 +662,22 @@ export const organizationRouter = createTRPCRouter({
             userId_organizationId: {
               userId: input.userId,
               organizationId: input.organizationId,
-            }
-          }
+            },
+          },
         });
 
         if (currentMember?.role === OrganizationUserRole.ADMIN) {
           const adminCount = await prisma.organizationUser.count({
             where: {
               organizationId: input.organizationId,
-              role: OrganizationUserRole.ADMIN
-            }
+              role: OrganizationUserRole.ADMIN,
+            },
           });
-          
+
           if (adminCount <= 1) {
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message: "Cannot remove the last admin from an organization"
+              message: "Cannot remove the last admin from an organization",
             });
           }
         }
