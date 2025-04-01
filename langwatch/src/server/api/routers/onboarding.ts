@@ -25,13 +25,18 @@ const signUpDataSchema = z.object({
 });
 
 /**
- * Onboarding router that orchestrates the organization and project creation process
+ * Router for handling onboarding-related operations.
  */
 export const onboardingRouter = createTRPCRouter({
   /**
-   * Creates an organization, team, and project in one go during onboarding
+   * Initializes an organization and its associated project.
+   * 
+   * This procedure handles the creation of a new organization and assigns it to a user.
+   * It also creates a project under the newly created organization.
+   * 
+   * @throws {TRPCError} - Throws an error if organization or project creation fails.
    */
-  createFullOnboarding: protectedProcedure
+  initializeOrganization: protectedProcedure
     .input(
       z.object({
         // Organization details
@@ -48,6 +53,7 @@ export const onboardingRouter = createTRPCRouter({
     .use(skipPermissionCheck)
     .mutation(async ({ input, ctx }) => {
       try {
+        // Create and assign organization
         const orgRouter = organizationRouter.createCaller(ctx);
         const orgResult = await orgRouter.createAndAssign({
           orgName: input.orgName,
@@ -61,6 +67,7 @@ export const onboardingRouter = createTRPCRouter({
           });
         }
 
+        // Create project under the organization
         const projectName = input.projectName ?? orgResult.team.name;
         const projectCaller = projectRouter.createCaller(ctx);
         const projectResult = await projectCaller.create({
@@ -77,6 +84,7 @@ export const onboardingRouter = createTRPCRouter({
           });
         }
 
+        // Execute post-registration callback if defined
         if (dependencies.postRegistrationCallback) {
           try {
             await dependencies.postRegistrationCallback(ctx.session.user, input);
@@ -85,6 +93,7 @@ export const onboardingRouter = createTRPCRouter({
           }
         }
 
+        // Return success response with team and project slugs
         return {
           success: true,
           teamSlug: orgResult.team.slug,
