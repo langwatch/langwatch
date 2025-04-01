@@ -1,32 +1,11 @@
-from typing import Dict, Optional, Sequence
+from typing import Dict
 
-from .client import Client
-from .typings import Instrumentor
-from .observability.tracing import trace
+from .observability.tracing import trace, sampling_rate, get_current_trace
 from .observability.span import span
-from .state import set_instance, get_endpoint
+from .state import get_endpoint
 from .types import BaseAttributes
 from .__version__ import __version__
-
-from opentelemetry.sdk.trace import TracerProvider
-
-def setup(
-    api_key: Optional[str] = None,
-    endpoint_url: Optional[str] = None,
-    base_attributes: Optional[BaseAttributes] = None,
-    tracer_provider: Optional[TracerProvider] = None,
-    instrumentors: Optional[Sequence[Instrumentor]] = None,
-) -> Client:
-    """Initialize the LangWatch client."""
-    client = Client(
-        api_key=api_key,
-        endpoint_url=endpoint_url,
-        base_attributes=base_attributes,
-        tracer_provider=tracer_provider,
-        instrumentors=instrumentors,
-    )
-    set_instance(client)
-    return client
+from .utils.initialization import ensure_setup, setup
 
 # Export the endpoint getter function
 endpoint = get_endpoint
@@ -38,4 +17,7 @@ __all__ = [
     "endpoint",
     "login",
     "__version__",
+    "sampling_rate",
+    "ensure_setup",
+    "get_current_trace",
 ]
