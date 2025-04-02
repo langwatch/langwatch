@@ -2,10 +2,8 @@ import { Link } from "../../components/ui/link";
 import { Card, Heading, Text, VStack, HStack } from "@chakra-ui/react";
 import SettingsLayout from "../../components/SettingsLayout";
 import { dependencies } from "../../injection/dependencies.client";
-import SubscriptionComponent from "../../../src/components/Subscription";
 
 export default function Subscription() {
-  return <SubscriptionComponent />;
   if (dependencies.SubscriptionPage) {
     return <dependencies.SubscriptionPage />;
   }
