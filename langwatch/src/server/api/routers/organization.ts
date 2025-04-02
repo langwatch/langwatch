@@ -116,7 +116,7 @@ export const organizationRouter = createTRPCRouter({
         "-" +
         teamNanoId.substring(0, 6);
 
-      await prisma.$transaction(async (prisma) => {
+      const { organization, team } = await prisma.$transaction(async (prisma) => {
         // 1. Create the organization
         const organization = await prisma.organization.create({
           data: {
@@ -155,6 +155,8 @@ export const organizationRouter = createTRPCRouter({
             role: "ADMIN", // Assuming the user becomes an admin of the created team
           },
         });
+
+        return { organization, team };
       });
 
       if (dependencies.postRegistrationCallback) {
@@ -164,8 +166,18 @@ export const organizationRouter = createTRPCRouter({
           Sentry.captureException(err);
         }
       }
-      // Return success response
-      return { success: true, teamSlug };
+
+      return {
+        success: true,
+        organization: {
+          id: organization.id,
+        },
+        team: {
+          id: team.id,
+          slug: team.slug,
+          name: team.name,
+        },
+      };
     }),
   deleteMember: protectedProcedure
     .input(z.object({ userId: z.string(), organizationId: z.string() }))
