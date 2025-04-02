@@ -56,7 +56,7 @@ const debug = getDebugger("langwatch:workers:evaluationsWorker");
 export async function runEvaluationJob(
   job: Job<EvaluationJob, any, string>
 ): Promise<SingleEvaluationResult> {
-  const check = await prisma.check.findUnique({
+  const check = await prisma.monitor.findUnique({
     where: {
       id: job.data.check.evaluator_id,
       projectId: job.data.trace.project_id,
@@ -525,7 +525,7 @@ const customEvaluation = async (
     throw new Error("Project not found");
   }
 
-  const check = await prisma.check.findFirst({
+  const check = await prisma.monitor.findFirst({
     where: {
       checkType: evaluatorType,
       projectId: projectId,

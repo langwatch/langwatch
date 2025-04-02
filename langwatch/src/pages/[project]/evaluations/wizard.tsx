@@ -11,7 +11,7 @@ import ErrorPage from "next/error";
 import { useEvaluationWizardStore } from "../../../components/evaluations/wizard/hooks/useEvaluationWizardStore";
 import { useShallow } from "zustand/react/shallow";
 import { LoadingScreen } from "../../../components/LoadingScreen";
-import useAutosaveWizard from "../../../optimization_studio/hooks/useAutosaveWizard";
+import useAutosaveWizard from "../../../components/evaluations/wizard/hooks/useAutosaveWizard";
 import { useInitialLoadExperiment } from "../../../components/evaluations/wizard/hooks/useInitialLoadExperiment";
 
 export default function EvaluationWizard() {
@@ -50,10 +50,7 @@ export default function EvaluationWizard() {
     return <ErrorPage statusCode={404} />;
   }
 
-  if (
-    !project ||
-    (initialLoadExperimentSlug && initialLoadExperiment.isLoading)
-  ) {
+  if (!project) {
     return <LoadingScreen />;
   }
 
@@ -68,7 +65,11 @@ export default function EvaluationWizard() {
         }}
         size="full"
       >
-        <EvaluationWizardComponent />
+        <EvaluationWizardComponent
+          isLoading={
+            !!initialLoadExperimentSlug && initialLoadExperiment.isLoading
+          }
+        />
       </Dialog.Root>
     </>
   );

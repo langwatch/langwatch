@@ -132,7 +132,7 @@ export default async function handler(
   let settings = null;
   let checkType;
 
-  const check = await prisma.check.findFirst({
+  const check = await prisma.monitor.findFirst({
     where: {
       projectId: project.id,
       slug: evaluation,

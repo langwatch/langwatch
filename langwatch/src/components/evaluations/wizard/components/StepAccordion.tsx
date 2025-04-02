@@ -9,6 +9,7 @@ export function StepAccordion({
   borderColor,
   value,
   showTrigger = true,
+  indicatorProps,
   ...props
 }: {
   children: React.ReactNode;
@@ -16,6 +17,7 @@ export function StepAccordion({
   value: string;
   borderColor: string;
   showTrigger?: boolean;
+  indicatorProps?: Accordion.ItemIndicatorProps;
 } & Omit<Accordion.ItemProps, "title">) {
   return (
     <Accordion.Item value={value} width="full" {...props}>
@@ -32,7 +34,7 @@ export function StepAccordion({
             <VStack width="full" align="start" gap={1}>
               {typeof title === "string" ? <Text>{title}</Text> : title}
             </VStack>
-            <Accordion.ItemIndicator>
+            <Accordion.ItemIndicator {...indicatorProps}>
               <LuChevronDown />
             </Accordion.ItemIndicator>
           </HStack>

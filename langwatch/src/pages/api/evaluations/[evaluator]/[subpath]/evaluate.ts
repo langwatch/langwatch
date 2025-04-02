@@ -76,7 +76,7 @@ export async function handleEvaluatorCall(
     .join("/");
   let checkType: string;
 
-  const storedEvaluator = await prisma.check.findUnique({
+  const storedEvaluator = await prisma.monitor.findUnique({
     where: {
       projectId_slug: {
         projectId: project.id,

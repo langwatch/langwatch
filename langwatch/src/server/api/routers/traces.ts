@@ -574,7 +574,7 @@ export const getAllTracesForProject = async ({
 
   const guardrailsSlugToName = Object.fromEntries(
     (
-      await prisma.check.findMany({
+      await prisma.monitor.findMany({
         where: {
           projectId: input.projectId,
         },

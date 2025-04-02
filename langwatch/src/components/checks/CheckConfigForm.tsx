@@ -13,8 +13,6 @@ import {
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EvaluationExecutionMode } from "@prisma/client";
-import type { JsonArray } from "@prisma/client/runtime/library";
-import type { Edge, Node } from "@xyflow/react";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Edit2, HelpCircle } from "react-feather";
@@ -26,16 +24,15 @@ import {
 } from "react-hook-form";
 import slugify from "slugify";
 import { z } from "zod";
+import { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { getInputsOutputs } from "../../optimization_studio/utils/nodeUtils";
 import {
   DEFAULT_MAPPINGS,
   migrateLegacyMappings,
 } from "../../server/evaluations/evaluationMappings";
 import {
-  AVAILABLE_EVALUATORS,
   type Evaluators,
-  type EvaluatorTypes,
+  type EvaluatorTypes
 } from "../../server/evaluations/evaluators.generated";
 import {
   evaluatorsSchema,
@@ -86,7 +83,7 @@ export default function CheckConfigForm({
   loading,
 }: CheckConfigFormProps) {
   const { project } = useOrganizationTeamProject();
-  const isNameAvailable = api.checks.isNameAvailable.useMutation();
+  const isNameAvailable = api.monitors.isNameAvailable.useMutation();
   const [isNameAlreadyInUse, setIsNameAlreadyInUse] = useState(false);
 
   const validateNameUniqueness = async (name: string) => {
@@ -142,6 +139,7 @@ export default function CheckConfigForm({
   const executionMode = watch("executionMode");
   const storeSettingsOnCode = watch("storeSettingsOnCode");
   const mappings = watch("mappings") ?? DEFAULT_MAPPINGS;
+  const settings = watch("settings");
 
   useEffect(() => {
     if (mappings && !mappings.mapping) {
@@ -165,44 +163,7 @@ export default function CheckConfigForm({
   const router = useRouter();
   const isChoosing = router.pathname.endsWith("/choose");
 
-  const availableCustomEvaluators =
-    api.evaluations.availableCustomEvaluators.useQuery(
-      { projectId: project?.id ?? "" },
-      { enabled: !!project }
-    );
-
-  const availableEvaluators = useMemo(
-    () => ({
-      ...AVAILABLE_EVALUATORS,
-      ...Object.fromEntries(
-        (availableCustomEvaluators.data ?? []).map((evaluator) => {
-          const { inputs } = getInputsOutputs(
-            JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-              ?.edges as Edge[],
-            JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-              ?.nodes as JsonArray as unknown[] as Node[]
-          );
-          const requiredFields = inputs.map((input) => input.identifier);
-
-          return [
-            `custom/${evaluator.id}`,
-            {
-              name: evaluator.name,
-              description: evaluator.description,
-              category: "custom",
-              isGuardrail: false,
-              requiredFields: requiredFields,
-              optionalFields: [],
-              settings: {},
-              result: {},
-              envVars: [],
-            },
-          ];
-        })
-      ),
-    }),
-    [availableCustomEvaluators.data]
-  );
+  const availableEvaluators = useAvailableEvaluators();
 
   useEffect(() => {
     if (!checkType && !isChoosing) {
@@ -417,6 +378,11 @@ export default function CheckConfigForm({
                       slug={slug}
                       evaluatorDefinition={availableEvaluators[checkType]}
                       form={form}
+                      checkType={checkType}
+                      name={nameValue}
+                      executionMode={executionMode}
+                      settings={settings}
+                      storeSettingsOnCode={storeSettingsOnCode}
                     />
                   )}
                 </VStack>

@@ -78,7 +78,7 @@ export const scheduleEvaluations = async (
     return;
   }
 
-  const checks = await prisma.check.findMany({
+  const checks = await prisma.monitor.findMany({
     where: {
       projectId: trace.project_id,
       enabled: true,

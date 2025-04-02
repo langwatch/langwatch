@@ -1,18 +1,20 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   initialState,
   useEvaluationWizardStore,
-} from "../../components/evaluations/wizard/hooks/useEvaluationWizardStore";
-import { api } from "../../utils/api";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+} from "./useEvaluationWizardStore";
+import { api } from "../../../../utils/api";
+import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useRouter } from "next/router";
 import { useShallow } from "zustand/react/shallow";
-import { getWorkflow } from "./useWorkflowStore";
+import { getWorkflow } from "../../../../optimization_studio/hooks/useWorkflowStore";
 
 const stringifiedInitialState = JSON.stringify({
   wizardState: initialState.wizardState,
   dsl: getWorkflow(initialState.workflowStore),
 });
+
+let lastAutosave = 0;
 
 const useAutosaveWizard = () => {
   const { project } = useOrganizationTeamProject();
@@ -21,6 +23,7 @@ const useAutosaveWizard = () => {
     wizardState,
     dsl,
     autosaveDisabled,
+    setExperimentId,
     setExperimentSlug,
     setIsAutosaving,
     setWizardState,
@@ -33,6 +36,7 @@ const useAutosaveWizard = () => {
         wizardState,
         getDSL,
         autosaveDisabled,
+        setExperimentId,
         setExperimentSlug,
         setIsAutosaving,
         setWizardState,
@@ -43,6 +47,7 @@ const useAutosaveWizard = () => {
         wizardState,
         dsl: getDSL(),
         autosaveDisabled,
+        setExperimentId,
         setExperimentSlug,
         setIsAutosaving,
         setWizardState,
@@ -86,6 +91,11 @@ const useAutosaveWizard = () => {
     if (!project) return;
     if ((!!experimentSlug || !!routerSlug) && !experiment.data) return;
     if (autosaveDisabled) return;
+    if (experimentSlug && !wizardState.name) return;
+
+    const now = Date.now();
+    if (now - lastAutosave < 100) return;
+    lastAutosave = now;
 
     if (!!experiment.data?.id || stringifiedState !== stringifiedInitialState) {
       void (async () => {
@@ -96,11 +106,19 @@ const useAutosaveWizard = () => {
           dsl,
         });
 
-        // Prevent re-triggering autosave on name change
+        // Sometimes autosave would keep true even after the mutation is done, this ensures it's set to false
+        setIsAutosaving(false);
+
+        // Prevent re-triggering autosave on name changes
         skipNextAutosave();
+
+        setExperimentId(updatedExperiment.id);
         setExperimentSlug(updatedExperiment.slug);
         setWizardState({ name: updatedExperiment.name ?? undefined });
-        setWorkflow({ workflow_id: updatedExperiment.workflowId ?? undefined });
+        setWorkflow({
+          workflow_id: updatedExperiment.workflowId ?? undefined,
+          experiment_id: updatedExperiment.id,
+        });
       })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

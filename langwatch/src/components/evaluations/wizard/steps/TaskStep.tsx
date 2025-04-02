@@ -14,9 +14,13 @@ export function TaskStep() {
 
   const handleTaskSelection = (task: State["wizardState"]["task"]) => {
     setWizardState({
-      step: "dataset",
       task,
     });
+    setTimeout(() => {
+      setWizardState({
+        step: "dataset",
+      });
+    }, 48);
   };
 
   return (
@@ -38,7 +42,7 @@ export function TaskStep() {
             colorPalette="green"
             value="real_time"
             title={TASK_TYPES.real_time}
-            description="Evaluate messages as they arrive in production"
+            description="Evaluate messages as they arrive in production or as a guardrail to protect your application"
             onClick={() => handleTaskSelection("real_time")}
             icon={
               <ColorfulBlockIcon

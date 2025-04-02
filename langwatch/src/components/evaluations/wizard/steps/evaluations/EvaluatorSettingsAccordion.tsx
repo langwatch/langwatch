@@ -90,7 +90,6 @@ export const EvaluatorSettingsAccordion = () => {
 
   useEffect(() => {
     form.watch(() => {
-      console.log(form.getValues());
       void form.handleSubmit(onSubmit)();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -103,6 +102,10 @@ export const EvaluatorSettingsAccordion = () => {
       borderColor="green.400"
       title="Evaluator Settings"
       showTrigger={!!wizardState.evaluatorCategory && !!hasEvaluatorFields}
+      indicatorProps={{
+        id: "js-expand-settings-button",
+        focusRing: "outside",
+      }}
     >
       <FormProvider {...form}>
         <VStack width="full" gap={3}>

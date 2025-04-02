@@ -43,9 +43,7 @@ export const useStepCompletedValue = () => {
       case "dataset":
         return databaseDataset?.data?.name;
       case "execution":
-        return task === "real_time"
-          ? "When message arrives"
-          : executionMethod
+        return executionMethod
           ? EXECUTION_METHODS[executionMethod]
           : undefined;
       case "evaluation":

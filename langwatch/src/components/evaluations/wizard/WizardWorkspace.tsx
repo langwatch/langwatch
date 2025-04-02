@@ -1,4 +1,4 @@
-import { Box, Card, Tabs, VStack } from "@chakra-ui/react";
+import { Box, Card, Tabs, VStack, Text } from "@chakra-ui/react";
 import { DatasetTable } from "../../datasets/DatasetTable";
 import {
   useEvaluationWizardStore,
@@ -15,6 +15,9 @@ import {
 import { memo, useEffect } from "react";
 import { EvaluationResults } from "../../../optimization_studio/components/ResultsPanel";
 import { useShallow } from "zustand/react/shallow";
+import { EvaluationManualIntegration } from "../../checks/EvaluationManualIntegration";
+import { useAvailableEvaluators } from "../../../hooks/useAvailableEvaluators";
+import type { EvaluatorTypes } from "../../../server/evaluations/evaluators.generated";
 
 export const WizardWorkspace = memo(function WizardWorkspace() {
   const {
@@ -22,17 +25,26 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
     workspaceTab,
     setWizardState,
     workflowId,
+    experimentId,
     evaluationState,
+    task,
     hasWorkflow,
+    hasCodeImplementation,
   } = useEvaluationWizardStore(
     useShallow((state) => ({
       getDatasetId: state.getDatasetId,
       workspaceTab: state.wizardState.workspaceTab,
       setWizardState: state.setWizardState,
       workflowId: state.workflowStore.workflow_id,
+      experimentId: state.workflowStore.experiment_id,
       evaluationState: state.workflowStore.state.evaluation,
       nodes: state.workflowStore.nodes,
+      task: state.wizardState.task,
       hasWorkflow: state.workflowStore.nodes.length > 0,
+      hasCodeImplementation:
+        !!state.getFirstEvaluatorNode() &&
+        (state.wizardState.executionMethod === "realtime_guardrail" ||
+          state.wizardState.executionMethod === "realtime_manually"),
     }))
   );
 
@@ -76,7 +88,14 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
             {hasWorkflow && (
               <Tabs.Trigger value="workflow">Workflow</Tabs.Trigger>
             )}
-            {hasResults && <Tabs.Trigger value="results">Results</Tabs.Trigger>}
+            {hasResults && (
+              <Tabs.Trigger value="results">
+                {task === "real_time" ? "Trial Results" : "Results"}
+              </Tabs.Trigger>
+            )}
+            {hasCodeImplementation && (
+              <Tabs.Trigger value="code-implementation">Code</Tabs.Trigger>
+            )}
           </Tabs.List>
           {hasDataset && (
             <Tabs.Content
@@ -126,6 +145,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
                 <Card.Body width="full" height="full" padding={0}>
                   <EvaluationResults
                     workflowId={workflowId}
+                    experimentId={experimentId}
                     evaluationState={evaluationState}
                     sidebarProps={{
                       padding: 2,
@@ -134,6 +154,15 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
                   />
                 </Card.Body>
               </Card.Root>
+            </Tabs.Content>
+          )}
+          {hasCodeImplementation && (
+            <Tabs.Content
+              value="code-implementation"
+              width="full"
+              height="full"
+            >
+              <CodeImplementation />
             </Tabs.Content>
           )}
         </Tabs.Root>
@@ -185,3 +214,45 @@ const WizardOptimizationStudioCanvas = memo(
     );
   }
 );
+
+function CodeImplementation() {
+  const { name, checkType, executionMethod, settings } =
+    useEvaluationWizardStore(
+      useShallow((state) => ({
+        name: state.wizardState.name,
+        checkType: state.getFirstEvaluatorNode()?.data.evaluator,
+        executionMethod: state.wizardState.executionMethod,
+        settings: Object.fromEntries(
+          state
+            .getFirstEvaluatorNode()
+            ?.data.parameters?.map((field) => [
+              field.identifier,
+              field.value,
+            ]) ?? []
+        ),
+      }))
+    );
+
+  const availableEvaluators = useAvailableEvaluators();
+
+  if (!checkType) return null;
+
+  return (
+    <Card.Root width="full" height="full" position="sticky" top={6}>
+      <Card.Body width="full" height="full" paddingTop={0}>
+        <EvaluationManualIntegration
+          evaluatorDefinition={availableEvaluators[checkType as EvaluatorTypes]}
+          checkType={checkType}
+          name={name ?? "Untitled"}
+          executionMode={
+            executionMethod === "realtime_guardrail"
+              ? "AS_GUARDRAIL"
+              : "MANUALLY"
+          }
+          settings={settings}
+          storeSettingsOnCode={true}
+        />
+      </Card.Body>
+    </Card.Root>
+  );
+}

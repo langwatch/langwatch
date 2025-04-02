@@ -1,41 +1,90 @@
-import { useState } from "react";
 import {
+  Badge,
   Box,
-  Button,
   Card,
   HStack,
   Heading,
-  Text,
-  VStack,
-  Badge,
   IconButton,
   SimpleGrid,
+  Text,
 } from "@chakra-ui/react";
-import { ChevronDown, ChevronUp, MoreHorizontal } from "react-feather";
-import { AreaChart, Area, ResponsiveContainer } from "recharts";
-import { getStatusColor, getStatusIcon, getChartColor } from "./utils";
+import { useMemo, useState } from "react";
 import { Menu } from "../../components/ui/menu";
-
-type Monitor = {
-  id: string;
-  name: string;
-  type: string;
-  metric: string;
-  value: number;
-  status: "error" | "warning" | "healthy";
-  lastUpdated: string;
-  history: { time: string; value: number }[];
-};
+import { CustomGraph } from "../analytics/CustomGraph";
+import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
+import {
+  LuChevronDown,
+  LuChevronUp,
+  LuEllipsis,
+  LuPause,
+  LuPlay,
+  LuPencil,
+  LuTrash,
+} from "react-icons/lu";
+import { TeamRoleGroup } from "../../server/api/permission";
+import { Link } from "../ui/link";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useRouter } from "next/router";
+import { api } from "../../utils/api";
+import type { TRPCClientErrorLike } from "@trpc/react-query";
+import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "../../server/api/root";
+import { toaster } from "../ui/toaster";
 
 type MonitorsSectionProps = {
   title: string;
-  description: string;
-  monitors: Monitor[];
-  onEditMonitor: (monitorId: string) => void;
+  monitors: UseTRPCQueryResult<
+    inferRouterOutputs<AppRouter>["monitors"]["getAllForProject"],
+    TRPCClientErrorLike<AppRouter>
+  >;
 };
 
-export const MonitorsSection = ({ title, description, monitors, onEditMonitor }: MonitorsSectionProps) => {
+export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const { project, hasTeamPermission } = useOrganizationTeamProject();
+  const router = useRouter();
+
+  const experiments = api.experiments.getAllForEvaluationsList.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project }
+  );
+
+  const experimentsSlugMap = useMemo(() => {
+    return Object.fromEntries(
+      experiments.data?.map((experiment) => [experiment.id, experiment.slug]) ??
+        []
+    );
+  }, [experiments.data]);
+
+  const deleteMonitorMutation = api.monitors.delete.useMutation({
+    onSuccess: () => {
+      void monitors.refetch();
+      void experiments.refetch();
+      toaster.create({
+        title: "Successfully deleted monitor",
+        type: "success",
+        placement: "top-end",
+        meta: {
+          closable: true,
+        },
+      });
+    },
+    onError: () => {
+      toaster.create({
+        title: "Error deleting monitor",
+        description: "Please try again",
+        type: "error",
+        placement: "top-end",
+        meta: {
+          closable: true,
+        },
+      });
+    },
+  });
+
+  const toggleMonitorMutation = api.monitors.toggle.useMutation();
 
   return (
     <Card.Root mb={8}>
@@ -44,7 +93,7 @@ export const MonitorsSection = ({ title, description, monitors, onEditMonitor }:
           <HStack gap={2}>
             <Heading size="md">{title}</Heading>
             <Badge variant="outline" px={2} py={1}>
-              {monitors.length} Active
+              {monitors.data?.length} Active
             </Badge>
           </HStack>
           <IconButton
@@ -53,98 +102,185 @@ export const MonitorsSection = ({ title, description, monitors, onEditMonitor }:
             size="sm"
             onClick={() => setIsCollapsed(!isCollapsed)}
           >
-            {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+            {isCollapsed ? (
+              <LuChevronDown size={16} />
+            ) : (
+              <LuChevronUp size={16} />
+            )}
           </IconButton>
         </HStack>
 
         {!isCollapsed && (
           <>
-            <Text color="gray.600" mb={4}>
-              {description}
-            </Text>
-
             <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
-              {monitors.map((monitor) => {
-                const statusColor = getStatusColor(monitor.status, monitor.value);
-                const statusIcon = getStatusIcon(monitor.status, monitor.value);
-                const chartColor = getChartColor(monitor.status, monitor.value);
+              {monitors.data?.map((monitor) => {
+                const evaluatorDefinition = getEvaluatorDefinitions(
+                  monitor.checkType
+                );
+                // TODO: handle custom evaluators
 
                 return (
-                  <Card.Root
-                    key={monitor.id}
-                    position="relative"
-                    overflow="hidden"
-                    bg={statusColor.bg}
-                    color={statusColor.color}
-                    borderColor={statusColor.borderColor}
-                    borderWidth="1px"
-                    _hover={{ shadow: "sm" }}
-                    height="full"
-                  >
-                    <Card.Body>
-                      {/* Background Chart */}
-                      <Box position="absolute" inset={0} opacity={0.15} pointerEvents="none">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={monitor.history}>
-                            <defs>
-                              <linearGradient id={`color-${monitor.id}`} x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor={chartColor} stopOpacity={0.8} />
-                                <stop offset="100%" stopColor={chartColor} stopOpacity={0.2} />
-                              </linearGradient>
-                            </defs>
-                            <Area
-                              type="monotone"
-                              dataKey="value"
-                              stroke={chartColor}
-                              fill={`url(#color-${monitor.id})`}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </Box>
+                  <Box key={monitor.id} position="relative">
+                    <Menu.Root>
+                      <Menu.Trigger
+                        asChild
+                        position="absolute"
+                        top={4}
+                        right={4}
+                        zIndex={2}
+                      >
+                        <IconButton
+                          variant="ghost"
+                          size="sm"
+                          aria-label="More options"
+                          _hover={{
+                            backgroundColor: "white",
+                          }}
+                        >
+                          <LuEllipsis size={16} />
+                        </IconButton>
+                      </Menu.Trigger>
+                      <Menu.Content>
+                        <Menu.Item
+                          value="edit"
+                          onClick={() => {
+                            if (!project) return;
 
-                      <VStack align="start" gap={2} position="relative" zIndex={1} height="full">
-                        <HStack width="full" justify="space-between">
-                          <Text fontWeight="medium" fontSize="sm">
-                            {monitor.name}
-                          </Text>
-                          <HStack gap={2}>
-                            <Box>{statusIcon}</Box>
-                            <Menu.Root>
-                              <Menu.Trigger asChild>
-                                <IconButton
-                                  variant="ghost"
-                                  size="sm"
-                                  aria-label="More options"
-                                >
-                                  <MoreHorizontal size={16} />
-                                </IconButton>
-                              </Menu.Trigger>
-                              <Menu.Content>
-                                <Menu.Item value="edit" onClick={() => onEditMonitor(monitor.id)}>
-                                  Edit
-                                </Menu.Item>
-                              </Menu.Content>
-                            </Menu.Root>
-                          </HStack>
-                        </HStack>
+                            console.log(
+                              "experimentsSlugMap",
+                              experimentsSlugMap
+                            );
+                            console.log("monitor", monitor);
 
-                        <VStack align="start" gap={1} mt="auto">
-                          <HStack>
-                            <Text fontSize="2xl" fontWeight="bold" mr={1}>
-                              {(monitor.value * 100).toFixed(0)}%
-                            </Text>
-                            <Text fontSize="xs">{monitor.metric}</Text>
-                          </HStack>
-                          <Text fontSize="xs" opacity={0.7}>
-                            Updated {monitor.lastUpdated}
-                          </Text>
-                        </VStack>
-                      </VStack>
-                    </Card.Body>
-                  </Card.Root>
+                            if (
+                              monitor.experimentId &&
+                              experimentsSlugMap[monitor.experimentId]
+                            ) {
+                              void router.push(
+                                `/${project.slug}/evaluations/wizard/${
+                                  experimentsSlugMap[monitor.experimentId]
+                                }`
+                              );
+                            } else {
+                              void router.push(
+                                `/${project.slug}/evaluations/${monitor.id}/edit`
+                              );
+                            }
+                          }}
+                        >
+                          <LuPencil size={16} />
+                          Edit
+                        </Menu.Item>
+                        <Menu.Item
+                          value="toggle"
+                          onClick={() => {
+                            if (!project) return;
+
+                            void toggleMonitorMutation.mutate(
+                              {
+                                id: monitor.id,
+                                projectId: project.id,
+                                enabled: !monitor.enabled,
+                              },
+                              {
+                                onSuccess: () => {
+                                  void monitors.refetch();
+                                  toaster.create({
+                                    title: `Monitor ${
+                                      monitor.enabled ? "disabled" : "enabled"
+                                    }`,
+                                    type: "info",
+                                    placement: "top-end",
+                                    meta: { closable: true },
+                                  });
+                                },
+                              }
+                            );
+                          }}
+                        >
+                          {monitor.enabled ? (
+                            <>
+                              <LuPause size={16} />
+                              Disable
+                            </>
+                          ) : (
+                            <>
+                              <LuPlay size={16} />
+                              Enable
+                            </>
+                          )}
+                        </Menu.Item>
+                        <Menu.Item
+                          value="delete"
+                          color="red.500"
+                          onClick={() => {
+                            if (!project) return;
+
+                            if (
+                              !confirm(
+                                "Are you sure you want to delete this monitor?"
+                              )
+                            )
+                              return;
+
+                            void deleteMonitorMutation.mutate({
+                              id: monitor.id,
+                              projectId: project.id,
+                            });
+                          }}
+                        >
+                          <LuTrash size={16} />
+                          Delete
+                        </Menu.Item>
+                      </Menu.Content>
+                    </Menu.Root>
+                    <CustomGraph
+                      input={{
+                        graphId: monitor.id,
+                        graphType: "monitor_graph",
+                        series: [
+                          {
+                            aggregation: "avg",
+                            colorSet: "tealTones",
+                            key: monitor.id,
+                            metric: evaluatorDefinition?.isGuardrail
+                              ? "evaluations.evaluation_pass_rate"
+                              : "evaluations.evaluation_score",
+                            name: monitor.name,
+                          },
+                        ],
+                        includePrevious: false,
+                        timeScale: 1,
+                        height: 140,
+                        monitorGraph: {
+                          disabled: !monitor.enabled,
+                          isGuardrail: monitor.executionMode === "AS_GUARDRAIL",
+                        },
+                      }}
+                    />
+                  </Box>
                 );
               })}
             </SimpleGrid>
+            {monitors.data?.length === 0 && (
+              <Text color="gray.600">
+                No real-time monitors or guardrails set up yet.
+                {project &&
+                  hasTeamPermission(TeamRoleGroup.GUARDRAILS_MANAGE) && (
+                    <>
+                      {" "}
+                      Click on{" "}
+                      <Link
+                        textDecoration="underline"
+                        href={`/${project.slug}/evaluations/wizard`}
+                      >
+                        New Evaluation
+                      </Link>{" "}
+                      to get started.
+                    </>
+                  )}
+              </Text>
+            )}
           </>
         )}
       </Card.Body>

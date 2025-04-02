@@ -5,6 +5,7 @@ import { CategorySelectionAccordion } from "./evaluations/CategorySelectionAccor
 import { EvaluatorMappingAccordion } from "./evaluations/EvaluatorMappingAccordion";
 import { EvaluatorSelectionAccordion } from "./evaluations/EvaluatorSelectionAccordion";
 import { EvaluatorSettingsAccordion } from "./evaluations/EvaluatorSettingsAccordion";
+import { useAnimatedFocusElementById } from "../../../../hooks/useAnimatedFocusElementById";
 
 export function EvaluationStep() {
   const {
@@ -33,6 +34,17 @@ export function EvaluationStep() {
       });
     }
   }, [accordeonValue, setWizardState]);
+
+  const [isRendered, setIsRendered] = useState(false);
+  const focusElementById = useAnimatedFocusElementById();
+
+  useEffect(() => {
+    if (isRendered && accordeonValue[0] === "settings") {
+      focusElementById("js-next-step-button");
+    }
+    setIsRendered(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accordeonValue]);
 
   return (
     <VStack width="full" align="start" gap={4}>

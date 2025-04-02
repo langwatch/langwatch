@@ -14,10 +14,10 @@ describe("Guardrail API Endpoint", () => {
 
   beforeAll(async () => {
     project = await getTestProject("evaluate-endpoint");
-    await prisma.check.deleteMany({
+    await prisma.monitor.deleteMany({
       where: { projectId: project.id },
     });
-    check = await prisma.check.create({
+    check = await prisma.monitor.create({
       data: {
         id: `check_${nanoid()}`,
         projectId: project.id,
