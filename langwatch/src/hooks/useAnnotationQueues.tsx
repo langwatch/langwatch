@@ -2,6 +2,14 @@ import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 import { useRequiredSession } from "./useRequiredSession";
 
+const batchArray = (array: string[], batchSize: number) => {
+  const batches: string[][] = [];
+  for (let i = 0; i < array.length; i += batchSize) {
+    batches.push(array.slice(i, i + batchSize));
+  }
+  return batches;
+};
+
 export function useAnnotationQueues() {
   const { project } = useOrganizationTeamProject();
 
@@ -69,16 +77,30 @@ export function useAnnotationQueues() {
     ...(doneTraceIdsForAssignedQueueItems ?? []),
   ];
 
-  const traces = api.traces.getTracesWithSpans.useQuery(
-    {
-      projectId: project?.id ?? "",
-      traceIds: traceIds,
-    },
-    {
-      enabled: !!project?.id,
-      refetchOnWindowFocus: false,
-    }
-  );
+  const MAX_BATCH_SIZE = 20;
+  const traceBatches = batchArray(traceIds, MAX_BATCH_SIZE);
+
+  const MAX_QUERIES = 10;
+
+  const batchQueries = [];
+  for (let i = 0; i < MAX_QUERIES; i++) {
+    const batch = traceBatches[i] || [];
+    const query = api.traces.getTracesWithSpans.useQuery(
+      {
+        projectId: project?.id ?? "",
+        traceIds: batch,
+      },
+      {
+        enabled: !!project?.id && batch.length > 0,
+        refetchOnWindowFocus: false,
+      }
+    );
+    batchQueries.push(query);
+  }
+
+  const traces = batchQueries
+    .filter((query) => query.data)
+    .flatMap((query) => query.data || []);
 
   const annotations = api.annotation.getAll.useQuery(
     {
@@ -92,7 +114,7 @@ export function useAnnotationQueues() {
 
   const assignedQueueItemsWithTraces = assignedQueueItems?.map((item) => ({
     ...item,
-    trace: traces.data?.find((trace) => trace.trace_id === item.traceId),
+    trace: traces?.find((trace) => trace.trace_id === item.traceId),
     annotations: annotations.data?.filter(
       (annotation) => annotation.traceId === item.traceId
     ),
@@ -115,7 +137,7 @@ export function useAnnotationQueues() {
 
       return {
         ...item,
-        trace: traces.data?.find((trace) => trace.trace_id === item.traceId),
+        trace: traces?.find((trace) => trace.trace_id === item.traceId),
         annotations: relevantAnnotations,
         members: queue?.members.map((member) => ({
           ...member,
@@ -131,7 +153,7 @@ export function useAnnotationQueues() {
 
   const doneQueueItemsWithTraces = doneQueueItemsFiltered?.map((item) => ({
     ...item,
-    trace: traces.data?.find((trace) => trace.trace_id === item.traceId),
+    trace: traces?.find((trace) => trace.trace_id === item.traceId),
     annotations: annotations.data?.filter(
       (annotation) => annotation.traceId === item.traceId
     ),
@@ -157,6 +179,10 @@ export function useAnnotationQueues() {
     doneQueueItemsWithTraces,
     memberAccessibleQueues,
     scoreOptions,
-    queuesLoading: queues.isLoading || queueItems.isLoading || traces.isLoading,
+    queuesLoading:
+      queues.isLoading ||
+      queueItems.isLoading ||
+      doneQueueItems.isLoading ||
+      batchQueries.some((query) => query.isLoading),
   };
 }
