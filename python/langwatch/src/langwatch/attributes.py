@@ -26,3 +26,5 @@ class MetadataName:
     CustomerId = "customer_id"
     ThreadId = "thread_id"
     SessionId = "thread_id" # We use thread_id for session_id
+
+    RAGContexts = "langwatch.rag_contexts"

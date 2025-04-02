@@ -7,53 +7,18 @@ import threading
 from deprecated import deprecated
 from opentelemetry import trace as trace_api
 from opentelemetry.sdk.trace import TracerProvider
-from typing import List, Optional, Callable, Any, TypeVar, Union, Dict
+from typing import List, Optional, Callable, Any, Union
 from warnings import warn
-import sys
-import asyncio
 import inspect
 
 from langwatch.state import get_endpoint, get_instance
 from langwatch.domain import ChatMessage, Evaluation, RAGChunk, SpanInputOutput, SpanMetrics, SpanParams, SpanTimestamps, SpanTypes, TraceMetadata
 from langwatch.observability.span import LangWatchSpan
-from langwatch.observability.types import SpanType, SpanInputType, ContextsType
 from langwatch.__version__ import __version__
 from langwatch.observability.context import stored_langwatch_trace, stored_langwatch_span
 from langwatch.utils.initialization import ensure_setup
 
-__all__ = ["trace", "get_current_trace", "get_current_span", "sampling_rate"]
-
-T = TypeVar("T", bound=Callable[..., Any])
-
-class SamplingRateDescriptor:
-    """Property descriptor for getting the sampling rate from the root tracer provider."""
-    
-    def __get__(self, obj, objtype=None) -> float:
-        """Get the sampling rate from the root OpenTelemetry tracer provider.
-
-        Returns:
-            The sampling rate as a float between 0 and 1. Returns 1.0 if:
-            - No tracer provider is set
-            - The tracer provider doesn't have a sampler
-            - The tracer provider is a NoOpTracerProvider
-            - The sampling rate cannot be determined
-        """
-        tracer_provider = trace_api.get_tracer_provider()
-        if not tracer_provider or isinstance(tracer_provider, trace_api.NoOpTracerProvider):
-            return 1.0
-            
-        try:
-            # Access the sampler from the tracer provider
-            sampler = tracer_provider.sampler
-            if hasattr(sampler, 'rate'):
-                return float(sampler.rate)
-            elif hasattr(sampler, 'sampling_rate'):
-                return float(sampler.sampling_rate)
-            return 1.0
-        except Exception:
-            return 1.0
-
-sampling_rate = SamplingRateDescriptor()
+__all__ = ["trace", "get_current_trace", "get_current_span"]
 
 def get_current_trace() -> Optional['LangWatchTrace']:
     """Get the current trace from the LangWatch context.
@@ -290,8 +255,12 @@ class LangWatchTrace:
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Makes the trace callable as a decorator."""
 
+        # This is a hack to set the name of the root span to the name of the function
+        self._root_span_params["name"] = self._root_span_params["name"] or args[0].__name__
+
         if len(args) == 1 and callable(args[0]) and not kwargs:
             func: Callable[..., Any] = args[0]
+
             if inspect.iscoroutinefunction(func):
                 async def wrapper(*wargs: Any, **wkwargs: Any) -> Any:
                     async with self:  # Use async context manager for async functions
