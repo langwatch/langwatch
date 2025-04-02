@@ -31,56 +31,6 @@ from langwatch.observability.span import span
 from langwatch.observability.types import SpanType
 from langwatch.utils import reduce_payload_size
 
-
-class SerializableAndPydanticEncoder(json.JSONEncoder):
-    def default(self, o):
-        classname = f"{o.__class__.__module__}.{o.__class__.__name__}"
-        if isinstance(o, FieldInfo):
-            return {"__class__": classname} | {
-                "field_type": o.json_schema_extra.get("__dspy_field_type", None),  # type: ignore
-                "prefix": o.json_schema_extra.get("prefix", None),  # type: ignore
-                "desc": o.json_schema_extra.get("desc", None),  # type: ignore
-            }
-        if isinstance(o, set):
-            return list(o)
-        if isinstance(o, Prediction):
-            return {"__class__": classname} | {
-                **o.__dict__.get("_store", {}),
-                **{
-                    k: v
-                    for k, v in o.__dict__.items()
-                    if k not in ["_store", "_completions"]
-                },
-            }
-        if isinstance(o, Predict):
-            return {"__class__": classname} | o.__dict__
-        if isinstance(o, Example):
-            return {"__class__": classname} | o.__dict__
-        if isinstance(o, SignatureMeta):
-            return {"__class__": classname} | {
-                "signature": o.signature,
-                "instructions": o.instructions,
-                "fields": o.fields,
-            }
-        if isinstance(o, dspy.LM):
-            return {"__class__": classname} | {
-                "model": o.model,
-                "kwargs": {
-                    k: v
-                    for k, v in o.kwargs.items()
-                    if k in ["temperature", "max_tokens"]
-                },
-            }
-        if isinstance(o, Completions):
-            return {"__class__": classname} | o.__dict__
-        if isinstance(o, BaseModel):
-            return o.model_dump(exclude_unset=True)
-        try:
-            return super().default(o)
-        except:
-            return str(o)
-
-
 class DSPyLLMCall(TypedDict, total=False):
     __class__: str
     model: Optional[str] = None
