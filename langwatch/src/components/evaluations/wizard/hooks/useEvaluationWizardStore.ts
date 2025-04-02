@@ -46,9 +46,9 @@ export type PartialEdge = Omit<Workflow["edges"][number], "target"> & {
 
 export const TASK_TYPES = {
   real_time: "Set up real-time evaluation",
-  llm_app: "Evaluate your LLM app",
+  llm_app: "Offline evaluation",
   prompt_creation: "Prompt Creation",
-  custom_evaluator: "Create Custom Evaluator",
+  custom_evaluator: "Evaluate your Evaluator",
   scan: "Scan for Vulnerabilities (Coming Soon)",
 } as const;
 
@@ -306,8 +306,9 @@ const store = (
       const initialEvaluator = convertEvaluator(
         evaluator.evaluator as keyof typeof AVAILABLE_EVALUATORS
       );
-      const firstEvaluator = current.nodes[firstEvaluatorIndex] ?? {
-        id: nameToId(initialEvaluator.name ?? initialEvaluator.cls),
+      const id = nameToId(initialEvaluator.name ?? initialEvaluator.cls);
+      const firstEvaluator = current.nodes[firstEvaluatorIndex] as Node<Evaluator> | undefined ?? {
+        id,
         type: "evaluator",
         data: initialEvaluator,
         position: { x: 600, y: 0 },
@@ -315,13 +316,17 @@ const store = (
 
       const evaluatorNode: Node<Evaluator> = {
         ...firstEvaluator,
+        // TODO: always rewire edges
+        id,
         data: {
-          ...(firstEvaluator.data as Evaluator),
+          ...firstEvaluator.data,
           ...evaluator,
+          name: initialEvaluator.name,
+          description: initialEvaluator.description,
           parameters:
-            evaluator.parameters ??
+            evaluator.data?.parameters ??
             // Reset parameters if not given the evaluator is not the same as the current evaluator
-            (firstEvaluator.data.cls !== evaluator.cls
+            (firstEvaluator.data.evaluator !== evaluator.evaluator
               ? []
               : firstEvaluator.data.parameters ?? []),
         },

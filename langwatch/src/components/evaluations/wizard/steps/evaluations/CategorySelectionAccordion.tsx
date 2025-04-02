@@ -98,30 +98,30 @@ export const evaluatorCategories: EvaluationCategoryConfig[] = [
       "For when you don't have a golden answer, but have a set of rules for another LLM to evaluate quality",
     icon: <LuBrain />,
     evaluators: [
-      // {
-      //   id: "llm_boolean",
-      //   name: "LLM-as-a-Judge Boolean",
-      //   description:
-      //     "Use an LLM to perform true/false boolean evaluation of the message",
-      // },
-      // {
-      //   id: "llm_score",
-      //   name: "LLM-as-a-Judge Score",
-      //   description:
-      //     "Use an LLM to generate a numeric score evaluation of the message",
-      // },
-      // {
-      //   id: "llm_category",
-      //   name: "LLM-as-a-Judge Category",
-      //   description:
-      //     "Use an LLM to classify the message into custom defined categories",
-      // },
-      // {
-      //   id: "rubrics_scoring",
-      //   name: "Rubrics Based Scoring",
-      //   description:
-      //     "Evaluate responses using a rubric with descriptions for each score level",
-      // },
+      {
+        id: "langevals/llm_boolean",
+        name: "LLM-as-a-Judge Boolean",
+        description:
+          "Use an LLM to perform true/false boolean evaluation of the message",
+      },
+      {
+        id: "langevals/llm_score",
+        name: "LLM-as-a-Judge Score",
+        description:
+          "Use an LLM to generate a numeric score evaluation of the message",
+      },
+      {
+        id: "langevals/llm_category",
+        name: "LLM-as-a-Judge Category",
+        description:
+          "Use an LLM to classify the message into custom defined categories",
+      },
+      {
+        id: "ragas/rubrics_based_scoring",
+        name: "Rubrics Based Scoring",
+        description:
+          "Evaluate responses using a rubric with descriptions for each score level",
+      },
     ],
     realtime: true,
   },

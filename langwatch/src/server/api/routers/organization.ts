@@ -519,6 +519,8 @@ export const organizationRouter = createTRPCRouter({
         include: { organization: true },
       });
 
+      console.debug("Invite:", invite);
+
       if (!invite || invite.expiration < new Date()) {
         throw new TRPCError({
           code: "NOT_FOUND",
