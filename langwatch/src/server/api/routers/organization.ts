@@ -21,7 +21,6 @@ import {
   checkUserPermissionForTeam,
   skipPermissionCheck,
 } from "../permission";
-import { dependencies } from "../../../injection/dependencies.server";
 import * as Sentry from "@sentry/nextjs";
 import { env } from "~/env.mjs";
 
@@ -75,23 +74,6 @@ export const organizationRouter = createTRPCRouter({
       z.object({
         orgName: z.string().optional(),
         phoneNumber: z.string().optional(),
-        signUpData: z
-          .object({
-            usage: z.string().optional().nullable(),
-            solution: z.string().optional().nullable(),
-            terms: z.boolean().optional(),
-            companyType: z.string().optional().nullable(),
-            companySize: z.string().optional().nullable(),
-            projectType: z.string().optional().nullable(),
-            howDidYouHearAboutUs: z.string().optional().nullable(),
-            otherCompanyType: z.string().optional().nullable(),
-            otherProjectType: z.string().optional().nullable(),
-            otherHowDidYouHearAboutUs: z.string().optional().nullable(),
-            yourRole: z.string().optional().nullable(),
-            featureUsage: z.string().optional().nullable(),
-            utmCampaign: z.string().optional().nullable(),
-          })
-          .optional(),
       })
     )
     .use(skipPermissionCheck)
@@ -158,14 +140,6 @@ export const organizationRouter = createTRPCRouter({
 
         return { organization, team };
       });
-
-      if (dependencies.postRegistrationCallback) {
-        try {
-          await dependencies.postRegistrationCallback(ctx.session.user, input);
-        } catch (err) {
-          Sentry.captureException(err);
-        }
-      }
 
       return {
         success: true,
