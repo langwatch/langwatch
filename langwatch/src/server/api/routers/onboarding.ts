@@ -58,7 +58,6 @@ export const onboardingRouter = createTRPCRouter({
         const orgResult = await orgRouter.createAndAssign({
           orgName: input.orgName,
           phoneNumber: input.phoneNumber,
-          signUpData: input.signUpData,
         });
         if (!orgResult.success) {
           throw new TRPCError({
