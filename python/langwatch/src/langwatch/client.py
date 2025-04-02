@@ -38,7 +38,7 @@ class Client(LangWatchClientProtocol):
 
 		Args:
 			api_key: Optional. The API key for the LangWatch tracing service, if none is provided, the `LANGWATCH_API_KEY` environment variable will be used.
-			endpoint_url: Optional. The URL of the LangWatch tracing service, if none is provided, the `LANGWATCH_ENDPOINT_URL` environment variable will be used. If that is not provided, the default value will be `https://app.langwatch.ai`.
+			endpoint_url: Optional. The URL of the LangWatch tracing service, if none is provided, the `LANGWATCH_ENDPOINT` environment variable will be used. If that is not provided, the default value will be `https://app.langwatch.ai`.
 			base_attributes: Optional. The base attributes to use for the LangWatch tracing client.
 			instrumentors: Optional. The instrumentors to use for the LangWatch tracing client.
 
@@ -46,7 +46,7 @@ class Client(LangWatchClientProtocol):
 		"""
 
 		self.api_key = api_key or os.getenv("LANGWATCH_API_KEY")
-		self._endpoint_url = endpoint_url or os.getenv("LANGWATCH_ENDPOINT_URL") or "https://app.langwatch.ai"
+		self._endpoint_url = endpoint_url or os.getenv("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
 		self.base_attributes = base_attributes or {}
 		self.debug = debug
 

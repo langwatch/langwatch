@@ -1,9 +1,7 @@
-from typing import Dict
-
-from .observability.tracing import trace, sampling_rate, get_current_trace
+from .observability.tracing import trace, get_current_trace, get_current_span
+from .observability.samping import sampling_rate
 from .observability.span import span
 from .state import get_endpoint
-from .types import BaseAttributes
 from .__version__ import __version__
 from .utils.initialization import ensure_setup, setup
 
@@ -20,4 +18,5 @@ __all__ = [
     "sampling_rate",
     "ensure_setup",
     "get_current_trace",
+    "get_current_span",
 ]
