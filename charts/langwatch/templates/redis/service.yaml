@@ -1,0 +1,18 @@
+# Service for Redis
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-redis
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-redis
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  type: {{ .Values.redis.service.type }}
+  ports:
+    - port: {{ .Values.redis.service.port }}
+      targetPort: redis
+      protocol: TCP
+      name: redis
+  selector:
+    app.kubernetes.io/name: {{ .Release.Name }}-redis
+    app.kubernetes.io/instance: {{ .Release.Name }}

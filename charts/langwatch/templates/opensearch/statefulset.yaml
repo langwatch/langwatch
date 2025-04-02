@@ -1,0 +1,83 @@
+# StatefulSet for OpenSearch
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-opensearch
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-opensearch
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  serviceName: {{ .Release.Name }}-opensearch
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-opensearch
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-opensearch
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}-opensearch
+          image: "{{ .Values.images.opensearch.repository }}:{{ .Values.images.opensearch.tag }}"
+          imagePullPolicy: {{ .Values.images.opensearch.pullPolicy }}
+          ports:
+            {{- range .Values.opensearch.service.ports }}
+            - name: {{ .name }}
+              containerPort: {{ .port }}
+              protocol: TCP
+            {{- end }}
+          # Environment variables for OpenSearch
+          env:
+            {{- range $key, $value := .Values.opensearch.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.opensearch.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/opensearch/data
+          # Security context settings for OpenSearch
+          securityContext:
+            capabilities:
+              add:
+                - IPC_LOCK
+                - SYS_RESOURCE
+          # Health check for OpenSearch
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ index .Values.opensearch.service.ports 0 "port" }}
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ index .Values.opensearch.service.ports 0 "port" }}
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 30
+            failureThreshold: 3
+      # Pod security context
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+  # Persistent volume claim for OpenSearch data
+  {{- if .Values.opensearch.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        {{- if .Values.opensearch.persistence.storageClass }}
+        storageClassName: {{ .Values.opensearch.persistence.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.opensearch.persistence.size }}
+  {{- end }}
