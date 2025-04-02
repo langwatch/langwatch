@@ -9,6 +9,7 @@ import {
   Link,
   SimpleGrid,
   Slider,
+  Spacer,
   Spinner,
   Tag,
   Text,
@@ -152,15 +153,15 @@ export default function Subscription() {
           >
             <Plan
               plan="FREE"
-              name="Free"
+              name="Developer"
               price={0}
-              description="For starting with LLM monitoring and optimization"
+              description="Get Started with LLM Monitoring and Evaluation"
               features={[
-                "1 Workflow",
-                "1k Traces",
-                "30-day retention",
-                "1 Project",
-                "1 Team Member",
+                "All platform features",
+                "1000 traces / month included, additional: €5 / 10k traces",
+                "30 days data access",
+                "2 users",
+                "Community Support (Github & Discord)",
               ]}
               selectedPlan={selectedPlan}
               setSelectedPlan={setSelectedPlan}
@@ -187,39 +188,28 @@ export default function Subscription() {
               name="Launch"
               price={59}
               hidden={billAnnually}
-              description={
-                <>
-                  For small teams improving their LLM solutions.{" "}
-                  <b>Startups only</b>{" "}
-                  <Box display="inline-block" marginBottom="-3px">
-                    <Tooltip content="Limited to companies with 1-10 employees or for personal usage.">
-                      <Info size={16} />
-                    </Tooltip>
-                  </Box>
-                </>
-              }
+              description="For small teams optimizing their LLM apps"
               features={[
-                "Up to 10 workflows",
-                "10,000 Traces",
-                "6 months retention",
-                "1 Project",
-                "2 Team Members",
+                "Everything in Developer",
+                "20k traces / month included, (around 120k events), additional: €5pm / 10,000 traces",
+                "180 days data access",
+                "3 users, additional: €19pm/user",
+                "Unlimited Evaluations",
+                "Unlimited Optimizations",
+                "Slack and Email Support",
               ]}
               additionalCosts={[
                 "Additional Traces - €5pm/10,000",
                 "Additional Users - €19pm/user",
-                "Usage-based price for evaluations and guardrails",
-                ``,
               ]}
               additionalUserCost={19}
               additionalTracesCost={5}
-              minTraces={10000}
-              minMembers={2}
-              maxTraces={100000}
+              minTraces={20000}
+              minMembers={3}
+              maxTraces={1000000}
               maxMembers={10}
               selectedPlan={selectedPlan}
               setSelectedPlan={setSelectedPlan}
-              subscription={subscription.data}
               traceStep={10000}
             />
             <Plan
@@ -228,40 +218,29 @@ export default function Subscription() {
               // saving={"8% saving"}
               isAnnual={billAnnually}
               hidden={!billAnnually}
-              price={651}
-              description={
-                <>
-                  For small teams improving their LLM solutions.{" "}
-                  <b>Startups only</b>{" "}
-                  <Box display="inline-block" marginBottom="-3px">
-                    <Tooltip content="Limited to companies with 1-10 employees or for personal usage.">
-                      <Info size={16} />
-                    </Tooltip>
-                  </Box>
-                </>
-              }
+              price={649}
+              description="For small teams optimizing their LLM apps"
               features={[
-                "Up to 10 workflows",
-                "10,000 Traces",
-                "6 months retention",
-                "1 Project",
-                "2 Team Members",
+                "Everything in Developer",
+                "20k traces / month included, (around 120k events), additional: €55yr / 10,000 traces(pm)",
+                "180 days data access",
+                "3 users, additional: €210yr / user",
+                "Unlimited Evaluations",
+                "Unlimited Optimizations",
+                "Slack and Email Support",
               ]}
               additionalCosts={[
-                "Additional Traces - €5pm/10,000",
-                "Additional Users - €19pm/user",
-                "Usage-based price for evaluations and guardrails",
-                ``,
+                "Additional Traces - €55pa/10,000",
+                "Additional Users - €210pa/user",
               ]}
-              additionalUserCost={19}
-              additionalTracesCost={5}
-              minTraces={10000}
-              minMembers={2}
+              additionalUserCost={210}
+              additionalTracesCost={55}
+              minTraces={20000}
+              minMembers={3}
               maxTraces={100000}
               maxMembers={10}
               selectedPlan={selectedPlan}
               setSelectedPlan={setSelectedPlan}
-              subscription={subscription.data}
               traceStep={10000}
             />
             <Plan
@@ -269,78 +248,88 @@ export default function Subscription() {
               name="Accelerate"
               recommended={true}
               hidden={billAnnually}
-              price={499}
-              description="For business with multiple teams working with LLMs"
+              price={199}
+              description="Dedicated support and security controls for larger teams"
               features={[
-                "Up to 50 workflows",
-                "100,000 Traces",
-                "1 year retention",
-                "10 Projects",
-                "10 Team Members",
+                "Everything in Launch",
+                "20k traces / month included, (around 120k events), additional: €45 / 100k traces",
+                "Up to 2 years data retention",
+                "5 users, additional: €10 / user",
+                "ISO27001 reports",
               ]}
               additionalCosts={[
-                "Additional Traces - €29pm/100,000",
+                "Additional Traces - €45pm/100,000",
                 "Additional Users - €10pm/user",
-                `Usage-based price for evaluations and guardrails`,
+              ]}
+              scaleUpFeatures={[
+                "Enterprise SSO",
+                "Hybrid Hosting (bring your own database)",
+                "Custom Data Retention",
+                "Auditing Logs",
+                "Dedicated Technical Support",
               ]}
               selectedPlan={selectedPlan}
               setSelectedPlan={setSelectedPlan}
               additionalUserCost={10}
-              additionalTracesCost={29}
-              minTraces={100000}
-              minMembers={10}
-              maxTraces={1000000}
+              additionalTracesCost={45}
+              minTraces={20000}
+              minMembers={5}
+              maxTraces={20000000}
               maxMembers={50}
               traceStep={100000}
-              subscription={subscription.data}
             />
             <Plan
               plan="ACCELERATE_ANNUAL"
               isAnnual={billAnnually}
               hidden={!billAnnually}
               recommended={true}
-              saving={"12% saving"}
-              price={5269}
+              // saving={"12% saving"}
+              price={2199}
               name="Accelerate"
               description="For business with multiple teams working with LLMs"
               features={[
-                "Up to 50 workflows",
-                "100,000 Traces",
-                "1 year retention",
-                "10 Projects",
-                "10 Team Members",
+                "Everything in Launch",
+                "20k traces / month included, (around 120k events), additional: €499yr / 100k traces(pm)",
+                "Up to 2 years data retention",
+                "5 users, additional: €110yr / user",
+                "ISO27001 reports",
               ]}
               additionalCosts={[
-                "Additional Traces - €29pm/100,000",
+                "Additional Traces - €45pm/100,000",
                 "Additional Users - €10pm/user",
-                `Usage-based price for evaluations and guardrails`,
+              ]}
+              scaleUpFeatures={[
+                "Enterprise SSO",
+                "Hybrid Hosting (bring your own database)",
+                "Custom Data Retention",
+                "Auditing Logs",
+                "Dedicated Technical Support",
               ]}
               selectedPlan={selectedPlan}
               setSelectedPlan={setSelectedPlan}
-              additionalUserCost={10}
-              additionalTracesCost={29}
-              minTraces={100000}
-              minMembers={10}
-              maxTraces={1000000}
+              additionalUserCost={110}
+              additionalTracesCost={499}
+              minTraces={20000}
+              minMembers={5}
+              maxTraces={20000000}
               maxMembers={50}
               traceStep={100000}
-              subscription={subscription.data}
             />
             <Plan
               plan="ENTERPRISE"
               name="Enterprise"
               isAnnual={billAnnually}
               price="custom"
-              description="Most scalable solution for enterprise needs"
+              description="Self-hosting, enterprise-grade support and security features"
               features={[
-                "Unlimited workflows",
-                "Custom Traces",
-                "Custom retention",
-                "Custom Projects",
-                "Custom Team Members",
-                "Self-Hosting available",
-                "RBAC control",
-                "SOC2 Reporting",
+                "Everything in Accelerate",
+                "Custom traces",
+                "Custom data retention",
+                "Custom users",
+                "Uptime & Support SLA",
+                "Custom Terms and SLA",
+                "Dedicated Support Engineer",
+                "Optional Billing via AWS Marketplace",
               ]}
               additionalCosts={["Custom"]}
               selectedPlan={selectedPlan}
@@ -373,6 +362,7 @@ function Plan({
   minMembers,
   maxMembers,
   traceStep,
+  scaleUpFeatures,
 }: {
   plan: PlanTypes;
   description: string | ReactNode;
@@ -394,6 +384,7 @@ function Plan({
   minMembers?: number;
   maxMembers?: number;
   traceStep?: number;
+  scaleUpFeatures?: string[];
 }) {
   const { organization } = useOrganizationTeamProject();
   const activePlan = api.plan.getActivePlan.useQuery(
@@ -545,6 +536,8 @@ function Plan({
     );
   };
 
+  console.log(plan);
+
   return (
     <Card.Root
       hidden={hidden}
@@ -622,30 +615,31 @@ function Plan({
               </VStack>
             </HStack>
 
-            {price === "custom" ? null : (
+            {price === "custom" ? (
+              <Text fontSize="18px">Custom</Text>
+            ) : (
               <VStack gap="0">
-                {plan === "ENTERPRISE" && (
-                  <Text alignSelf="start" marginTop="3px" color="gray.500">
-                    starting at
-                  </Text>
-                )}
                 <HStack
                   gap="2px"
                   fontSize="18px"
                   color="gray.600"
                   marginTop="-4px"
                 >
-                  <Text alignSelf="start" marginTop="3px">
-                    €
-                  </Text>
-                  <Text fontSize="22px">
-                    {typeof totalCost === "number"
-                      ? totalCost.toFixed(2)
-                      : totalCost}
-                  </Text>
-                  <Text alignSelf="end" marginBottom="3px">
-                    {isAnnual ? "/yr" : "/mo"}
-                  </Text>
+                  {totalCost != 0 ? (
+                    <>
+                      <Text fontSize="22px">
+                        {typeof totalCost === "number"
+                          ? totalCost.toFixed(2)
+                          : totalCost}
+                      </Text>
+                      <Text alignSelf="end" marginBottom="3px">
+                        {isAnnual ? "/yr" : "/mo"}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text fontSize="22px">Free</Text>
+                  )}
+
                   {isCurrentPlan && (
                     <Tag.Root colorPalette="green" marginLeft={2}>
                       <Tag.Label>Current Plan</Tag.Label>
@@ -660,14 +654,35 @@ function Plan({
             <Feature key={`feature-${index}`} label={feature as string} />
           ))}
 
-          {additionalCosts && (
+          {scaleUpFeatures && (
+            <VStack
+              gap={2}
+              align="start"
+              border="1px solid lightgray"
+              padding={2}
+              borderRadius="md"
+              paddingTop={0}
+              marginTop={4}
+            >
+              <HStack width="full" marginY={2}>
+                <Text fontWeight="bold">Scale-up Add-on</Text>
+                <Spacer />
+                <Text>+€300/mo</Text>
+              </HStack>
+
+              {scaleUpFeatures.map((feature, index) => (
+                <Feature key={`feature-${index}`} label={feature as string} />
+              ))}
+            </VStack>
+          )}
+          {/* {additionalCosts && (
             <>
               <Text fontWeight="bold" marginTop="20px">
                 Add-On Costs:
               </Text>
               {additionalCosts?.map((cost) => <Text key={cost}>{cost}</Text>)}
             </>
-          )}
+          )} */}
           {plan !== "ENTERPRISE" && plan !== "FREE" && (
             <PlanCard
               selectedMaxMessagesPerMonth={selectedMaxMessagesPerMonth ?? 0}
@@ -767,7 +782,15 @@ const getActionText = (activePlan: any, price: number | "custom") => {
 function Feature({ label, key }: { label: string; key: string }) {
   return (
     <HStack key={key} gap={2}>
-      <Check size={16} color="green" strokeWidth={3} />
+      <Box
+        width="16px"
+        height="16px"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Check size={16} color="green" strokeWidth={3} />
+      </Box>
       <Text>{label}</Text>
     </HStack>
   );
