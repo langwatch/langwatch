@@ -307,12 +307,21 @@ const store = (
         evaluator.evaluator as keyof typeof AVAILABLE_EVALUATORS
       );
       const id = nameToId(initialEvaluator.name ?? initialEvaluator.cls);
-      const firstEvaluator = current.nodes[firstEvaluatorIndex] as Node<Evaluator> | undefined ?? {
-        id,
-        type: "evaluator",
-        data: initialEvaluator,
-        position: { x: 600, y: 0 },
-      };
+
+      const previousEvaluator = current.nodes[firstEvaluatorIndex] as
+        | Node<Evaluator>
+        | undefined;
+      const hasEvaluatorChanged =
+        previousEvaluator?.data.evaluator !== evaluator.evaluator;
+      const firstEvaluator =
+        hasEvaluatorChanged || !previousEvaluator
+          ? {
+              id,
+              type: "evaluator",
+              data: initialEvaluator,
+              position: { x: 600, y: 0 },
+            }
+          : previousEvaluator;
 
       const evaluatorNode: Node<Evaluator> = {
         ...firstEvaluator,
@@ -343,6 +352,10 @@ const store = (
         ...current,
         nodes: current.nodes.map((node, index) =>
           index === firstEvaluatorIndex ? evaluatorNode : node
+        ),
+        edges: current.edges.filter(
+          (edge) =>
+            edge.target !== previousEvaluator?.id || !hasEvaluatorChanged
         ),
       };
     });

@@ -1,18 +1,9 @@
-import {
-  Accordion,
-  Grid,
-  HStack,
-  RadioCard,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import { ChevronDown } from "lucide-react";
+import { Grid, RadioCard } from "@chakra-ui/react";
 import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
-import { evaluatorCategories } from "./CategorySelectionAccordion";
-import { StepAccordion } from "../../components/StepAccordion";
 import { useAnimatedFocusElementById } from "../../../../../hooks/useAnimatedFocusElementById";
-import { LuChevronRight } from "react-icons/lu";
+import { StepAccordion } from "../../components/StepAccordion";
 import { StepRadio } from "../../components/StepButton";
+import { evaluatorCategories } from "./CategorySelectionAccordion";
 
 export const EvaluatorSelectionAccordion = ({
   setAccordeonValue,
