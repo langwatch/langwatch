@@ -9,4 +9,10 @@ metadata:
 spec:
   type: {{ .Values.redis.service.type }}
   ports:
-    - port
+    - port: {{ .Values.redis.service.port }}
+      targetPort: redis
+      protocol: TCP
+      name: redis
+  selector:
+    app.kubernetes.io/name: {{ .Release.Name }}-redis
+    app.kubernetes.io/instance: {{ .Release.Name }}

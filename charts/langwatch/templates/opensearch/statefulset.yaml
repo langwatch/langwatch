@@ -63,16 +63,6 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 30
             failureThreshold: 3
-      # Set ulimits for the container
-      initContainers:
-        - name: init-sysctl
-          image: busybox
-          command:
-            - sysctl
-            - -w
-            - vm.max_map_count=262144
-          securityContext:
-            privileged: true
       # Pod security context
       securityContext:
         fsGroup: 1000

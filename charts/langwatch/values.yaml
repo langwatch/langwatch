@@ -57,10 +57,10 @@ app:
   resources:
     requests:
       cpu: 100m
-      memory: 256Mi
+      memory: 512Mi
     limits:
       cpu: 500m
-      memory: 512Mi
+      memory: 1024Mi
   env:
     SKIP_ENV_VALIDATION: "true"
     DISABLE_PII_REDACTION: "true"
@@ -70,6 +70,13 @@ app:
     REDIS_URL: "redis://{{ .Release.Name }}-redis:6379"
     LANGWATCH_NLP_SERVICE: "http://{{ .Release.Name }}-langwatch-nlp:5561"
     LANGEVALS_ENDPOINT: "http://{{ .Release.Name }}-langevals:5562"
+    # User provided environment variables
+    BASE_HOST: "http://localhost:5560"
+    NEXTAUTH_URL: "http://localhost:5560"
+    NEXTAUTH_SECRET: ""  # Users must provide this values
+    API_TOKEN_JWT_SECRET: ""  # Users must provide this values
+    # SENDGRID_API_KEY: ""  # Optional
+
 
 langwatch_nlp:
   replicaCount: 1
@@ -85,6 +92,8 @@ langwatch_nlp:
       memory: 512Mi
   env:
     LANGWATCH_ENDPOINT: "http://{{ .Release.Name }}-app:5560"
+    # For when running on minikube on Mac OS
+    # STUDIO_RUNTIME: "async"
 
 langevals:
   replicaCount: 1
@@ -93,13 +102,11 @@ langevals:
     port: 5562
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
       cpu: 500m
-      memory: 512Mi
-  env:
-    DISABLE_EVALUATORS_PRELOAD: "true"
+      memory: 4096Mi
+    limits:
+      cpu: 1000m
+      memory: 6144Mi
 
 postgres:
   service:

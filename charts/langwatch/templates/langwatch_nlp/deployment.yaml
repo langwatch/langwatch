@@ -18,8 +18,13 @@ spec:
         app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      # Pod security context
+      securityContext:
+        {{- toYaml .Values.global.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}-langwatch-nlp
+          securityContext:
+            {{- toYaml .Values.global.containerSecurityContext | nindent 12 }}
           image: "{{ .Values.images.langwatch_nlp.repository }}:{{ .Values.images.langwatch_nlp.tag }}"
           imagePullPolicy: {{ .Values.images.langwatch_nlp.pullPolicy }}
           ports:
@@ -34,3 +39,13 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.langwatch_nlp.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+            - name: log-dir
+              mountPath: /var/log
+      volumes:
+        - name: tmp-dir
+          emptyDir: {}
+        - name: log-dir
+          emptyDir: {}

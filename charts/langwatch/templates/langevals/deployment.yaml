@@ -18,8 +18,13 @@ spec:
         app.kubernetes.io/name: {{ .Release.Name }}-langevals
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      # Pod security context
+      securityContext:
+        {{- toYaml .Values.global.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}-langevals
+          securityContext:
+            {{- toYaml .Values.global.containerSecurityContext | nindent 12 }}
           image: "{{ .Values.images.langevals.repository }}:{{ .Values.images.langevals.tag }}"
           imagePullPolicy: {{ .Values.images.langevals.pullPolicy }}
           ports:
@@ -34,3 +39,9 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.langevals.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+      volumes:
+        - name: tmp-dir
+          emptyDir: {}
