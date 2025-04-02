@@ -46,9 +46,9 @@ export type PartialEdge = Omit<Workflow["edges"][number], "target"> & {
 
 export const TASK_TYPES = {
   real_time: "Set up real-time evaluation",
-  llm_app: "Evaluate your LLM app",
+  llm_app: "Offline evaluation",
   prompt_creation: "Prompt Creation",
-  custom_evaluator: "Create Custom Evaluator",
+  custom_evaluator: "Evaluate your Evaluator",
   scan: "Scan for Vulnerabilities (Coming Soon)",
 } as const;
 
@@ -306,22 +306,35 @@ const store = (
       const initialEvaluator = convertEvaluator(
         evaluator.evaluator as keyof typeof AVAILABLE_EVALUATORS
       );
-      const firstEvaluator = current.nodes[firstEvaluatorIndex] ?? {
-        id: nameToId(initialEvaluator.name ?? initialEvaluator.cls),
-        type: "evaluator",
-        data: initialEvaluator,
-        position: { x: 600, y: 0 },
-      };
+      const id = nameToId(initialEvaluator.name ?? initialEvaluator.cls);
+
+      const previousEvaluator = current.nodes[firstEvaluatorIndex] as
+        | Node<Evaluator>
+        | undefined;
+      const hasEvaluatorChanged =
+        previousEvaluator?.data.evaluator !== evaluator.evaluator;
+      const firstEvaluator =
+        hasEvaluatorChanged || !previousEvaluator
+          ? {
+              id,
+              type: "evaluator",
+              data: initialEvaluator,
+              position: { x: 600, y: 0 },
+            }
+          : previousEvaluator;
 
       const evaluatorNode: Node<Evaluator> = {
         ...firstEvaluator,
+        id,
         data: {
-          ...(firstEvaluator.data as Evaluator),
+          ...firstEvaluator.data,
           ...evaluator,
+          name: initialEvaluator.name,
+          description: initialEvaluator.description,
           parameters:
-            evaluator.parameters ??
+            evaluator.data?.parameters ??
             // Reset parameters if not given the evaluator is not the same as the current evaluator
-            (firstEvaluator.data.cls !== evaluator.cls
+            (firstEvaluator.data.evaluator !== evaluator.evaluator
               ? []
               : firstEvaluator.data.parameters ?? []),
         },
@@ -338,6 +351,10 @@ const store = (
         ...current,
         nodes: current.nodes.map((node, index) =>
           index === firstEvaluatorIndex ? evaluatorNode : node
+        ),
+        edges: current.edges.filter(
+          (edge) =>
+            edge.target !== previousEvaluator?.id || !hasEvaluatorChanged
         ),
       };
     });

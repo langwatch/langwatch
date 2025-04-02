@@ -1,28 +1,4 @@
-import {
-  Accordion,
-  Grid,
-  HStack,
-  RadioCard,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import {
-  Brain,
-  CheckSquare,
-  ChevronDown,
-  Database,
-  Shield,
-  Star,
-} from "lucide-react";
-import {
-  useEvaluationWizardStore,
-  type EvaluatorCategory as EvaluationCategory,
-} from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
-import { OverflownTextWithTooltip } from "../../../../OverflownText";
-import { Tooltip } from "../../../../ui/tooltip";
-import type { AVAILABLE_EVALUATORS } from "../../../../../server/evaluations/evaluators.generated";
-import { StepAccordion } from "../../components/StepAccordion";
-import { StepRadio } from "../../components/StepButton";
+import { Grid, RadioCard } from "@chakra-ui/react";
 import {
   LuBrain,
   LuDatabase,
@@ -30,6 +6,14 @@ import {
   LuSquareCheckBig,
   LuStar,
 } from "react-icons/lu";
+import {
+  useEvaluationWizardStore,
+  type EvaluatorCategory as EvaluationCategory,
+} from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
+import { AVAILABLE_EVALUATORS } from "../../../../../server/evaluations/evaluators.generated";
+import { Tooltip } from "../../../../ui/tooltip";
+import { StepAccordion } from "../../components/StepAccordion";
+import { StepRadio } from "../../components/StepButton";
 
 type EvaluationCategoryConfig = {
   id: string;
@@ -55,40 +39,20 @@ export const evaluatorCategories: EvaluationCategoryConfig[] = [
     description:
       "For when you have the golden answer and want to measure how correct can the LLM get it",
     icon: <LuSquareCheckBig />,
-    evaluators: [
-      // {
-      //   id: "langevals/exact_match",
-      //   name: "Exact Match",
-      //   description:
-      //     "Compare the output with the expected answer for exact matches",
-      // },
-      {
-        id: "langevals/llm_answer_match",
-        name: "LLM Answer Match",
-        description:
-          "Use an LLM to check if the generated output answers a question correctly the same way as the expected output",
-      },
-      {
-        id: "ragas/factual_correctness",
-        name: "LLM Factual Correctness",
-        description:
-          "Computes with an LLM how factually similar the generated answer is to the expected output",
-      },
-      // {
-      //   id: "extracted_data_match",
-      //   name: "Extracted Data Match",
-      //   description:
-      //     "Compare structured data extracted from the output with expected data",
-      //   future: true,
-      // },
-      // {
-      //   id: "tool_usage",
-      //   name: "Tool Usage Evaluation",
-      //   description:
-      //     "Evaluate if the LLM is using tools correctly and effectively",
-      //   future: true,
-      // },
-    ],
+    evaluators: (
+      [
+        "langevals/exact_match",
+        "langevals/llm_answer_match",
+        "ragas/factual_correctness",
+        "ragas/sql_query_equivalence",
+        "ragas/rouge_score",
+        "ragas/bleu_score",
+      ] as const
+    ).map((evaluator) => ({
+      id: evaluator,
+      name: AVAILABLE_EVALUATORS[evaluator].name,
+      description: AVAILABLE_EVALUATORS[evaluator].description,
+    })),
     realtime: false,
   },
   {
@@ -97,65 +61,18 @@ export const evaluatorCategories: EvaluationCategoryConfig[] = [
     description:
       "For when you don't have a golden answer, but have a set of rules for another LLM to evaluate quality",
     icon: <LuBrain />,
-    evaluators: [
-      // {
-      //   id: "llm_boolean",
-      //   name: "LLM-as-a-Judge Boolean",
-      //   description:
-      //     "Use an LLM to perform true/false boolean evaluation of the message",
-      // },
-      // {
-      //   id: "llm_score",
-      //   name: "LLM-as-a-Judge Score",
-      //   description:
-      //     "Use an LLM to generate a numeric score evaluation of the message",
-      // },
-      // {
-      //   id: "llm_category",
-      //   name: "LLM-as-a-Judge Category",
-      //   description:
-      //     "Use an LLM to classify the message into custom defined categories",
-      // },
-      // {
-      //   id: "rubrics_scoring",
-      //   name: "Rubrics Based Scoring",
-      //   description:
-      //     "Evaluate responses using a rubric with descriptions for each score level",
-      // },
-    ],
-    realtime: true,
-  },
-  {
-    id: "quality",
-    name: "Quality Aspects Evaluation",
-    description:
-      "For when you want to check the language, structure, style and other general quality metrics",
-    icon: <LuStar />,
-    evaluators: [
-      // {
-      //   id: "language_detection",
-      //   name: "Language Detection",
-      //   description: "Detect and verify the language of inputs and outputs",
-      // },
-      // {
-      //   id: "summarization_score",
-      //   name: "Summarization Score",
-      //   description:
-      //     "Measure how well the summary captures important information",
-      // },
-      // {
-      //   id: "response_relevancy",
-      //   name: "Response Relevancy",
-      //   description:
-      //     "Evaluate how pertinent the generated answer is to the given prompt",
-      // },
-      // {
-      //   id: "valid_format",
-      //   name: "Valid Format",
-      //   description:
-      //     "Check if the output follows a valid format (JSON, Markdown, etc)",
-      // },
-    ],
+    evaluators: (
+      [
+        "langevals/llm_boolean",
+        "langevals/llm_score",
+        "langevals/llm_category",
+        "ragas/rubrics_based_scoring",
+      ] as const
+    ).map((evaluator) => ({
+      id: evaluator,
+      name: AVAILABLE_EVALUATORS[evaluator].name,
+      description: AVAILABLE_EVALUATORS[evaluator].description,
+    })),
     realtime: true,
   },
   {
@@ -164,31 +81,40 @@ export const evaluatorCategories: EvaluationCategoryConfig[] = [
     description:
       "For measuring the quality of your RAG, check for hallucinations with faithfulness and precision/recall",
     icon: <LuDatabase />,
-    evaluators: [
-      // {
-      //   id: "faithfulness",
-      //   name: "Ragas Faithfulness",
-      //   description:
-      //     "Assess if the generated answer is consistent with the provided context",
-      // },
-      // {
-      //   id: "context_f1",
-      //   name: "Context F1",
-      //   description:
-      //     "Balance between precision and recall for context retrieval",
-      // },
-      // {
-      //   id: "context_precision",
-      //   name: "Context Precision",
-      //   description:
-      //     "Measure how accurate the retrieval is compared to expected contexts",
-      // },
-      // {
-      //   id: "context_recall",
-      //   name: "Context Recall",
-      //   description: "Measure how many relevant contexts were retrieved",
-      // },
-    ],
+    evaluators: (
+      [
+        "ragas/faithfulness",
+        "ragas/response_relevancy",
+        "ragas/response_context_recall",
+        "ragas/response_context_precision",
+        "ragas/context_f1",
+        "ragas/context_precision",
+        "ragas/context_recall",
+      ] as const
+    ).map((evaluator) => ({
+      id: evaluator,
+      name: AVAILABLE_EVALUATORS[evaluator].name,
+      description: AVAILABLE_EVALUATORS[evaluator].description,
+    })),
+    realtime: true,
+  },
+  {
+    id: "quality",
+    name: "Quality Aspects Evaluation",
+    description:
+      "For when you want to check the language, structure, style and other general quality metrics",
+    icon: <LuStar />,
+    evaluators: (
+      [
+        "lingua/language_detection",
+        "ragas/summarization_score",
+        "langevals/valid_format",
+      ] as const
+    ).map((evaluator) => ({
+      id: evaluator,
+      name: AVAILABLE_EVALUATORS[evaluator].name,
+      description: AVAILABLE_EVALUATORS[evaluator].description,
+    })),
     realtime: true,
   },
   {
@@ -200,24 +126,19 @@ export const evaluatorCategories: EvaluationCategoryConfig[] = [
       {
         id: "presidio/pii_detection",
         name: "PII Detection",
-        description: "Detect personally identifiable information in text",
+        description: AVAILABLE_EVALUATORS["presidio/pii_detection"].description,
       },
-      // {
-      //   id: "prompt_injection",
-      //   name: "Prompt Injection Detection",
-      //   description: "Check for prompt injection attempts in the input",
-      // },
-      // {
-      //   id: "content_safety",
-      //   name: "Content Safety",
-      //   description:
-      //     "Detect potentially unsafe content including hate speech and violence",
-      // },
-      // {
-      //   id: "moderation",
-      //   name: "Moderation",
-      //   description: "Check for harmful content using OpenAI's moderation API",
-      // },
+      {
+        id: "azure/prompt_injection",
+        name: "Prompt Injection / Jailbreak Detection",
+        description:
+          "Detect prompt injection attempts and jailbreak attempts in the input",
+      },
+      {
+        id: "azure/content_safety",
+        name: "Content Safety",
+        description: AVAILABLE_EVALUATORS["azure/content_safety"].description,
+      },
     ],
     realtime: true,
   },

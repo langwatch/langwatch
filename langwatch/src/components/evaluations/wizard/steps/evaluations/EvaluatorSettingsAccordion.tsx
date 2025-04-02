@@ -1,6 +1,6 @@
 import { Accordion, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { z } from "zod";
 import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
@@ -88,12 +88,25 @@ export const EvaluatorSettingsAccordion = () => {
     [evaluatorType, setFirstEvaluator]
   );
 
+  const formRenderedFor = useRef<string>(evaluatorType);
+
   useEffect(() => {
-    form.watch(() => {
+    formRenderedFor.current = undefined;
+    setTimeout(() => {
+      formRenderedFor.current = evaluatorType ?? '';
+    }, 300);
+  }, [evaluatorType]);
+
+  useEffect(() => {
+    const watcher = form.watch(() => {
+      if (!formRenderedFor.current) return;
       void form.handleSubmit(onSubmit)();
     });
+    return () => {
+      watcher.unsubscribe();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form]);
+  }, [form, onSubmit]);
 
   return (
     <StepAccordion

@@ -199,23 +199,15 @@ export function EvaluationResults({
     setSelectedRunId,
   });
 
-  if (experiment.isError && experiment.error.data?.httpStatus === 404) {
+  if (
+    (experiment.isError && experiment.error.data?.httpStatus === 404) ||
+    batchEvaluationRuns.data?.runs.length === 0 ||
+    !experiment.data ||
+    !project
+  ) {
     if (keepFetching) {
       return <Text padding={4}>Loading...</Text>;
     }
-    return <Text padding={4}>No evaluations started yet</Text>;
-  }
-
-  if (experiment.isError) {
-    return (
-      <Alert.Root status="error">
-        <Alert.Indicator />
-        Error loading evaluation results
-      </Alert.Root>
-    );
-  }
-
-  if (!experiment.data || !project) {
     return (
       <Center width="full" height="full">
         <EmptyState.Root marginTop="-60px">
@@ -230,6 +222,15 @@ export function EvaluationResults({
           </EmptyState.Content>
         </EmptyState.Root>
       </Center>
+    );
+  }
+
+  if (experiment.isError) {
+    return (
+      <Alert.Root status="error">
+        <Alert.Indicator />
+        Error loading evaluation results
+      </Alert.Root>
     );
   }
 
