@@ -325,7 +325,6 @@ const store = (
 
       const evaluatorNode: Node<Evaluator> = {
         ...firstEvaluator,
-        // TODO: always rewire edges
         id,
         data: {
           ...firstEvaluator.data,
