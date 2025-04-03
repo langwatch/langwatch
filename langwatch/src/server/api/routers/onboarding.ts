@@ -10,7 +10,7 @@ import { projectRouter } from "./project";
 /**
  * Input schema for organization signup data
  */
-const signUpDataSchema = z.object({
+export const signUpDataSchema = z.object({
   usage: z.string().optional().nullable(),
   solution: z.string().optional().nullable(),
   terms: z.boolean().optional(),
@@ -30,10 +30,10 @@ const signUpDataSchema = z.object({
 export const onboardingRouter = createTRPCRouter({
   /**
    * Initializes an organization and its associated project.
-   * 
+   *
    * This procedure handles the creation of a new organization and assigns it to a user.
    * It also creates a project under the newly created organization.
-   * 
+   *
    * @throws {TRPCError} - Throws an error if organization or project creation fails.
    */
   initializeOrganization: protectedProcedure
@@ -43,7 +43,7 @@ export const onboardingRouter = createTRPCRouter({
         orgName: z.string().optional(),
         phoneNumber: z.string().optional(),
         signUpData: signUpDataSchema.optional(),
-        
+
         // Project details
         projectName: z.string().optional(),
         language: z.string().default("other"),
@@ -58,6 +58,7 @@ export const onboardingRouter = createTRPCRouter({
         const orgResult = await orgRouter.createAndAssign({
           orgName: input.orgName,
           phoneNumber: input.phoneNumber,
+          signUpData: input.signUpData,
         });
         if (!orgResult.success) {
           throw new TRPCError({
@@ -86,7 +87,10 @@ export const onboardingRouter = createTRPCRouter({
         // Execute post-registration callback if defined
         if (dependencies.postRegistrationCallback) {
           try {
-            await dependencies.postRegistrationCallback(ctx.session.user, input);
+            await dependencies.postRegistrationCallback(
+              ctx.session.user,
+              input
+            );
           } catch (err) {
             Sentry.captureException(err);
           }
@@ -103,4 +107,4 @@ export const onboardingRouter = createTRPCRouter({
         throw error;
       }
     }),
-}); 
+});
