@@ -24,6 +24,7 @@ import {
 import * as Sentry from "@sentry/nextjs";
 import { env } from "~/env.mjs";
 import { signUpDataSchema } from "./onboarding";
+import { dependencies } from "../../../injection/dependencies.server";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
