@@ -13,6 +13,7 @@ import {
   FilePlus,
   FileText,
   Folder,
+  Upload,
   UploadCloud,
 } from "react-feather";
 import {
@@ -27,6 +28,7 @@ import { OverflownTextWithTooltip } from "../../../OverflownText";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { StepAccordion } from "../components/StepAccordion";
 import { useAnimatedFocusElementById } from "../../../../hooks/useAnimatedFocusElementById";
+import { useDrawer } from "~/components/CurrentDrawer";
 
 export function DatasetStep() {
   const { setWizardState, wizardState, setDatasetId, getDatasetId } =
@@ -36,6 +38,8 @@ export function DatasetStep() {
   const [accordeonValue, setAccordeonValue] = useState(
     wizardState.dataSource ? ["configuration"] : ["data-source"]
   );
+
+  const { openDrawer } = useDrawer();
 
   // Fetch datasets
   const datasets = api.dataset.getAll.useQuery(
@@ -70,6 +74,14 @@ export function DatasetStep() {
     setWizardState({
       step: "execution",
       dataSource,
+    });
+  };
+
+  // Handle CSV upload success
+  const handleCSVUploadSuccess = (datasetId: string) => {
+    setDatasetId(datasetId, []);
+    setWizardState({
+      step: "execution",
     });
   };
 
@@ -263,12 +275,19 @@ export function DatasetStep() {
 
               {wizardState.dataSource === "upload" && (
                 <VStack width="full" align="start" gap={3}>
-                  <Text>Configure CSV upload settings</Text>
                   <Button
-                    colorPalette="orange"
-                    onClick={() => handleContinue("upload")}
+                    colorPalette="gray"
+                    minWidth="fit-content"
+                    onClick={() =>
+                      openDrawer("uploadCSV", {
+                        onSuccess: ({ datasetId }) => {
+                          handleCSVUploadSuccess(datasetId);
+                        },
+                      })
+                    }
                   >
-                    Continue to Upload
+                    <Upload height={17} width={17} strokeWidth={2.5} />
+                    Upload or Create Dataset
                   </Button>
                 </VStack>
               )}

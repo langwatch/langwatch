@@ -242,6 +242,7 @@ function CSVReaderBox({
       borderStyle="dashed"
       padding={10}
       textAlign="center"
+      cursor="pointer"
     >
       {acceptedFile ? (
         <>
