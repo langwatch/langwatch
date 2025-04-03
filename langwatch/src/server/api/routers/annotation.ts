@@ -10,6 +10,7 @@ import {
   checkPermissionOrPubliclyShared,
   checkUserPermissionForProject,
 } from "../permission";
+import { getTracesWithSpans } from "./traces";
 const scoreOptionSchema = z.object({
   value: z
     .union([z.string(), z.array(z.string())])
@@ -296,23 +297,8 @@ export const annotationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.annotationQueueItem.findMany({
+      const queueItems = await ctx.prisma.annotationQueueItem.findMany({
         where: { projectId: input.projectId },
-        include: {
-          annotationQueue: true,
-          createdByUser: true,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
-    }),
-  getDoneQueueItems: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
-    .query(async ({ ctx, input }) => {
-      return ctx.prisma.annotationQueueItem.findMany({
-        where: { projectId: input.projectId, doneAt: { not: null } },
         include: {
           annotationQueue: {
             include: {
@@ -325,6 +311,13 @@ export const annotationRouter = createTRPCRouter({
           createdAt: "desc",
         },
       });
+
+      const traceIds = queueItems.map((item) => item.traceId);
+      const traces = await getTracesWithSpans(input.projectId, traceIds);
+      return queueItems.map((item) => ({
+        ...item,
+        trace: traces.find((trace) => trace.trace_id === item.traceId),
+      }));
     }),
   createQueueItem: protectedProcedure
     .input(
