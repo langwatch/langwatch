@@ -13,7 +13,6 @@ import {
   FilePlus,
   FileText,
   Folder,
-  Upload,
   UploadCloud,
 } from "react-feather";
 import {
@@ -28,7 +27,6 @@ import { OverflownTextWithTooltip } from "../../../OverflownText";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { StepAccordion } from "../components/StepAccordion";
 import { useAnimatedFocusElementById } from "../../../../hooks/useAnimatedFocusElementById";
-import { useDrawer } from "~/components/CurrentDrawer";
 import { InlineUploadCSVForm } from "~/components/datasets/UploadCSVModal";
 
 export function DatasetStep() {
@@ -39,8 +37,6 @@ export function DatasetStep() {
   const [accordeonValue, setAccordeonValue] = useState(
     wizardState.dataSource ? ["configuration"] : ["data-source"]
   );
-
-  const { openDrawer } = useDrawer();
 
   // Fetch datasets
   const datasets = api.dataset.getAll.useQuery(
@@ -79,8 +75,11 @@ export function DatasetStep() {
   };
 
   // Handle CSV upload success
-  const handleCSVUploadSuccess = (datasetId: string) => {
-    setDatasetId(datasetId, []);
+  const handleCSVUploadSuccess = (
+    datasetId: string,
+    columnTypes: DatasetColumns
+  ) => {
+    setDatasetId(datasetId, columnTypes);
     setWizardState({
       step: "execution",
     });
@@ -275,8 +274,8 @@ export function DatasetStep() {
 
               {wizardState.dataSource === "upload" && (
                 <InlineUploadCSVForm
-                  onSuccess={({ datasetId }) => {
-                    handleCSVUploadSuccess(datasetId);
+                  onSuccess={({ datasetId, columnTypes }) => {
+                    handleCSVUploadSuccess(datasetId, columnTypes);
                   }}
                 />
               )}
