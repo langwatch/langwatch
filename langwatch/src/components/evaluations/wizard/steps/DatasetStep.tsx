@@ -29,6 +29,7 @@ import type { DatasetColumns } from "../../../../server/datasets/types";
 import { StepAccordion } from "../components/StepAccordion";
 import { useAnimatedFocusElementById } from "../../../../hooks/useAnimatedFocusElementById";
 import { useDrawer } from "~/components/CurrentDrawer";
+import { InlineUploadCSVForm } from "~/components/datasets/UploadCSVModal";
 
 export function DatasetStep() {
   const { setWizardState, wizardState, setDatasetId, getDatasetId } =
@@ -273,22 +274,11 @@ export function DatasetStep() {
               )}
 
               {wizardState.dataSource === "upload" && (
-                <VStack width="full" align="start" gap={3}>
-                  <Button
-                    colorPalette="gray"
-                    minWidth="fit-content"
-                    onClick={() =>
-                      openDrawer("uploadCSV", {
-                        onSuccess: ({ datasetId }) => {
-                          handleCSVUploadSuccess(datasetId);
-                        },
-                      })
-                    }
-                  >
-                    <Upload height={17} width={17} strokeWidth={2.5} />
-                    Upload or Create Dataset
-                  </Button>
-                </VStack>
+                <InlineUploadCSVForm
+                  onSuccess={({ datasetId }) => {
+                    handleCSVUploadSuccess(datasetId);
+                  }}
+                />
               )}
             </StepAccordion>
           )}
