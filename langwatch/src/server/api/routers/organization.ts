@@ -23,6 +23,7 @@ import {
 } from "../permission";
 import * as Sentry from "@sentry/nextjs";
 import { env } from "~/env.mjs";
+import { signUpDataSchema } from "./onboarding";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
@@ -74,6 +75,7 @@ export const organizationRouter = createTRPCRouter({
       z.object({
         orgName: z.string().optional(),
         phoneNumber: z.string().optional(),
+        signUpData: signUpDataSchema.optional(),
       })
     )
     .use(skipPermissionCheck)
@@ -98,48 +100,50 @@ export const organizationRouter = createTRPCRouter({
         "-" +
         teamNanoId.substring(0, 6);
 
-      const { organization, team } = await prisma.$transaction(async (prisma) => {
-        // 1. Create the organization
-        const organization = await prisma.organization.create({
-          data: {
-            id: orgId,
-            name: orgName,
-            slug: orgSlug,
-            phoneNumber: input.phoneNumber,
-            signupData: input.signUpData,
-          },
-        });
+      const { organization, team } = await prisma.$transaction(
+        async (prisma) => {
+          // 1. Create the organization
+          const organization = await prisma.organization.create({
+            data: {
+              id: orgId,
+              name: orgName,
+              slug: orgSlug,
+              phoneNumber: input.phoneNumber,
+              signupData: input.signUpData,
+            },
+          });
 
-        // 2. Assign the user to the organization
-        await prisma.organizationUser.create({
-          data: {
-            userId: userId,
-            organizationId: organization.id,
-            role: "ADMIN", // Assuming the user becomes an admin of the created organization
-          },
-        });
+          // 2. Assign the user to the organization
+          await prisma.organizationUser.create({
+            data: {
+              userId: userId,
+              organizationId: organization.id,
+              role: "ADMIN", // Assuming the user becomes an admin of the created organization
+            },
+          });
 
-        // 3. Create the default team
-        const team = await prisma.team.create({
-          data: {
-            id: teamId,
-            name: orgName, // Same name as organization
-            slug: teamSlug, // Same as organization
-            organizationId: organization.id,
-          },
-        });
+          // 3. Create the default team
+          const team = await prisma.team.create({
+            data: {
+              id: teamId,
+              name: orgName, // Same name as organization
+              slug: teamSlug, // Same as organization
+              organizationId: organization.id,
+            },
+          });
 
-        // 4. Assign the user to the team
-        await prisma.teamUser.create({
-          data: {
-            userId: userId,
-            teamId: team.id,
-            role: "ADMIN", // Assuming the user becomes an admin of the created team
-          },
-        });
+          // 4. Assign the user to the team
+          await prisma.teamUser.create({
+            data: {
+              userId: userId,
+              teamId: team.id,
+              role: "ADMIN", // Assuming the user becomes an admin of the created team
+            },
+          });
 
-        return { organization, team };
-      });
+          return { organization, team };
+        }
+      );
 
       return {
         success: true,
