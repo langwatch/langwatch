@@ -139,6 +139,15 @@ export function DatasetStep() {
                 />
 
                 <StepRadio
+                  value="upload"
+                  title={DATA_SOURCE_TYPES.upload}
+                  description="Upload your pre-existing dataset from Excel or CSV"
+                  _icon={{ color: "blue.400" }}
+                  icon={<UploadCloud />}
+                  onClick={() => handleDataSourceSelect("upload")}
+                />
+
+                <StepRadio
                   value="from_production"
                   title={DATA_SOURCE_TYPES.from_production}
                   description="Import tracing data from production to test the evaluator"
@@ -156,16 +165,6 @@ export function DatasetStep() {
                   icon={<FilePlus />}
                   disabled
                   onClick={() => handleDataSourceSelect("manual")}
-                />
-
-                <StepRadio
-                  value="upload"
-                  title={DATA_SOURCE_TYPES.upload}
-                  description="Upload your pre-existing dataset from Excel or CSV"
-                  _icon={{ color: "blue.400" }}
-                  icon={<UploadCloud />}
-                  disabled
-                  onClick={() => handleDataSourceSelect("upload")}
                 />
               </VStack>
             </RadioCard.Root>
