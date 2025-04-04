@@ -27,6 +27,7 @@ import { OverflownTextWithTooltip } from "../../../OverflownText";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { StepAccordion } from "../components/StepAccordion";
 import { useAnimatedFocusElementById } from "../../../../hooks/useAnimatedFocusElementById";
+import { InlineUploadCSVForm } from "~/components/datasets/UploadCSVModal";
 
 export function DatasetStep() {
   const { setWizardState, wizardState, setDatasetId, getDatasetId } =
@@ -70,6 +71,17 @@ export function DatasetStep() {
     setWizardState({
       step: "execution",
       dataSource,
+    });
+  };
+
+  // Handle CSV upload success
+  const handleCSVUploadSuccess = (
+    datasetId: string,
+    columnTypes: DatasetColumns
+  ) => {
+    setDatasetId(datasetId, columnTypes);
+    setWizardState({
+      step: "execution",
     });
   };
 
@@ -127,6 +139,15 @@ export function DatasetStep() {
                 />
 
                 <StepRadio
+                  value="upload"
+                  title={DATA_SOURCE_TYPES.upload}
+                  description="Upload your pre-existing dataset from Excel or CSV"
+                  _icon={{ color: "blue.400" }}
+                  icon={<UploadCloud />}
+                  onClick={() => handleDataSourceSelect("upload")}
+                />
+
+                <StepRadio
                   value="from_production"
                   title={DATA_SOURCE_TYPES.from_production}
                   description="Import tracing data from production to test the evaluator"
@@ -144,16 +165,6 @@ export function DatasetStep() {
                   icon={<FilePlus />}
                   disabled
                   onClick={() => handleDataSourceSelect("manual")}
-                />
-
-                <StepRadio
-                  value="upload"
-                  title={DATA_SOURCE_TYPES.upload}
-                  description="Upload your pre-existing dataset from Excel or CSV"
-                  _icon={{ color: "blue.400" }}
-                  icon={<UploadCloud />}
-                  disabled
-                  onClick={() => handleDataSourceSelect("upload")}
                 />
               </VStack>
             </RadioCard.Root>
@@ -262,15 +273,11 @@ export function DatasetStep() {
               )}
 
               {wizardState.dataSource === "upload" && (
-                <VStack width="full" align="start" gap={3}>
-                  <Text>Configure CSV upload settings</Text>
-                  <Button
-                    colorPalette="orange"
-                    onClick={() => handleContinue("upload")}
-                  >
-                    Continue to Upload
-                  </Button>
-                </VStack>
+                <InlineUploadCSVForm
+                  onSuccess={({ datasetId, columnTypes }) => {
+                    handleCSVUploadSuccess(datasetId, columnTypes);
+                  }}
+                />
               )}
             </StepAccordion>
           )}

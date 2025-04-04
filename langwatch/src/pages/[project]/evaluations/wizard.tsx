@@ -13,6 +13,7 @@ import { useShallow } from "zustand/react/shallow";
 import { LoadingScreen } from "../../../components/LoadingScreen";
 import useAutosaveWizard from "../../../components/evaluations/wizard/hooks/useAutosaveWizard";
 import { useInitialLoadExperiment } from "../../../components/evaluations/wizard/hooks/useInitialLoadExperiment";
+import { CurrentDrawer } from "../../../components/CurrentDrawer";
 
 export default function EvaluationWizard() {
   const { open, setOpen } = useDisclosure();
@@ -71,6 +72,7 @@ export default function EvaluationWizard() {
           }
         />
       </Dialog.Root>
+      <CurrentDrawer />
     </>
   );
 }
