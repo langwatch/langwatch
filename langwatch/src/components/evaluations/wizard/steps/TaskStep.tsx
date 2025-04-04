@@ -58,9 +58,7 @@ export function TaskStep() {
             value="llm_app"
             title={TASK_TYPES.llm_app}
             description="Run a batch evaluation of dataset examples against your existing LLM application"
-            // Disabled for now
-            // onClick={() => handleTaskSelection("llm_app")}
-            disabled
+            onClick={() => handleTaskSelection("llm_app")}
             icon={
               <ColorfulBlockIcon
                 color="blue.400"
