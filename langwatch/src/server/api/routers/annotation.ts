@@ -10,6 +10,7 @@ import {
   checkPermissionOrPubliclyShared,
   checkUserPermissionForProject,
 } from "../permission";
+import { getTracesWithSpans } from "./traces";
 const scoreOptionSchema = z.object({
   value: z
     .union([z.string(), z.array(z.string())])
@@ -268,7 +269,7 @@ export const annotationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.annotationQueue.findMany({
+      const queues = await ctx.prisma.annotationQueue.findMany({
         where: { projectId: input.projectId },
         include: {
           members: {
@@ -291,28 +292,31 @@ export const annotationRouter = createTRPCRouter({
           createdAt: "desc",
         },
       });
+
+      const traceIds = [
+        ...new Set(
+          queues.flatMap((queue) =>
+            queue.AnnotationQueueItems.map((item) => item.traceId)
+          )
+        ),
+      ];
+      const traces = await getTracesWithSpans(input.projectId, traceIds);
+      const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
+
+      return queues.map((queue) => ({
+        ...queue,
+        AnnotationQueueItems: queue.AnnotationQueueItems.map((item) => ({
+          ...item,
+          trace: traceMap.get(item.traceId) || null,
+        })),
+      }));
     }),
   getQueueItems: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.annotationQueueItem.findMany({
+      const queueItems = await ctx.prisma.annotationQueueItem.findMany({
         where: { projectId: input.projectId },
-        include: {
-          annotationQueue: true,
-          createdByUser: true,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
-    }),
-  getDoneQueueItems: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
-    .query(async ({ ctx, input }) => {
-      return ctx.prisma.annotationQueueItem.findMany({
-        where: { projectId: input.projectId, doneAt: { not: null } },
         include: {
           annotationQueue: {
             include: {
@@ -325,6 +329,15 @@ export const annotationRouter = createTRPCRouter({
           createdAt: "desc",
         },
       });
+
+      const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
+      const traces = await getTracesWithSpans(input.projectId, traceIds);
+      const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
+
+      return queueItems.map((item) => ({
+        ...item,
+        trace: traceMap.get(item.traceId) || null,
+      }));
     }),
   createQueueItem: protectedProcedure
     .input(
