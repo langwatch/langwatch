@@ -59,14 +59,22 @@ export const DATA_SOURCE_TYPES = {
   upload: "Upload CSV",
 } as const;
 
+export const OFFLINE_EXECUTION_METHODS = {
+  offline_prompt: "Create a prompt",
+  offline_http: "Call an HTTP endpoint",
+  offline_workflow: "Create a Workflow",
+  offline_notebook: "Run on Notebook or CI/CD Pipeline",
+  offline_code_execution: "Run code",
+} as const;
+
+export type OfflineExecutionMethod = keyof typeof OFFLINE_EXECUTION_METHODS;
+
 export const EXECUTION_METHODS = {
   realtime_on_message: "When a message arrives",
   realtime_guardrail: "As a guardrail",
   realtime_manually: "Manually",
 
-  prompt: "Create a prompt",
-  http_endpoint: "Call an HTTP endpoint",
-  create_a_workflow: "Create a Workflow",
+  ...OFFLINE_EXECUTION_METHODS,
   api: "Run on Notebook or CI/CD Pipeline",
 } as const;
 

@@ -2,6 +2,7 @@ import { Heading, Text, VStack } from "@chakra-ui/react";
 import { useShallow } from "zustand/react/shallow";
 import { useEvaluationWizardStore } from "../hooks/useEvaluationWizardStore";
 import { RealTimeExecutionStep } from "./execution/RealTimeExecutionStep";
+import { OfflineExecutionStep } from "./execution/OfflineExecutionStep";
 
 export function ExecutionStep() {
   const { task } = useEvaluationWizardStore(
@@ -24,6 +25,7 @@ export function ExecutionStep() {
             : "How to do the LLM execution"}
         </Text>
         {task === "real_time" && <RealTimeExecutionStep />}
+        {task === "llm_app" && <OfflineExecutionStep />}
       </VStack>
     </VStack>
   );

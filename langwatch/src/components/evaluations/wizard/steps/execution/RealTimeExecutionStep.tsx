@@ -167,6 +167,7 @@ export function RealTimeExecutionStep() {
             colorPalette="orange"
             value={executionMethod}
             onValueChange={(e) =>
+              // TODO: Isn't this redundant?
               handleRealTimeExecutionMethodSelect(
                 e.value as
                   | "realtime_on_message"
