@@ -145,6 +145,9 @@ model Organization {
     usageSpendingMaxLimit Int?
     signupData            Json?
     signedDPA             Boolean              @default(false)
+    elasticsearchNodeUrl  String?
+    elasticsearchApiKey   String?
+    useElasticsearch      Boolean              @default(false)
 
     promoCode String?
     features  OrganizationFeature[]

@@ -5,6 +5,9 @@ import { env } from "../env.mjs";
 import { patchForOpensearchCompatibility } from "./elasticsearch/opensearchCompatibility";
 import { patchForQuickwitCompatibility } from "./elasticsearch/quickwitCompatibility";
 
+import { getServerSession } from "next-auth";
+import { authOptions } from "./auth";
+
 export type IndexSpec = {
   alias: string;
   base: string;
@@ -27,21 +30,55 @@ export const BATCH_EVALUATION_INDEX: IndexSpec = {
   alias: "search-batch-evaluations-alias",
 };
 
-export const esClient =
-  !!env.IS_OPENSEARCH || !!env.IS_QUICKWIT
-    ? (new OpenSearchClient({
-        node: env.ELASTICSEARCH_NODE_URL?.replace("quickwit://", "http://"),
-      }) as unknown as ElasticClient)
-    : new ElasticClient({
-        node: env.ELASTICSEARCH_NODE_URL ?? "http://bogus:9200",
-        ...(env.ELASTICSEARCH_API_KEY
-          ? {
-              auth: {
-                apiKey: env.ELASTICSEARCH_API_KEY,
-              },
-            }
-          : {}),
-      });
+export const esClient = async () => {
+  const session = await getServerSession(authOptions);
+  console.log("Session in server component:", session);
+
+  // Create a client with session context if needed
+  const client =
+    !!env.IS_OPENSEARCH || !!env.IS_QUICKWIT
+      ? (new OpenSearchClient({
+          node: env.ELASTICSEARCH_NODE_URL?.replace("quickwit://", "http://"),
+        }) as unknown as ElasticClient)
+      : new ElasticClient({
+          node: env.ELASTICSEARCH_NODE_URL ?? "http://bogus:9200",
+          ...(env.ELASTICSEARCH_API_KEY
+            ? {
+                auth: {
+                  apiKey: env.ELASTICSEARCH_API_KEY,
+                },
+              }
+            : {}),
+        });
+
+  // Apply patches to this specific client instance
+  if (env.IS_OPENSEARCH) {
+    patchForOpensearchCompatibility(client);
+  }
+
+  if (env.IS_QUICKWIT) {
+    patchForOpensearchCompatibility(client);
+    patchForQuickwitCompatibility(client);
+  }
+
+  return client;
+};
+
+// export const esClient =
+//   !!env.IS_OPENSEARCH || !!env.IS_QUICKWIT
+//     ? (new OpenSearchClient({
+//         node: env.ELASTICSEARCH_NODE_URL?.replace("quickwit://", "http://"),
+//       }) as unknown as ElasticClient)
+//     : new ElasticClient({
+//         node: env.ELASTICSEARCH_NODE_URL ?? "http://bogus:9200",
+//         ...(env.ELASTICSEARCH_API_KEY
+//           ? {
+//               auth: {
+//                 apiKey: env.ELASTICSEARCH_API_KEY,
+//               },
+//             }
+//           : {}),
+//       });
 
 export const FLATENNED_TYPE = env.IS_OPENSEARCH ? "flat_object" : "flattened";
 

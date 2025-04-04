@@ -251,6 +251,8 @@ export const organizationRouter = createTRPCRouter({
       z.object({
         organizationId: z.string(),
         name: z.string(),
+        elasticsearchNodeUrl: z.string().optional(),
+        elasticsearchApiKey: z.string().optional(),
       })
     )
     .use(
@@ -283,6 +285,8 @@ export const organizationRouter = createTRPCRouter({
         },
         data: {
           name: input.name,
+          elasticsearchNodeUrl: input.elasticsearchNodeUrl,
+          elasticsearchApiKey: input.elasticsearchApiKey,
         },
       });
 
