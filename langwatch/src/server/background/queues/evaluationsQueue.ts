@@ -148,7 +148,8 @@ export const updateEvaluationStatusInES = async ({
   // Random delay to avoid elasticsearch update collisions
   await new Promise((resolve) => setTimeout(resolve, Math.random() * 1000));
 
-  await esClient.update({
+  const client = await esClient(undefined, trace.project_id);
+  await client.update({
     index: TRACE_INDEX.alias,
     id: traceIndexId({
       traceId: trace.trace_id,

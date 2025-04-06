@@ -196,7 +196,8 @@ export const timeseries = async (input: TimeseriesInputType) => {
           } as any),
   };
 
-  const result = (await esClient.search({
+  const client = await esClient(undefined, input.projectId);
+  const result = (await client.search({
     index: TRACE_INDEX.alias,
     body: queryBody,
   })) as any;

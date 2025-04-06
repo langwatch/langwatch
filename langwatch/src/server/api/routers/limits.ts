@@ -62,7 +62,7 @@ export const getOrganizationProjectsCount = async (organizationId: string) => {
 };
 
 export const getCurrentMonthMessagesCount = async (projectIds: string[]) => {
-  const client = await esClient();
+  const client = await esClient(undefined, projectIds[0]);
   const messagesCount = await client.count({
     index: TRACE_INDEX.alias,
     body: {

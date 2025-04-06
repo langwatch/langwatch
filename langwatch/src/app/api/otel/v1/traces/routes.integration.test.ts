@@ -27,7 +27,8 @@ describe("opentelemetry traces receiver", () => {
   beforeAll(async () => {
     project = await getTestProject("collect");
 
-    await esClient.deleteByQuery({
+    const client = await esClient();
+    await client.deleteByQuery({
       index: TRACE_INDEX.alias,
       body: {
         query: {

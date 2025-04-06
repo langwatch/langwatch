@@ -18,7 +18,8 @@ export const feedbacks = protectedProcedure
   .query(async ({ input }) => {
     const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
 
-    const result = await esClient.search<ElasticSearchTrace>({
+    const client = await esClient(undefined, input.projectId);
+    const result = await client.search<ElasticSearchTrace>({
       index: TRACE_INDEX.alias,
       size: 100,
       body: {

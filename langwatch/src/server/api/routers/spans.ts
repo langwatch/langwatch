@@ -23,7 +23,8 @@ export const spansRouter = createTRPCRouter({
       )
     )
     .query(async ({ input }) => {
-      const result = await esClient.search<ElasticSearchTrace>({
+      const client = await esClient(undefined, input.projectId);
+      const result = await client.search<ElasticSearchTrace>({
         index: TRACE_INDEX.alias,
         size: 50,
         body: {

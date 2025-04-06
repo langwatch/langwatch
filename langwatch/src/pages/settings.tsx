@@ -81,6 +81,8 @@ function SettingsForm({
         {
           organizationId: organization.id,
           name: data.name,
+          elasticsearchNodeUrl: data.elasticsearchNodeUrl,
+          elasticsearchApiKey: data.elasticsearchApiKey,
         },
         {
           onSuccess: () => {

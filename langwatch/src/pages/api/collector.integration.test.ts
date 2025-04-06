@@ -52,13 +52,13 @@ describe("Collector API Endpoint", () => {
 
   beforeAll(async () => {
     project = await getTestProject("collect");
-
-    await esClient.deleteByQuery({
+    const client = await esClient();
+    await client.deleteByQuery({
       index: TRACE_INDEX.alias,
       body: {
         query: {
           match: {
-            project_id: project.id,
+            project_id: project?.id,
           },
         },
       },
@@ -100,7 +100,8 @@ describe("Collector API Endpoint", () => {
     expect(res.statusCode).toBe(200);
 
     const indexedTrace = await waitForResult(async () => {
-      const trace = await esClient.getSource<ElasticSearchTrace>({
+      const client = await esClient();
+      const trace = await client.getSource<ElasticSearchTrace>({
         index: TRACE_INDEX.alias,
         id: traceIndexId({
           traceId: sampleSpan.trace_id,
@@ -345,7 +346,8 @@ describe("Collector API Endpoint", () => {
     expect(res.statusCode).toBe(200);
 
     const indexedRagTrace = await waitForResult(async () => {
-      const trace = await esClient.getSource<ElasticSearchTrace>({
+      const client = await esClient();
+      const trace = await client.getSource<ElasticSearchTrace>({
         index: TRACE_INDEX.alias,
         id: traceIndexId({
           traceId,
@@ -438,7 +440,8 @@ describe("Collector API Endpoint", () => {
     expect(res.statusCode).toBe(200);
 
     const indexedRagTrace = await waitForResult(async () => {
-      const trace = await esClient.getSource<ElasticSearchTrace>({
+      const client = await esClient();
+      const trace = await client.getSource<ElasticSearchTrace>({
         index: TRACE_INDEX.alias,
         id: traceIndexId({
           traceId,
@@ -506,15 +509,16 @@ describe("Collector API Endpoint", () => {
     await handler(req, res);
     expect(res.statusCode).toBe(200);
 
-    const indexedTrace = await waitForResult(() =>
-      esClient.getSource<ElasticSearchTrace>({
+    const indexedTrace = await waitForResult(async () => {
+      const client = await esClient();
+      return client.getSource<ElasticSearchTrace>({
         index: TRACE_INDEX.alias,
         id: traceIndexId({
           traceId,
           projectId: project?.id ?? "",
         }),
-      })
-    );
+      });
+    });
 
     expect(indexedTrace).toMatchObject({
       input: {
@@ -583,7 +587,8 @@ describe("Collector API Endpoint", () => {
     expect(res.statusCode).toBe(200);
 
     const indexedTraceWithEvaluations = await waitForResult(async () => {
-      const trace = await esClient.getSource<ElasticSearchTrace>({
+      const client = await esClient();
+      const trace = await client.getSource<ElasticSearchTrace>({
         index: TRACE_INDEX.alias,
         id: traceIndexId({
           traceId,

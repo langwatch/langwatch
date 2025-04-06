@@ -11,10 +11,11 @@ export const sessionsVsPreviousPeriod = protectedProcedure
   .input(sharedFiltersInputSchema)
   .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
   .query(async ({ input }) => {
+    const client = await esClient(undefined, input.projectId);
     const { previousPeriodStartDate } = currentVsPreviousDates(input);
 
     const sessionsQuery = (startDate: number, endDate: number) =>
-      esClient.search({
+      client.search({
         index: TRACE_INDEX.alias,
         body: {
           aggs: {

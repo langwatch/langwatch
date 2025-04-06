@@ -251,7 +251,8 @@ const processCollectorJob_ = async (
   let existingEvaluations: Evaluation[] | undefined;
   if (existingTrace?.inserted_at) {
     // TODO: check for quickwit
-    const existingTraceResponse = await esClient.search<ElasticSearchTrace>({
+    const client = await esClient(undefined, project.id);
+    const existingTraceResponse = await client.search<ElasticSearchTrace>({
       index: TRACE_INDEX.alias,
       body: {
         size: 1,
@@ -392,7 +393,8 @@ const updateTrace = async (
   evaluations: Evaluation[] | undefined
 ) => {
   if (env.IS_QUICKWIT) {
-    return await esClient.update({
+    const client = await esClient(undefined, trace.project_id);
+    return await client.update({
       index: TRACE_INDEX.alias,
       id: traceIndexId({
         traceId: trace.trace_id,
@@ -409,7 +411,8 @@ const updateTrace = async (
   }
 
   try {
-    await esClient.update({
+    const client = await esClient(undefined, trace.project_id);
+    await client.update({
       index: TRACE_INDEX.alias,
       id: traceIndexId({
         traceId: trace.trace_id,
@@ -536,7 +539,8 @@ export const processCollectorCheckAndAdjustJob = async (
   debug(`Post-processing job ${id}`);
 
   const { traceId, projectId } = data;
-  const existingTraceResponse = await esClient.search<ElasticSearchTrace>({
+  const client = await esClient(undefined, projectId);
+  const existingTraceResponse = await client.search<ElasticSearchTrace>({
     index: TRACE_INDEX.alias,
     body: {
       size: 1,
@@ -588,7 +592,7 @@ export const processCollectorCheckAndAdjustJob = async (
     expected_output: existingTrace.expected_output,
   };
 
-  await esClient.update({
+  await client.update({
     index: TRACE_INDEX.alias,
     id: traceIndexId({ traceId, projectId }),
     retry_on_conflict: 10,
@@ -737,7 +741,8 @@ export const fetchExistingMD5s = async (
     }
   | undefined
 > => {
-  const existingTraceResponse = await esClient.search<ElasticSearchTrace>({
+  const client = await esClient(undefined, projectId);
+  const existingTraceResponse = await client.search<ElasticSearchTrace>({
     index: TRACE_INDEX.alias,
     version: true,
     body: {

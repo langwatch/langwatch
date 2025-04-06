@@ -5,12 +5,14 @@ import type {
   QueryDslQueryContainer,
 } from "@elastic/elasticsearch/lib/api/types";
 
-export const migrate = async () => {
+import { Client as ElasticClient } from "@elastic/elasticsearch";
+
+export const migrate = async (_migrationKey: string, client: ElasticClient) => {
   const currentIndex = await getCurrentWriteIndex({
     indexSpec: TRACE_INDEX,
   });
 
-  await esClient.indices.putMapping({
+  await client.indices.putMapping({
     index: currentIndex,
     properties: {
       evaluations: {
@@ -36,7 +38,7 @@ export const migrate = async () => {
   let searchAfter: any;
   let response;
   do {
-    response = await esClient.search({
+    response = await client.search({
       index: currentIndex,
       _source: {
         includes: ["evaluations"],
@@ -129,7 +131,7 @@ export const migrate = async () => {
       );
 
       if (bulkActions.length >= 1000) {
-        const result = await esClient.bulk({ body: bulkActions });
+        const result = await client.bulk({ body: bulkActions });
         bulkActions = [];
         if (result.errors) {
           throw new Error(
@@ -140,7 +142,7 @@ export const migrate = async () => {
     }
 
     if (bulkActions.length > 0) {
-      const result = await esClient.bulk({ body: bulkActions });
+      const result = await client.bulk({ body: bulkActions });
       if (result.errors) {
         throw new Error(
           "Error in bulk update:\n" + JSON.stringify(result, null, 2)
