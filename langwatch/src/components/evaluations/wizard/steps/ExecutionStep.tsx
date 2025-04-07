@@ -2,7 +2,7 @@ import { Heading, Text, VStack } from "@chakra-ui/react";
 import { useShallow } from "zustand/react/shallow";
 import { useEvaluationWizardStore } from "../hooks/useEvaluationWizardStore";
 import { RealTimeExecutionStep } from "./execution/RealTimeExecutionStep";
-import { OfflineExecutionStep } from "./execution/OfflineExecutionStep";
+import { OfflineExecutionStep } from "./execution/offline-exectution/OfflineExecutionStep";
 
 export function ExecutionStep() {
   const { task } = useEvaluationWizardStore(

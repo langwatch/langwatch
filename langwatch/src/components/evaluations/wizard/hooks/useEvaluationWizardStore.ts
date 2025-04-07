@@ -10,7 +10,9 @@ import {
 } from "../../../../optimization_studio/hooks/useWorkflowStore";
 import { entryNode } from "../../../../optimization_studio/templates/blank";
 import type {
+  BaseComponent,
   Evaluator,
+  Signature,
   Workflow,
 } from "../../../../optimization_studio/types/dsl";
 import { datasetColumnsToFields } from "../../../../optimization_studio/utils/datasetUtils";
@@ -19,6 +21,7 @@ import { convertEvaluator } from "../../../../optimization_studio/utils/registry
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { mappingStateSchema } from "../../../../server/tracer/tracesMapping";
 import { checkPreconditionsSchema } from "../../../../server/evaluations/types.generated";
+import { MODULES } from "~/optimization_studio/registry";
 
 export const EVALUATOR_CATEGORIES = [
   "expected_answer",
@@ -143,6 +146,9 @@ type EvaluationWizardStore = State & {
   setFirstEvaluatorEdges: (edges: Workflow["edges"]) => void;
   getFirstEvaluatorEdges: () => Workflow["edges"] | undefined;
 
+  // Signature Node Management
+  getSignatureNodes: () => Node<Signature>[];
+  addSignatureNode: (node?: Omit<Partial<Node<Signature>>, "type">) => void;
   workflowStore: WorkflowStore;
 };
 
@@ -168,246 +174,306 @@ const store = (
     replace?: boolean | undefined
   ) => void,
   get: () => EvaluationWizardStore
-): EvaluationWizardStore => ({
-  ...initialState,
-  reset() {
-    set((current) => ({
+): EvaluationWizardStore => {
+  const addNode = (node: Node<BaseComponent>) => {
+    get().workflowStore.setWorkflow((current) => ({
       ...current,
-      ...initialState,
-      workflowStore: createWorkflowStore(set, get),
+      nodes: [...current.nodes, node],
     }));
-  },
-  setExperimentId(experimentId) {
-    set((current) => ({ ...current, experimentId }));
-  },
-  setExperimentSlug(experimentSlug) {
-    set((current) => ({ ...current, experimentSlug }));
-  },
-  setWizardState(state) {
-    const applyChanges = (
-      current: EvaluationWizardStore,
-      next: Partial<State["wizardState"]>
-    ) => {
-      return {
-        ...current,
-        wizardState: {
-          ...current.wizardState,
-          ...next,
-          ...(next.step === "dataset"
-            ? { workspaceTab: "dataset" as const }
-            : {}),
-        },
-      };
-    };
+  };
 
-    if (typeof state === "function") {
-      set((current) => applyChanges(current, state(current.wizardState)));
-    } else {
-      set((current) => applyChanges(current, state));
-    }
-  },
-  getWizardState() {
-    return get().wizardState;
-  },
-  setDSL(dsl) {
-    get().workflowStore.setWorkflow(dsl);
-  },
-  getDSL() {
-    return get().workflowStore.getWorkflow();
-  },
-  setIsAutosaving(isAutosaving) {
-    set((current) => ({ ...current, isAutosaving }));
-  },
-  skipNextAutosave() {
-    set((current) => ({ ...current, autosaveDisabled: true }));
-    setTimeout(() => {
-      set((current) => ({ ...current, autosaveDisabled: false }));
-    }, 100);
-  },
-  nextStep() {
-    set((current) => {
-      const currentStepIndex = STEPS.indexOf(current.wizardState.step);
-      if (currentStepIndex < STEPS.length - 1) {
-        const nextStep = STEPS[currentStepIndex + 1];
-        return {
-          ...current,
-          wizardState: { ...current.wizardState, step: nextStep! },
-        };
-      }
-      return current;
-    });
-  },
-  previousStep() {
-    set((current) => {
-      const currentStepIndex = STEPS.indexOf(current.wizardState.step);
-      if (currentStepIndex > 0) {
-        const previousStep = STEPS[currentStepIndex - 1];
-        return {
-          ...current,
-          wizardState: { ...current.wizardState, step: previousStep! },
-        };
-      }
-      return current;
-    });
-  },
-  setDatasetId(datasetId, columnTypes) {
-    get().workflowStore.setWorkflow((current) => {
-      const hasEntryNode = current.nodes.some((node) => node.type === "entry");
-
-      if (hasEntryNode) {
-        return {
-          ...current,
-          nodes: current.nodes.map((node) => {
-            if (node.type !== "entry") {
-              return node;
-            }
-
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                dataset: { id: datasetId },
-                outputs: datasetColumnsToFields(columnTypes),
-              },
-            };
-          }),
-        };
-      } else {
-        const newEntryNode = entryNode();
-
-        return {
-          ...current,
-          nodes: [
-            ...current.nodes,
-            {
-              ...newEntryNode,
-              data: {
-                ...newEntryNode.data,
-                dataset: { id: datasetId },
-                outputs: datasetColumnsToFields(columnTypes),
-              },
-            },
-          ],
-        };
-      }
-    });
-  },
-  getDatasetId() {
-    const entryNodeData = get()
-      .workflowStore.getWorkflow()
-      .nodes.find((node) => node.type === "entry")?.data;
-    if (entryNodeData && "dataset" in entryNodeData) {
-      return entryNodeData.dataset?.id;
-    }
-    return undefined;
-  },
-  setFirstEvaluator(evaluator: Partial<Evaluator> & { evaluator: string }) {
-    get().workflowStore.setWorkflow((current) => {
-      if (evaluator.evaluator.startsWith("custom/")) {
-        throw new Error("Custom evaluators are not supported yet");
-      }
-
-      const firstEvaluatorIndex = current.nodes.findIndex(
-        (node) => node.type === "evaluator"
-      );
-
-      const initialEvaluator = convertEvaluator(
-        evaluator.evaluator as keyof typeof AVAILABLE_EVALUATORS
-      );
-      const id = nameToId(initialEvaluator.name ?? initialEvaluator.cls);
-
-      const previousEvaluator = current.nodes[firstEvaluatorIndex] as
-        | Node<Evaluator>
-        | undefined;
-      const hasEvaluatorChanged =
-        previousEvaluator?.data.evaluator !== evaluator.evaluator;
-      const firstEvaluator =
-        hasEvaluatorChanged || !previousEvaluator
-          ? {
-              id,
-              type: "evaluator",
-              data: initialEvaluator,
-              position: { x: 600, y: 0 },
-            }
-          : previousEvaluator;
-
-      const evaluatorNode: Node<Evaluator> = {
-        ...firstEvaluator,
-        id,
-        data: {
-          ...firstEvaluator.data,
-          ...evaluator,
-          name: initialEvaluator.name,
-          description: initialEvaluator.description,
-          parameters:
-            evaluator.data?.parameters ??
-            // Reset parameters if not given the evaluator is not the same as the current evaluator
-            (firstEvaluator.data.evaluator !== evaluator.evaluator
-              ? []
-              : firstEvaluator.data.parameters ?? []),
-        },
-      };
-
-      if (firstEvaluatorIndex === -1) {
-        return {
-          ...current,
-          nodes: [...current.nodes, evaluatorNode],
-        };
-      }
-
-      return {
-        ...current,
-        nodes: current.nodes.map((node, index) =>
-          index === firstEvaluatorIndex ? evaluatorNode : node
-        ),
-        edges: current.edges.filter(
-          (edge) =>
-            edge.target !== previousEvaluator?.id || !hasEvaluatorChanged
-        ),
-      };
-    });
-  },
-  getFirstEvaluatorNode() {
-    const node = get()
-      .workflowStore.getWorkflow()
-      .nodes.find((node) => node.type === "evaluator");
-    if (node?.data && "evaluator" in node.data) {
-      return node as Node<Evaluator>;
-    }
-    return undefined;
-  },
-  setFirstEvaluatorEdges(edges: Edge[]) {
-    get().workflowStore.setWorkflow((current) => {
-      const firstEvaluator = get().getFirstEvaluatorNode();
-
-      if (!firstEvaluator?.id) {
-        return current;
-      }
-
-      return {
-        ...current,
-        edges: [
-          ...current.edges.filter((edge) => edge.target !== firstEvaluator.id),
-          ...edges.map((edge) => ({
-            ...edge,
-            target: firstEvaluator.id,
-          })),
-        ],
-      };
-    });
-  },
-  getFirstEvaluatorEdges() {
-    const firstEvaluator = get().getFirstEvaluatorNode();
-    if (!firstEvaluator) {
-      return undefined;
-    }
-
+  const getNodes = ({ type }: { type?: string }) => {
     return get()
       .workflowStore.getWorkflow()
-      .edges.filter((edge) => edge.target === firstEvaluator.id);
-  },
-  workflowStore: createWorkflowStore(set, get),
-});
+      .nodes.filter((node) => !type || node.type === type);
+  };
+
+  const store: EvaluationWizardStore = {
+    ...initialState,
+    reset() {
+      set((current) => ({
+        ...current,
+        ...initialState,
+        workflowStore: createWorkflowStore(set, get),
+      }));
+    },
+    setExperimentId(experimentId) {
+      set((current) => ({ ...current, experimentId }));
+    },
+    setExperimentSlug(experimentSlug) {
+      set((current) => ({ ...current, experimentSlug }));
+    },
+    setWizardState(state) {
+      const applyChanges = (
+        current: EvaluationWizardStore,
+        next: Partial<State["wizardState"]>
+      ) => {
+        console.log("applyChanges", next);
+        return {
+          ...current,
+          wizardState: {
+            ...current.wizardState,
+            ...next,
+            ...(next.step === "dataset"
+              ? { workspaceTab: "dataset" as const }
+              : {}),
+          },
+        };
+      };
+
+      if (typeof state === "function") {
+        set((current) => applyChanges(current, state(current.wizardState)));
+      } else {
+        set((current) => applyChanges(current, state));
+      }
+    },
+    getWizardState() {
+      return get().wizardState;
+    },
+    setDSL(dsl) {
+      get().workflowStore.setWorkflow(dsl);
+    },
+    getDSL() {
+      return get().workflowStore.getWorkflow();
+    },
+    setIsAutosaving(isAutosaving) {
+      set((current) => ({ ...current, isAutosaving }));
+    },
+    skipNextAutosave() {
+      set((current) => ({ ...current, autosaveDisabled: true }));
+      setTimeout(() => {
+        set((current) => ({ ...current, autosaveDisabled: false }));
+      }, 100);
+    },
+    nextStep() {
+      set((current) => {
+        const currentStepIndex = STEPS.indexOf(current.wizardState.step);
+        if (currentStepIndex < STEPS.length - 1) {
+          const nextStep = STEPS[currentStepIndex + 1];
+          return {
+            ...current,
+            wizardState: { ...current.wizardState, step: nextStep! },
+          };
+        }
+        return current;
+      });
+    },
+    previousStep() {
+      set((current) => {
+        const currentStepIndex = STEPS.indexOf(current.wizardState.step);
+        if (currentStepIndex > 0) {
+          const previousStep = STEPS[currentStepIndex - 1];
+          return {
+            ...current,
+            wizardState: { ...current.wizardState, step: previousStep! },
+          };
+        }
+        return current;
+      });
+    },
+    setDatasetId(datasetId, columnTypes) {
+      get().workflowStore.setWorkflow((current) => {
+        const hasEntryNode = current.nodes.some(
+          (node) => node.type === "entry"
+        );
+
+        if (hasEntryNode) {
+          return {
+            ...current,
+            nodes: current.nodes.map((node) => {
+              if (node.type !== "entry") {
+                return node;
+              }
+
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  dataset: { id: datasetId },
+                  outputs: datasetColumnsToFields(columnTypes),
+                },
+              };
+            }),
+          };
+        } else {
+          const newEntryNode = entryNode();
+
+          return {
+            ...current,
+            nodes: [
+              ...current.nodes,
+              {
+                ...newEntryNode,
+                data: {
+                  ...newEntryNode.data,
+                  dataset: { id: datasetId },
+                  outputs: datasetColumnsToFields(columnTypes),
+                },
+              },
+            ],
+          };
+        }
+      });
+    },
+    getDatasetId() {
+      const entryNodeData = get()
+        .workflowStore.getWorkflow()
+        .nodes.find((node) => node.type === "entry")?.data;
+      if (entryNodeData && "dataset" in entryNodeData) {
+        return entryNodeData.dataset?.id;
+      }
+      return undefined;
+    },
+    setFirstEvaluator(evaluator: Partial<Evaluator> & { evaluator: string }) {
+      get().workflowStore.setWorkflow((current) => {
+        if (evaluator.evaluator.startsWith("custom/")) {
+          throw new Error("Custom evaluators are not supported yet");
+        }
+
+        const firstEvaluatorIndex = current.nodes.findIndex(
+          (node) => node.type === "evaluator"
+        );
+
+        const initialEvaluator = convertEvaluator(
+          evaluator.evaluator as keyof typeof AVAILABLE_EVALUATORS
+        );
+        const id = nameToId(initialEvaluator.name ?? initialEvaluator.cls);
+
+        const previousEvaluator = current.nodes[firstEvaluatorIndex] as
+          | Node<Evaluator>
+          | undefined;
+        const hasEvaluatorChanged =
+          previousEvaluator?.data.evaluator !== evaluator.evaluator;
+        const firstEvaluator =
+          hasEvaluatorChanged || !previousEvaluator
+            ? {
+                id,
+                type: "evaluator",
+                data: initialEvaluator,
+                position: { x: 600, y: 0 },
+              }
+            : previousEvaluator;
+
+        const evaluatorNode: Node<Evaluator> = {
+          ...firstEvaluator,
+          id,
+          data: {
+            ...firstEvaluator.data,
+            ...evaluator,
+            name: initialEvaluator.name,
+            description: initialEvaluator.description,
+            parameters:
+              evaluator.data?.parameters ??
+              // Reset parameters if not given the evaluator is not the same as the current evaluator
+              (firstEvaluator.data.evaluator !== evaluator.evaluator
+                ? []
+                : firstEvaluator.data.parameters ?? []),
+          },
+        };
+
+        if (firstEvaluatorIndex === -1) {
+          return {
+            ...current,
+            nodes: [...current.nodes, evaluatorNode],
+          };
+        }
+
+        // Update the state with the new evaluator node and remove the old edges
+        return {
+          ...current,
+          nodes: current.nodes.map((node, index) =>
+            index === firstEvaluatorIndex ? evaluatorNode : node
+          ),
+          edges: current.edges.filter(
+            (edge) =>
+              edge.target !== previousEvaluator?.id || !hasEvaluatorChanged
+          ),
+        };
+      });
+    },
+    getFirstEvaluatorNode() {
+      const node = get()
+        .workflowStore.getWorkflow()
+        .nodes.find((node) => node.type === "evaluator");
+      if (node?.data && "evaluator" in node.data) {
+        return node as Node<Evaluator>;
+      }
+      return undefined;
+    },
+    setFirstEvaluatorEdges(edges: Edge[]) {
+      get().workflowStore.setWorkflow((current) => {
+        const firstEvaluator = get().getFirstEvaluatorNode();
+
+        if (!firstEvaluator?.id) {
+          return current;
+        }
+
+        return {
+          ...current,
+          edges: [
+            ...current.edges.filter(
+              (edge) => edge.target !== firstEvaluator.id
+            ),
+            ...edges.map((edge) => ({
+              ...edge,
+              target: firstEvaluator.id,
+            })),
+          ],
+        };
+      });
+    },
+    getFirstEvaluatorEdges() {
+      const firstEvaluator = get().getFirstEvaluatorNode();
+      if (!firstEvaluator) {
+        return undefined;
+      }
+
+      return get()
+        .workflowStore.getWorkflow()
+        .edges.filter((edge) => edge.target === firstEvaluator.id);
+    },
+    getSignatureNodes() {
+      return getNodes({ type: "signature" });
+    },
+    addSignatureNode(node?: Omit<Partial<Node<Signature>>, "type">) {
+      // Calculate node position based on the last node or use default position
+      const nodePosition =
+        node?.position ??
+        (() => {
+          const currentNodes = get().workflowStore.getWorkflow().nodes;
+          const defaultPosition = { x: 0, y: 0 };
+          const lastNode = currentNodes[currentNodes.length - 1];
+
+          if (lastNode) {
+            const X_OFFSET = 200;
+            return {
+              x: lastNode.position.x + (lastNode.width ?? 0) + X_OFFSET,
+              y: lastNode.position.y,
+            };
+          }
+
+          return defaultPosition;
+        })();
+
+      addNode({
+        // Default node properties
+        id: "signature-node",
+        position: nodePosition,
+        deletable: true,
+        data: {
+          // Default signature data
+          ...MODULES.signature,
+        },
+        // Override the default node data
+        ...node,
+        type: "signature",
+      });
+    },
+    workflowStore: createWorkflowStore(set, get),
+  };
+
+  return store;
+};
 
 const createWorkflowStore = (
   set: (

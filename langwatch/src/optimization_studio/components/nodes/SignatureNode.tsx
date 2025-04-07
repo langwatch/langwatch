@@ -1,14 +1,27 @@
-import { HStack } from "@chakra-ui/react";
 import { type Node, type NodeProps } from "@xyflow/react";
 import { forwardRef, type Ref } from "react";
-import type { LLMConfig, Signature } from "../../types/dsl";
-import { LLMModelDisplay } from "../properties/modals/LLMConfigModal";
-import { ComponentNode, NodeSectionTitle } from "./Nodes";
+import type { Signature } from "../../types/dsl";
+import { ComponentNode } from "./Nodes";
 import {
   PromptingTechniqueDropArea,
   PromptingTechniqueWrapper,
 } from "./PromptingTechniqueNode";
 
+/**
+ * SignatureNode represents an LLM calling node in the workflow editor.
+ *
+ * It's based on the concept of signature from DSPy, which defines the interface
+ * for LLM interactions with inputs, outputs, and parameters.
+ *
+ * This node can:
+ * - Be configured with an LLM model
+ * - Have instructions for the LLM
+ * - Include demonstrations (few-shot examples)
+ * - Be wrapped with a prompting technique (like Chain of Thought)
+ *
+ * The node is used in the optimization studio to visually construct
+ * LLM-powered workflows where users can connect it with other components.
+ */
 export const SignatureNode = forwardRef(function SignatureNode(
   props: NodeProps<Node<Signature>>,
   ref: Ref<HTMLDivElement>
