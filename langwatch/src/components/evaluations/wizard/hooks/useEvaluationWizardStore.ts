@@ -28,6 +28,7 @@ import { MODULES } from "~/optimization_studio/registry";
 
 const DEFAULT_LLM_CONFIG = {
   model: "gpt-4o-mini",
+  label: "gpt-4o-mini",
 };
 
 const DEFAULT_SIGNATURE_NODE_PROPERTIES = {
@@ -38,12 +39,15 @@ const DEFAULT_SIGNATURE_NODE_PROPERTIES = {
     // Default signature data
     ...MODULES.signature,
     parameters: [
-      ...(MODULES.signature.parameters ?? []),
-      {
-        identifier: "llm",
-        type: "llm" as const,
-        value: DEFAULT_LLM_CONFIG,
-      },
+      ...(MODULES.signature.parameters ?? []).map((p) =>
+        // Set the default LLM config
+        p.identifier === "llm"
+          ? {
+              ...p,
+              value: DEFAULT_LLM_CONFIG,
+            }
+          : p
+      ),
     ],
   },
   type: "signature",
@@ -186,14 +190,11 @@ type EvaluationWizardStore = State & {
     nodeId: string,
     updateProperties: Partial<Node<T>>
   ) => void;
-  updateNodeParameter: <T extends BaseComponent, V>(
-    nodeId: string,
-    parameterId: string,
-    value: V,
-    type: Field["type"]
-  ) => void;
 
   workflowStore: WorkflowStore;
+} & {
+  // Properties and methods from the workflow store
+  setNodeParameter: WorkflowStore["setNodeParameter"];
 };
 
 export const initialState: State = {
@@ -507,7 +508,11 @@ const store = (
     updateSignatureNodeLLMConfigValue(nodeId: string, llmConfig: LLMConfig) {
       get().workflowStore.setWorkflow((current) => {
         return updateNode(current, nodeId, (node) =>
-          updateNodeParameter(node, "llm", llmConfig, "llm")
+          updateNodeParameter(node, {
+            identifier: "llm",
+            type: "llm",
+            value: llmConfig,
+          })
         );
       });
     },
@@ -521,10 +526,17 @@ const store = (
       });
     },
     // Generic node parameter update function
-    updateNodeParameter(nodeId, parameterId, value, type) {
+    setNodeParameter(
+      nodeId: string,
+      parameter: Partial<Omit<Field, "value">> & {
+        identifier: string;
+        type: Field["type"];
+        value?: unknown;
+      }
+    ) {
       get().workflowStore.setWorkflow((current) => {
         return updateNode(current, nodeId, (node) =>
-          updateNodeParameter(node, parameterId, value, type)
+          updateNodeParameter(node, parameter)
         );
       });
     },
@@ -605,18 +617,22 @@ function updateNode(
  */
 function updateNodeParameter(
   node: Node<Component>,
-  identifier: string,
-  value: any,
-  type: Field["type"]
+  parameter: Partial<Omit<Field, "value">> & {
+    identifier: string;
+    type: Field["type"];
+    value?: any;
+  }
 ): Node<Component> {
   const parameters = node.data.parameters ?? [];
-  const paramIndex = parameters.findIndex((p) => p.identifier === identifier);
+  const paramIndex = parameters.findIndex(
+    (p) => p.identifier === parameter.identifier
+  );
 
   const updatedParameters =
     paramIndex === -1
-      ? [...parameters, { identifier, type, value }]
+      ? [...parameters, parameter]
       : parameters.map((param, index) =>
-          index === paramIndex ? { ...param, value } : param
+          index === paramIndex ? { ...param, ...parameter } : param
         );
 
   return {

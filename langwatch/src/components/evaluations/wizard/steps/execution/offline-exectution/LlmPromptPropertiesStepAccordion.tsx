@@ -1,10 +1,11 @@
-import { VStack } from "@chakra-ui/react";
+import { Textarea, VStack } from "@chakra-ui/react";
 import { StepAccordion } from "../../../components/StepAccordion";
 import { useShallow } from "zustand/react/shallow";
 import { useEvaluationWizardStore } from "../../../hooks/useEvaluationWizardStore";
 import { LLMConfigField } from "~/optimization_studio/components/properties/modals/llm-config/LLMConfigField";
 import { useCallback, useMemo } from "react";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
+import { PropertyField } from "~/optimization_studio/components/properties/BasePropertiesPanel";
 
 export const LLM_PROMPT_PROPERTIES_STEP_ACCORDION_VALUE =
   "llm-prompt-properties";
@@ -15,6 +16,7 @@ export function LlmPromptPropertiesStepAccordion() {
     addSignatureNode,
     getSignatureNodes,
     updateSignatureNodeLLMConfigValue,
+    setNodeParameter,
   } = useEvaluationWizardStore(
     useShallow(
       ({
@@ -23,12 +25,14 @@ export function LlmPromptPropertiesStepAccordion() {
         addSignatureNode,
         getSignatureNodes,
         updateSignatureNodeLLMConfigValue,
+        setNodeParameter,
       }) => ({
         executionMethod: wizardState.executionMethod,
         workflowStore,
         addSignatureNode,
         getSignatureNodes,
         updateSignatureNodeLLMConfigValue,
+        setNodeParameter,
       })
     )
   );
@@ -61,9 +65,17 @@ export function LlmPromptPropertiesStepAccordion() {
     [updateSignatureNodeLLMConfigValue, signatureNode]
   );
 
-  const llmConfig = useMemo(() => {
-    return signatureNode?.data.parameters?.find((p) => p.identifier === "llm")
-      ?.value as LLMConfig;
+  const { llmConfig, instructions } = useMemo(() => {
+    const parameters = signatureNode?.data.parameters;
+    const llmConfig = parameters?.find((p) => p.identifier === "llm");
+    const instructions = parameters?.find(
+      (p) => p.identifier === "instructions"
+    );
+
+    return {
+      llmConfig: llmConfig?.value as LLMConfig,
+      instructions: instructions?.value as string | undefined,
+    };
   }, [signatureNode]);
 
   return (
@@ -72,18 +84,35 @@ export function LlmPromptPropertiesStepAccordion() {
       width="full"
       borderColor="blue.400"
       title="LLM Prompt Properties"
-      showTrigger={!!executionMethod}
+      showTrigger={true}
     >
       <VStack width="full" gap={3}>
         {signatureNode && (
-          <div>
-            {llmConfig && (
-              <LLMConfigField
-                llmConfig={llmConfig}
-                onChange={updateLLMConfig}
+          <>
+            <PropertyField title="LLM">
+              {llmConfig && (
+                <LLMConfigField
+                  llmConfig={llmConfig}
+                  onChange={updateLLMConfig}
+                />
+              )}
+            </PropertyField>
+            <PropertyField title="Instructions">
+              <Textarea
+                height="100px"
+                fontFamily="monospace"
+                fontSize="13px"
+                value={instructions}
+                onChange={(e) =>
+                  setNodeParameter(signatureNode.id, {
+                    identifier: "instructions",
+                    type: "str",
+                    value: e.target.value,
+                  })
+                }
               />
-            )}
-          </div>
+            </PropertyField>
+          </>
         )}
       </VStack>
     </StepAccordion>
