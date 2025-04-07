@@ -87,10 +87,14 @@ export const onboardingRouter = createTRPCRouter({
         // Execute post-registration callback if defined
         if (dependencies.postRegistrationCallback) {
           try {
-            await dependencies.postRegistrationCallback(
-              ctx.session.user,
-              input
-            );
+            await dependencies.postRegistrationCallback({
+              name: ctx.session.user.name,
+              email: ctx.session.user.email,
+            }, {
+              orgName: orgResult.organization.name,
+              phoneNumber: input.phoneNumber,
+              signUpData: input.signUpData,
+            });
           } catch (err) {
             Sentry.captureException(err);
           }
