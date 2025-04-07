@@ -194,6 +194,7 @@ describe("opentelemetry traces receiver", () => {
   };
 
   it("receives a basic openai trace", async () => {
+    const client = await esClient();
     const encodedMessage = traceRequestType.encode(request).finish();
     const uint8Array = new Uint8Array(encodedMessage);
     const blob = new Blob([uint8Array], { type: "application/x-protobuf" });
@@ -212,7 +213,7 @@ describe("opentelemetry traces receiver", () => {
     expect(response.status).toBe(200);
 
     const indexedTrace = await waitForResult(() =>
-      esClient.getSource<ElasticSearchTrace>({
+      client.getSource<ElasticSearchTrace>({
         index: TRACE_INDEX.alias,
         id: traceIndexId({
           traceId,

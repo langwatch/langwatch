@@ -25,6 +25,8 @@ const files = fs
   .filter((file) => file.endsWith(".ts") && file !== "index.ts")
   .sort();
 
+console.log(files);
+
 const migrations = Object.fromEntries(
   files.map((file) => {
     const name = path.basename(file, ".ts");
@@ -34,6 +36,8 @@ const migrations = Object.fromEntries(
     ];
   })
 );
+
+console.log(migrations);
 
 export default async function execute() {
   if (env.IS_QUICKWIT) {
@@ -56,8 +60,8 @@ export default async function execute() {
   // await elasticsearchMigrate();
 }
 
-const elasticsearchMigrate = async (organizationId?: string) => {
-  const client = await esClient(undefined, organizationId);
+export const elasticsearchMigrate = async (organizationId?: string) => {
+  const client = await esClient(organizationId);
   const migrationsExists = await client.indices.exists({
     index: MIGRATION_INDEX,
   });
@@ -72,7 +76,7 @@ const elasticsearchMigrate = async (organizationId?: string) => {
         process.env.IS_OPENSEARCH ? "OpenSearch" : "Elasticsearch"
       } indexes from scratch`
     );
-    await createIndexes(lastMigration);
+    await createIndexes(lastMigration, client);
     await new Promise((resolve) => setTimeout(resolve, 3000));
   }
 

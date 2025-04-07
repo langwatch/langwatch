@@ -12,6 +12,7 @@ export const migrate = async (_migrationKey: string, client: ElasticClient) => {
   await createIndex({
     index: BATCH_EVALUATION_INDEX.base,
     mappings: batchEvaluationMapping as Record<string, MappingProperty>,
+    client,
   });
 
   await client.indices.putAlias({

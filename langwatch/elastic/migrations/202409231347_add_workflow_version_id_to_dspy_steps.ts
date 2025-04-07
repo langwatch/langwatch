@@ -6,6 +6,7 @@ import { Client as ElasticClient } from "@elastic/elasticsearch";
 export const migrate = async (_migrationKey: string, client: ElasticClient) => {
   const currentIndex = await getCurrentWriteIndex({
     indexSpec: DSPY_STEPS_INDEX,
+    client,
   });
 
   await client.indices.putMapping({

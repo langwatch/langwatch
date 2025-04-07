@@ -37,14 +37,19 @@ const getOrgElasticsearchDetailsFromProject = async (projectId: string) => {
   return project?.team.organization ?? null;
 };
 
-export const esClient = async (projectId?: string, organizationId?: string) => {
+export const esClient = async (organizationId?: string, projectId?: string) => {
   let orgElasticsearchNodeUrl: string | null = null;
   let orgElasticsearchApiKey: string | null = null;
+
+  console.log("organizationId", organizationId);
+  console.log("projectId", projectId);
 
   if (organizationId) {
     const organization = await prisma.organization.findUnique({
       where: { id: organizationId },
     });
+
+    console.log("organization", organization);
 
     orgElasticsearchNodeUrl = organization?.elasticsearchNodeUrl ?? null;
     orgElasticsearchApiKey = organization?.elasticsearchApiKey ?? null;
@@ -62,15 +67,19 @@ export const esClient = async (projectId?: string, organizationId?: string) => {
     });
   }
 
-  const elasticsearchNodeUrl =
-    orgElasticsearchNodeUrl ?? env.ELASTICSEARCH_NODE_URL;
-  const elasticsearchApiKey =
-    orgElasticsearchApiKey ?? env.ELASTICSEARCH_API_KEY;
+  const useOrgSettings = orgElasticsearchNodeUrl && orgElasticsearchApiKey;
+
+  const elasticsearchNodeUrl = useOrgSettings
+    ? orgElasticsearchNodeUrl
+    : env.ELASTICSEARCH_NODE_URL;
+  const elasticsearchApiKey = useOrgSettings
+    ? orgElasticsearchApiKey
+    : env.ELASTICSEARCH_API_KEY;
 
   const client =
     !!env.IS_OPENSEARCH || !!env.IS_QUICKWIT
       ? (new OpenSearchClient({
-          node: env.ELASTICSEARCH_NODE_URL?.replace("quickwit://", "http://"),
+          node: elasticsearchNodeUrl?.replace("quickwit://", "http://"),
         }) as unknown as ElasticClient)
       : new ElasticClient({
           node: elasticsearchNodeUrl ?? "http://bogus:9200",
@@ -96,32 +105,7 @@ export const esClient = async (projectId?: string, organizationId?: string) => {
   return client;
 };
 
-// export const esClient =
-//   !!env.IS_OPENSEARCH || !!env.IS_QUICKWIT
-//     ? (new OpenSearchClient({
-//         node: env.ELASTICSEARCH_NODE_URL?.replace("quickwit://", "http://"),
-//       }) as unknown as ElasticClient)
-//     : new ElasticClient({
-//         node: env.ELASTICSEARCH_NODE_URL ?? "http://bogus:9200",
-//         ...(env.ELASTICSEARCH_API_KEY
-//           ? {
-//               auth: {
-//                 apiKey: env.ELASTICSEARCH_API_KEY,
-//               },
-//             }
-//           : {}),
-//       });
-
-// export const FLATENNED_TYPE = env.IS_OPENSEARCH ? "flat_object" : "flattened";
-
-// if (env.IS_OPENSEARCH) {
-//   patchForOpensearchCompatibility(esClient);
-// }
-
-// if (env.IS_QUICKWIT) {
-//   patchForOpensearchCompatibility(esClient);
-//   patchForQuickwitCompatibility(esClient);
-// }
+export const FLATENNED_TYPE = env.IS_OPENSEARCH ? "flat_object" : "flattened";
 
 export const traceIndexId = ({
   traceId,
