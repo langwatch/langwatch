@@ -41,9 +41,11 @@ export class StorageService {
     }
   }
 
-  async getObject(projectId: string, datasetId: string): Promise<any> {
+  async getObject(
+    projectId: string,
+    datasetId: string
+  ): Promise<{ records: any[]; count: number }> {
     if (env.DATASET_STORAGE_LOCAL) {
-      console.log("Getting object from local storage");
       const filePath = await this.getLocalStoragePath(projectId, datasetId);
       try {
         const fileContent = await fs.readFile(filePath, "utf-8");
@@ -62,7 +64,10 @@ export class StorageService {
       } catch (error: any) {
         if (error.code === "ENOENT") {
           await fs.writeFile(filePath, JSON.stringify([]), "utf-8");
-          return Buffer.from(JSON.stringify([]));
+          return {
+            records: [],
+            count: 0,
+          };
         }
         throw error;
       }

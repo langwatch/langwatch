@@ -87,12 +87,12 @@ export function DatasetTable({
       enabled: !!project && !!datasetId,
       refetchOnWindowFocus: false,
       onError: (error) => {
-        toast({
+        toaster.create({
           title: "Error fetching dataset",
           description: error.message,
-          status: "error",
+          type: "error",
           duration: 5000,
-          isClosable: true,
+          meta: { closable: true },
         });
       },
     }

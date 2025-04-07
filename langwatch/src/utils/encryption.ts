@@ -28,7 +28,6 @@ export function encrypt(text: string): string {
 }
 
 export function decrypt(encryptedString: string): string {
-  console.log("encryptedString", encryptedString);
   const [ivHex, encryptedData, authTagHex] = encryptedString.split(":"); // Split the string
   if (!ivHex || !encryptedData || !authTagHex) {
     throw new Error("Invalid encrypted string format");
@@ -37,11 +36,21 @@ export function decrypt(encryptedString: string): string {
   const iv = Buffer.from(ivHex, "hex");
   const authTag = Buffer.from(authTagHex, "hex");
 
-  const decipher = crypto.createDecipheriv(algorithm, key, new Uint8Array(iv));
-  decipher.setAuthTag(new Uint8Array(authTag));
+  try {
+    const decipher = crypto.createDecipheriv(
+      algorithm,
+      key,
+      new Uint8Array(iv)
+    );
+    decipher.setAuthTag(new Uint8Array(authTag));
 
-  let decrypted = decipher.update(encryptedData, "hex", "utf8");
-  decrypted += decipher.final("utf8");
+    let decrypted = decipher.update(encryptedData, "hex", "utf8");
+    decrypted += decipher.final("utf8");
 
-  return decrypted;
+    return decrypted;
+  } catch (error) {
+    throw new Error(
+      "Failed to decrypt: Data may be corrupted or tampered with"
+    );
+  }
 }
