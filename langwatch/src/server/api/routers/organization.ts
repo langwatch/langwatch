@@ -150,6 +150,7 @@ export const organizationRouter = createTRPCRouter({
         success: true,
         organization: {
           id: organization.id,
+          name: organization.name,
         },
         team: {
           id: team.id,
