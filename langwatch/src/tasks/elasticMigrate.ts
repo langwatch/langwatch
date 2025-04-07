@@ -20,24 +20,8 @@ import { execSync } from "child_process";
 import { prisma } from "../server/db";
 import { Client as ElasticClient } from "@elastic/elasticsearch";
 
-const files = fs
-  .readdirSync(path.join(__dirname, "..", "..", "elastic", "migrations"))
-  .filter((file) => file.endsWith(".ts") && file !== "index.ts")
-  .sort();
-
-console.log(files);
-
-const migrations = Object.fromEntries(
-  files.map((file) => {
-    const name = path.basename(file, ".ts");
-    return [
-      name,
-      require(path.join(__dirname, "..", "..", "elastic", "migrations", file)),
-    ];
-  })
-);
-
-console.log(migrations);
+import { migrations as importedMigrations } from "../../elastic/migrations";
+const migrations: { [key: string]: any } = importedMigrations;
 
 export default async function execute() {
   if (env.IS_QUICKWIT) {
@@ -52,12 +36,10 @@ export default async function execute() {
     },
   });
 
-  console.log("Organizations with elasticsearchNodeUrl:", organizations);
-
   for (const org of organizations) {
     await elasticsearchMigrate(org.id);
   }
-  // await elasticsearchMigrate();
+  await elasticsearchMigrate();
 }
 
 export const elasticsearchMigrate = async (organizationId?: string) => {

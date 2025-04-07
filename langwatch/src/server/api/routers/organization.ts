@@ -25,7 +25,7 @@ import * as Sentry from "@sentry/nextjs";
 import { env } from "~/env.mjs";
 import { signUpDataSchema } from "./onboarding";
 import { dependencies } from "../../../injection/dependencies.server";
-//import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
+import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
@@ -292,12 +292,9 @@ export const organizationRouter = createTRPCRouter({
         },
       });
 
-      console.log("elasticsearchNodeUrl", input.elasticsearchNodeUrl);
-      console.log("elasticsearchApiKey", input.elasticsearchApiKey);
-
-      // if (input.elasticsearchNodeUrl && input.elasticsearchApiKey) {
-      //   await elasticsearchMigrate(input.organizationId);
-      // }
+      if (input.elasticsearchNodeUrl && input.elasticsearchApiKey) {
+        await elasticsearchMigrate(input.organizationId);
+      }
 
       return { success: true };
     }),
