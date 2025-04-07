@@ -44,7 +44,7 @@ import {
 } from "../../types/dsl";
 import { checkIsEvaluator } from "../../utils/nodeUtils";
 import { ComponentIcon } from "../ColorfulBlockIcons";
-import { LLMModelDisplay } from "../properties/modals/LLMConfigModal";
+import { LLMModelDisplay } from "../properties/modals/llm-config/LLMConfigModal";
 
 export function getNodeDisplayName(node: { id: string; data: Component }) {
   return node.data.name ?? node.data.cls ?? node.id;

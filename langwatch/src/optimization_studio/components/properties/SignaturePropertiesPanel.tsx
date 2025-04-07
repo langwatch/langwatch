@@ -26,7 +26,7 @@ import {
   PropertyField,
   PropertySectionTitle,
 } from "./BasePropertiesPanel";
-import { LLMConfigField } from "./modals/LLMConfigModal";
+import { LLMConfigField } from "./modals/llm-config/LLMConfigField";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 
 /**
