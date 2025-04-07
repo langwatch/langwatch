@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 
+import langwatch
 from langwatch.types import RAGChunk
 
 load_dotenv()

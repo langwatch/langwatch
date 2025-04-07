@@ -4,14 +4,13 @@ load_dotenv()
 
 import chainlit as cl
 from openai import OpenAI
-from opentelemetry import trace
 import langwatch
 
 client = OpenAI()
 
 
 @cl.on_message
-@langwatch.trace(name="openai_bot")
+@langwatch.trace(max_string_length=100)  # default is 5000
 async def main(message: cl.Message):
     langwatch.get_current_trace().autotrack_openai_calls(client)
 

@@ -4,14 +4,13 @@ load_dotenv()
 
 import chainlit as cl
 from openai import OpenAI
-from opentelemetry import trace
 import langwatch
 
 client = OpenAI()
 
 
 @cl.on_message
-@langwatch.trace(name="openai_bot")
+@langwatch.trace(max_string_length=None)  # default is 5000
 async def main(message: cl.Message):
     langwatch.get_current_trace().autotrack_openai_calls(client)
 
@@ -26,7 +25,7 @@ async def main(message: cl.Message):
                 "role": "system",
                 "content": "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.",
             },
-            {"role": "user", "content": message.content},
+            {"role": "user", "content": "a" * 6000},
         ],
         stream=True,
         stream_options={"include_usage": True},
