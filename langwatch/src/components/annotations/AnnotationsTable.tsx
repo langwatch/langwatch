@@ -459,7 +459,6 @@ export const AnnotationsTable = ({
                                   lineClamp={2}
                                   maxWidth="350px"
                                   textOverflow="ellipsis"
-                                  display="block"
                                   wordBreak="break-word"
                                 >
                                   {item.trace?.input?.value ?? "<empty>"}
@@ -472,7 +471,6 @@ export const AnnotationsTable = ({
                                   lineClamp={2}
                                   maxWidth="350px"
                                   textOverflow="ellipsis"
-                                  display="block"
                                   wordBreak="break-word"
                                 >
                                   {item.trace?.output?.value ?? "<empty>"}

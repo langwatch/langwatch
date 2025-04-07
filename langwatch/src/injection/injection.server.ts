@@ -9,6 +9,24 @@ import type {
 import type { ProcedureRouterRecord } from "@trpc/server";
 import type { NextRequest } from "next/server";
 
+export interface RegistrationCbUser {
+  name?: string | null;
+  email?: string | null;
+}
+
+export interface RegistrationCbOrganization {
+  phoneNumber?: string | null;
+  orgName?: string | null;
+  signUpData?: Partial<{
+    featureUsage?: string | null;
+    yourRole?: string | null;
+    usage?: string | null;
+    solution?: string | null;
+    companySize?: string | null;
+    utmCampaign?: string | null;
+  }> | null;
+}
+
 export interface Dependencies {
   subscriptionHandler: typeof SubscriptionHandler;
   sessionHandler?: (params: {
@@ -28,7 +46,7 @@ export interface Dependencies {
     ) => Promise<void | NextApiResponse<any>>
   >;
   extraTRPCRoutes?: () => ProcedureRouterRecord;
-  postRegistrationCallback?: (user: any, org: any) => void | Promise<void>;
+  postRegistrationCallback?: (user: RegistrationCbUser, org: RegistrationCbOrganization) => void | Promise<void>;
 }
 
 const dependencies: Dependencies = {

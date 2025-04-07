@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  HStack,
   Spacer,
   Text,
   useDisclosure,
@@ -67,69 +68,13 @@ export function UploadCSVModal({
             <Dialog.CloseTrigger />
           </Dialog.Header>
           <Dialog.Body>
-            <CSVReaderComponent
-              onUploadAccepted={({ data, acceptedFile }) => {
-                const columns: DatasetColumns = (data[0] ?? []).map(
-                  (col: string) => ({
-                    name: col,
-                    type: "string",
-                  })
-                );
-                const now = new Date().getTime();
-                const records: DatasetRecordEntry[] = data
-                  .slice(1)
-                  .map((row: string[], index: number) => ({
-                    id: `${now}-${index}`,
-                    ...Object.fromEntries(
-                      row.map((col, i) => [columns[i]?.name, col])
-                    ),
-                  }));
-
-                setUploadedDataset({
-                  datasetRecords: records,
-                  columnTypes: columns,
-                  name: acceptedFile.name.split(".")[0],
-                });
-              }}
-              onUploadRemoved={() => {
-                setUploadedDataset(undefined);
-              }}
+            <UploadCSVForm
+              setUploadedDataset={setUploadedDataset}
+              uploadedDataset={uploadedDataset}
+              uploadCSVData={uploadCSVData}
+              onCreateFromScratch={onCreateFromScratch}
             />
-            {uploadedDataset &&
-              uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT && (
-                <Text color="red.500" paddingTop={4}>
-                  Sorry, the max number of rows accepted for datasets is
-                  currently {MAX_ROWS_LIMIT} rows. Please reduce the number of
-                  rows or contact support.
-                </Text>
-              )}
           </Dialog.Body>
-
-          <Dialog.Footer>
-            {onCreateFromScratch && (
-              <Button
-                variant="plain"
-                colorPalette="gray"
-                fontWeight="normal"
-                color="blue.700"
-                onClick={onCreateFromScratch}
-              >
-                Skip, create empty dataset
-              </Button>
-            )}
-            <Spacer />
-            <Button
-              colorPalette="blue"
-              disabled={
-                !uploadedDataset ||
-                uploadedDataset.datasetRecords.length === 0 ||
-                uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT
-              }
-              onClick={uploadCSVData}
-            >
-              Upload
-            </Button>
-          </Dialog.Footer>
         </Dialog.Content>
       </Dialog.Root>
       <AddOrEditDatasetDrawer
@@ -145,6 +90,120 @@ export function UploadCSVModal({
         }}
       />
     </>
+  );
+}
+
+export function InlineUploadCSVForm({
+  onSuccess,
+}: {
+  onSuccess: Parameters<typeof AddOrEditDatasetDrawer>[0]["onSuccess"];
+}) {
+  const addDatasetDrawer = useDisclosure();
+  const [uploadedDataset, setUploadedDataset] = useState<
+    InMemoryDataset | undefined
+  >(undefined);
+
+  return (
+    <>
+      <UploadCSVForm
+        setUploadedDataset={setUploadedDataset}
+        uploadedDataset={uploadedDataset}
+        uploadCSVData={addDatasetDrawer.onOpen}
+        disabled={addDatasetDrawer.open}
+      />
+      <AddOrEditDatasetDrawer
+        datasetToSave={uploadedDataset}
+        open={addDatasetDrawer.open}
+        onClose={() => {
+          addDatasetDrawer.onClose();
+        }}
+        onSuccess={(params) => {
+          onSuccess(params);
+        }}
+      />
+    </>
+  );
+}
+
+export function UploadCSVForm({
+  setUploadedDataset,
+  uploadedDataset,
+  onCreateFromScratch,
+  uploadCSVData,
+  disabled,
+}: {
+  setUploadedDataset: (dataset: InMemoryDataset | undefined) => void;
+  uploadedDataset: InMemoryDataset | undefined;
+  onCreateFromScratch?: () => void;
+  uploadCSVData: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <VStack width="full" align="start" gap={4}>
+      <CSVReaderComponent
+        onUploadAccepted={({ data, acceptedFile }) => {
+          const columns: DatasetColumns = (data[0] ?? []).map(
+            (col: string) => ({
+              name: col,
+              type: "string",
+            })
+          );
+          const now = new Date().getTime();
+          const records: DatasetRecordEntry[] = data
+            .slice(1)
+            .map((row: string[], index: number) => ({
+              id: `${now}-${index}`,
+              ...Object.fromEntries(
+                row.map((col, i) => [columns[i]?.name, col])
+              ),
+            }));
+
+          setUploadedDataset({
+            datasetRecords: records,
+            columnTypes: columns,
+            name: acceptedFile.name.split(".")[0],
+          });
+        }}
+        onUploadRemoved={() => {
+          setUploadedDataset(undefined);
+        }}
+      />
+      <HStack width="full" align="end">
+        {uploadedDataset &&
+          uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT && (
+            <Text color="red.500" paddingTop={4}>
+              Sorry, the max number of rows accepted for datasets is currently{" "}
+              {MAX_ROWS_LIMIT} rows. Please reduce the number of rows or contact
+              support.
+            </Text>
+          )}
+
+        {onCreateFromScratch && (
+          <Button
+            variant="plain"
+            colorPalette="gray"
+            fontWeight="normal"
+            color="blue.700"
+            onClick={onCreateFromScratch}
+          >
+            Skip, create empty dataset
+          </Button>
+        )}
+        <Spacer />
+        <Button
+          colorPalette="blue"
+          disabled={
+            !!disabled ||
+            !uploadedDataset ||
+            uploadedDataset.datasetRecords.length === 0 ||
+            uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT
+          }
+          onClick={uploadCSVData}
+        >
+          Upload
+        </Button>
+      </HStack>
+    </VStack>
   );
 }
 
@@ -242,6 +301,8 @@ function CSVReaderBox({
       borderStyle="dashed"
       padding={10}
       textAlign="center"
+      cursor="pointer"
+      width="full"
     >
       {acceptedFile ? (
         <>

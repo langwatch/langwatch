@@ -2,14 +2,6 @@ import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 import { useRequiredSession } from "./useRequiredSession";
 
-const batchArray = (array: string[], batchSize: number) => {
-  const batches: string[][] = [];
-  for (let i = 0; i < array.length; i += batchSize) {
-    batches.push(array.slice(i, i + batchSize));
-  }
-  return batches;
-};
-
 export function useAnnotationQueues() {
   const { project } = useOrganizationTeamProject();
 
@@ -36,17 +28,11 @@ export function useAnnotationQueues() {
     }
   );
 
-  const doneQueueItems = api.annotation.getDoneQueueItems.useQuery(
-    {
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project,
-      refetchOnWindowFocus: false,
-    }
+  const doneQueueItems = queueItems.data?.filter(
+    (item) => item.doneAt !== null
   );
 
-  const doneQueueItemsFiltered = doneQueueItems.data?.filter(
+  const doneQueueItemsFiltered = doneQueueItems?.filter(
     (item) =>
       item.userId === user?.id ||
       item.annotationQueue?.members.some((member) => member.userId === user?.id)
@@ -55,12 +41,6 @@ export function useAnnotationQueues() {
   const assignedQueueItems = queueItems.data?.filter(
     (item) => item.userId === user?.id
   );
-  const traceIdsForAssignedQueueItems = assignedQueueItems?.flatMap(
-    (item) => item.traceId
-  );
-  const doneTraceIdsForAssignedQueueItems = doneQueueItemsFiltered?.flatMap(
-    (item) => item.traceId
-  );
 
   const memberAccessibleQueues = queues.data?.filter((queue) =>
     queue.members.some((member) => member.userId === user?.id)
@@ -68,39 +48,6 @@ export function useAnnotationQueues() {
   const memberAccessibleQueueItems = memberAccessibleQueues?.flatMap(
     (queue) => queue.AnnotationQueueItems
   );
-  const traceIdsForMemberAccessibleQueueItems =
-    memberAccessibleQueueItems?.flatMap((item) => item.traceId);
-
-  const traceIds = [
-    ...(traceIdsForAssignedQueueItems ?? []),
-    ...(traceIdsForMemberAccessibleQueueItems ?? []),
-    ...(doneTraceIdsForAssignedQueueItems ?? []),
-  ];
-
-  const MAX_BATCH_SIZE = 20;
-  const traceBatches = batchArray(traceIds, MAX_BATCH_SIZE);
-
-  const MAX_QUERIES = 10;
-
-  const batchQueries = [];
-  for (let i = 0; i < MAX_QUERIES; i++) {
-    const batch = traceBatches[i] || [];
-    const query = api.traces.getTracesWithSpans.useQuery(
-      {
-        projectId: project?.id ?? "",
-        traceIds: batch,
-      },
-      {
-        enabled: !!project?.id && batch.length > 0,
-        refetchOnWindowFocus: false,
-      }
-    );
-    batchQueries.push(query);
-  }
-
-  const traces = batchQueries
-    .filter((query) => query.data)
-    .flatMap((query) => query.data || []);
 
   const annotations = api.annotation.getAll.useQuery(
     {
@@ -114,7 +61,6 @@ export function useAnnotationQueues() {
 
   const assignedQueueItemsWithTraces = assignedQueueItems?.map((item) => ({
     ...item,
-    trace: traces?.find((trace) => trace.trace_id === item.traceId),
     annotations: annotations.data?.filter(
       (annotation) => annotation.traceId === item.traceId
     ),
@@ -137,7 +83,6 @@ export function useAnnotationQueues() {
 
       return {
         ...item,
-        trace: traces?.find((trace) => trace.trace_id === item.traceId),
         annotations: relevantAnnotations,
         members: queue?.members.map((member) => ({
           ...member,
@@ -153,7 +98,6 @@ export function useAnnotationQueues() {
 
   const doneQueueItemsWithTraces = doneQueueItemsFiltered?.map((item) => ({
     ...item,
-    trace: traces?.find((trace) => trace.trace_id === item.traceId),
     annotations: annotations.data?.filter(
       (annotation) => annotation.traceId === item.traceId
     ),
@@ -179,10 +123,6 @@ export function useAnnotationQueues() {
     doneQueueItemsWithTraces,
     memberAccessibleQueues,
     scoreOptions,
-    queuesLoading:
-      queues.isLoading ||
-      queueItems.isLoading ||
-      doneQueueItems.isLoading ||
-      batchQueries.some((query) => query.isLoading),
+    queuesLoading: queues.isLoading || queueItems.isLoading,
   };
 }
