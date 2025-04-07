@@ -160,9 +160,16 @@ export const TracesMapping = ({
   );
 
   const now = useMemo(() => new Date().getTime(), []);
+  const isInitializedRef = React.useRef(false);
 
-  // Try to set default for the mappings
   useEffect(() => {
+    if (
+      isInitializedRef.current &&
+      Object.keys(traceMappingState.mapping).length > 0
+    ) {
+      return;
+    }
+
     const traceMappingStateWithDefaults = {
       mapping: Object.fromEntries(
         targetFields.map((name) => [
@@ -185,6 +192,8 @@ export const TracesMapping = ({
         ...traceMappingStateWithDefaults,
         expansions: Array.from(traceMappingStateWithDefaults.expansions),
       });
+
+      isInitializedRef.current = true;
     }
 
     if (!dsl) return;
