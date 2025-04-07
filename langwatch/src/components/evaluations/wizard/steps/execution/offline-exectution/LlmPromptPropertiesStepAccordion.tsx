@@ -10,9 +10,13 @@ import { PropertyField } from "~/optimization_studio/components/properties/BaseP
 export const LLM_PROMPT_PROPERTIES_STEP_ACCORDION_VALUE =
   "llm-prompt-properties";
 
+/**
+ * This component is used to configure the LLM prompt properties for the offline execution step.
+ *
+ * It is a simplified version of what's available in the SignaturePropertiesPanel.
+ */
 export function LlmPromptPropertiesStepAccordion() {
   const {
-    executionMethod,
     addSignatureNode,
     getSignatureNodes,
     updateSignatureNodeLLMConfigValue,
@@ -20,14 +24,12 @@ export function LlmPromptPropertiesStepAccordion() {
   } = useEvaluationWizardStore(
     useShallow(
       ({
-        wizardState,
         workflowStore,
         addSignatureNode,
         getSignatureNodes,
         updateSignatureNodeLLMConfigValue,
         setNodeParameter,
       }) => ({
-        executionMethod: wizardState.executionMethod,
         workflowStore,
         addSignatureNode,
         getSignatureNodes,

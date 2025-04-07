@@ -28,7 +28,6 @@ import { MODULES } from "~/optimization_studio/registry";
 
 const DEFAULT_LLM_CONFIG = {
   model: "gpt-4o-mini",
-  label: "gpt-4o-mini",
 };
 
 const DEFAULT_SIGNATURE_NODE_PROPERTIES = {
@@ -48,6 +47,18 @@ const DEFAULT_SIGNATURE_NODE_PROPERTIES = {
             }
           : p
       ),
+    ],
+    inputs: [
+      {
+        identifier: "input",
+        type: "str" as const,
+      },
+    ],
+    outputs: [
+      {
+        identifier: "output",
+        type: "str" as const,
+      },
     ],
   },
   type: "signature",
@@ -225,6 +236,19 @@ const store = (
       ...current,
       nodes: [...current.nodes, node],
     }));
+  };
+
+  const addEdge = (edge: Edge) => {
+    get().workflowStore.setWorkflow((current) => ({
+      ...current,
+      edges: [...current.edges, edge],
+    }));
+  };
+
+  const findNodeByType = (type: string) => {
+    return get()
+      .workflowStore.getWorkflow()
+      .nodes.find((node) => node.type === type);
   };
 
   const getNodes = ({ type }: { type?: string }) => {
@@ -480,6 +504,13 @@ const store = (
     getSignatureNodes() {
       return getNodes({ type: "signature" });
     },
+
+    /**
+     * Add a signature node to the workflow
+     *
+     * If no node is provide, assumes it is the first llm added
+     * and will use defaults
+     */
     addSignatureNode(node?: Omit<Partial<Node<Signature>>, "type">) {
       // Calculate node position based on the last node or use default position
       const nodePosition =
@@ -488,12 +519,37 @@ const store = (
           get().workflowStore.getWorkflow().nodes
         );
 
-      addNode({
+      const signatureNode = {
         ...DEFAULT_SIGNATURE_NODE_PROPERTIES,
         position: nodePosition,
         ...node,
+      };
+
+      addNode(signatureNode);
+
+      // Find the entry node for the dataset
+      const entryNode = findNodeByType("entry");
+
+      // Handle the case where the entry node is not found
+      if (!entryNode) {
+        // We should handle this better
+        console.warn(
+          "Entry node not found. Unable to connect to signature node."
+        );
+
+        return;
+      }
+
+      // Add edge connecting entry node input to signature node input
+      addEdge({
+        id: `${entryNode.id}-to-${signatureNode.id}`,
+        source: entryNode.id,
+        sourceHandle: "outputs.input",
+        target: signatureNode.id,
+        targetHandle: "inputs.input",
       });
     },
+
     updateSignatureNode(
       nodeId: string,
       updateProperties: Partial<Node<Signature>>

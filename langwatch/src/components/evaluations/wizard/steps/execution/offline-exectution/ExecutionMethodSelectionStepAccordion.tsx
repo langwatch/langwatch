@@ -56,8 +56,6 @@ export function ExecutionMethodSelectionStepAccordion({
     [handleOptionClick]
   );
 
-  console.log({ executionMethod });
-
   return (
     <StepAccordion
       value={EXECUTION_METHOD_SELECTOR_STEP_ACCORDION_VALUE}
