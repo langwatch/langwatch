@@ -10,7 +10,7 @@ from deprecated import deprecated
 from langwatch.utils.transformation import convert_typed_values
 from opentelemetry import trace as trace_api
 from opentelemetry.sdk.trace import TracerProvider
-from typing import List, Optional, Callable, Any, Union
+from typing import Dict, List, Optional, Callable, Any, Union
 from warnings import warn
 import inspect
 
@@ -58,6 +58,9 @@ def get_current_span() -> Optional[LangWatchSpan]:
 class LangWatchTrace:
     """A trace represents a complete request/response cycle in your application.
     It can contain multiple spans representing different operations within that cycle."""
+
+    _root_span_params: Optional[Dict[str, Any]] = None
+    root_span: Optional[LangWatchSpan] = None
 
     def __init__(
         self,
@@ -145,28 +148,30 @@ class LangWatchTrace:
 
     def _create_root_span(self):
         """Create the root span if parameters were provided."""
+
         if self._root_span_params is not None:
             self.root_span = LangWatchSpan(
                 trace=self,
                 **self._root_span_params
             )
-            return self.root_span.__enter__()
+            return self.root_span
 
     async def _create_root_span_async(self):
         """Create the root span asynchronously if parameters were provided."""
+
         if self._root_span_params is not None:
             self.root_span = LangWatchSpan(
                 trace=self,
                 **self._root_span_params
             )
-            return await self.root_span.__aenter__()
+            return self.root_span
 
     def _cleanup(self) -> None:
         """Internal method to cleanup resources with proper locking."""
         with self._lock:
             if self._cleaned_up:
                 return
-            
+
             try:
                 if hasattr(self, 'root_span'):
                     self.root_span._cleanup()
@@ -320,7 +325,8 @@ class LangWatchTrace:
     def __enter__(self) -> 'LangWatchTrace':
         """Makes the trace usable as a context manager."""
         self._context_token = stored_langwatch_trace.set(self)
-        self._create_root_span()
+        self._create_root_span().__enter__()
+
         return self
 
     def __exit__(self, exc_type: Optional[type], exc_value: Optional[BaseException], traceback: Any) -> bool:
@@ -336,6 +342,7 @@ class LangWatchTrace:
         """Makes the trace usable as an async context manager."""
         self._context_token = stored_langwatch_trace.set(self)
         await self._create_root_span_async()
+        await self.root_span.__aenter__()
         return self
 
     async def __aexit__(self, exc_type: Optional[type], exc_value: Optional[BaseException], traceback: Any) -> bool:
@@ -391,7 +398,7 @@ class LangWatchTrace:
         if len(all_args) == 0:
             return
 
-        self.root_span.update(input=json.dumps(convert_typed_values(all_args)))
+        self.root_span.update(input=convert_typed_values(all_args))
 
     def _set_callee_output_information(self, func: Callable[..., Any], output: Any):
         """Set the output of the trace based on the callee function and output."""
@@ -401,7 +408,7 @@ class LangWatchTrace:
         if self.root_span.capture_input is False or self.root_span.output is not None:
             return
 
-        self.root_span.update(output=json.dumps(convert_typed_values(output)))
+        self.root_span.update(output=convert_typed_values(output))
 
     @property
     def disable_sending(self) -> bool:
@@ -481,19 +488,3 @@ def trace(
         evaluations=evaluations,
         skip_root_span=skip_root_span,
     )
-
-class set_langwatch_trace_value:
-    """Context manager for setting the current trace."""
-    trace: Optional[LangWatchTrace] = None
-    token: Optional[contextvars.Token] = None
-
-    def __init__(self, trace: LangWatchTrace):
-        self.trace = trace
-
-    def __enter__(self):
-        self.token = stored_langwatch_trace.set(self.trace)
-        return self.trace
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        stored_langwatch_trace.reset(self.token)
-
