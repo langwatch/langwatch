@@ -7,6 +7,7 @@ from uuid import UUID
 import httpx
 import threading
 from deprecated import deprecated
+from langwatch.attributes import AttributeName
 from langwatch.utils.transformation import convert_typed_values
 from opentelemetry import trace as trace_api
 from opentelemetry.sdk.trace import TracerProvider
@@ -262,6 +263,49 @@ class LangWatchTrace:
                 timeout=15,
             )
             response.raise_for_status()
+
+
+    def update(
+        self,
+        trace_id: Optional[Union[str, UUID]] = None,
+        metadata: Optional[TraceMetadata] = None,
+        expected_output: Optional[str] = None,
+        disable_sending: Optional[bool] = None,
+
+        # root span update
+        name: Optional[str] = None,
+        type: Optional[SpanTypes] = None,
+        input: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
+        output: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
+        error: Optional[Exception] = None,
+        timestamps: Optional[SpanTimestamps] = None,
+        contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
+        model: Optional[str] = None,
+        params: Optional[SpanParams] = None,
+        metrics: Optional[SpanMetrics] = None,
+    ) -> None:
+        ensure_setup()
+
+        if trace_id is not None:
+            metadata[AttributeName.DeprecatedTraceId] = trace_id
+        if expected_output is not None:
+            self._expected_output = expected_output
+        if disable_sending is not None:
+            get_instance().disable_sending = disable_sending
+
+        self.root_span.set_attributes(metadata)
+        self.root_span.update(
+            name=name,
+            type=type,
+            input=input,
+            output=output,
+            error=error,
+            timestamps=timestamps,
+            contexts=contexts,
+            model=model,
+            params=params,
+            metrics=metrics,
+        )
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Makes the trace callable as a decorator."""
