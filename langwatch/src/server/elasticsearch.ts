@@ -45,23 +45,12 @@ export const esClient = async (projectId?: string, organizationId?: string) => {
     const organization = await prisma.organization.findUnique({
       where: { id: organizationId },
     });
-
-    console.log("organization", organization);
-
     orgElasticsearchNodeUrl = organization?.elasticsearchNodeUrl ?? null;
     orgElasticsearchApiKey = organization?.elasticsearchApiKey ?? null;
-    console.log("Using organization elasticsearch details", {
-      orgElasticsearchNodeUrl,
-      orgElasticsearchApiKey,
-    });
   } else if (projectId) {
     const project = await getOrgElasticsearchDetailsFromProject(projectId);
     orgElasticsearchNodeUrl = project?.elasticsearchNodeUrl ?? null;
     orgElasticsearchApiKey = project?.elasticsearchApiKey ?? null;
-    console.log("Using project elasticsearch details", {
-      orgElasticsearchNodeUrl,
-      orgElasticsearchApiKey,
-    });
   }
 
   const useOrgSettings = orgElasticsearchNodeUrl && orgElasticsearchApiKey;
