@@ -47,7 +47,7 @@ class WorkflowModule(ReportingModule):
 
         {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
         {% if node.type == "evaluator" %}
-        self.{{ node.id }} = asyncify(self.with_reporting({{ evaluator_instance(node) }}, "{{ node.id }}"))
+        self.{{ node.id }} = asyncify(self.with_reporting({{ evaluator_instance(workflow, node) }}, "{{ node.id }}"))
         {% else %}
         self.{{ node.id }} = asyncify(self.with_reporting({{ node_templates[node.id][0] }}(), "{{ node.id }}"))
         {% endif %}
@@ -78,6 +78,7 @@ class WorkflowModule(ReportingModule):
             {# Now generate execution layers #}
             {% set executed = {'nodes': ['entry']} %}
             {% set layers = [] %}
+            {% set previous_executed_count = {'value': 0} %}
 
             {% if debug_level > 1 %}
             # Dependency graph: {{ dependency_graph }}
@@ -87,6 +88,20 @@ class WorkflowModule(ReportingModule):
             {% set remaining_nodes = nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
             {% for i in range(nodes|length) %}
                 {% set current_layer = [] %}
+
+                {# Check if we're making progress - only if there are still unprocessed nodes #}
+                {% set unprocessed_nodes = [] %}
+                {% for node in remaining_nodes %}
+                    {% if node.id not in executed.nodes %}
+                        {% set _ = unprocessed_nodes.append(node.id) %}
+                    {% endif %}
+                {% endfor %}
+
+                {% if unprocessed_nodes and previous_executed_count.value == executed.nodes|length and i > 0 %}
+                    {{ raise("Cyclic dependency detected") }}
+                {% endif %}
+                {% set _ = previous_executed_count.update({'value': executed.nodes|length}) %}
+
                 {% for node in remaining_nodes %}
                     {% set ns = namespace(can_execute=true) %}
                     {% for dep in dependency_graph[node.id] %}

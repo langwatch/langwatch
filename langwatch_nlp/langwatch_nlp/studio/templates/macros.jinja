@@ -23,7 +23,7 @@ dspy.LM(
 {% endif %}
 {% endmacro %}
 
-{% macro evaluator_instance(node) %}
+{% macro evaluator_instance(workflow, node) %}
 {% if not node.data.cls %}
 {{ raise("Evaluator class not specified for " ~ node.data.name) }}
 {% endif %}

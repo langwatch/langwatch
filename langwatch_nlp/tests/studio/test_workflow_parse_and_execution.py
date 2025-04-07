@@ -306,12 +306,13 @@ simple_workflow = Workflow(
     state=WorkflowState(execution=None, evaluation=None),
 )
 
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_parse_workflow():
     disable_dsp_caching()
 
-    class_name, code = parse_workflow(simple_workflow, format=True)
+    class_name, code = parse_workflow(simple_workflow, format=True, debug_level=1)
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
     result: PredictionWithEvaluationAndMetadata = await instance(
@@ -603,7 +604,7 @@ async def test_parse_parallel_execution_workflow():
         state=WorkflowState(execution=None, evaluation=None),
     )
 
-    class_name, code = parse_workflow(workflow, format=True)
+    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
     result: PredictionWithEvaluationAndMetadata = await instance(
@@ -636,7 +637,7 @@ async def test_parse_workflow_with_orphan_nodes():
             type="signature",
         )
     )
-    class_name, code = parse_workflow(workflow, format=True)
+    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
     print("\n\ncode", code, "\n\n")
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
@@ -650,8 +651,169 @@ async def test_parse_workflow_with_orphan_nodes():
     assert result.get_cost() > 0
     assert result.get_duration() > 0
 
-# TODO: test infinite loops
-# TODO: test langwatch evaluators with settings
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_parse_workflow_with_infinite_loop():
+    disable_dsp_caching()
+    workflow = copy.deepcopy(simple_workflow)
+    workflow.nodes.append(
+        SignatureNode(
+            id="infinite_loop",
+            data=Signature(
+                name="InfiniteLoop",
+                cls=None,
+                parameters=[llm_field],
+                inputs=[
+                    Field(
+                        identifier="question",
+                        type=FieldType.str,
+                        optional=None,
+                        value=None,
+                        desc=None,
+                        prefix=None,
+                        hidden=None,
+                    ),
+                    Field(
+                        identifier="second_question",
+                        type=FieldType.str,
+                        optional=None,
+                        value=None,
+                        desc=None,
+                        prefix=None,
+                        hidden=None,
+                    ),
+                ],
+                outputs=[
+                    Field(
+                        identifier="answer",
+                        type=FieldType.str,
+                        optional=None,
+                        value=None,
+                        desc=None,
+                        prefix=None,
+                        hidden=None,
+                    )
+                ],
+                execution_state=None,
+            ),
+            type="signature",
+        )
+    )
+    workflow.edges.append(
+        Edge(
+            id="e0-1",
+            source="entry",
+            sourceHandle="outputs.question",
+            target="infinite_loop",
+            targetHandle="inputs.question",
+            type="default",
+        )
+    )
+    workflow.edges.append(
+        Edge(
+            id="e1-2",
+            source="infinite_loop",
+            sourceHandle="outputs.answer",
+            target="generate_query",
+            targetHandle="inputs.question",
+            type="default",
+        )
+    )
+    workflow.edges.append(
+        Edge(
+            id="e2-3",
+            source="generate_query",
+            sourceHandle="outputs.answer",
+            target="infinite_loop",
+            targetHandle="inputs.second_question",
+            type="default",
+        )
+    )
+
+    with pytest.raises(Exception) as e:
+        parse_workflow(workflow, format=True, debug_level=2)
+
+    assert "Cyclic dependency detected" in str(e.value)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_langwatch_evaluator_with_settings():
+    disable_dsp_caching()
+    workflow = copy.deepcopy(simple_workflow)
+    workflow.nodes.append(
+        EvaluatorNode(
+            id="langwatch_evaluator",
+            data=Evaluator(
+                name="PII Detection Evaluator",
+                cls="LangWatchEvaluator",
+                evaluator="presidio/pii_detection",
+                inputs=[
+                    Field(
+                        identifier="input",
+                        type=FieldType.str,
+                        optional=None,
+                        value=None,
+                        desc=None,
+                        prefix=None,
+                        hidden=None,
+                    ),
+                ],
+                outputs=[],
+                parameters=[
+                    Field(
+                        identifier="min_threshold",
+                        type=FieldType.str,
+                        optional=None,
+                        value="0.5",
+                        desc=None,
+                        prefix=None,
+                        hidden=None,
+                    ),
+                    Field(
+                        identifier="entities",
+                        type=FieldType.str,
+                        optional=None,
+                        value={
+                            "credit_card": True,
+                            "email_address": True,
+                            "person": True,
+                            "location": True,
+                        },
+                        desc=None,
+                        prefix=None,
+                    ),
+                ],
+            ),
+            type="evaluator",
+        )
+    )
+    workflow.edges.append(
+        Edge(
+            id="e0-1",
+            source="generate_answer",
+            sourceHandle="outputs.answer",
+            target="langwatch_evaluator",
+            targetHandle="inputs.input",
+            type="default",
+        )
+    )
+
+    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+    Module = get_component_class(component_code=code, class_name=class_name)
+    instance = Module()  # type: ignore
+    result: PredictionWithEvaluationAndMetadata = await instance(
+        inputs={
+            "question": "What is the capital of France?",
+            "gold_answer": "Paris",
+        }
+    )
+
+    assert result.get_cost() > 0
+    assert result.get_duration() > 0
+
+
 # TODO: test until_node_id
 # TODO: test evaluate_prediction
 # TODO: test different formats auto-parsing

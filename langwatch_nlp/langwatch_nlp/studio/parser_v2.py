@@ -66,7 +66,7 @@ def render_template(template_name: str, format=False, **kwargs) -> str:
     return code
 
 
-def parse_workflow(workflow: Workflow, format=False) -> Tuple[str, str]:
+def parse_workflow(workflow: Workflow, format=False, debug_level=0) -> Tuple[str, str]:
     # Find all reachable nodes from entry
     nodes = find_reachable_nodes(workflow.nodes, workflow.edges)
 
@@ -78,7 +78,7 @@ def parse_workflow(workflow: Workflow, format=False) -> Tuple[str, str]:
         "workflow.py.jinja",
         format=format,
         workflow=workflow,
-        debug_level=1,
+        debug_level=debug_level,
         node_templates=node_templates,
         nodes=nodes,
     )
@@ -95,7 +95,7 @@ def parse_and_instantiate_workflow(
     return cast(Type[WorkflowModule], Module)
 
 
-def parse_component(node: Node, workflow: Workflow, format=False) -> Tuple[str, str]:
+def parse_component(node: Node, workflow: Workflow, format=False, debug_level=0) -> Tuple[str, str]:
     match node.type:
         case "signature":
             parameters = {}
@@ -135,7 +135,7 @@ def parse_component(node: Node, workflow: Workflow, format=False) -> Tuple[str, 
             return f"{node.data.name}", render_template(
                 "llm.py.jinja",
                 format=format,
-                debug_level=1,
+                debug_level=debug_level,
                 node_id=node.id,
                 component=node.data,
                 workflow=workflow,
