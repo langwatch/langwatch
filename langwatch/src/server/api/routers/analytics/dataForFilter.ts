@@ -46,7 +46,7 @@ export const dataForFilter = protectedProcedure
       },
     });
 
-    const client = await esClient(undefined, input.projectId);
+    const client = await esClient(input.projectId);
     const response = await client.search({
       index: TRACE_INDEX.alias,
       body: {

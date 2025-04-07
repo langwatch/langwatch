@@ -251,7 +251,7 @@ const processCollectorJob_ = async (
   let existingEvaluations: Evaluation[] | undefined;
   if (existingTrace?.inserted_at) {
     // TODO: check for quickwit
-    const client = await esClient(undefined, project.id);
+    const client = await esClient(project.id);
     const existingTraceResponse = await client.search<ElasticSearchTrace>({
       index: TRACE_INDEX.alias,
       body: {
@@ -393,7 +393,7 @@ const updateTrace = async (
   evaluations: Evaluation[] | undefined
 ) => {
   if (env.IS_QUICKWIT) {
-    const client = await esClient(undefined, trace.project_id);
+    const client = await esClient(trace.project_id);
     return await client.update({
       index: TRACE_INDEX.alias,
       id: traceIndexId({
@@ -411,7 +411,7 @@ const updateTrace = async (
   }
 
   try {
-    const client = await esClient(undefined, trace.project_id);
+    const client = await esClient(trace.project_id);
     await client.update({
       index: TRACE_INDEX.alias,
       id: traceIndexId({
@@ -539,7 +539,7 @@ export const processCollectorCheckAndAdjustJob = async (
   debug(`Post-processing job ${id}`);
 
   const { traceId, projectId } = data;
-  const client = await esClient(undefined, projectId);
+  const client = await esClient(projectId);
   const existingTraceResponse = await client.search<ElasticSearchTrace>({
     index: TRACE_INDEX.alias,
     body: {
@@ -741,7 +741,7 @@ export const fetchExistingMD5s = async (
     }
   | undefined
 > => {
-  const client = await esClient(undefined, projectId);
+  const client = await esClient(projectId);
   const existingTraceResponse = await client.search<ElasticSearchTrace>({
     index: TRACE_INDEX.alias,
     version: true,

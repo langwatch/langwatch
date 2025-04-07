@@ -8,5 +8,6 @@ export const migrate = async (migrationKey: string, client: ElasticClient) => {
     indexSpec: TRACE_INDEX,
     mapping: traceMapping as Record<string, MappingProperty>,
     migrationKey,
+    client,
   });
 };

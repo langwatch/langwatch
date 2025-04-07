@@ -440,7 +440,7 @@ export const experimentsRouter = createTRPCRouter({
         input.projectId,
         input.experimentSlug
       );
-      const client = await esClient(undefined, input.projectId);
+      const client = await esClient(input.projectId);
 
       const dspySteps = await client.search<DSPyStep>({
         index: DSPY_STEPS_INDEX.alias,
@@ -560,7 +560,7 @@ export const experimentsRouter = createTRPCRouter({
         input.experimentSlug
       );
 
-      const client = await esClient(undefined, input.projectId);
+      const client = await esClient(input.projectId);
       const dspyStep = await client.search<DSPyStep>({
         index: DSPY_STEPS_INDEX.alias,
         size: 10_000,
@@ -627,7 +627,7 @@ export const experimentsRouter = createTRPCRouter({
         runId: input.runId,
       });
 
-      const client = await esClient(undefined, input.projectId);
+      const client = await esClient(input.projectId);
       const batchEvaluationRun = await client.get<ESBatchEvaluation>({
         index: BATCH_EVALUATION_INDEX.alias,
         id: id,
@@ -672,7 +672,7 @@ export const experimentsRouter = createTRPCRouter({
       await prisma.$transaction(async (tx) => {
         // Delete experiment-related data in Elasticsearch
         try {
-          const client = await esClient(undefined, input.projectId);
+          const client = await esClient(input.projectId);
           await client.deleteByQuery({
             index: BATCH_EVALUATION_INDEX.alias,
             body: {
@@ -864,7 +864,7 @@ const getExperimentBatchEvaluationRuns = async (
     | "total"
   >;
 
-  const client = await esClient(undefined, projectId);
+  const client = await esClient(projectId);
   const batchEvaluationRuns = await client.search<ESBatchEvaluationRunInfo>({
     index: BATCH_EVALUATION_INDEX.alias,
     size: 10_000,

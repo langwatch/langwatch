@@ -261,7 +261,7 @@ const processBatchEvaluation = async (
     },
   };
 
-  const client = await esClient(undefined, project.id);
+  const client = await esClient(project.id);
   await client.update({
     index: BATCH_EVALUATION_INDEX.alias,
     id,

@@ -19,8 +19,8 @@ import { env } from "../env.mjs";
 import { execSync } from "child_process";
 import { prisma } from "../server/db";
 import { Client as ElasticClient } from "@elastic/elasticsearch";
-
 import { migrations as importedMigrations } from "../../elastic/migrations";
+
 const migrations: { [key: string]: any } = importedMigrations;
 
 export default async function execute() {

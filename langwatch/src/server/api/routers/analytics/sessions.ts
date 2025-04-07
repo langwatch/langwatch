@@ -11,7 +11,7 @@ export const sessionsVsPreviousPeriod = protectedProcedure
   .input(sharedFiltersInputSchema)
   .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
   .query(async ({ input }) => {
-    const client = await esClient(undefined, input.projectId);
+    const client = await esClient(input.projectId);
     const { previousPeriodStartDate } = currentVsPreviousDates(input);
 
     const sessionsQuery = (startDate: number, endDate: number) =>
