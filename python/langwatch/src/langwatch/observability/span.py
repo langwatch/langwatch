@@ -9,7 +9,7 @@ import threading
 import inspect
 
 from langwatch.attributes import AttributeName
-from langwatch.utils.transformation import autoconvert_rag_contexts, convert_typed_values
+from langwatch.utils.transformation import SerializableWithStringFallback, rag_contexts, convert_typed_values, truncate_object_recursively
 from opentelemetry import trace as trace_api, context
 from opentelemetry.trace import SpanKind, Context, _Links, Span as OtelSpan, Status, StatusCode, set_span_in_context, get_current_span
 from opentelemetry.util.types import Attributes
@@ -114,11 +114,20 @@ class LangWatchSpan:
         if self.metrics:
             full_attributes.update(self.metrics)
         if self.contexts:
-            full_attributes[AttributeName.LangWatchRAGContexts] = autoconvert_rag_contexts(self.contexts)
+            full_attributes[AttributeName.LangWatchRAGContexts] = json.dumps(truncate_object_recursively(
+                rag_contexts(self.contexts),
+                max_string_length=self.trace.max_string_length,
+            ), cls=SerializableWithStringFallback),
         if self.input and self.capture_input:
-            full_attributes[AttributeName.LangWatchInput] = self.input
+            full_attributes[AttributeName.LangWatchInput] = json.dumps(truncate_object_recursively(
+                convert_typed_values(self.input),
+                max_string_length=self.trace.max_string_length,
+            ), cls=SerializableWithStringFallback),
         if self.output and self.capture_output:
-            full_attributes[AttributeName.LangWatchOutput] = self.output
+            full_attributes[AttributeName.LangWatchOutput] = json.dumps(truncate_object_recursively(
+                convert_typed_values(self.output),
+                max_string_length=self.trace.max_string_length,
+            ), cls=SerializableWithStringFallback),
         if self.timestamps:
             full_attributes.update(self.timestamps)
 
@@ -150,37 +159,34 @@ class LangWatchSpan:
 
         # Create the underlying OpenTelemetry span with the proper context
         token = context.attach(current_context)
+        self._span = tracer.start_span(
+            name=self.name or self.type,
+            context=self.span_context,
+            kind=self.kind,
+            attributes=full_attributes,
+            links=self.links,
+            start_time=self.start_time,
+            record_exception=self.record_exception,
+            set_status_on_exception=self.set_status_on_exception,
+        )
+
+        # Set error if provided
+        if self.error:
+            self.record_error(self.error)
+
+        # Set this span in both LangWatch and OpenTelemetry contexts
         try:
-            self._span = tracer.start_span(
-                name=self.name or self.type,
-                context=self.span_context,
-                kind=self.kind,
-                attributes=full_attributes,
-                links=self.links,
-                start_time=self.start_time,
-                record_exception=self.record_exception,
-                set_status_on_exception=self.set_status_on_exception,
-            )
+            self._context_token = stored_langwatch_span.set(self)
+        except Exception as e:
+            warn(f"Failed to set LangWatch span context: {e}")
 
-            # Set error if provided
-            if self.error:
-                self.record_error(self.error)
-
-            # Set this span in both LangWatch and OpenTelemetry contexts
-            try:
-                self._context_token = stored_langwatch_span.set(self)
-            except Exception as e:
-                warn(f"Failed to set LangWatch span context: {e}")
-
-            try:
-                self._otel_token = context.attach(set_span_in_context(self._span))
-            except Exception as e:
-                warn(f"Failed to set OpenTelemetry span context: {e}")
-                if self._context_token is not None:
-                    stored_langwatch_span.reset(self._context_token)
-                    self._context_token = None
-        finally:
-            context.detach(token)
+        try:
+            self._otel_token = context.attach(set_span_in_context(self._span))
+        except Exception as e:
+            warn(f"Failed to set OpenTelemetry span context: {e}")
+            if self._context_token is not None:
+                stored_langwatch_span.reset(self._context_token)
+                self._context_token = None
 
     def record_error(self, error: Exception) -> None:
         """Record an error in this span."""
@@ -225,6 +231,7 @@ class LangWatchSpan:
         **kwargs: Any,
     ) -> None:
         ensure_setup()
+
         attributes = dict(kwargs)
 
         if name is not None:
@@ -235,9 +242,15 @@ class LangWatchSpan:
         if type is not None:
             attributes[AttributeName.LangWatchSpanType] = type
         if self.capture_input and input is not None:
-            attributes[AttributeName.LangWatchInput] = deepcopy(input)
+            attributes[AttributeName.LangWatchInput] = json.dumps(truncate_object_recursively(
+                convert_typed_values(deepcopy(input)),
+                max_string_length=self.trace.max_string_length,
+            ), cls=SerializableWithStringFallback),
         if self.capture_output and output is not None:
-            attributes[AttributeName.LangWatchOutput] = deepcopy(output)
+            attributes[AttributeName.LangWatchOutput] = json.dumps(truncate_object_recursively(
+                convert_typed_values(deepcopy(output)),
+                max_string_length=self.trace.max_string_length,
+            ), cls=SerializableWithStringFallback),
         if error is not None:
             self.record_error(error)
         if timestamps is not None:
@@ -246,7 +259,10 @@ class LangWatchSpan:
             else:
                 attributes[AttributeName.LangWatchTimestamps] = timestamps
         if contexts is not None:
-            attributes[AttributeName.LangWatchRAGContexts] = json.dumps(autoconvert_rag_contexts(contexts))
+            attributes[AttributeName.LangWatchRAGContexts] = json.dumps(truncate_object_recursively(
+                rag_contexts(contexts),
+                max_string_length=self.trace.max_string_length,
+            ), cls=SerializableWithStringFallback),
         if model is not None:
             attributes[AttributeName.GenAIRequestModel] = model
         if params is not None:
@@ -465,7 +481,7 @@ class LangWatchSpan:
         if len(all_args) == 0:
             return
 
-        self.update(input=json.dumps(convert_typed_values(all_args)))
+        self.update(input=convert_typed_values(all_args))
 
     def _set_callee_output_information(self, func: Callable[..., Any], output: Any):
         if self.name is None:
@@ -473,7 +489,7 @@ class LangWatchSpan:
         if self.capture_output is False or self.output is not None:
             return
 
-        self.update(output=json.dumps(convert_typed_values(output)))
+        self.update(output=convert_typed_values(output))
 
     @staticmethod
     def wrap_otel_span(otel_span: 'trace_api.Span', trace: Optional['LangWatchTrace'] = None) -> 'LangWatchSpan':
@@ -600,18 +616,3 @@ def span(
         record_exception=record_exception,
         set_status_on_exception=set_status_on_exception,
     )
-
-class set_span_value:
-    """Context manager for setting the current span."""
-    span: Optional[LangWatchSpan] = None
-    token: Optional[contextvars.Token] = None
-
-    def __init__(self, span: LangWatchSpan):
-        self.span = span
-
-    def __enter__(self):
-        self.token = stored_langwatch_span.set(self.span)
-        return self.span
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        stored_langwatch_span.reset(self.token)
