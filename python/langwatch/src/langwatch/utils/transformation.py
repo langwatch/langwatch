@@ -1,7 +1,10 @@
+
+
+from ctypes import Union
+from langwatch.domain import ChatMessage, EvaluationResult, SpanInputOutput, TypedValueChatMessages, TypedValueEvaluationResult, TypedValueJson, TypedValueRaw, TypedValueText, RAGChunk
 import json
 from typing import List, Union, cast
-from langwatch.domain import RAGChunk
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 
 class SerializableWithStringFallback(json.JSONEncoder):
@@ -14,6 +17,7 @@ class SerializableWithStringFallback(json.JSONEncoder):
             return super().default(o)
         except:
             return str(o)
+
 
 def validate_safe(type_, item: dict, min_required_keys_for_pydantic_1: List[str]):
     import pydantic
@@ -49,3 +53,42 @@ def autoconvert_rag_contexts(value: Union[List[RAGChunk], List[str]]) -> List[RA
     raise ValueError(
         'Invalid RAG contexts, expected list of string or list of {"document_id": Optional[str], "chunk_id": Optional[str], "content": str} dicts'
     )
+
+
+def convert_typed_values(
+    value: Union[SpanInputOutput, ChatMessage, str, dict, list]
+) -> SpanInputOutput:
+    value_ = value
+
+    if type(value_) == str:
+        return TypedValueText(type="text", value=value_)
+    if type(value_) == dict and validate_safe(
+        SpanInputOutput, value_, ["type", "value"]
+    ):
+        return cast(SpanInputOutput, value_)
+    if (
+        type(value_) == list
+        and len(value_) > 0
+        and all(validate_safe(ChatMessage, item, ["role"]) for item in value_)
+    ):
+        return TypedValueChatMessages(type="chat_messages", value=value_)
+
+    if isinstance(value_, BaseModel) and value_.__class__.__name__ in [
+        "EvaluationResult",
+        "EvaluationResultSkipped",
+        "EvaluationResultError",
+    ]:
+        return TypedValueEvaluationResult(
+            type="evaluation_result",
+            value=cast(
+                EvaluationResult,
+                value_.model_dump(exclude_unset=False, exclude_none=True),
+            ),
+        )
+
+    try:
+        json_ = json.dumps(value, cls=SerializableWithStringFallback)
+        return TypedValueJson(type="json", value=json.loads(json_))
+    except:
+        return TypedValueRaw(type="raw", value=str(value_))
+

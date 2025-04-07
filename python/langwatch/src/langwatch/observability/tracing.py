@@ -1,10 +1,13 @@
 import contextvars
+import functools
+import json
 from logging import warn
 from types import ModuleType
 from uuid import UUID
 import httpx
 import threading
 from deprecated import deprecated
+from langwatch.utils.transformation import convert_typed_values
 from opentelemetry import trace as trace_api
 from opentelemetry.sdk.trace import TracerProvider
 from typing import List, Optional, Callable, Any, Union
@@ -97,10 +100,13 @@ class LangWatchTrace:
             warn("trace_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `trace_id` will be mapped to `deprecated.trace_id` in the trace's metadata.")
             metadata["deprecated.trace_id"] = trace_id
 
-        # Determine which tracer provider to use
         if disable_sending:
-            tracer_provider = trace_api.NoOpTracerProvider()
-        elif tracer_provider is not None:
+            client = get_instance()
+            if client:
+                client.disable_sending = True
+
+        # Determine which tracer provider to use
+        if tracer_provider is not None:
             # Use the explicitly provided tracer provider
             pass
         else:
@@ -184,7 +190,7 @@ class LangWatchTrace:
         client: Any,
     ):
         from openinference.instrumentation.openai import OpenAIInstrumentor
-        OpenAIInstrumentor().instrument(tracer_provider=trace_api.get_tracer_provider())
+        OpenAIInstrumentor().instrument()
 
     @deprecated(
         reason="This method of instrumenting LiteLLM is deprecated and will be removed in a future version. Please refer to the docs to see the new way to instrument LiteLLM."
@@ -255,23 +261,59 @@ class LangWatchTrace:
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Makes the trace callable as a decorator."""
 
-        # This is a hack to set the name of the root span to the name of the function
-        self._root_span_params["name"] = self._root_span_params["name"] or args[0].__name__
-
         if len(args) == 1 and callable(args[0]) and not kwargs:
             func: Callable[..., Any] = args[0]
 
-            if inspect.iscoroutinefunction(func):
+            if inspect.isasyncgenfunction(func):
+                @functools.wraps(func)
                 async def wrapper(*wargs: Any, **wkwargs: Any) -> Any:
-                    async with self:  # Use async context manager for async functions
-                        result = await func(*wargs, **wkwargs)
-                        return result
+                    with self:
+                        self._set_callee_input_information(func, *wargs, **wkwargs)
+                        items = []
+                        async for item in func(*args, **kwargs):
+                            items.append(item)
+                            yield item
+
+                        output = (
+                            "".join(items)
+                            if all(isinstance(item, str) for item in items)
+                            else items
+                        )
+                        self._set_callee_output_information(func, output)
+                return wrapper
+            elif inspect.isgeneratorfunction(func):
+                @functools.wraps(func)
+                async def wrapper(*wargs: Any, **wkwargs: Any) -> Any:
+                    with self:
+                        self._set_callee_input_information(func, *wargs, **wkwargs)
+                        items = []
+                        for item in func(*args, **kwargs):
+                            items.append(item)
+                            yield item
+
+                        output = (
+                            "".join(items)
+                            if all(isinstance(item, str) for item in items)
+                            else items
+                        )
+                        self._set_callee_output_information(func, output)
+                return wrapper
+            elif inspect.iscoroutinefunction(func):
+                async def wrapper(*wargs: Any, **wkwargs: Any) -> Any:
+                    async with self:
+                        self._set_callee_input_information(func, *wargs, **wkwargs)
+                        output = await func(*wargs, **wkwargs)
+                        self._set_callee_output_information(func, output)
+                        return output
                 return wrapper
             else:
+                @functools.wraps(func)
                 def wrapper(*wargs: Any, **wkwargs: Any) -> Any:
-                    with self:  # Use regular context manager for sync functions
-                        result = func(*wargs, **wkwargs)
-                        return result
+                    with self:
+                        self._set_callee_input_information(func, *wargs, **wkwargs)
+                        output = func(*wargs, **wkwargs)
+                        self._set_callee_output_information(func, output)
+                        return output
                 return wrapper
         return self
 
@@ -312,6 +354,73 @@ class LangWatchTrace:
     # Forward all other methods to the underlying tracer
     def __getattr__(self, name: str) -> Any:
         return getattr(self.tracer, name)
+
+    def _set_callee_input_information(self, func: Callable[..., Any], *args: Any, **kwargs: Any):
+        """Set the name and input of the trace based on the callee function and arguments."""
+
+        if self.root_span.name is None:
+            self.root_span.update_name(func.__name__)
+        if self.root_span.capture_input is False or self.root_span.input is not None:
+            return
+        
+        sig = inspect.signature(func)
+        parameters = list(sig.parameters.values())
+
+        all_args = {
+            str(parameter.name): value for parameter, value in zip(parameters, args)
+        }
+
+        # Skip self parameters because it doesn't really help with debugging, becomes just noise
+        if (
+            "self" in all_args
+            and len(all_args) > 0
+            and parameters[0].name == "self"
+        ):
+            self_ = all_args["self"]
+            if self.root_span.name is None:
+                try:
+                    self.root_span.update_name(f"{self_.__class__.__name__}.{func.__name__}")
+                except:
+                    pass
+            del all_args["self"]
+
+        if kwargs and len(kwargs) > 0:
+            if kwargs:
+                all_args.update(kwargs)
+
+        if len(all_args) == 0:
+            return
+
+        self.root_span.update(input=json.dumps(convert_typed_values(all_args)))
+
+    def _set_callee_output_information(self, func: Callable[..., Any], output: Any):
+        """Set the output of the trace based on the callee function and output."""
+
+        if self.root_span.name is None:
+            self.root_span.update_name(func.__name__)
+        if self.root_span.capture_input is False or self.root_span.output is not None:
+            return
+
+        self.root_span.update(output=json.dumps(convert_typed_values(output)))
+
+    @property
+    def disable_sending(self) -> bool:
+        """Get whether sending is disabled."""
+        ensure_setup()
+        client = get_instance()
+        return client.disable_sending
+
+    @disable_sending.setter
+    @deprecated(
+        reason="Setting disable_sending on the trace is deprecated. Please set it on the LangWatch client instance instead using `langwatch.get_instance().disable_sending = True`"
+    )
+    def disable_sending(self, value: bool) -> None:
+        """Set whether sending is disabled. This will also update the client's setting."""
+        ensure_setup()
+        client = get_instance()
+        if client is not None:
+            client.disable_sending = value
+
 
 def trace(
     trace_id: Optional[Union[str, UUID]] = None,
