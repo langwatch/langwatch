@@ -45,7 +45,7 @@ import {
   TypeLabel,
 } from "../nodes/Nodes";
 
-import { LLMConfigField } from "./modals/llm-config/LLMConfigModal";
+import { LLMConfigField } from "./modals/llm-config/LLMConfigField";
 import { RenderCode } from "../../../components/code/RenderCode";
 import { CodeEditorModal } from "../code/CodeEditorModal";
 import { Tooltip } from "../../../components/ui/tooltip";

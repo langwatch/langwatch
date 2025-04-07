@@ -11,10 +11,13 @@ import {
 import { entryNode } from "../../../../optimization_studio/templates/blank";
 import type {
   BaseComponent,
+  Component,
   Evaluator,
+  Field,
   Signature,
   Workflow,
 } from "../../../../optimization_studio/types/dsl";
+import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import { datasetColumnsToFields } from "../../../../optimization_studio/utils/datasetUtils";
 import { nameToId } from "../../../../optimization_studio/utils/nodeUtils";
 import { convertEvaluator } from "../../../../optimization_studio/utils/registryUtils";
@@ -22,6 +25,29 @@ import type { DatasetColumns } from "../../../../server/datasets/types";
 import { mappingStateSchema } from "../../../../server/tracer/tracesMapping";
 import { checkPreconditionsSchema } from "../../../../server/evaluations/types.generated";
 import { MODULES } from "~/optimization_studio/registry";
+
+const DEFAULT_LLM_CONFIG = {
+  model: "gpt-4o-mini",
+};
+
+const DEFAULT_SIGNATURE_NODE_PROPERTIES = {
+  id: "signature-node",
+  position: { x: 0, y: 0 },
+  deletable: true,
+  data: {
+    // Default signature data
+    ...MODULES.signature,
+    parameters: [
+      ...(MODULES.signature.parameters ?? []),
+      {
+        identifier: "llm",
+        type: "llm" as const,
+        value: DEFAULT_LLM_CONFIG,
+      },
+    ],
+  },
+  type: "signature",
+};
 
 export const EVALUATOR_CATEGORIES = [
   "expected_answer",
@@ -149,6 +175,24 @@ type EvaluationWizardStore = State & {
   // Signature Node Management
   getSignatureNodes: () => Node<Signature>[];
   addSignatureNode: (node?: Omit<Partial<Node<Signature>>, "type">) => void;
+  updateSignatureNode: (nodeId: string, node: Partial<Node<Signature>>) => void;
+  updateSignatureNodeLLMConfigValue: (
+    nodeId: string,
+    llmConfig: LLMConfig
+  ) => void;
+
+  // Generic node management
+  updateNode: <T extends BaseComponent>(
+    nodeId: string,
+    updateProperties: Partial<Node<T>>
+  ) => void;
+  updateNodeParameter: <T extends BaseComponent, V>(
+    nodeId: string,
+    parameterId: string,
+    value: V,
+    type: Field["type"]
+  ) => void;
+
   workflowStore: WorkflowStore;
 };
 
@@ -439,34 +483,49 @@ const store = (
       // Calculate node position based on the last node or use default position
       const nodePosition =
         node?.position ??
-        (() => {
-          const currentNodes = get().workflowStore.getWorkflow().nodes;
-          const defaultPosition = { x: 0, y: 0 };
-          const lastNode = currentNodes[currentNodes.length - 1];
-
-          if (lastNode) {
-            const X_OFFSET = 200;
-            return {
-              x: lastNode.position.x + (lastNode.width ?? 0) + X_OFFSET,
-              y: lastNode.position.y,
-            };
-          }
-
-          return defaultPosition;
-        })();
+        calcNextNodePositionFromCurrentNodes(
+          get().workflowStore.getWorkflow().nodes
+        );
 
       addNode({
-        // Default node properties
-        id: "signature-node",
+        ...DEFAULT_SIGNATURE_NODE_PROPERTIES,
         position: nodePosition,
-        deletable: true,
-        data: {
-          // Default signature data
-          ...MODULES.signature,
-        },
-        // Override the default node data
         ...node,
-        type: "signature",
+      });
+    },
+    updateSignatureNode(
+      nodeId: string,
+      updateProperties: Partial<Node<Signature>>
+    ) {
+      get().workflowStore.setWorkflow((current) => {
+        return updateNode(current, nodeId, (node) => ({
+          ...node,
+          ...updateProperties,
+        }));
+      });
+    },
+    updateSignatureNodeLLMConfigValue(nodeId: string, llmConfig: LLMConfig) {
+      get().workflowStore.setWorkflow((current) => {
+        return updateNode(current, nodeId, (node) =>
+          updateNodeParameter(node, "llm", llmConfig, "llm")
+        );
+      });
+    },
+    // Generic node update function
+    updateNode(nodeId, updateProperties) {
+      get().workflowStore.setWorkflow((current) => {
+        return updateNode(current, nodeId, (node) => ({
+          ...node,
+          ...updateProperties,
+        }));
+      });
+    },
+    // Generic node parameter update function
+    updateNodeParameter(nodeId, parameterId, value, type) {
+      get().workflowStore.setWorkflow((current) => {
+        return updateNode(current, nodeId, (node) =>
+          updateNodeParameter(node, parameterId, value, type)
+        );
       });
     },
     workflowStore: createWorkflowStore(set, get),
@@ -506,3 +565,65 @@ const createWorkflowStore = (
 };
 
 export const useEvaluationWizardStore = create<EvaluationWizardStore>()(store);
+
+const calcNextNodePositionFromCurrentNodes = (
+  currentNodes: Node<BaseComponent>[]
+) => {
+  const lastNode = currentNodes[currentNodes.length - 1];
+  if (lastNode) {
+    return {
+      x: lastNode.position.x + (lastNode.width ?? 0) + 200,
+      y: lastNode.position.y,
+    };
+  }
+  return { x: 0, y: 0 };
+};
+
+type NodeUpdater<C extends Component> = (node: Node<C>) => Node<C>;
+
+/**
+ * Generic node update function
+ * Will update the node with the updater function
+ */
+function updateNode(
+  workflow: Workflow,
+  nodeId: string,
+  updater: NodeUpdater<Component>
+): Workflow {
+  return {
+    ...workflow,
+    nodes: workflow.nodes.map((node) =>
+      node.id === nodeId ? updater(node) : node
+    ),
+  };
+}
+
+/**
+ * TODO: Reconsider this approach
+ * Generic parameter update function
+ * Will add the parameter if it doesn't exist and update the value if it does
+ */
+function updateNodeParameter(
+  node: Node<Component>,
+  identifier: string,
+  value: any,
+  type: Field["type"]
+): Node<Component> {
+  const parameters = node.data.parameters ?? [];
+  const paramIndex = parameters.findIndex((p) => p.identifier === identifier);
+
+  const updatedParameters =
+    paramIndex === -1
+      ? [...parameters, { identifier, type, value }]
+      : parameters.map((param, index) =>
+          index === paramIndex ? { ...param, value } : param
+        );
+
+  return {
+    ...node,
+    data: {
+      ...node.data,
+      parameters: updatedParameters,
+    },
+  };
+}

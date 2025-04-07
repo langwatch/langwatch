@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import { BasePropertiesPanel, PropertyField } from "./BasePropertiesPanel";
-import { LLMConfigField } from "./modals/llm-config/LLMConfigModal";
+import { LLMConfigField } from "./modals/llm-config/LLMConfigField";
 import { WorkflowIcon } from "../ColorfulBlockIcons";
 import { EmojiPickerModal } from "./modals/EmojiPickerModal";
 import { useState } from "react";
