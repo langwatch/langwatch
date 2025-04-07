@@ -78,7 +78,7 @@ class Client(LangWatchClientProtocol):
 
 	@disable_sending.setter
 	def disable_sending(self, value: bool) -> None:
-		"""Set whether sending is disabled and update the tracer provider accordingly. This will create a new global tracer provider."""
+		"""Set whether sending is disabled. If enabling, this will create a new global tracer provider."""
 		if self._disable_sending == value:
 			return
 
@@ -87,7 +87,7 @@ class Client(LangWatchClientProtocol):
 		if value:
 			self.tracer_provider.shutdown()
 		else:
-			self.tracer_provider = self.__create_new_tracer_provider()
+			self.tracer_provider
 
 	def __ensure_otel_setup(self, tracer_provider: Optional[TracerProvider] = None) -> TracerProvider:
 		# Check provided tracer provider
