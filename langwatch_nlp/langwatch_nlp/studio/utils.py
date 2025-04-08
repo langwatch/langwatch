@@ -202,3 +202,20 @@ def optional_langwatch_trace(
             metadata=metadata,
         ) as trace:
             yield trace
+
+
+def normalize_name_to_class_name(node_name: str) -> str:
+    """
+    Converts a node name like "LLM Signature (2)" to a valid Python class name like "LLMSignature2".
+
+    Args:
+        node_name: A string representing the node name
+
+    Returns:
+        A string representing a valid Python class name
+    """
+    # Keep only alphanumeric characters
+    import re
+    class_name = re.sub(r'[^a-zA-Z0-9]', '', node_name)
+
+    return class_name

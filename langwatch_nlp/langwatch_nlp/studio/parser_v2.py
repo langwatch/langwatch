@@ -1,3 +1,4 @@
+import copy
 from typing import Tuple, Type, cast, List, Dict, Set
 import asyncio
 import time
@@ -29,7 +30,10 @@ from jinja2 import Environment, FileSystemLoader
 import re
 import dspy
 
-from langwatch_nlp.studio.utils import transpose_inline_dataset_to_object_list
+from langwatch_nlp.studio.utils import (
+    normalize_name_to_class_name,
+    transpose_inline_dataset_to_object_list,
+)
 import isort
 import black
 
@@ -67,12 +71,18 @@ def render_template(template_name: str, format=False, **kwargs) -> str:
 
 
 def parse_workflow(
-    workflow: Workflow, format=False, debug_level=0, until_node_id=None, handle_errors=False
+    workflow: Workflow,
+    format=False,
+    debug_level=0,
+    until_node_id=None,
+    handle_errors=False,
 ) -> Tuple[str, str]:
     # Find all reachable nodes from entry
     nodes = find_reachable_nodes(
         workflow.nodes, workflow.edges, until_node_id=until_node_id
     )
+    for node in nodes:
+        node.data.name = normalize_name_to_class_name(node.data.name or "")
 
     node_templates = {
         node.id: parse_component(node, workflow, format) for node in nodes
@@ -103,6 +113,9 @@ def parse_and_instantiate_workflow(
 def parse_component(
     node: Node, workflow: Workflow, format=False, debug_level=0
 ) -> Tuple[str, str]:
+    node = copy.deepcopy(node)
+    node.data.name = normalize_name_to_class_name(node.data.name or "")
+
     match node.type:
         case "signature":
             parameters = {}
@@ -167,7 +180,9 @@ def parse_component(
             )
             code = code.value if code else None
             if not code:
-                raise Exception(f"Code node has no source content for component {node.data.name}")
+                raise Exception(
+                    f"Code node has no source content for component {node.data.name}"
+                )
 
             pattern = r"class (.*?)\(dspy\.Module\):"
             match = re.search(pattern, code)
