@@ -15,7 +15,7 @@ export const topUsedDocuments = protectedProcedure
   .query(async ({ input }) => {
     const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
 
-    const client = await esClient(input.projectId);
+    const client = await esClient({ projectId: input.projectId });
     const result = (await client.search<ElasticSearchTrace>({
       index: TRACE_INDEX.alias,
       size: 0,

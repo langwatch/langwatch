@@ -145,7 +145,7 @@ describe("Log Steps API Endpoint", () => {
       },
     });
 
-    const client = await esClient();
+    const client = await esClient({ test: true });
     await client.deleteByQuery({
       index: DSPY_STEPS_INDEX.alias,
       query: {
@@ -183,7 +183,7 @@ describe("Log Steps API Endpoint", () => {
     });
     expect(experiment).not.toBeNull();
 
-    const client = await esClient();
+    const client = await esClient({ test: true });
     const indexedStep = await client.get<DSPyStep>({
       index: DSPY_STEPS_INDEX.alias,
       id: dspyStepIndexId({

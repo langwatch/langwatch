@@ -34,7 +34,7 @@ const getTraceCheck = async (
   checkId: string,
   projectId: string
 ) => {
-  const client = await esClient();
+  const client = await esClient({ test: true });
   return await client.search({
     index: TRACE_CHECKS_INDEX,
     body: {
@@ -75,7 +75,7 @@ describe("Check Queue Integration Tests", () => {
     await worker?.close();
 
     // Delete test documents
-    const client = await esClient();
+    const client = await esClient({ test: true });
     await client.deleteByQuery({
       index: TRACE_CHECKS_INDEX,
       body: {
@@ -109,7 +109,7 @@ describe("Check Queue Integration Tests", () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Query ES to verify the status is "scheduled"
-    const client = await esClient();
+    const client = await esClient({ test: true });
     const response = await client.search<ElasticSearchEvaluation>({
       index: TRACE_CHECKS_INDEX,
       query: {
@@ -159,7 +159,7 @@ describe("Check Queue Integration Tests", () => {
     );
 
     // Query ES to verify the status is "processed"
-    const client = await esClient();
+    const client = await esClient({ test: true });
     const response = await client.search<ElasticSearchEvaluation>({
       index: TRACE_CHECKS_INDEX,
       query: {
@@ -197,7 +197,7 @@ describe("Check Queue Integration Tests", () => {
     );
 
     // Query ES to verify the status is "processed"
-    const client = await esClient();
+    const client = await esClient({ test: true });
     const response = await client.search<ElasticSearchEvaluation>({
       index: TRACE_CHECKS_INDEX,
       query: {
@@ -226,7 +226,7 @@ describe("Check Queue Integration Tests", () => {
     await new Promise((resolve) => worker?.on("failed", resolve));
 
     // Query ES to verify the status is "processed"
-    const client = await esClient();
+    const client = await esClient({ test: true });
     const response = await client.search<ElasticSearchEvaluation>({
       index: TRACE_CHECKS_INDEX,
       query: {
@@ -262,7 +262,7 @@ describe("Check Queue Integration Tests", () => {
     );
 
     // Query ES to verify the status is "processed"
-    const client = await esClient();
+    const client = await esClient({ test: true });
     let response = await client.search<ElasticSearchEvaluation>({
       index: TRACE_CHECKS_INDEX,
       query: {
@@ -322,7 +322,7 @@ describe("updateCheckStatusInES", () => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // Delete test documents to not polute the db
-    const client = await esClient();
+    const client = await esClient({ test: true });
     await client.deleteByQuery({
       index: TRACE_CHECKS_INDEX,
       body: {

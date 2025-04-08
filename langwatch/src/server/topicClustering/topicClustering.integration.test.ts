@@ -103,7 +103,7 @@ describe("Topic Clustering Integration Test", () => {
       trace.subtopic_id = null;
     });
 
-    const client = await esClient();
+    const client = await esClient({ test: true });
     await client.bulk({
       index: TRACE_INDEX.alias,
       body: traces.flatMap((trace) => [
@@ -135,7 +135,7 @@ describe("Topic Clustering Integration Test", () => {
   });
 
   afterAll(async () => {
-    const client = await esClient();
+    const client = await esClient({ test: true });
     await client.deleteByQuery({
       index: TRACE_INDEX.alias,
       body: {
@@ -178,7 +178,7 @@ describe("Topic Clustering Integration Test", () => {
       await clusterTopicsForProject(testProjectId);
 
       // Fetch the updated traces from Elasticsearch and verify topics were assigned
-      const client = await esClient();
+      const client = await esClient({ test: true });
       const result = await client.search<Trace>({
         index: TRACE_INDEX.alias,
         query: {

@@ -61,7 +61,7 @@ export const clusterTopicsForProject = async (
     );
   }
 
-  const client = await esClient(projectId);
+  const client = await esClient({ projectId });
   const assignedTracesCount = await client.count({
     index: TRACE_INDEX.alias,
     body: {
@@ -465,7 +465,7 @@ export const storeResults = async (
   ]);
 
   if (body.length > 0) {
-    const client = await esClient(projectId);
+    const client = await esClient({ projectId });
     await client.bulk({
       index: TRACE_INDEX.alias,
       refresh: true,

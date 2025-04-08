@@ -37,30 +37,44 @@ const getOrgElasticsearchDetailsFromProject = async (projectId: string) => {
   return project?.team.organization ?? null;
 };
 
-export const esClient = async (projectId?: string, organizationId?: string) => {
-  let orgElasticsearchNodeUrl: string | null = null;
-  let orgElasticsearchApiKey: string | null = null;
+export const esClient = async (
+  args: { projectId: string } | { organizationId: string } | { test: true }
+) => {
+  let elasticsearchNodeUrl: string | null = null;
+  let elasticsearchApiKey: string | null = null;
 
-  if (organizationId) {
-    const organization = await prisma.organization.findUnique({
-      where: { id: organizationId },
-    });
-    orgElasticsearchNodeUrl = organization?.elasticsearchNodeUrl ?? null;
-    orgElasticsearchApiKey = organization?.elasticsearchApiKey ?? null;
-  } else if (projectId) {
-    const project = await getOrgElasticsearchDetailsFromProject(projectId);
-    orgElasticsearchNodeUrl = project?.elasticsearchNodeUrl ?? null;
-    orgElasticsearchApiKey = project?.elasticsearchApiKey ?? null;
+  if ("test" in args) {
+    // For tests, directly use environment variables
+    elasticsearchNodeUrl = env.ELASTICSEARCH_NODE_URL ?? null;
+    elasticsearchApiKey = env.ELASTICSEARCH_API_KEY ?? null;
+  } else {
+    // For non-test cases, check org-specific settings first
+    let orgElasticsearchNodeUrl: string | null = null;
+    let orgElasticsearchApiKey: string | null = null;
+
+    if ("organizationId" in args) {
+      const organization = await prisma.organization.findUnique({
+        where: { id: args.organizationId },
+      });
+      orgElasticsearchNodeUrl = organization?.elasticsearchNodeUrl ?? null;
+      orgElasticsearchApiKey = organization?.elasticsearchApiKey ?? null;
+    } else if ("projectId" in args) {
+      const project = await getOrgElasticsearchDetailsFromProject(
+        args.projectId
+      );
+      orgElasticsearchNodeUrl = project?.elasticsearchNodeUrl ?? null;
+      orgElasticsearchApiKey = project?.elasticsearchApiKey ?? null;
+    }
+
+    // Use org settings if available, otherwise fall back to env vars
+    const useOrgSettings = orgElasticsearchNodeUrl && orgElasticsearchApiKey;
+    elasticsearchNodeUrl = useOrgSettings
+      ? orgElasticsearchNodeUrl
+      : env.ELASTICSEARCH_NODE_URL ?? null;
+    elasticsearchApiKey = useOrgSettings
+      ? orgElasticsearchApiKey
+      : env.ELASTICSEARCH_API_KEY ?? null;
   }
-
-  const useOrgSettings = orgElasticsearchNodeUrl && orgElasticsearchApiKey;
-
-  const elasticsearchNodeUrl = useOrgSettings
-    ? orgElasticsearchNodeUrl
-    : env.ELASTICSEARCH_NODE_URL;
-  const elasticsearchApiKey = useOrgSettings
-    ? orgElasticsearchApiKey
-    : env.ELASTICSEARCH_API_KEY;
 
   const client =
     !!env.IS_OPENSEARCH || !!env.IS_QUICKWIT

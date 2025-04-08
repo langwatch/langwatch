@@ -4,7 +4,7 @@ ALTER TABLE "Monitor" RENAME CONSTRAINT "Check_pkey" TO "Monitor_pkey";
 -- AlterTable
 ALTER TABLE "Organization" ADD COLUMN     "elasticsearchApiKey" TEXT,
 ADD COLUMN     "elasticsearchNodeUrl" TEXT,
-ADD COLUMN     "useElasticsearch" BOOLEAN NOT NULL DEFAULT false;
+ADD COLUMN     "useCustomElasticsearch" BOOLEAN NOT NULL DEFAULT false;
 
 -- RenameIndex
 ALTER INDEX "Check_experimentId_key" RENAME TO "Monitor_experimentId_key";

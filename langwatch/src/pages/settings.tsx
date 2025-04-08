@@ -173,7 +173,7 @@ function SettingsForm({
                   )}
                 </HorizontalFormControl>
 
-                {organization.useElasticsearch && (
+                {organization.useCustomElasticsearch && (
                   <>
                     <HorizontalFormControl
                       label="Elasticsearch Node URL"

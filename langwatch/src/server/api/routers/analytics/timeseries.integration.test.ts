@@ -175,7 +175,7 @@ describe("Timeseries Graph Integration Tests", () => {
       skipDuplicates: true,
     });
 
-    const client = await esClient();
+    const client = await esClient({ test: true });
     await client.bulk({
       index: TRACES_PIVOT_INDEX,
       body: traceEntries.flatMap((trace) => [
@@ -194,7 +194,7 @@ describe("Timeseries Graph Integration Tests", () => {
   });
 
   afterAll(async () => {
-    const client = await esClient();
+    const client = await esClient({ test: true });
     await client.deleteByQuery({
       index: TRACES_PIVOT_INDEX,
       body: {

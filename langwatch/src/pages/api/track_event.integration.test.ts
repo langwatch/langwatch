@@ -47,7 +47,7 @@ describe("/api/track_event", () => {
     });
 
     // Clean up the trace
-    const client = await esClient();
+    const client = await esClient({ test: true });
     await client.delete({
       index: TRACE_INDEX.alias,
       id: traceIndexId({ traceId, projectId: project.id }),
@@ -102,7 +102,7 @@ describe("/api/track_event", () => {
       metrics: {},
     };
 
-    const client = await esClient();
+    const client = await esClient({ test: true });
     await client.index({
       index: TRACE_INDEX.alias,
       id: traceIndexId({ traceId, projectId: project.id }),
@@ -123,7 +123,7 @@ describe("/api/track_event", () => {
     console.log("Event processed");
 
     const trace = await waitForResult(async () => {
-      const client = await esClient();
+      const client = await esClient({ test: true });
       const trace = await client.getSource<ElasticSearchTrace>({
         index: TRACE_INDEX.alias,
         id: traceIndexId({
