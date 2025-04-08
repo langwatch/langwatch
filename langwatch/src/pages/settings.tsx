@@ -41,6 +41,8 @@ type OrganizationFormData = {
   s3Endpoint: string;
   s3AccessKeyId: string;
   s3SecretAccessKey: string;
+  elasticsearchNodeUrl: string;
+  elasticsearchApiKey: string;
 };
 
 export default function Settings() {
@@ -65,6 +67,8 @@ function SettingsForm({
     s3Endpoint: organization.s3Endpoint ?? "",
     s3AccessKeyId: organization.s3AccessKeyId ?? "",
     s3SecretAccessKey: organization.s3SecretAccessKey ?? "",
+    elasticsearchNodeUrl: organization.elasticsearchNodeUrl ?? "",
+    elasticsearchApiKey: organization.elasticsearchApiKey ?? "",
   });
   const { register, handleSubmit, control, getFieldState } = useForm({
     defaultValues,
@@ -86,6 +90,8 @@ function SettingsForm({
           s3Endpoint: data.s3Endpoint,
           s3AccessKeyId: data.s3AccessKeyId,
           s3SecretAccessKey: data.s3SecretAccessKey,
+          elasticsearchNodeUrl: data.elasticsearchNodeUrl,
+          elasticsearchApiKey: data.elasticsearchApiKey,
         },
         {
           onSuccess: () => {
@@ -211,6 +217,53 @@ function SettingsForm({
                       </Text>
                     )}
                   </HorizontalFormControl>
+                )}
+
+                {organization.useCustomElasticsearch && (
+                  <>
+                    <HorizontalFormControl
+                      label="Elasticsearch Node URL"
+                      helper="The URL of your Elasticsearch node"
+                    >
+                      {hasOrganizationPermission(
+                        OrganizationRoleGroup.ORGANIZATION_MANAGE
+                      ) ? (
+                        <Input
+                          width="full"
+                          type="text"
+                          {...register("elasticsearchNodeUrl", {
+                            required: true,
+                            validate: (value) => {
+                              if (!value.trim()) return false;
+                            },
+                          })}
+                        />
+                      ) : (
+                        <Text>{organization.elasticsearchNodeUrl}</Text>
+                      )}
+                    </HorizontalFormControl>
+                    <HorizontalFormControl
+                      label="Elasticsearch API Key"
+                      helper="The API key for your Elasticsearch node"
+                    >
+                      {hasOrganizationPermission(
+                        OrganizationRoleGroup.ORGANIZATION_MANAGE
+                      ) ? (
+                        <Input
+                          width="full"
+                          type="password"
+                          {...register("elasticsearchApiKey", {
+                            required: true,
+                            validate: (value) => {
+                              if (!value.trim()) return false;
+                            },
+                          })}
+                        />
+                      ) : (
+                        <Text>{organization.elasticsearchApiKey}</Text>
+                      )}
+                    </HorizontalFormControl>
+                  </>
                 )}
               </VStack>
             </form>

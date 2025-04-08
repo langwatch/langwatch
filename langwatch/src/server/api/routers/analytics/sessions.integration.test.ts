@@ -93,7 +93,8 @@ describe("Sessions Endpoint Integration Tests", () => {
   ];
 
   beforeAll(async () => {
-    await esClient.bulk({
+    const client = await esClient({ test: true });
+    await client.bulk({
       index: TRACE_INDEX.alias,
       body: sampleTraces.flatMap((trace) => [
         {
@@ -111,7 +112,8 @@ describe("Sessions Endpoint Integration Tests", () => {
   });
 
   afterAll(async () => {
-    await esClient.deleteByQuery({
+    const client = await esClient({ test: true });
+    await client.deleteByQuery({
       index: TRACE_INDEX.alias,
       body: {
         query: {

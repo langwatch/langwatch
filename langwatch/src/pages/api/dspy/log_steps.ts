@@ -261,7 +261,8 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
     },
   };
 
-  await esClient.update({
+  const client = await esClient({ projectId: project.id });
+  await client.update({
     index: DSPY_STEPS_INDEX.alias,
     id,
     body: {

@@ -39,7 +39,7 @@ import { trainTestSplit } from "../utils/datasetUtils";
 import { checkIsEvaluator } from "../utils/nodeUtils";
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
-import { LLMConfigField } from "./properties/modals/LLMConfigModal";
+import { LLMConfigField } from "./properties/modals/llm-config/LLMConfigField";
 
 const optimizerOptions: {
   label: string;

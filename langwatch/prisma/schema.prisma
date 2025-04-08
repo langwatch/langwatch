@@ -133,22 +133,25 @@ model Team {
 }
 
 model Organization {
-    id                    String               @id @default(nanoid())
-    name                  String
-    phoneNumber           String?
-    slug                  String               @unique
-    members               OrganizationUser[]
-    teams                 Team[]
-    createdAt             DateTime             @default(now())
-    updatedAt             DateTime             @default(now()) @updatedAt
-    OrganizationInvite    OrganizationInvite[]
-    usageSpendingMaxLimit Int?
-    signupData            Json?
-    signedDPA             Boolean              @default(false)
-    s3Endpoint            String?
-    s3AccessKeyId         String?
-    s3SecretAccessKey     String?
-    useCustomS3           Boolean              @default(false)
+    id                     String               @id @default(nanoid())
+    name                   String
+    phoneNumber            String?
+    slug                   String               @unique
+    members                OrganizationUser[]
+    teams                  Team[]
+    createdAt              DateTime             @default(now())
+    updatedAt              DateTime             @default(now()) @updatedAt
+    OrganizationInvite     OrganizationInvite[]
+    usageSpendingMaxLimit  Int?
+    signupData             Json?
+    signedDPA              Boolean              @default(false)
+    elasticsearchNodeUrl   String?
+    elasticsearchApiKey    String?
+    useCustomElasticsearch Boolean              @default(false)
+    s3Endpoint             String?
+    s3AccessKeyId          String?
+    s3SecretAccessKey      String?
+    useCustomS3            Boolean              @default(false)
 
     promoCode String?
     features  OrganizationFeature[]

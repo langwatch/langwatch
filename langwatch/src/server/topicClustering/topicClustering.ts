@@ -61,7 +61,8 @@ export const clusterTopicsForProject = async (
     );
   }
 
-  const assignedTracesCount = await esClient.count({
+  const client = await esClient({ projectId });
+  const assignedTracesCount = await client.count({
     index: TRACE_INDEX.alias,
     body: {
       query: {
@@ -172,7 +173,8 @@ export const clusterTopicsForProject = async (
   }
 
   // Fetch last 2000 traces that were not classified in sorted and paginated, with only id, input fields and their current topics
-  const result = await esClient.search<Trace>({
+
+  const result = await client.search<Trace>({
     index: TRACE_INDEX.alias,
     body: {
       query: {
@@ -463,7 +465,8 @@ export const storeResults = async (
   ]);
 
   if (body.length > 0) {
-    await esClient.bulk({
+    const client = await esClient({ projectId });
+    await client.bulk({
       index: TRACE_INDEX.alias,
       refresh: true,
       body,

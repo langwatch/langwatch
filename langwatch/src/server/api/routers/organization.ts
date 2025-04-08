@@ -26,6 +26,7 @@ import { env } from "~/env.mjs";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { signUpDataSchema } from "./onboarding";
 import { dependencies } from "../../../injection/dependencies.server";
+import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
@@ -286,6 +287,8 @@ export const organizationRouter = createTRPCRouter({
         s3Endpoint: z.string().optional(),
         s3AccessKeyId: z.string().optional(),
         s3SecretAccessKey: z.string().optional(),
+        elasticsearchNodeUrl: z.string().optional(),
+        elasticsearchApiKey: z.string().optional(),
       })
     )
     .use(
@@ -325,8 +328,14 @@ export const organizationRouter = createTRPCRouter({
           s3SecretAccessKey: input.s3SecretAccessKey
             ? encrypt(input.s3SecretAccessKey)
             : null,
+          elasticsearchNodeUrl: input.elasticsearchNodeUrl,
+          elasticsearchApiKey: input.elasticsearchApiKey,
         },
       });
+
+      if (input.elasticsearchNodeUrl && input.elasticsearchApiKey) {
+        await elasticsearchMigrate(input.organizationId);
+      }
 
       return { success: true };
     }),

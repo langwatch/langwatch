@@ -26,9 +26,24 @@ import {
   PropertyField,
   PropertySectionTitle,
 } from "./BasePropertiesPanel";
-import { LLMConfigField } from "./modals/LLMConfigModal";
+import { LLMConfigField } from "./modals/llm-config/LLMConfigField";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 
+/**
+ * Properties panel for the Signature node in the optimization studio.
+ *
+ * A Signature in this context is based on the DSPy concept, which defines
+ * an interface for LLM interactions with inputs, outputs, and parameters.
+ *
+ * This panel allows users to configure:
+ * - The LLM model to use for this signature
+ * - Instructions for the LLM
+ * - Demonstrations (few-shot examples)
+ * - Prompting techniques (like Chain of Thought)
+ *
+ * The Signature node represents an LLM calling component in the workflow
+ * that can be connected with other nodes to build complex LLM-powered applications.
+ */
 export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
   const { default_llm, setNodeParameter } = useWorkflowStore(
     ({ default_llm, setNodeParameter, setWorkflowSelected }) => ({

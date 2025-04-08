@@ -3,9 +3,11 @@ import {
   type QueryDslQueryContainer,
   type SearchResponse,
 } from "@elastic/elasticsearch/lib/api/types";
+import { Client as ElasticClient } from "@elastic/elasticsearch";
+
 import { esClient, TRACE_INDEX } from "../../src/server/elasticsearch";
 
-export const migrate = async () => {
+export const migrate = async (client: ElasticClient) => {
   let searchAfter: unknown[] | undefined;
   let response: SearchResponse<{ trace_id: string }>;
   let bulkActions = [];
@@ -26,7 +28,7 @@ export const migrate = async () => {
       } as QueryDslBoolQuery,
     };
 
-    response = await esClient.search<{ trace_id: string }>({
+    response = await client.search<{ trace_id: string }>({
       index: TRACE_INDEX.alias,
       _source: {
         includes: ["trace_id"],
@@ -42,7 +44,7 @@ export const migrate = async () => {
     const results = response.hits.hits;
     process.stdout.write(`\nFetched ${results.length} more hits`);
 
-    const count = await esClient.count({
+    const count = await client.count({
       index: TRACE_INDEX.alias,
       body: {
         query: query,
@@ -79,13 +81,13 @@ export const migrate = async () => {
       process.stdout.write(`\r${i + 1}/${results.length} being updated`);
 
       if (bulkActions.length >= 400) {
-        await esClient.bulk({ body: bulkActions });
+        await client.bulk({ body: bulkActions });
         bulkActions = [];
       }
     }
 
     if (bulkActions.length > 0) {
-      await esClient.bulk({ body: bulkActions });
+      await client.bulk({ body: bulkActions });
     }
   } while (response.hits.hits.length > 0);
 };
