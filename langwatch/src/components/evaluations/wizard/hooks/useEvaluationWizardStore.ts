@@ -431,7 +431,6 @@ const store = (
           },
         };
 
-        // Find node with output.input
         const newEdges = createNewEdgesForNewNode(current, evaluatorNode);
 
         // If the first evaluator node is not found,
