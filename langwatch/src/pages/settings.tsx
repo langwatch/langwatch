@@ -205,7 +205,7 @@ function SettingsForm({
                       ) ? (
                         <Input
                           width="full"
-                          type="text"
+                          type="password"
                           {...register("elasticsearchApiKey", {
                             required: true,
                             validate: (value) => {
