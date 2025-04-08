@@ -1,7 +1,15 @@
 import { HStack, Text, VStack } from "@chakra-ui/react";
-
 import { Accordion } from "@chakra-ui/react";
 import { LuChevronDown } from "react-icons/lu";
+
+export interface StepAccordionProps extends Omit<Accordion.ItemProps, "title"> {
+  children: React.ReactNode;
+  title: string | React.ReactNode;
+  value: string;
+  borderColor?: string;
+  showTrigger?: boolean;
+  indicatorProps?: Accordion.ItemIndicatorProps;
+}
 
 export function StepAccordion({
   children,
@@ -11,14 +19,7 @@ export function StepAccordion({
   showTrigger = true,
   indicatorProps,
   ...props
-}: {
-  children: React.ReactNode;
-  title: string | React.ReactNode;
-  value: string;
-  borderColor: string;
-  showTrigger?: boolean;
-  indicatorProps?: Accordion.ItemIndicatorProps;
-} & Omit<Accordion.ItemProps, "title">) {
+}: StepAccordionProps) {
   return (
     <Accordion.Item value={value} width="full" {...props}>
       {showTrigger && (

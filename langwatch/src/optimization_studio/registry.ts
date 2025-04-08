@@ -10,6 +10,12 @@ import {
 } from "./types/dsl";
 import { convertEvaluators } from "./utils/registryUtils";
 
+/**
+ * Default Empty LLM Signature Node
+ *
+ * This is an empty llm signature node
+ * Use this when adding a new signature node to the workspace.
+ */
 const signature: Signature = {
   name: "LLM Signature",
   description: "LLM calling node",
