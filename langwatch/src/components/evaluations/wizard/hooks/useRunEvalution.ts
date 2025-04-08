@@ -1,12 +1,8 @@
 import { useStepCompletedValue } from "./useStepCompletedValue";
 import { useEvaluationWizardStore } from "./useEvaluationWizardStore";
 import { toaster } from "../../../../components/ui/toaster";
-import type {
-  StudioClientEvent,
-  StudioServerEvent,
-} from "../../../../optimization_studio/types/events";
-import { useCallback, useEffect } from "react";
-import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
+import type { StudioClientEvent } from "../../../../optimization_studio/types/events";
+import { useCallback } from "react";
 import { nanoid } from "nanoid";
 import { usePostEvent } from "./usePostEvent";
 import { useShallow } from "zustand/react/shallow";

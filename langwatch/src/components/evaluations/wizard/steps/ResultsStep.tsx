@@ -86,42 +86,40 @@ export function ResultsStep() {
           />
           <StepStatus name="Evaluation" step="evaluation" />
         </VStack>
-        {wizardState.task === "real_time" && (
-          <Alert.Root colorPalette="blue">
-            <Alert.Content>
-              <Alert.Description>
-                <VStack align="start" gap={4}>
-                  Try out your real-time evaluation with the sample before
-                  enabling monitoring.
-                  <Tooltip
-                    content={
-                      trialDisabled
-                        ? "Select a dataset and evaluation to run a trial"
-                        : ""
-                    }
-                    positioning={{
-                      placement: "top",
+        <Alert.Root colorPalette="blue">
+          <Alert.Content>
+            <Alert.Description>
+              <VStack align="start" gap={4}>
+                Try out your real-time evaluation with the sample before
+                enabling monitoring.
+                <Tooltip
+                  content={
+                    trialDisabled
+                      ? "Select a dataset and evaluation to run a trial"
+                      : ""
+                  }
+                  positioning={{
+                    placement: "top",
+                  }}
+                >
+                  <Button
+                    colorPalette="blue"
+                    _icon={{
+                      minWidth: "18px",
+                      minHeight: "18px",
                     }}
+                    onClick={runEvaluation}
+                    loading={isLoading}
+                    disabled={trialDisabled}
                   >
-                    <Button
-                      colorPalette="blue"
-                      _icon={{
-                        minWidth: "18px",
-                        minHeight: "18px",
-                      }}
-                      onClick={runEvaluation}
-                      loading={isLoading}
-                      disabled={trialDisabled}
-                    >
-                      <LuCirclePlay />
-                      Run Trial Evaluation
-                    </Button>
-                  </Tooltip>
-                </VStack>
-              </Alert.Description>
-            </Alert.Content>
-          </Alert.Root>
-        )}
+                    <LuCirclePlay />
+                    Run Trial Evaluation
+                  </Button>
+                </Tooltip>
+              </VStack>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
       </VStack>
     </>
   );
