@@ -16,6 +16,9 @@ const stringifiedInitialState = JSON.stringify({
 
 let lastAutosave = 0;
 
+/**
+ * Manages syncing the client-side wizard state with the database
+ */
 const useAutosaveWizard = () => {
   const { project } = useOrganizationTeamProject();
   const {
