@@ -119,11 +119,11 @@ export const datasetRecordRouter = createTRPCRouter({
       }
 
       if (dataset.useS3) {
-        const records = await storageService.getObject(
+        const { records, count } = await storageService.getObject(
           input.projectId,
           dataset.id
         );
-        const total = records.length;
+        const total = count;
         (dataset as any).datasetRecords = records.slice(0, 5);
 
         return { dataset, total };
