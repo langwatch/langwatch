@@ -1,14 +1,11 @@
 import { Textarea, VStack } from "@chakra-ui/react";
-import { StepAccordion } from "../../../components/StepAccordion";
 import { useShallow } from "zustand/react/shallow";
-import {
-  useEvaluationWizardStore,
-  type WizardState,
-} from "../../../hooks/useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "../../../hooks/useEvaluationWizardStore";
 import { LLMConfigField } from "~/optimization_studio/components/properties/modals/llm-config/LLMConfigField";
 import { useCallback, useMemo } from "react";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import { PropertyField } from "~/optimization_studio/components/properties/BasePropertiesPanel";
+import { ExecutionStepAccordion } from "../../../components/ExecutionStepAccordion";
 
 export const LLM_PROMPT_PROPERTIES_STEP_ACCORDION_VALUE = "offline_prompt";
 
@@ -83,10 +80,8 @@ export function LlmPromptPropertiesStepAccordion() {
   }, [signatureNode]);
 
   return (
-    <StepAccordion
+    <ExecutionStepAccordion
       value={LLM_PROMPT_PROPERTIES_STEP_ACCORDION_VALUE}
-      width="full"
-      borderColor="blue.400"
       title="LLM Prompt Properties"
       showTrigger={true}
     >
@@ -119,6 +114,6 @@ export function LlmPromptPropertiesStepAccordion() {
           </>
         )}
       </VStack>
-    </StepAccordion>
+    </ExecutionStepAccordion>
   );
 }

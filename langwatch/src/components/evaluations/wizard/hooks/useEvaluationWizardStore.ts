@@ -24,45 +24,7 @@ import { convertEvaluator } from "../../../../optimization_studio/utils/registry
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { mappingStateSchema } from "../../../../server/tracer/tracesMapping";
 import { checkPreconditionsSchema } from "../../../../server/evaluations/types.generated";
-import { MODULES } from "~/optimization_studio/registry";
-
-const DEFAULT_LLM_CONFIG = {
-  model: "gpt-4o-mini",
-};
-
-const DEFAULT_SIGNATURE_NODE_PROPERTIES = {
-  id: "signature-node",
-  position: { x: 0, y: 0 },
-  deletable: true,
-  data: {
-    // Default signature data
-    ...MODULES.signature,
-    parameters: [
-      ...(MODULES.signature.parameters ?? []).map((p) =>
-        // Set the default LLM config
-        p.identifier === "llm"
-          ? {
-              ...p,
-              value: DEFAULT_LLM_CONFIG,
-            }
-          : p
-      ),
-    ],
-    inputs: [
-      {
-        identifier: "input",
-        type: "str" as const,
-      },
-    ],
-    outputs: [
-      {
-        identifier: "output",
-        type: "str" as const,
-      },
-    ],
-  },
-  type: "signature",
-};
+import { DEFAULT_SIGNATURE_NODE_PROPERTIES } from "./constants/llm-signature";
 
 export const EVALUATOR_CATEGORIES = [
   "expected_answer",
@@ -635,6 +597,8 @@ const createWorkflowStore = (
 };
 
 export const useEvaluationWizardStore = create<EvaluationWizardStore>()(store);
+
+// Helper functions
 
 const calcNextNodePositionFromCurrentNodes = (
   currentNodes: Node<BaseComponent>[]

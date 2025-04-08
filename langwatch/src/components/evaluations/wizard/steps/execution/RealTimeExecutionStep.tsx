@@ -27,6 +27,7 @@ import { PreconditionsField } from "../../../../checks/PreconditionsField";
 import { HorizontalFormControl } from "../../../../HorizontalFormControl";
 import { Tooltip } from "../../../../ui/tooltip";
 import { StepAccordion } from "../../components/StepAccordion";
+import { ExecutionStepAccordion } from "../../components/ExecutionStepAccordion";
 import { StepRadio } from "../../components/StepButton";
 import {
   EXECUTION_METHODS,
@@ -155,10 +156,8 @@ export function RealTimeExecutionStep() {
       variant="plain"
     >
       <VStack width="full" gap={3}>
-        <StepAccordion
+        <ExecutionStepAccordion
           value="execution-method"
-          width="full"
-          borderColor="orange.400"
           title="Execution Method"
           showTrigger={executionMethod === "realtime_on_message"}
         >
@@ -196,7 +195,7 @@ export function RealTimeExecutionStep() {
               }
             />
           </RadioCard.Root>
-        </StepAccordion>
+        </ExecutionStepAccordion>
         <StepAccordion
           value="execution-settings"
           width="full"

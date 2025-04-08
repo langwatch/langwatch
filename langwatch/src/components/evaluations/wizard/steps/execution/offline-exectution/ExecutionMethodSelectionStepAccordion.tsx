@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { RadioCard, VStack } from "@chakra-ui/react";
+import { RadioCard } from "@chakra-ui/react";
 import {
   LuCode,
   LuTerminal,
@@ -8,7 +8,7 @@ import {
   LuWorkflow,
   LuMessageSquareCode,
 } from "react-icons/lu";
-import { StepAccordion } from "../../../components/StepAccordion";
+import { ExecutionStepAccordion } from "../../../components/ExecutionStepAccordion";
 import { StepRadio } from "../../../components/StepButton";
 import {
   EXECUTION_METHODS,
@@ -57,10 +57,8 @@ export function ExecutionMethodSelectionStepAccordion({
   );
 
   return (
-    <StepAccordion
+    <ExecutionStepAccordion
       value={EXECUTION_METHOD_SELECTOR_STEP_ACCORDION_VALUE}
-      width="full"
-      borderColor="orange.400"
       title="Execution Method"
       showTrigger={true}
     >
@@ -100,6 +98,6 @@ export function ExecutionMethodSelectionStepAccordion({
           disabled
         />
       </RadioCard.Root>
-    </StepAccordion>
+    </ExecutionStepAccordion>
   );
 }
