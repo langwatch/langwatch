@@ -11,11 +11,16 @@ import { decrypt } from "~/utils/encryption";
 
 export class StorageService {
   private async getLocalStoragePath(projectId: string, key: string) {
-    const storageDir = process.env.LOCAL_STORAGE_PATH ?? "./storage";
+    // Make sure projectId and key don't contain path traversal characters
+    if (projectId.includes("..") || key.includes("..")) {
+      throw new Error(
+        "Invalid projectId or key: path traversal attempt detected"
+      );
+    }
+    const storageDir =
+      process.env.LOCAL_STORAGE_PATH ?? path.resolve(process.cwd(), "storage");
     const fullPath = path.join(storageDir, projectId, key);
-
     await fs.mkdir(path.dirname(fullPath), { recursive: true });
-
     return fullPath;
   }
 
@@ -26,7 +31,6 @@ export class StorageService {
   ): Promise<void> {
     if (env.DATASET_STORAGE_LOCAL) {
       const filePath = await this.getLocalStoragePath(projectId, datasetId);
-      await fs.mkdir(path.dirname(filePath), { recursive: true });
       await fs.writeFile(filePath, data as string);
     } else {
       const s3Client = await createS3Client(projectId);

@@ -388,10 +388,19 @@ export const createManyDatasetRecords = async ({
       true
     );
 
-    const { records: existingRecords } = await storageService.getObject(
-      projectId,
-      datasetId
-    );
+    let existingRecords: any[] = [];
+    try {
+      const { records: fetchedRecords } = await storageService.getObject(
+        projectId,
+        datasetId
+      );
+      existingRecords = fetchedRecords;
+    } catch (error) {
+      if ((error as any).name !== "NoSuchKey") {
+        throw error;
+      }
+      // If the key doesn't exist, we'll initialize with an empty array
+    }
 
     // Combine existing and new records
     const allRecords = [...existingRecords, ...recordData];
