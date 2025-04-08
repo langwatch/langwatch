@@ -376,23 +376,30 @@ const store = (
       evaluator: Partial<Evaluator> & { evaluator: EvaluatorTypes }
     ) {
       get().workflowStore.setWorkflow((current) => {
+        // Validate evaluator type
         if (evaluator.evaluator.startsWith("custom/")) {
           throw new Error("Custom evaluators are not supported yet");
         }
 
+        // Find existing evaluator node if any
         const firstEvaluatorIndex = current.nodes.findIndex(
           (node) => node.type === "evaluator"
         );
+        const previousEvaluator =
+          firstEvaluatorIndex !== -1
+            ? (current.nodes[firstEvaluatorIndex] as Node<Evaluator>)
+            : undefined;
 
+        // Get base evaluator properties from the evaluator type
         const initialEvaluator = buildEvaluatorFromType(evaluator.evaluator);
         const id = nameToId(initialEvaluator.name ?? initialEvaluator.cls);
 
-        const previousEvaluator = current.nodes[firstEvaluatorIndex] as
-          | Node<Evaluator>
-          | undefined;
+        // Check if evaluator type has changed
         const hasEvaluatorChanged =
           previousEvaluator?.data.evaluator !== evaluator.evaluator;
-        const firstEvaluator =
+
+        // Determine base node to use (create new or use existing)
+        const baseEvaluatorNode =
           hasEvaluatorChanged || !previousEvaluator
             ? {
                 id,
@@ -402,43 +409,124 @@ const store = (
               }
             : previousEvaluator;
 
+        // Create the final evaluator node with merged properties
         const evaluatorNode: Node<Evaluator> = {
-          ...firstEvaluator,
+          ...baseEvaluatorNode,
           id,
           data: {
-            ...firstEvaluator.data,
+            ...baseEvaluatorNode.data,
             ...evaluator,
+            // Preserve metadata from initial evaluator
             name: initialEvaluator.name,
             description: initialEvaluator.description,
+            // Handle parameters:
+            // 1. Use provided parameters if available
+            // 2. Reset parameters if evaluator type changed
+            // 3. Otherwise keep existing parameters
             parameters:
               evaluator.data?.parameters ??
-              // Reset parameters if not given the evaluator is not the same as the current evaluator
-              (firstEvaluator.data.evaluator !== evaluator.evaluator
+              (hasEvaluatorChanged
                 ? []
-                : firstEvaluator.data.parameters ?? []),
+                : baseEvaluatorNode.data.parameters ?? []),
           },
         };
 
+        // Create new edges based on specific input and output connections
+        const newEdges: Edge[] = [];
+
+        // Start index for searching previous nodes
+        const startIndex =
+          firstEvaluatorIndex === -1
+            ? current.nodes.length - 1
+            : firstEvaluatorIndex - 1;
+
+        // Find node with output.input
+        let nodeWithInputOutput = null;
+        let nodeWithOutputOutput = null;
+
+        // Iterate backward through nodes looking for required outputs
+        console.log("iterating to find input and output nodes");
+        for (let i = startIndex; i >= 0; i--) {
+          const node = current.nodes[i];
+
+          // Skip if this is the evaluator node itself
+          if (!node || node.id === evaluatorNode.id) continue;
+
+          console.log(node.type, JSON.stringify(node.data.outputs));
+
+          const outputNamedInput = node.data.outputs?.find(
+            (output) => output.identifier === "input"
+          );
+
+          const outputNamedOutput = node.data.outputs?.find(
+            (output) => output.identifier === "output"
+          );
+
+          // Check for input output if we haven't found it yet
+          if (!nodeWithInputOutput && outputNamedInput) {
+            nodeWithInputOutput = node;
+          }
+
+          // Check for output output if we haven't found it yet
+          if (!nodeWithOutputOutput && outputNamedOutput) {
+            nodeWithOutputOutput = node;
+          }
+
+          // Break early if we found both
+          if (nodeWithInputOutput && nodeWithOutputOutput) break;
+        }
+
+        // Connect input if found
+        if (nodeWithInputOutput) {
+          console.log(JSON.stringify({ nodeWithInputOutput }));
+          newEdges.push({
+            id: `${nodeWithInputOutput.id}-input-to-${evaluatorNode.id}-input`,
+            source: nodeWithInputOutput.id,
+            sourceHandle: "outputs.input",
+            target: evaluatorNode.id,
+            targetHandle: "inputs.input",
+          });
+        }
+
+        // Connect output if found
+        if (nodeWithOutputOutput) {
+          console.log(JSON.stringify({ nodeWithOutputOutput }));
+          newEdges.push({
+            id: `${nodeWithOutputOutput.id}-output-to-${evaluatorNode.id}-output`,
+            source: nodeWithOutputOutput.id,
+            sourceHandle: "outputs.output",
+            target: evaluatorNode.id,
+            targetHandle: "inputs.output",
+          });
+        }
+
+        console.log(JSON.stringify({ evaluatorNode }));
+
         if (firstEvaluatorIndex === -1) {
+          console.log("adding new evaluator node");
           return {
             ...current,
             nodes: [...current.nodes, evaluatorNode],
+            edges: [...current.edges, ...newEdges],
           };
         }
 
-        // Update nodes by replacing the evaluator node and removing edges targeting
-        // the previous evaluator only if the evaluator type has changed. This prevents
-        // the removal of edges when only the settings are modified.
+        console.log(
+          "updating existing evaluator node, but leaving edges alone"
+        );
+
+        // Otherwise, update the existing evaluator and handle edges
         return {
           ...current,
+          // Replace the existing evaluator node
           nodes: current.nodes.map((node, index) =>
             index === firstEvaluatorIndex ? evaluatorNode : node
           ),
-          // Remove edges that target the previous evaluator only if the evaluator type has changed
-          edges: current.edges.filter(
-            (edge) =>
-              edge.target !== previousEvaluator?.id || !hasEvaluatorChanged
-          ),
+          // Remove old edges targeting the evaluator and add new connections
+          edges: [
+            ...current.edges.filter((edge) => edge.target !== evaluatorNode.id),
+            ...newEdges,
+          ],
         };
       });
     },
@@ -467,18 +555,20 @@ const store = (
           return current;
         }
 
-        return {
-          ...current,
-          edges: [
-            ...current.edges.filter(
-              (edge) => edge.target !== firstEvaluator.id
-            ),
-            ...edges.map((edge) => ({
-              ...edge,
-              target: firstEvaluator.id,
-            })),
-          ],
-        };
+        return current;
+
+        // return {
+        //   ...current,
+        //   edges: [
+        //     ...current.edges.filter(
+        //       (edge) => edge.target !== firstEvaluator.id
+        //     ),
+        //     ...edges.map((edge) => ({
+        //       ...edge,
+        //       target: firstEvaluator.id,
+        //     })),
+        //   ],
+        // };
       });
     },
     getFirstEvaluatorEdges() {
