@@ -1,14 +1,16 @@
 import { Textarea, VStack } from "@chakra-ui/react";
 import { StepAccordion } from "../../../components/StepAccordion";
 import { useShallow } from "zustand/react/shallow";
-import { useEvaluationWizardStore } from "../../../hooks/useEvaluationWizardStore";
+import {
+  useEvaluationWizardStore,
+  type WizardState,
+} from "../../../hooks/useEvaluationWizardStore";
 import { LLMConfigField } from "~/optimization_studio/components/properties/modals/llm-config/LLMConfigField";
 import { useCallback, useMemo } from "react";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import { PropertyField } from "~/optimization_studio/components/properties/BasePropertiesPanel";
 
-export const LLM_PROMPT_PROPERTIES_STEP_ACCORDION_VALUE =
-  "llm-prompt-properties";
+export const LLM_PROMPT_PROPERTIES_STEP_ACCORDION_VALUE = "offline_prompt";
 
 /**
  * This component is used to configure the LLM prompt properties for the offline execution step.

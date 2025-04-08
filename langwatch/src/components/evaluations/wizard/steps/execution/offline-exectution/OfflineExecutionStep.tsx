@@ -4,7 +4,10 @@ import {
   EXECUTION_METHOD_SELECTOR_STEP_ACCORDION_VALUE,
   ExecutionMethodSelectionStepAccordion,
 } from "./ExecutionMethodSelectionStepAccordion";
-import { LlmPromptPropertiesStepAccordion } from "./LlmPromptPropertiesStepAccordion";
+import {
+  LLM_PROMPT_PROPERTIES_STEP_ACCORDION_VALUE,
+  LlmPromptPropertiesStepAccordion,
+} from "./LlmPromptPropertiesStepAccordion";
 import type { WizardState } from "../../../hooks/useEvaluationWizardStore";
 import { useEvaluationWizardStore } from "../../../hooks/useEvaluationWizardStore";
 import { useShallow } from "zustand/react/shallow";
@@ -31,15 +34,22 @@ export function OfflineExecutionStep() {
     }))
   );
 
-  /**
-   * Force the accordion to render the desired accordion item.
-   * Necessary because we want to open the correct step even if
-   * the execution method is not changed.
-   */
   const updateAccordionValue = useCallback(() => {
+    /**
+     * Force the accordion to re-render.
+     * Necessary because we want to trigger the UI to expand the correct step even if
+     * the execution method is not changed.
+     */
     setAccordionValue([]);
-    if (executionMethod) {
-      setAccordionValue([executionMethod]);
+    /**
+     * When the execution method is changed, we want to open the correct accordion item.
+     */
+    switch (executionMethod) {
+      case "offline_prompt":
+        setAccordionValue([LLM_PROMPT_PROPERTIES_STEP_ACCORDION_VALUE]);
+        break;
+      default:
+        setAccordionValue([EXECUTION_METHOD_SELECTOR_STEP_ACCORDION_VALUE]);
     }
   }, [setAccordionValue, executionMethod]);
 
