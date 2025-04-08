@@ -8,12 +8,8 @@ import type {
   Trace,
   TraceWithSpans,
 } from "./types";
-import {
-  baseSpanSchema,
-  lLMSpanSchema,
-  rAGSpanSchema,
-} from "./types.generated";
 import { getSpanNameOrModel } from "../../utils/trace";
+import { datasetSpanSchema } from "../datasets/types";
 
 export type TraceWithSpansAndAnnotations = TraceWithSpans & {
   annotations?: (Annotation & {
@@ -425,48 +421,6 @@ export const mappingStateSchema = z.object({
 });
 
 export type MappingState = z.infer<typeof mappingStateSchema>;
-
-export const datasetSpanSchema = z.union([
-  baseSpanSchema
-    .omit({
-      project_id: true,
-      trace_id: true,
-      id: true,
-      timestamps: true,
-      metrics: true,
-      params: true,
-    })
-    .extend({
-      params: z.record(z.string(), z.any()),
-      model: z.string().optional(),
-    }),
-  lLMSpanSchema
-    .omit({
-      project_id: true,
-      trace_id: true,
-      id: true,
-      timestamps: true,
-      metrics: true,
-      params: true,
-    })
-    .extend({
-      params: z.record(z.string(), z.any()),
-      model: z.string().optional(),
-    }),
-  rAGSpanSchema
-    .omit({
-      project_id: true,
-      trace_id: true,
-      id: true,
-      timestamps: true,
-      metrics: true,
-      params: true,
-    })
-    .extend({
-      params: z.record(z.string(), z.any()),
-      model: z.string().optional(),
-    }),
-]);
 
 const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
   try {

@@ -258,7 +258,7 @@ export const getFullDataset = async ({
     };
   }
 
-  let truncatedDatasetRecords: DatasetRecord[] = [];
+  const truncatedDatasetRecords: DatasetRecord[] = [];
   let truncated = false;
   let totalSize = 0;
   let currentPage = 0;
