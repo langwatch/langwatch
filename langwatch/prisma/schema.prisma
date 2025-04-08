@@ -148,6 +148,7 @@ model Organization {
     s3Endpoint            String?
     s3AccessKeyId         String?
     s3SecretAccessKey     String?
+    useCustomS3           Boolean              @default(false)
 
     promoCode String?
     features  OrganizationFeature[]

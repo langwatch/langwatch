@@ -175,40 +175,43 @@ function SettingsForm({
                     <Text>{organization.slug}</Text>
                   )}
                 </HorizontalFormControl>
-                <HorizontalFormControl
-                  label="S3 Storage"
-                  helper="Configure S3 storage to host data on your own infrastructure. Leave empty to use LangWatch's managed storage."
-                >
-                  {hasOrganizationPermission(
-                    OrganizationRoleGroup.ORGANIZATION_MANAGE
-                  ) ? (
-                    <VStack width="full" align="start" gap={3}>
-                      <Input
-                        width="full"
-                        type="text"
-                        placeholder="S3 Endpoint (e.g. http://localhost:9000)"
-                        {...register("s3Endpoint")}
-                      />
-                      <Input
-                        width="full"
-                        type="text"
-                        placeholder="Access Key ID"
-                        {...register("s3AccessKeyId")}
-                      />
-                      <Input
-                        width="full"
-                        type="password"
-                        placeholder="Secret Access Key"
-                        {...register("s3SecretAccessKey")}
-                      />
-                    </VStack>
-                  ) : (
-                    <Text>
-                      S3 storage configuration is only visible to organization
-                      managers
-                    </Text>
-                  )}
-                </HorizontalFormControl>
+
+                {organization.useCustomS3 && (
+                  <HorizontalFormControl
+                    label="S3 Storage"
+                    helper="Configure S3 storage to host data on your own infrastructure. Leave empty to use LangWatch's managed storage."
+                  >
+                    {hasOrganizationPermission(
+                      OrganizationRoleGroup.ORGANIZATION_MANAGE
+                    ) ? (
+                      <VStack width="full" align="start" gap={3}>
+                        <Input
+                          width="full"
+                          type="text"
+                          placeholder="S3 Endpoint (e.g. http://localhost:9000)"
+                          {...register("s3Endpoint")}
+                        />
+                        <Input
+                          width="full"
+                          type="text"
+                          placeholder="Access Key ID"
+                          {...register("s3AccessKeyId")}
+                        />
+                        <Input
+                          width="full"
+                          type="password"
+                          placeholder="Secret Access Key"
+                          {...register("s3SecretAccessKey")}
+                        />
+                      </VStack>
+                    ) : (
+                      <Text>
+                        S3 storage configuration is only visible to organization
+                        managers
+                      </Text>
+                    )}
+                  </HorizontalFormControl>
+                )}
               </VStack>
             </form>
           </Card.Body>
@@ -420,31 +423,34 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                 )}
               />
             </HorizontalFormControl>
-            <HorizontalFormControl
-              label="S3 Storage"
-              helper="Configure project-specific S3 storage settings for datasets. If left empty, organization-level settings will be used."
-            >
-              <VStack width="full" align="start" gap={3}>
-                <Input
-                  width="full"
-                  type="text"
-                  placeholder="S3 Endpoint (e.g. http://localhost:9000)"
-                  {...register("s3Endpoint")}
-                />
-                <Input
-                  width="full"
-                  type="text"
-                  placeholder="Access Key ID"
-                  {...register("s3AccessKeyId")}
-                />
-                <Input
-                  width="full"
-                  type="password"
-                  placeholder="Secret Access Key"
-                  {...register("s3SecretAccessKey")}
-                />
-              </VStack>
-            </HorizontalFormControl>
+
+            {organization?.useCustomS3 && (
+              <HorizontalFormControl
+                label="S3 Storage"
+                helper="Configure project-specific S3 storage settings for datasets. If left empty, organization-level settings will be used."
+              >
+                <VStack width="full" align="start" gap={3}>
+                  <Input
+                    width="full"
+                    type="text"
+                    placeholder="S3 Endpoint (e.g. http://localhost:9000)"
+                    {...register("s3Endpoint")}
+                  />
+                  <Input
+                    width="full"
+                    type="text"
+                    placeholder="Access Key ID"
+                    {...register("s3AccessKeyId")}
+                  />
+                  <Input
+                    width="full"
+                    type="password"
+                    placeholder="Secret Access Key"
+                    {...register("s3SecretAccessKey")}
+                  />
+                </VStack>
+              </HorizontalFormControl>
+            )}
           </form>
         </Card.Body>
       </Card.Root>
