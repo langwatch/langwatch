@@ -357,6 +357,21 @@ const store = (
       }
       return undefined;
     },
+    /**
+     * Creates or updates the first evaluator node in the workflow.
+     *
+     * If no evaluator node exists, it creates a new one with the specified evaluator type.
+     * If an evaluator node already exists, it updates it with the new properties while
+     * preserving existing parameters unless the evaluator type has changed.
+     *
+     * When the evaluator type changes, it:
+     * 1. Resets the parameters to default values
+     * 2. Maintains the node's position in the workflow
+     * 3. Preserves the node's ID based on the evaluator name/class
+     *
+     * This method is used by the evaluator selection and settings components to
+     * configure the evaluation workflow.
+     */
     setFirstEvaluator(
       evaluator: Partial<Evaluator> & { evaluator: EvaluatorTypes }
     ) {
@@ -419,6 +434,7 @@ const store = (
           nodes: current.nodes.map((node, index) =>
             index === firstEvaluatorIndex ? evaluatorNode : node
           ),
+          // Remove edges that target the previous evaluator only if the evaluator type has changed
           edges: current.edges.filter(
             (edge) =>
               edge.target !== previousEvaluator?.id || !hasEvaluatorChanged
