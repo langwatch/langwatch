@@ -246,6 +246,17 @@ export const typedValueToText = (
         return json.llm.replies[0];
       }
 
+      // Langgraph.js
+
+      if (
+        Array.isArray(json.messages) &&
+        Array.isArray(json.messages.at(-1)?.id) &&
+        json.messages.at(-1)?.id.includes("AIMessage") &&
+        json.messages.at(-1)?.kwargs?.content
+      ) {
+        return json.messages.at(-1)?.kwargs?.content;
+      }
+
       // Optimization Studio
       if (json.end !== undefined) {
         return specialKeysMapping(json.end) ?? json.end;
