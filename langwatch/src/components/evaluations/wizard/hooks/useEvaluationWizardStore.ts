@@ -96,6 +96,8 @@ export const TASK_TYPES = {
   scan: "Scan for Vulnerabilities (Coming Soon)",
 } as const;
 
+export type TaskType = keyof typeof TASK_TYPES;
+
 export const DATA_SOURCE_TYPES = {
   choose: "Choose existing dataset",
   from_production: "Import from Production",
