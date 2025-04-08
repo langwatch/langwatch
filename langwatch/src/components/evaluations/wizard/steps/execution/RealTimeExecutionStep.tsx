@@ -166,15 +166,6 @@ export function RealTimeExecutionStep() {
             variant="outline"
             colorPalette="orange"
             value={executionMethod}
-            onValueChange={(e) =>
-              // TODO: Isn't this redundant?
-              handleRealTimeExecutionMethodSelect(
-                e.value as
-                  | "realtime_on_message"
-                  | "realtime_guardrail"
-                  | "realtime_manually"
-              )
-            }
             paddingBottom={1}
           >
             <StepRadio
