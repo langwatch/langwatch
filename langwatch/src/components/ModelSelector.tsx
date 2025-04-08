@@ -140,7 +140,7 @@ export const ModelSelector = React.memo(function ModelSelector({
       >
         {selectedItem?.label ?? model}
       </Box>
-      {(isDisabled || isDeprecated) && (
+      {(isDisabled ?? isDeprecated) && (
         <Text
           fontSize={size === "sm" ? 12 : 14}
           fontFamily="mono"
@@ -169,6 +169,10 @@ export const ModelSelector = React.memo(function ModelSelector({
     <Select.Root
       collection={modelCollection}
       value={[model]}
+      onChange={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
       onValueChange={(change) => {
         const selectedValue = change.value[0];
         if (selectedValue) {
@@ -180,6 +184,7 @@ export const ModelSelector = React.memo(function ModelSelector({
       onHighlightChange={(details) => {
         setHighlightedValue(details.highlightedValue);
       }}
+      size={size === "full" ? "lg" : size}
     >
       <Select.Trigger
         className="fix-hidden-inputs"

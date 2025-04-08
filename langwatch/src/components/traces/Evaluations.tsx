@@ -78,13 +78,22 @@ export const Guardrails = (trace: TraceEval) => {
   );
 };
 
-export const EvaluationsCount = (trace: TraceEval) => {
+export const EvaluationsCount = (
+  trace: TraceEval & { countGuardrails?: boolean }
+) => {
+  const evaluations = trace.countGuardrails
+    ? trace.evaluations?.filter((x) => x.is_guardrail)
+    : trace.evaluations?.filter((x) => !x.is_guardrail);
   const totalErrors =
-    trace.evaluations?.filter(
+    evaluations?.filter(
       (check) => check.status === "error" || evaluationPassed(check) === false
     ).length ?? 0;
 
   if (totalErrors > 0) {
+    if (trace.countGuardrails) {
+      return null;
+    }
+
     return (
       <Text
         borderRadius={"md"}
@@ -99,9 +108,8 @@ export const EvaluationsCount = (trace: TraceEval) => {
   }
 
   const totalProcessed =
-    trace.evaluations?.filter((check) => check.status === "processed").length ??
-    0;
-  const total = trace.evaluations?.length ?? 0;
+    evaluations?.filter((check) => check.status === "processed").length ?? 0;
+  const total = evaluations?.length ?? 0;
 
   if (total === 0) return null;
 

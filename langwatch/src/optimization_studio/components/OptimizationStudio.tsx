@@ -14,6 +14,7 @@ import {
   Panel as FlowPanel,
   ReactFlow,
   ReactFlowProvider,
+  type ReactFlowProps,
 } from "@xyflow/react";
 
 import { DndProvider, useDrop } from "react-dnd";
@@ -58,6 +59,7 @@ import { PropertiesPanel } from "./properties/PropertiesPanel";
 import { Publish } from "./Publish";
 import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
+import type { Workflow } from "../types/dsl";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {
   const [_, drop] = useDrop(() => ({
@@ -84,9 +86,6 @@ function DragDropArea({ children }: { children: React.ReactNode }) {
 }
 
 export default function OptimizationStudio() {
-  const nodeTypes = useMemo(() => NodeComponents, []);
-  const edgeTypes = useMemo(() => ({ default: DefaultEdge }), []);
-
   const {
     name,
     nodes,
@@ -296,9 +295,7 @@ export default function OptimizationStudio() {
                     </HStack>
                     {isResultsPanelCollapsed && <ProgressToast />}
                     <DragDropArea>
-                      <ReactFlow
-                        nodeTypes={nodeTypes}
-                        edgeTypes={edgeTypes}
+                      <OptimizationStudioCanvas
                         nodes={nodes}
                         edges={edges}
                         onNodesChange={onNodesChange}
@@ -308,16 +305,6 @@ export default function OptimizationStudio() {
                         onPaneClick={() => {
                           setWorkflowSelected(true);
                         }}
-                        defaultViewport={{
-                          zoom: 1,
-                          x: 100,
-                          y: Math.round(
-                            ((typeof window !== "undefined"
-                              ? window.innerHeight - 360
-                              : 0) || 300) / 2
-                          ),
-                        }}
-                        proOptions={{ hideAttribution: true }}
                       >
                         <Controls
                           position="bottom-left"
@@ -333,7 +320,6 @@ export default function OptimizationStudio() {
                             marginBottom: "15px",
                           }}
                         />
-                        <ReactFlowBackground />
 
                         <FlowPanel position="bottom-right">
                           <PlaygroundButton
@@ -342,7 +328,7 @@ export default function OptimizationStudio() {
                             executionStatus={executionStatus ?? ""}
                           />
                         </FlowPanel>
-                      </ReactFlow>
+                      </OptimizationStudioCanvas>
                     </DragDropArea>
                   </Panel>
                   <PanelResizeHandle
@@ -422,5 +408,39 @@ function StatusCircle({
         borderRadius="full"
       />
     </Tooltip>
+  );
+}
+
+export function OptimizationStudioCanvas({
+  children,
+  defaultZoom = 1,
+  yAdjust = -360,
+  ...props
+}: {
+  children?: React.ReactNode;
+  defaultZoom?: number;
+  yAdjust?: number;
+} & ReactFlowProps) {
+  const nodeTypes = useMemo(() => NodeComponents, []);
+  const edgeTypes = useMemo(() => ({ default: DefaultEdge }), []);
+
+  return (
+    <ReactFlow
+      nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
+      defaultViewport={{
+        zoom: defaultZoom,
+        x: 100,
+        y: Math.round(
+          ((typeof window !== "undefined" ? window.innerHeight - yAdjust : 0) ||
+            300) / 2
+        ),
+      }}
+      proOptions={{ hideAttribution: true }}
+      {...props}
+    >
+      <ReactFlowBackground />
+      {children}
+    </ReactFlow>
   );
 }

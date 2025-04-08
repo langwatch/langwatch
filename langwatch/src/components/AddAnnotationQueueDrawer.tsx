@@ -19,7 +19,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
-import { AddAnnotationScore } from "./annotations/AddAnnotationScore";
+import { AddOrEditAnnotationScore } from "./annotations/AddOrEditAnnotationScore";
 import { useDrawer } from "./CurrentDrawer";
 import { FullWidthFormControl } from "./FullWidthFormControl";
 import { RandomColorAvatar } from "./RandomColorAvatar";
@@ -69,6 +69,11 @@ export const AddAnnotationQueueDrawer = ({
   );
 
   const { closeDrawer } = useDrawer();
+
+  const closeAll = () => {
+    closeDrawer();
+    onClose?.();
+  };
 
   const users =
     api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
@@ -185,7 +190,7 @@ export const AddAnnotationQueueDrawer = ({
         size="lg"
         onOpenChange={({ open }) => {
           if (!open) {
-            closeDrawer();
+            closeAll();
           }
         }}
       >
@@ -193,7 +198,7 @@ export const AddAnnotationQueueDrawer = ({
         <Drawer.Content>
           <Drawer.Header>
             <HStack>
-              <Drawer.CloseTrigger />
+              <Drawer.CloseTrigger onClick={() => closeAll()} />
             </HStack>
             <HStack>
               <Text paddingTop={5} fontSize="2xl">
@@ -408,7 +413,7 @@ export const AddAnnotationQueueDrawer = ({
             </HStack>
           </Drawer.Header>
           <Drawer.Body>
-            <AddAnnotationScore onClose={scoreTypeDrawerOpen.onClose} />
+            <AddOrEditAnnotationScore onClose={scoreTypeDrawerOpen.onClose} />
           </Drawer.Body>
         </Drawer.Content>
       </Drawer.Root>

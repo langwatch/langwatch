@@ -187,7 +187,7 @@ def parse_code(node_id: str, component: Code, workflow: Workflow) -> dspy.Module
 
     namespace = {}
     try:
-        exec(code, None, namespace)
+        exec(code, namespace)
     except Exception as e:
         raise ValueError(f"Error parsing code for component {component.name}: {e}")
 
@@ -284,7 +284,14 @@ def autoparse_field_value(field: Field, value: Optional[Any]) -> Optional[Any]:
             if isinstance(value, object):
                 return repr(value)
             return str(value)
-    if field.type == FieldType.list_str and not isinstance(value, list):
+    if field.type == FieldType.list_str:
+        if isinstance(value, list):
+            return [
+                autoparse_field_value(
+                    Field(identifier=field.identifier, type=FieldType.str), item
+                )
+                for item in value
+            ]
         return [
             autoparse_field_value(
                 Field(identifier=field.identifier, type=FieldType.str), value

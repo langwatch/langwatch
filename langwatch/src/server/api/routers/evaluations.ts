@@ -8,6 +8,7 @@ import {
   type EvaluatorTypes,
 } from "../../evaluations/evaluators.generated";
 import { prisma } from "~/server/db";
+import { mappingStateSchema } from "../../tracer/tracesMapping";
 
 export const evaluationsRouter = createTRPCRouter({
   availableEvaluators: protectedProcedure
@@ -46,7 +47,7 @@ export const evaluationsRouter = createTRPCRouter({
         ]),
         traceId: z.string(),
         settings: z.object({}).passthrough(),
-        mappings: z.record(z.string(), z.string()).optional(),
+        mappings: mappingStateSchema,
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))

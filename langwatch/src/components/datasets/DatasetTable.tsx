@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Card,
+  Center,
   Heading,
   HStack,
   Spacer,
@@ -41,6 +42,7 @@ import { AddRowsFromCSVModal } from "./AddRowsFromCSVModal";
 
 import { toaster } from "../ui/toaster";
 import { Menu } from "../ui/menu";
+import { ErrorBoundary } from "react-error-boundary";
 
 export type InMemoryDataset = {
   datasetId?: string;
@@ -56,6 +58,7 @@ export function DatasetTable({
   inMemoryDataset,
   onUpdateDataset,
   isEmbedded = false,
+  insideWizard = false,
   title,
   hideButtons = false,
   bottomSpace = "300px",
@@ -65,6 +68,7 @@ export function DatasetTable({
   inMemoryDataset?: InMemoryDataset;
   onUpdateDataset?: (dataset: InMemoryDataset & { datasetId?: string }) => void;
   isEmbedded?: boolean;
+  insideWizard?: boolean;
   title?: string;
   hideButtons?: boolean;
   bottomSpace?: string;
@@ -461,22 +465,28 @@ export function DatasetTable({
   return (
     <>
       <HStack width="full" verticalAlign={"middle"} paddingBottom={6} gap={6}>
-        <Heading as={"h1"} size="lg">
-          {title ? (
-            title
-          ) : (
-            <>
-              {isEmbedded ? "Edit Dataset" : "Dataset"}{" "}
-              {`- ${
-                dataset?.name
-                  ? dataset.name
-                  : datasetId
-                  ? ""
-                  : DEFAULT_DATASET_NAME
-              }`}
-            </>
-          )}
-        </Heading>
+        {insideWizard ? (
+          <Heading as="h3" size="md" fontWeight="600">
+            {dataset?.name ?? DEFAULT_DATASET_NAME}
+          </Heading>
+        ) : (
+          <Heading as="h1" size="lg">
+            {title ? (
+              title
+            ) : (
+              <>
+                {isEmbedded ? "Edit Dataset" : "Dataset"}{" "}
+                {`- ${
+                  dataset?.name
+                    ? dataset.name
+                    : datasetId
+                    ? ""
+                    : DEFAULT_DATASET_NAME
+                }`}
+              </>
+            )}
+          </Heading>
+        )}
         <Text fontSize={"14px"} color="gray.400">
           {databaseDataset.data?.count ?? parentRowData?.length} records
         </Text>
@@ -515,16 +525,18 @@ export function DatasetTable({
                 Upload or Create Dataset
               </Button>
             )}
-            <Button
-              colorPalette="gray"
-              minWidth="fit-content"
-              onClick={() => dataset && void downloadCSV()}
-              loading={downloadDataset.isLoading}
-              loadingText="Downloading..."
-            >
-              <Download />
-              Export
-            </Button>
+            {!insideWizard && (
+              <Button
+                colorPalette="gray"
+                minWidth="fit-content"
+                onClick={() => dataset && void downloadCSV()}
+                loading={downloadDataset.isLoading}
+                loadingText="Downloading..."
+              >
+                <Download />
+                Export
+              </Button>
+            )}
             <Button
               colorPalette="gray"
               onClick={() => editDataset.onOpen()}
@@ -533,7 +545,7 @@ export function DatasetTable({
               <Edit2 />
               Edit Columns
             </Button>
-            {datasetId && !isEmbedded && (
+            {datasetId && !isEmbedded && !insideWizard && (
               <Button
                 colorPalette="blue"
                 onClick={() => {
@@ -562,16 +574,24 @@ export function DatasetTable({
                 </Alert.Content>
               </Alert.Root>
             )}
-            <DatasetGrid
-              columnDefs={columnDefs}
-              rowData={localRowData}
-              onCellValueChanged={onCellValueChanged}
-              ref={gridRef}
-              domLayout="normal"
-              {...(loadingOverlayComponent !== undefined
-                ? { loadingOverlayComponent }
-                : {})}
-            />
+            <ErrorBoundary
+              fallback={
+                <Center width="full" height="full">
+                  Error rendering the dataset, please refresh the page
+                </Center>
+              }
+            >
+              <DatasetGrid
+                columnDefs={columnDefs}
+                rowData={localRowData}
+                onCellValueChanged={onCellValueChanged}
+                ref={gridRef}
+                domLayout="normal"
+                {...(loadingOverlayComponent !== undefined
+                  ? { loadingOverlayComponent }
+                  : {})}
+              />
+            </ErrorBoundary>
           </Box>
         </Card.Body>
       </Card.Root>
@@ -582,7 +602,7 @@ export function DatasetTable({
             left="0"
             bottom={isEmbedded ? "32px" : 6}
             marginTop={6}
-            marginLeft={6}
+            marginLeft={insideWizard ? 0 : 6}
             backgroundColor="#ffffff"
             padding="8px"
             paddingX="16px"

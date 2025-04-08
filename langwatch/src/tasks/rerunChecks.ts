@@ -75,7 +75,7 @@ export default async function execute(evaluatorId: string) {
   //       await currentJob.retry(state);
   //     }
   //   } else {
-  //     const check = await prisma.check.findFirst({
+  //     const check = await prisma.monitor.findFirst({
   //       where: {
   //         id: checkId,
   //         projectId: traceCheck.project_id,

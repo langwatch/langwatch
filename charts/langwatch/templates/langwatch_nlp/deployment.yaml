@@ -1,0 +1,51 @@
+# Deployment for the LangWatch NLP service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-langwatch-nlp
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.langwatch_nlp.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      # Pod security context
+      securityContext:
+        {{- toYaml .Values.global.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}-langwatch-nlp
+          securityContext:
+            {{- toYaml .Values.global.containerSecurityContext | nindent 12 }}
+          image: "{{ .Values.images.langwatch_nlp.repository }}:{{ .Values.images.langwatch_nlp.tag }}"
+          imagePullPolicy: {{ .Values.images.langwatch_nlp.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.langwatch_nlp.service.port }}
+              protocol: TCP
+          # Environment variables for the NLP service
+          env:
+            {{- range $key, $value := .Values.langwatch_nlp.env }}
+            - name: {{ $key }}
+              value: {{ tpl $value $ | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.langwatch_nlp.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+            - name: log-dir
+              mountPath: /var/log
+      volumes:
+        - name: tmp-dir
+          emptyDir: {}
+        - name: log-dir
+          emptyDir: {}

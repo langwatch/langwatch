@@ -205,3 +205,24 @@ div input[type="number"] {
 .chakra-radio-group__itemText {
   cursor: pointer;
 }
+
+*:is([data-focus-visible-animated]) {
+  outline-offset: 2px;
+  animation: focus-visible-animation 1s ease-out;
+  animation-delay: 0.2s;
+}
+
+@keyframes focus-visible-animation {
+  0% {
+    outline-offset: 2px;
+    scale: 1;
+  }
+  50% {
+    outline-offset: 10px;
+    scale: 1.2;
+  }
+  100% {
+    outline-offset: 2px;
+    scale: 1;
+  }
+}

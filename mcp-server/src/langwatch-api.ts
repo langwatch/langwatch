@@ -6,20 +6,27 @@ interface SearchTrace {
 }
 
 interface GetLlmTraceByIdOptions {
-	langWatchEndpoint?: string;
+	endpoint: string;
 }
 
 interface ListLLmTracesOptions {
 	pageSize?: number;
 	pageOffset?: number;
 	timeTravelDays?: number;
-	langWatchEndpoint?: string;
+	endpoint: string;
+}
+
+interface SearchTracesOptions {
+	pageSize?: number;
+	pageOffset?: number;
+	timeTravelDays?: number;
+	endpoint: string;
+
+	filters: Record<string, string[] | Record<string, string[]>>;
 }
 
 export const getLlmTraceById = async (authToken: string, id: string, opts?: GetLlmTraceByIdOptions): Promise<LLMModeTrace> => {
-	const { langWatchEndpoint } = opts ?? {};
-
-	const endpoint = langWatchEndpoint ?? "https://app.langwatch.ai";
+	const { endpoint } = opts ?? {};
 
 	const url = new URL(`${endpoint}/api/trace/${id}`);
 	url.searchParams.set("llmMode", "true");
@@ -48,10 +55,8 @@ export const listLlmTraces = async (authToken: string, opts?: ListLLmTracesOptio
 		pageSize = 10,
 		pageOffset = 0,
 		timeTravelDays = 1,
-		langWatchEndpoint,
+		endpoint,
 	} = opts ?? {};
-
-	const endpoint = langWatchEndpoint ?? "https://app.langwatch.ai";
 
 	const response = await fetch(`${endpoint}/api/trace/search`, {
 		method: "POST",
@@ -63,6 +68,33 @@ export const listLlmTraces = async (authToken: string, opts?: ListLLmTracesOptio
 			startDate: addDays(new Date(), -timeTravelDays).toISOString(),
 			endDate: addDays(new Date(), 1).toISOString(),
 			llmMode: true,
+			pageOffset,
+			pageSize,
+		}),
+	});
+
+	return await response.json() as Promise<SearchTrace>;
+}
+
+export const searchTraces = async (authToken: string, opts: SearchTracesOptions): Promise<SearchTrace> => {
+	const {
+		pageSize = 10,
+		pageOffset = 0,
+		timeTravelDays = 1,
+		endpoint,
+		filters,
+	} = opts;
+
+	const response = await fetch(`${endpoint}/api/trace/search`, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			"X-Auth-Token": authToken,
+		},
+		body: JSON.stringify({
+			startDate: addDays(new Date(), -timeTravelDays).toISOString(),
+			endDate: addDays(new Date(), 1).toISOString(),
+			filters: filters,
 			pageOffset,
 			pageSize,
 		}),

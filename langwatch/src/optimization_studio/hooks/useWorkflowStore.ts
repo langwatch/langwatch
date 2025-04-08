@@ -29,7 +29,7 @@ export type SocketStatus =
   | "connecting-python"
   | "connected";
 
-type State = Workflow & {
+export type State = Workflow & {
   workflow_id?: string;
   hoveredNodeId?: string;
   socketStatus: SocketStatus;
@@ -45,12 +45,16 @@ type State = Workflow & {
   playgroundOpen: boolean;
 };
 
-type WorkflowStore = State & {
+export type WorkflowStore = State & {
   reset: () => void;
   getWorkflow: () => Workflow;
   getPreviousWorkflow: () => Workflow | undefined;
   hasPendingChanges: () => boolean;
-  setWorkflow: (workflow: Partial<Workflow> & { workflowId?: string }) => void;
+  setWorkflow: (
+    workflow:
+      | (Partial<Workflow> & { workflow_id?: string })
+      | ((current: Workflow) => Partial<Workflow> & { workflow_id?: string })
+  ) => void;
   setPreviousWorkflow: (workflow: Workflow | undefined) => void;
   setSocketStatus: (
     status: SocketStatus | ((status: SocketStatus) => SocketStatus)
@@ -95,6 +99,8 @@ type WorkflowStore = State & {
     request: "evaluations" | "optimizations" | "closed" | undefined
   ) => void;
   setPlaygroundOpen: (open: boolean) => void;
+  stopWorkflowIfRunning: (message: string | undefined) => void;
+  checkIfUnreachableErrorMessage: (message: string | undefined) => void;
 };
 
 const DEFAULT_LLM_CONFIG: LLMConfig = {
@@ -103,7 +109,7 @@ const DEFAULT_LLM_CONFIG: LLMConfig = {
   max_tokens: 2048,
 };
 
-const initialState: State = {
+export const initialDSL: Workflow = {
   workflow_id: undefined,
   spec_version: "1.3",
   name: "Loading...",
@@ -115,6 +121,10 @@ const initialState: State = {
   default_llm: DEFAULT_LLM_CONFIG,
   enable_tracing: true,
   state: {},
+};
+
+export const initialState: State = {
+  ...initialDSL,
 
   hoveredNodeId: undefined,
   socketStatus: "disconnected",
@@ -126,7 +136,25 @@ const initialState: State = {
   playgroundOpen: false,
 };
 
-const store = (
+export const getWorkflow = (state: State) => {
+  // Keep only the keys present on Workflow type
+  return {
+    workflow_id: state.workflow_id,
+    experiment_id: state.experiment_id,
+    spec_version: state.spec_version,
+    name: state.name,
+    icon: state.icon,
+    description: state.description,
+    version: state.version,
+    default_llm: state.default_llm,
+    enable_tracing: state.enable_tracing,
+    nodes: state.nodes,
+    edges: state.edges,
+    state: state.state,
+  };
+};
+
+export const store = (
   set: (
     partial:
       | WorkflowStore
@@ -142,21 +170,7 @@ const store = (
   },
   getWorkflow: () => {
     const state = get();
-
-    // Keep only the keys present on Workflow type
-    return {
-      workflow_id: state.workflow_id,
-      spec_version: state.spec_version,
-      name: state.name,
-      icon: state.icon,
-      description: state.description,
-      version: state.version,
-      default_llm: state.default_llm,
-      enable_tracing: state.enable_tracing,
-      nodes: state.nodes,
-      edges: state.edges,
-      state: state.state,
-    };
+    return getWorkflow(state);
   },
   getPreviousWorkflow: () => {
     return get().previousWorkflow;
@@ -169,7 +183,9 @@ const store = (
     }
     return hasDSLChange(previousWorkflow, currentWorkflow, true);
   },
-  setWorkflow: (workflow: Partial<Workflow>) => {
+  setWorkflow: (
+    workflow: Partial<Workflow> | ((current: Workflow) => Partial<Workflow>)
+  ) => {
     set(workflow);
   },
   setPreviousWorkflow: (workflow: Workflow | undefined) => {
@@ -471,6 +487,30 @@ const store = (
   },
   setPlaygroundOpen: (open: boolean) => {
     set({ playgroundOpen: open });
+  },
+  stopWorkflowIfRunning: (message: string | undefined) => {
+    get().setWorkflowExecutionState({
+      status: "error",
+      error: message,
+      timestamps: { finished_at: Date.now() },
+    });
+    for (const node of get().nodes) {
+      if (node.data.execution_state?.status === "running") {
+        get().setComponentExecutionState(node.id, {
+          status: "error",
+          error: message,
+          timestamps: { finished_at: Date.now() },
+        });
+      }
+    }
+  },
+  checkIfUnreachableErrorMessage: (message: string | undefined) => {
+    if (
+      get().socketStatus === "connected" &&
+      message?.toLowerCase().includes("runtime is unreachable")
+    ) {
+      get().setSocketStatus("connecting-python");
+    }
   },
 });
 

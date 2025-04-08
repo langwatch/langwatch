@@ -142,31 +142,38 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                           : "")
                       }
                     >
-                      {projectGroup.projects.map((project) => (
+                      {projectGroup.projects.map((project_) => (
                         <Menu.Item
-                          key={project.id}
-                          value={project.id}
+                          key={project_.id}
+                          value={project_.id}
                           fontSize="14px"
                           asChild
                         >
                           <Link
-                            key={project.id}
+                            key={project_.id}
                             href={
                               currentRoute?.path.includes("[project]")
                                 ? currentRoute.path
-                                    .replace("[project]", project.slug)
+                                    .replace("[project]", project_.slug)
                                     .replace(/\[.*?\]/g, "")
                                     .replace(/\/\/+/g, "/")
-                                : `/${project.slug}?return_to=${window.location.pathname}`
+                                : window.location.pathname.includes(
+                                    project.slug
+                                  )
+                                ? window.location.pathname.replace(
+                                    project.slug,
+                                    project_.slug
+                                  )
+                                : `/${project_.slug}?return_to=${window.location.pathname}`
                             }
                             _hover={{
                               textDecoration: "none",
                             }}
                           >
                             <HStack width="26px" justify="center">
-                              <ProjectTechStackIcon project={project} />
+                              <ProjectTechStackIcon project={project_} />
                             </HStack>{" "}
-                            {project.name}
+                            {project_.name}
                           </Link>
                         </Menu.Item>
                       ))}

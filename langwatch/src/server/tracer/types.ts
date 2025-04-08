@@ -303,10 +303,7 @@ export type Trace = {
   // TODO: add spans here too
 };
 
-export type LLMModeTrace = Omit<
-  Trace,
-  "timestamps" | "indexing_md5s"
-> & {
+export type LLMModeTrace = Omit<Trace, "timestamps" | "indexing_md5s"> & {
   timestamps: {
     started_at: string;
     inserted_at: string;
@@ -429,12 +426,12 @@ export type DatasetSpan =
   | (Omit<
       BaseSpan,
       "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"
-    > & { params: Record<string, any> })
+    > & { params: Record<string, any>; model?: string | null })
   | (Omit<
       LLMSpan,
       "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"
-    > & { params: Record<string, any> })
+    > & { params: Record<string, any>; model?: string | null })
   | (Omit<
       RAGSpan,
       "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"
-    > & { params: Record<string, any> });
+    > & { params: Record<string, any>; model?: string | null });

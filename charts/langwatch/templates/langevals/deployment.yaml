@@ -1,0 +1,47 @@
+# Deployment for the LangWatch Evaluations service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-langevals
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-langevals
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.langevals.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-langevals
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-langevals
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      # Pod security context
+      securityContext:
+        {{- toYaml .Values.global.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}-langevals
+          securityContext:
+            {{- toYaml .Values.global.containerSecurityContext | nindent 12 }}
+          image: "{{ .Values.images.langevals.repository }}:{{ .Values.images.langevals.tag }}"
+          imagePullPolicy: {{ .Values.images.langevals.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.langevals.service.port }}
+              protocol: TCP
+          # Environment variables for the evaluations service
+          env:
+            {{- range $key, $value := .Values.langevals.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.langevals.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+      volumes:
+        - name: tmp-dir
+          emptyDir: {}

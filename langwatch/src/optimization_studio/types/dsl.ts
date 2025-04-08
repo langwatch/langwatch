@@ -1,5 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { DatasetColumns } from "../../server/datasets/types";
+import { z } from "zod";
 
 export type Field = {
   identifier: string;
@@ -72,12 +73,14 @@ export type BaseComponent = {
   };
 };
 
-export type LLMConfig = {
-  model: string;
-  temperature?: number;
-  max_tokens?: number;
-  litellm_params?: Record<string, string>;
-};
+export const llmConfigSchema = z.object({
+  model: z.string(),
+  temperature: z.number().optional(),
+  max_tokens: z.number().optional(),
+  litellm_params: z.record(z.string()).optional(),
+});
+
+export type LLMConfig = z.infer<typeof llmConfigSchema>;
 
 export type Signature = BaseComponent;
 
@@ -141,9 +144,30 @@ type Flow = {
   edges: Edge[];
 };
 
+// TODO: make this a complete replacement for Workflow below
+export const workflowJsonSchema = z
+  .object({
+    workflow_id: z.string().optional(),
+    experiment_id: z.string().optional(),
+    spec_version: z.string(),
+    name: z.string(),
+    icon: z.string(),
+    description: z.string(),
+    version: z
+      .string()
+      .regex(
+        /^\d+(\.\d+)?$/,
+        "Version must be in the format 'number.number' (e.g. 1.0)"
+      ),
+    nodes: z.array(z.any()),
+    default_llm: llmConfigSchema,
+  })
+  .passthrough();
+
 export type Workflow = {
   spec_version: "1.3";
   workflow_id?: string;
+  experiment_id?: string;
   name: string;
   icon: string;
   description: string;
@@ -167,7 +191,6 @@ export type Workflow = {
       };
     };
     evaluation?: {
-      experiment_slug?: string;
       run_id?: string;
       status?: ExecutionStatus;
       error?: string;
@@ -180,7 +203,6 @@ export type Workflow = {
       };
     };
     optimization?: {
-      experiment_slug?: string;
       run_id?: string;
       status?: ExecutionStatus;
       stdout?: string;

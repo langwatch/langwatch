@@ -32,6 +32,7 @@ import {
   type MaybeStoredLLMModelCost,
 } from "../../../server/modelProviders/llmModelCost";
 import { getPayloadSizeHistogram } from "../../../server/metrics";
+import { safeTruncate } from "../../../utils/truncate";
 
 export const debug = getDebugger("langwatch:dspy_log_steps");
 
@@ -146,13 +147,14 @@ export default async function handler(
 }
 
 const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
-  const { run_id, index, experiment_slug } = param;
+  const { run_id, index, experiment_id, experiment_slug } = param;
 
-  const experiment = await findOrCreateExperiment(
+  const experiment = await findOrCreateExperiment({
     project,
+    experiment_id,
     experiment_slug,
-    ExperimentType.DSPY
-  );
+    experiment_type: ExperimentType.DSPY,
+  });
 
   const id = dspyStepIndexId({
     projectId: project.id,
@@ -196,11 +198,17 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
         if (llmCall.response?.output) {
           delete llmCall.response.choices;
         }
-        totalSize += JSON.stringify(llmCall).length;
-        if (totalSize >= 256_000 && llmCall.response) {
-          llmCall.response.output = "[truncated]";
-          llmCall.response.messages = [];
+
+        if (llmCall.response) {
+          llmCall.response = safeTruncate(llmCall.response);
+          totalSize = JSON.stringify(llmCall).length;
+
+          if (totalSize >= 256_000) {
+            llmCall.response.output = "[truncated]";
+            llmCall.response.messages = [];
+          }
         }
+
         return llmCall;
       }),
   };

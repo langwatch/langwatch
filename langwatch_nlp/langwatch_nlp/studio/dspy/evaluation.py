@@ -227,8 +227,15 @@ class EvaluationReporting:
     def send_batch(self, finished: bool = False):
         with self.lock:
             body = {
-                "experiment_slug": self.workflow.workflow_id,
-                "name": f"{self.workflow.name} - Evaluations",
+                "experiment_id": self.workflow.experiment_id,
+                "experiment_slug": (
+                    None if self.workflow.experiment_id else self.workflow.workflow_id
+                ),
+                "name": (
+                    None
+                    if self.workflow.experiment_id
+                    else f"{self.workflow.name} - Evaluations"
+                ),
                 "workflow_id": self.workflow.workflow_id,
                 "run_id": self.run_id,
                 "workflow_version_id": self.workflow_version_id,

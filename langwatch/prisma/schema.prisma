@@ -173,7 +173,7 @@ model Project {
     createdAt            DateTime              @default(now())
     updatedAt            DateTime              @default(now()) @updatedAt
     userLinkTemplate     String?
-    checks               Check[]
+    checks               Monitor[]
     costs                Cost[]
     topics               Topic[]
     datasets             Dataset[]
@@ -228,10 +228,12 @@ enum EvaluationExecutionMode {
     MANUALLY
 }
 
-model Check {
+model Monitor {
     id            String                  @id @default(nanoid())
     projectId     String
     project       Project                 @relation(fields: [projectId], references: [id])
+    experimentId  String?                 @unique
+    experiment    Experiment?             @relation(fields: [experimentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
     checkType     String
     name          String
     slug          String
@@ -426,6 +428,8 @@ model Experiment {
     createdAt        DateTime          @default(now())
     updatedAt        DateTime          @default(now()) @updatedAt
     batchEvaluations BatchEvaluation[]
+    wizardState      Json?
+    monitor          Monitor?
 
     @@unique([projectId, slug])
     @@index([projectId])
@@ -498,6 +502,7 @@ model AnnotationScore {
     project               Project                  @relation(fields: [projectId], references: [id])
     createdAt             DateTime                 @default(now())
     updatedAt             DateTime                 @default(now()) @updatedAt
+    deletedAt             DateTime?
     description           String?
     active                Boolean                  @default(true)
     dataType              AnnotationScoreDataType?

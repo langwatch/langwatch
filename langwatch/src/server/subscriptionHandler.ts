@@ -11,6 +11,14 @@ export type PlanInfo = {
   evaluationsCredit: number;
   maxWorkflows: number;
   canPublish: boolean;
+  userPrice?: {
+    USD: number;
+    EUR: number;
+  };
+  tracesPrice?: {
+    USD: number;
+    EUR: number;
+  };
   prices: {
     USD: number;
     EUR: number;

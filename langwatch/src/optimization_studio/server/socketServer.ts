@@ -59,7 +59,11 @@ const handleClientMessage = async (
       case "stop_evaluation_execution":
       case "execute_optimization":
       case "stop_optimization_execution":
-        await callPython(ws, message, projectId);
+        await studioBackendPostEvent({
+          projectId,
+          message,
+          onEvent: (event) => sendMessageToClient(ws, event),
+        });
         break;
       default:
         //@ts-expect-error
@@ -100,16 +104,20 @@ const handleComponentError = (
   });
 };
 
-const callPython = async (
-  ws: WebSocket,
-  event: StudioClientEvent,
-  projectId: string
-) => {
+export const studioBackendPostEvent = async ({
+  projectId,
+  message: message,
+  onEvent,
+}: {
+  projectId: string;
+  message: StudioClientEvent;
+  onEvent: (event: StudioServerEvent) => void;
+}) => {
   let reader: ReadableStreamDefaultReader<Uint8Array>;
   try {
     const s3CacheKey = getS3CacheKey(projectId);
 
-    reader = await invokeLambda(event, s3CacheKey);
+    reader = await invokeLambda(message, s3CacheKey);
   } catch (error) {
     if (
       (error as any)?.cause?.code === "ECONNREFUSED" ||
@@ -138,7 +146,7 @@ const callPython = async (
         if (event.startsWith("data: ")) {
           try {
             const serverEvent: StudioServerEvent = JSON.parse(event.slice(6));
-            sendMessageToClient(ws, serverEvent);
+            onEvent(serverEvent);
 
             // Close the connection if we receive a completion event
             if (serverEvent.type === "done") {
@@ -183,10 +191,10 @@ const callPython = async (
   } catch (error) {
     console.error("Error reading stream:", error);
     const node_id =
-      "node_id" in event.payload ? event.payload.node_id : undefined;
+      "node_id" in message.payload ? message.payload.node_id : undefined;
 
     if (node_id) {
-      sendMessageToClient(ws, {
+      onEvent({
         type: "component_state_change",
         payload: {
           component_id: node_id,
@@ -198,7 +206,7 @@ const callPython = async (
         },
       });
     } else {
-      sendMessageToClient(ws, {
+      onEvent({
         type: "error",
         payload: { message: (error as Error).message },
       });

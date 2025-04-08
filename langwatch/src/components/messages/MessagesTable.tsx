@@ -15,6 +15,8 @@ import {
   Text,
   VStack,
   useDisclosure,
+  Portal,
+  CloseButton,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
@@ -54,12 +56,17 @@ import { Checkbox } from "../ui/checkbox";
 import { Popover } from "../ui/popover";
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
+import { Dialog } from "../ui/dialog";
+import { Link } from "../ui/link";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import type { TraceWithGuardrail } from "./MessageCard";
 import {
   MessagesNavigationFooter,
   useMessagesNavigationFooter,
 } from "./MessagesNavigationFooter";
+
+import { AddParticipants } from "../traces/AddParticipants";
+import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
 
 export function MessagesTable() {
   const router = useRouter();
@@ -872,6 +879,46 @@ export function MessagesTable() {
       console.error(error);
     }
   };
+  const queueItem = api.annotation.createQueueItem.useMutation();
+  const [annotators, setAnnotators] = useState<{ id: string; name: string }[]>(
+    []
+  );
+
+  const dialog = useDisclosure();
+  const queueDrawerOpen = useDisclosure();
+
+  const sendToQueue = () => {
+    queueItem.mutate(
+      {
+        projectId: project?.id ?? "",
+        traceIds: selectedTraceIds,
+        annotators: annotators.map((p) => p.id),
+      },
+      {
+        onSuccess: () => {
+          dialog.onClose();
+          toaster.create({
+            title: "Trace added to annotation queue",
+            description: (
+              <>
+                <Link
+                  href={`/${project?.slug}/annotations/`}
+                  textDecoration="underline"
+                >
+                  View Queues
+                </Link>
+              </>
+            ),
+            type: "success",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
+          });
+        },
+      }
+    );
+  };
 
   const downloadCSV_ = async (selection = false) => {
     const traceGroups_ = selection
@@ -1098,7 +1145,9 @@ export function MessagesTable() {
                       ? "calc(100vw - 580px)"
                       : showFilters
                       ? "calc(100vw - 450px)"
-                      : "50%"
+                      : isExpanded
+                      ? "calc(100vw - 260px)"
+                      : "calc(100vw - 130px)"
                   }
                 >
                   {downloadProgress > 0 && (
@@ -1273,6 +1322,51 @@ export function MessagesTable() {
             >
               Add to Dataset
             </Button>
+            <Dialog.Root
+              open={dialog.open}
+              onOpenChange={(e) =>
+                e.open ? dialog.onOpen() : dialog.onClose()
+              }
+            >
+              <Dialog.Trigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => dialog.onOpen()}
+                >
+                  Add to Queue
+                </Button>
+              </Dialog.Trigger>
+              <Portal>
+                <Dialog.Backdrop />
+
+                <Dialog.Content>
+                  <Dialog.Header>
+                    <Dialog.Title>Add to Queue</Dialog.Title>
+                  </Dialog.Header>
+                  <Dialog.Body>
+                    <Dialog.Description mb="4">
+                      Add selected traces to an annotation queue
+                    </Dialog.Description>
+                    <AddParticipants
+                      annotators={annotators}
+                      setAnnotators={setAnnotators}
+                      queueDrawerOpen={queueDrawerOpen}
+                      sendToQueue={sendToQueue}
+                      isLoading={queueItem.isLoading}
+                    />
+                  </Dialog.Body>
+
+                  <Dialog.CloseTrigger asChild>
+                    <CloseButton size="sm" onClick={() => dialog.onClose()} />
+                  </Dialog.CloseTrigger>
+                </Dialog.Content>
+                <AddAnnotationQueueDrawer
+                  open={queueDrawerOpen.open}
+                  onClose={queueDrawerOpen.onClose}
+                />
+              </Portal>
+            </Dialog.Root>
           </HStack>
         </Box>
       )}

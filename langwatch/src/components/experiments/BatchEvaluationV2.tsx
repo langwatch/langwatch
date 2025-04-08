@@ -10,6 +10,8 @@ import {
   Spinner,
   Text,
   VStack,
+  type BoxProps,
+  type StackProps,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
@@ -35,6 +37,7 @@ import {
   BatchEvaluationV2EvaluationResults,
   useBatchEvaluationDownloadCSV,
 } from "./BatchEvaluationV2/BatchEvaluationV2EvaluationResults";
+import React from "react";
 
 export function BatchEvaluationV2({
   project,
@@ -247,6 +250,7 @@ export function BatchEvaluationV2RunList({
   selectedRunId,
   setSelectedRunId,
   size = "md",
+  ...props
 }: {
   batchEvaluationRuns: UseTRPCQueryResult<
     inferRouterOutputs<AppRouter>["experiments"]["getExperimentBatchEvaluationRuns"],
@@ -263,7 +267,7 @@ export function BatchEvaluationV2RunList({
   selectedRunId: string | undefined;
   setSelectedRunId: (runId: string) => void;
   size?: "sm" | "md";
-}) {
+} & StackProps) {
   const hasAnyVersion = batchEvaluationRuns.data?.runs.some(
     (run) => run.workflow_version
   );
@@ -281,6 +285,7 @@ export function BatchEvaluationV2RunList({
       height="full"
       gap={0}
       overflowY="auto"
+      {...props}
     >
       {size !== "sm" && (
         <Heading as="h2" size="md" paddingX={6} paddingY={4}>
@@ -400,7 +405,7 @@ export function BatchEvaluationV2RunList({
                     {Object.values(run.summary.evaluations)
                       .slice(0, 2)
                       .map((evaluation, index) => (
-                        <>
+                        <React.Fragment key={evaluation.name}>
                           {index > 0 && <Text>·</Text>}
                           <Tooltip
                             content={evaluation.name}
@@ -410,9 +415,9 @@ export function BatchEvaluationV2RunList({
                               {formatEvaluationSummary(evaluation, true)}
                             </Text>
                           </Tooltip>
-                        </>
+                        </React.Fragment>
                       ))}
-                    {runCost && (
+                    {!!runCost && (
                       <>
                         {Object.keys(run.summary.evaluations).length > 0 && (
                           <Text>·</Text>
