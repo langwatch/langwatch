@@ -66,13 +66,14 @@ class LangWatchSpan:
 
         if span_id is not None:
             warn("span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the span's metadata.")
-            attributes["deprecated.span_id"] = span_id
+            attributes[AttributeName.DeprecatedSpanId] = str(span_id)
 
         # Store LangWatch-specific attributes
-        self.name = name 
         self.trace = trace or stored_langwatch_trace.get(None)
+        self.parent = parent
         self.capture_input = capture_input
         self.capture_output = capture_output
+        self.name = name
         self.type = type
         self.ignore_missing_trace_warning = ignore_missing_trace_warning
         self.input = input
@@ -93,7 +94,6 @@ class LangWatchSpan:
         self.start_time = start_time
         self.record_exception = record_exception
         self.set_status_on_exception = set_status_on_exception
-        self.parent = parent
 
         self._span: Optional[OtelSpan] = None
         self._context_token = None
@@ -101,36 +101,11 @@ class LangWatchSpan:
         self._lock = threading.Lock()
         self._cleaned_up = False
 
+        if self.trace:
+            self._create_span()
+
     def _create_span(self):
         """Internal method to create and start the OpenTelemetry span."""
-        # Merge LangWatch attributes with OpenTelemetry attributes
-        full_attributes: Attributes = self.attributes or {}
-        if self.type:
-            full_attributes[AttributeName.LangWatchSpanType] = self.type
-        if self.model:
-            full_attributes[AttributeName.GenAIRequestModel] = self.model
-        if self.params:
-            full_attributes.update(self.params)
-        if self.metrics:
-            full_attributes.update(self.metrics)
-        if self.contexts:
-            full_attributes[AttributeName.LangWatchRAGContexts] = json.dumps(truncate_object_recursively(
-                rag_contexts(self.contexts),
-                max_string_length=self.trace.max_string_length,
-            ), cls=SerializableWithStringFallback),
-        if self.input and self.capture_input:
-            full_attributes[AttributeName.LangWatchInput] = json.dumps(truncate_object_recursively(
-                convert_typed_values(self.input),
-                max_string_length=self.trace.max_string_length,
-            ), cls=SerializableWithStringFallback),
-        if self.output and self.capture_output:
-            full_attributes[AttributeName.LangWatchOutput] = json.dumps(truncate_object_recursively(
-                convert_typed_values(self.output),
-                max_string_length=self.trace.max_string_length,
-            ), cls=SerializableWithStringFallback),
-        if self.timestamps:
-            full_attributes.update(self.timestamps)
-
         if self.trace:
             tracer = self.trace.tracer
         else:
@@ -150,7 +125,6 @@ class LangWatchSpan:
                 # If still no parent, use the current span from OpenTelemetry context
                 parent = get_current_span()
 
-        # Create proper context with parent... if needed
         if parent is not None:
             if isinstance(parent, LangWatchSpan):
                 parent = parent._span
@@ -158,23 +132,31 @@ class LangWatchSpan:
                 current_context = set_span_in_context(parent, current_context)
 
         # Create the underlying OpenTelemetry span with the proper context
-        token = context.attach(current_context)
+        self._otel_token = context.attach(current_context)
         self._span = tracer.start_span(
             name=self.name or self.type,
             context=self.span_context,
             kind=self.kind,
-            attributes=full_attributes,
             links=self.links,
             start_time=self.start_time,
             record_exception=self.record_exception,
             set_status_on_exception=self.set_status_on_exception,
         )
 
-        # Set error if provided
-        if self.error:
-            self.record_error(self.error)
+        self.update(
+            name=self.name,
+            type=self.type,
+            input=self.input,
+            output=self.output,
+            error=self.error,
+            timestamps=self.timestamps,
+            contexts=self.contexts,
+            model=self.model,
+            params=self.params,
+            metrics=self.metrics,
+            **(self.attributes or {}),
+        )
 
-        # Set this span in both LangWatch and OpenTelemetry contexts
         try:
             self._context_token = stored_langwatch_span.set(self)
         except Exception as e:
@@ -238,9 +220,9 @@ class LangWatchSpan:
             self._span.update_name(name)
         if span_id is not None:
             warn("span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the spans's metadata.")
-            attributes[AttributeName.DeprecatedSpanId] = span_id
+            attributes[AttributeName.DeprecatedSpanId] = str(span_id)
         if type is not None:
-            attributes[AttributeName.LangWatchSpanType] = type
+            attributes[AttributeName.LangWatchSpanType] = str(type)
         if self.capture_input and input is not None:
             attributes[AttributeName.LangWatchInput] = json.dumps(truncate_object_recursively(
                 convert_typed_values(deepcopy(input)),
@@ -267,16 +249,19 @@ class LangWatchSpan:
             attributes[AttributeName.GenAIRequestModel] = model
         if params is not None:
             params = deepcopy(params)
-            if attributes[AttributeName.LangWatchParams]:
+            if self.params:
                 attributes[AttributeName.LangWatchParams] = {**self.params, **params}
             else:
                 attributes[AttributeName.LangWatchParams] = params
+            self.params = attributes[AttributeName.LangWatchParams]
+
         if metrics is not None:
             metrics = deepcopy(metrics)
-            if attributes[AttributeName.LangWatchMetrics]:
+            if self.metrics:
                 attributes[AttributeName.LangWatchMetrics] = {**self.metrics, **metrics}
             else:
                 attributes[AttributeName.LangWatchMetrics] = metrics
+            self.metrics = attributes[AttributeName.LangWatchMetrics]
 
         self.set_attributes(attributes)
 
@@ -313,64 +298,60 @@ class LangWatchSpan:
             "set_status_on_exception": self.set_status_on_exception,
         }
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+    def __call__(self, func: T) -> T:
         """Makes the span callable as a decorator."""
 
-        if len(args) == 1 and callable(args[0]) and not kwargs:
-            func: Callable[..., Any] = args[0]
+        if inspect.isasyncgenfunction(func):
+            @functools.wraps(func)
+            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                with self:
+                    self._set_callee_input_information(func, *args, **kwargs)
+                    items = []
+                    async for item in func(*args, **kwargs):
+                        items.append(item)
+                        yield item
 
-            if inspect.isasyncgenfunction(func):
-                @functools.wraps(func)
-                async def wrapper(*wargs: Any, **wkwargs: Any) -> Any:
-                    with self:
-                        self._set_callee_input_information(func, *wargs, **wkwargs)
-                        items = []
-                        async for item in func(*args, **kwargs):
-                            items.append(item)
-                            yield item
+                    output = (
+                        "".join(items)
+                        if all(isinstance(item, str) for item in items)
+                        else items
+                    )
+                    self._set_callee_output_information(func, output)
+            return wrapper
+        elif inspect.isgeneratorfunction(func):
+            @functools.wraps(func)
+            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                with self:
+                    self._set_callee_input_information(func, *args, **kwargs)
+                    items = []
+                    for item in func(*args, **kwargs):
+                        items.append(item)
+                        yield item
 
-                        output = (
-                            "".join(items)
-                            if all(isinstance(item, str) for item in items)
-                            else items
-                        )
-                        self._set_callee_output_information(func, output)
-                return wrapper
-            elif inspect.isgeneratorfunction(func):
-                @functools.wraps(func)
-                async def wrapper(*wargs: Any, **wkwargs: Any) -> Any:
-                    with self:
-                        self._set_callee_input_information(func, *wargs, **wkwargs)
-                        items = []
-                        for item in func(*args, **kwargs):
-                            items.append(item)
-                            yield item
-
-                        output = (
-                            "".join(items)
-                            if all(isinstance(item, str) for item in items)
-                            else items
-                        )
-                        self._set_callee_output_information(func, output)
-                return wrapper
-            elif inspect.iscoroutinefunction(func):
-                async def wrapper(*wargs: Any, **wkwargs: Any) -> Any:
-                    async with self:
-                        self._set_callee_input_information(func, *wargs, **wkwargs)
-                        output = await func(*wargs, **wkwargs)
-                        self._set_callee_output_information(func, output)
-                        return output
-                return wrapper
-            else:
-                @functools.wraps(func)
-                def wrapper(*wargs: Any, **wkwargs: Any) -> Any:
-                    with self:
-                        self._set_callee_input_information(func, *wargs, **wkwargs)
-                        output = func(*wargs, **wkwargs)
-                        self._set_callee_output_information(func, output)
-                        return output
-                return wrapper
-        return self
+                    output = (
+                        "".join(items)
+                        if all(isinstance(item, str) for item in items)
+                        else items
+                    )
+                    self._set_callee_output_information(func, output)
+            return wrapper
+        elif inspect.iscoroutinefunction(func):
+            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                async with self:
+                    self._set_callee_input_information(func, *args, **kwargs)
+                    output = await func(*args, **kwargs)
+                    self._set_callee_output_information(func, output)
+                    return output
+            return wrapper
+        else:
+            @functools.wraps(func)
+            def wrapper(*args: Any, **kwargs: Any) -> Any:
+                with self:
+                    self._set_callee_input_information(func, *args, **kwargs)
+                    output = func(*args, **kwargs)
+                    self._set_callee_output_information(func, output)
+                    return output
+            return wrapper
 
     def _cleanup(self) -> None:
         """Internal method to cleanup resources with proper locking."""
