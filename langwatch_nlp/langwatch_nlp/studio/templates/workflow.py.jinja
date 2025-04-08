@@ -40,15 +40,9 @@ dspy.configure(lm=lm)
 class WorkflowModule(ReportingModule):
     def __init__(
         self,
-        {# TODO: support this, and remove this into actual template logic #}
-        manual_execution_mode: bool = False,
-        {# TODO: support this, and remove this into actual template logic #}
-        until_node_id: Optional[str] = None,
         evaluation_weighting: Literal["mean"] = "mean",
     ):
         super().__init__()
-
-        self.manual_execution_mode = manual_execution_mode
 
         {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
         {% if node.type == "evaluator" %}
@@ -59,149 +53,156 @@ class WorkflowModule(ReportingModule):
         {% endfor %}
 
     {# TODO: migrate from inputs: Dict to actual arguments #}
+    {% if handle_errors %}
     async def forward(self, inputs: Dict[str, Any]) -> dspy.Prediction:
+        try:
+            return await self._forward(inputs)
+
+        except Exception as e:
+            return PredictionWithEvaluationAndMetadata(
+                error=e,
+                cost=self.cost,
+                duration=round((time.time() - self.start_time) * 1000),
+                evaluation=self.evaluate_prediction,
+            )
+
+    async def _forward(self, inputs: Dict[str, Any]) -> dspy.Prediction:
+    {% else %}
+    async def forward(self, inputs: Dict[str, Any]) -> dspy.Prediction:
+    {% endif %}
         try:
             langwatch.get_current_span().update(type="workflow")
         except Exception:
             pass
 
-        cost = 0
-        start_time = time.time()
-        error: Optional[Exception] = None
+        self.cost = 0
+        self.start_time = time.time()
 
-        try:
-
-            {# First build dependency graph #}
-            {% set dependency_graph = {} %}
-            {% for node in nodes %}
-                {% set _ = dependency_graph.update({node.id: []}) %}
-            {% endfor %}
-            {% for edge in workflow.edges %}
-                {% if edge.target in dependency_graph %}
-                    {% set _ = dependency_graph[edge.target].append(edge.source) %}
-                {% endif %}
-            {% endfor %}
-
-            {# Now generate execution layers #}
-            {% set executed = {'nodes': ['entry']} %}
-            {% set layers = [] %}
-            {% set previous_executed_count = {'value': 0} %}
-
-            {% if debug_level > 1 %}
-            # Dependency graph: {{ dependency_graph }}
+        {# First build dependency graph #}
+        {% set dependency_graph = {} %}
+        {% for node in nodes %}
+            {% set _ = dependency_graph.update({node.id: []}) %}
+        {% endfor %}
+        {% for edge in workflow.edges %}
+            {% if edge.target in dependency_graph %}
+                {% set _ = dependency_graph[edge.target].append(edge.source) %}
             {% endif %}
+        {% endfor %}
 
-            {# Build layers until all nodes are executed #}
-            {% set remaining_nodes = nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
-            {% for i in range(nodes|length) %}
-                {% set current_layer = [] %}
+        {# Now generate execution layers #}
+        {% set executed = {'nodes': ['entry']} %}
+        {% set layers = [] %}
+        {% set previous_executed_count = {'value': 0} %}
 
-                {% for node in remaining_nodes %}
-                    {% set ns = namespace(can_execute=true) %}
-                    {% for dep in dependency_graph[node.id] %}
-                        {% if dep not in executed.nodes %}
-                            {% set ns.can_execute = false %}
-                        {% endif %}
-                    {% endfor %}
-                    {% if debug_level > 1 %}
-            # {{ i }}: Node: {{ node.id }}, can execute: {{ ns.can_execute }}, executed: {{ executed.nodes }}, dependencies: {{ dependency_graph[node.id] }}
-                    {% endif %}
-                    {% if ns.can_execute and node.id not in executed.nodes %}
-                        {% set _ = current_layer.append(node) %}
+        {% if debug_level > 1 %}
+        # Dependency graph: {{ dependency_graph }}
+        {% endif %}
+
+        {# Build layers until all nodes are executed #}
+        {% set remaining_nodes = nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
+        {% for i in range(nodes|length) %}
+            {% set current_layer = [] %}
+
+            {% for node in remaining_nodes %}
+                {% set ns = namespace(can_execute=true) %}
+                {% for dep in dependency_graph[node.id] %}
+                    {% if dep not in executed.nodes %}
+                        {% set ns.can_execute = false %}
                     {% endif %}
                 {% endfor %}
-                {% if current_layer %}
-                    {% set _ = layers.append(current_layer) %}
-                    {% for node in current_layer %}
-                        {% set _ = executed.nodes.append(node.id) %}
-                    {% endfor %}
+                {% if debug_level > 1 %}
+        # {{ i }}: Node: {{ node.id }}, can execute: {{ ns.can_execute }}, executed: {{ executed.nodes }}, dependencies: {{ dependency_graph[node.id] }}
+                {% endif %}
+                {% if ns.can_execute and node.id not in executed.nodes %}
+                    {% set _ = current_layer.append(node) %}
                 {% endif %}
             {% endfor %}
+            {% if current_layer %}
+                {% set _ = layers.append(current_layer) %}
+                {% for node in current_layer %}
+                    {% set _ = executed.nodes.append(node.id) %}
+                {% endfor %}
+            {% endif %}
+        {% endfor %}
 
-            {% for layer in layers if debug_level > 0 %}
-            # Layer {{ loop.index }}: {{ layer|map(attribute="id")|list }}
-            {% endfor %}
+        {% for layer in layers if debug_level > 0 %}
+        # Layer {{ loop.index }}: {{ layer|map(attribute="id")|list }}
+        {% endfor %}
 
-            {# Generate code for each layer #}
-            {% for layer in layers %}
-                {% if layer|length > 1 %}
-            {{ layer|map(attribute="id")|list|join(", ") }} = await asyncio.gather(
-                    {% for node in layer %}
-                self.{{ node.id }}(
-                        {% for edge in workflow.edges %}
-                            {% if edge.target == node.id %}
-                                {% set source_parts = edge.sourceHandle.split(".") %}
-                                {% set target_parts = edge.targetHandle.split(".") %}
-                                {{ edge_param(edge, source_parts, target_parts) }}
-                            {% endif %}
-                        {% endfor %}
-                ),
-                    {% endfor %}
-            )
-            {% for node in layer %}
-            cost += {{ node.id }}.cost
-            {% endfor %}
-
-                {% else %}
-            {{ layer[0].id }} = await self.{{ layer[0].id }}(
+        {# Generate code for each layer #}
+        {% for layer in layers %}
+            {% if layer|length > 1 %}
+        {{ layer|map(attribute="id")|list|join(", ") }} = await asyncio.gather(
+                {% for node in layer %}
+            self.{{ node.id }}(
                     {% for edge in workflow.edges %}
-                        {% if edge.target == layer[0].id %}
+                        {% if edge.target == node.id %}
                             {% set source_parts = edge.sourceHandle.split(".") %}
                             {% set target_parts = edge.targetHandle.split(".") %}
                             {{ edge_param(edge, source_parts, target_parts) }}
                         {% endif %}
                     {% endfor %}
-            )
-            {# TODO: move this to parent class probably #}
-            cost += {{ layer[0].id }}.cost or 0
-
-                {% endif %}
-            {% endfor %}
-
-            {# Finally execute end node #}
-            {% set ns = namespace(end_node=None) %}
-            {% for node in workflow.nodes %}
-                {% if node.type == "end" %}
-                    {% set ns.end_node = node %}
-                {% endif %}
-            {% endfor %}
-
-            return PredictionWithEvaluationAndMetadata(
-                {% if ns.end_node %}
-                end={
-                    {% for edge in workflow.edges %}
-                        {% if edge.target == ns.end_node.id %}
-                            {% set source_parts = edge.sourceHandle.split(".") %}
-                            {% set target_parts = edge.targetHandle.split(".") %}
-                            {% if edge.source == "entry" %}
-                    "{{ target_parts[1] }}": inputs["{{ source_parts[1] }}"],
-                            {% else %}
-                    "{{ target_parts[1] }}": {{ edge.source }}.{{ source_parts[1] }},
-                            {% endif %}
-                        {% endif %}
-                    {% endfor %}
-                },
-                {% endif %}
-                {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
-                {{ node.id }}={{ node.id }},
+            ),
                 {% endfor %}
-                cost=cost,
-                duration=round((time.time() - start_time) * 1000),
-                error=error,
-                {# # TODO: rename this to evaluate #}
-                evaluation=self.evaluate_prediction,
-            )
+        )
+        {% for node in layer %}
+            {# TODO: move this to parent class probably #}
+            {% if node.type != "code" %}
+        cost += {{ node.id }}.cost or 0
+            {% endif %}
+        {% endfor %}
 
-        except Exception as e:
-            if self.manual_execution_mode:
-                raise e
+            {% else %}
+        {{ layer[0].id }} = await self.{{ layer[0].id }}(
+                {% for edge in workflow.edges %}
+                    {% if edge.target == layer[0].id %}
+                        {% set source_parts = edge.sourceHandle.split(".") %}
+                        {% set target_parts = edge.targetHandle.split(".") %}
+                        {{ edge_param(edge, source_parts, target_parts) }}
+                    {% endif %}
+                {% endfor %}
+        )
+                {# TODO: move this to parent class probably #}
+                {% if layer[0].type != "code" %}
+        cost += {{ layer[0].id }}.cost or 0
+                {% endif %}
 
-            return PredictionWithEvaluationAndMetadata(
-                error=e,
-                cost=cost,
-                duration=round((time.time() - start_time) * 1000),
-                evaluation=self.evaluate_prediction,
-            )
+            {% endif %}
+        {% endfor %}
+
+        {# Finally execute end node #}
+        {% set ns = namespace(end_node=None) %}
+        {% for node in workflow.nodes %}
+            {% if node.type == "end" %}
+                {% set ns.end_node = node %}
+            {% endif %}
+        {% endfor %}
+
+        return PredictionWithEvaluationAndMetadata(
+            {% if ns.end_node %}
+            end={
+                {% for edge in workflow.edges %}
+                    {% if edge.target == ns.end_node.id %}
+                        {% set source_parts = edge.sourceHandle.split(".") %}
+                        {% set target_parts = edge.targetHandle.split(".") %}
+                        {% if edge.source == "entry" %}
+                "{{ target_parts[1] }}": inputs["{{ source_parts[1] }}"],
+                        {% else %}
+                "{{ target_parts[1] }}": {{ edge.source }}.{{ source_parts[1] }},
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+            },
+            {% endif %}
+            {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
+            {{ node.id }}={{ node.id }},
+            {% endfor %}
+            cost=cost,
+            duration=round((time.time() - start_time) * 1000),
+            error=error,
+            {# # TODO: rename this to evaluate #}
+            evaluation=self.evaluate_prediction,
+        )
 
     def evaluate_prediction(
         self,

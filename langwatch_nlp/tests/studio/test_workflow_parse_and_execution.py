@@ -876,6 +876,126 @@ async def test_parse_workflow_with_default_llm():
     assert result.duration > 0
 
 
-# TODO: manual execution mode
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_blows_up_with_execution_error():
+    disable_dsp_caching()
+
+    workflow = copy.deepcopy(simple_workflow)
+    workflow.nodes.append(
+        CodeNode(
+            id="blows_up",
+            data=Code(
+                name="BlowsUp",
+                cls=None,
+                parameters=[
+                    Field(
+                        identifier="code",
+                        type=FieldType.str,
+                        optional=None,
+                        value="""
+import dspy
+
+class BlowsUp(dspy.Module):
+    def forward(self, **kwargs):
+        raise Exception('Blows up')
+                        """,
+                        desc=None,
+                        prefix=None,
+                    ),
+                ],
+                inputs=[],
+                outputs=[],
+            ),
+            type="code",
+        )
+    )
+    workflow.edges.append(
+        Edge(
+            id="e0-1",
+            source="entry",
+            sourceHandle="outputs.question",
+            target="blows_up",
+            targetHandle="inputs.question",
+            type="default",
+        )
+    )
+
+    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+    Module = get_component_class(component_code=code, class_name=class_name)
+    instance = Module()  # type: ignore
+
+    with pytest.raises(Exception) as e:
+        await instance(
+            inputs={
+                "question": "What is the capital of France?",
+                "gold_answer": "Paris",
+            }
+        )
+
+    assert "Blows up" in str(e.value)
+
+
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_does_not_blow_up_with_error_handling():
+    disable_dsp_caching()
+
+    workflow = copy.deepcopy(simple_workflow)
+    workflow.nodes.append(
+        CodeNode(
+            id="blows_up",
+            data=Code(
+                name="BlowsUp",
+                cls=None,
+                parameters=[
+                    Field(
+                        identifier="code",
+                        type=FieldType.str,
+                        optional=None,
+                        value="""
+import dspy
+
+class BlowsUp(dspy.Module):
+    def forward(self, **kwargs):
+        raise Exception('Blows up')
+                        """,
+                        desc=None,
+                        prefix=None,
+                    ),
+                ],
+                inputs=[],
+                outputs=[],
+            ),
+            type="code",
+        )
+    )
+    workflow.edges.append(
+        Edge(
+            id="e0-1",
+            source="entry",
+            sourceHandle="outputs.question",
+            target="blows_up",
+            targetHandle="inputs.question",
+            type="default",
+        )
+    )
+
+    class_name, code = parse_workflow(workflow, format=True, debug_level=1, handle_errors=True)
+    Module = get_component_class(component_code=code, class_name=class_name)
+    instance = Module()  # type: ignore
+
+    result = await instance(
+        inputs={
+            "question": "What is the capital of France?",
+            "gold_answer": "Paris",
+        }
+    )
+
+    assert "Blows up" in str(result.error)
+
+
 # TODO: test evaluate_prediction
 # TODO: test different formats auto-parsing

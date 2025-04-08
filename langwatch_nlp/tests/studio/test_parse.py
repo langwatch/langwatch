@@ -1,8 +1,11 @@
 import copy
+import dspy
 from langwatch_nlp.studio.dspy.llm_node import LLMNode
 from langwatch_nlp.studio.parser_v2 import parse_component, get_component_class
 from langwatch_nlp.studio.types.dataset import DatasetColumn, DatasetColumnType
 from langwatch_nlp.studio.types.dsl import (
+    Code,
+    CodeNode,
     DatasetInline,
     Field,
     FieldType,
@@ -16,7 +19,6 @@ from langwatch_nlp.studio.types.dsl import (
     Workflow,
     WorkflowState,
 )
-
 
 basic_workflow = Workflow(
     workflow_id="basic",
@@ -223,3 +225,28 @@ def test_parse_signature_with_default_workflow_llm():
 
     assert issubclass(Module, LLMNode)
 
+
+def test_parse_code():
+    node = CodeNode(
+        id="generate_answer",
+        data=Code(name="GenerateAnswer", cls="GenerateAnswer", parameters=[
+            Field(
+                identifier="code",
+                type=FieldType.str,
+                optional=None,
+                value="""
+import dspy
+
+class GenerateAnswer(dspy.Module):
+    def forward(self, **kwargs):
+        return "Hello, world!"
+                """,
+                desc=None,
+            ),
+        ]),
+    )
+
+    class_name, code = parse_component(node, basic_workflow, format=True)
+    Module = get_component_class(code, class_name)
+
+    assert issubclass(Module, dspy.Module)

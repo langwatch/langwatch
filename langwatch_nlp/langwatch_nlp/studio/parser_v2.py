@@ -67,7 +67,7 @@ def render_template(template_name: str, format=False, **kwargs) -> str:
 
 
 def parse_workflow(
-    workflow: Workflow, format=False, debug_level=0, until_node_id=None
+    workflow: Workflow, format=False, debug_level=0, until_node_id=None, handle_errors=False
 ) -> Tuple[str, str]:
     # Find all reachable nodes from entry
     nodes = find_reachable_nodes(
@@ -85,6 +85,7 @@ def parse_workflow(
         debug_level=debug_level,
         node_templates=node_templates,
         nodes=nodes,
+        handle_errors=handle_errors,
     )
 
     return "WorkflowModule", module
@@ -159,6 +160,28 @@ def parse_component(
         case "evaluator":
             # Evaluators are handled directly in the workflow template
             return "None", ""
+        case "code":
+            code = next(
+                (p for p in node.data.parameters or [] if p.identifier == "code"),
+                None,
+            )
+            code = code.value if code else None
+            if not code:
+                raise Exception(f"Code node has no source content for component {node.data.name}")
+
+            pattern = r"class (.*?)\(dspy\.Module\):"
+            match = re.search(pattern, code)
+            if not match:
+                raise ValueError(
+                    f"Could not find a class that inherits from dspy.Module for component {node.data.name}"
+                )
+            class_name = match.group(1)
+
+            return class_name, code
+        case "retriever":
+            raise NotImplementedError("Not implemented yet")
+        case "custom":
+            raise NotImplementedError("Not implemented yet")
         case _:
             # TODO: throw error for unknown node type
             return "None", ""
