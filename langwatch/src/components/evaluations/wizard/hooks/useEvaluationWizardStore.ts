@@ -555,20 +555,18 @@ const store = (
           return current;
         }
 
-        return current;
-
-        // return {
-        //   ...current,
-        //   edges: [
-        //     ...current.edges.filter(
-        //       (edge) => edge.target !== firstEvaluator.id
-        //     ),
-        //     ...edges.map((edge) => ({
-        //       ...edge,
-        //       target: firstEvaluator.id,
-        //     })),
-        //   ],
-        // };
+        return {
+          ...current,
+          edges: [
+            ...current.edges.filter(
+              (edge) => edge.target !== firstEvaluator.id
+            ),
+            ...edges.map((edge) => ({
+              ...edge,
+              target: firstEvaluator.id,
+            })),
+          ],
+        };
       });
     },
     getFirstEvaluatorEdges() {
