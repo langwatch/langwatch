@@ -1,7 +1,7 @@
 import { type Edge, type Node } from "@xyflow/react";
 import { z } from "zod";
 import { create } from "zustand";
-import type { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import {
   initialState as initialWorkflowStore,
   type WorkflowStore,
@@ -20,7 +20,7 @@ import type {
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import { datasetColumnsToFields } from "../../../../optimization_studio/utils/datasetUtils";
 import { nameToId } from "../../../../optimization_studio/utils/nodeUtils";
-import { convertEvaluator } from "../../../../optimization_studio/utils/registryUtils";
+import { buildEvaluatorFromType } from "../../../../optimization_studio/utils/registryUtils";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { mappingStateSchema } from "../../../../server/tracer/tracesMapping";
 import { checkPreconditionsSchema } from "../../../../server/evaluations/types.generated";
@@ -145,7 +145,7 @@ type EvaluationWizardStore = State & {
   setDatasetId: (datasetId: string, columnTypes: DatasetColumns) => void;
   getDatasetId: () => string | undefined;
   setFirstEvaluator: (
-    evaluator: Partial<Evaluator> & { evaluator: string }
+    evaluator: Partial<Evaluator> & { evaluator: EvaluatorTypes }
   ) => void;
   getFirstEvaluatorNode: () => Node<Evaluator> | undefined;
   setFirstEvaluatorEdges: (edges: Workflow["edges"]) => void;
@@ -357,7 +357,9 @@ const store = (
       }
       return undefined;
     },
-    setFirstEvaluator(evaluator: Partial<Evaluator> & { evaluator: string }) {
+    setFirstEvaluator(
+      evaluator: Partial<Evaluator> & { evaluator: EvaluatorTypes }
+    ) {
       get().workflowStore.setWorkflow((current) => {
         if (evaluator.evaluator.startsWith("custom/")) {
           throw new Error("Custom evaluators are not supported yet");
@@ -367,9 +369,7 @@ const store = (
           (node) => node.type === "evaluator"
         );
 
-        const initialEvaluator = convertEvaluator(
-          evaluator.evaluator as keyof typeof AVAILABLE_EVALUATORS
-        );
+        const initialEvaluator = buildEvaluatorFromType(evaluator.evaluator);
         const id = nameToId(initialEvaluator.name ?? initialEvaluator.cls);
 
         const previousEvaluator = current.nodes[firstEvaluatorIndex] as
