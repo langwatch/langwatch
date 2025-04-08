@@ -814,6 +814,24 @@ async def test_langwatch_evaluator_with_settings():
     assert result.get_duration() > 0
 
 
-# TODO: test until_node_id
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_parse_workflow_with_until_node():
+    disable_dsp_caching()
+
+    class_name, code = parse_workflow(simple_workflow, format=True, debug_level=1, until_node_id="generate_query")
+    print("\n\ncode", code, "\n\n")
+    Module = get_component_class(component_code=code, class_name=class_name)
+    instance = Module()  # type: ignore
+    result: PredictionWithEvaluationAndMetadata = await instance(
+        inputs={
+            "question": "What is the capital of France?",
+            "gold_answer": "Paris",
+        }
+    )
+    assert "Paris" in result["generate_query"]["query"]
+    assert result.get_cost() > 0
+    assert result.get_duration() > 0
+
 # TODO: test evaluate_prediction
 # TODO: test different formats auto-parsing

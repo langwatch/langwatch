@@ -66,9 +66,13 @@ def render_template(template_name: str, format=False, **kwargs) -> str:
     return code
 
 
-def parse_workflow(workflow: Workflow, format=False, debug_level=0) -> Tuple[str, str]:
+def parse_workflow(
+    workflow: Workflow, format=False, debug_level=0, until_node_id=None
+) -> Tuple[str, str]:
     # Find all reachable nodes from entry
-    nodes = find_reachable_nodes(workflow.nodes, workflow.edges)
+    nodes = find_reachable_nodes(
+        workflow.nodes, workflow.edges, until_node_id=until_node_id
+    )
 
     node_templates = {
         node.id: parse_component(node, workflow, format) for node in nodes
@@ -95,7 +99,9 @@ def parse_and_instantiate_workflow(
     return cast(Type[WorkflowModule], Module)
 
 
-def parse_component(node: Node, workflow: Workflow, format=False, debug_level=0) -> Tuple[str, str]:
+def parse_component(
+    node: Node, workflow: Workflow, format=False, debug_level=0
+) -> Tuple[str, str]:
     match node.type:
         case "signature":
             parameters = {}
@@ -164,7 +170,9 @@ def get_component_class(component_code: str, class_name: str) -> Type[dspy.Modul
     return namespace[class_name]
 
 
-def find_reachable_nodes(nodes: List[Node], edges: List[Edge]) -> List[Node]:
+def find_reachable_nodes(
+    nodes: List[Node], edges: List[Edge], until_node_id=None
+) -> List[Node]:
     # Build dependency graph and node lookup
     dependency_graph: Dict[str, List[str]] = {node.id: [] for node in nodes}
     node_lookup: Dict[str, Node] = {node.id: node for node in nodes}
@@ -173,9 +181,9 @@ def find_reachable_nodes(nodes: List[Node], edges: List[Edge]) -> List[Node]:
         dependency_graph[edge.target].append(edge.source)
 
     # BFS to find all reachable nodes
-    reachable_node_ids = {"entry"}
+    reachable_node_ids: Set[str] = {"entry"}
     queue = ["entry"]
-    visited = set()
+    visited: Set[str] = set()
 
     while queue:
         current = queue.pop(0)
@@ -185,10 +193,22 @@ def find_reachable_nodes(nodes: List[Node], edges: List[Edge]) -> List[Node]:
 
             # Find all nodes that have this node as a dependency
             for node_id, deps in dependency_graph.items():
+                new_queue_items = []
                 if current in deps and node_id not in visited and node_id not in queue:
-                    queue.append(node_id)
+                    new_queue_items.append(node_id)
+
+                # If we've reached the specified until_node_id, stop the traversal
+                if until_node_id is not None and until_node_id in new_queue_items:
+                    queue.append(until_node_id)
+                    visited.add(current)
+                    reachable_node_ids.add(current)
+                    break
+
+            queue.extend(new_queue_items)
 
     # Convert IDs to Node objects
-    reachable_nodes = [node_lookup[node_id] for node_id in reachable_node_ids if node_id in node_lookup]
+    reachable_nodes = [
+        node_lookup[node_id] for node_id in reachable_node_ids if node_id in node_lookup
+    ]
 
     return reachable_nodes

@@ -72,7 +72,9 @@ class WorkflowModule(ReportingModule):
                 {% set _ = dependency_graph.update({node.id: []}) %}
             {% endfor %}
             {% for edge in workflow.edges %}
-                {% set _ = dependency_graph[edge.target].append(edge.source) %}
+                {% if edge.target in dependency_graph %}
+                    {% set _ = dependency_graph[edge.target].append(edge.source) %}
+                {% endif %}
             {% endfor %}
 
             {# Now generate execution layers #}
@@ -178,6 +180,7 @@ class WorkflowModule(ReportingModule):
         {% endfor %}
 
         return PredictionWithEvaluationAndMetadata(
+            {% if "end" in nodes %}
             end={
                 {% for edge in workflow.edges %}
                     {% if edge.target == ns.end_node.id %}
@@ -191,6 +194,7 @@ class WorkflowModule(ReportingModule):
                     {% endif %}
                 {% endfor %}
             },
+            {% endif %}
             {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
             {{ node.id }}={{ node.id }},
             {% endfor %}
