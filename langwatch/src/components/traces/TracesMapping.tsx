@@ -296,7 +296,7 @@ export const TracesMapping = ({
   return (
     <Grid
       width="full"
-      templateColumns={dsl ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr"}
+      templateColumns={"1fr auto 1fr"}
       alignItems="center"
       gap={2}
     >
