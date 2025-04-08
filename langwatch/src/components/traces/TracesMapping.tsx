@@ -1,10 +1,3 @@
-/**
- * TracesMapping Component
- *
- * This component provides a UI for mapping trace data to dataset entries.
- * It allows users to define how trace data should be transformed and structured
- * for use in datasets or workflows.
- */
 import {
   Box,
   Field,
@@ -31,10 +24,6 @@ import { api } from "../../utils/api";
 import { Switch } from "../ui/switch";
 import type { Workflow } from "../../optimization_studio/types/dsl";
 
-/**
- * Default mappings from common dataset field names to trace mapping keys
- * This helps with automatic inference of mappings based on field names
- */
 export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   string,
   keyof typeof TRACE_MAPPINGS
@@ -53,10 +42,6 @@ export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   contexts: "contexts.string_list",
   spans: "spans",
 };
-
-/**
- * Transposed version of the inferred mappings to look up by trace mapping key
- */
 const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
   DATASET_INFERRED_MAPPINGS_BY_NAME
 ).reduce(
@@ -104,7 +89,6 @@ export const TracesMapping = ({
     },
     { enabled: !!project, refetchOnWindowFocus: false }
   );
-
   const getAnnotationScoreOptions = api.annotationScore.getAllActive.useQuery(
     { projectId: project?.id ?? "" },
     {
@@ -112,7 +96,6 @@ export const TracesMapping = ({
       refetchOnWindowFocus: false,
     }
   );
-
   const traces_ = useMemo(
     () =>
       traces.map((trace) => ({
@@ -124,16 +107,17 @@ export const TracesMapping = ({
     [traces, annotationScores.data]
   );
 
+  const currentMapping = traceMapping ?? { mapping: {}, expansions: [] };
+
   type LocalTraceMappingState = Omit<MappingState, "expansions"> & {
     expansions: Set<keyof typeof TRACE_EXPANSIONS>;
   };
 
   const [traceMappingState, setTraceMappingState_] =
     useState<LocalTraceMappingState>({
-      mapping: traceMapping?.mapping ?? {},
+      mapping: {},
       expansions: new Set(),
     });
-
   const setTraceMappingState = useCallback(
     (
       callback: (mappingState: LocalTraceMappingState) => LocalTraceMappingState
@@ -165,7 +149,6 @@ export const TracesMapping = ({
       ),
     [mapping]
   );
-
   const expansions = useMemo(
     () =>
       new Set(
@@ -177,8 +160,42 @@ export const TracesMapping = ({
   );
 
   const now = useMemo(() => new Date().getTime(), []);
+  const isInitializedRef = React.useRef(false);
 
   useEffect(() => {
+    if (
+      isInitializedRef.current &&
+      Object.keys(traceMappingState.mapping).length > 0
+    ) {
+      return;
+    }
+
+    const traceMappingStateWithDefaults = {
+      mapping: Object.fromEntries(
+        targetFields.map((name) => [
+          name,
+          currentMapping.mapping[name] ?? {
+            source: (DATASET_INFERRED_MAPPINGS_BY_NAME[name] ??
+              "") as keyof typeof TRACE_MAPPINGS,
+          },
+        ]) ?? []
+      ),
+      expansions: new Set(currentMapping.expansions),
+    };
+
+    if (
+      JSON.stringify(traceMappingState) !==
+      JSON.stringify(traceMappingStateWithDefaults)
+    ) {
+      setTraceMappingState_(traceMappingStateWithDefaults);
+      setTraceMapping?.({
+        ...traceMappingStateWithDefaults,
+        expansions: Array.from(traceMappingStateWithDefaults.expansions),
+      });
+
+      isInitializedRef.current = true;
+    }
+
     if (!dsl) return;
 
     const currentTargetEdges = Object.fromEntries(
@@ -187,7 +204,6 @@ export const TracesMapping = ({
         edge,
       ])
     );
-
     const targetEdgesWithDefaults = [
       ...dsl.targetEdges.filter(
         (edge) =>
@@ -238,17 +254,10 @@ export const TracesMapping = ({
         })
         .filter((x) => x) as Workflow["edges"]),
     ];
-
     dsl.setTargetEdges?.(targetEdgesWithDefaults);
-  }, [
-    targetFields,
-    dsl?.sourceOptions,
-    traceMappingState,
-    dsl,
-    setTraceMapping,
-    traceMapping?.expansions,
-    traceMapping?.mapping,
-  ]);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetFields, dsl?.sourceOptions]);
 
   useEffect(() => {
     let index = 0;
@@ -262,6 +271,7 @@ export const TracesMapping = ({
         getAnnotationScoreOptions.data
       );
 
+      // Add each expanded entry to the final results
       for (const entry of mappedEntries) {
         entries.push({
           id: `${now}-${index}`,
@@ -290,7 +300,6 @@ export const TracesMapping = ({
       alignItems="center"
       gap={2}
     >
-      {/* Column headers */}
       {titles?.map((title, idx) => (
         <GridItem
           key={title}
@@ -300,8 +309,6 @@ export const TracesMapping = ({
           <Text fontWeight="semibold">{title}</Text>
         </GridItem>
       ))}
-
-      {/* Mapping rows */}
       {Object.entries(mapping).map(
         ([targetField, { source, key, subkey }], index) => {
           const traceMappingDefinition = source
@@ -322,7 +329,6 @@ export const TracesMapping = ({
 
           return (
             <React.Fragment key={index}>
-              {/* DSL source selection */}
               {dsl && (
                 <>
                   <GridItem>
@@ -384,13 +390,10 @@ export const TracesMapping = ({
                   </GridItem>
                 </>
               )}
-
-              {/* Trace mapping selection */}
               {traceMapping && (
                 <>
                   <GridItem>
                     <VStack align="start" width="full" gap={2}>
-                      {/* Source field selection */}
                       <NativeSelect.Root width="full">
                         <NativeSelect.Field
                           onChange={(e) => {
@@ -444,8 +447,6 @@ export const TracesMapping = ({
                         </NativeSelect.Field>
                         <NativeSelect.Indicator />
                       </NativeSelect.Root>
-
-                      {/* Key selection for mappings that support keys */}
                       {traceMappingDefinition &&
                         "keys" in traceMappingDefinition && (
                           <HStack align="start" width="full">
@@ -489,8 +490,6 @@ export const TracesMapping = ({
                             </NativeSelect.Root>
                           </HStack>
                         )}
-
-                      {/* Subkey selection for mappings that support subkeys */}
                       {subkeys && subkeys.length > 0 && (
                         <HStack align="start" width="full">
                           <Box
@@ -538,8 +537,6 @@ export const TracesMapping = ({
                   </GridItem>
                 </>
               )}
-
-              {/* Target field name */}
               <GridItem>
                 <Text flexShrink={0} whiteSpace="nowrap">
                   {targetField}
@@ -550,7 +547,6 @@ export const TracesMapping = ({
         }
       )}
 
-      {/* Expansion options */}
       {!disableExpansions && availableExpansions.size > 0 && (
         <Field.Root width="full" paddingY={4} marginTop={2}>
           <VStack align="start">
