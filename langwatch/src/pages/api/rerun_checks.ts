@@ -7,8 +7,9 @@ export default async function handler(
 ) {
   try {
     const checkId = req.query.checkId as string;
+    const projectId = req.query.projectId as string;
 
-    await rerunChecks(checkId);
+    await rerunChecks(checkId, projectId);
 
     res.status(200).json({ message: "Checks rescheduled" });
   } catch (error: any) {

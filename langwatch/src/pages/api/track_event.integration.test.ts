@@ -47,7 +47,8 @@ describe("/api/track_event", () => {
     });
 
     // Clean up the trace
-    await esClient.delete({
+    const client = await esClient({ test: true });
+    await client.delete({
       index: TRACE_INDEX.alias,
       id: traceIndexId({ traceId, projectId: project.id }),
       refresh: true,
@@ -101,14 +102,15 @@ describe("/api/track_event", () => {
       metrics: {},
     };
 
-    await esClient.index({
+    const client = await esClient({ test: true });
+    await client.index({
       index: TRACE_INDEX.alias,
       id: traceIndexId({ traceId, projectId: project.id }),
       document: testTraceData,
       refresh: true,
     });
 
-    console.log("Waiting for job")
+    console.log("Waiting for job");
 
     // Wait for the job to be completed
     await new Promise<void>(
@@ -118,10 +120,11 @@ describe("/api/track_event", () => {
         })
     );
 
-    console.log("Event processed")
+    console.log("Event processed");
 
     const trace = await waitForResult(async () => {
-      const trace = await esClient.getSource<ElasticSearchTrace>({
+      const client = await esClient({ test: true });
+      const trace = await client.getSource<ElasticSearchTrace>({
         index: TRACE_INDEX.alias,
         id: traceIndexId({
           traceId,

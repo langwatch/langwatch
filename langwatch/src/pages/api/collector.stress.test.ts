@@ -25,7 +25,8 @@ describe("Collector API stress test", () => {
       const project = await getTestProject("collect");
       apiKey = project.apiKey;
 
-      await esClient.deleteByQuery({
+      const client = await esClient({ test: true });
+      await client.deleteByQuery({
         index: TRACE_INDEX.alias,
         body: {
           query: {

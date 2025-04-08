@@ -62,7 +62,8 @@ export const esGetSpansByTraceId = async ({
   traceId: string;
   projectId: string;
 }): Promise<ElasticSearchSpan[]> => {
-  const result = await esClient.search<ElasticSearchTrace>({
+  const client = await esClient({ projectId });
+  const result = await client.search<ElasticSearchTrace>({
     index: TRACE_INDEX.alias,
     body: {
       query: {
@@ -163,7 +164,8 @@ export const tracesRouter = createTRPCRouter({
       const { pivotIndexConditions } =
         generateTracesPivotQueryConditions(input);
 
-      const topicCountsResult = await esClient.search<ElasticSearchTrace>({
+      const client = await esClient({ projectId: input.projectId });
+      const topicCountsResult = await client.search<ElasticSearchTrace>({
         index: TRACE_INDEX.alias,
         size: 0, // We do not need the actual documents, just the aggregations
         body: {
@@ -247,7 +249,8 @@ export const tracesRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input }) => {
-      const customersLabelsResult = await esClient.search<ElasticSearchTrace>({
+      const client = await esClient({ projectId: input.projectId });
+      const customersLabelsResult = await client.search<ElasticSearchTrace>({
         index: TRACE_INDEX.alias,
         size: 0, // We don't need the actual documents, just the aggregation results
         body: {
@@ -476,12 +479,14 @@ export const getAllTracesForProject = async ({
 
   let tracesResult: SearchResponse<ElasticSearchTrace>;
   if (scrollId) {
-    tracesResult = await esClient.scroll({
+    const client = await esClient({ projectId: input.projectId });
+    tracesResult = await client.scroll({
       scroll_id: scrollId,
       scroll: "1m",
     });
   } else {
-    tracesResult = await esClient.search<ElasticSearchTrace>({
+    const client = await esClient({ projectId: input.projectId });
+    tracesResult = await client.search<ElasticSearchTrace>({
       index: TRACE_INDEX.alias,
       from: downloadMode ? undefined : pageOffset,
       size: pageSize,
@@ -599,7 +604,8 @@ export const getAllTracesForProject = async ({
         .filter((x) => x)
     );
 
-    messagesFromThreadIds = await esClient.search<ElasticSearchTrace>({
+    const client = await esClient({ projectId: input.projectId });
+    messagesFromThreadIds = await client.search<ElasticSearchTrace>({
       index: TRACE_INDEX.alias,
       body: {
         query: {
@@ -699,8 +705,9 @@ export const getSpansForTraceIds = async (
 
   for (let i = 0; i < traceIds.length; i += batchSize) {
     const batchTraceIds = traceIds.slice(i, i + batchSize);
+    const client = await esClient({ projectId });
 
-    const searchPromise = esClient.search<ElasticSearchTrace>({
+    const searchPromise = client.search<ElasticSearchTrace>({
       index: TRACE_INDEX.alias,
       body: {
         size: 10_000,
@@ -735,7 +742,8 @@ export const getTracesWithSpans = async (
   projectId: string,
   traceIds: string[]
 ) => {
-  const tracesResult = await esClient.search<ElasticSearchTrace>({
+  const client = await esClient({ projectId });
+  const tracesResult = await client.search<ElasticSearchTrace>({
     index: TRACE_INDEX.alias,
     body: {
       query: {
@@ -842,7 +850,8 @@ export const getEvaluationsMultiple = async (input: {
 }) => {
   const { projectId, traceIds } = input;
 
-  const checksResult = await esClient.search<ElasticSearchTrace>({
+  const client = await esClient({ projectId });
+  const checksResult = await client.search<ElasticSearchTrace>({
     index: TRACE_INDEX.alias,
     _source: ["trace_id", "evaluations"],
     body: {
@@ -876,7 +885,8 @@ export const getTraceById = async ({
   traceId: string;
   canSeeCosts?: boolean | undefined | null;
 }) => {
-  const result = await esClient.search<ElasticSearchTrace>({
+  const client = await esClient({ projectId });
+  const result = await client.search<ElasticSearchTrace>({
     index: TRACE_INDEX.alias,
     size: 1,
     _source: {
@@ -915,7 +925,8 @@ export const getTracesByThreadId = async ({
   projectId: string;
   threadId: string;
 }) => {
-  const tracesResult = await esClient.search<ElasticSearchTrace>({
+  const client = await esClient({ projectId });
+  const tracesResult = await client.search<ElasticSearchTrace>({
     index: TRACE_INDEX.alias,
     body: {
       query: {

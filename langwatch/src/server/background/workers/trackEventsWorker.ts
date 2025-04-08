@@ -49,7 +49,9 @@ export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
     events: [event],
   };
 
-  await esClient.update({
+  const client = await esClient({ projectId: event.project_id });
+
+  await client.update({
     index: TRACE_INDEX.alias,
     id: traceIndexId({
       traceId: event.trace_id,

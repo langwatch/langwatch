@@ -27,7 +27,8 @@ describe("Satisfaction Scoring Integration Test", () => {
     testTraceData.project_id = project.id;
 
     // Create a trace entry in Elasticsearch for the test
-    await esClient.index({
+    const client = await esClient({ test: true });
+    await client.index({
       index: TRACE_INDEX.alias,
       id: traceIndexId({
         traceId: testTraceId,
@@ -40,7 +41,8 @@ describe("Satisfaction Scoring Integration Test", () => {
 
   afterAll(async () => {
     // Clean up the test data from Elasticsearch
-    await esClient.delete({
+    const client = await esClient({ test: true });
+    await client.delete({
       index: TRACE_INDEX.alias,
       id: traceIndexId({
         traceId: testTraceId,
@@ -60,7 +62,8 @@ describe("Satisfaction Scoring Integration Test", () => {
     });
 
     // Fetch the updated trace from Elasticsearch and verify the satisfaction score was updated
-    const result = await esClient.get<Trace>({
+    const client = await esClient({ test: true });
+    const result = await client.get<Trace>({
       index: TRACE_INDEX.alias,
       id: traceIndexId({
         traceId: testTraceId,

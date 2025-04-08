@@ -440,8 +440,9 @@ export const experimentsRouter = createTRPCRouter({
         input.projectId,
         input.experimentSlug
       );
+      const client = await esClient({ projectId: input.projectId });
 
-      const dspySteps = await esClient.search<DSPyStep>({
+      const dspySteps = await client.search<DSPyStep>({
         index: DSPY_STEPS_INDEX.alias,
         size: 10_000,
         body: {
@@ -559,7 +560,8 @@ export const experimentsRouter = createTRPCRouter({
         input.experimentSlug
       );
 
-      const dspyStep = await esClient.search<DSPyStep>({
+      const client = await esClient({ projectId: input.projectId });
+      const dspyStep = await client.search<DSPyStep>({
         index: DSPY_STEPS_INDEX.alias,
         size: 10_000,
         body: {
@@ -625,7 +627,8 @@ export const experimentsRouter = createTRPCRouter({
         runId: input.runId,
       });
 
-      const batchEvaluationRun = await esClient.get<ESBatchEvaluation>({
+      const client = await esClient({ projectId: input.projectId });
+      const batchEvaluationRun = await client.get<ESBatchEvaluation>({
         index: BATCH_EVALUATION_INDEX.alias,
         id: id,
       });
@@ -669,7 +672,8 @@ export const experimentsRouter = createTRPCRouter({
       await prisma.$transaction(async (tx) => {
         // Delete experiment-related data in Elasticsearch
         try {
-          await esClient.deleteByQuery({
+          const client = await esClient({ projectId: input.projectId });
+          await client.deleteByQuery({
             index: BATCH_EVALUATION_INDEX.alias,
             body: {
               query: {
@@ -684,7 +688,7 @@ export const experimentsRouter = createTRPCRouter({
           });
 
           // Delete DSPy steps in ES if applicable
-          await esClient.deleteByQuery({
+          await client.deleteByQuery({
             index: DSPY_STEPS_INDEX.alias,
             body: {
               query: {
@@ -860,7 +864,8 @@ const getExperimentBatchEvaluationRuns = async (
     | "total"
   >;
 
-  const batchEvaluationRuns = await esClient.search<ESBatchEvaluationRunInfo>({
+  const client = await esClient({ projectId });
+  const batchEvaluationRuns = await client.search<ESBatchEvaluationRunInfo>({
     index: BATCH_EVALUATION_INDEX.alias,
     size: 10_000,
     body: {
