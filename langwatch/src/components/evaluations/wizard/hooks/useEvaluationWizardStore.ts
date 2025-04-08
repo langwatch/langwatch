@@ -371,6 +371,11 @@ const store = (
      *
      * This method is used by the evaluator selection and settings components to
      * configure the evaluation workflow.
+     *
+     * ---
+     *
+     * TODO: Consider simply replacing any existing evaluators when this is called,
+     * rather than trying to handle a complex merge.
      */
     setFirstEvaluator(
       evaluator: Partial<Evaluator> & { evaluator: EvaluatorTypes }
@@ -712,6 +717,8 @@ function updateNodeParameter(
  * Create new edges for new node.
  * We assume that we want to connect the output.input to the input.input
  * and the output.output to the input.output for the new node.
+ *
+ * TODO: Handle other cases
  */
 function createNewEdgesForNewNode(
   workflow: Workflow,
