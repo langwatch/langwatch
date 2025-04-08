@@ -31,7 +31,13 @@ export default async function handler(
 
   try {
     const dataset = await prisma.dataset.findFirst({
-      where: { slug: req.query.slug as string, projectId: project.id },
+      where: {
+        projectId: project.id,
+        OR: [
+          { slug: req.query.slug as string },
+          { id: req.query.slug as string },
+        ],
+      },
     });
 
     if (!dataset) {
