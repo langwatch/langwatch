@@ -411,7 +411,9 @@ const store = (
           };
         }
 
-        // Update the state with the new evaluator node and remove the old edges
+        // Update nodes by replacing the evaluator node and removing edges targeting
+        // the previous evaluator only if the evaluator type has changed. This prevents
+        // the removal of edges when only the settings are modified.
         return {
           ...current,
           nodes: current.nodes.map((node, index) =>
@@ -433,10 +435,18 @@ const store = (
       }
       return undefined;
     },
+    /**
+     * Updates the edges by removing those that target the previous evaluator
+     * and adding the new edges provided. It also updates the target of the
+     * provided edges to point to the new evaluator.
+     *
+     * If no evaluator node is found, the current workflow is returned.
+     */
     setFirstEvaluatorEdges(edges: Edge[]) {
       get().workflowStore.setWorkflow((current) => {
         const firstEvaluator = get().getFirstEvaluatorNode();
 
+        // If no evaluator node is found, return the current workflow
         if (!firstEvaluator?.id) {
           return current;
         }

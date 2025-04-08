@@ -52,7 +52,7 @@ export const EvaluatorMappingAccordion = () => {
   const evaluatorType = evaluator?.data.evaluator;
   const evaluatorDefinition = useMemo(() => {
     return evaluatorType && evaluatorType in AVAILABLE_EVALUATORS
-      ? AVAILABLE_EVALUATORS[evaluatorType as keyof Evaluators]
+      ? AVAILABLE_EVALUATORS[evaluatorType]
       : undefined;
   }, [evaluatorType]);
 
