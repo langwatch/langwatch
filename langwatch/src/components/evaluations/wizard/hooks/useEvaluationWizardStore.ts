@@ -431,89 +431,18 @@ const store = (
           },
         };
 
-        // Create new edges based on specific input and output connections
-        const newEdges: Edge[] = [];
-
-        // Start index for searching previous nodes
-        const startIndex =
-          firstEvaluatorIndex === -1
-            ? current.nodes.length - 1
-            : firstEvaluatorIndex - 1;
-
         // Find node with output.input
-        let nodeWithInputOutput = null;
-        let nodeWithOutputOutput = null;
+        const newEdges = createNewEdgesForNewNode(current, evaluatorNode);
 
-        // Iterate backward through nodes looking for required outputs
-        console.log("iterating to find input and output nodes");
-        for (let i = startIndex; i >= 0; i--) {
-          const node = current.nodes[i];
-
-          // Skip if this is the evaluator node itself
-          if (!node || node.id === evaluatorNode.id) continue;
-
-          console.log(node.type, JSON.stringify(node.data.outputs));
-
-          const outputNamedInput = node.data.outputs?.find(
-            (output) => output.identifier === "input"
-          );
-
-          const outputNamedOutput = node.data.outputs?.find(
-            (output) => output.identifier === "output"
-          );
-
-          // Check for input output if we haven't found it yet
-          if (!nodeWithInputOutput && outputNamedInput) {
-            nodeWithInputOutput = node;
-          }
-
-          // Check for output output if we haven't found it yet
-          if (!nodeWithOutputOutput && outputNamedOutput) {
-            nodeWithOutputOutput = node;
-          }
-
-          // Break early if we found both
-          if (nodeWithInputOutput && nodeWithOutputOutput) break;
-        }
-
-        // Connect input if found
-        if (nodeWithInputOutput) {
-          console.log(JSON.stringify({ nodeWithInputOutput }));
-          newEdges.push({
-            id: `${nodeWithInputOutput.id}-input-to-${evaluatorNode.id}-input`,
-            source: nodeWithInputOutput.id,
-            sourceHandle: "outputs.input",
-            target: evaluatorNode.id,
-            targetHandle: "inputs.input",
-          });
-        }
-
-        // Connect output if found
-        if (nodeWithOutputOutput) {
-          console.log(JSON.stringify({ nodeWithOutputOutput }));
-          newEdges.push({
-            id: `${nodeWithOutputOutput.id}-output-to-${evaluatorNode.id}-output`,
-            source: nodeWithOutputOutput.id,
-            sourceHandle: "outputs.output",
-            target: evaluatorNode.id,
-            targetHandle: "inputs.output",
-          });
-        }
-
-        console.log(JSON.stringify({ evaluatorNode }));
-
+        // If the first evaluator node is not found,
+        // simply add the new evaluator node and new edges
         if (firstEvaluatorIndex === -1) {
-          console.log("adding new evaluator node");
           return {
             ...current,
             nodes: [...current.nodes, evaluatorNode],
             edges: [...current.edges, ...newEdges],
           };
         }
-
-        console.log(
-          "updating existing evaluator node, but leaving edges alone"
-        );
 
         // Otherwise, update the existing evaluator and handle edges
         return {
@@ -778,4 +707,48 @@ function updateNodeParameter(
       parameters: updatedParameters,
     },
   };
+}
+
+/**
+ * Create new edges for new node.
+ * We assume that we want to connect the output.input to the input.input
+ * and the output.output to the input.output for the new node.
+ */
+function createNewEdgesForNewNode(
+  workflow: Workflow,
+  node: Node<Component>
+): Edge[] {
+  const edges: Edge[] = [];
+  // Filter out the node we are adding and reverse the order of the nodes to search backwards from the last node
+  const nodes = workflow.nodes.filter((n) => n.id !== node.id).reverse();
+  // Find the first node with an output.input
+  const inputNode = nodes.find(
+    (n) => n.data.outputs?.some((o) => o.identifier === "input")
+  );
+  // Find the first node with an input.output
+  const outputNode = nodes.find(
+    (n) => n.data.outputs?.some((o) => o.identifier === "output")
+  );
+
+  if (inputNode) {
+    edges.push({
+      id: `${inputNode.id}-to-${node.id}-input`,
+      source: inputNode.id,
+      sourceHandle: "outputs.input",
+      target: node.id,
+      targetHandle: "inputs.input",
+    });
+  }
+
+  if (outputNode) {
+    edges.push({
+      id: `${outputNode.id}-to-${node.id}-output`,
+      source: outputNode.id,
+      sourceHandle: "outputs.output",
+      target: node.id,
+      targetHandle: "inputs.output",
+    });
+  }
+
+  return edges;
 }
