@@ -128,11 +128,25 @@ export const TracesMapping = ({
     expansions: Set<keyof typeof TRACE_EXPANSIONS>;
   };
 
+  const getDefaultMappingState = useCallback((): LocalTraceMappingState => {
+    const currentMapping = traceMapping ?? { mapping: {}, expansions: [] };
+    return {
+      mapping: Object.fromEntries(
+        targetFields.map((name) => [
+          name,
+          currentMapping.mapping[name] ?? {
+            source: (DATASET_INFERRED_MAPPINGS_BY_NAME[name] ??
+              "") as keyof typeof TRACE_MAPPINGS,
+          },
+        ]) ?? []
+      ),
+      expansions: new Set(currentMapping.expansions),
+    };
+  }, [targetFields, traceMapping]);
+
+  // Initialize state with the default values
   const [traceMappingState, setTraceMappingState_] =
-    useState<LocalTraceMappingState>({
-      mapping: traceMapping?.mapping ?? {},
-      expansions: new Set(),
-    });
+    useState<LocalTraceMappingState>(getDefaultMappingState());
 
   const setTraceMappingState = useCallback(
     (
