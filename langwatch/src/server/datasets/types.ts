@@ -59,9 +59,7 @@ export const jsonSchema: z.ZodType<Json> = z.lazy(() =>
 export const datasetSpanSchema = z.union([
   baseSpanSchema
     .omit({
-      project_id: true,
       trace_id: true,
-      id: true,
       timestamps: true,
       metrics: true,
       params: true,
@@ -72,9 +70,7 @@ export const datasetSpanSchema = z.union([
     }),
   lLMSpanSchema
     .omit({
-      project_id: true,
       trace_id: true,
-      id: true,
       timestamps: true,
       metrics: true,
       params: true,
@@ -85,9 +81,7 @@ export const datasetSpanSchema = z.union([
     }),
   rAGSpanSchema
     .omit({
-      project_id: true,
       trace_id: true,
-      id: true,
       timestamps: true,
       metrics: true,
       params: true,
