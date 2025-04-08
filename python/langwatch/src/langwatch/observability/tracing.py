@@ -11,7 +11,7 @@ from langwatch.attributes import AttributeName
 from langwatch.utils.transformation import convert_typed_values
 from opentelemetry import trace as trace_api
 from opentelemetry.sdk.trace import TracerProvider
-from typing import Dict, List, Optional, Callable, Any, Union
+from typing import Dict, List, Optional, Callable, Any, TypeVar, Union
 from warnings import warn
 import inspect
 
@@ -23,6 +23,8 @@ from langwatch.observability.context import stored_langwatch_trace, stored_langw
 from langwatch.utils.initialization import ensure_setup
 
 __all__ = ["trace", "get_current_trace", "get_current_span"]
+
+T = TypeVar("T", bound=Callable[..., Any])
 
 def get_current_trace() -> Optional['LangWatchTrace']:
     """Get the current trace from the LangWatch context.
@@ -307,64 +309,60 @@ class LangWatchTrace:
             metrics=metrics,
         )
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+    def __call__(self, func: T) -> T:
         """Makes the trace callable as a decorator."""
 
-        if len(args) == 1 and callable(args[0]) and not kwargs:
-            func: Callable[..., Any] = args[0]
+        if inspect.isasyncgenfunction(func):
+            @functools.wraps(func)
+            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                with self:
+                    self._set_callee_input_information(func, *args, **kwargs)
+                    items = []
+                    async for item in func(*args, **kwargs):
+                        items.append(item)
+                        yield item
 
-            if inspect.isasyncgenfunction(func):
-                @functools.wraps(func)
-                async def wrapper(*wargs: Any, **wkwargs: Any) -> Any:
-                    with self:
-                        self._set_callee_input_information(func, *wargs, **wkwargs)
-                        items = []
-                        async for item in func(*args, **kwargs):
-                            items.append(item)
-                            yield item
+                    output = (
+                        "".join(items)
+                        if all(isinstance(item, str) for item in items)
+                        else items
+                    )
+                    self._set_callee_output_information(func, output)
+            return wrapper
+        elif inspect.isgeneratorfunction(func):
+            @functools.wraps(func)
+            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                with self:
+                    self._set_callee_input_information(func, *args, **kwargs)
+                    items = []
+                    for item in func(*args, **kwargs):
+                        items.append(item)
+                        yield item
 
-                        output = (
-                            "".join(items)
-                            if all(isinstance(item, str) for item in items)
-                            else items
-                        )
-                        self._set_callee_output_information(func, output)
-                return wrapper
-            elif inspect.isgeneratorfunction(func):
-                @functools.wraps(func)
-                async def wrapper(*wargs: Any, **wkwargs: Any) -> Any:
-                    with self:
-                        self._set_callee_input_information(func, *wargs, **wkwargs)
-                        items = []
-                        for item in func(*args, **kwargs):
-                            items.append(item)
-                            yield item
-
-                        output = (
-                            "".join(items)
-                            if all(isinstance(item, str) for item in items)
-                            else items
-                        )
-                        self._set_callee_output_information(func, output)
-                return wrapper
-            elif inspect.iscoroutinefunction(func):
-                async def wrapper(*wargs: Any, **wkwargs: Any) -> Any:
-                    async with self:
-                        self._set_callee_input_information(func, *wargs, **wkwargs)
-                        output = await func(*wargs, **wkwargs)
-                        self._set_callee_output_information(func, output)
-                        return output
-                return wrapper
-            else:
-                @functools.wraps(func)
-                def wrapper(*wargs: Any, **wkwargs: Any) -> Any:
-                    with self:
-                        self._set_callee_input_information(func, *wargs, **wkwargs)
-                        output = func(*wargs, **wkwargs)
-                        self._set_callee_output_information(func, output)
-                        return output
-                return wrapper
-        return self
+                    output = (
+                        "".join(items)
+                        if all(isinstance(item, str) for item in items)
+                        else items
+                    )
+                    self._set_callee_output_information(func, output)
+            return wrapper
+        elif inspect.iscoroutinefunction(func):
+            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                async with self:
+                    self._set_callee_input_information(func, *args, **kwargs)
+                    output = await func(*args, **kwargs)
+                    self._set_callee_output_information(func, output)
+                    return output
+            return wrapper
+        else:
+            @functools.wraps(func)
+            def wrapper(*args: Any, **kwargs: Any) -> Any:
+                with self:
+                    self._set_callee_input_information(func, *args, **kwargs)
+                    output = func(*args, **kwargs)
+                    self._set_callee_output_information(func, output)
+                    return output
+            return wrapper
 
     def __enter__(self) -> 'LangWatchTrace':
         """Makes the trace usable as a context manager."""
