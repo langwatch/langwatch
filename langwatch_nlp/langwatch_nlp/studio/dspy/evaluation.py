@@ -170,9 +170,9 @@ class EvaluationReporting:
         evaluation_results: dict[str, EvaluationResultWithMetadata],
     ):
         entry = dict(example.inputs())
-        cost = pred.get_cost() if hasattr(pred, "get_cost") else None
-        duration = pred.get_duration() if hasattr(pred, "get_duration") else None
-        error = pred.get_error() if hasattr(pred, "get_error") else None
+        cost = pred.cost if hasattr(pred, "cost") else None
+        duration = pred.duration if hasattr(pred, "duration") else None
+        error = pred.error if hasattr(pred, "error") else None
 
         node_results = {
             **pred.__dict__.get("_store", {}),

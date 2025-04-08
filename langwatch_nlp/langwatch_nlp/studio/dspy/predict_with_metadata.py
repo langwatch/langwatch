@@ -13,13 +13,16 @@ class PredictionWithMetadata(dspy.Prediction):
         self._duration = 0
         self._error = error
 
-    def get_error(self):
+    @property
+    def error(self):
         return self._error
 
-    def get_cost(self):
+    @property
+    def cost(self):
         return self._cost or 0
 
-    def get_duration(self):
+    @property
+    def duration(self):
         return self._duration or 0
 
 
@@ -42,7 +45,7 @@ class ModuleWithMetadata:
         duration = round((time.time() - start_time) * 1000)
 
         dspy.settings.configure(experimental=True)
-        lm = cast(dspy.LM, self.get_lm())
+        lm = cast(dspy.LM, self.get_lm()) or dspy.settings.lm
         response.__class__ = PredictionWithMetadata
         last_response = lm.history[-1]
         response._cost = 0

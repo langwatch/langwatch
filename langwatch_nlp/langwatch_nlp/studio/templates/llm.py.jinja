@@ -49,8 +49,6 @@ class {{ class_name }}(LLMNode):
         {# Configure LLM #}
         {% if llm_config %}
         lm = {{ node_llm_config_to_dspy_lm(llm_config) }}
-        {% else %}
-        {{ raise("LLM is required for " ~ component.name) }}
         {% endif %}
 
         {# Process demonstrations if available #}
@@ -62,7 +60,9 @@ class {{ class_name }}(LLMNode):
             node_id="{{ node_id }}",
             name="{{ class_name }}",
             predict=predict,
+            {% if llm_config %}
             lm=lm,
+            {% endif %}
             {% if demonstrations %}
             demos=demos
             {% endif %}

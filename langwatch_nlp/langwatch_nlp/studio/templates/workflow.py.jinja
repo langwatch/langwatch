@@ -1,4 +1,4 @@
-{% from 'macros.jinja' import evaluator_instance, edge_param %}
+{% from 'macros.jinja' import evaluator_instance, edge_param, node_llm_config_to_dspy_lm %}
 
 import time
 from typing import Callable, Dict, Any, Literal, Optional, Tuple, cast, overload
@@ -31,6 +31,11 @@ from dspy.utils.asyncify import asyncify
 {% endfor %}
 
 patch_optional_image()
+
+{% if workflow.default_llm %}
+lm = {{ node_llm_config_to_dspy_lm(workflow.default_llm) }}
+dspy.configure(lm=lm)
+{% endif %}
 
 class WorkflowModule(ReportingModule):
     def __init__(
@@ -91,19 +96,6 @@ class WorkflowModule(ReportingModule):
             {% for i in range(nodes|length) %}
                 {% set current_layer = [] %}
 
-                {# Check if we're making progress - only if there are still unprocessed nodes #}
-                {% set unprocessed_nodes = [] %}
-                {% for node in remaining_nodes %}
-                    {% if node.id not in executed.nodes %}
-                        {% set _ = unprocessed_nodes.append(node.id) %}
-                    {% endif %}
-                {% endfor %}
-
-                {% if unprocessed_nodes and previous_executed_count.value == executed.nodes|length and i > 0 %}
-                    {{ raise("Cyclic dependency detected") }}
-                {% endif %}
-                {% set _ = previous_executed_count.update({'value': executed.nodes|length}) %}
-
                 {% for node in remaining_nodes %}
                     {% set ns = namespace(can_execute=true) %}
                     {% for dep in dependency_graph[node.id] %}
@@ -147,7 +139,7 @@ class WorkflowModule(ReportingModule):
                     {% endfor %}
             )
             {% for node in layer %}
-            cost += {{ node.id }}.get_cost()
+            cost += {{ node.id }}.cost
             {% endfor %}
 
                 {% else %}
@@ -161,49 +153,55 @@ class WorkflowModule(ReportingModule):
                     {% endfor %}
             )
             {# TODO: move this to parent class probably #}
-            cost += {{ layer[0].id }}.get_cost()
+            cost += {{ layer[0].id }}.cost or 0
 
                 {% endif %}
             {% endfor %}
 
+            {# Finally execute end node #}
+            {% set ns = namespace(end_node=None) %}
+            {% for node in workflow.nodes %}
+                {% if node.type == "end" %}
+                    {% set ns.end_node = node %}
+                {% endif %}
+            {% endfor %}
+
+            return PredictionWithEvaluationAndMetadata(
+                {% if ns.end_node %}
+                end={
+                    {% for edge in workflow.edges %}
+                        {% if edge.target == ns.end_node.id %}
+                            {% set source_parts = edge.sourceHandle.split(".") %}
+                            {% set target_parts = edge.targetHandle.split(".") %}
+                            {% if edge.source == "entry" %}
+                    "{{ target_parts[1] }}": inputs["{{ source_parts[1] }}"],
+                            {% else %}
+                    "{{ target_parts[1] }}": {{ edge.source }}.{{ source_parts[1] }},
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                },
+                {% endif %}
+                {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
+                {{ node.id }}={{ node.id }},
+                {% endfor %}
+                cost=cost,
+                duration=round((time.time() - start_time) * 1000),
+                error=error,
+                {# # TODO: rename this to evaluate #}
+                evaluation=self.evaluate_prediction,
+            )
+
         except Exception as e:
-            error = e
             if self.manual_execution_mode:
                 raise e
 
-        {# Finally execute end node #}
-        {% set ns = namespace(end_node=None) %}
-        {% for node in workflow.nodes %}
-            {% if node.type == "end" %}
-                {% set ns.end_node = node %}
-            {% endif %}
-        {% endfor %}
-
-        return PredictionWithEvaluationAndMetadata(
-            {% if "end" in nodes %}
-            end={
-                {% for edge in workflow.edges %}
-                    {% if edge.target == ns.end_node.id %}
-                        {% set source_parts = edge.sourceHandle.split(".") %}
-                        {% set target_parts = edge.targetHandle.split(".") %}
-                        {% if edge.source == "entry" %}
-                "{{ target_parts[1] }}": inputs["{{ source_parts[1] }}"],
-                        {% else %}
-                "{{ target_parts[1] }}": {{ edge.source }}.{{ source_parts[1] }},
-                        {% endif %}
-                    {% endif %}
-                {% endfor %}
-            },
-            {% endif %}
-            {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
-            {{ node.id }}={{ node.id }},
-            {% endfor %}
-            cost=cost,
-            duration=round((time.time() - start_time) * 1000),
-            error=error,
-            {# # TODO: rename this to evaluate #}
-            evaluation=self.evaluate_prediction,
-        )
+            return PredictionWithEvaluationAndMetadata(
+                error=e,
+                cost=cost,
+                duration=round((time.time() - start_time) * 1000),
+                evaluation=self.evaluate_prediction,
+            )
 
     def evaluate_prediction(
         self,

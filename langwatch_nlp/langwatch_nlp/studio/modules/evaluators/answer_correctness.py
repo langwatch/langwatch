@@ -58,5 +58,5 @@ class AnswerCorrectnessEvaluator(Evaluator):
         return EvaluationResult(
             score=1 if passed else 0,
             passed=passed,
-            cost=Money(currency="USD", amount=result.get_cost()),
+            cost=Money(currency="USD", amount=result.cost),
         )

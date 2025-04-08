@@ -127,9 +127,6 @@ class Entry(BaseComponent):
 
 class Signature(BaseComponent):
     pass
-    # prompt: Optional[str] = None
-    # llm: Optional[LLMConfig] = None
-    # demonstrations: Optional[NodeDataset] = None
 
 
 class PromptingTechnique(BaseComponent):
@@ -274,6 +271,7 @@ class Workflow(BaseModel):
     icon: str
     description: str
     version: str
+    default_llm: Optional[LLMConfig] = None
     nodes: List[Node]
     edges: List[Edge]
     state: WorkflowState

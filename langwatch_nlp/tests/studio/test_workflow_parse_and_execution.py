@@ -11,6 +11,8 @@ from langwatch_nlp.studio.dspy.workflow_module import (
 )
 from langwatch_nlp.studio.types.dataset import DatasetColumn, DatasetColumnType
 from langwatch_nlp.studio.types.dsl import (
+    Code,
+    CodeNode,
     NodeDataset,
     DatasetInline,
     Edge,
@@ -322,8 +324,8 @@ async def test_parse_workflow():
         }
     )
     assert "Paris" in result["end"]["result"]
-    assert result.get_cost() > 0
-    assert result.get_duration() > 0
+    assert result.cost > 0
+    assert result.duration > 0
 
     # evaluation, evaluation_results = result.evaluation(
     #     example=dspy.Example(
@@ -615,8 +617,8 @@ async def test_parse_parallel_execution_workflow():
     )
     assert "Paris" in result["end"]["correct_answer"]
     assert "Paris" not in result["end"]["wrong_answer"]
-    assert result.get_cost() > 0
-    assert result.get_duration() > 0
+    assert result.cost > 0
+    assert result.duration > 0
 
 
 @pytest.mark.integration
@@ -648,8 +650,8 @@ async def test_parse_workflow_with_orphan_nodes():
         }
     )
     assert "Paris" in result["end"]["result"]
-    assert result.get_cost() > 0
-    assert result.get_duration() > 0
+    assert result.cost > 0
+    assert result.duration > 0
 
 
 @pytest.mark.integration
@@ -810,8 +812,8 @@ async def test_langwatch_evaluator_with_settings():
         }
     )
 
-    assert result.get_cost() > 0
-    assert result.get_duration() > 0
+    assert result.cost > 0
+    assert result.duration > 0
 
 
 @pytest.mark.integration
@@ -819,7 +821,9 @@ async def test_langwatch_evaluator_with_settings():
 async def test_parse_workflow_with_until_node():
     disable_dsp_caching()
 
-    class_name, code = parse_workflow(simple_workflow, format=True, debug_level=1, until_node_id="generate_query")
+    class_name, code = parse_workflow(
+        simple_workflow, format=True, debug_level=1, until_node_id="generate_query"
+    )
     print("\n\ncode", code, "\n\n")
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
@@ -830,8 +834,48 @@ async def test_parse_workflow_with_until_node():
         }
     )
     assert "Paris" in result["generate_query"]["query"]
-    assert result.get_cost() > 0
-    assert result.get_duration() > 0
+    assert result.cost > 0
+    assert result.duration > 0
 
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_parse_workflow_with_default_llm():
+    disable_dsp_caching()
+
+    workflow = copy.deepcopy(simple_workflow)
+    workflow.default_llm = LLMConfig(
+        model="gpt-4o-mini", temperature=0.0, max_tokens=100
+    )
+
+    generate_query_node = next(
+        node for node in workflow.nodes if node.data.name == "GenerateQuery"
+    )
+    generate_query_node.data.parameters = []
+
+    generate_answer_node = next(
+        node for node in workflow.nodes if node.data.name == "GenerateAnswer"
+    )
+    generate_answer_node.data.parameters = []
+
+    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+
+    print("\n\ncode", code, "\n\n")
+
+    Module = get_component_class(component_code=code, class_name=class_name)
+    instance = Module()  # type: ignore
+    result: PredictionWithEvaluationAndMetadata = await instance(
+        inputs={
+            "question": "What is the capital of France?",
+            "gold_answer": "Paris",
+        }
+    )
+
+    assert not result.error
+    assert result.cost > 0
+    assert result.duration > 0
+
+
+# TODO: manual execution mode
 # TODO: test evaluate_prediction
 # TODO: test different formats auto-parsing

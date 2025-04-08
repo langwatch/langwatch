@@ -173,6 +173,9 @@ def get_component_class(component_code: str, class_name: str) -> Type[dspy.Modul
 def find_reachable_nodes(
     nodes: List[Node], edges: List[Edge], until_node_id=None
 ) -> List[Node]:
+    # First, check for cycles in the workflow
+    detect_cycles(nodes, edges)
+
     # Build dependency graph and node lookup
     dependency_graph: Dict[str, List[str]] = {node.id: [] for node in nodes}
     node_lookup: Dict[str, Node] = {node.id: node for node in nodes}
@@ -192,8 +195,8 @@ def find_reachable_nodes(
             reachable_node_ids.add(current)
 
             # Find all nodes that have this node as a dependency
+            new_queue_items = []
             for node_id, deps in dependency_graph.items():
-                new_queue_items = []
                 if current in deps and node_id not in visited and node_id not in queue:
                     new_queue_items.append(node_id)
 
@@ -212,3 +215,56 @@ def find_reachable_nodes(
     ]
 
     return reachable_nodes
+
+
+def detect_cycles(nodes: List[Node], edges: List[Edge]) -> None:
+    """
+    Detects cyclic dependencies in the workflow graph.
+    Raises an exception with details if a cycle is found.
+
+    Uses Depth-First Search (DFS) with tracking of visited and in-progress nodes.
+    """
+    # Build forward adjacency list (node_id -> nodes it points to)
+    graph: Dict[str, List[str]] = {"entry": []}
+    for node in nodes:
+        graph[node.id] = []
+
+    for edge in edges:
+        source, target = edge.source, edge.target
+        if source not in graph:
+            graph[source] = []
+        graph[source].append(target)
+
+    # For cycle detection
+    visited: Dict[str, bool] = {node_id: False for node_id in graph.keys()}
+    in_progress: Dict[str, bool] = {node_id: False for node_id in graph.keys()}
+    # Track the path for better error reporting
+    path: Dict[str, List[str]] = {}
+
+    def dfs_check_cycle(node_id: str) -> Tuple[bool, List[str]]:
+        visited[node_id] = True
+        in_progress[node_id] = True
+
+        if node_id not in path:
+            path[node_id] = [node_id]
+
+        for neighbor in graph.get(node_id, []):
+            if not visited.get(neighbor, False):
+                path[neighbor] = path[node_id] + [neighbor]
+                has_cycle, cycle_path = dfs_check_cycle(neighbor)
+                if has_cycle:
+                    return True, cycle_path
+            elif in_progress.get(neighbor, False):
+                # Cycle detected - get the path from current node to the repeated neighbor
+                cycle_path = path[node_id] + [neighbor]
+                # Find the start of the cycle
+                start_idx = cycle_path.index(neighbor)
+                return True, cycle_path[start_idx:]
+
+        in_progress[node_id] = False
+        return False, []
+
+    # Start DFS from entry node
+    has_cycle, cycle_path = dfs_check_cycle("entry")
+    if has_cycle:
+        raise Exception(f"Cyclic dependency detected: {' -> '.join(cycle_path)}")

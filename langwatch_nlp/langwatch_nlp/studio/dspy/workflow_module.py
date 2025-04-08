@@ -160,7 +160,7 @@ class WorkflowModule(ReportingModule):
                             print(f"Error executing node {node.id}:", e)
                             raise e
                         duration += round((time.time() - start_time) * 1000)
-                        cost += result.get_cost() if hasattr(result, "get_cost") else 0  # type: ignore
+                        cost += result.cost if hasattr(result, "cost") else 0  # type: ignore
                         node_outputs[node.id] = result  # type: ignore
                         executed_nodes.add(node.id)
 
@@ -253,8 +253,8 @@ class WorkflowModule(ReportingModule):
                     ),
                     inputs={},
                     duration=(
-                        prediction.get_duration()
-                        if hasattr(prediction, "get_duration")
+                        prediction.duration
+                        if hasattr(prediction, "duration")
                         else 0
                     ),
                 )

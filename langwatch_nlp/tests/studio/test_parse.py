@@ -201,5 +201,25 @@ def test_parse_signature_with_demonstrations():
 
     assert issubclass(Module, LLMNode)
 
+def test_parse_signature_with_default_workflow_llm():
+    node = SignatureNode(
+        id="generate_answer",
+        data=Signature(
+            name="GenerateAnswer",
+            cls=None,
+            parameters=[],
+            inputs=inputs,
+            outputs=outputs,
+            execution_state=None,
+        ),
+        type="signature",
+    )
+    workflow = copy.deepcopy(basic_workflow)
+    workflow.default_llm = LLMConfig(model="gpt-4o", temperature=0.0, max_tokens=100)
 
-# TODO: default llm from workflow instead of llm_field
+    class_name, code = parse_component(node, workflow)
+    print("\n\ncode", code, "\n\n")
+    Module = get_component_class(code, class_name)
+
+    assert issubclass(Module, LLMNode)
+
