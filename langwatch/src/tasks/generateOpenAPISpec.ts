@@ -1,6 +1,6 @@
 import { generateSpecs } from "hono-openapi";
 
-import { app as datasetApp } from "../app/api/dataset/[[...route]]/route";
+import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 
 /**
  * This task generates the OpenAPI spec for the dataset API.
