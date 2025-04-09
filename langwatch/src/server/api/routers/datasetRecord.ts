@@ -198,7 +198,11 @@ const deleteManyDatasetRecords = async ({
     // Get existing records
     let records: any[] = [];
     try {
-      records = await storageService.getObject(projectId, datasetId);
+      const { records: fetchedRecords } = await storageService.getObject(
+        projectId,
+        datasetId
+      );
+      records = fetchedRecords;
     } catch (error) {
       if ((error as any).name === "NoSuchKey") {
         throw new TRPCError({
