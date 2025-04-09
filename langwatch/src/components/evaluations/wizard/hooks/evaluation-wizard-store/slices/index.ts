@@ -10,11 +10,16 @@ import {
   type EvaluatorNodeSlice,
 } from "./evaluatorNodeSlice";
 import { createExecutorSlice, type ExecutorSlice } from "./executorSlice";
+import {
+  createCodeExecutionSlice,
+  type CodeExecutionSlice,
+} from "./codeExecutionSlice";
 
 export type EvaluationWizardSlicesUnion = BaseNodeSlice &
   LlmSignatureNodeSlice &
   EvaluatorNodeSlice &
-  ExecutorSlice;
+  ExecutorSlice &
+  CodeExecutionSlice;
 
 export const createEvaluationWizardSlicesStore: StateCreator<
   EvaluationWizardStore & EvaluationWizardSlicesUnion,
@@ -26,4 +31,5 @@ export const createEvaluationWizardSlicesStore: StateCreator<
   ...createLlmSignatureNodeSlice(...args),
   ...createEvaluatorNodeSlice(...args),
   ...createExecutorSlice(...args),
+  ...createCodeExecutionSlice(...args),
 });

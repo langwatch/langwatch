@@ -7,17 +7,12 @@ import {
 import { OptimizationStudioCanvas } from "../../../optimization_studio/components/OptimizationStudio";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import {
-  Controls,
-  ReactFlowProvider,
-  useUpdateNodeInternals,
-} from "@xyflow/react";
+import { Controls, useUpdateNodeInternals } from "@xyflow/react";
 import { memo, useEffect } from "react";
 import { EvaluationResults } from "../../../optimization_studio/components/ResultsPanel";
 import { useShallow } from "zustand/react/shallow";
 import { EvaluationManualIntegration } from "../../checks/EvaluationManualIntegration";
 import { useAvailableEvaluators } from "../../../hooks/useAvailableEvaluators";
-import type { EvaluatorTypes } from "../../../server/evaluations/evaluators.generated";
 
 export const WizardWorkspace = memo(function WizardWorkspace() {
   const {
@@ -123,13 +118,11 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
               position="sticky"
               top="58px"
             >
-              <ReactFlowProvider>
-                <DndProvider backend={HTML5Backend}>
-                  {workspaceTab === "workflow" && (
-                    <WizardOptimizationStudioCanvas />
-                  )}
-                </DndProvider>
-              </ReactFlowProvider>
+              <DndProvider backend={HTML5Backend}>
+                {workspaceTab === "workflow" && (
+                  <WizardOptimizationStudioCanvas />
+                )}
+              </DndProvider>
             </Tabs.Content>
           )}
           {hasResults && (
@@ -241,7 +234,7 @@ function CodeImplementation() {
     <Card.Root width="full" height="full" position="sticky" top={6}>
       <Card.Body width="full" height="full" paddingTop={0}>
         <EvaluationManualIntegration
-          evaluatorDefinition={availableEvaluators[checkType as EvaluatorTypes]}
+          evaluatorDefinition={availableEvaluators[checkType]}
           checkType={checkType}
           name={name ?? "Untitled"}
           executionMode={

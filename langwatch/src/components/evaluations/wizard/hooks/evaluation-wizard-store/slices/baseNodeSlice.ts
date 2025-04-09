@@ -8,6 +8,8 @@ import { calculateNodePosition, updateNodeParameter } from "./utils/node.util";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import type { NodeWithOptionalPosition } from "./types";
 
+type NodeTypes = "signature" | "code" | "evaluator" | "entry";
+
 export interface BaseNodeSlice {
   getLastNode: <T extends Component>() => Node<T> | undefined;
   getNodeById: <T extends Component>(nodeId: string) => Node<T> | undefined;
@@ -29,11 +31,13 @@ export interface BaseNodeSlice {
     node: Node<T>,
     newEdges?: Edge[]
   ) => string;
-  getNodesByType: <T extends Component>(type: string) => Node<T>[];
+  getNodesByType: <T extends Component>(type: NodeTypes) => Node<T>[];
   updateNode: (
     nodeId: string,
     updater: (node: Node<Component>) => Node<Component>
   ) => void;
+  setNodeInputs: (nodeId: string, inputs: Field[]) => void;
+  setNodeOutputs: (nodeId: string, outputs: Field[]) => void;
   setNodeParameter: (
     nodeId: string,
     parameter: Partial<Omit<Field, "value">> & {
@@ -45,7 +49,7 @@ export interface BaseNodeSlice {
 }
 
 export const createBaseNodeSlice: StateCreator<
-  {
+  BaseNodeSlice & {
     workflowStore: WorkflowStore;
   },
   [],
@@ -60,7 +64,7 @@ export const createBaseNodeSlice: StateCreator<
   const getNodeById = <T extends Component>(nodeId: string) =>
     getWorkflow().nodes.find((node) => node.id === nodeId) as Node<T>;
 
-  const getNodesByType = <T extends Component>(type: string) => {
+  const getNodesByType: BaseNodeSlice["getNodesByType"] = (type) => {
     return getWorkflow().nodes.filter(
       (node) => node.type === type
     ) as Node<T>[];
@@ -114,6 +118,20 @@ export const createBaseNodeSlice: StateCreator<
     return updateNode(nodeId, (node) => updateNodeParameter(node, parameter));
   };
 
+  const setNodeDataField = <T extends Component>(
+    nodeId: string,
+    field: "inputs" | "outputs" | "parameters",
+    value: Field[]
+  ) => {
+    return get().updateNode(nodeId, (node) => ({
+      ...node,
+      data: {
+        ...node.data,
+        [field]: value,
+      },
+    }));
+  };
+
   return {
     getNodesByType,
     getLastNode,
@@ -122,5 +140,11 @@ export const createBaseNodeSlice: StateCreator<
     addNodeToWorkflow,
     updateNode,
     setNodeParameter,
+    setNodeInputs: (nodeId: string, inputs: Field[]) => {
+      return setNodeDataField(nodeId, "inputs", inputs);
+    },
+    setNodeOutputs: (nodeId: string, outputs: Field[]) => {
+      return setNodeDataField(nodeId, "outputs", outputs);
+    },
   };
 };

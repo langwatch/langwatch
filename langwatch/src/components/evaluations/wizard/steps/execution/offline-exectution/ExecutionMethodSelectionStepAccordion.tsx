@@ -25,12 +25,16 @@ export function ExecutionMethodSelectionStepAccordion({
 }: {
   onSelect: (executionMethod: OfflineExecutionMethod) => void;
 }) {
-  const { executionMethod, setWizardState } = useEvaluationWizardStore(
-    useShallow(({ wizardState, setWizardState }) => ({
-      executionMethod: wizardState.executionMethod,
-      setWizardState,
-    }))
-  );
+  const { executionMethod, setWizardState, getOrCreateCodeExecutionNode } =
+    useEvaluationWizardStore(
+      useShallow(
+        ({ wizardState, setWizardState, getOrCreateCodeExecutionNode }) => ({
+          executionMethod: wizardState.executionMethod,
+          setWizardState,
+          getOrCreateCodeExecutionNode,
+        })
+      )
+    );
 
   const focusElementById = useAnimatedFocusElementById();
 
@@ -77,6 +81,10 @@ export function ExecutionMethodSelectionStepAccordion({
           {...buildBaseRadioParams("offline_code_execution")}
           description="Run code"
           icon={<LuCode />}
+          onClick={() => {
+            getOrCreateCodeExecutionNode();
+            handleOptionClick("offline_code_execution");
+          }}
         />
         <StepRadio
           {...buildBaseRadioParams("offline_http")}

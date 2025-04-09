@@ -1,11 +1,14 @@
-import { Textarea, VStack } from "@chakra-ui/react";
 import { useShallow } from "zustand/react/shallow";
 import { useEvaluationWizardStore } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { LLMConfigField } from "~/optimization_studio/components/properties/modals/llm-config/LLMConfigField";
-import { useCallback, useMemo } from "react";
-import type { LLMConfig } from "~/optimization_studio/types/dsl";
-import { PropertyField } from "~/optimization_studio/components/properties/BasePropertiesPanel";
+import {
+  FieldsForm,
+  FieldsDefinition,
+} from "~/optimization_studio/components/properties/BasePropertiesPanel";
 import { ExecutionStepAccordion } from "../../../components/ExecutionStepAccordion";
+import { VStack } from "@chakra-ui/react";
+import { useUpdateNodeInternals } from "@xyflow/react";
+import type { Field } from "~/optimization_studio/types/dsl";
+import { useCallback } from "react";
 
 export const CODE_EXECUTION_STEP_ACCORDION_VALUE = "offline_code_execution";
 
@@ -15,90 +18,60 @@ export const CODE_EXECUTION_STEP_ACCORDION_VALUE = "offline_code_execution";
  * It allows users to set up the code execution environment and parameters.
  */
 export function CodeExecutionStepAccordion() {
-  const {
-    updateSignatureNodeLLMConfigValue,
-    setNodeParameter,
-    getOrCreateSignatureNode,
-  } = useEvaluationWizardStore(
-    useShallow(
-      ({
-        updateSignatureNodeLLMConfigValue,
-        setNodeParameter,
-        getOrCreateSignatureNode,
-      }) => ({
-        updateSignatureNodeLLMConfigValue,
-        getOrCreateSignatureNode,
-        setNodeParameter,
-      })
-    )
-  );
-
-  /**
-   * Find or create the signature node
-   * This will run on every render to keep the signature node up to date
-   * since we don't currently have a way to trigger on workflow changes
-   */
-  const signatureNode = getOrCreateSignatureNode();
-
-  const updateLLMConfig = useCallback(
-    (llmConfig: LLMConfig) => {
-      if (!signatureNode) {
-        return;
-      }
-
-      updateSignatureNodeLLMConfigValue(signatureNode.id, llmConfig);
-    },
-    [updateSignatureNodeLLMConfigValue, signatureNode]
-  );
-
-  const { llmConfig, codeSnippet } = useMemo(() => {
-    const parameters = signatureNode?.data.parameters;
-    const llmConfig = parameters?.find((p) => p.identifier === "llm");
-    const codeSnippet = parameters?.find(
-      (p) => p.identifier === "code_snippet"
+  const { getNodesByType, setNodeInputs, setNodeOutputs } =
+    useEvaluationWizardStore(
+      useShallow(({ getNodesByType, setNodeInputs, setNodeOutputs }) => ({
+        getNodesByType,
+        setNodeInputs,
+        setNodeOutputs,
+      }))
     );
 
-    return {
-      llmConfig: llmConfig?.value as LLMConfig,
-      codeSnippet: codeSnippet?.value as string | undefined,
-    };
-  }, [signatureNode]);
+  const executorNode = getNodesByType("code")[0];
+  const updateNodeInternals = useUpdateNodeInternals();
+
+  const handleOnInputsChange = useCallback(
+    (data: { fields: Field[] }) => {
+      if (!executorNode) return;
+      setNodeInputs(executorNode.id, data.fields);
+      updateNodeInternals(executorNode.id);
+    },
+    [executorNode, setNodeInputs, updateNodeInternals]
+  );
+
+  const handleOnOutputsChange = useCallback(
+    (data: { fields: Field[] }) => {
+      if (!executorNode) return;
+      setNodeOutputs(executorNode.id, data.fields);
+      updateNodeInternals(executorNode.id);
+    },
+    [executorNode, setNodeOutputs, updateNodeInternals]
+  );
+
+  if (!executorNode) {
+    return null;
+  }
 
   return (
     <ExecutionStepAccordion
       value={CODE_EXECUTION_STEP_ACCORDION_VALUE}
-      title="Code Execution Properties"
+      title="Code Execution"
       showTrigger={true}
     >
       <VStack width="full" gap={3}>
-        {signatureNode && (
-          <>
-            <PropertyField title="LLM">
-              {llmConfig && (
-                <LLMConfigField
-                  llmConfig={llmConfig}
-                  onChange={updateLLMConfig}
-                />
-              )}
-            </PropertyField>
-            <PropertyField title="Code Snippet">
-              <Textarea
-                height="200px"
-                fontFamily="monospace"
-                fontSize="13px"
-                value={codeSnippet}
-                onChange={(e) =>
-                  setNodeParameter(signatureNode.id, {
-                    identifier: "code_snippet",
-                    type: "str",
-                    value: e.target.value,
-                  })
-                }
-                placeholder="Enter your code snippet here..."
-              />
-            </PropertyField>
-          </>
-        )}
+        <FieldsForm node={executorNode} field="parameters" />
+        <FieldsDefinition
+          node={executorNode}
+          field="inputs"
+          title={"Inputs"}
+          onChange={handleOnInputsChange}
+        />
+        <FieldsDefinition
+          node={executorNode}
+          field="outputs"
+          title="Outputs"
+          onChange={handleOnOutputsChange}
+        />
       </VStack>
     </ExecutionStepAccordion>
   );
