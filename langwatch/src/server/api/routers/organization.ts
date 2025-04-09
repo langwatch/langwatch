@@ -256,6 +256,17 @@ export const organizationRouter = createTRPCRouter({
         if (organization.s3Endpoint) {
           organization.s3Endpoint = decrypt(organization.s3Endpoint);
         }
+        if (organization.elasticsearchNodeUrl) {
+          organization.elasticsearchNodeUrl = decrypt(
+            organization.elasticsearchNodeUrl
+          );
+        }
+        if (organization.elasticsearchApiKey) {
+          organization.elasticsearchApiKey = decrypt(
+            organization.elasticsearchApiKey
+          );
+        }
+
         const isExternal =
           organization.members[0]?.role !== "ADMIN" &&
           organization.members[0]?.role !== "MEMBER";
@@ -324,8 +335,12 @@ export const organizationRouter = createTRPCRouter({
           s3SecretAccessKey: input.s3SecretAccessKey
             ? encrypt(input.s3SecretAccessKey)
             : null,
-          elasticsearchNodeUrl: input.elasticsearchNodeUrl,
-          elasticsearchApiKey: input.elasticsearchApiKey,
+          elasticsearchNodeUrl: input.elasticsearchNodeUrl
+            ? encrypt(input.elasticsearchNodeUrl)
+            : null,
+          elasticsearchApiKey: input.elasticsearchApiKey
+            ? encrypt(input.elasticsearchApiKey)
+            : null,
           s3Bucket: input.s3Bucket,
         },
       });

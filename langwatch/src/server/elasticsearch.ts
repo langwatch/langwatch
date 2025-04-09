@@ -6,6 +6,7 @@ import { patchForOpensearchCompatibility } from "./elasticsearch/opensearchCompa
 import { patchForQuickwitCompatibility } from "./elasticsearch/quickwitCompatibility";
 
 import { prisma } from "./db";
+import { decrypt } from "~/utils/encryption";
 export type IndexSpec = {
   alias: string;
   base: string;
@@ -56,14 +57,16 @@ export const esClient = async (
       const organization = await prisma.organization.findUnique({
         where: { id: args.organizationId },
       });
-      orgElasticsearchNodeUrl = organization?.elasticsearchNodeUrl ?? null;
-      orgElasticsearchApiKey = organization?.elasticsearchApiKey ?? null;
+      orgElasticsearchNodeUrl = decrypt(
+        organization?.elasticsearchNodeUrl ?? ""
+      );
+      orgElasticsearchApiKey = decrypt(organization?.elasticsearchApiKey ?? "");
     } else if ("projectId" in args) {
       const project = await getOrgElasticsearchDetailsFromProject(
         args.projectId
       );
-      orgElasticsearchNodeUrl = project?.elasticsearchNodeUrl ?? null;
-      orgElasticsearchApiKey = project?.elasticsearchApiKey ?? null;
+      orgElasticsearchNodeUrl = decrypt(project?.elasticsearchNodeUrl ?? "");
+      orgElasticsearchApiKey = decrypt(project?.elasticsearchApiKey ?? "");
     }
 
     // Use org settings if available, otherwise fall back to env vars
