@@ -46,13 +46,13 @@ class Code(dspy.Module):
     ],
     inputs: [
       {
-        identifier: "question",
+        identifier: "input",
         type: "str",
       },
     ],
     outputs: [
       {
-        identifier: "answer",
+        identifier: "output",
         type: "str",
       },
     ],

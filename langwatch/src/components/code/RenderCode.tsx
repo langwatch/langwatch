@@ -14,11 +14,6 @@ export const RenderCode = ({
   language: string;
   style?: React.CSSProperties;
 }) => {
-  console.log({
-    code,
-    language,
-    propsStyle,
-  });
   return (
     <Highlight
       prism={Prism}
