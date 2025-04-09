@@ -23,15 +23,11 @@ export function LlmPromptPropertiesStepAccordion() {
     useShallow(
       ({
         workflowStore,
-        addSignatureNode,
-        getSignatureNodes,
         updateSignatureNodeLLMConfigValue,
         setNodeParameter,
         getOrCreateSignatureNode,
       }) => ({
         workflowStore,
-        addSignatureNode,
-        getSignatureNodes,
         updateSignatureNodeLLMConfigValue,
         getOrCreateSignatureNode,
         setNodeParameter,
