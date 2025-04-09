@@ -1,6 +1,9 @@
 import { type Node } from "@xyflow/react";
 import { type StateCreator } from "zustand";
-import type { Signature } from "../../../../../../optimization_studio/types/dsl";
+import type {
+  LLMConfig,
+  Signature,
+} from "../../../../../../optimization_studio/types/dsl";
 import type { BaseNodeSlice } from "./baseNodeSlice";
 import { LlmSignatureNodeFactory } from "./factories/llm-signature-node.factory";
 
@@ -8,6 +11,10 @@ export interface LlmSignatureNodeSlice {
   createNewLlmSignatureNode: () => Node<Signature>;
   addNewSignatureNodeToWorkflow: () => string;
   getOrCreateSignatureNode: () => Node<Signature>;
+  updateSignatureNodeLLMConfigValue: (
+    nodeId: string,
+    llmConfig: LLMConfig
+  ) => void;
 }
 
 export const createLlmSignatureNodeSlice: StateCreator<
@@ -36,9 +43,24 @@ export const createLlmSignatureNodeSlice: StateCreator<
     return get().getNodeById(nodeId)!;
   };
 
+  /**
+   * Specialized function to update the LLM config value for the signature node
+   */
+  const updateSignatureNodeLLMConfigValue = (
+    nodeId: string,
+    llmConfig: LLMConfig
+  ) => {
+    get().setNodeParameter(nodeId, {
+      identifier: "llm",
+      type: "llm",
+      value: llmConfig,
+    });
+  };
+
   return {
     createNewLlmSignatureNode,
     addNewSignatureNodeToWorkflow,
     getOrCreateSignatureNode,
+    updateSignatureNodeLLMConfigValue,
   };
 };

@@ -17,7 +17,6 @@ import type {
   Signature,
   Workflow,
 } from "../../../../../optimization_studio/types/dsl";
-import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import { datasetColumnsToFields } from "../../../../../optimization_studio/utils/datasetUtils";
 import { nameToId } from "../../../../../optimization_studio/utils/nodeUtils";
 import { buildEvaluatorFromType } from "../../../../../optimization_studio/utils/registryUtils";
@@ -158,25 +157,7 @@ export type EvaluationWizardStore = State & {
   setFirstEvaluatorEdges: (edges: Workflow["edges"]) => void;
   getFirstEvaluatorEdges: () => Workflow["edges"] | undefined;
 
-  // Signature Node Management
-  getSignatureNodes: () => Node<Signature>[];
-  addSignatureNode: (node?: Omit<Partial<Node<Signature>>, "type">) => void;
-  updateSignatureNode: (nodeId: string, node: Partial<Node<Signature>>) => void;
-  updateSignatureNodeLLMConfigValue: (
-    nodeId: string,
-    llmConfig: LLMConfig
-  ) => void;
-
-  // Generic node management
-  updateNode: <T extends BaseComponent>(
-    nodeId: string,
-    updateProperties: Partial<Node<T>>
-  ) => void;
-
   workflowStore: WorkflowStore;
-} & {
-  // Properties and methods from the workflow store
-  setNodeParameter: WorkflowStore["setNodeParameter"];
 };
 
 export const initialState: State = {
@@ -202,32 +183,6 @@ const store = (
   ) => void,
   get: () => EvaluationWizardStore
 ): EvaluationWizardStore => {
-  const addNode = (node: Node<BaseComponent>) => {
-    get().workflowStore.setWorkflow((current) => ({
-      ...current,
-      nodes: [...current.nodes, node],
-    }));
-  };
-
-  const addEdge = (edge: Edge) => {
-    get().workflowStore.setWorkflow((current) => ({
-      ...current,
-      edges: [...current.edges, edge],
-    }));
-  };
-
-  const findNodeByType = (type: string) => {
-    return get()
-      .workflowStore.getWorkflow()
-      .nodes.find((node) => node.type === type);
-  };
-
-  const getNodes = ({ type }: { type?: string }) => {
-    return get()
-      .workflowStore.getWorkflow()
-      .nodes.filter((node) => !type || node.type === type);
-  };
-
   const store: EvaluationWizardStore = {
     ...initialState,
     reset() {
@@ -518,102 +473,6 @@ const store = (
         .workflowStore.getWorkflow()
         .edges.filter((edge) => edge.target === firstEvaluator.id);
     },
-    getSignatureNodes() {
-      return getNodes({ type: "signature" });
-    },
-
-    /**
-     * Add a signature node to the workflow
-     *
-     * If no node is provide, assumes it is the first llm added
-     * and will use defaults
-     */
-    addSignatureNode(node?: Omit<Partial<Node<Signature>>, "type">) {
-      // Calculate node position based on the last node or use default position
-      const nodePosition =
-        node?.position ??
-        calcNextNodePositionFromCurrentNodes(
-          get().workflowStore.getWorkflow().nodes
-        );
-
-      const signatureNode = {
-        // ...DEFAULT_SIGNATURE_NODE_PROPERTIES,
-        position: nodePosition,
-        ...node,
-      };
-
-      addNode(signatureNode as Node<Signature>);
-
-      // Find the entry node for the dataset
-      const entryNode = findNodeByType("entry");
-
-      // Handle the case where the entry node is not found
-      if (!entryNode) {
-        // We should handle this better
-        console.warn(
-          "Entry node not found. Unable to connect to signature node."
-        );
-
-        return;
-      }
-
-      const edges = createNewEdgesForNewNode(
-        get().workflowStore.getWorkflow(),
-        signatureNode as Node<Signature>
-      );
-
-      // Add edges connecting entry node input to signature node input
-      edges.forEach((edge) => {
-        addEdge(edge);
-      });
-    },
-
-    updateSignatureNode(
-      nodeId: string,
-      updateProperties: Partial<Node<Signature>>
-    ) {
-      get().workflowStore.setWorkflow((current) => {
-        return updateNode(current, nodeId, (node) => ({
-          ...node,
-          ...updateProperties,
-        }));
-      });
-    },
-    updateSignatureNodeLLMConfigValue(nodeId: string, llmConfig: LLMConfig) {
-      get().workflowStore.setWorkflow((current) => {
-        return updateNode(current, nodeId, (node) =>
-          updateNodeParameter(node, {
-            identifier: "llm",
-            type: "llm",
-            value: llmConfig,
-          })
-        );
-      });
-    },
-    // Generic node update function
-    updateNode(nodeId, updateProperties) {
-      get().workflowStore.setWorkflow((current) => {
-        return updateNode(current, nodeId, (node) => ({
-          ...node,
-          ...updateProperties,
-        }));
-      });
-    },
-    // Generic node parameter update function
-    setNodeParameter(
-      nodeId: string,
-      parameter: Partial<Omit<Field, "value">> & {
-        identifier: string;
-        type: Field["type"];
-        value?: unknown;
-      }
-    ) {
-      get().workflowStore.setWorkflow((current) => {
-        return updateNode(current, nodeId, (node) =>
-          updateNodeParameter(node, parameter)
-        );
-      });
-    },
     workflowStore: createWorkflowStore(set, get),
   };
 
@@ -656,74 +515,6 @@ export const useEvaluationWizardStore = create<
   ...store(args[0], args[1]),
   ...createEvaluationWizardSlicesStore(...args),
 }));
-
-// Helper functions
-
-const calcNextNodePositionFromCurrentNodes = (
-  currentNodes: Node<BaseComponent>[]
-) => {
-  const lastNode = currentNodes[currentNodes.length - 1];
-  if (lastNode) {
-    return {
-      x: lastNode.position.x + (lastNode.width ?? 0) + 200,
-      y: lastNode.position.y,
-    };
-  }
-  return { x: 0, y: 0 };
-};
-
-type NodeUpdater<C extends Component> = (node: Node<C>) => Node<C>;
-
-/**
- * Generic node update function
- * Will update the node with the updater function
- */
-function updateNode(
-  workflow: Workflow,
-  nodeId: string,
-  updater: NodeUpdater<Component>
-): Workflow {
-  return {
-    ...workflow,
-    nodes: workflow.nodes.map((node) =>
-      node.id === nodeId ? updater(node) : node
-    ),
-  };
-}
-
-/**
- * TODO: Reconsider this approach
- * Generic parameter update function
- * Will add the parameter if it doesn't exist and update the value if it does
- */
-function updateNodeParameter(
-  node: Node<Component>,
-  parameter: Partial<Omit<Field, "value">> & {
-    identifier: string;
-    type: Field["type"];
-    value?: any;
-  }
-): Node<Component> {
-  const parameters = node.data.parameters ?? [];
-  const paramIndex = parameters.findIndex(
-    (p) => p.identifier === parameter.identifier
-  );
-
-  const updatedParameters =
-    paramIndex === -1
-      ? [...parameters, parameter]
-      : parameters.map((param, index) =>
-          index === paramIndex ? { ...param, ...parameter } : param
-        );
-
-  return {
-    ...node,
-    data: {
-      ...node.data,
-      parameters: updatedParameters,
-    },
-  };
-}
 
 /**
  * Create new edges for new node using our field mapping utility.

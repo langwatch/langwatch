@@ -1,8 +1,11 @@
 import { type Node } from "@xyflow/react";
 import { type StateCreator } from "zustand";
-import type { Component } from "../../../../../../optimization_studio/types/dsl";
+import type {
+  Component,
+  Field,
+} from "../../../../../../optimization_studio/types/dsl";
 import { createFieldMappingEdges } from "../../../../utils/field-mapping";
-import { calculateNodePosition } from "./utils/nodeUtils";
+import { calculateNodePosition, updateNodeParameter } from "./utils/nodeUtils";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import type { NodeWithOptionalPosition } from "./types";
 
@@ -19,6 +22,18 @@ export interface BaseNodeSlice {
   ) => Node<T>;
   addNodeToWorkflow: <T extends Component>(node: Node<T>) => string;
   getNodesByType: <T extends Component>(type: string) => Node<T>[];
+  updateNode: <T extends Component>(
+    nodeId: string,
+    updater: (node: Node<T>) => Node<T>
+  ) => void;
+  setNodeParameter: (
+    nodeId: string,
+    parameter: Partial<Omit<Field, "value">> & {
+      identifier: string;
+      type: Field["type"];
+      value?: unknown;
+    }
+  ) => void;
 }
 
 export const createBaseNodeSlice: StateCreator<
@@ -69,11 +84,36 @@ export const createBaseNodeSlice: StateCreator<
     return node.id;
   };
 
+  const updateNode: BaseNodeSlice["updateNode"] = (nodeId, updater) => {
+    get().workflowStore.setWorkflow((current) => {
+      return {
+        ...current,
+        nodes: current.nodes.map((node) =>
+          node.id === nodeId ? updater(node as Node<T>) : node
+        ),
+      };
+    });
+  };
+
+  // Generic node parameter update function
+  const setNodeParameter = (
+    nodeId: string,
+    parameter: Partial<Omit<Field, "value">> & {
+      identifier: string;
+      type: Field["type"];
+      value?: unknown;
+    }
+  ) => {
+    return updateNode(nodeId, (node) => updateNodeParameter(node, parameter));
+  };
+
   return {
+    getNodesByType,
     getLastNode,
     getNodeById,
     createNewNode,
     addNodeToWorkflow,
-    getNodesByType,
+    updateNode,
+    setNodeParameter,
   };
 };

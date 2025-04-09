@@ -565,17 +565,6 @@ const store = (
       });
     },
 
-    updateSignatureNode(
-      nodeId: string,
-      updateProperties: Partial<Node<Signature>>
-    ) {
-      get().workflowStore.setWorkflow((current) => {
-        return updateNode(current, nodeId, (node) => ({
-          ...node,
-          ...updateProperties,
-        }));
-      });
-    },
     updateSignatureNodeLLMConfigValue(nodeId: string, llmConfig: LLMConfig) {
       get().workflowStore.setWorkflow((current) => {
         return updateNode(current, nodeId, (node) =>
@@ -630,12 +619,7 @@ const createWorkflowStore = (
   get: () => EvaluationWizardStore
 ) => {
   return workflowStore(
-    (
-      partial:
-        | WorkflowStore
-        | Partial<WorkflowStore>
-        | ((state: WorkflowStore) => WorkflowStore | Partial<WorkflowStore>)
-    ) =>
+    (partial: WorkflowStore | ((state: WorkflowStore) => WorkflowStore)) =>
       set((current) => ({
         ...current,
         workflowStore:
