@@ -29,6 +29,10 @@ import {
   createFieldMappingEdges,
   connectEvaluatorFields,
 } from "../../../utils/field-mapping";
+import {
+  createEvaluationWizardSlicesStore,
+  type EvaluationWizardSlicesUnion,
+} from "./slices";
 
 export const EVALUATOR_CATEGORIES = [
   "expected_answer",
@@ -124,7 +128,7 @@ export type State = {
   workflowStore: WorkflowStoreState;
 };
 
-type EvaluationWizardStore = State & {
+export type EvaluationWizardStore = State & {
   reset: () => void;
   setExperimentId: (experimentId: string) => void;
   setExperimentSlug: (experimentSlug: string) => void;
@@ -647,7 +651,12 @@ const createWorkflowStore = (
   );
 };
 
-export const useEvaluationWizardStore = create<EvaluationWizardStore>()(store);
+export const useEvaluationWizardStore = create<
+  EvaluationWizardStore & EvaluationWizardSlicesUnion
+>()((...args) => ({
+  ...store(args[0], args[1]),
+  ...createEvaluationWizardSlicesStore(...args),
+}));
 
 // Helper functions
 
