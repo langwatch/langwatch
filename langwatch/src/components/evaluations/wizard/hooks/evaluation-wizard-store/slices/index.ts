@@ -5,8 +5,14 @@ import {
 } from "./llmSignatureNodeSlice";
 import type { StateCreator } from "zustand";
 import type { EvaluationWizardStore } from "../useEvaluationWizardStore";
+import {
+  createEvaluatorNodeSlice,
+  type EvaluatorNodeSlice,
+} from "./evaluatorNodeSlice";
 
-export type EvaluationWizardSlicesUnion = BaseNodeSlice & LlmSignatureNodeSlice;
+export type EvaluationWizardSlicesUnion = BaseNodeSlice &
+  LlmSignatureNodeSlice &
+  EvaluatorNodeSlice;
 
 export const createEvaluationWizardSlicesStore: StateCreator<
   EvaluationWizardStore & EvaluationWizardSlicesUnion,
@@ -16,4 +22,5 @@ export const createEvaluationWizardSlicesStore: StateCreator<
 > = (...args) => ({
   ...createBaseNodeSlice(...args),
   ...createLlmSignatureNodeSlice(...args),
+  ...createEvaluatorNodeSlice(...args),
 });
