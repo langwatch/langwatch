@@ -68,8 +68,8 @@ def set_dspy_cache_dir(cache_dir: str, limit_size=1e9):  # 1 GB
 
     litellm.cache = Cache(disk_cache_dir=cache_dir, type=LiteLLMCacheType.DISK)
 
-    if litellm.cache.cache.disk_cache.size_limit != limit_size:
-        litellm.cache.cache.disk_cache.reset("size_limit", limit_size)
+    if litellm.cache.cache.disk_cache.size_limit != limit_size:  # type: ignore
+        litellm.cache.cache.disk_cache.reset("size_limit", limit_size)  # type: ignore
 
 
 def print_ast(node):

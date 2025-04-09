@@ -9,7 +9,8 @@ from langwatch_nlp.studio.dspy.evaluation import (
 from langwatch_nlp.studio.dspy.predict_with_metadata import (
     PredictionWithMetadata,
 )
-from langwatch_nlp.studio.parser import autoparse_fields, parse_component
+from langwatch_nlp.studio.field_parser import autoparse_fields
+from langwatch_nlp.studio.parser import parse_component
 from langwatch_nlp.studio.types.dsl import Workflow, Node
 from langwatch_nlp.studio.dspy.reporting_module import ReportingModule
 import dspy

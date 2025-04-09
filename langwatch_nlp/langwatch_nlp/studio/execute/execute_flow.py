@@ -2,6 +2,7 @@ import time
 from typing import Dict, Set, cast
 from contextlib import contextmanager
 
+import asyncer
 import langwatch
 import sentry_sdk
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
@@ -101,7 +102,7 @@ async def execute_flow(
                 )
 
             try:
-                result = await asyncify(module)(**entries[0])
+                result = await asyncify(module)(**entries[0])  # type: ignore
 
             except Exception as e:
                 import traceback
@@ -122,7 +123,7 @@ async def execute_flow(
         yield end_workflow_event(workflow, trace_id, result)
     finally:
         if trace:
-            await asyncify(trace.send_spans)()
+            await asyncer.asyncify(trace.send_spans)()
 
 
 def start_workflow_event(workflow: Workflow, trace_id: str):
