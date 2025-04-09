@@ -1,4 +1,8 @@
-import { PrismaClient, type Dataset, type DatasetRecord } from "@prisma/client";
+import {
+  type PrismaClient,
+  type Dataset,
+  type DatasetRecord,
+} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -85,7 +89,7 @@ export const datasetRecordRouter = createTRPCRouter({
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
-    .query(async ({ input, ctx }) => {
+    .query(async ({ input }) => {
       return getFullDataset({
         datasetId: input.datasetId,
         projectId: input.projectId,
