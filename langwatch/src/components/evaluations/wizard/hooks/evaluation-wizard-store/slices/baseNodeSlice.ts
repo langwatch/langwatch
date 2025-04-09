@@ -1,10 +1,10 @@
-import { type Node } from "@xyflow/react";
+import { type Edge, type Node } from "@xyflow/react";
 import { type StateCreator } from "zustand";
 import type {
   Component,
   Field,
 } from "../../../../../../optimization_studio/types/dsl";
-import { calculateNodePosition, updateNodeParameter } from "./utils/nodeUtils";
+import { calculateNodePosition, updateNodeParameter } from "./utils/node.util";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import type { NodeWithOptionalPosition } from "./types";
 
@@ -19,7 +19,16 @@ export interface BaseNodeSlice {
   createNewNode: <T extends Component>(
     node: NodeWithOptionalPosition<T>
   ) => Node<T>;
-  addNodeToWorkflow: <T extends Component>(node: Node<T>) => string;
+  /**
+   * Adds a new node the workflow. Optionally pass in new edges as well
+   * @param node - The node to add
+   * @param newEdges (optional) - The edges to add to the new node
+   * @returns The id of the new node
+   */
+  addNodeToWorkflow: <T extends Component>(
+    node: Node<T>,
+    newEdges?: Edge[]
+  ) => string;
   getNodesByType: <T extends Component>(type: string) => Node<T>[];
   updateNode: (
     nodeId: string,
@@ -68,11 +77,15 @@ export const createBaseNodeSlice: StateCreator<
     };
   };
 
-  const addNodeToWorkflow = (node: Node<Component>): string => {
+  const addNodeToWorkflow = (
+    node: Node<Component>,
+    newEdges?: Edge[]
+  ): string => {
     get().workflowStore.setWorkflow((current) => {
       return {
         ...current,
         nodes: [...current.nodes, node],
+        edges: newEdges ? [...current.edges, ...newEdges] : current.edges,
       };
     });
     return node.id;

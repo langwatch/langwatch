@@ -1,4 +1,4 @@
-import { type Node } from "@xyflow/react";
+import { type Edge, type Node } from "@xyflow/react";
 import { type StateCreator } from "zustand";
 import type {
   LLMConfig,
@@ -6,6 +6,8 @@ import type {
 } from "../../../../../../optimization_studio/types/dsl";
 import type { BaseNodeSlice } from "./baseNodeSlice";
 import { LlmSignatureNodeFactory } from "./factories/llm-signature-node.factory";
+import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
+import { createDefaultEdge } from "./utils/edge.util";
 
 export interface LlmSignatureNodeSlice {
   createNewLlmSignatureNode: () => Node<Signature>;
@@ -18,24 +20,27 @@ export interface LlmSignatureNodeSlice {
 }
 
 export const createLlmSignatureNodeSlice: StateCreator<
-  BaseNodeSlice & LlmSignatureNodeSlice,
+  BaseNodeSlice & LlmSignatureNodeSlice & { workflowStore: WorkflowStore },
   [],
   [],
   LlmSignatureNodeSlice
 > = (set, get) => {
+  const getEntryNodeId = () => get().getNodesByType("entry")[0]?.id;
+
   return {
     createNewLlmSignatureNode: (): Node<Signature> =>
       get().createNewNode(LlmSignatureNodeFactory.build()),
 
-    addNewSignatureNodeToWorkflow: (): string =>
-      get().addNodeToWorkflow(get().createNewLlmSignatureNode()),
+    addNewSignatureNodeToWorkflow: (): string => {
+      const node = get().createNewLlmSignatureNode();
+      const entryNodeId = getEntryNodeId();
+      const newEdges: Edge[] = entryNodeId
+        ? [createDefaultEdge(entryNodeId, node.id)]
+        : [];
+      const nodeId = get().addNodeToWorkflow(node, newEdges);
+      return nodeId;
+    },
 
-    /**
-     * Notes:
-     * - This is a specialized function to get the first signature node in the workflow
-     * - If no signature node exists, it creates a new one and adds it to the workflow
-     * - It is used by the LlmPromptPropertiesStepAccordion component
-     */
     getOrCreateSignatureNode: (): Node<Signature> => {
       const signatureNodes = get().getNodesByType("signature");
 
@@ -47,11 +52,6 @@ export const createLlmSignatureNodeSlice: StateCreator<
       return get().getNodeById(nodeId)!;
     },
 
-    /**
-     * Notes:
-     * - This is a specialized function to update the LLM config value for the signature node
-     * - It is used by the LlmPromptPropertiesStepAccordion component
-     */
     updateSignatureNodeLLMConfigValue: (
       nodeId: string,
       llmConfig: LLMConfig
