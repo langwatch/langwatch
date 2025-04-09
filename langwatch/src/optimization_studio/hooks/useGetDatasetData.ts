@@ -45,9 +45,11 @@ export const useGetDatasetData = ({
       },
     }
   );
-  const databaseDataset_ = databaseDataset.data?.dataset
-    ? datasetDatabaseRecordsToInMemoryDataset(databaseDataset.data.dataset)
-    : undefined;
+  const databaseDataset_ =
+    databaseDataset.data?.dataset &&
+    "datasetRecords" in databaseDataset.data.dataset
+      ? datasetDatabaseRecordsToInMemoryDataset(databaseDataset.data.dataset)
+      : undefined;
 
   const data:
     | { records: DatasetRecordEntry[]; columnTypes: DatasetColumns }
