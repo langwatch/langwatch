@@ -57,16 +57,22 @@ export const esClient = async (
       const organization = await prisma.organization.findUnique({
         where: { id: args.organizationId },
       });
-      orgElasticsearchNodeUrl = decrypt(
-        organization?.elasticsearchNodeUrl ?? ""
-      );
-      orgElasticsearchApiKey = decrypt(organization?.elasticsearchApiKey ?? "");
+      orgElasticsearchNodeUrl = organization?.elasticsearchNodeUrl
+        ? decrypt(organization.elasticsearchNodeUrl)
+        : null;
+      orgElasticsearchApiKey = organization?.elasticsearchApiKey
+        ? decrypt(organization.elasticsearchApiKey)
+        : null;
     } else if ("projectId" in args) {
       const project = await getOrgElasticsearchDetailsFromProject(
         args.projectId
       );
-      orgElasticsearchNodeUrl = decrypt(project?.elasticsearchNodeUrl ?? "");
-      orgElasticsearchApiKey = decrypt(project?.elasticsearchApiKey ?? "");
+      orgElasticsearchNodeUrl = project?.elasticsearchNodeUrl
+        ? decrypt(project.elasticsearchNodeUrl)
+        : null;
+      orgElasticsearchApiKey = project?.elasticsearchApiKey
+        ? decrypt(project.elasticsearchApiKey)
+        : null;
     }
 
     // Use org settings if available, otherwise fall back to env vars
