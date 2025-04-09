@@ -78,7 +78,7 @@ export const createBaseNodeSlice: StateCreator<
       return {
         ...current,
         nodes: [...current.nodes, node],
-        edges: [...current.edges, ...newEdges],
+        edges: newEdges,
       };
     });
     return node.id;
