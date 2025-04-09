@@ -78,8 +78,6 @@ export class StorageService {
     } else {
       const { s3Client, s3Bucket } = await createS3Client(projectId);
 
-      console.log("s3Bucket", s3Bucket);
-
       try {
         const { Body } = await s3Client.send(
           new GetObjectCommand({
