@@ -18,49 +18,49 @@ export interface LlmSignatureNodeSlice {
 }
 
 export const createLlmSignatureNodeSlice: StateCreator<
-  BaseNodeSlice,
+  BaseNodeSlice & LlmSignatureNodeSlice,
   [],
   [],
   LlmSignatureNodeSlice
 > = (set, get) => {
-  const getAllSignatureNodes = (): Node<Signature>[] =>
-    get().getNodesByType("signature");
-
-  const createNewLlmSignatureNode = (): Node<Signature> =>
-    get().createNewNode(LlmSignatureNodeFactory.build());
-
-  const addNewSignatureNodeToWorkflow = (): string =>
-    get().addNodeToWorkflow(createNewLlmSignatureNode());
-
-  const getOrCreateSignatureNode = (): Node<Signature> => {
-    const signatureNodes = getAllSignatureNodes();
-
-    if (signatureNodes.length > 0) {
-      return signatureNodes[0]!;
-    }
-
-    const nodeId = addNewSignatureNodeToWorkflow();
-    return get().getNodeById(nodeId)!;
-  };
-
-  /**
-   * Specialized function to update the LLM config value for the signature node
-   */
-  const updateSignatureNodeLLMConfigValue = (
-    nodeId: string,
-    llmConfig: LLMConfig
-  ) => {
-    get().setNodeParameter(nodeId, {
-      identifier: "llm",
-      type: "llm",
-      value: llmConfig,
-    });
-  };
-
   return {
-    createNewLlmSignatureNode,
-    addNewSignatureNodeToWorkflow,
-    getOrCreateSignatureNode,
-    updateSignatureNodeLLMConfigValue,
+    createNewLlmSignatureNode: (): Node<Signature> =>
+      get().createNewNode(LlmSignatureNodeFactory.build()),
+
+    addNewSignatureNodeToWorkflow: (): string =>
+      get().addNodeToWorkflow(get().createNewLlmSignatureNode()),
+
+    /**
+     * Notes:
+     * - This is a specialized function to get the first signature node in the workflow
+     * - If no signature node exists, it creates a new one and adds it to the workflow
+     * - It is used by the LlmPromptPropertiesStepAccordion component
+     */
+    getOrCreateSignatureNode: (): Node<Signature> => {
+      const signatureNodes = get().getNodesByType("signature");
+
+      if (signatureNodes.length > 0) {
+        return signatureNodes[0]!;
+      }
+
+      const nodeId = get().addNewSignatureNodeToWorkflow();
+      return get().getNodeById(nodeId)!;
+    },
+
+    /**
+     * Notes:
+     * - This is a specialized function to update the LLM config value for the signature node
+     * - It is used by the LlmPromptPropertiesStepAccordion component
+     */
+    updateSignatureNodeLLMConfigValue: (
+      nodeId: string,
+      llmConfig: LLMConfig
+    ) => {
+      get().setNodeParameter(nodeId, {
+        identifier: "llm",
+        type: "llm",
+        value: llmConfig,
+      });
+    },
   };
 };

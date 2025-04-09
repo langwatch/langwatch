@@ -22,12 +22,10 @@ export function LlmPromptPropertiesStepAccordion() {
   } = useEvaluationWizardStore(
     useShallow(
       ({
-        workflowStore,
         updateSignatureNodeLLMConfigValue,
         setNodeParameter,
         getOrCreateSignatureNode,
       }) => ({
-        workflowStore,
         updateSignatureNodeLLMConfigValue,
         getOrCreateSignatureNode,
         setNodeParameter,

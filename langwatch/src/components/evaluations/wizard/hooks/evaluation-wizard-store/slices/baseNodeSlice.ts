@@ -4,7 +4,6 @@ import type {
   Component,
   Field,
 } from "../../../../../../optimization_studio/types/dsl";
-import { createFieldMappingEdges } from "../../../../utils/field-mapping";
 import { calculateNodePosition, updateNodeParameter } from "./utils/nodeUtils";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import type { NodeWithOptionalPosition } from "./types";
