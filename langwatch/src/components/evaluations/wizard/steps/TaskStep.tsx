@@ -5,7 +5,7 @@ import {
   TASK_TYPES,
   useEvaluationWizardStore,
   type State,
-} from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
+} from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { ColorfulBlockIcon } from "../../../../optimization_studio/components/ColorfulBlockIcons";
 import { StepButton } from "../components/StepButton";
 

@@ -1,6 +1,6 @@
 import { Textarea, VStack } from "@chakra-ui/react";
 import { useShallow } from "zustand/react/shallow";
-import { useEvaluationWizardStore } from "../../../hooks/useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { LLMConfigField } from "~/optimization_studio/components/properties/modals/llm-config/LLMConfigField";
 import { useCallback, useMemo } from "react";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
@@ -16,10 +16,9 @@ export const LLM_PROMPT_PROPERTIES_STEP_ACCORDION_VALUE = "offline_prompt";
  */
 export function LlmPromptPropertiesStepAccordion() {
   const {
-    addSignatureNode,
-    getSignatureNodes,
     updateSignatureNodeLLMConfigValue,
     setNodeParameter,
+    getOrCreateSignatureNode,
   } = useEvaluationWizardStore(
     useShallow(
       ({
@@ -28,11 +27,13 @@ export function LlmPromptPropertiesStepAccordion() {
         getSignatureNodes,
         updateSignatureNodeLLMConfigValue,
         setNodeParameter,
+        getOrCreateSignatureNode,
       }) => ({
         workflowStore,
         addSignatureNode,
         getSignatureNodes,
         updateSignatureNodeLLMConfigValue,
+        getOrCreateSignatureNode,
         setNodeParameter,
       })
     )
@@ -43,17 +44,7 @@ export function LlmPromptPropertiesStepAccordion() {
    * This will run on every render to keep the signature node up to date
    * since we don't currently have a way to trigger on workflow changes
    */
-  const signatureNode = (() => {
-    const signatureNodes = getSignatureNodes();
-
-    if (signatureNodes.length > 0) {
-      return signatureNodes[0];
-    }
-
-    addSignatureNode();
-
-    return getSignatureNodes()[0];
-  })();
+  const signatureNode = getOrCreateSignatureNode();
 
   const updateLLMConfig = useCallback(
     (llmConfig: LLMConfig) => {

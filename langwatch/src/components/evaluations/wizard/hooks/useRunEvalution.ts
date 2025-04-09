@@ -1,5 +1,5 @@
 import { useStepCompletedValue } from "./useStepCompletedValue";
-import { useEvaluationWizardStore } from "./useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "./evaluation-wizard-store/useEvaluationWizardStore";
 import { toaster } from "../../../../components/ui/toaster";
 import type { StudioClientEvent } from "../../../../optimization_studio/types/events";
 import { useCallback } from "react";

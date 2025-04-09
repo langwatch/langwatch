@@ -6,7 +6,7 @@ import type {
   StudioClientEvent,
   StudioServerEvent,
 } from "../../../../optimization_studio/types/events";
-import { useEvaluationWizardStore } from "./useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "./evaluation-wizard-store/useEvaluationWizardStore";
 import { getDebugger } from "../../../../utils/logger";
 
 const DEBUGGING_ENABLED = true;

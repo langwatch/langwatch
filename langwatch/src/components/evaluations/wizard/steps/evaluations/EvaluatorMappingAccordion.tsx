@@ -1,7 +1,7 @@
 import { Field, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 import type { Entry } from "../../../../../optimization_studio/types/dsl";
 import { EvaluatorTracesMapping } from "../../../EvaluatorTracesMapping";

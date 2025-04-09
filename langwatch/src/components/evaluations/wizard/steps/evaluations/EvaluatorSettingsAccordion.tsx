@@ -2,7 +2,7 @@ import { VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { z } from "zod";
-import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 import { evaluatorsSchema } from "../../../../../server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "../../../../../server/evaluations/getEvaluator";

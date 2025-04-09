@@ -12,7 +12,7 @@ import { LuCircleAlert, LuCircleCheck, LuCirclePlay } from "react-icons/lu";
 import {
   useEvaluationWizardStore,
   type Step,
-} from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
+} from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { FullWidthFormControl } from "../../../FullWidthFormControl";
 import { useRunEvalution } from "../hooks/useRunEvalution";
 import { useStepCompletedValue } from "../hooks/useStepCompletedValue";

@@ -32,7 +32,7 @@ import { StepRadio } from "../../components/StepButton";
 import {
   EXECUTION_METHODS,
   useEvaluationWizardStore,
-} from "../../hooks/useEvaluationWizardStore";
+} from "../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useAnimatedFocusElementById } from "../../../../../hooks/useAnimatedFocusElementById";
 
 export function RealTimeExecutionStep() {

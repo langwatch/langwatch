@@ -1,5 +1,5 @@
 import { Grid, RadioCard } from "@chakra-ui/react";
-import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useAnimatedFocusElementById } from "../../../../../hooks/useAnimatedFocusElementById";
 import { StepAccordion } from "../../components/StepAccordion";
 import { StepRadio } from "../../components/StepButton";

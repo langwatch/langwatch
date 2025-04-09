@@ -19,7 +19,7 @@ import {
   DATA_SOURCE_TYPES,
   useEvaluationWizardStore,
   type State,
-} from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
+} from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { StepRadio } from "../components/StepButton";

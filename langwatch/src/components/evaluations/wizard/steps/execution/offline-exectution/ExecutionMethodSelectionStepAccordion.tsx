@@ -14,7 +14,7 @@ import {
   EXECUTION_METHODS,
   type OfflineExecutionMethod,
   useEvaluationWizardStore,
-} from "../../../hooks/useEvaluationWizardStore";
+} from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useAnimatedFocusElementById } from "../../../../../../hooks/useAnimatedFocusElementById";
 
 export const EXECUTION_METHOD_SELECTOR_STEP_ACCORDION_VALUE =
