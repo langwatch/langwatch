@@ -249,10 +249,6 @@ export const organizationRouter = createTRPCRouter({
           organization.s3AccessKeyId = decrypt(organization.s3AccessKeyId);
         }
         if (organization.s3SecretAccessKey) {
-          console.log(
-            "organization.s3SecretAccessKey",
-            organization.s3SecretAccessKey
-          );
           organization.s3SecretAccessKey = decrypt(
             organization.s3SecretAccessKey
           );
