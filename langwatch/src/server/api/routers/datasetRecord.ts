@@ -15,7 +15,7 @@ import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 import { StorageService } from "../../storage";
-
+import * as Sentry from "@sentry/nextjs";
 const storageService = new StorageService();
 
 export const datasetRecordRouter = createTRPCRouter({
@@ -214,6 +214,7 @@ const deleteManyDatasetRecords = async ({
           message: "No records found to delete",
         });
       }
+      Sentry.captureException(error);
       throw error;
     }
 
@@ -405,9 +406,9 @@ export const createManyDatasetRecords = async ({
       existingRecords = fetchedRecords;
     } catch (error) {
       if ((error as any).name !== "NoSuchKey") {
+        Sentry.captureException(error);
         throw error;
       }
-      // If the key doesn't exist, we'll initialize with an empty array
     }
 
     // Combine existing and new records
@@ -511,6 +512,7 @@ export const getFullDataset = async ({
         truncated,
       };
     } catch (error) {
+      Sentry.captureException(error);
       throw error;
     }
   } else {
