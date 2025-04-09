@@ -22,9 +22,9 @@ export interface BaseNodeSlice {
   ) => Node<T>;
   addNodeToWorkflow: <T extends Component>(node: Node<T>) => string;
   getNodesByType: <T extends Component>(type: string) => Node<T>[];
-  updateNode: <T extends Component>(
+  updateNode: (
     nodeId: string,
-    updater: (node: Node<T>) => Node<T>
+    updater: (node: Node<Component>) => Node<Component>
   ) => void;
   setNodeParameter: (
     nodeId: string,
@@ -86,7 +86,7 @@ export const createBaseNodeSlice: StateCreator<
       return {
         ...current,
         nodes: current.nodes.map((node) =>
-          node.id === nodeId ? updater(node as Node<T>) : node
+          node.id === nodeId ? updater(node) : node
         ),
       };
     });
