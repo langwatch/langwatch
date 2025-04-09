@@ -2,13 +2,7 @@ import { type Node } from "@xyflow/react";
 import { type StateCreator } from "zustand";
 import type { Signature } from "../../../../../../optimization_studio/types/dsl";
 import type { BaseNodeSlice } from "./baseNodeSlice";
-
-const createSignatureData = (): Signature => ({
-  name: "New Signature",
-  parameters: [],
-  inputs: [],
-  outputs: [],
-});
+import { LlmSignatureNodeFactory } from "./factories/llm-signature-node.factory";
 
 export interface LlmSignatureNodeSlice {
   createNewLlmSignatureNode: () => Node<Signature>;
@@ -26,7 +20,7 @@ export const createLlmSignatureNodeSlice: StateCreator<
     get().getNodesByType("signature");
 
   const createNewLlmSignatureNode = (): Node<Signature> =>
-    get().createNewNode("signature", createSignatureData());
+    get().createNewNode(LlmSignatureNodeFactory.build());
 
   const addNewSignatureNodeToWorkflow = (): string =>
     get().addNodeToWorkflow(createNewLlmSignatureNode());

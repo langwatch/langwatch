@@ -1,6 +1,5 @@
 import { AVAILABLE_EVALUATORS } from "../server/evaluations/evaluators.generated";
 import {
-  type BaseComponent,
   type Code,
   type Evaluator,
   type Field,

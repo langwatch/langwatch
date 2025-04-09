@@ -1,14 +1,22 @@
-import { type Node, type Edge } from "@xyflow/react";
+import { type Node } from "@xyflow/react";
 import { type StateCreator } from "zustand";
 import type { Component } from "../../../../../../optimization_studio/types/dsl";
 import { createFieldMappingEdges } from "../../../../utils/field-mapping";
-import { calculateNodePosition, createBaseNode } from "./utils/nodeUtils";
+import { calculateNodePosition } from "./utils/nodeUtils";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
+import type { NodeWithOptionalPosition } from "./types";
 
 export interface BaseNodeSlice {
   getLastNode: <T extends Component>() => Node<T> | undefined;
   getNodeById: <T extends Component>(nodeId: string) => Node<T> | undefined;
-  createNewNode: <T extends Component>(type: string, data: T) => Node<T>;
+  /**
+   * Create a new node with an optional position
+   *
+   * If position is not provided, it will be calculated based on the last node
+   */
+  createNewNode: <T extends Component>(
+    node: NodeWithOptionalPosition<T>
+  ) => Node<T>;
   addNodeToWorkflow: <T extends Component>(node: Node<T>) => string;
   getNodesByType: <T extends Component>(type: string) => Node<T>[];
 }
@@ -35,12 +43,21 @@ export const createBaseNodeSlice: StateCreator<
     ) as Node<T>[];
   };
 
-  const createNewNode = <T extends Component>(type: string, data: T) => {
-    const position = calculateNodePosition(getLastNode<T>());
-    return createBaseNode(type, data, position);
+  const createNewNode = <T extends Component>(
+    node: NodeWithOptionalPosition<T>
+  ) => {
+    console.log("createNewNode", node);
+    const lastNode = getLastNode<T>();
+    console.log("lastNode", lastNode);
+    const position = node.position ?? calculateNodePosition(lastNode);
+    return {
+      ...node,
+      position,
+    };
   };
 
   const addNodeToWorkflow = (node: Node<Component>): string => {
+    console.log("addNodeToWorkflow", node);
     get().workflowStore.setWorkflow((current) => {
       const newEdges = createFieldMappingEdges(current, node);
       return {

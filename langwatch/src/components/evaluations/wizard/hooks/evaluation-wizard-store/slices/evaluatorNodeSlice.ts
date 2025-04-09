@@ -3,12 +3,16 @@ import { type StateCreator } from "zustand";
 import type { Evaluator } from "../../../../../../optimization_studio/types/dsl";
 import type { BaseNodeSlice } from "./baseNodeSlice";
 
-const createEvaluatorData = (): Evaluator => ({
-  name: "New Evaluator",
-  parameters: [],
-  inputs: [],
-  outputs: [],
-  cls: "evaluator",
+const createEvaluatorData = (): Omit<Node<Evaluator>, "position"> => ({
+  id: "evaluator_node",
+  type: "evaluator",
+  data: {
+    name: "New Evaluator",
+    cls: "evaluator",
+    parameters: [],
+    inputs: [],
+    outputs: [],
+  },
 });
 
 export interface EvaluatorNodeSlice {
@@ -23,7 +27,7 @@ export const createEvaluatorNodeSlice: StateCreator<
   EvaluatorNodeSlice
 > = (set, get) => {
   const createNewEvaluatorNode = (): Node<Evaluator> =>
-    get().createNewNode("evaluator", createEvaluatorData());
+    get().createNewNode(createEvaluatorData());
 
   const addNewEvaluatorNodeToWorkflow = (): string =>
     get().addNodeToWorkflow(createNewEvaluatorNode());

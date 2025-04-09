@@ -24,7 +24,6 @@ import { buildEvaluatorFromType } from "../../../../../optimization_studio/utils
 import type { DatasetColumns } from "../../../../../server/datasets/types";
 import { mappingStateSchema } from "../../../../../server/tracer/tracesMapping";
 import { checkPreconditionsSchema } from "../../../../../server/evaluations/types.generated";
-import { DEFAULT_SIGNATURE_NODE_PROPERTIES } from "../constants/llm-signature";
 import {
   createFieldMappingEdges,
   connectEvaluatorFields,
@@ -538,12 +537,12 @@ const store = (
         );
 
       const signatureNode = {
-        ...DEFAULT_SIGNATURE_NODE_PROPERTIES,
+        // ...DEFAULT_SIGNATURE_NODE_PROPERTIES,
         position: nodePosition,
         ...node,
       };
 
-      addNode(signatureNode);
+      addNode(signatureNode as Node<Signature>);
 
       // Find the entry node for the dataset
       const entryNode = findNodeByType("entry");
@@ -560,7 +559,7 @@ const store = (
 
       const edges = createNewEdgesForNewNode(
         get().workflowStore.getWorkflow(),
-        signatureNode
+        signatureNode as Node<Signature>
       );
 
       // Add edges connecting entry node input to signature node input
