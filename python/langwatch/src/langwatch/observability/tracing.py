@@ -8,10 +8,10 @@ import httpx
 import threading
 from deprecated import deprecated
 from langwatch.attributes import AttributeName
-from langwatch.utils.transformation import convert_typed_values
+from langwatch.utils.transformation import SerializableWithStringFallback, convert_typed_values
 from opentelemetry import trace as trace_api
 from opentelemetry.sdk.trace import TracerProvider
-from typing import Dict, List, Optional, Callable, Any, TypeVar, Union
+from typing import Dict, List, Optional, Callable, Any, Type, TypeVar, Union, cast
 from warnings import warn
 import inspect
 
@@ -64,6 +64,7 @@ class LangWatchTrace:
 
     _root_span_params: Optional[Dict[str, Any]] = None
     root_span: Optional[LangWatchSpan] = None
+    span: Optional[LangWatchSpan] = None
 
     def __init__(
         self,
@@ -101,7 +102,12 @@ class LangWatchTrace:
         self._lock = threading.Lock()
         self._expected_output = expected_output
         self._cleaned_up = False
+        self.span = cast(
+            Type[LangWatchSpan], lambda **kwargs: LangWatchSpan(trace=self, **kwargs)
+        )
 
+        if metadata is None:
+            metadata = {}
         if trace_id is not None:
             warn("trace_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `trace_id` will be mapped to `deprecated.trace_id` in the trace's metadata.")
             metadata["deprecated.trace_id"] = trace_id
@@ -288,6 +294,8 @@ class LangWatchTrace:
     ) -> None:
         ensure_setup()
 
+        if metadata is None:
+            metadata = {}
         if trace_id is not None:
             metadata[AttributeName.DeprecatedTraceId] = trace_id
         if expected_output is not None:
@@ -295,7 +303,10 @@ class LangWatchTrace:
         if disable_sending is not None:
             get_instance().disable_sending = disable_sending
 
-        self.root_span.set_attributes(metadata)
+        self.root_span.set_attributes({
+            "metadata": json.dumps(metadata, cls=SerializableWithStringFallback),
+        })
+
         self.root_span.update(
             name=name,
             type=type,
@@ -369,6 +380,10 @@ class LangWatchTrace:
         self._context_token = stored_langwatch_trace.set(self)
         self._create_root_span().__enter__()
 
+        self.span = cast(
+            Type[LangWatchSpan], lambda **kwargs: LangWatchSpan(trace=self, **kwargs)
+        )
+
         return self
 
     def __exit__(self, exc_type: Optional[type], exc_value: Optional[BaseException], traceback: Any) -> bool:
@@ -385,6 +400,11 @@ class LangWatchTrace:
         self._context_token = stored_langwatch_trace.set(self)
         await self._create_root_span_async()
         await self.root_span.__aenter__()
+
+        self.span = cast(
+            Type[LangWatchSpan], lambda **kwargs: LangWatchSpan(trace=self, **kwargs)
+        )
+
         return self
 
     async def __aexit__(self, exc_type: Optional[type], exc_value: Optional[BaseException], traceback: Any) -> bool:
@@ -407,11 +427,6 @@ class LangWatchTrace:
     def _set_callee_input_information(self, func: Callable[..., Any], *args: Any, **kwargs: Any):
         """Set the name and input of the trace based on the callee function and arguments."""
 
-        if self.root_span.name is None:
-            self.root_span.update_name(func.__name__)
-        if self.root_span.capture_input is False or self.root_span.input is not None:
-            return
-        
         sig = inspect.signature(func)
         parameters = list(sig.parameters.values())
 
@@ -432,6 +447,13 @@ class LangWatchTrace:
                 except:
                     pass
             del all_args["self"]
+
+        # Fallback to only the function name if no name is set
+        if self.root_span.name is None:
+            self.root_span.update_name(func.__name__)
+
+        if self.root_span.capture_input is False or self.root_span.input is not None:
+            return
 
         if kwargs and len(kwargs) > 0:
             if kwargs:
