@@ -1,9 +1,10 @@
 import { Grid, RadioCard } from "@chakra-ui/react";
-import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useAnimatedFocusElementById } from "../../../../../hooks/useAnimatedFocusElementById";
 import { StepAccordion } from "../../components/StepAccordion";
 import { StepRadio } from "../../components/StepButton";
 import { evaluatorCategories } from "./CategorySelectionAccordion";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 
 export const EvaluatorSelectionAccordion = ({
   setAccordeonValue,
@@ -15,7 +16,8 @@ export const EvaluatorSelectionAccordion = ({
 
   const focusElementById = useAnimatedFocusElementById();
 
-  const handleEvaluatorSelect = (evaluatorType: string) => {
+  const handleEvaluatorSelect = (evaluatorType: EvaluatorTypes) => {
+    // This initializes the evaluator node without any properties
     setFirstEvaluator({
       evaluator: evaluatorType,
     });
@@ -46,7 +48,7 @@ export const EvaluatorSelectionAccordion = ({
         variant="outline"
         colorPalette="green"
         value={getFirstEvaluatorNode()?.data.evaluator}
-        onValueChange={(e: { value: string }) => {
+        onValueChange={(e: { value: EvaluatorTypes }) => {
           handleEvaluatorSelect(e.value);
         }}
         paddingTop={2}

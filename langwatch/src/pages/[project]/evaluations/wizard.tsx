@@ -8,7 +8,7 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 import { api } from "../../../utils/api";
 import { isNotFound } from "../../../utils/trpcError";
 import ErrorPage from "next/error";
-import { useEvaluationWizardStore } from "../../../components/evaluations/wizard/hooks/useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "../../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useShallow } from "zustand/react/shallow";
 import { LoadingScreen } from "../../../components/LoadingScreen";
 import useAutosaveWizard from "../../../components/evaluations/wizard/hooks/useAutosaveWizard";

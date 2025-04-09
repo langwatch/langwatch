@@ -12,7 +12,7 @@ import { z } from "zod";
 import {
   wizardStateSchema,
   type WizardState,
-} from "../../../components/evaluations/wizard/hooks/useEvaluationWizardStore";
+} from "../../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import {
   workflowJsonSchema,
   type Entry,

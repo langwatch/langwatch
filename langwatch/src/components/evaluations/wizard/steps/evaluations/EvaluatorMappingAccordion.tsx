@@ -1,11 +1,8 @@
 import { Field, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
-import {
-  AVAILABLE_EVALUATORS,
-  type Evaluators,
-} from "~/server/evaluations/evaluators.generated";
+import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 import type { Entry } from "../../../../../optimization_studio/types/dsl";
 import { EvaluatorTracesMapping } from "../../../EvaluatorTracesMapping";
 import { StepAccordion } from "../../components/StepAccordion";
@@ -52,7 +49,7 @@ export const EvaluatorMappingAccordion = () => {
   const evaluatorType = evaluator?.data.evaluator;
   const evaluatorDefinition = useMemo(() => {
     return evaluatorType && evaluatorType in AVAILABLE_EVALUATORS
-      ? AVAILABLE_EVALUATORS[evaluatorType as keyof Evaluators]
+      ? AVAILABLE_EVALUATORS[evaluatorType]
       : undefined;
   }, [evaluatorType]);
 
@@ -114,6 +111,15 @@ export const EvaluatorMappingAccordion = () => {
                           sourceOptions,
                           targetId: evaluator?.id ?? "",
                           targetEdges: evaluatorEdges ?? [],
+                          /**
+                           * This was confusing for me when I first saw it,
+                           * but basically it's just setting a callback to update the evaluator edges
+                           * whenever the dsl edges change.
+                           *
+                           * However, if there are no edges, it will use defaults hidden in the logic:
+                           * The defaults will come from the dataset inferred mappings,
+                           * which is what we want for realtime evals, but not for offline evals
+                           */
                           setTargetEdges: (mapping) => {
                             setFirstEvaluatorEdges(mapping);
                           },

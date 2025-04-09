@@ -20,7 +20,7 @@ import { useShallow } from "zustand/react/shallow";
 import {
   STEPS,
   useEvaluationWizardStore,
-} from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
+} from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { LogoIcon } from "../../icons/LogoIcon";
 import { Dialog } from "../../ui/dialog";

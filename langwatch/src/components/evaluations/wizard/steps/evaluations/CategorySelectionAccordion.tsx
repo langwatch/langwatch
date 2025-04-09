@@ -9,7 +9,7 @@ import {
 import {
   useEvaluationWizardStore,
   type EvaluatorCategory as EvaluationCategory,
-} from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
+} from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { AVAILABLE_EVALUATORS } from "../../../../../server/evaluations/evaluators.generated";
 import { Tooltip } from "../../../../ui/tooltip";
 import { StepAccordion } from "../../components/StepAccordion";

@@ -27,7 +27,7 @@ import {
 } from "react-icons/lu";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { MonitorsSection } from "../../components/evaluations/MonitorsSection";
-import type { TASK_TYPES } from "../../components/evaluations/wizard/hooks/useEvaluationWizardStore";
+import type { TASK_TYPES } from "../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import {
   formatEvaluationSummary,
   getFinishedAt,

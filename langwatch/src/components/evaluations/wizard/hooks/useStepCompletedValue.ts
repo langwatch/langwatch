@@ -1,9 +1,12 @@
-import { EXECUTION_METHODS, STEPS } from "./useEvaluationWizardStore";
-import { TASK_TYPES } from "./useEvaluationWizardStore";
-import type { Step } from "./useEvaluationWizardStore";
+import {
+  EXECUTION_METHODS,
+  STEPS,
+} from "./evaluation-wizard-store/useEvaluationWizardStore";
+import { TASK_TYPES } from "./evaluation-wizard-store/useEvaluationWizardStore";
+import type { Step } from "./evaluation-wizard-store/useEvaluationWizardStore";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../../utils/api";
-import { useEvaluationWizardStore } from "./useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "./evaluation-wizard-store/useEvaluationWizardStore";
 
 export const useStepCompletedValue = () => {
   const { project } = useOrganizationTeamProject();
@@ -43,9 +46,7 @@ export const useStepCompletedValue = () => {
       case "dataset":
         return databaseDataset?.data?.name;
       case "execution":
-        return executionMethod
-          ? EXECUTION_METHODS[executionMethod]
-          : undefined;
+        return executionMethod ? EXECUTION_METHODS[executionMethod] : undefined;
       case "evaluation":
         return evaluator?.data?.name;
       case "results":

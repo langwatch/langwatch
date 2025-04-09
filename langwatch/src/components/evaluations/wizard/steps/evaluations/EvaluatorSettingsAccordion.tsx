@@ -1,13 +1,9 @@
-import { Accordion, HStack, Text, VStack } from "@chakra-ui/react";
-import { ChevronDown } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { VStack } from "@chakra-ui/react";
+import { useCallback, useEffect, useRef } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { z } from "zod";
-import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
-import {
-  AVAILABLE_EVALUATORS,
-  type Evaluators,
-} from "~/server/evaluations/evaluators.generated";
+import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 import { evaluatorsSchema } from "../../../../../server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "../../../../../server/evaluations/getEvaluator";
 import DynamicZodForm from "../../../../checks/DynamicZodForm";
@@ -23,7 +19,7 @@ export const EvaluatorSettingsAccordion = () => {
 
   const schema =
     evaluatorType && evaluatorType in AVAILABLE_EVALUATORS
-      ? evaluatorsSchema.shape[evaluatorType as keyof Evaluators].shape.settings
+      ? evaluatorsSchema.shape[evaluatorType].shape.settings
       : undefined;
 
   const hasEvaluatorFields =
@@ -45,9 +41,7 @@ export const EvaluatorSettingsAccordion = () => {
     Object.keys(settingsFromParameters).length > 0
       ? (settingsFromParameters as any)
       : evaluatorType
-      ? getEvaluatorDefaultSettings(
-          AVAILABLE_EVALUATORS[evaluatorType as keyof Evaluators]
-        )
+      ? getEvaluatorDefaultSettings(AVAILABLE_EVALUATORS[evaluatorType])
       : undefined;
 
   const form = useForm<{
@@ -73,6 +67,7 @@ export const EvaluatorSettingsAccordion = () => {
     (data: { settings?: Record<string, any> }) => {
       if (!evaluatorType) return;
 
+      // This updates the evaluator node with the settings
       setFirstEvaluator({
         evaluator: evaluatorType,
         parameters: Object.entries(data.settings ?? {}).map(
@@ -93,7 +88,7 @@ export const EvaluatorSettingsAccordion = () => {
   useEffect(() => {
     formRenderedFor.current = undefined;
     setTimeout(() => {
-      formRenderedFor.current = evaluatorType ?? '';
+      formRenderedFor.current = evaluatorType ?? "";
     }, 300);
   }, [evaluatorType]);
 
@@ -125,7 +120,7 @@ export const EvaluatorSettingsAccordion = () => {
           {hasEvaluatorFields && (
             <DynamicZodForm
               schema={schema}
-              evaluatorType={evaluatorType as keyof Evaluators}
+              evaluatorType={evaluatorType}
               prefix="settings"
               errors={form.formState.errors.settings}
               variant="default"

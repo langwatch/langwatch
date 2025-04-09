@@ -1,6 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { DatasetColumns } from "../../server/datasets/types";
 import { z } from "zod";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 
 export type Field = {
   identifier: string;
@@ -118,7 +119,7 @@ export type Entry = BaseComponent & {
 
 export type Evaluator = Omit<BaseComponent, "cls"> & {
   cls: string;
-  evaluator?: string;
+  evaluator?: EvaluatorTypes;
   workflowId?: string;
   data?: any;
 };

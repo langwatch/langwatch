@@ -6,7 +6,7 @@ import type {
   StudioClientEvent,
   StudioServerEvent,
 } from "../../../../optimization_studio/types/events";
-import { useEvaluationWizardStore } from "./useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "./evaluation-wizard-store/useEvaluationWizardStore";
 import { getDebugger } from "../../../../utils/logger";
 
 const DEBUGGING_ENABLED = true;
@@ -31,6 +31,19 @@ export const usePostEvent = () => {
 
   const [isLoading, setIsLoading] = useState(false);
 
+  const handleTimeout = useCallback(() => {
+    console.error("Timeout");
+    toaster.create({
+      title: "Timeout",
+      type: "error",
+      duration: 5000,
+      meta: {
+        closable: true,
+      },
+    });
+    setIsLoading(false);
+  }, []);
+
   const postEvent = useCallback(
     (event: StudioClientEvent) => {
       if (!project) {
@@ -41,15 +54,7 @@ export const usePostEvent = () => {
         let timeout: NodeJS.Timeout | undefined;
         try {
           timeout = setTimeout(() => {
-            console.error("Timeout");
-            toaster.create({
-              title: "Timeout",
-              type: "error",
-              duration: 5000,
-              meta: {
-                closable: true,
-              },
-            });
+            handleTimeout();
           }, 20_000);
 
           setIsLoading(true);

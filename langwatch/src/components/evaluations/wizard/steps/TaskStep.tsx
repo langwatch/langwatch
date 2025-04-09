@@ -5,14 +5,23 @@ import {
   TASK_TYPES,
   useEvaluationWizardStore,
   type State,
-} from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
+} from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { ColorfulBlockIcon } from "../../../../optimization_studio/components/ColorfulBlockIcons";
 import { StepButton } from "../components/StepButton";
 
 export function TaskStep() {
-  const { wizardState, setWizardState } = useEvaluationWizardStore();
+  const { wizardState, setWizardState, setDSL } = useEvaluationWizardStore();
 
   const handleTaskSelection = (task: State["wizardState"]["task"]) => {
+    if (task === wizardState.task) {
+      return;
+    } else {
+      // Reset the workflow
+      setDSL({
+        nodes: [],
+        edges: [],
+      });
+    }
     setWizardState({
       task,
     });

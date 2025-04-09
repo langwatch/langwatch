@@ -1,14 +1,14 @@
 import { type Edge, type Node } from "@xyflow/react";
 import { z } from "zod";
 import { create } from "zustand";
-import type { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import {
   initialState as initialWorkflowStore,
   type WorkflowStore,
   store as workflowStore,
   type State as WorkflowStoreState,
-} from "../../../../optimization_studio/hooks/useWorkflowStore";
-import { entryNode } from "../../../../optimization_studio/templates/blank";
+} from "../../../../../optimization_studio/hooks/useWorkflowStore";
+import { entryNode } from "../../../../../optimization_studio/templates/blank";
 import type {
   BaseComponent,
   Component,
@@ -16,15 +16,19 @@ import type {
   Field,
   Signature,
   Workflow,
-} from "../../../../optimization_studio/types/dsl";
+} from "../../../../../optimization_studio/types/dsl";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
-import { datasetColumnsToFields } from "../../../../optimization_studio/utils/datasetUtils";
-import { nameToId } from "../../../../optimization_studio/utils/nodeUtils";
-import { convertEvaluator } from "../../../../optimization_studio/utils/registryUtils";
-import type { DatasetColumns } from "../../../../server/datasets/types";
-import { mappingStateSchema } from "../../../../server/tracer/tracesMapping";
-import { checkPreconditionsSchema } from "../../../../server/evaluations/types.generated";
-import { DEFAULT_SIGNATURE_NODE_PROPERTIES } from "./constants/llm-signature";
+import { datasetColumnsToFields } from "../../../../../optimization_studio/utils/datasetUtils";
+import { nameToId } from "../../../../../optimization_studio/utils/nodeUtils";
+import { buildEvaluatorFromType } from "../../../../../optimization_studio/utils/registryUtils";
+import type { DatasetColumns } from "../../../../../server/datasets/types";
+import { mappingStateSchema } from "../../../../../server/tracer/tracesMapping";
+import { checkPreconditionsSchema } from "../../../../../server/evaluations/types.generated";
+import { DEFAULT_SIGNATURE_NODE_PROPERTIES } from "../constants/llm-signature";
+import {
+  createFieldMappingEdges,
+  connectEvaluatorFields,
+} from "../../../utils/field-mapping";
 
 export const EVALUATOR_CATEGORIES = [
   "expected_answer",
@@ -145,7 +149,7 @@ type EvaluationWizardStore = State & {
   setDatasetId: (datasetId: string, columnTypes: DatasetColumns) => void;
   getDatasetId: () => string | undefined;
   setFirstEvaluator: (
-    evaluator: Partial<Evaluator> & { evaluator: string }
+    evaluator: Partial<Evaluator> & { evaluator: EvaluatorTypes }
   ) => void;
   getFirstEvaluatorNode: () => Node<Evaluator> | undefined;
   setFirstEvaluatorEdges: (edges: Workflow["edges"]) => void;
@@ -241,7 +245,6 @@ const store = (
         current: EvaluationWizardStore,
         next: Partial<State["wizardState"]>
       ) => {
-        console.log("applyChanges", next);
         return {
           ...current,
           wizardState: {
@@ -357,27 +360,54 @@ const store = (
       }
       return undefined;
     },
-    setFirstEvaluator(evaluator: Partial<Evaluator> & { evaluator: string }) {
+    /**
+     * Creates or updates the first evaluator node in the workflow.
+     *
+     * If no evaluator node exists, it creates a new one with the specified evaluator type.
+     * If an evaluator node already exists, it updates it with the new properties while
+     * preserving existing parameters unless the evaluator type has changed.
+     *
+     * When the evaluator type changes, it:
+     * 1. Resets the parameters to default values
+     * 2. Maintains the node's position in the workflow
+     * 3. Preserves the node's ID based on the evaluator name/class
+     *
+     * This method is used by the evaluator selection and settings components to
+     * configure the evaluation workflow.
+     *
+     * ---
+     *
+     * TODO: Consider simply replacing any existing evaluators when this is called,
+     * rather than trying to handle a complex merge.
+     */
+    setFirstEvaluator(
+      evaluator: Partial<Evaluator> & { evaluator: EvaluatorTypes }
+    ) {
       get().workflowStore.setWorkflow((current) => {
+        // Validate evaluator type
         if (evaluator.evaluator.startsWith("custom/")) {
           throw new Error("Custom evaluators are not supported yet");
         }
 
+        // Find existing evaluator node if any
         const firstEvaluatorIndex = current.nodes.findIndex(
           (node) => node.type === "evaluator"
         );
+        const previousEvaluator =
+          firstEvaluatorIndex !== -1
+            ? (current.nodes[firstEvaluatorIndex] as Node<Evaluator>)
+            : undefined;
 
-        const initialEvaluator = convertEvaluator(
-          evaluator.evaluator as keyof typeof AVAILABLE_EVALUATORS
-        );
+        // Get base evaluator properties from the evaluator type
+        const initialEvaluator = buildEvaluatorFromType(evaluator.evaluator);
         const id = nameToId(initialEvaluator.name ?? initialEvaluator.cls);
 
-        const previousEvaluator = current.nodes[firstEvaluatorIndex] as
-          | Node<Evaluator>
-          | undefined;
+        // Check if evaluator type has changed
         const hasEvaluatorChanged =
           previousEvaluator?.data.evaluator !== evaluator.evaluator;
-        const firstEvaluator =
+
+        // Determine base node to use (create new or use existing)
+        const baseEvaluatorNode =
           hasEvaluatorChanged || !previousEvaluator
             ? {
                 id,
@@ -387,40 +417,52 @@ const store = (
               }
             : previousEvaluator;
 
+        // Create the final evaluator node with merged properties
         const evaluatorNode: Node<Evaluator> = {
-          ...firstEvaluator,
+          ...baseEvaluatorNode,
           id,
           data: {
-            ...firstEvaluator.data,
+            ...baseEvaluatorNode.data,
             ...evaluator,
+            // Preserve metadata from initial evaluator
             name: initialEvaluator.name,
             description: initialEvaluator.description,
+            // Handle parameters:
+            // 1. Use provided parameters if available
+            // 2. Reset parameters if evaluator type changed
+            // 3. Otherwise keep existing parameters
             parameters:
               evaluator.data?.parameters ??
-              // Reset parameters if not given the evaluator is not the same as the current evaluator
-              (firstEvaluator.data.evaluator !== evaluator.evaluator
+              (hasEvaluatorChanged
                 ? []
-                : firstEvaluator.data.parameters ?? []),
+                : baseEvaluatorNode.data.parameters ?? []),
           },
         };
 
+        const newEdges = createNewEdgesForNewNode(current, evaluatorNode);
+
+        // If the first evaluator node is not found,
+        // simply add the new evaluator node and new edges
         if (firstEvaluatorIndex === -1) {
           return {
             ...current,
             nodes: [...current.nodes, evaluatorNode],
+            edges: [...current.edges, ...newEdges],
           };
         }
 
-        // Update the state with the new evaluator node and remove the old edges
+        // Otherwise, update the existing evaluator and handle edges
         return {
           ...current,
+          // Replace the existing evaluator node
           nodes: current.nodes.map((node, index) =>
             index === firstEvaluatorIndex ? evaluatorNode : node
           ),
-          edges: current.edges.filter(
-            (edge) =>
-              edge.target !== previousEvaluator?.id || !hasEvaluatorChanged
-          ),
+          // Remove old edges targeting the evaluator and add new connections
+          edges: [
+            ...current.edges.filter((edge) => edge.target !== evaluatorNode.id),
+            ...newEdges,
+          ],
         };
       });
     },
@@ -433,10 +475,18 @@ const store = (
       }
       return undefined;
     },
+    /**
+     * Updates the edges by removing those that target the previous evaluator
+     * and adding the new edges provided. It also updates the target of the
+     * provided edges to point to the new evaluator.
+     *
+     * If no evaluator node is found, the current workflow is returned.
+     */
     setFirstEvaluatorEdges(edges: Edge[]) {
       get().workflowStore.setWorkflow((current) => {
         const firstEvaluator = get().getFirstEvaluatorNode();
 
+        // If no evaluator node is found, return the current workflow
         if (!firstEvaluator?.id) {
           return current;
         }
@@ -504,27 +554,17 @@ const store = (
         return;
       }
 
-      // Add edge connecting entry node input to signature node input
-      addEdge({
-        id: `${entryNode.id}-to-${signatureNode.id}`,
-        source: entryNode.id,
-        sourceHandle: "outputs.input",
-        target: signatureNode.id,
-        targetHandle: "inputs.input",
+      const edges = createNewEdgesForNewNode(
+        get().workflowStore.getWorkflow(),
+        signatureNode
+      );
+
+      // Add edges connecting entry node input to signature node input
+      edges.forEach((edge) => {
+        addEdge(edge);
       });
     },
 
-    updateSignatureNode(
-      nodeId: string,
-      updateProperties: Partial<Node<Signature>>
-    ) {
-      get().workflowStore.setWorkflow((current) => {
-        return updateNode(current, nodeId, (node) => ({
-          ...node,
-          ...updateProperties,
-        }));
-      });
-    },
     updateSignatureNodeLLMConfigValue(nodeId: string, llmConfig: LLMConfig) {
       get().workflowStore.setWorkflow((current) => {
         return updateNode(current, nodeId, (node) =>
@@ -579,12 +619,7 @@ const createWorkflowStore = (
   get: () => EvaluationWizardStore
 ) => {
   return workflowStore(
-    (
-      partial:
-        | WorkflowStore
-        | Partial<WorkflowStore>
-        | ((state: WorkflowStore) => WorkflowStore | Partial<WorkflowStore>)
-    ) =>
+    (partial: WorkflowStore | ((state: WorkflowStore) => WorkflowStore)) =>
       set((current) => ({
         ...current,
         workflowStore:
@@ -664,4 +699,22 @@ function updateNodeParameter(
       parameters: updatedParameters,
     },
   };
+}
+
+/**
+ * Create new edges for new node using our field mapping utility.
+ * This is more comprehensive than the previous implementation and handles all
+ * fields, not just input and output.
+ */
+function createNewEdgesForNewNode(
+  workflow: Workflow,
+  node: Node<Component>
+): Edge[] {
+  // Use specialized function for evaluator nodes
+  if (node.type === "evaluator") {
+    return connectEvaluatorFields(workflow, node as Node<Evaluator>);
+  }
+
+  // Use general field mapping for other node types
+  return createFieldMappingEdges(workflow, node);
 }

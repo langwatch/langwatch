@@ -8,8 +8,8 @@ import {
   LLM_PROMPT_PROPERTIES_STEP_ACCORDION_VALUE,
   LlmPromptPropertiesStepAccordion,
 } from "./LlmPromptPropertiesStepAccordion";
-import type { WizardState } from "../../../hooks/useEvaluationWizardStore";
-import { useEvaluationWizardStore } from "../../../hooks/useEvaluationWizardStore";
+import type { WizardState } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useShallow } from "zustand/react/shallow";
 
 const ExecutionMethodStepAccordionFactory = (

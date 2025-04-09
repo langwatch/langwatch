@@ -3,7 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import {
   type TaskType,
   useEvaluationWizardStore,
-} from "../hooks/useEvaluationWizardStore";
+} from "../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { RealTimeExecutionStep } from "./execution/RealTimeExecutionStep";
 import { OfflineExecutionStep } from "./execution/offline-exectution/OfflineExecutionStep";
 

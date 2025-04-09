@@ -23,6 +23,7 @@ import type { TraceWithSpans } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { Switch } from "../ui/switch";
 import type { Workflow } from "../../optimization_studio/types/dsl";
+import { useEvaluationWizardStore } from "../evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 
 export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   string,
@@ -81,6 +82,9 @@ export const TracesMapping = ({
   disableExpansions?: boolean;
 }) => {
   const { project } = useOrganizationTeamProject();
+  const { task } = useEvaluationWizardStore((state) => ({
+    task: state.wizardState.task,
+  }));
 
   const annotationScores = api.annotation.getByTraceIds.useQuery(
     {
@@ -293,10 +297,14 @@ export const TracesMapping = ({
     now,
   ]);
 
+  const isThreeColumns = task === "real_time";
+
   return (
     <Grid
       width="full"
-      templateColumns={dsl ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr"}
+      templateColumns={
+        isThreeColumns ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr"
+      }
       alignItems="center"
       gap={2}
     >
