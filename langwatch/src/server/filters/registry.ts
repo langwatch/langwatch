@@ -1385,6 +1385,11 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             label: "Has Annotation",
             count: _result.unique_values?.buckets?.[0]?.doc_count ?? 0,
           },
+          {
+            field: "false",
+            label: "No Annotation",
+            count: _result.unique_values?.buckets?.[1]?.doc_count ?? 0,
+          },
         ];
       },
     },
