@@ -3,7 +3,7 @@ from copy import deepcopy
 import functools
 import json
 from warnings import warn
-from typing import List, Optional, Callable, Any, TypeVar, Dict, Union, TYPE_CHECKING
+from typing import List, Optional, Callable, Any, Type, TypeVar, Dict, Union, TYPE_CHECKING, cast
 from uuid import UUID
 import threading
 import inspect
@@ -32,6 +32,8 @@ class LangWatchSpan:
     
     This class extends OpenTelemetry's span functionality with LangWatch-specific features
     like input/output capture, model tracking, and context management."""
+
+    span: Type['LangWatchSpan']
 
     def __init__(
         self,
@@ -100,6 +102,10 @@ class LangWatchSpan:
         self._otel_token = None
         self._lock = threading.Lock()
         self._cleaned_up = False
+
+        self.span = cast(
+            Type['LangWatchSpan'], lambda **kwargs: LangWatchSpan(trace=self, **kwargs)
+        )
 
         if self.trace:
             self._create_span()
@@ -249,19 +255,12 @@ class LangWatchSpan:
             attributes[AttributeName.GenAIRequestModel] = model
         if params is not None:
             params = deepcopy(params)
-            if self.params:
-                attributes[AttributeName.LangWatchParams] = {**self.params, **params}
-            else:
-                attributes[AttributeName.LangWatchParams] = params
-            self.params = attributes[AttributeName.LangWatchParams]
-
+            self.params = {**(self.params or {}), **params}
+            attributes[AttributeName.LangWatchParams] = json.dumps(self.params, cls=SerializableWithStringFallback)
         if metrics is not None:
             metrics = deepcopy(metrics)
-            if self.metrics:
-                attributes[AttributeName.LangWatchMetrics] = {**self.metrics, **metrics}
-            else:
-                attributes[AttributeName.LangWatchMetrics] = metrics
-            self.metrics = attributes[AttributeName.LangWatchMetrics]
+            self.metrics = {**(self.metrics or {}), **metrics}
+            attributes[AttributeName.LangWatchMetrics] = json.dumps(self.metrics, cls=SerializableWithStringFallback)
 
         self.set_attributes(attributes)
 
@@ -388,6 +387,11 @@ class LangWatchSpan:
         if not self.ignore_missing_trace_warning and not self.trace:
             warn("No current trace found, some spans will may not be sent to LangWatch")
         self._create_span()
+
+        self.span = cast(
+            Type['LangWatchSpan'], lambda **kwargs: LangWatchSpan(trace=self, **kwargs)
+        )
+
         return self
 
     def __exit__(self, exc_type: Optional[type], exc_value: Optional[BaseException], traceback: Any) -> bool:
@@ -405,6 +409,11 @@ class LangWatchSpan:
         if not self.ignore_missing_trace_warning and not self.trace:
             warn("No current trace found, some spans may not be sent to LangWatch")
         self._create_span()
+
+        self.span = cast(
+            Type['LangWatchSpan'], lambda **kwargs: LangWatchSpan(trace=self, **kwargs)
+        )
+
         return self
 
     async def __aexit__(self, exc_type: Optional[type], exc_value: Optional[BaseException], traceback: Any) -> bool:
@@ -429,11 +438,6 @@ class LangWatchSpan:
     def _set_callee_input_information(self, func: Callable[..., Any], *args: Any, **kwargs: Any):
         """Set the name and input of the span based on the callee function and arguments."""
 
-        if self.name is None:
-            self.update_name(func.__name__)
-        if self.capture_input is False or self.input is not None:
-            return
-        
         sig = inspect.signature(func)
         parameters = list(sig.parameters.values())
 
@@ -454,6 +458,13 @@ class LangWatchSpan:
                 except:
                     pass
             del all_args["self"]
+
+        # Fallback to only the function name if no name is set
+        if self.name is None:
+            self.update_name(func.__name__)
+
+        if self.capture_input is False or self.input is not None:
+            return
 
         if kwargs and len(kwargs) > 0:
             if kwargs:
