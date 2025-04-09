@@ -165,9 +165,5 @@ export const createS3Client = async (projectId: string) => {
     forcePathStyle: true,
   });
 
-  if (!s3Client) {
-    throw new Error("Failed to create S3 client");
-  }
-
   return { s3Client, s3Bucket };
 };
