@@ -1,6 +1,6 @@
 import re
 from typing import Any, Dict, List, Union, cast
-from langwatch_nlp.studio.field_parser import autoparse_field_value
+from langwatch_nlp.studio.field_parser import autoparse_field_value, parse_fields
 from langwatch_nlp.studio.modules.evaluators.evaluator_wrapper import EvaluatorWrapper
 from langwatch_nlp.studio.dspy.llm_node import LLMNode
 from langwatch_nlp.studio.dspy.retrieve import ContextsRetriever
@@ -247,12 +247,3 @@ def parse_retriever(
     kwargs = parse_fields(component.parameters or [])
     return ContextsRetriever(rm=RETRIEVERS[component.cls], **kwargs)
 
-
-def parse_fields(fields: List[Field], autoparse=True) -> Dict[str, Any]:
-    return {
-        field.identifier: (
-            autoparse_field_value(field, field.value) if autoparse else field.value
-        )
-        for field in fields
-        if field.value
-    }

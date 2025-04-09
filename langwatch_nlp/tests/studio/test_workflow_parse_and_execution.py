@@ -1,4 +1,6 @@
 import copy
+import json
+from typing import cast
 import pytest
 from langwatch_nlp.studio.parser_v2 import (
     get_component_class,
@@ -318,10 +320,8 @@ async def test_parse_workflow():
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
     result: PredictionWithEvaluationAndMetadata = await instance(
-        inputs={
-            "question": "What is the capital of France?",
-            "gold_answer": "Paris",
-        }
+        question="What is the capital of France?",
+        gold_answer="Paris",
     )
     assert "Paris" in result["end"]["result"]
     assert result.cost > 0
@@ -610,10 +610,8 @@ async def test_parse_parallel_execution_workflow():
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
     result: PredictionWithEvaluationAndMetadata = await instance(
-        inputs={
-            "question": "What is the capital of France?",
-            "gold_answer": "Paris",
-        }
+        question="What is the capital of France?",
+        gold_answer="Paris",
     )
     assert "Paris" in result["end"]["correct_answer"]
     assert "Paris" not in result["end"]["wrong_answer"]
@@ -640,14 +638,11 @@ async def test_parse_workflow_with_orphan_nodes():
         )
     )
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
-    print("\n\ncode", code, "\n\n")
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
     result: PredictionWithEvaluationAndMetadata = await instance(
-        inputs={
-            "question": "What is the capital of France?",
-            "gold_answer": "Paris",
-        }
+        question="What is the capital of France?",
+        gold_answer="Paris",
     )
     assert "Paris" in result["end"]["result"]
     assert result.cost > 0
@@ -806,10 +801,8 @@ async def test_langwatch_evaluator_with_settings():
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
     result: PredictionWithEvaluationAndMetadata = await instance(
-        inputs={
-            "question": "What is the capital of France?",
-            "gold_answer": "Paris",
-        }
+        question="What is the capital of France?",
+        gold_answer="Paris",
     )
 
     assert result.cost > 0
@@ -824,14 +817,11 @@ async def test_parse_workflow_with_until_node():
     class_name, code = parse_workflow(
         simple_workflow, format=True, debug_level=1, until_node_id="generate_query"
     )
-    print("\n\ncode", code, "\n\n")
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
     result: PredictionWithEvaluationAndMetadata = await instance(
-        inputs={
-            "question": "What is the capital of France?",
-            "gold_answer": "Paris",
-        }
+        question="What is the capital of France?",
+        gold_answer="Paris",
     )
     assert "Paris" in result["generate_query"]["query"]
     assert result.cost > 0
@@ -860,15 +850,11 @@ async def test_parse_workflow_with_default_llm():
 
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
 
-    print("\n\ncode", code, "\n\n")
-
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
     result: PredictionWithEvaluationAndMetadata = await instance(
-        inputs={
-            "question": "What is the capital of France?",
-            "gold_answer": "Paris",
-        }
+        question="What is the capital of France?",
+        gold_answer="Paris",
     )
 
     assert not result.error
@@ -927,15 +913,11 @@ class BlowsUp(dspy.Module):
 
     with pytest.raises(Exception) as e:
         await instance(
-            inputs={
-                "question": "What is the capital of France?",
-                "gold_answer": "Paris",
-            }
+            question="What is the capital of France?",
+            gold_answer="Paris",
         )
 
     assert "Blows up" in str(e.value)
-
-
 
 
 @pytest.mark.integration
@@ -983,19 +965,110 @@ class BlowsUp(dspy.Module):
         )
     )
 
-    class_name, code = parse_workflow(workflow, format=True, debug_level=1, handle_errors=True)
+    class_name, code = parse_workflow(
+        workflow, format=True, debug_level=1, handle_errors=True
+    )
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
 
     result = await instance(
-        inputs={
-            "question": "What is the capital of France?",
-            "gold_answer": "Paris",
-        }
+        question="What is the capital of France?",
+        gold_answer="Paris",
     )
 
     assert "Blows up" in str(result.error)
 
 
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_autoparse_fields():
+    disable_dsp_caching()
+
+    workflow = copy.deepcopy(simple_workflow)
+
+    generate_query_node = cast(
+        SignatureNode,
+        next(node for node in workflow.nodes if node.data.name == "GenerateQuery"),
+    )
+
+    workflow.nodes.append(
+        CodeNode(
+            id="check_input_types",
+            data=Code(
+                name="CheckInputTypes",
+                cls=None,
+                parameters=[
+                    Field(
+                        identifier="code",
+                        type=FieldType.str,
+                        optional=None,
+                        value="""
+import dspy
+
+class CheckInputTypes(dspy.Module):
+    def forward(self, field_list_str: list[str], field_float: float):
+        return {"field_list_str": type(field_list_str), "field_float": type(field_float)}
+                        """,
+                        desc=None,
+                        prefix=None,
+                    ),
+                ],
+                inputs=[
+                    Field(
+                        identifier="field_list_str",
+                        type=FieldType.list_str,
+                        optional=None,
+                        value=None,
+                        desc=None,
+                        prefix=None,
+                    ),
+                    Field(
+                        identifier="field_float",
+                        type=FieldType.float,
+                        optional=None,
+                        value=None,
+                        desc=None,
+                        prefix=None,
+                    ),
+                ],
+                outputs=[],
+            ),
+            type="code",
+        )
+    )
+    workflow.edges.append(
+        Edge(
+            id="e0-1",
+            source="entry",
+            sourceHandle="outputs.question",
+            target="check_input_types",
+            targetHandle="inputs.field_list_str",
+            type="default",
+        )
+    )
+    workflow.edges.append(
+        Edge(
+            id="e1-2",
+            source="entry",
+            sourceHandle="outputs.gold_answer",
+            target="check_input_types",
+            targetHandle="inputs.field_float",
+            type="default",
+        )
+    )
+
+    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+    Module = get_component_class(component_code=code, class_name=class_name)
+    instance = Module()  # type: ignore
+    result: PredictionWithEvaluationAndMetadata = await instance(
+        question=json.dumps(
+            ["What is the capital of France?", "What is the capital of Germany?"]
+        ),
+        gold_answer="170",
+    )
+
+    assert result["check_input_types"]["field_list_str"] == list
+    assert result["check_input_types"]["field_float"] == float
+
+
 # TODO: test evaluate_prediction
-# TODO: test different formats auto-parsing

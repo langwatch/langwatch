@@ -16,7 +16,7 @@ dspy.LM(
 {% macro edge_param(edge, source_parts, target_parts) %}
 {% if source_parts[0] == "outputs" %}
     {% if edge.source == "entry" %}
-{{ target_parts[1] }}=inputs["{{ source_parts[1] }}"],
+{{ target_parts[1] }}={{ source_parts[1] }},
     {% else %}
 {{ target_parts[1] }}={{ edge.source }}.{{ source_parts[1] }},
     {% endif %}

@@ -1,43 +1,28 @@
 {% from 'macros.jinja' import evaluator_instance, edge_param, node_llm_config_to_dspy_lm %}
 
 import time
-from typing import Callable, Dict, Any, Literal, Optional, Tuple, cast, overload
 import asyncio
+from typing import Dict, Any, Literal, Optional
 
+import dspy
 import langwatch
-from langwatch_nlp.studio.dspy.evaluation import (
+from langwatch_nlp.studio.dspy import (
+    LangWatchWorkflowModule,
+    PredictionWithMetadata,
     EvaluationResultWithMetadata,
     PredictionWithEvaluationAndMetadata,
 )
-from langwatch_nlp.studio.dspy.predict_with_metadata import (
-    PredictionWithMetadata,
-)
-from langwatch_nlp.studio.parser import autoparse_fields, parse_component
-from langwatch_nlp.studio.types.dsl import Workflow, Node
-from langwatch_nlp.studio.dspy.reporting_module import ReportingModule
-import dspy
-
-from langwatch_nlp.studio.utils import get_node_by_id, validate_identifier
-from langevals_core.base_evaluator import (
-    SingleEvaluationResult,
-    EvaluationResultError,
-    EvaluationResult,
-)
-from langwatch_nlp.studio.dspy.patched_optional_image import patch_optional_image
-from dspy.utils.asyncify import asyncify
 
 {% for node in workflow.nodes|selectattr("type", "eq", "evaluator")|list %}
 {{ EVALUATORS[node.data.cls]["import"] }}
 {% endfor %}
-
-patch_optional_image()
 
 {% if workflow.default_llm %}
 lm = {{ node_llm_config_to_dspy_lm(workflow.default_llm) }}
 dspy.configure(lm=lm)
 {% endif %}
 
-class WorkflowModule(ReportingModule):
+class WorkflowModule(LangWatchWorkflowModule):
     def __init__(
         self,
         evaluation_weighting: Literal["mean"] = "mean",
@@ -46,29 +31,36 @@ class WorkflowModule(ReportingModule):
 
         {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
         {% if node.type == "evaluator" %}
-        self.{{ node.id }} = asyncify(self.with_reporting({{ evaluator_instance(workflow, node) }}, "{{ node.id }}"))
+        self.{{ node.id }} = self.wrapped({{ evaluator_instance(workflow, node) }}, "{{ node.id }}")
         {% else %}
-        self.{{ node.id }} = asyncify(self.with_reporting({{ node_templates[node.id][0] }}(), "{{ node.id }}"))
+        self.{{ node.id }} = self.wrapped({{ node_templates[node.id][0] }}(), "{{ node.id }}")
         {% endif %}
         {% endfor %}
 
     {# TODO: migrate from inputs: Dict to actual arguments #}
+    {% set input_args = [] %}
+    {% set forward_args = [] %}
+    {% for input_field in inputs %}
+        {% set _ = input_args.append(input_field.identifier + ": " + FIELD_TYPE_TO_DSPY_TYPE[input_field.type.value]) %}
+        {% set _ = forward_args.append(input_field.identifier + "=" + input_field.identifier) %}
+    {% endfor %}
+
     {% if handle_errors %}
-    async def forward(self, inputs: Dict[str, Any]) -> dspy.Prediction:
+    async def forward(self, {{ input_args | join(", ") }}) -> dspy.Prediction:
         try:
-            return await self._forward(inputs)
+            return await self._forward({{ forward_args | join(", ") }})
 
         except Exception as e:
             return PredictionWithEvaluationAndMetadata(
                 error=e,
                 cost=self.cost,
                 duration=round((time.time() - self.start_time) * 1000),
-                evaluation=self.evaluate_prediction,
+                evaluate=self.evaluate_prediction,
             )
 
-    async def _forward(self, inputs: Dict[str, Any]) -> dspy.Prediction:
+    async def _forward(self, {{ input_args | join(", ") }}) -> dspy.Prediction:
     {% else %}
-    async def forward(self, inputs: Dict[str, Any]) -> dspy.Prediction:
+    async def forward(self, {{ input_args | join(", ") }}) -> dspy.Prediction:
     {% endif %}
         try:
             langwatch.get_current_span().update(type="workflow")
@@ -145,12 +137,6 @@ class WorkflowModule(ReportingModule):
             ),
                 {% endfor %}
         )
-        {% for node in layer %}
-            {# TODO: move this to parent class probably #}
-            {% if node.type != "code" %}
-        cost += {{ node.id }}.cost or 0
-            {% endif %}
-        {% endfor %}
 
             {% else %}
         {{ layer[0].id }} = await self.{{ layer[0].id }}(
@@ -162,11 +148,6 @@ class WorkflowModule(ReportingModule):
                     {% endif %}
                 {% endfor %}
         )
-                {# TODO: move this to parent class probably #}
-                {% if layer[0].type != "code" %}
-        cost += {{ layer[0].id }}.cost or 0
-                {% endif %}
-
             {% endif %}
         {% endfor %}
 
@@ -186,7 +167,7 @@ class WorkflowModule(ReportingModule):
                         {% set source_parts = edge.sourceHandle.split(".") %}
                         {% set target_parts = edge.targetHandle.split(".") %}
                         {% if edge.source == "entry" %}
-                "{{ target_parts[1] }}": inputs["{{ source_parts[1] }}"],
+                "{{ target_parts[1] }}": {{ source_parts[1] }},
                         {% else %}
                 "{{ target_parts[1] }}": {{ edge.source }}.{{ source_parts[1] }},
                         {% endif %}
@@ -197,11 +178,9 @@ class WorkflowModule(ReportingModule):
             {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
             {{ node.id }}={{ node.id }},
             {% endfor %}
-            cost=cost,
-            duration=round((time.time() - start_time) * 1000),
-            error=error,
-            {# # TODO: rename this to evaluate #}
-            evaluation=self.evaluate_prediction,
+            cost=self.cost,
+            duration=round((time.time() - self.start_time) * 1000),
+            evaluate=self.evaluate_prediction,
         )
 
     def evaluate_prediction(

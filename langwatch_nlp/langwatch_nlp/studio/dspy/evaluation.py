@@ -69,7 +69,7 @@ class EvaluationResultWithMetadata(BaseModel):
 class PredictionWithEvaluationAndMetadata(PredictionWithMetadata):
     def __init__(
         self,
-        evaluation: Callable[
+        evaluate: Callable[
             [dspy.Example, PredictionWithMetadata, Optional[Any], bool],
             float | tuple[float, dict],
         ],
@@ -79,13 +79,13 @@ class PredictionWithEvaluationAndMetadata(PredictionWithMetadata):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self._evaluation = evaluation
+        self._evaluate = evaluate
         self._cost = cost
         self._duration = duration
         self._error = error
 
     @overload
-    def evaluation(
+    def evaluate(
         self,
         example: dspy.Example,
         trace: Optional[Any] = None,
@@ -93,20 +93,20 @@ class PredictionWithEvaluationAndMetadata(PredictionWithMetadata):
     ) -> float: ...
 
     @overload
-    def evaluation(
+    def evaluate(
         self,
         example: dspy.Example,
         trace: Optional[Any] = None,
         return_results: Literal[True] = True,
     ) -> Tuple[float, dict[str, EvaluationResultWithMetadata]]: ...
 
-    def evaluation(
+    def evaluate(
         self,
         example,
         trace=None,
         return_results=False,
     ) -> float | tuple[float, dict[str, EvaluationResultWithMetadata]]:
-        return self._evaluation(example, self, trace, return_results)
+        return self._evaluate(example, self, trace, return_results)
 
 
 class EvaluationReporting:
@@ -138,7 +138,7 @@ class EvaluationReporting:
         pred: PredictionWithEvaluationAndMetadata,
         trace=None,
     ):
-        evaluation, evaluation_results = pred.evaluation(example, return_results=True)
+        evaluation, evaluation_results = pred.evaluate(example, return_results=True)
 
         if self.progress == 0:
             self.last_sent = 0

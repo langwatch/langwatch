@@ -1,8 +1,7 @@
 {% from 'macros.jinja' import node_llm_config_to_dspy_lm %}
 
 import dspy
-import os
-from typing import Dict, Any, List, Optional, Union, cast
+from typing import Dict, Any, List, Optional
 from langwatch_nlp.studio.dspy.llm_node import LLMNode
 
 {% set class_name = component.name or "Anonymous" %}
@@ -67,3 +66,13 @@ class {{ class_name }}(LLMNode):
             demos=demos
             {% endif %}
         )
+
+    {% set input_args = [] %}
+    {% set forward_args = [] %}
+    {% for input_field in component.inputs or [] %}
+        {% set _ = input_args.append(input_field.identifier + ": " + FIELD_TYPE_TO_DSPY_TYPE[input_field.type.value]) %}
+        {% set _ = forward_args.append(input_field.identifier + "=" + input_field.identifier) %}
+    {% endfor %}
+
+    def forward(self, {{ input_args | join(", ") }}):
+        return super().forward({{ forward_args | join(", ") }})

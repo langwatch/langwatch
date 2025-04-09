@@ -4,13 +4,13 @@ import asyncio
 import time
 import importlib
 
+from langwatch_nlp.studio.field_parser import parse_fields
 from langwatch_nlp.studio.modules.registry import (
     EVALUATORS_FOR_TEMPLATE,
     FIELD_TYPE_TO_DSPY_TYPE,
     PROMPTING_TECHNIQUES_FOR_TEMPLATE,
 )
-from langwatch_nlp.studio.parser import parse_fields
-from langwatch_nlp.studio.types.dsl import Node, Workflow, Edge
+from langwatch_nlp.studio.types.dsl import Field, Node, Workflow, Edge
 from langwatch_nlp.studio.dspy.workflow_module import WorkflowModule
 from langwatch_nlp.studio.dspy.reporting_module import ReportingModule
 from langwatch_nlp.studio.dspy.llm_node import LLMNode
@@ -19,7 +19,6 @@ from langwatch_nlp.studio.dspy.evaluation import (
     PredictionWithEvaluationAndMetadata,
 )
 from langwatch_nlp.studio.dspy.predict_with_metadata import PredictionWithMetadata
-from dspy.utils.asyncify import asyncify
 from langevals_core.base_evaluator import (
     SingleEvaluationResult,
     EvaluationResultError,
@@ -88,6 +87,8 @@ def parse_workflow(
         node.id: parse_component(node, workflow, format) for node in nodes
     }
 
+    inputs = workflow_inputs(workflow)
+
     module = render_template(
         "workflow.py.jinja",
         format=format,
@@ -95,6 +96,7 @@ def parse_workflow(
         debug_level=debug_level,
         node_templates=node_templates,
         nodes=nodes,
+        inputs=inputs,
         handle_errors=handle_errors,
     )
 
@@ -306,3 +308,12 @@ def detect_cycles(nodes: List[Node], edges: List[Edge]) -> None:
     has_cycle, cycle_path = dfs_check_cycle("entry")
     if has_cycle:
         raise Exception(f"Cyclic dependency detected: {' -> '.join(cycle_path)}")
+
+
+# Get all edges with source "entry"
+def workflow_inputs(workflow: Workflow) -> List[Field]:
+    entry_node = next((node for node in workflow.nodes if node.type == "entry"), None)
+    if not entry_node:
+        raise Exception("Entry node not found in workflow")
+
+    return [field for field in (entry_node.data.outputs or [])]

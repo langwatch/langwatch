@@ -1,3 +1,4 @@
+import dspy
 import asyncer
 import sentry_sdk
 from langwatch_nlp.studio.field_parser import autoparse_fields
@@ -10,7 +11,6 @@ from langwatch_nlp.studio.types.events import (
     end_component_event,
     start_component_event,
 )
-from dspy.utils.asyncify import asyncify
 
 
 async def execute_component(event: ExecuteComponentPayload):
@@ -39,7 +39,7 @@ async def execute_component(event: ExecuteComponentPayload):
             class_name, code = parse_component(node, event.workflow)
             Module = get_component_class(component_code=code, class_name=class_name)
             instance = Module()
-            result = await asyncify(instance)(
+            result = await dspy.asyncify(instance)(
                 **autoparse_fields(node.data.inputs or [], event.inputs)  # type: ignore
             )
 

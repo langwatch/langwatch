@@ -128,7 +128,7 @@ async def execute_optimization(
             pred: PredictionWithEvaluationAndMetadata,
             trace=None,
         ):
-            score, results = pred.evaluation(example, trace=trace, return_results=True)
+            score, results = pred.evaluate(example, trace=trace, return_results=True)
             return score
 
         langwatch.api_key = workflow.api_key
