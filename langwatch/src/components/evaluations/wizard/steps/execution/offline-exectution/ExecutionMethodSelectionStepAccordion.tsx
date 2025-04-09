@@ -77,7 +77,6 @@ export function ExecutionMethodSelectionStepAccordion({
           {...buildBaseRadioParams("offline_code_execution")}
           description="Run code"
           icon={<LuCode />}
-          disabled
         />
         <StepRadio
           {...buildBaseRadioParams("offline_http")}
