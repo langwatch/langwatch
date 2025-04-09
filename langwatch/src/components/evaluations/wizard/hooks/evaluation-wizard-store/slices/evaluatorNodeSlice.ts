@@ -3,6 +3,7 @@ import { type StateCreator } from "zustand";
 import type {
   Evaluator,
   Workflow,
+  Component,
 } from "../../../../../../optimization_studio/types/dsl";
 import type { BaseNodeSlice } from "./baseNodeSlice";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
