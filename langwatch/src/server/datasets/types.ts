@@ -1,8 +1,10 @@
 import { z } from "zod";
 import {
-  datasetSpanSchema,
+  baseSpanSchema,
   chatMessageSchema,
+  lLMSpanSchema,
   rAGChunkSchema,
+  rAGSpanSchema,
 } from "../tracer/types.generated";
 
 export type DatasetRecordEntry = { id: string } & Record<string, any>;
@@ -53,6 +55,42 @@ type Json = Literal | { [key: string]: Json } | Json[];
 export const jsonSchema: z.ZodType<Json> = z.lazy(() =>
   z.union([literalSchema, z.array(jsonSchema), z.record(jsonSchema)])
 );
+
+export const datasetSpanSchema = z.union([
+  baseSpanSchema
+    .omit({
+      trace_id: true,
+      timestamps: true,
+      metrics: true,
+      params: true,
+    })
+    .extend({
+      params: z.record(z.string(), z.any()),
+      model: z.string().optional(),
+    }),
+  lLMSpanSchema
+    .omit({
+      trace_id: true,
+      timestamps: true,
+      metrics: true,
+      params: true,
+    })
+    .extend({
+      params: z.record(z.string(), z.any()),
+      model: z.string().optional(),
+    }),
+  rAGSpanSchema
+    .omit({
+      trace_id: true,
+      timestamps: true,
+      metrics: true,
+      params: true,
+    })
+    .extend({
+      params: z.record(z.string(), z.any()),
+      model: z.string().optional(),
+    }),
+]);
 
 export const datasetColumnTypeMapping: {
   [key in DatasetColumnType]: z.ZodType<any>;

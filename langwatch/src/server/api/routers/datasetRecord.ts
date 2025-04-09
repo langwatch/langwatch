@@ -465,9 +465,7 @@ export const getFullDataset = async ({
   }
 
   const truncatedDatasetRecords: DatasetRecord[] = [];
-  let truncated = false;
-  let totalSize = 0;
-  let currentPage = 0;
+
   const BATCH_SIZE = 500;
 
   if (dataset.useS3) {
@@ -537,6 +535,12 @@ export const getFullDataset = async ({
         }),
       };
     }
+
+    const truncatedDatasetRecords: DatasetRecord[] = [];
+    let truncated = false;
+    let totalSize = 0;
+    let currentPage = 0;
+    const BATCH_SIZE = 500;
 
     // Fetch records in batches
     while (!truncated) {

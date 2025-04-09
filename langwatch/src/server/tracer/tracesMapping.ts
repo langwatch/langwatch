@@ -8,8 +8,8 @@ import type {
   Trace,
   TraceWithSpans,
 } from "./types";
-import { datasetSpanSchema } from "./types.generated";
 import { getSpanNameOrModel } from "../../utils/trace";
+import { datasetSpanSchema } from "../datasets/types";
 
 export type TraceWithSpansAndAnnotations = TraceWithSpans & {
   annotations?: (Annotation & {
