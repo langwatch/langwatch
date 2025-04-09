@@ -71,11 +71,9 @@ export const createBaseNodeSlice: StateCreator<
 
   const addNodeToWorkflow = (node: Node<Component>): string => {
     get().workflowStore.setWorkflow((current) => {
-      const newEdges = createFieldMappingEdges(current, node);
       return {
         ...current,
         nodes: [...current.nodes, node],
-        edges: newEdges,
       };
     });
     return node.id;
