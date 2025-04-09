@@ -12,6 +12,18 @@ import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import { createManyDatasetRecords } from "./datasetRecord";
 import { tryToMapPreviousColumnsToNewColumns } from "../../../optimization_studio/utils/datasetUtils";
 import type { DatasetColumns, DatasetRecordEntry } from "../../datasets/types";
+import { prisma } from "../../db";
+
+const getOrgCanUseS3FromProject = async (projectId: string) => {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: { team: { include: { organization: true } } },
+  });
+
+  return {
+    canUseS3: project?.team?.organization?.useCustomS3,
+  };
+};
 
 export const datasetRouter = createTRPCRouter({
   upsert: protectedProcedure
@@ -106,6 +118,8 @@ export const datasetRouter = createTRPCRouter({
         });
       }
 
+      const { canUseS3 } = await getOrgCanUseS3FromProject(input.projectId);
+
       const dataset = await ctx.prisma.dataset.create({
         data: {
           id: nanoid(),
@@ -113,6 +127,7 @@ export const datasetRouter = createTRPCRouter({
           name: input.name,
           projectId: input.projectId,
           columnTypes: input.columnTypes,
+          useS3: canUseS3,
         },
       });
 

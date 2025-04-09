@@ -90,8 +90,18 @@ export function DatasetTable({
     {
       enabled: !!project && !!datasetId,
       refetchOnWindowFocus: false,
+      onError: (error) => {
+        toaster.create({
+          title: "Error fetching dataset",
+          description: error.message,
+          type: "error",
+          duration: 5000,
+          meta: { closable: true },
+        });
+      },
     }
   );
+
   const dataset = useMemo(
     () =>
       databaseDataset.data

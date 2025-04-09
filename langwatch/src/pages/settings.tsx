@@ -4,7 +4,6 @@ import {
   Field,
   Heading,
   Input,
-  Separator,
   Spacer,
   Spinner,
   Text,
@@ -38,8 +37,12 @@ import { Select } from "../components/ui/select";
 
 type OrganizationFormData = {
   name: string;
+  s3Endpoint: string;
+  s3AccessKeyId: string;
+  s3SecretAccessKey: string;
   elasticsearchNodeUrl: string;
   elasticsearchApiKey: string;
+  s3Bucket: string;
 };
 
 export default function Settings() {
@@ -61,8 +64,12 @@ function SettingsForm({
     useOrganizationTeamProject();
   const [defaultValues, setDefaultValues] = useState<OrganizationFormData>({
     name: organization.name,
+    s3Endpoint: organization.s3Endpoint ?? "",
+    s3AccessKeyId: organization.s3AccessKeyId ?? "",
+    s3SecretAccessKey: organization.s3SecretAccessKey ?? "",
     elasticsearchNodeUrl: organization.elasticsearchNodeUrl ?? "",
     elasticsearchApiKey: organization.elasticsearchApiKey ?? "",
+    s3Bucket: organization.s3Bucket ?? "",
   });
   const { register, handleSubmit, control, getFieldState } = useForm({
     defaultValues,
@@ -81,8 +88,12 @@ function SettingsForm({
         {
           organizationId: organization.id,
           name: data.name,
+          s3Endpoint: data.s3Endpoint,
+          s3AccessKeyId: data.s3AccessKeyId,
+          s3SecretAccessKey: data.s3SecretAccessKey,
           elasticsearchNodeUrl: data.elasticsearchNodeUrl,
           elasticsearchApiKey: data.elasticsearchApiKey,
+          s3Bucket: data.s3Bucket,
         },
         {
           onSuccess: () => {
@@ -173,6 +184,49 @@ function SettingsForm({
                   )}
                 </HorizontalFormControl>
 
+                {organization.useCustomS3 && (
+                  <HorizontalFormControl
+                    label="S3 Storage"
+                    helper="Configure S3 storage to host data on your own infrastructure. Leave empty to use LangWatch's managed storage."
+                  >
+                    {hasOrganizationPermission(
+                      OrganizationRoleGroup.ORGANIZATION_MANAGE
+                    ) ? (
+                      <VStack width="full" align="start" gap={3}>
+                        <Input
+                          width="full"
+                          type="text"
+                          placeholder="S3 Endpoint (e.g. http://localhost:9000)"
+                          {...register("s3Endpoint")}
+                        />
+                        <Input
+                          width="full"
+                          type="text"
+                          placeholder="Access Key ID"
+                          {...register("s3AccessKeyId")}
+                        />
+                        <Input
+                          width="full"
+                          type="password"
+                          placeholder="Secret Access Key"
+                          {...register("s3SecretAccessKey")}
+                        />
+                        <Input
+                          width="full"
+                          type="text"
+                          placeholder="S3 Bucket Name"
+                          {...register("s3Bucket")}
+                        />
+                      </VStack>
+                    ) : (
+                      <Text>
+                        S3 storage configuration is only visible to organization
+                        managers
+                      </Text>
+                    )}
+                  </HorizontalFormControl>
+                )}
+
                 {organization.useCustomElasticsearch && (
                   <>
                     <HorizontalFormControl
@@ -237,6 +291,10 @@ type ProjectFormData = {
   language: string;
   framework: string;
   userLinkTemplate?: string;
+  s3Endpoint?: string;
+  s3AccessKeyId?: string;
+  s3SecretAccessKey?: string;
+  s3Bucket?: string;
   piiRedactionLevel: PIIRedactionLevel;
 };
 
@@ -276,6 +334,10 @@ function ProjectSettingsForm({ project }: { project: Project }) {
     language: project.language,
     framework: project.framework,
     userLinkTemplate: project.userLinkTemplate ?? "",
+    s3Endpoint: project.s3Endpoint ?? "",
+    s3AccessKeyId: project.s3AccessKeyId ?? "",
+    s3SecretAccessKey: project.s3SecretAccessKey ?? "",
+    s3Bucket: project.s3Bucket ?? "",
     piiRedactionLevel: project.piiRedactionLevel,
   };
   const [previousValues, setPreviousValues] =
@@ -300,6 +362,10 @@ function ProjectSettingsForm({ project }: { project: Project }) {
           projectId: project.id,
           ...data,
           userLinkTemplate: data.userLinkTemplate ?? "",
+          s3Endpoint: data.s3Endpoint ?? "",
+          s3AccessKeyId: data.s3AccessKeyId ?? "",
+          s3SecretAccessKey: data.s3SecretAccessKey ?? "",
+          s3Bucket: data.s3Bucket ?? "",
         },
         {
           onSuccess: () => {
@@ -421,6 +487,40 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                 )}
               />
             </HorizontalFormControl>
+
+            {organization?.useCustomS3 && (
+              <HorizontalFormControl
+                label="S3 Storage"
+                helper="Configure project-specific S3 storage settings for datasets. If left empty, organization-level settings will be used."
+              >
+                <VStack width="full" align="start" gap={3}>
+                  <Input
+                    width="full"
+                    type="text"
+                    placeholder="S3 Endpoint (e.g. http://localhost:9000)"
+                    {...register("s3Endpoint")}
+                  />
+                  <Input
+                    width="full"
+                    type="text"
+                    placeholder="Access Key ID"
+                    {...register("s3AccessKeyId")}
+                  />
+                  <Input
+                    width="full"
+                    type="password"
+                    placeholder="Secret Access Key"
+                    {...register("s3SecretAccessKey")}
+                  />
+                  <Input
+                    width="full"
+                    type="text"
+                    placeholder="S3 Bucket Name"
+                    {...register("s3Bucket")}
+                  />
+                </VStack>
+              </HorizontalFormControl>
+            )}
           </form>
         </Card.Body>
       </Card.Root>
