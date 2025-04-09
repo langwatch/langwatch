@@ -10,9 +10,18 @@ import { ColorfulBlockIcon } from "../../../../optimization_studio/components/Co
 import { StepButton } from "../components/StepButton";
 
 export function TaskStep() {
-  const { wizardState, setWizardState } = useEvaluationWizardStore();
+  const { wizardState, setWizardState, setDSL } = useEvaluationWizardStore();
 
   const handleTaskSelection = (task: State["wizardState"]["task"]) => {
+    if (task === wizardState.task) {
+      return;
+    } else {
+      // Reset the workflow
+      setDSL({
+        nodes: [],
+        edges: [],
+      });
+    }
     setWizardState({
       task,
     });

@@ -25,6 +25,10 @@ import type { DatasetColumns } from "../../../../server/datasets/types";
 import { mappingStateSchema } from "../../../../server/tracer/tracesMapping";
 import { checkPreconditionsSchema } from "../../../../server/evaluations/types.generated";
 import { DEFAULT_SIGNATURE_NODE_PROPERTIES } from "./constants/llm-signature";
+import {
+  createFieldMappingEdges,
+  connectEvaluatorFields,
+} from "../../utils/field-mapping";
 
 export const EVALUATOR_CATEGORIES = [
   "expected_answer",
@@ -241,7 +245,6 @@ const store = (
         current: EvaluationWizardStore,
         next: Partial<State["wizardState"]>
       ) => {
-        console.log("applyChanges", next);
         return {
           ...current,
           wizardState: {
@@ -551,13 +554,14 @@ const store = (
         return;
       }
 
-      // Add edge connecting entry node input to signature node input
-      addEdge({
-        id: `${entryNode.id}-to-${signatureNode.id}`,
-        source: entryNode.id,
-        sourceHandle: "outputs.input",
-        target: signatureNode.id,
-        targetHandle: "inputs.input",
+      const edges = createNewEdgesForNewNode(
+        get().workflowStore.getWorkflow(),
+        signatureNode
+      );
+
+      // Add edges connecting entry node input to signature node input
+      edges.forEach((edge) => {
+        addEdge(edge);
       });
     },
 
@@ -714,47 +718,19 @@ function updateNodeParameter(
 }
 
 /**
- * Create new edges for new node.
- * We assume that we want to connect the output.input to the input.input
- * and the output.output to the input.output for the new node.
- *
- * TODO: Handle other cases
+ * Create new edges for new node using our field mapping utility.
+ * This is more comprehensive than the previous implementation and handles all
+ * fields, not just input and output.
  */
 function createNewEdgesForNewNode(
   workflow: Workflow,
   node: Node<Component>
 ): Edge[] {
-  const edges: Edge[] = [];
-  // Filter out the node we are adding and reverse the order of the nodes to search backwards from the last node
-  const nodes = workflow.nodes.filter((n) => n.id !== node.id).reverse();
-  // Find the first node with an output.input
-  const inputNode = nodes.find(
-    (n) => n.data.outputs?.some((o) => o.identifier === "input")
-  );
-  // Find the first node with an input.output
-  const outputNode = nodes.find(
-    (n) => n.data.outputs?.some((o) => o.identifier === "output")
-  );
-
-  if (inputNode) {
-    edges.push({
-      id: `${inputNode.id}-to-${node.id}-input`,
-      source: inputNode.id,
-      sourceHandle: "outputs.input",
-      target: node.id,
-      targetHandle: "inputs.input",
-    });
+  // Use specialized function for evaluator nodes
+  if (node.type === "evaluator") {
+    return connectEvaluatorFields(workflow, node as Node<Evaluator>);
   }
 
-  if (outputNode) {
-    edges.push({
-      id: `${outputNode.id}-to-${node.id}-output`,
-      source: outputNode.id,
-      sourceHandle: "outputs.output",
-      target: node.id,
-      targetHandle: "inputs.output",
-    });
-  }
-
-  return edges;
+  // Use general field mapping for other node types
+  return createFieldMappingEdges(workflow, node);
 }

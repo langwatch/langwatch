@@ -23,8 +23,7 @@ import type { TraceWithSpans } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { Switch } from "../ui/switch";
 import type { Workflow } from "../../optimization_studio/types/dsl";
-import { useEvaluationWizardStore } from "../evaluations/wizard/hooks/useEvaluationWizardStore";
-import { useShallow } from "zustand/react/shallow";
+
 export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   string,
   keyof typeof TRACE_MAPPINGS
@@ -43,6 +42,19 @@ export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   contexts: "contexts.string_list",
   spans: "spans",
 };
+const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
+  DATASET_INFERRED_MAPPINGS_BY_NAME
+).reduce(
+  (acc, [key, value]) => {
+    if (acc[value]) {
+      acc[value]!.push(key);
+    } else {
+      acc[value] = [key];
+    }
+    return acc;
+  },
+  {} as Record<string, string[]>
+);
 
 export const TracesMapping = ({
   titles,
@@ -69,11 +81,6 @@ export const TracesMapping = ({
   disableExpansions?: boolean;
 }) => {
   const { project } = useOrganizationTeamProject();
-  const { task } = useEvaluationWizardStore(
-    useShallow(({ wizardState }) => ({
-      task: wizardState.task,
-    }))
-  );
 
   const annotationScores = api.annotation.getByTraceIds.useQuery(
     {
@@ -189,6 +196,66 @@ export const TracesMapping = ({
       isInitializedRef.current = true;
     }
 
+    if (!dsl) return;
+
+    const currentTargetEdges = Object.fromEntries(
+      dsl.targetEdges.map((edge) => [
+        edge.targetHandle?.split(".")[1] ?? "",
+        edge,
+      ])
+    );
+    const targetEdgesWithDefaults = [
+      ...dsl.targetEdges.filter(
+        (edge) =>
+          dsl.sourceOptions[edge.source]?.fields.includes(
+            edge.sourceHandle?.split(".")[1] ?? ""
+          )
+      ),
+      ...(targetFields
+        .map((targetField) => {
+          if (currentTargetEdges[targetField]) {
+            return;
+          }
+
+          const mappingOptions = [
+            DATASET_INFERRED_MAPPINGS_BY_NAME[targetField]!,
+            ...(DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED[targetField] ??
+              []),
+          ].filter((x) => x);
+
+          let inferredSource:
+            | { source: string; sourceHandle: string }
+            | undefined;
+          for (const [source, { fields }] of Object.entries(
+            dsl.sourceOptions
+          )) {
+            for (const option of mappingOptions) {
+              if (option && fields.includes(option)) {
+                inferredSource = { source, sourceHandle: `outputs.${option}` };
+                break;
+              }
+            }
+          }
+
+          if (!inferredSource) {
+            return;
+          }
+
+          const edge: Workflow["edges"][number] = {
+            id: `${Date.now()}-${targetField}`,
+            source: inferredSource.source,
+            sourceHandle: inferredSource.sourceHandle,
+            target: dsl.targetId,
+            targetHandle: `inputs.${targetField}`,
+            type: "default",
+          };
+
+          return edge;
+        })
+        .filter((x) => x) as Workflow["edges"]),
+    ];
+    dsl.setTargetEdges?.(targetEdgesWithDefaults);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetFields, dsl?.sourceOptions]);
 
@@ -226,22 +293,10 @@ export const TracesMapping = ({
     now,
   ]);
 
-  /**
-   * For real-time evaluations, we need three columns in the mapping UI:
-   * 1. Dataset column - shows the dataset fields for trial evaluation
-   * 2. Trace column - shows the trace fields that will be used in production
-   * 3. Evaluator column - shows the evaluator fields
-   *
-   * For other evaluation types, we only need two columns:
-   * 1. Source column (Dataset or Trace)
-   * 2. Evaluator column
-   */
-  const isThreeColumn = task === "real_time";
-
   return (
     <Grid
       width="full"
-      templateColumns={isThreeColumn ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr"}
+      templateColumns={dsl ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr"}
       alignItems="center"
       gap={2}
     >

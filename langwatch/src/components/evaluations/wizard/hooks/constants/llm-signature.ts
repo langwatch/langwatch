@@ -1,11 +1,12 @@
 import { MODULES } from "~/optimization_studio/registry";
+import { nameToId } from "~/optimization_studio/utils/nodeUtils";
 
 const DEFAULT_LLM_CONFIG = {
   model: "openai/gpt-4o-mini",
 };
 
 export const DEFAULT_SIGNATURE_NODE_PROPERTIES = {
-  id: "signature-node",
+  id: nameToId("signature-node"),
   position: { x: 0, y: 0 },
   deletable: true,
   data: {
