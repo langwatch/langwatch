@@ -61,9 +61,7 @@ export const createBaseNodeSlice: StateCreator<
   const createNewNode = <T extends Component>(
     node: NodeWithOptionalPosition<T>
   ) => {
-    console.log("createNewNode", node);
     const lastNode = getLastNode<T>();
-    console.log("lastNode", lastNode);
     const position = node.position ?? calculateNodePosition(lastNode);
     return {
       ...node,
@@ -72,7 +70,6 @@ export const createBaseNodeSlice: StateCreator<
   };
 
   const addNodeToWorkflow = (node: Node<Component>): string => {
-    console.log("addNodeToWorkflow", node);
     get().workflowStore.setWorkflow((current) => {
       const newEdges = createFieldMappingEdges(current, node);
       return {
