@@ -21,7 +21,6 @@ import {
   checkUserPermissionForTeam,
   skipPermissionCheck,
 } from "../permission";
-import * as Sentry from "@sentry/nextjs";
 import { env } from "~/env.mjs";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { signUpDataSchema } from "./onboarding";

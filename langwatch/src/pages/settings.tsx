@@ -4,7 +4,6 @@ import {
   Field,
   Heading,
   Input,
-  Separator,
   Spacer,
   Spinner,
   Text,
