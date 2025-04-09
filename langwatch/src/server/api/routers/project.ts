@@ -232,6 +232,7 @@ export const projectRouter = createTRPCRouter({
         s3Endpoint: z.string().optional(),
         s3AccessKeyId: z.string().optional(),
         s3SecretAccessKey: z.string().optional(),
+        s3Bucket: z.string().optional(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
@@ -279,6 +280,7 @@ export const projectRouter = createTRPCRouter({
           s3SecretAccessKey: input.s3SecretAccessKey
             ? encrypt(input.s3SecretAccessKey)
             : null,
+          s3Bucket: input.s3Bucket,
         },
       });
 

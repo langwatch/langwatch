@@ -289,6 +289,7 @@ export const organizationRouter = createTRPCRouter({
         s3SecretAccessKey: z.string().optional(),
         elasticsearchNodeUrl: z.string().optional(),
         elasticsearchApiKey: z.string().optional(),
+        s3Bucket: z.string().optional(),
       })
     )
     .use(
@@ -330,6 +331,7 @@ export const organizationRouter = createTRPCRouter({
             : null,
           elasticsearchNodeUrl: input.elasticsearchNodeUrl,
           elasticsearchApiKey: input.elasticsearchApiKey,
+          s3Bucket: input.s3Bucket,
         },
       });
 

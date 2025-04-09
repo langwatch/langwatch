@@ -33,10 +33,10 @@ export class StorageService {
       const filePath = await this.getLocalStoragePath(projectId, datasetId);
       await fs.writeFile(filePath, data as string);
     } else {
-      const s3Client = await createS3Client(projectId);
+      const { s3Client, s3Bucket } = await createS3Client(projectId);
       await s3Client.send(
         new PutObjectCommand({
-          Bucket: env.S3_BUCKET_NAME ?? "langwatch-storage-prod",
+          Bucket: s3Bucket,
           Key: `datasets/${projectId}/${datasetId}`,
           Body: data,
           ContentType: "application/json",
@@ -76,12 +76,14 @@ export class StorageService {
         throw error;
       }
     } else {
-      const s3Client = await createS3Client(projectId);
+      const { s3Client, s3Bucket } = await createS3Client(projectId);
+
+      console.log("s3Bucket", s3Bucket);
 
       try {
         const { Body } = await s3Client.send(
           new GetObjectCommand({
-            Bucket: env.S3_BUCKET_NAME ?? "langwatch-storage-prod",
+            Bucket: s3Bucket,
             Key: `datasets/${projectId}/${datasetId}`,
           })
         );
@@ -129,6 +131,15 @@ export const createS3Client = async (projectId: string) => {
     throw new Error("Organization not found");
   }
 
+  const s3Bucket =
+    project.s3Bucket && project.s3Bucket.trim() !== ""
+      ? project.s3Bucket
+      : organization?.s3Bucket && organization.s3Bucket.trim() !== ""
+      ? organization.s3Bucket
+      : env.S3_BUCKET_NAME && env.S3_BUCKET_NAME.trim() !== ""
+      ? env.S3_BUCKET_NAME
+      : "langwatch";
+
   const s3Config = {
     endpoint: project.s3Endpoint
       ? decrypt(project.s3Endpoint)
@@ -160,5 +171,5 @@ export const createS3Client = async (projectId: string) => {
     throw new Error("Failed to create S3 client");
   }
 
-  return s3Client;
+  return { s3Client, s3Bucket };
 };
