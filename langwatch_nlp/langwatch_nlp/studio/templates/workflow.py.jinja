@@ -23,21 +23,19 @@ dspy.configure(lm=lm)
 {% endif %}
 
 class WorkflowModule(LangWatchWorkflowModule):
-    def __init__(
-        self,
-        evaluation_weighting: Literal["mean"] = "mean",
-    ):
+    def __init__(self, run_evaluations: bool = False):
         super().__init__()
 
         {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
         {% if node.type == "evaluator" %}
-        self.{{ node.id }} = self.wrapped({{ evaluator_instance(workflow, node) }}, "{{ node.id }}")
+        self.{{ node.id }} = self.wrapped({{ evaluator_instance(workflow, node) }}, "{{ node.id }}", run=run_evaluations)
+        {% elif node.behave_as == "evaluator" %}
+        self.{{ node.id }} = self.wrapped({{ node_templates[node.id][0] }}(), "{{ node.id }}", run=run_evaluations)
         {% else %}
         self.{{ node.id }} = self.wrapped({{ node_templates[node.id][0] }}(), "{{ node.id }}")
         {% endif %}
         {% endfor %}
 
-    {# TODO: migrate from inputs: Dict to actual arguments #}
     {% set input_args = [] %}
     {% set forward_args = [] %}
     {% for input_field in inputs %}
@@ -68,7 +66,7 @@ class WorkflowModule(LangWatchWorkflowModule):
             pass
 
         self.cost = 0
-        self.start_time = time.time()
+        self.duration = 0
 
         {# First build dependency graph #}
         {% set dependency_graph = {} %}
@@ -160,6 +158,9 @@ class WorkflowModule(LangWatchWorkflowModule):
         {% endfor %}
 
         return PredictionWithEvaluationAndMetadata(
+            {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|selectattr("type", "ne", "evaluator")|selectattr("behave_as", "ne", "evaluator")|list %}
+            {{ node.id }}={{ node.id }},
+            {% endfor %}
             {% if ns.end_node %}
             end={
                 {% for edge in workflow.edges %}
@@ -175,22 +176,14 @@ class WorkflowModule(LangWatchWorkflowModule):
                 {% endfor %}
             },
             {% endif %}
-            {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
-            {{ node.id }}={{ node.id }},
-            {% endfor %}
+            evaluations={
+                {% for node in nodes if node.type == "evaluator" or node.behave_as == "evaluator" %}
+                "{{ node.id }}": {{ node.id }},
+                {% endfor %}
+            },
             cost=self.cost,
-            duration=round((time.time() - self.start_time) * 1000),
-            evaluate=self.evaluate_prediction,
+            duration=self.duration,
         )
-
-    def evaluate_prediction(
-        self,
-        example: dspy.Example,
-        prediction: PredictionWithMetadata,
-        trace: Optional[Any] = None,
-        return_results: bool = False,
-    ) -> float | tuple[float, dict[str, EvaluationResultWithMetadata]]:
-        pass
 
 {% for node_id, node_template in node_templates.items() %}
 {{ node_template[1] }}

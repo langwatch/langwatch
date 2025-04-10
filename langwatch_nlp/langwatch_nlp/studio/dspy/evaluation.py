@@ -1,17 +1,17 @@
 import asyncio
 import threading
 import time
-from typing import Callable, List, Optional, Any, Tuple, Literal, overload
+from typing import List, Optional, Any, Literal
 import httpx
 import langwatch
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import dspy
 from tenacity import retry, stop_after_attempt, wait_exponential
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.dspy.predict_with_metadata import (
     PredictionWithMetadata,
 )
-from langevals_core.base_evaluator import SingleEvaluationResult
+from langevals_core.base_evaluator import Money
 
 from langwatch_nlp.studio.types.dsl import EvaluationExecutionState, Workflow
 from langwatch_nlp.studio.types.events import (
@@ -35,7 +35,7 @@ class Evaluator(dspy.Module):
     def trace_evaluation(cls, func):
         def wrapper(self, *args, **kwargs):
             try:
-                result: SingleEvaluationResult = func(self, *args, **kwargs)
+                result: EvaluationResultWithMetadata = func(self, *args, **kwargs)
             except Exception as error:
                 try:
                     langwatch.get_current_span().add_evaluation(
@@ -61,52 +61,54 @@ class Evaluator(dspy.Module):
 
 
 class EvaluationResultWithMetadata(BaseModel):
-    result: SingleEvaluationResult
+    status: Literal["processed", "error", "skipped"]
+    score: Optional[float] = None
+    passed: Optional[bool] = None
+    label: Optional[str] = None
+    details: Optional[str] = Field(
+        default=None, description="Short human-readable description of the result"
+    )
     inputs: dict[str, Any]
+    cost: Optional[Money] = None
     duration: int
 
 
 class PredictionWithEvaluationAndMetadata(PredictionWithMetadata):
     def __init__(
         self,
-        evaluate: Callable[
-            [dspy.Example, PredictionWithMetadata, Optional[Any], bool],
-            float | tuple[float, dict],
-        ],
         cost: float,
         duration: int,
         error: Optional[Exception] = None,
+        evaluations: dict[str, EvaluationResultWithMetadata] = {},
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self._evaluate = evaluate
         self._cost = cost
         self._duration = duration
         self._error = error
+        self._evaluations = evaluations
 
-    @overload
-    def evaluate(
-        self,
-        example: dspy.Example,
-        trace: Optional[Any] = None,
-        return_results: Literal[False] = False,
-    ) -> float: ...
+    @property
+    def evaluations(self) -> dict[str, EvaluationResultWithMetadata]:
+        return self._evaluations
 
-    @overload
-    def evaluate(
-        self,
-        example: dspy.Example,
-        trace: Optional[Any] = None,
-        return_results: Literal[True] = True,
-    ) -> Tuple[float, dict[str, EvaluationResultWithMetadata]]: ...
+    def total_score(self, weighting: Literal["mean"] = "mean") -> float:
+        def get_score(result: EvaluationResultWithMetadata) -> float:
+            return (
+                result.score
+                if result.score is not None
+                else float(result.passed) if result.passed is not None else 0
+            )
 
-    def evaluate(
-        self,
-        example,
-        trace=None,
-        return_results=False,
-    ) -> float | tuple[float, dict[str, EvaluationResultWithMetadata]]:
-        return self._evaluate(example, self, trace, return_results)
+        if weighting == "mean":
+            evaluation_scores = [
+                get_score(evaluation)
+                for evaluation in self._evaluations.values()
+                if evaluation.status == "processed"
+            ]
+            return sum(evaluation_scores) / max(len(evaluation_scores), 1)
+        else:
+            raise ValueError(f"Unsupported evaluation weighting: {weighting}")
 
 
 class EvaluationReporting:
@@ -192,20 +194,18 @@ class EvaluationReporting:
 
         self.batch["dataset"].append(predicted)
 
-        for node_id, result_with_metadata in evaluation_results.items():
+        for node_id, result in evaluation_results.items():
             node = get_node_by_id(self.workflow, node_id)
             if not node:
                 raise ValueError(f"Node with id {node_id} not found")
-
-            result = result_with_metadata.result
 
             evaluation = {
                 "evaluator": node_id,
                 "name": node.data.name,
                 "status": result.status,
                 "index": example._index,
-                "duration": result_with_metadata.duration,
-                "inputs": result_with_metadata.inputs,
+                "duration": result.duration,
+                "inputs": result.inputs,
             }
 
             if result.status == "processed":

@@ -1,12 +1,8 @@
+import time
 import dspy
 import dspy.evaluate
 
-from langevals_core.base_evaluator import (
-    EvaluationResult,
-    SingleEvaluationResult,
-)
-
-from langwatch_nlp.studio.dspy.evaluation import Evaluator
+from langwatch_nlp.studio.dspy.evaluation import EvaluationResultWithMetadata, Evaluator
 
 
 class EvaluatorWrapper(Evaluator):
@@ -15,9 +11,25 @@ class EvaluatorWrapper(Evaluator):
         self.wrapped = wrapped
 
     @Evaluator.trace_evaluation
-    def forward(self, **kwargs) -> SingleEvaluationResult:
+    def forward(self, **kwargs) -> EvaluationResultWithMetadata:
         super().forward()
 
+        start_time = time.time()
         result = self.wrapped(**kwargs)
 
-        return EvaluationResult.model_validate(result)
+        try:
+            return EvaluationResultWithMetadata.model_validate(
+                {
+                    "status": "processed",
+                    **result.model_dump(),
+                    "inputs": kwargs,
+                    "duration": round(time.time() - start_time),
+                }
+            )
+        except Exception as e:
+            return EvaluationResultWithMetadata(
+                status="error",
+                details=str(e),
+                inputs=kwargs,
+                duration=round(time.time() - start_time),
+            )

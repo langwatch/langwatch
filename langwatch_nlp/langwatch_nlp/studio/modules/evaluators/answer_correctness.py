@@ -1,16 +1,17 @@
+import time
 import dspy
 
-from langevals_core.base_evaluator import (
-    EvaluationResult,
-    SingleEvaluationResult,
+from langwatch_nlp.studio.dspy.evaluation import (
+    EvaluationResultWithMetadata,
+    Evaluator,
     Money,
 )
-
-from langwatch_nlp.studio.dspy.evaluation import Evaluator
 from langwatch_nlp.studio.dspy.predict_with_metadata import ModuleWithMetadata
 from langwatch_nlp.studio.types.dsl import LLMConfig
 from langwatch_nlp.studio.utils import node_llm_config_to_dspy_lm
 
+
+# TODO: remove this class from existence, use langevals llm_answer_match instead
 
 class AnswerCorrectnessSignature(dspy.Signature):
     """Verify that the predicted answer matches the gold answer."""
@@ -47,16 +48,24 @@ class AnswerCorrectnessEvaluator(Evaluator):
     @Evaluator.trace_evaluation
     def forward(
         self, input: str, output: str, expected_output: str
-    ) -> SingleEvaluationResult:
+    ) -> EvaluationResultWithMetadata:
         super().forward()
 
+        start_time = time.time()
         result = self.evaluator(
             question=input, gold_answer=expected_output, predicted_answer=output
         )
 
         passed = str(result.is_correct) == "True"
-        return EvaluationResult(
+        return EvaluationResultWithMetadata(
+            status="processed",
             score=1 if passed else 0,
             passed=passed,
             cost=Money(currency="USD", amount=result.cost),
+            inputs={
+                "input": input,
+                "output": output,
+                "expected_output": expected_output,
+            },
+            duration=round(time.time() - start_time),
         )

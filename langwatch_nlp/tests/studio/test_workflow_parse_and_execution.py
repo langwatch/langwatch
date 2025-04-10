@@ -4,12 +4,10 @@ from typing import cast
 import pytest
 from langwatch_nlp.studio.parser_v2 import (
     get_component_class,
-    parse_and_instantiate_workflow,
     parse_workflow,
 )
 from langwatch_nlp.studio.dspy.workflow_module import (
     PredictionWithEvaluationAndMetadata,
-    WorkflowModule,
 )
 from langwatch_nlp.studio.types.dataset import DatasetColumn, DatasetColumnType
 from langwatch_nlp.studio.types.dsl import (
@@ -318,25 +316,18 @@ async def test_parse_workflow():
 
     class_name, code = parse_workflow(simple_workflow, format=True, debug_level=1)
     Module = get_component_class(component_code=code, class_name=class_name)
-    instance = Module()  # type: ignore
+    instance = Module(run_evaluations=True)  # type: ignore
     result: PredictionWithEvaluationAndMetadata = await instance(
-        question="What is the capital of France?",
+        question="What is the capital of France? Reply in a single word with no period.",
         gold_answer="Paris",
     )
     assert "Paris" in result["end"]["result"]
     assert result.cost > 0
     assert result.duration > 0
 
-    # evaluation, evaluation_results = result.evaluation(
-    #     example=dspy.Example(
-    #         question="What is the capital of France?", gold_answer="Paris"
-    #     ),
-    #     return_results=True,
-    # )
-
-    # assert evaluation == 1.0
-    # assert evaluation_results["exact_match_evaluator"].status == "processed"
-    # assert evaluation_results["exact_match_evaluator"].score == 1.0
+    assert result.total_score() == 1.0
+    assert result.evaluations["exact_match_evaluator"].status == "processed"
+    assert result.evaluations["exact_match_evaluator"].score == 1.0
 
 
 @pytest.mark.integration
@@ -1070,5 +1061,3 @@ class CheckInputTypes(dspy.Module):
     assert result["check_input_types"]["field_list_str"] == list
     assert result["check_input_types"]["field_float"] == float
 
-
-# TODO: test evaluate_prediction

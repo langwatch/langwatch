@@ -1,12 +1,8 @@
+import time
 import dspy
 import dspy.evaluate
 
-from langevals_core.base_evaluator import (
-    EvaluationResult,
-    SingleEvaluationResult,
-)
-
-from langwatch_nlp.studio.dspy.evaluation import Evaluator
+from langwatch_nlp.studio.dspy.evaluation import EvaluationResultWithMetadata, Evaluator
 
 
 class ExactMatchEvaluator(Evaluator):
@@ -14,14 +10,20 @@ class ExactMatchEvaluator(Evaluator):
         super().__init__()
 
     @Evaluator.trace_evaluation
-    def forward(self, output: str, expected_output: str) -> SingleEvaluationResult:
+    def forward(
+        self, output: str, expected_output: str
+    ) -> EvaluationResultWithMetadata:
         super().forward()
 
+        start_time = time.time()
         result = dspy.evaluate.answer_exact_match(
             dspy.Example(answer=expected_output), dspy.Prediction(answer=output)
         )
 
-        return EvaluationResult(
+        return EvaluationResultWithMetadata(
+            status="processed",
+            inputs={"output": output, "expected_output": expected_output},
             score=float(result),
             passed=result,
+            duration=round(time.time() - start_time),
         )
