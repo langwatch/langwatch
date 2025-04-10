@@ -27,26 +27,16 @@ export function ExecutionMethodSelectionStepAccordion({
   onSelect: (executionMethod: OfflineExecutionMethod) => void;
 }) {
   const updateNodeInternals = useUpdateNodeInternals();
-  const {
-    executionMethod,
-    addCodeExecutionNodeToWorkflow,
-    setWizardState,
-    addNewSignatureNodeToWorkflow,
-  } = useEvaluationWizardStore(
-    useShallow(
-      ({
-        wizardState,
-        setWizardState,
-        addNewSignatureNodeToWorkflow,
-        addCodeExecutionNodeToWorkflow,
-      }) => ({
-        executionMethod: wizardState.executionMethod,
-        setWizardState,
-        addNewSignatureNodeToWorkflow,
-        addCodeExecutionNodeToWorkflow,
-      })
-    )
-  );
+  const { executionMethod, upsertExecutorNodeByType, setWizardState } =
+    useEvaluationWizardStore(
+      useShallow(
+        ({ wizardState, setWizardState, upsertExecutorNodeByType }) => ({
+          executionMethod: wizardState.executionMethod,
+          setWizardState,
+          upsertExecutorNodeByType,
+        })
+      )
+    );
 
   const focusElementById = useAnimatedFocusElementById();
 
@@ -89,7 +79,7 @@ export function ExecutionMethodSelectionStepAccordion({
           description="Run a prompt via any LLM model to evaluate"
           icon={<LuMessageSquareCode />}
           onClick={() => {
-            const nodeId = addNewSignatureNodeToWorkflow();
+            const nodeId = upsertExecutorNodeByType({ type: "signature" });
             updateNodeInternals(nodeId);
             handleOptionClick("offline_prompt");
           }}
@@ -99,7 +89,7 @@ export function ExecutionMethodSelectionStepAccordion({
           description="Run code"
           icon={<LuCode />}
           onClick={() => {
-            const nodeId = addCodeExecutionNodeToWorkflow();
+            const nodeId = upsertExecutorNodeByType({ type: "code" });
             updateNodeInternals(nodeId);
             handleOptionClick("offline_code_execution");
           }}
