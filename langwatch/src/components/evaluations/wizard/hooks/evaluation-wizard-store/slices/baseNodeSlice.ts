@@ -1,31 +1,53 @@
-import { type Node } from "@xyflow/react";
+import { type Edge, type Node } from "@xyflow/react";
 import { type StateCreator } from "zustand";
 import type {
   Component,
   Field,
 } from "../../../../../../optimization_studio/types/dsl";
-import { createFieldMappingEdges } from "../../../../utils/field-mapping";
-import { calculateNodePosition, updateNodeParameter } from "./utils/nodeUtils";
+import { calculateNodePosition, updateNodeParameter } from "./utils/node.util";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import type { NodeWithOptionalPosition } from "./types";
+
+type NodeTypes = "signature" | "code" | "evaluator" | "entry";
 
 export interface BaseNodeSlice {
   getLastNode: <T extends Component>() => Node<T> | undefined;
   getNodeById: <T extends Component>(nodeId: string) => Node<T> | undefined;
+  getNodesByType: <T extends Component>(type: NodeTypes) => Node<T>[];
+
   /**
    * Create a new node with an optional position
-   *
-   * If position is not provided, it will be calculated based on the last node
+   * @param node - The node data to create
+   * @param node.position - The position of the node - optional - if not provided, it will be calculated based on the last node
+   * @returns A new node with position
    */
   createNewNode: <T extends Component>(
     node: NodeWithOptionalPosition<T>
   ) => Node<T>;
-  addNodeToWorkflow: <T extends Component>(node: Node<T>) => string;
-  getNodesByType: <T extends Component>(type: string) => Node<T>[];
-  updateNode: (
+
+  /**
+   * Adds a new node the workflow. Optionally pass in new edges as well
+   * @returns The id of the new node
+   */
+  addNodeToWorkflow: <T extends Component>(
+    node: Node<T>,
+    newEdges?: Edge[]
+  ) => string;
+
+  /**
+   * Update a node with a custom updater function
+   * @param nodeId - The ID of the node to update
+   * @param updater - Function that receives the current node and returns the updated node
+   */
+  updateNode: <T extends Component>(
     nodeId: string,
-    updater: (node: Node<Component>) => Node<Component>
+    updater: (node: Node<T>) => Node<T>
   ) => void;
+
+  // Setters
+
+  setNodeInputs: (nodeId: string, inputs: Field[]) => void;
+  setNodeOutputs: (nodeId: string, outputs: Field[]) => void;
   setNodeParameter: (
     nodeId: string,
     parameter: Partial<Omit<Field, "value">> & {
@@ -37,7 +59,7 @@ export interface BaseNodeSlice {
 }
 
 export const createBaseNodeSlice: StateCreator<
-  {
+  BaseNodeSlice & {
     workflowStore: WorkflowStore;
   },
   [],
@@ -46,71 +68,88 @@ export const createBaseNodeSlice: StateCreator<
 > = (_set, get) => {
   const getWorkflow = () => get().workflowStore.getWorkflow();
 
-  const getLastNode = <T extends Component>() =>
-    getWorkflow().nodes[getWorkflow().nodes.length - 1] as Node<T>;
-
-  const getNodeById = <T extends Component>(nodeId: string) =>
-    getWorkflow().nodes.find((node) => node.id === nodeId) as Node<T>;
-
-  const getNodesByType = <T extends Component>(type: string) => {
-    return getWorkflow().nodes.filter(
-      (node) => node.type === type
-    ) as Node<T>[];
-  };
-
-  const createNewNode = <T extends Component>(
-    node: NodeWithOptionalPosition<T>
-  ) => {
-    const lastNode = getLastNode<T>();
-    const position = node.position ?? calculateNodePosition(lastNode);
-    return {
-      ...node,
-      position,
-    };
-  };
-
-  const addNodeToWorkflow = (node: Node<Component>): string => {
-    get().workflowStore.setWorkflow((current) => {
-      const newEdges = createFieldMappingEdges(current, node);
-      return {
-        ...current,
-        nodes: [...current.nodes, node],
-        edges: newEdges,
-      };
-    });
-    return node.id;
-  };
-
-  const updateNode: BaseNodeSlice["updateNode"] = (nodeId, updater) => {
-    get().workflowStore.setWorkflow((current) => {
-      return {
-        ...current,
-        nodes: current.nodes.map((node) =>
-          node.id === nodeId ? updater(node) : node
-        ),
-      };
-    });
-  };
-
-  // Generic node parameter update function
-  const setNodeParameter = (
-    nodeId: string,
-    parameter: Partial<Omit<Field, "value">> & {
-      identifier: string;
-      type: Field["type"];
-      value?: unknown;
-    }
-  ) => {
-    return updateNode(nodeId, (node) => updateNodeParameter(node, parameter));
-  };
-
   return {
-    getNodesByType,
-    getLastNode,
-    getNodeById,
-    createNewNode,
-    addNodeToWorkflow,
-    updateNode,
-    setNodeParameter,
+    getLastNode: <T extends Component>() =>
+      getWorkflow().nodes[getWorkflow().nodes.length - 1] as Node<T>,
+
+    getNodeById: <T extends Component>(nodeId: string) =>
+      getWorkflow().nodes.find((node) => node.id === nodeId) as Node<T>,
+
+    getNodesByType: <T extends Component>(type: NodeTypes) => {
+      return getWorkflow().nodes.filter(
+        (node) => node.type === type
+      ) as Node<T>[];
+    },
+
+    createNewNode: <T extends Component>(node: NodeWithOptionalPosition<T>) => {
+      const lastNode = get().getLastNode<T>();
+      const position = node.position ?? calculateNodePosition(lastNode);
+      return {
+        ...node,
+        position,
+      };
+    },
+
+    addNodeToWorkflow: <T extends Component>(
+      node: Node<T>,
+      newEdges?: Edge[]
+    ): string => {
+      get().workflowStore.setWorkflow((current) => {
+        return {
+          ...current,
+          nodes: [...current.nodes, node],
+          edges: newEdges ? [...current.edges, ...newEdges] : current.edges,
+        };
+      });
+
+      return node.id;
+    },
+
+    updateNode: <T extends Component>(
+      nodeId: string,
+      updater: (node: Node<T>) => Node<T>
+    ) => {
+      get().workflowStore.setWorkflow((current) => {
+        return {
+          ...current,
+          nodes: current.nodes.map((node) =>
+            node.id === nodeId ? updater(node as Node<T>) : node
+          ),
+        };
+      });
+    },
+
+    setNodeParameter: (
+      nodeId: string,
+      parameter: Partial<Omit<Field, "value">> & {
+        identifier: string;
+        type: Field["type"];
+        value?: unknown;
+      }
+    ) => {
+      return get().updateNode(nodeId, (node) =>
+        updateNodeParameter(node, parameter)
+      );
+    },
+
+    setNodeInputs: <T extends Component>(nodeId: string, inputs: Field[]) => {
+      return get().updateNode<T>(nodeId, (node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          inputs,
+        },
+      }));
+    },
+
+    setNodeOutputs: <T extends Component>(nodeId: string, outputs: Field[]) => {
+      return get().updateNode<T>(nodeId, (node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          outputs,
+        },
+      }));
+    },
   };
 };

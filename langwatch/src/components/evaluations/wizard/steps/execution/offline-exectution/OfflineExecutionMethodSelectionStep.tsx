@@ -11,6 +11,10 @@ import {
 import type { WizardState } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useEvaluationWizardStore } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useShallow } from "zustand/react/shallow";
+import {
+  CODE_EXECUTION_STEP_ACCORDION_VALUE,
+  CodeExecutionStepAccordion,
+} from "./CodeExecutionStepAccordion";
 
 const ExecutionMethodStepAccordionFactory = (
   executionMethod?: WizardState["executionMethod"]
@@ -18,12 +22,14 @@ const ExecutionMethodStepAccordionFactory = (
   switch (executionMethod) {
     case "offline_prompt":
       return <LlmPromptPropertiesStepAccordion />;
+    case "offline_code_execution":
+      return <CodeExecutionStepAccordion />;
     default:
       return null;
   }
 };
 
-export function OfflineExecutionStep() {
+export function OfflineExecutionMethodSelectionStep() {
   const [accordionValue, setAccordionValue] = useState<string[]>([
     EXECUTION_METHOD_SELECTOR_STEP_ACCORDION_VALUE,
   ]);
@@ -47,6 +53,9 @@ export function OfflineExecutionStep() {
     switch (executionMethod) {
       case "offline_prompt":
         setAccordionValue([LLM_PROMPT_PROPERTIES_STEP_ACCORDION_VALUE]);
+        break;
+      case "offline_code_execution":
+        setAccordionValue([CODE_EXECUTION_STEP_ACCORDION_VALUE]);
         break;
       default:
         setAccordionValue([EXECUTION_METHOD_SELECTOR_STEP_ACCORDION_VALUE]);
