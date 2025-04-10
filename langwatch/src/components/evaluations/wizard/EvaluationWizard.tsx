@@ -36,6 +36,8 @@ import { TaskStep } from "./steps/TaskStep";
 import { api } from "../../../utils/api";
 import { toaster } from "../../ui/toaster";
 import { ReactFlowProvider } from "@xyflow/react";
+import { RunTrialButton } from "./components/RunTrialEvaluationButton";
+import { useRunEvalution } from "./hooks/useRunEvalution";
 
 export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
   const router = useRouter();
@@ -141,6 +143,8 @@ const WizardSidebar = memo(function WizardSidebar({
   );
 
   const [showSpinner, setShowSpinner] = useState(false);
+  const { runEvaluation, isLoading: runEvaluationIsLoading } =
+    useRunEvalution();
 
   useEffect(() => {
     setTimeout(
@@ -188,6 +192,7 @@ const WizardSidebar = memo(function WizardSidebar({
   const stepCompletedValue = useStepCompletedValue();
   const evaluationDisabled =
     !stepCompletedValue("all") || isAutosaving || !experimentId || !project;
+  const trialDisabled = !stepCompletedValue("all");
   const saveAsMonitor = api.experiments.saveAsMonitor.useMutation();
   const router = useRouter();
 
@@ -392,6 +397,13 @@ const WizardSidebar = memo(function WizardSidebar({
                   Show Code
                 </Button>
               )}
+            {step === "results" && !executionMethod?.startsWith("realtime") && (
+              <RunTrialButton
+                runEvaluation={runEvaluation}
+                isLoading={runEvaluationIsLoading}
+                trialDisabled={trialDisabled}
+              />
+            )}
           </HStack>
         </>
       )}
