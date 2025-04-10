@@ -78,47 +78,51 @@ function SettingsForm({
   const updateOrganization = api.organization.update.useMutation();
   const apiContext = api.useContext();
 
-  const onSubmit: SubmitHandler<OrganizationFormData> = useDebouncedCallback(
-    (data: OrganizationFormData) => {
-      if (isEqual(data, defaultValues)) return;
+  const onSubmit: SubmitHandler<OrganizationFormData> = (
+    data: OrganizationFormData
+  ) => {
+    if (isEqual(data, defaultValues)) return;
 
-      setDefaultValues(data);
+    setDefaultValues(data);
 
-      updateOrganization.mutate(
-        {
-          organizationId: organization.id,
-          name: data.name,
-          s3Endpoint: data.s3Endpoint,
-          s3AccessKeyId: data.s3AccessKeyId,
-          s3SecretAccessKey: data.s3SecretAccessKey,
-          elasticsearchNodeUrl: data.elasticsearchNodeUrl,
-          elasticsearchApiKey: data.elasticsearchApiKey,
-          s3Bucket: data.s3Bucket,
+    updateOrganization.mutate(
+      {
+        organizationId: organization.id,
+        name: data.name,
+        s3Endpoint: data.s3Endpoint,
+        s3AccessKeyId: data.s3AccessKeyId,
+        s3SecretAccessKey: data.s3SecretAccessKey,
+        elasticsearchNodeUrl: data.elasticsearchNodeUrl,
+        elasticsearchApiKey: data.elasticsearchApiKey,
+        s3Bucket: data.s3Bucket,
+      },
+      {
+        onSuccess: () => {
+          void apiContext.organization.getAll.refetch();
+          toaster.create({
+            title: "Organization updated",
+            description: "Your organization settings have been saved",
+            type: "success",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
+          });
         },
-        {
-          onSuccess: () => {
-            void apiContext.organization.getAll.refetch();
-          },
-          onError: () => {
-            toaster.create({
-              title: "Failed to create organization",
-              description: "Please try that again",
-              type: "error",
-              meta: {
-                closable: true,
-              },
-              placement: "top-end",
-            });
-          },
-        }
-      );
-    },
-    250
-  );
-
-  useEffect(() => {
-    void handleSubmit(onSubmit)();
-  }, [formWatch, handleSubmit, onSubmit]);
+        onError: () => {
+          toaster.create({
+            title: "Failed to update organization",
+            description: "Please try that again",
+            type: "error",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
+          });
+        },
+      }
+    );
+  };
 
   return (
     <SettingsLayout>
@@ -138,8 +142,9 @@ function SettingsForm({
           {updateOrganization.isLoading && <Spinner />}
         </HStack>
         <Card.Root width="full">
-          <Card.Body width="full" paddingY={2}>
-            <form onSubmit={void handleSubmit(onSubmit)}>
+          <Card.Body width="full" paddingY={2} paddingBottom={4}>
+            {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
+            <form onSubmit={handleSubmit(onSubmit)}>
               <VStack gap={0}>
                 <HorizontalFormControl
                   label="Name"
@@ -273,6 +278,16 @@ function SettingsForm({
                     </HorizontalFormControl>
                   </>
                 )}
+
+                <HStack width="full" justify="flex-end" paddingTop={4}>
+                  <Button
+                    type="submit"
+                    colorPalette="blue"
+                    loading={updateOrganization.isLoading}
+                  >
+                    Save Changes
+                  </Button>
+                </HStack>
               </VStack>
             </form>
           </Card.Body>
@@ -351,46 +366,48 @@ function ProjectSettingsForm({ project }: { project: Project }) {
   const apiContext = api.useContext();
   const [changeLanguageFramework, setChangeLanguageFramework] = useState(false);
 
-  const onSubmit: SubmitHandler<ProjectFormData> = useDebouncedCallback(
-    (data: ProjectFormData) => {
-      if (isEqual(data, previousValues)) return;
+  const onSubmit: SubmitHandler<ProjectFormData> = (data: ProjectFormData) => {
+    if (isEqual(data, previousValues)) return;
 
-      setPreviousValues(data);
+    setPreviousValues(data);
 
-      updateProject.mutate(
-        {
-          projectId: project.id,
-          ...data,
-          userLinkTemplate: data.userLinkTemplate ?? "",
-          s3Endpoint: data.s3Endpoint ?? "",
-          s3AccessKeyId: data.s3AccessKeyId ?? "",
-          s3SecretAccessKey: data.s3SecretAccessKey ?? "",
-          s3Bucket: data.s3Bucket ?? "",
+    updateProject.mutate(
+      {
+        projectId: project.id,
+        ...data,
+        userLinkTemplate: data.userLinkTemplate ?? "",
+        s3Endpoint: data.s3Endpoint ?? "",
+        s3AccessKeyId: data.s3AccessKeyId ?? "",
+        s3SecretAccessKey: data.s3SecretAccessKey ?? "",
+        s3Bucket: data.s3Bucket ?? "",
+      },
+      {
+        onSuccess: () => {
+          void apiContext.organization.getAll.refetch();
+          toaster.create({
+            title: "Project updated",
+            description: "Your project settings have been saved",
+            type: "success",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
+          });
         },
-        {
-          onSuccess: () => {
-            void apiContext.organization.getAll.refetch();
-          },
-          onError: () => {
-            toaster.create({
-              title: "Failed to create organization",
-              description: "Please try that again",
-              type: "error",
-              meta: {
-                closable: true,
-              },
-              placement: "top-end",
-            });
-          },
-        }
-      );
-    },
-    250
-  );
-
-  useEffect(() => {
-    void handleSubmit(onSubmit)();
-  }, [formWatch, handleSubmit, onSubmit]);
+        onError: () => {
+          toaster.create({
+            title: "Failed to update project",
+            description: "Please try that again",
+            type: "error",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
+          });
+        },
+      }
+    );
+  };
 
   return (
     <>
@@ -405,8 +422,9 @@ function ProjectSettingsForm({ project }: { project: Project }) {
         )}
       </HStack>
       <Card.Root width="full">
-        <Card.Body width="full" paddingY={2}>
-          <form onSubmit={void handleSubmit(onSubmit)}>
+        <Card.Body width="full" paddingY={2} paddingBottom={4}>
+          {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
+          <form onSubmit={handleSubmit(onSubmit)}>
             <HorizontalFormControl
               label="Name"
               helper="The name of the project"
@@ -521,6 +539,15 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                 </VStack>
               </HorizontalFormControl>
             )}
+            <HStack width="full" justify="flex-end" paddingTop={4}>
+              <Button
+                type="submit"
+                colorPalette="blue"
+                loading={updateProject.isLoading}
+              >
+                Save Changes
+              </Button>
+            </HStack>
           </form>
         </Card.Body>
       </Card.Root>
