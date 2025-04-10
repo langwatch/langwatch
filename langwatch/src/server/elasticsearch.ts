@@ -6,7 +6,7 @@ import { patchForOpensearchCompatibility } from "./elasticsearch/opensearchCompa
 import { patchForQuickwitCompatibility } from "./elasticsearch/quickwitCompatibility";
 
 import { prisma } from "./db";
-import { decrypt } from "~/utils/encryption";
+import { decrypt } from "../utils/encryption";
 export type IndexSpec = {
   alias: string;
   base: string;
