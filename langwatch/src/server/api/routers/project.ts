@@ -222,18 +222,29 @@ export const projectRouter = createTRPCRouter({
     }),
   update: protectedProcedure
     .input(
-      z.object({
-        projectId: z.string(),
-        name: z.string(),
-        language: z.string(),
-        framework: z.string(),
-        piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]),
-        userLinkTemplate: z.string().optional(),
-        s3Endpoint: z.string().optional(),
-        s3AccessKeyId: z.string().optional(),
-        s3SecretAccessKey: z.string().optional(),
-        s3Bucket: z.string().optional(),
-      })
+      z
+        .object({
+          projectId: z.string(),
+          name: z.string(),
+          language: z.string(),
+          framework: z.string(),
+          piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]),
+          userLinkTemplate: z.string().optional(),
+          s3Endpoint: z.string().optional(),
+          s3AccessKeyId: z.string().optional(),
+          s3SecretAccessKey: z.string().optional(),
+          s3Bucket: z.string().optional(),
+        })
+        .refine((data) => {
+          const hasEndpoint = !!data.s3Endpoint?.trim();
+          const hasAccessKey = !!data.s3AccessKeyId?.trim();
+          const hasSecretKey = !!data.s3SecretAccessKey?.trim();
+
+          return (
+            (hasEndpoint && hasAccessKey && hasSecretKey) ||
+            (!hasEndpoint && !hasAccessKey && !hasSecretKey)
+          );
+        })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
     .mutation(async ({ input, ctx }) => {

@@ -287,16 +287,38 @@ export const organizationRouter = createTRPCRouter({
 
   update: protectedProcedure
     .input(
-      z.object({
-        organizationId: z.string(),
-        name: z.string(),
-        s3Endpoint: z.string().optional(),
-        s3AccessKeyId: z.string().optional(),
-        s3SecretAccessKey: z.string().optional(),
-        elasticsearchNodeUrl: z.string().optional(),
-        elasticsearchApiKey: z.string().optional(),
-        s3Bucket: z.string().optional(),
-      })
+      z
+        .object({
+          organizationId: z.string(),
+          name: z.string(),
+          s3Endpoint: z.string().optional(),
+          s3AccessKeyId: z.string().optional(),
+          s3SecretAccessKey: z.string().optional(),
+          elasticsearchNodeUrl: z.string().optional(),
+          elasticsearchApiKey: z.string().optional(),
+          s3Bucket: z.string().optional(),
+        })
+        .refine((data) => {
+          const hasNodeUrl = !!data.elasticsearchNodeUrl?.trim();
+          const hasApiKey = !!data.elasticsearchApiKey?.trim();
+          return (hasNodeUrl && hasApiKey) || (!hasNodeUrl && !hasApiKey);
+        })
+        .refine(
+          (data) => {
+            const hasEndpoint = !!data.s3Endpoint?.trim();
+            const hasAccessKey = !!data.s3AccessKeyId?.trim();
+            const hasSecretKey = !!data.s3SecretAccessKey?.trim();
+
+            return (
+              (hasEndpoint && hasAccessKey && hasSecretKey) ||
+              (!hasEndpoint && !hasAccessKey && !hasSecretKey)
+            );
+          },
+          {
+            message:
+              "S3 Endpoint, Access Key ID, and Secret Access Key must all be provided together",
+          }
+        )
     )
     .use(
       checkUserPermissionForOrganization(

@@ -112,7 +112,8 @@ function SettingsForm({
         onError: () => {
           toaster.create({
             title: "Failed to update organization",
-            description: "Please try that again",
+            description:
+              "Please make sure you have filled out all fields related to either S3 or Elasticsearch",
             type: "error",
             meta: {
               closable: true,
@@ -233,50 +234,34 @@ function SettingsForm({
                 )}
 
                 {organization.useCustomElasticsearch && (
-                  <>
-                    <HorizontalFormControl
-                      label="Elasticsearch Node URL"
-                      helper="The URL of your Elasticsearch node"
-                    >
-                      {hasOrganizationPermission(
-                        OrganizationRoleGroup.ORGANIZATION_MANAGE
-                      ) ? (
+                  <HorizontalFormControl
+                    label="Elasticsearch"
+                    helper="Configure your Elasticsearch instance for advanced search capabilities"
+                  >
+                    {hasOrganizationPermission(
+                      OrganizationRoleGroup.ORGANIZATION_MANAGE
+                    ) ? (
+                      <VStack width="full" align="start" gap={3}>
                         <Input
                           width="full"
                           type="text"
-                          {...register("elasticsearchNodeUrl", {
-                            required: true,
-                            validate: (value) => {
-                              if (!value.trim()) return false;
-                            },
-                          })}
+                          placeholder="Elasticsearch Node URL"
+                          {...register("elasticsearchNodeUrl")}
                         />
-                      ) : (
-                        <Text>{organization.elasticsearchNodeUrl}</Text>
-                      )}
-                    </HorizontalFormControl>
-                    <HorizontalFormControl
-                      label="Elasticsearch API Key"
-                      helper="The API key for your Elasticsearch node"
-                    >
-                      {hasOrganizationPermission(
-                        OrganizationRoleGroup.ORGANIZATION_MANAGE
-                      ) ? (
                         <Input
                           width="full"
                           type="password"
-                          {...register("elasticsearchApiKey", {
-                            required: true,
-                            validate: (value) => {
-                              if (!value.trim()) return false;
-                            },
-                          })}
+                          placeholder="Elasticsearch API Key"
+                          {...register("elasticsearchApiKey")}
                         />
-                      ) : (
-                        <Text>{organization.elasticsearchApiKey}</Text>
-                      )}
-                    </HorizontalFormControl>
-                  </>
+                      </VStack>
+                    ) : (
+                      <Text>
+                        Elasticsearch configuration is only visible to
+                        organization managers
+                      </Text>
+                    )}
+                  </HorizontalFormControl>
                 )}
 
                 <HStack width="full" justify="flex-end" paddingTop={4}>
@@ -397,7 +382,8 @@ function ProjectSettingsForm({ project }: { project: Project }) {
         onError: () => {
           toaster.create({
             title: "Failed to update project",
-            description: "Please try that again",
+            description:
+              "Please make sure you have filled out all fields related to S3",
             type: "error",
             meta: {
               closable: true,
