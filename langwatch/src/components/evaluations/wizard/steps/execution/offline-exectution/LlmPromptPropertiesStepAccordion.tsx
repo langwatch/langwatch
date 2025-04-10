@@ -86,7 +86,7 @@ export function LlmPromptPropertiesStepAccordion() {
   return (
     <ExecutionStepAccordion
       value={LLM_PROMPT_PROPERTIES_STEP_ACCORDION_VALUE}
-      title="LLM Prompt Properties"
+      title="LLM Prompt"
       showTrigger={true}
     >
       {signatureNode && (

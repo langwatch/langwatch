@@ -1,6 +1,5 @@
 import type { Code } from "~/optimization_studio/types/dsl";
 import type { NodeWithOptionalPosition } from "../types";
-import type { Node } from "@xyflow/react";
 
 type CodeExecutionNode = NodeWithOptionalPosition<Code>;
 
@@ -46,10 +45,9 @@ class Code(dspy.Module):
  * Simple factory for creating Code Execution Nodes
  */
 export class CodeExecutionNodeFactory {
-  static build(overrides?: Partial<CodeExecutionNode>): Node<Code> {
+  static build(overrides?: Partial<CodeExecutionNode>): CodeExecutionNode {
     return {
       ...DEFAULT_CODE_NODE_PROPERTIES,
-      position: { x: 0, y: 0 },
       ...overrides,
     };
   }

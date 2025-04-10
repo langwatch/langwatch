@@ -3,7 +3,6 @@ import { type StateCreator } from "zustand";
 import type { BaseNodeSlice } from "./baseNodeSlice";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import { createDefaultEdge } from "./utils/edge.util";
-import { calculateNodePosition } from "./utils/node.util";
 import { CodeExecutionNodeFactory } from "./factories/code-execution-node.factory";
 
 export interface CodeExecutionSlice {
@@ -24,8 +23,7 @@ export const createCodeExecutionSlice: StateCreator<
     addCodeExecutionNodeToWorkflow: (): string => {
       // Create a new code node based on the default structure
       const entryNode = get().getNodesByType("entry")[0];
-      const position = calculateNodePosition(entryNode);
-      const node = CodeExecutionNodeFactory.build({ position });
+      const node = get().createNewNode(CodeExecutionNodeFactory.build());
 
       // Create an edge from the entry node to the code node if an entry node exists
       const entryNodeId = entryNode?.id;
