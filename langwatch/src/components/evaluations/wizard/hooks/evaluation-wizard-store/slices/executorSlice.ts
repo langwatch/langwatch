@@ -70,6 +70,9 @@ export const createExecutorSlice: StateCreator<
             return get().addCodeExecutionNodeToWorkflow();
         }
       } else {
+        // Make sure the new node has the same inputs and outputs as the existing node
+        node.data.inputs = existingExecutorNode?.data.inputs;
+        node.data.outputs = existingExecutorNode?.data.outputs;
         get().replaceNode(existingExecutorNode.id, node);
         return node.id;
       }
