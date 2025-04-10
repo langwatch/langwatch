@@ -22,6 +22,8 @@ export const signUpDataSchema = z.object({
   otherProjectType: z.string().optional().nullable(),
   otherHowDidYouHearAboutUs: z.string().optional().nullable(),
   utmCampaign: z.string().optional().nullable(),
+  yourRole: z.string().optional().nullable(),
+  featureUsage: z.string().optional().nullable(),
 });
 
 /**
@@ -87,14 +89,17 @@ export const onboardingRouter = createTRPCRouter({
         // Execute post-registration callback if defined
         if (dependencies.postRegistrationCallback) {
           try {
-            await dependencies.postRegistrationCallback({
-              name: ctx.session.user.name,
-              email: ctx.session.user.email,
-            }, {
-              orgName: orgResult.organization.name,
-              phoneNumber: input.phoneNumber,
-              signUpData: input.signUpData,
-            });
+            await dependencies.postRegistrationCallback(
+              {
+                name: ctx.session.user.name,
+                email: ctx.session.user.email,
+              },
+              {
+                orgName: orgResult.organization.name,
+                phoneNumber: input.phoneNumber,
+                signUpData: input.signUpData,
+              }
+            );
           } catch (err) {
             Sentry.captureException(err);
           }
