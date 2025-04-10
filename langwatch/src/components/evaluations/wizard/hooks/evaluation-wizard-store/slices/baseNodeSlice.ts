@@ -101,6 +101,7 @@ export const createBaseNodeSlice: StateCreator<
           edges: newEdges ? [...current.edges, ...newEdges] : current.edges,
         };
       });
+
       return node.id;
     },
 

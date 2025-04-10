@@ -6,7 +6,6 @@ import {
 } from "~/optimization_studio/components/properties/BasePropertiesPanel";
 import { ExecutionStepAccordion } from "../../../components/ExecutionStepAccordion";
 import { VStack } from "@chakra-ui/react";
-import { useUpdateNodeInternals } from "@xyflow/react";
 import type { Field } from "~/optimization_studio/types/dsl";
 import { useCallback } from "react";
 
@@ -28,24 +27,21 @@ export function CodeExecutionStepAccordion() {
     );
 
   const executorNode = getNodesByType("code")[0];
-  const updateNodeInternals = useUpdateNodeInternals();
 
   const handleOnInputsChange = useCallback(
     (data: { fields: Field[] }) => {
       if (!executorNode) return;
       setNodeInputs(executorNode.id, data.fields);
-      updateNodeInternals(executorNode.id);
     },
-    [executorNode, setNodeInputs, updateNodeInternals]
+    [executorNode, setNodeInputs]
   );
 
   const handleOnOutputsChange = useCallback(
     (data: { fields: Field[] }) => {
       if (!executorNode) return;
       setNodeOutputs(executorNode.id, data.fields);
-      updateNodeInternals(executorNode.id);
     },
-    [executorNode, setNodeOutputs, updateNodeInternals]
+    [executorNode, setNodeOutputs]
   );
 
   if (!executorNode) {

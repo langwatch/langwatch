@@ -12,8 +12,8 @@ import { type Edge } from "@xyflow/react";
 export const createDefaultEdge = (
   source: string,
   target: string,
-  sourceHandle = "output.output",
-  targetHandle = "input.input"
+  sourceHandle = "outputs.output",
+  targetHandle = "inputs.input"
 ): Edge => ({
   id: `${source}-to-${target}`,
   source,

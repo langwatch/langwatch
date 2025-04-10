@@ -4,6 +4,8 @@ import type { Node } from "@xyflow/react";
 
 type CodeExecutionNode = NodeWithOptionalPosition<Code>;
 
+const OUTPUT_FIELD_NAME = "output";
+
 const DEFAULT_CODE_NODE_PROPERTIES: CodeExecutionNode = {
   type: "code",
   id: "code_node",
@@ -21,7 +23,7 @@ class Code(dspy.Module):
     def forward(self, question: str):
         # Your code goes here
 
-        return {"answer": "Hello world!"}
+        return {"${OUTPUT_FIELD_NAME}": "Hello world!"}
 `,
       },
     ],
@@ -33,7 +35,7 @@ class Code(dspy.Module):
     ],
     outputs: [
       {
-        identifier: "output",
+        identifier: OUTPUT_FIELD_NAME,
         type: "str",
       },
     ],

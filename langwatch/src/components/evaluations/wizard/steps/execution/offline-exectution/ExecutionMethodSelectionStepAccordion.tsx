@@ -16,6 +16,7 @@ import {
   useEvaluationWizardStore,
 } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useAnimatedFocusElementById } from "../../../../../../hooks/useAnimatedFocusElementById";
+import { useUpdateNodeInternals } from "@xyflow/react";
 
 export const EXECUTION_METHOD_SELECTOR_STEP_ACCORDION_VALUE =
   "execution-method-selector";
@@ -25,6 +26,7 @@ export function ExecutionMethodSelectionStepAccordion({
 }: {
   onSelect: (executionMethod: OfflineExecutionMethod) => void;
 }) {
+  const updateNodeInternals = useUpdateNodeInternals();
   const { executionMethod, setWizardState, getOrCreateCodeExecutionNode } =
     useEvaluationWizardStore(
       useShallow(
@@ -82,7 +84,8 @@ export function ExecutionMethodSelectionStepAccordion({
           description="Run code"
           icon={<LuCode />}
           onClick={() => {
-            getOrCreateCodeExecutionNode();
+            const nodeId = getOrCreateCodeExecutionNode();
+            updateNodeInternals(nodeId);
             handleOptionClick("offline_code_execution");
           }}
         />

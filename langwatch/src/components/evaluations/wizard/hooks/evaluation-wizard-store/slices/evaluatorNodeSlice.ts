@@ -14,6 +14,10 @@ import {
   connectEvaluatorFields,
   createFieldMappingEdges,
 } from "~/components/evaluations/utils/field-mapping";
+import type { Component } from "~/optimization_studio/types/dsl";
+import { createDefaultEdge } from "./utils/edge.util";
+import type { ExecutorSlice } from "./executorSlice";
+
 const createEvaluatorData = (): Omit<Node<Evaluator>, "position"> => ({
   id: "evaluator_node",
   type: "evaluator",
@@ -38,7 +42,8 @@ export interface EvaluatorNodeSlice {
 }
 
 export const createEvaluatorNodeSlice: StateCreator<
-  BaseNodeSlice & { workflowStore: WorkflowStore } & EvaluatorNodeSlice,
+  BaseNodeSlice & { workflowStore: WorkflowStore } & EvaluatorNodeSlice &
+    ExecutorSlice,
   [],
   [],
   EvaluatorNodeSlice
@@ -128,7 +133,17 @@ export const createEvaluatorNodeSlice: StateCreator<
           },
         };
 
-        const newEdges = createNewEdgesForNewNode(current, evaluatorNode);
+        const newEdges = [];
+        // createNewEdgesForNewNode(current, evaluatorNode);
+
+        // If there is an executor node, update the edges
+        // to connect the output of the executor node to the input of the evaluator node
+        // TODO: This isn't actually working.
+        const executorNode = get().getFirstExecutorNode();
+        if (executorNode) {
+          console.log("executorNode - edge being created", executorNode);
+          newEdges.push(createDefaultEdge(executorNode.id, evaluatorNode.id));
+        }
 
         // If the first evaluator node is not found,
         // simply add the new evaluator node and new edges
