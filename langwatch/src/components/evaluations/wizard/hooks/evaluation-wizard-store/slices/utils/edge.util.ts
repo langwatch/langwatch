@@ -59,6 +59,28 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<string, string> = {
 };
 
 /**
+ * Create the transposed version of the mapping for bidirectional lookups.
+ * This allows us to find all possible dataset field names that map to a specific trace field.
+ *
+ * @example
+ * // Original mapping: { "question": "input", "user_input": "input" }
+ * // Transposed result: { "input": ["question", "user_input"] }
+ */
+const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
+  DATASET_INFERRED_MAPPINGS_BY_NAME
+).reduce(
+  (acc, [key, value]) => {
+    if (acc[value]) {
+      acc[value]!.push(key);
+    } else {
+      acc[value] = [key];
+    }
+    return acc;
+  },
+  {} as Record<string, string[]>
+);
+
+/**
  * Create default entry to target edges
  *
  * For all of the target inputs, we try to find the best

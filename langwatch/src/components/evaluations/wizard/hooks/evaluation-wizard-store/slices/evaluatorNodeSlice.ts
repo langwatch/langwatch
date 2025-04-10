@@ -3,7 +3,6 @@ import { type StateCreator } from "zustand";
 import type {
   Evaluator,
   Workflow,
-  Component,
   Entry,
 } from "~/optimization_studio/types/dsl";
 import type { BaseNodeSlice } from "./baseNodeSlice";
@@ -11,10 +10,6 @@ import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { buildEvaluatorFromType } from "~/optimization_studio/utils/registryUtils";
 import { nameToId } from "~/optimization_studio/utils/nodeUtils";
-import {
-  connectEvaluatorFields,
-  createFieldMappingEdges,
-} from "~/components/evaluations/utils/field-mapping";
 import {
   buildEntryToTargetEdges,
   buildExecutorToEvaluatorEdge,
@@ -234,21 +229,3 @@ export const createEvaluatorNodeSlice: StateCreator<
     },
   };
 };
-
-/**
- * Create new edges for new node using our field mapping utility.
- * This is more comprehensive than the previous implementation and handles all
- * fields, not just input and output.
- */
-function createNewEdgesForNewNode(
-  workflow: Workflow,
-  node: Node<Component>
-): Edge[] {
-  // Use specialized function for evaluator nodes
-  if (node.type === "evaluator") {
-    return connectEvaluatorFields(workflow, node as Node<Evaluator>);
-  }
-
-  // Use general field mapping for other node types
-  return createFieldMappingEdges(workflow, node);
-}
