@@ -18,16 +18,24 @@ export const StepsItem = React.forwardRef<
   HTMLDivElement,
   StepsItemProps & {
     isCompleted?: boolean;
+    isDisabled?: boolean;
   }
 >(function StepsItem(props, ref) {
-  const { title, description, completedIcon, icon, isCompleted, ...rest } =
-    props;
+  const {
+    title,
+    description,
+    completedIcon,
+    icon,
+    isCompleted,
+    isDisabled,
+    ...rest
+  } = props;
   return (
     <ChakraSteps.Item {...rest} ref={ref} marginBottom="28px">
-      <ChakraSteps.Trigger position="relative">
+      <ChakraSteps.Trigger position="relative" disabled={isDisabled}>
         <VStack gap={0}>
           <ChakraSteps.Indicator
-            cursor="pointer"
+            cursor={isDisabled ? "not-allowed" : "pointer"}
             _complete={
               !isCompleted
                 ? {
@@ -38,6 +46,7 @@ export const StepsItem = React.forwardRef<
                   }
                 : {}
             }
+            opacity={isDisabled ? 0.5 : 1}
           >
             <ChakraSteps.Status
               complete={
@@ -47,12 +56,16 @@ export const StepsItem = React.forwardRef<
               incomplete={icon ?? <ChakraSteps.Number />}
             />
           </ChakraSteps.Indicator>
-          <Box position="absolute" bottom="-28px">
+          <Box
+            position="absolute"
+            bottom="-28px"
+            opacity={isDisabled ? 0.5 : 1}
+          >
             <StepInfo title={title} description={description} />
           </Box>
         </VStack>
       </ChakraSteps.Trigger>
-      <ChakraSteps.Separator />
+      <ChakraSteps.Separator opacity={isDisabled ? 0.5 : 1} />
     </ChakraSteps.Item>
   );
 });
