@@ -1,9 +1,5 @@
 import { useShallow } from "zustand/react/shallow";
 import { useEvaluationWizardStore } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import {
-  FieldsForm,
-  FieldsDefinition,
-} from "~/optimization_studio/components/properties/BasePropertiesPanel";
 import { ExecutionStepAccordion } from "../../../components/ExecutionStepAccordion";
 import { VStack } from "@chakra-ui/react";
 import type { Field } from "~/optimization_studio/types/dsl";
@@ -54,21 +50,15 @@ export function CodeExecutionStepAccordion() {
       title="Code Execution"
       showTrigger={true}
     >
-      <VStack width="full" gap={3}>
-        <FieldsForm node={executorNode} field="parameters" />
-        <FieldsDefinition
-          node={executorNode}
-          field="inputs"
-          title={"Inputs"}
-          onChange={handleOnInputsChange}
-        />
-        <FieldsDefinition
-          node={executorNode}
-          field="outputs"
-          title="Outputs"
-          onChange={handleOnOutputsChange}
-        />
-      </VStack>
+      <ExecutionStepAccordion.ParametersField node={executorNode} />
+      <ExecutionStepAccordion.InputField
+        node={executorNode}
+        onChange={handleOnInputsChange}
+      />
+      <ExecutionStepAccordion.OutputField
+        node={executorNode}
+        onChange={handleOnOutputsChange}
+      />
     </ExecutionStepAccordion>
   );
 }

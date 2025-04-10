@@ -1,4 +1,4 @@
-import { Textarea, VStack } from "@chakra-ui/react";
+import { Textarea } from "@chakra-ui/react";
 import { useShallow } from "zustand/react/shallow";
 import { useEvaluationWizardStore } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { LLMConfigField } from "~/optimization_studio/components/properties/modals/llm-config/LLMConfigField";
@@ -19,16 +19,22 @@ export function LlmPromptPropertiesStepAccordion() {
     updateSignatureNodeLLMConfigValue,
     setNodeParameter,
     getOrCreateSignatureNode,
+    setNodeInputs,
+    setNodeOutputs,
   } = useEvaluationWizardStore(
     useShallow(
       ({
         updateSignatureNodeLLMConfigValue,
         setNodeParameter,
         getOrCreateSignatureNode,
+        setNodeInputs,
+        setNodeOutputs,
       }) => ({
         updateSignatureNodeLLMConfigValue,
         getOrCreateSignatureNode,
         setNodeParameter,
+        setNodeInputs,
+        setNodeOutputs,
       })
     )
   );
@@ -39,17 +45,6 @@ export function LlmPromptPropertiesStepAccordion() {
    * since we don't currently have a way to trigger on workflow changes
    */
   const signatureNode = getOrCreateSignatureNode();
-
-  const updateLLMConfig = useCallback(
-    (llmConfig: LLMConfig) => {
-      if (!signatureNode) {
-        return;
-      }
-
-      updateSignatureNodeLLMConfigValue(signatureNode.id, llmConfig);
-    },
-    [updateSignatureNodeLLMConfigValue, signatureNode]
-  );
 
   const { llmConfig, instructions } = useMemo(() => {
     const parameters = signatureNode?.data.parameters;
@@ -64,41 +59,76 @@ export function LlmPromptPropertiesStepAccordion() {
     };
   }, [signatureNode]);
 
+  const handleOnLLMConfigChange = useCallback(
+    (llmConfig: LLMConfig) => {
+      if (!signatureNode) return;
+
+      updateSignatureNodeLLMConfigValue(signatureNode.id, llmConfig);
+    },
+    [updateSignatureNodeLLMConfigValue, signatureNode]
+  );
+
+  const handleOnInputsChange = useCallback(
+    (data: { fields: Field[] }) => {
+      if (!signatureNode) return;
+      setNodeInputs(signatureNode.id, data.fields);
+    },
+    [signatureNode, setNodeInputs]
+  );
+
+  const handleOnOutputsChange = useCallback(
+    (data: { fields: Field[] }) => {
+      if (!signatureNode) return;
+      setNodeOutputs(signatureNode.id, data.fields);
+    },
+    [signatureNode, setNodeOutputs]
+  );
+
+  if (!signatureNode) {
+    return null;
+  }
+
   return (
     <ExecutionStepAccordion
       value={LLM_PROMPT_PROPERTIES_STEP_ACCORDION_VALUE}
       title="LLM Prompt Properties"
       showTrigger={true}
     >
-      <VStack width="full" gap={3}>
-        {signatureNode && (
-          <>
-            <PropertyField title="LLM">
-              {llmConfig && (
-                <LLMConfigField
-                  llmConfig={llmConfig}
-                  onChange={updateLLMConfig}
-                />
-              )}
-            </PropertyField>
-            <PropertyField title="Instructions">
-              <Textarea
-                height="100px"
-                fontFamily="monospace"
-                fontSize="13px"
-                value={instructions}
-                onChange={(e) =>
-                  setNodeParameter(signatureNode.id, {
-                    identifier: "instructions",
-                    type: "str",
-                    value: e.target.value,
-                  })
-                }
+      {signatureNode && (
+        <>
+          <PropertyField title="LLM">
+            {llmConfig && (
+              <LLMConfigField
+                llmConfig={llmConfig}
+                onChange={handleOnLLMConfigChange}
               />
-            </PropertyField>
-          </>
-        )}
-      </VStack>
+            )}
+          </PropertyField>
+          <PropertyField title="Instructions">
+            <Textarea
+              height="100px"
+              fontFamily="monospace"
+              fontSize="13px"
+              value={instructions}
+              onChange={(e) =>
+                setNodeParameter(signatureNode.id, {
+                  identifier: "instructions",
+                  type: "str",
+                  value: e.target.value,
+                })
+              }
+            />
+          </PropertyField>
+          <ExecutionStepAccordion.InputField
+            node={signatureNode}
+            onChange={handleOnInputsChange}
+          />
+          <ExecutionStepAccordion.OutputField
+            node={signatureNode}
+            onChange={handleOnOutputsChange}
+          />
+        </>
+      )}
     </ExecutionStepAccordion>
   );
 }
