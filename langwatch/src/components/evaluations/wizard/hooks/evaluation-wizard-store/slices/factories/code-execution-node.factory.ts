@@ -9,7 +9,7 @@ const OUTPUT_FIELD_NAME = "output";
 const DEFAULT_CODE_NODE_PROPERTIES: CodeExecutionNode = {
   type: "code",
   id: "code_node",
-  deletable: true,
+  deletable: false,
   data: {
     name: "Code",
     description: "Python code block",

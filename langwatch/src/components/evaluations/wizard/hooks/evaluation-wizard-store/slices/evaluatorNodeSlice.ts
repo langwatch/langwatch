@@ -113,6 +113,7 @@ export const createEvaluatorNodeSlice: StateCreator<
         const evaluatorNode: Node<Evaluator> = {
           ...baseEvaluatorNode,
           id,
+          deletable: false,
           data: {
             ...baseEvaluatorNode.data,
             ...evaluator,
