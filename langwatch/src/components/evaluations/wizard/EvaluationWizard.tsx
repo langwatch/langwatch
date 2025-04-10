@@ -191,6 +191,20 @@ const WizardSidebar = memo(function WizardSidebar({
   const saveAsMonitor = api.experiments.saveAsMonitor.useMutation();
   const router = useRouter();
 
+  // When step changes, if it's execution or evaluation,
+  // Update the view to show the workflow tab
+  useEffect(() => {
+    if (step === "execution" || step === "evaluation") {
+      setWizardState({ workspaceTab: "workflow" });
+    }
+    if (step === "dataset") {
+      setWizardState({ workspaceTab: "dataset" });
+    }
+    if (step === "results") {
+      setWizardState({ workspaceTab: "results" });
+    }
+  }, [step, setWizardState]);
+
   return (
     <VStack
       height={isLoading || !isTallScreen ? "full" : "fit-content"}
