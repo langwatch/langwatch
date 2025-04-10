@@ -27,16 +27,26 @@ export function ExecutionMethodSelectionStepAccordion({
   onSelect: (executionMethod: OfflineExecutionMethod) => void;
 }) {
   const updateNodeInternals = useUpdateNodeInternals();
-  const { executionMethod, setWizardState, getOrCreateCodeExecutionNode } =
-    useEvaluationWizardStore(
-      useShallow(
-        ({ wizardState, setWizardState, getOrCreateCodeExecutionNode }) => ({
-          executionMethod: wizardState.executionMethod,
-          setWizardState,
-          getOrCreateCodeExecutionNode,
-        })
-      )
-    );
+  const {
+    executionMethod,
+    addCodeExecutionNodeToWorkflow,
+    setWizardState,
+    addNewSignatureNodeToWorkflow,
+  } = useEvaluationWizardStore(
+    useShallow(
+      ({
+        wizardState,
+        setWizardState,
+        addNewSignatureNodeToWorkflow,
+        addCodeExecutionNodeToWorkflow,
+      }) => ({
+        executionMethod: wizardState.executionMethod,
+        setWizardState,
+        addNewSignatureNodeToWorkflow,
+        addCodeExecutionNodeToWorkflow,
+      })
+    )
+  );
 
   const focusElementById = useAnimatedFocusElementById();
 
@@ -78,13 +88,18 @@ export function ExecutionMethodSelectionStepAccordion({
           {...buildBaseRadioParams("offline_prompt")}
           description="Run a prompt via any LLM model to evaluate"
           icon={<LuMessageSquareCode />}
+          onClick={() => {
+            const nodeId = addNewSignatureNodeToWorkflow();
+            updateNodeInternals(nodeId);
+            handleOptionClick("offline_prompt");
+          }}
         />
         <StepRadio
           {...buildBaseRadioParams("offline_code_execution")}
           description="Run code"
           icon={<LuCode />}
           onClick={() => {
-            const nodeId = getOrCreateCodeExecutionNode();
+            const nodeId = addCodeExecutionNodeToWorkflow();
             updateNodeInternals(nodeId);
             handleOptionClick("offline_code_execution");
           }}

@@ -12,7 +12,6 @@ import { createDefaultEdge } from "./utils/edge.util";
 export interface LlmSignatureNodeSlice {
   createNewLlmSignatureNode: () => Node<Signature>;
   addNewSignatureNodeToWorkflow: () => string;
-  getOrCreateSignatureNode: () => Node<Signature>;
   updateSignatureNodeLLMConfigValue: (
     nodeId: string,
     llmConfig: LLMConfig
@@ -39,17 +38,6 @@ export const createLlmSignatureNodeSlice: StateCreator<
         : [];
       const nodeId = get().addNodeToWorkflow(node, newEdges);
       return nodeId;
-    },
-
-    getOrCreateSignatureNode: (): Node<Signature> => {
-      const signatureNodes = get().getNodesByType("signature");
-
-      if (signatureNodes.length > 0) {
-        return signatureNodes[0]!;
-      }
-
-      const nodeId = get().addNewSignatureNodeToWorkflow();
-      return get().getNodeById(nodeId)!;
     },
 
     updateSignatureNodeLLMConfigValue: (

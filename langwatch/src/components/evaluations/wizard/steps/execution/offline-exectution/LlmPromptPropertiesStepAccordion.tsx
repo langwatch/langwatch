@@ -3,7 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useEvaluationWizardStore } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { LLMConfigField } from "~/optimization_studio/components/properties/modals/llm-config/LLMConfigField";
 import { useCallback, useMemo } from "react";
-import type { LLMConfig } from "~/optimization_studio/types/dsl";
+import type { Field, LLMConfig } from "~/optimization_studio/types/dsl";
 import { PropertyField } from "~/optimization_studio/components/properties/BasePropertiesPanel";
 import { ExecutionStepAccordion } from "../../../components/ExecutionStepAccordion";
 
@@ -18,7 +18,7 @@ export function LlmPromptPropertiesStepAccordion() {
   const {
     updateSignatureNodeLLMConfigValue,
     setNodeParameter,
-    getOrCreateSignatureNode,
+    getNodesByType,
     setNodeInputs,
     setNodeOutputs,
   } = useEvaluationWizardStore(
@@ -26,12 +26,12 @@ export function LlmPromptPropertiesStepAccordion() {
       ({
         updateSignatureNodeLLMConfigValue,
         setNodeParameter,
-        getOrCreateSignatureNode,
+        getNodesByType,
         setNodeInputs,
         setNodeOutputs,
       }) => ({
         updateSignatureNodeLLMConfigValue,
-        getOrCreateSignatureNode,
+        getNodesByType,
         setNodeParameter,
         setNodeInputs,
         setNodeOutputs,
@@ -39,12 +39,7 @@ export function LlmPromptPropertiesStepAccordion() {
     )
   );
 
-  /**
-   * Find or create the signature node
-   * This will run on every render to keep the signature node up to date
-   * since we don't currently have a way to trigger on workflow changes
-   */
-  const signatureNode = getOrCreateSignatureNode();
+  const signatureNode = getNodesByType("signature")[0];
 
   const { llmConfig, instructions } = useMemo(() => {
     const parameters = signatureNode?.data.parameters;

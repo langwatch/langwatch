@@ -5,7 +5,7 @@ import {
   useEvaluationWizardStore,
 } from "../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { RealTimeExecutionStep } from "./execution/RealTimeExecutionStep";
-import { OfflineExecutionStep } from "./execution/offline-exectution/OfflineExecutionStep";
+import { OfflineExecutionMethodSelectionStep } from "./execution/offline-exectution/OfflineExecutionMethodSelectionStep";
 
 export function ExecutionStep() {
   const { task } = useEvaluationWizardStore(
@@ -52,7 +52,7 @@ function ExecutionStepFactory({ task }: { task: TaskType | undefined }) {
     case "real_time":
       return <RealTimeExecutionStep />;
     case "llm_app":
-      return <OfflineExecutionStep />;
+      return <OfflineExecutionMethodSelectionStep />;
     // Add other cases as needed
     default:
       return null;

@@ -29,7 +29,7 @@ const ExecutionMethodStepAccordionFactory = (
   }
 };
 
-export function OfflineExecutionStep() {
+export function OfflineExecutionMethodSelectionStep() {
   const [accordionValue, setAccordionValue] = useState<string[]>([
     EXECUTION_METHOD_SELECTOR_STEP_ACCORDION_VALUE,
   ]);
