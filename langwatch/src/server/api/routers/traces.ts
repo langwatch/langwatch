@@ -471,7 +471,7 @@ export const getAllTracesForProject = async ({
   const { pivotIndexConditions } = generateTracesPivotQueryConditions({
     ...input,
     traceIds,
-    showTraceIds: !shouldExcludeTraceIds,
+    filterForAnnotatedTraces: !shouldExcludeTraceIds,
   });
 
   let pageSize = input.pageSize ? input.pageSize : 25;
