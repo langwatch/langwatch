@@ -6,6 +6,7 @@ import { buildEntryToTargetEdges } from "./utils/edge.util";
 import { CodeExecutionNodeFactory } from "./factories/code-execution-node.factory";
 import type { ExecutorSlice } from "./executorSlice";
 import type { Entry } from "~/optimization_studio/types/dsl";
+import { calculateNextPosition } from "./utils/node.util";
 
 export interface CodeExecutionSlice {
   /**
@@ -28,7 +29,12 @@ export const createCodeExecutionSlice: StateCreator<
     addCodeExecutionNodeToWorkflow: (): string => {
       // Create a new code node based on the default structure
       const entryNode = get().getNodesByType("entry")[0] as Node<Entry>;
-      const node = get().createNewNode(CodeExecutionNodeFactory.build());
+      const position = calculateNextPosition(entryNode.position);
+      const node = get().createNewNode(
+        CodeExecutionNodeFactory.build({
+          position,
+        })
+      );
 
       // Create an edge from the entry node to the code node if an entry node exists
       const entryNodeId = entryNode?.id;

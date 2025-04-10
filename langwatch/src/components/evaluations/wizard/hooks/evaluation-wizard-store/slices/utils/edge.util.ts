@@ -1,5 +1,4 @@
 import { type Edge, type Node } from "@xyflow/react";
-import { DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED } from "~/components/evaluations/utils/field-mapping";
 import type { Component, Entry } from "~/optimization_studio/types/dsl";
 
 const createEdgeId = (source: string, target: string) =>
@@ -42,6 +41,11 @@ export const buildExecutorToEvaluatorEdge = (
     ...edge,
   }) as Edge;
 
+/**
+ * Map of dataset field names to trace field names
+ * This is used to infer the correct trace field name for a given dataset field name
+ * since we don't know the exact field name provided by the user.
+ */
 const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<string, string> = {
   trace_id: "trace_id",
   timestamp: "timestamp",
@@ -84,7 +88,7 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
  * Create default entry to target edges
  *
  * For all of the target inputs, we try to find the best
- * match from the source outputs.
+ * match from the source outputs based on the dataset inferred mappings.
  */
 export const buildEntryToTargetEdges = (
   entryNode: Node<Entry>,
@@ -126,7 +130,9 @@ export const buildEntryToTargetEdges = (
     const mappingKey = DATASET_INFERRED_MAPPINGS_BY_NAME[inputIdentifier];
     const potentialFields = mappingKey
       ? [
+          // Put the direct mapping first so it's prioritized
           mappingKey,
+          // Then try the transposed mappings
           ...(DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED[mappingKey] ?? []),
         ]
       : [];

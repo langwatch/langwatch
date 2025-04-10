@@ -4,7 +4,7 @@ import type {
   Component,
   Field,
 } from "../../../../../../optimization_studio/types/dsl";
-import { calculateNodePosition, updateNodeParameter } from "./utils/node.util";
+import { calculateNextPosition, updateNodeParameter } from "./utils/node.util";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import type { NodeWithOptionalPosition } from "./types";
 
@@ -83,7 +83,7 @@ export const createBaseNodeSlice: StateCreator<
 
     createNewNode: <T extends Component>(node: NodeWithOptionalPosition<T>) => {
       const lastNode = get().getLastNode<T>();
-      const position = node.position ?? calculateNodePosition(lastNode);
+      const position = node.position ?? calculateNextPosition(lastNode);
       return {
         ...node,
         position,
