@@ -1,7 +1,12 @@
 import { Button } from "@chakra-ui/react";
 import { LuCirclePlay } from "react-icons/lu";
+import { useRunEvalution } from "../hooks/useRunEvalution";
+import { useStepCompletedValue } from "../hooks/useStepCompletedValue";
 
-export function RunTrialButton({
+/**
+ * This is a stateless button
+ */
+function RunTrialButtonUI({
   runEvaluation,
   isLoading,
   trialDisabled,
@@ -24,5 +29,23 @@ export function RunTrialButton({
       <LuCirclePlay />
       Run Trial Evaluation
     </Button>
+  );
+}
+
+/**
+ * This is a stateful component is used to run a trial evaluation.
+ * @returns A button to run a trial evaluation.
+ */
+export function RunTrialButton() {
+  const { runEvaluation, isLoading } = useRunEvalution();
+  const stepCompletedValue = useStepCompletedValue();
+  const trialDisabled = !stepCompletedValue("all");
+
+  return (
+    <RunTrialButtonUI
+      runEvaluation={runEvaluation}
+      isLoading={isLoading}
+      trialDisabled={trialDisabled}
+    />
   );
 }

@@ -29,8 +29,6 @@ export function ResultsStep() {
     })
   );
 
-  const { runEvaluation, isLoading } = useRunEvalution();
-
   const form = useForm<{
     name: string;
   }>({
@@ -104,11 +102,7 @@ export function ResultsStep() {
                       placement: "top",
                     }}
                   >
-                    <RunTrialButton
-                      runEvaluation={runEvaluation}
-                      isLoading={isLoading}
-                      trialDisabled={trialDisabled}
-                    />
+                    <RunTrialButton />
                   </Tooltip>
                 </VStack>
               </Alert.Description>
