@@ -76,8 +76,8 @@ export const dataForFilter = protectedProcedure
             {
               key: "false",
               doc_count:
-                (response.hits.total as any)?.value ??
-                0 - annotatedTraceIds.length,
+                ((response.hits.total as any)?.value ?? 0) -
+                annotatedTraceIds.length,
             },
           ],
         },
