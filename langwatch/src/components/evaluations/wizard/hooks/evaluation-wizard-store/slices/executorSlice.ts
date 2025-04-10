@@ -68,6 +68,9 @@ export const createExecutorSlice: StateCreator<
             return get().addNewSignatureNodeToWorkflow();
           case "code":
             return get().addCodeExecutionNodeToWorkflow();
+          default:
+            // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+            throw new Error(`Unknown executor node type: ${type}`);
         }
       } else {
         // Make sure the new node has the same inputs and outputs as the existing node
