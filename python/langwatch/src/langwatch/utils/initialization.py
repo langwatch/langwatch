@@ -1,6 +1,6 @@
 """Utility module for handling LangWatch initialization."""
 
-from typing import Dict, Optional, Sequence
+from typing import Optional, Sequence
 from opentelemetry.sdk.trace import TracerProvider
 
 from langwatch.state import get_instance, set_instance
@@ -31,6 +31,5 @@ def ensure_setup() -> None:
     
     If no client is setup, this will create a default client using environment variables.
     """
-
     if get_instance() is None:
         setup()
