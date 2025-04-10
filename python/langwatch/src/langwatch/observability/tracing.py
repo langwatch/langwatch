@@ -9,14 +9,15 @@ import threading
 from deprecated import deprecated
 from langwatch.attributes import AttributeName
 from langwatch.utils.transformation import SerializableWithStringFallback, convert_typed_values
+import nanoid
 from opentelemetry import trace as trace_api
 from opentelemetry.sdk.trace import TracerProvider
-from typing import Dict, List, Optional, Callable, Any, Type, TypeVar, Union, cast
+from typing import Dict, List, Literal, Optional, Callable, Any, Type, TypeVar, Union, cast
 from warnings import warn
 import inspect
 
-from langwatch.state import get_endpoint, get_instance
-from langwatch.domain import ChatMessage, Evaluation, RAGChunk, SpanInputOutput, SpanMetrics, SpanParams, SpanTimestamps, SpanTypes, TraceMetadata
+from langwatch.state import get_api_key, get_endpoint, get_instance
+from langwatch.domain import ChatMessage, Conversation, Evaluation, EvaluationTimestamps, Money, MoneyDict, RAGChunk, SpanInputOutput, SpanMetrics, SpanParams, SpanTimestamps, SpanTypes, TraceMetadata
 from langwatch.observability.span import LangWatchSpan
 from langwatch.__version__ import __version__
 from langwatch.observability.context import stored_langwatch_trace, stored_langwatch_span
@@ -35,7 +36,7 @@ def get_current_trace() -> Optional['LangWatchTrace']:
     ensure_setup()
     return stored_langwatch_trace.get(None)
 
-def get_current_span() -> Optional[LangWatchSpan]:
+def get_current_span() -> Optional['LangWatchSpan']:
     """Get the current span from the LangWatch context.
     If no span exists in LangWatch context, falls back to OpenTelemetry context.
     
@@ -65,6 +66,7 @@ class LangWatchTrace:
     _root_span_params: Optional[Dict[str, Any]] = None
     root_span: Optional[LangWatchSpan] = None
     span: Optional[LangWatchSpan] = None
+    evaluations: List[Evaluation] = []
 
     def __init__(
         self,
@@ -155,6 +157,9 @@ class LangWatchTrace:
             "evaluations": evaluations,
         } if not skip_root_span else None
 
+        if skip_root_span is False:
+            self._create_root_span()
+
     def _create_root_span(self):
         """Create the root span if parameters were provided."""
 
@@ -163,6 +168,7 @@ class LangWatchTrace:
                 trace=self,
                 **self._root_span_params
             )
+            
             return self.root_span
 
     async def _create_root_span_async(self):
@@ -173,6 +179,8 @@ class LangWatchTrace:
                 trace=self,
                 **self._root_span_params
             )
+            # Ensure the span is properly initialized before returning
+            await self.root_span.__aenter__()
             return self.root_span
 
     def _cleanup(self) -> None:
@@ -253,7 +261,7 @@ class LangWatchTrace:
         with httpx.Client() as client:
             response = client.post(
                 f"{endpoint}/api/trace/{self.trace_id}/share",
-                headers={"Authorization": f"Bearer {self.api_key}"},
+                headers={"X-Auth-Token": get_api_key()},
                 timeout=15,
             )
             response.raise_for_status()
@@ -267,11 +275,10 @@ class LangWatchTrace:
         with httpx.Client() as client:
             response = client.post(
                 f"{endpoint}/api/trace/{self.trace_id}/unshare",
-                headers={"Authorization": f"Bearer {self.api_key}"},
+                headers={"X-Auth-Token": get_api_key()},
                 timeout=15,
             )
             response.raise_for_status()
-
 
     def update(
         self,
@@ -318,6 +325,93 @@ class LangWatchTrace:
             model=model,
             params=params,
             metrics=metrics,
+        )
+
+    def add_evaluation(
+        self,
+        *,
+        evaluation_id: Optional[str] = None,
+        span: Optional[LangWatchSpan] = None,
+        name: str,
+        type: Optional[str] = None,
+        is_guardrail: Optional[bool] = None,
+        status: Literal["processed", "skipped", "error"] = "processed",
+        passed: Optional[bool] = None,
+        score: Optional[float] = None,
+        label: Optional[str] = None,
+        details: Optional[str] = None,
+        cost: Optional[Union[Money, MoneyDict, float]] = None,
+        error: Optional[Exception] = None,
+        timestamps: Optional[EvaluationTimestamps] = None,
+    ):
+        from langwatch import evaluations
+        return evaluations.add_evaluation(
+            trace=self,
+            span=span,
+            evaluation_id=evaluation_id,
+            name=name,
+            type=type,
+            is_guardrail=is_guardrail,
+            status=status,
+            passed=passed,
+            score=score,
+            label=label,
+            details=details,
+            cost=cost,
+            error=error,
+            timestamps=timestamps,
+        )
+
+    def evaluate(
+        self,
+        slug: str,
+        name: Optional[str] = None,
+        input: Optional[str] = None,
+        output: Optional[str] = None,
+        expected_output: Optional[str] = None,
+        contexts: Union[List[RAGChunk], List[str]] = [],
+        conversation: Conversation = [],
+        settings: Optional[dict] = None,
+        as_guardrail: bool = False,
+    ):
+        from langwatch import evaluations
+        return evaluations.evaluate(
+            trace=self,
+            slug=slug,
+            name=name,
+            input=input,
+            output=output,
+            expected_output=expected_output,
+            contexts=contexts,
+            conversation=conversation,
+            settings=settings,
+            as_guardrail=as_guardrail,
+        )
+
+    async def async_evaluate(
+        self,
+        slug: str,
+        name: Optional[str] = None,
+        input: Optional[str] = None,
+        output: Optional[str] = None,
+        expected_output: Optional[str] = None,
+        contexts: Union[List[RAGChunk], List[str]] = [],
+        conversation: Conversation = [],
+        settings: Optional[dict] = None,
+        as_guardrail: bool = False,
+    ):
+        from langwatch import evaluations
+        return await evaluations.async_evaluate(
+            trace=self,
+            slug=slug,
+            name=name,
+            input=input,
+            output=output,
+            expected_output=expected_output,
+            contexts=contexts,
+            conversation=conversation,
+            settings=settings,
+            as_guardrail=as_guardrail,
         )
 
     def __call__(self, func: T) -> T:
@@ -399,7 +493,6 @@ class LangWatchTrace:
         """Makes the trace usable as an async context manager."""
         self._context_token = stored_langwatch_trace.set(self)
         await self._create_root_span_async()
-        await self.root_span.__aenter__()
 
         self.span = cast(
             Type[LangWatchSpan], lambda **kwargs: LangWatchSpan(trace=self, **kwargs)
@@ -467,12 +560,13 @@ class LangWatchTrace:
     def _set_callee_output_information(self, func: Callable[..., Any], output: Any):
         """Set the output of the trace based on the callee function and output."""
 
-        if self.root_span.name is None:
-            self.root_span.update_name(func.__name__)
-        if self.root_span.capture_input is False or self.root_span.output is not None:
-            return
+        if self._root_span_params is not None:
+            if self.root_span.name is None:
+                self.root_span.update_name(func.__name__)
+            if self.root_span.capture_input is False or self.root_span.output is not None:
+                return
 
-        self.root_span.update(output=convert_typed_values(output))
+            self.root_span.update(output=convert_typed_values(output))
 
     @property
     def disable_sending(self) -> bool:

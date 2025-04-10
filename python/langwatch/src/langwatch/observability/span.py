@@ -3,7 +3,7 @@ from copy import deepcopy
 import functools
 import json
 from warnings import warn
-from typing import List, Optional, Callable, Any, Type, TypeVar, Dict, Union, TYPE_CHECKING, cast
+from typing import List, Literal, Optional, Callable, Any, Type, TypeVar, Dict, Union, TYPE_CHECKING, cast
 from uuid import UUID
 import threading
 import inspect
@@ -14,7 +14,7 @@ from opentelemetry import trace as trace_api, context
 from opentelemetry.trace import SpanKind, Context, _Links, Span as OtelSpan, Status, StatusCode, set_span_in_context, get_current_span
 from opentelemetry.util.types import Attributes
 
-from langwatch.domain import ChatMessage, SpanInputOutput, SpanMetrics, SpanParams, SpanTimestamps, RAGChunk, SpanTypes
+from langwatch.domain import ChatMessage, Conversation, EvaluationTimestamps, Money, MoneyDict, SpanInputOutput, SpanMetrics, SpanParams, SpanTimestamps, RAGChunk, SpanTypes
 from langwatch.observability.types import SpanType, SpanInputType, ContextsType
 from langwatch.__version__ import __version__
 from .context import stored_langwatch_span, stored_langwatch_trace
@@ -104,7 +104,7 @@ class LangWatchSpan:
         self._cleaned_up = False
 
         self.span = cast(
-            Type['LangWatchSpan'], lambda **kwargs: LangWatchSpan(trace=self, **kwargs)
+            Type['LangWatchSpan'], lambda **kwargs: LangWatchSpan(trace=trace or stored_langwatch_trace.get(None), **kwargs)
         )
 
         if self.trace:
@@ -201,6 +201,9 @@ class LangWatchSpan:
         """Update the name of the span."""
         ensure_setup()
         self.name = name
+
+        print("span", self._span)
+
         self._span.update_name(name)
 
     def update(
@@ -263,6 +266,91 @@ class LangWatchSpan:
             attributes[AttributeName.LangWatchMetrics] = json.dumps(self.metrics, cls=SerializableWithStringFallback)
 
         self.set_attributes(attributes)
+
+    def add_evaluation(
+        self,
+        *,
+        evaluation_id: Optional[str] = None,
+        name: str,
+        type: Optional[str] = None,
+        is_guardrail: Optional[bool] = None,
+        status: Literal["processed", "skipped", "error"] = "processed",
+        passed: Optional[bool] = None,
+        score: Optional[float] = None,
+        label: Optional[str] = None,
+        details: Optional[str] = None,
+        cost: Optional[Union[Money, MoneyDict, float]] = None,
+        error: Optional[Exception] = None,
+        timestamps: Optional[EvaluationTimestamps] = None,
+    ):
+        from langwatch import evaluations
+        return evaluations.add_evaluation(
+            span=self,
+            evaluation_id=evaluation_id,
+            name=name,
+            type=type,
+            is_guardrail=is_guardrail,
+            status=status,
+            passed=passed,
+            score=score,
+            label=label,
+            details=details,
+            cost=cost,
+            error=error,
+            timestamps=timestamps,
+        )
+
+    def evaluate(
+        self,
+        slug: str,
+        name: Optional[str] = None,
+        input: Optional[str] = None,
+        output: Optional[str] = None,
+        expected_output: Optional[str] = None,
+        contexts: Union[List[RAGChunk], List[str]] = [],
+        conversation: Conversation = [],
+        settings: Optional[dict] = None,
+        as_guardrail: bool = False,
+    ):
+        from langwatch import evaluations
+        return evaluations.evaluate(
+            span=self,
+            slug=slug,
+            name=name,
+            input=input,
+            output=output,
+            expected_output=expected_output,
+            contexts=contexts,
+            conversation=conversation,
+            settings=settings,
+            as_guardrail=as_guardrail,
+        )
+
+    async def async_evaluate(
+        self,
+        slug: str,
+        name: Optional[str] = None,
+        input: Optional[str] = None,
+        output: Optional[str] = None,
+        expected_output: Optional[str] = None,
+        contexts: Union[List[RAGChunk], List[str]] = [],
+        conversation: Conversation = [],
+        settings: Optional[dict] = None,
+        as_guardrail: bool = False,
+    ):
+        from langwatch import evaluations
+        return await evaluations.async_evaluate(
+            span=self,
+            slug=slug,
+            name=name,
+            input=input,
+            output=output,
+            expected_output=expected_output,
+            contexts=contexts,
+            conversation=conversation,
+            settings=settings,
+            as_guardrail=as_guardrail,
+        )
 
     def _get_span_params(self, func_name: Optional[str] = None) -> Dict[str, Any]:
         """Helper method to get common span parameters."""
@@ -383,13 +471,14 @@ class LangWatchSpan:
 
     def __enter__(self) -> 'LangWatchSpan':
         """Makes the span usable as a context manager."""
+
         self.trace = self.trace or stored_langwatch_trace.get(None)
         if not self.ignore_missing_trace_warning and not self.trace:
             warn("No current trace found, some spans will may not be sent to LangWatch")
         self._create_span()
 
         self.span = cast(
-            Type['LangWatchSpan'], lambda **kwargs: LangWatchSpan(trace=self, **kwargs)
+            Type['LangWatchSpan'], lambda **kwargs: LangWatchSpan(trace=self.trace or stored_langwatch_trace.get(None), **kwargs)
         )
 
         return self
@@ -405,13 +494,14 @@ class LangWatchSpan:
 
     async def __aenter__(self) -> 'LangWatchSpan':
         """Makes the span usable as an async context manager."""
+
         self.trace = self.trace or stored_langwatch_trace.get(None)
         if not self.ignore_missing_trace_warning and not self.trace:
             warn("No current trace found, some spans may not be sent to LangWatch")
         self._create_span()
 
         self.span = cast(
-            Type['LangWatchSpan'], lambda **kwargs: LangWatchSpan(trace=self, **kwargs)
+            Type['LangWatchSpan'], lambda **kwargs: LangWatchSpan(trace=self.trace or stored_langwatch_trace.get(None), **kwargs)
         )
 
         return self
