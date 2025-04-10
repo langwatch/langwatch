@@ -3,6 +3,7 @@ import type { NodeWithOptionalPosition } from "../types";
 
 type CodeExecutionNode = NodeWithOptionalPosition<Code>;
 
+const INPUT_FIELD_NAME = "input";
 const OUTPUT_FIELD_NAME = "output";
 
 const DEFAULT_CODE_NODE_PROPERTIES: CodeExecutionNode = {
@@ -19,7 +20,7 @@ const DEFAULT_CODE_NODE_PROPERTIES: CodeExecutionNode = {
         value: `import dspy
 
 class Code(dspy.Module):
-    def forward(self, question: str):
+    def forward(self, ${INPUT_FIELD_NAME}: str):
         # Your code goes here
 
         return {"${OUTPUT_FIELD_NAME}": "Hello world!"}
@@ -28,7 +29,7 @@ class Code(dspy.Module):
     ],
     inputs: [
       {
-        identifier: "input",
+        identifier: INPUT_FIELD_NAME,
         type: "str",
       },
     ],

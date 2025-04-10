@@ -61,6 +61,7 @@ export const createExecutorSlice: StateCreator<
     upsertExecutorNodeByType: ({ type }: { type: "signature" | "code" }) => {
       const existingExecutorNode = get().getFirstExecutorNode();
       const node = createNodeByType(type);
+      console.log({ existingExecutorNode, node });
 
       if (!existingExecutorNode) {
         switch (type) {
