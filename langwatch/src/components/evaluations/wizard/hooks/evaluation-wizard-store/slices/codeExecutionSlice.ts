@@ -11,12 +11,12 @@ import { calculateNextPosition } from "./utils/node.util";
 export interface CodeExecutionSlice {
   /**
    * Creates a new code execution node and adds it to the workflow
-   * Also deletes all existing executor nodes and edges
+   * with edges from the entry node to the new node
    * @returns The ID of the newly created node
    */
   addCodeExecutionNodeToWorkflow: () => string;
   /**
-   * Creates a new code execution node
+   * Creates a new code execution node but does not add it to the workflow
    */
   createNewCodeExecutionNode: () => Node<Code>;
 }

@@ -41,7 +41,6 @@ export function OfflineExecutionMethodSelectionStep() {
   );
 
   const updateAccordionValue = useCallback(() => {
-    console.log("updateAccordionValue", { executionMethod });
     /**
      * Force the accordion to re-render.
      * Necessary because we want to trigger the UI to expand the correct step even if
