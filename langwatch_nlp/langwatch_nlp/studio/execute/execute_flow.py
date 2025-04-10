@@ -79,8 +79,6 @@ async def execute_flow(
                 until_node_id=until_node_id,
                 do_not_trace=do_not_trace,
             )
-            print("\n\nuntil_node_id", until_node_id, "\n\n")
-            print("\n\ncode", code, "\n\n")
             Module = get_component_class(component_code=code, class_name=class_name)
             module = cast(LangWatchWorkflowModule, Module)(run_evaluations=True)
             module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)

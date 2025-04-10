@@ -78,8 +78,10 @@ def parse_workflow(
     do_not_trace=False,
 ) -> Tuple[str, str]:
     # Find all reachable nodes from entry
-    nodes = find_reachable_nodes(
-        workflow.nodes, workflow.edges, until_node_id=until_node_id
+    nodes = (
+        find_path_until_node(until_node_id, workflow.nodes, workflow.edges)
+        if until_node_id
+        else find_reachable_nodes(workflow.nodes, workflow.edges)
     )
     for node in nodes:
         node.data.name = normalize_name_to_class_name(node.data.name or "")
@@ -187,9 +189,81 @@ def get_component_class(component_code: str, class_name: str) -> Type[dspy.Modul
     return namespace[class_name]
 
 
-def find_reachable_nodes(
-    nodes: List[Node], edges: List[Edge], until_node_id=None
+def find_path_until_node(
+    until_node_id: str, nodes: List[Node], edges: List[Edge]
 ) -> List[Node]:
+    # First, check for cycles in the workflow
+    detect_cycles(nodes, edges)
+
+    # If the target node is not found, return an empty list
+    if until_node_id not in [node.id for node in nodes] and until_node_id != "entry":
+        raise ValueError(f"Node with ID '{until_node_id}' not found in the workflow")
+
+    # Handle special case if until_node_id is "entry"
+    if until_node_id == "entry":
+        entry_node = next((node for node in nodes if node.id == "entry"), None)
+        return [entry_node] if entry_node else []
+
+    # Build reverse dependency graph: node_id -> nodes it depends on
+    reverse_graph: Dict[str, List[str]] = {"entry": []}
+    for node in nodes:
+        reverse_graph[node.id] = []
+
+    for edge in edges:
+        source, target = edge.source, edge.target
+        # In the reverse graph, target depends on source
+        reverse_graph[target].append(source)
+
+    # Create a lookup for nodes by their id
+    node_lookup = {node.id: node for node in nodes}
+
+    # Trace back from the target node to the entry
+    visited = set()
+    required_nodes = set()
+
+    def trace_dependencies(node_id: str):
+        if node_id in visited:
+            return
+
+        visited.add(node_id)
+        required_nodes.add(node_id)
+
+        for dependency in reverse_graph.get(node_id, []):
+            trace_dependencies(dependency)
+
+    # Start tracing from the target node
+    trace_dependencies(until_node_id)
+
+    # Get all nodes in the correct order (using topological sort)
+    result_nodes = []
+
+    # A simplified topological sort since we already know the graph is acyclic
+    def dfs_topo_sort(node_id: str, visited_topo: Set[str]):
+        if node_id in visited_topo or node_id not in required_nodes:
+            return
+
+        visited_topo.add(node_id)
+
+        # Visit all dependencies first
+        for dependency in reverse_graph.get(node_id, []):
+            dfs_topo_sort(dependency, visited_topo)
+
+        # Add the node to result if it's in our required set
+        if node_id in node_lookup:
+            result_nodes.append(node_lookup[node_id])
+        elif node_id == "entry":
+            entry_node = next((node for node in nodes if node.id == "entry"), None)
+            if entry_node:
+                result_nodes.append(entry_node)
+
+    # Start DFS from the target node to get a topological ordering
+    dfs_topo_sort(until_node_id, set())
+
+    # Reverse to get the correct order (from entry to target)
+    return list(reversed(result_nodes))
+
+
+def find_reachable_nodes(nodes: List[Node], edges: List[Edge]) -> List[Node]:
     # First, check for cycles in the workflow
     detect_cycles(nodes, edges)
 
@@ -216,13 +290,6 @@ def find_reachable_nodes(
             for node_id, deps in dependency_graph.items():
                 if current in deps and node_id not in visited and node_id not in queue:
                     new_queue_items.append(node_id)
-
-            # If we've reached the specified until_node_id, stop the traversal
-            if until_node_id is not None and until_node_id in new_queue_items:
-                queue.append(until_node_id)
-                visited.add(until_node_id)
-                reachable_node_ids.add(until_node_id)
-                break
 
             queue.extend(new_queue_items)
 
