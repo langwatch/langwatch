@@ -12,11 +12,6 @@ export interface CodeExecutionSlice {
    * @returns The ID of the newly created node
    */
   addCodeExecutionNodeToWorkflow: () => string;
-  /**
-   * Get or create a code execution node
-   * @returns The ID of the code execution node
-   */
-  getOrCreateCodeExecutionNode: () => string;
 }
 
 export const createCodeExecutionSlice: StateCreator<
@@ -41,13 +36,6 @@ export const createCodeExecutionSlice: StateCreator<
       // Add the node and edges to the workflow
       const nodeId = get().addNodeToWorkflow(node, newEdges);
       return nodeId;
-    },
-    getOrCreateCodeExecutionNode: () => {
-      const node = get().getNodesByType("code")[0];
-      if (node) {
-        return node.id;
-      }
-      return get().addCodeExecutionNodeToWorkflow();
     },
   };
 };
