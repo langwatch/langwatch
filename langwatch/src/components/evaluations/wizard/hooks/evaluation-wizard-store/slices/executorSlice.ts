@@ -60,11 +60,16 @@ export const createExecutorSlice: StateCreator<
     },
     upsertExecutorNodeByType: ({ type }: { type: "signature" | "code" }) => {
       const existingExecutorNode = get().getFirstExecutorNode();
+      const node = createNodeByType(type);
 
       if (!existingExecutorNode) {
-        return createNodeByType(type).id;
+        switch (type) {
+          case "signature":
+            return get().addNewSignatureNodeToWorkflow();
+          case "code":
+            return get().addCodeExecutionNodeToWorkflow();
+        }
       } else {
-        const node = createNodeByType(type);
         get().replaceNode(existingExecutorNode.id, node);
         return node.id;
       }

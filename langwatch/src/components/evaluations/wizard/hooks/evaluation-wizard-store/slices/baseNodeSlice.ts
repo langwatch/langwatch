@@ -167,12 +167,18 @@ export const createBaseNodeSlice: StateCreator<
       get().workflowStore.setWorkflow((current) => {
         return {
           ...current,
+          // Replace the node with the new node
           nodes: current.nodes.map((node) => {
-            return {
-              ...node,
-              id: node.id === nodeId ? newNode.id : node.id,
-            };
+            if (node.id === nodeId) {
+              return {
+                ...newNode,
+                // Keep the same position as the old node
+                position: node.position,
+              };
+            }
+            return node;
           }),
+          // Replace the edges with the new edges
           edges: current.edges.map((edge) => {
             return {
               ...edge,
