@@ -1,13 +1,15 @@
 import { type Edge, type Node } from "@xyflow/react";
 import { type StateCreator } from "zustand";
 import type {
+  Entry,
   LLMConfig,
   Signature,
-} from "../../../../../../optimization_studio/types/dsl";
+} from "~/optimization_studio/types/dsl";
 import type { BaseNodeSlice } from "./baseNodeSlice";
 import { LlmSignatureNodeFactory } from "./factories/llm-signature-node.factory";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
-import { createDefaultEdge } from "./utils/edge.util";
+import { buildEntryToTargetEdges } from "./utils/edge.util";
+import { calculateNextPosition } from "./utils/node.util";
 
 export interface LlmSignatureNodeSlice {
   createNewLlmSignatureNode: () => Node<Signature>;
@@ -24,18 +26,29 @@ export const createLlmSignatureNodeSlice: StateCreator<
   [],
   LlmSignatureNodeSlice
 > = (set, get) => {
-  const getEntryNodeId = () => get().getNodesByType("entry")[0]?.id;
+  const getEntryNode: () => Node<Entry> | undefined = () =>
+    get().getNodesByType("entry")[0] as Node<Entry> | undefined;
 
   return {
-    createNewLlmSignatureNode: (): Node<Signature> =>
-      get().createNewNode(LlmSignatureNodeFactory.build()),
+    createNewLlmSignatureNode: (): Node<Signature> => {
+      const entryNode = getEntryNode();
+      const position = entryNode
+        ? calculateNextPosition(entryNode.position)
+        : { x: 0, y: 0 };
+      return get().createNewNode(
+        LlmSignatureNodeFactory.build({
+          position,
+        })
+      );
+    },
 
     addNewSignatureNodeToWorkflow: (): string => {
       const node = get().createNewLlmSignatureNode();
-      const entryNodeId = getEntryNodeId();
-      const newEdges: Edge[] = entryNodeId
-        ? [createDefaultEdge(entryNodeId, node.id)]
+      const entryNode = getEntryNode();
+      const newEdges: Edge[] = entryNode
+        ? buildEntryToTargetEdges(entryNode, node)
         : [];
+
       const nodeId = get().addNodeToWorkflow(node, newEdges);
       return nodeId;
     },

@@ -1,37 +1,56 @@
-import { type Edge } from "@xyflow/react";
+import { type Edge, type Node } from "@xyflow/react";
 import { type StateCreator } from "zustand";
 import type { BaseNodeSlice } from "./baseNodeSlice";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
-import { createDefaultEdge } from "./utils/edge.util";
+import { buildEntryToTargetEdges } from "./utils/edge.util";
 import { CodeExecutionNodeFactory } from "./factories/code-execution-node.factory";
+import type { ExecutorSlice } from "./executorSlice";
+import type { Entry, Code } from "~/optimization_studio/types/dsl";
+import { calculateNextPosition } from "./utils/node.util";
 
 export interface CodeExecutionSlice {
   /**
    * Creates a new code execution node and adds it to the workflow
+   * with edges from the entry node to the new node
    * @returns The ID of the newly created node
    */
   addCodeExecutionNodeToWorkflow: () => string;
+  /**
+   * Creates a new code execution node but does not add it to the workflow
+   */
+  createNewCodeExecutionNode: () => Node<Code>;
 }
 
 export const createCodeExecutionSlice: StateCreator<
-  BaseNodeSlice & CodeExecutionSlice & { workflowStore: WorkflowStore },
+  { workflowStore: WorkflowStore } & BaseNodeSlice &
+    CodeExecutionSlice &
+    ExecutorSlice,
   [],
   [],
   CodeExecutionSlice
 > = (set, get) => {
   return {
+    createNewCodeExecutionNode: (): Node<Code> => {
+      const entryNode = get().getNodesByType("entry")[0] as Node<Entry>;
+      const position = entryNode
+        ? calculateNextPosition(entryNode.position)
+        : { x: 0, y: 0 };
+      return get().createNewNode(
+        CodeExecutionNodeFactory.build({
+          position,
+        })
+      );
+    },
     addCodeExecutionNodeToWorkflow: (): string => {
       // Create a new code node based on the default structure
-      const entryNode = get().getNodesByType("entry")[0];
-      const node = get().createNewNode(CodeExecutionNodeFactory.build());
-
+      const node = get().createNewCodeExecutionNode();
       // Create an edge from the entry node to the code node if an entry node exists
-      const entryNodeId = entryNode?.id;
-      const newEdges: Edge[] = entryNodeId
-        ? [createDefaultEdge(entryNodeId, node.id)]
+      const entryNode = get().getNodesByType("entry")[0] as Node<Entry>;
+      const newEdges: Edge[] = entryNode
+        ? buildEntryToTargetEdges(entryNode, node)
         : [];
 
-      // Add the node and edges to the workflow
+      // Add the executor  node and edges to the workflow
       const nodeId = get().addNodeToWorkflow(node, newEdges);
       return nodeId;
     },

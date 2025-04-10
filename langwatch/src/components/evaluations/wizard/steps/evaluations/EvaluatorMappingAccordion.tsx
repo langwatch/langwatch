@@ -96,6 +96,7 @@ export const EvaluatorMappingAccordion = () => {
             <Field.Root>
               <VStack align="start" gap={4} width="full">
                 <EvaluatorTracesMapping
+                  skipSettingDefaultEdges={true}
                   titles={
                     task == "real_time" && dataSource !== "from_production"
                       ? ["Dataset", "Trace", "Evaluator"]

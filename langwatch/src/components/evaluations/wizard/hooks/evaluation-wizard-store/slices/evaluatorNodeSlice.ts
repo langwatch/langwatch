@@ -3,7 +3,7 @@ import { type StateCreator } from "zustand";
 import type {
   Evaluator,
   Workflow,
-  Component,
+  Entry,
 } from "~/optimization_studio/types/dsl";
 import type { BaseNodeSlice } from "./baseNodeSlice";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
@@ -11,10 +11,9 @@ import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { buildEvaluatorFromType } from "~/optimization_studio/utils/registryUtils";
 import { nameToId } from "~/optimization_studio/utils/nodeUtils";
 import {
-  connectEvaluatorFields,
-  createFieldMappingEdges,
-} from "~/components/evaluations/utils/field-mapping";
-import { createDefaultEdge } from "./utils/edge.util";
+  buildEntryToTargetEdges,
+  buildExecutorToEvaluatorEdge,
+} from "./utils/edge.util";
 import type { ExecutorSlice } from "./executorSlice";
 
 const createEvaluatorData = (): Omit<Node<Evaluator>, "position"> => ({
@@ -114,6 +113,7 @@ export const createEvaluatorNodeSlice: StateCreator<
         const evaluatorNode: Node<Evaluator> = {
           ...baseEvaluatorNode,
           id,
+          deletable: false,
           data: {
             ...baseEvaluatorNode.data,
             ...evaluator,
@@ -132,16 +132,26 @@ export const createEvaluatorNodeSlice: StateCreator<
           },
         };
 
-        const newEdges = [];
-        // createNewEdgesForNewNode(current, evaluatorNode);
+        const entryNode = get().getNodesByType("entry")[0] as Node<Entry>;
+        let newEdges = buildEntryToTargetEdges(entryNode, evaluatorNode);
 
         // If there is an executor node, update the edges
         // to connect the output of the executor node to the input of the evaluator node
         // TODO: This isn't actually working.
         const executorNode = get().getFirstExecutorNode();
         if (executorNode) {
-          console.log("executorNode - edge being created", executorNode);
-          newEdges.push(createDefaultEdge(executorNode.id, evaluatorNode.id));
+          const edge = buildExecutorToEvaluatorEdge({
+            source: executorNode.id,
+            target: evaluatorNode.id,
+          });
+          // Remove edges with the same target as the new edge
+          newEdges = newEdges.filter(
+            (e) =>
+              !(
+                e.target === edge.target && e.targetHandle === edge.targetHandle
+              )
+          );
+          newEdges.push(edge);
         }
 
         // If the first evaluator node is not found,
@@ -220,21 +230,3 @@ export const createEvaluatorNodeSlice: StateCreator<
     },
   };
 };
-
-/**
- * Create new edges for new node using our field mapping utility.
- * This is more comprehensive than the previous implementation and handles all
- * fields, not just input and output.
- */
-function createNewEdgesForNewNode(
-  workflow: Workflow,
-  node: Node<Component>
-): Edge[] {
-  // Use specialized function for evaluator nodes
-  if (node.type === "evaluator") {
-    return connectEvaluatorFields(workflow, node as Node<Evaluator>);
-  }
-
-  // Use general field mapping for other node types
-  return createFieldMappingEdges(workflow, node);
-}

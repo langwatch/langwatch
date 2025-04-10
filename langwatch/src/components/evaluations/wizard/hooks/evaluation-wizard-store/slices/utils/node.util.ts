@@ -1,11 +1,11 @@
 import { type Node } from "@xyflow/react";
 import type { Component, Field } from "~/optimization_studio/types/dsl";
 
-export const calculateNodePosition = (lastNode: Node<Component> | undefined) =>
-  lastNode
+export const calculateNextPosition = (position: Node<Component>["position"]) =>
+  position
     ? {
-        x: lastNode.position.x + (lastNode.width ?? 0) + 200,
-        y: lastNode.position.y,
+        x: position.x + 300,
+        y: position.y - 50,
       }
     : { x: 0, y: 0 };
 

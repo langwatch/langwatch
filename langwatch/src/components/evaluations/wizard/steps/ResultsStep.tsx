@@ -18,6 +18,7 @@ import { useRunEvalution } from "../hooks/useRunEvalution";
 import { useStepCompletedValue } from "../hooks/useStepCompletedValue";
 import { Tooltip } from "../../../ui/tooltip";
 import { useEffect } from "react";
+import { RunTrialButton } from "../components/RunTrialEvaluationButton";
 
 export function ResultsStep() {
   const { name, wizardState, setWizardState } = useEvaluationWizardStore(
@@ -27,8 +28,6 @@ export function ResultsStep() {
       setWizardState,
     })
   );
-
-  const { runEvaluation, isLoading } = useRunEvalution();
 
   const form = useForm<{
     name: string;
@@ -86,40 +85,30 @@ export function ResultsStep() {
           />
           <StepStatus name="Evaluation" step="evaluation" />
         </VStack>
-        <Alert.Root colorPalette="blue">
-          <Alert.Content>
-            <Alert.Description>
-              <VStack align="start" gap={4}>
-                Try out your real-time evaluation with the sample before
-                enabling monitoring.
-                <Tooltip
-                  content={
-                    trialDisabled
-                      ? "Select a dataset and evaluation to run a trial"
-                      : ""
-                  }
-                  positioning={{
-                    placement: "top",
-                  }}
-                >
-                  <Button
-                    colorPalette="blue"
-                    _icon={{
-                      minWidth: "18px",
-                      minHeight: "18px",
+        {wizardState.executionMethod?.startsWith("realtime") && (
+          <Alert.Root colorPalette="blue">
+            <Alert.Content>
+              <Alert.Description>
+                <VStack align="start" gap={4}>
+                  Try out your real-time evaluation with the sample before
+                  enabling monitoring.
+                  <Tooltip
+                    content={
+                      trialDisabled
+                        ? "Select a dataset and evaluation to run a trial"
+                        : ""
+                    }
+                    positioning={{
+                      placement: "top",
                     }}
-                    onClick={runEvaluation}
-                    loading={isLoading}
-                    disabled={trialDisabled}
                   >
-                    <LuCirclePlay />
-                    Run Trial Evaluation
-                  </Button>
-                </Tooltip>
-              </VStack>
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
+                    <RunTrialButton />
+                  </Tooltip>
+                </VStack>
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+        )}
       </VStack>
     </>
   );

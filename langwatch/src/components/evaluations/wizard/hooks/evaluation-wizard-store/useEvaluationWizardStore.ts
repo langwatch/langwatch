@@ -16,7 +16,6 @@ import {
   createEvaluationWizardSlicesStore,
   type EvaluationWizardSlicesUnion,
 } from "./slices";
-import { useShallow } from "zustand/react/shallow";
 
 export const EVALUATOR_CATEGORIES = [
   "expected_answer",

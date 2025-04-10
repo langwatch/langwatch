@@ -4,7 +4,7 @@ import type {
   Component,
   Field,
 } from "../../../../../../optimization_studio/types/dsl";
-import { calculateNodePosition, updateNodeParameter } from "./utils/node.util";
+import { calculateNextPosition, updateNodeParameter } from "./utils/node.util";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import type { NodeWithOptionalPosition } from "./types";
 
@@ -56,6 +56,12 @@ export interface BaseNodeSlice {
       value?: unknown;
     }
   ) => void;
+  /**
+   * Replace node with a new node
+   * @param nodeId - The ID of the node to replace
+   * @param newNode - The new node to replace the old node with
+   */
+  replaceNode: <T extends Component>(nodeId: string, newNode: Node<T>) => void;
 }
 
 export const createBaseNodeSlice: StateCreator<
@@ -83,7 +89,12 @@ export const createBaseNodeSlice: StateCreator<
 
     createNewNode: <T extends Component>(node: NodeWithOptionalPosition<T>) => {
       const lastNode = get().getLastNode<T>();
-      const position = node.position ?? calculateNodePosition(lastNode);
+      const position =
+        // If the node has a position, use it
+        node.position ??
+        // If there is a last node, calculate the next position
+        (lastNode ? calculateNextPosition(lastNode.position) : { x: 0, y: 0 });
+
       return {
         ...node,
         position,
@@ -150,6 +161,33 @@ export const createBaseNodeSlice: StateCreator<
           outputs,
         },
       }));
+    },
+
+    replaceNode: <T extends Component>(nodeId: string, newNode: Node<T>) => {
+      get().workflowStore.setWorkflow((current) => {
+        return {
+          ...current,
+          // Replace the node with the new node
+          nodes: current.nodes.map((node) => {
+            if (node.id === nodeId) {
+              return {
+                ...newNode,
+                // Keep the same position as the old node
+                position: node.position,
+              };
+            }
+            return node;
+          }),
+          // Replace the edges with the new edges
+          edges: current.edges.map((edge) => {
+            return {
+              ...edge,
+              source: edge?.source === nodeId ? newNode.id : edge?.source,
+              target: edge?.target === nodeId ? newNode.id : edge?.target,
+            };
+          }),
+        };
+      });
     },
   };
 };

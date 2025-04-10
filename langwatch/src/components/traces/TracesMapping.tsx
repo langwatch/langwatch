@@ -66,6 +66,7 @@ export const TracesMapping = ({
   setDatasetEntries,
   setTraceMapping,
   disableExpansions,
+  skipSettingDefaultEdges,
 }: {
   titles?: string[];
   traces: TraceWithSpans[];
@@ -80,6 +81,18 @@ export const TracesMapping = ({
   setDatasetEntries?: (entries: DatasetRecordEntry[]) => void;
   setTraceMapping?: (mapping: MappingState) => void;
   disableExpansions?: boolean;
+  /**
+   * To consider:
+   * This is a hacky way to prevent the default edges from being set.
+   * This component shouldn't be setting the default edges on mount,
+   * but because we need it to do this for the optimization studio,
+   * we need to pass this prop in so we can skip this behavior for the wizard.
+   *
+   * Please refactor asap.
+   * Date: April 10th, 2025
+   * @Author: @drewdrewthis
+   */
+  skipSettingDefaultEdges?: boolean;
 }) => {
   const { project } = useOrganizationTeamProject();
   const { task } = useEvaluationWizardStore((state) => ({
@@ -258,7 +271,10 @@ export const TracesMapping = ({
         })
         .filter((x) => x) as Workflow["edges"]),
     ];
-    dsl.setTargetEdges?.(targetEdgesWithDefaults);
+
+    if (!skipSettingDefaultEdges) {
+      dsl.setTargetEdges?.(targetEdgesWithDefaults);
+    }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetFields, dsl?.sourceOptions]);

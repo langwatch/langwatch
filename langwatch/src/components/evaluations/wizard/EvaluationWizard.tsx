@@ -36,6 +36,7 @@ import { TaskStep } from "./steps/TaskStep";
 import { api } from "../../../utils/api";
 import { toaster } from "../../ui/toaster";
 import { ReactFlowProvider } from "@xyflow/react";
+import { RunTrialButton } from "./components/RunTrialEvaluationButton";
 
 export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
   const router = useRouter();
@@ -191,6 +192,20 @@ const WizardSidebar = memo(function WizardSidebar({
   const saveAsMonitor = api.experiments.saveAsMonitor.useMutation();
   const router = useRouter();
 
+  // When step changes, if it's execution or evaluation,
+  // Update the view to show the workflow tab
+  useEffect(() => {
+    if (step === "execution" || step === "evaluation") {
+      setWizardState({ workspaceTab: "workflow" });
+    }
+    if (step === "dataset") {
+      setWizardState({ workspaceTab: "dataset" });
+    }
+    if (step === "results") {
+      setWizardState({ workspaceTab: "results" });
+    }
+  }, [step, setWizardState]);
+
   return (
     <VStack
       height={isLoading || !isTallScreen ? "full" : "fit-content"}
@@ -232,21 +247,25 @@ const WizardSidebar = memo(function WizardSidebar({
                   index={1}
                   title="Dataset"
                   isCompleted={!!stepCompletedValue("dataset")}
+                  isDisabled={!stepCompletedValue("task")}
                 />
                 <Steps.Item
                   index={2}
                   title="Execution"
                   isCompleted={!!stepCompletedValue("execution")}
+                  isDisabled={!stepCompletedValue("dataset")}
                 />
                 <Steps.Item
                   index={3}
                   title="Evaluation"
                   isCompleted={!!stepCompletedValue("evaluation")}
+                  isDisabled={!stepCompletedValue("execution")}
                 />
                 <Steps.Item
                   index={4}
                   title="Results"
                   isCompleted={!!stepCompletedValue("results")}
+                  isDisabled={!stepCompletedValue("evaluation")}
                 />
               </Steps.List>
             </Steps.Root>
@@ -374,6 +393,7 @@ const WizardSidebar = memo(function WizardSidebar({
                   Show Code
                 </Button>
               )}
+            {step === "results" && task !== "real_time" && <RunTrialButton />}
           </HStack>
         </>
       )}
