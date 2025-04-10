@@ -216,6 +216,18 @@ def normalize_name_to_class_name(node_name: str) -> str:
     """
     # Keep only alphanumeric characters
     import re
-    class_name = re.sub(r'[^a-zA-Z0-9]', '', node_name)
+
+    class_name = re.sub(r"[^a-zA-Z0-9]", "", node_name)
 
     return class_name
+
+
+def normalize_to_variable_name(node_name: str) -> str:
+    """
+    Converts a node name like "LLM Signature (2)" to a valid Python variable name like "llm_signature_2".
+
+    Args:
+        node_name: A string representing the node name
+    """
+
+    return re.sub(r"[^a-zA-Z0-9]", "", node_name).lower().replace(" ", "_")

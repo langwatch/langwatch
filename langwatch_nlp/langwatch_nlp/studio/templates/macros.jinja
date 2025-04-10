@@ -13,10 +13,10 @@ dspy.LM(
         )
 {% endmacro %}
 
-{% macro edge_param(edge, source_parts, target_parts) %}
+{% macro edge_param(edge, source_parts, target_parts, use_kwargs) %}
 {% if source_parts[0] == "outputs" %}
     {% if edge.source == "entry" %}
-{{ target_parts[1] }}={{ source_parts[1] }},
+{{ target_parts[1] }}={% if use_kwargs %}kwargs.get("{{ source_parts[1] }}"){% else %}{{ source_parts[1] }}{% endif %},
     {% else %}
 {{ target_parts[1] }}={{ edge.source }}.{{ source_parts[1] }},
     {% endif %}

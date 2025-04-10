@@ -42,7 +42,14 @@ class WorkflowModule(LangWatchWorkflowModule):
         {% set _ = input_args.append(input_field.identifier + ": " + FIELD_TYPE_TO_DSPY_TYPE[input_field.type.value]) %}
         {% set _ = forward_args.append(input_field.identifier + "=" + input_field.identifier) %}
     {% endfor %}
+    {% if use_kwargs %}
+    {% set input_args = ["**kwargs"] %}
+    {% set forward_args = ["**kwargs"] %}
+    {% endif %}
 
+    {% if not do_not_trace %}
+    @langwatch.span(type="workflow")
+    {% endif %}
     {% if handle_errors %}
     async def forward(self, {{ input_args | join(", ") }}) -> dspy.Prediction:
         try:
@@ -52,19 +59,13 @@ class WorkflowModule(LangWatchWorkflowModule):
             return PredictionWithEvaluationAndMetadata(
                 error=e,
                 cost=self.cost,
-                duration=round((time.time() - self.start_time) * 1000),
-                evaluate=self.evaluate_prediction,
+                duration=self.duration,
             )
 
     async def _forward(self, {{ input_args | join(", ") }}) -> dspy.Prediction:
     {% else %}
     async def forward(self, {{ input_args | join(", ") }}) -> dspy.Prediction:
     {% endif %}
-        try:
-            langwatch.get_current_span().update(type="workflow")
-        except Exception:
-            pass
-
         self.cost = 0
         self.duration = 0
 
@@ -129,7 +130,7 @@ class WorkflowModule(LangWatchWorkflowModule):
                         {% if edge.target == node.id %}
                             {% set source_parts = edge.sourceHandle.split(".") %}
                             {% set target_parts = edge.targetHandle.split(".") %}
-                            {{ edge_param(edge, source_parts, target_parts) }}
+                            {{ edge_param(edge, source_parts, target_parts, use_kwargs) }}
                         {% endif %}
                     {% endfor %}
             ),
@@ -142,7 +143,7 @@ class WorkflowModule(LangWatchWorkflowModule):
                     {% if edge.target == layer[0].id %}
                         {% set source_parts = edge.sourceHandle.split(".") %}
                         {% set target_parts = edge.targetHandle.split(".") %}
-                        {{ edge_param(edge, source_parts, target_parts) }}
+                        {{ edge_param(edge, source_parts, target_parts, use_kwargs) }}
                     {% endif %}
                 {% endfor %}
         )
@@ -168,7 +169,7 @@ class WorkflowModule(LangWatchWorkflowModule):
                         {% set source_parts = edge.sourceHandle.split(".") %}
                         {% set target_parts = edge.targetHandle.split(".") %}
                         {% if edge.source == "entry" %}
-                "{{ target_parts[1] }}": {{ source_parts[1] }},
+                "{{ target_parts[1] }}": {% if use_kwargs %}kwargs.get("{{ source_parts[1] }}"){% else %}{{ source_parts[1] }}{% endif %},
                         {% else %}
                 "{{ target_parts[1] }}": {{ edge.source }}.{{ source_parts[1] }},
                         {% endif %}

@@ -5,6 +5,8 @@ from contextlib import contextmanager
 import asyncer
 import langwatch
 import sentry_sdk
+from langwatch_nlp.studio.dspy.langwatch_workflow_module import LangWatchWorkflowModule
+from langwatch_nlp.studio.parser_v2 import get_component_class, parse_workflow
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.dspy.workflow_module import WorkflowModule
 from langwatch_nlp.studio.types.dsl import (
@@ -20,7 +22,6 @@ from langwatch_nlp.studio.types.events import (
     ExecuteFlowPayload,
     ExecutionStateChange,
     ExecutionStateChangePayload,
-    StudioServerEvent,
 )
 from langwatch_nlp.studio.utils import (
     ClientReadableValueError,
@@ -71,12 +72,17 @@ async def execute_flow(
             if not do_not_trace and trace:
                 trace.autotrack_dspy()
 
-            module = WorkflowModule(
+            class_name, code = parse_workflow(
                 workflow,
-                manual_execution_mode=manual_execution_mode,
+                format=True,
+                debug_level=0,
                 until_node_id=until_node_id,
-                inputs=inputs[0] if inputs else None,
+                do_not_trace=do_not_trace,
             )
+            print("\n\nuntil_node_id", until_node_id, "\n\n")
+            print("\n\ncode", code, "\n\n")
+            Module = get_component_class(component_code=code, class_name=class_name)
+            module = cast(LangWatchWorkflowModule, Module)(run_evaluations=True)
             module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
 
             entry_node = cast(
@@ -102,7 +108,7 @@ async def execute_flow(
                 )
 
             try:
-                result = await asyncify(module)(**entries[0])  # type: ignore
+                result = await module.forward(**entries[0])  # type: ignore
 
             except Exception as e:
                 import traceback

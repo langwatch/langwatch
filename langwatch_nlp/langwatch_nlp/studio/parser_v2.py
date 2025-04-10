@@ -75,6 +75,7 @@ def parse_workflow(
     debug_level=0,
     until_node_id=None,
     handle_errors=False,
+    do_not_trace=False,
 ) -> Tuple[str, str]:
     # Find all reachable nodes from entry
     nodes = find_reachable_nodes(
@@ -88,6 +89,7 @@ def parse_workflow(
     }
 
     inputs = workflow_inputs(workflow)
+    use_kwargs = any(re.search(r"[^a-zA-Z0-9]", field.identifier) for field in inputs)
 
     module = render_template(
         "workflow.py.jinja",
@@ -97,7 +99,9 @@ def parse_workflow(
         node_templates=node_templates,
         nodes=nodes,
         inputs=inputs,
+        use_kwargs=use_kwargs,
         handle_errors=handle_errors,
+        do_not_trace=do_not_trace,
     )
 
     return "WorkflowModule", module
@@ -120,37 +124,14 @@ def parse_component(
 
     match node.type:
         case "signature":
-            parameters = {}
-            if node.data.parameters:
-                for param in node.data.parameters:
-                    if param.value is not None:
-                        parameters[param.identifier] = param.value
+            parameters = parse_fields(node.data.parameters or [], autoparse=True)
 
-            prompting_technique = next(
-                (
-                    p
-                    for p in node.data.parameters or []
-                    if p.identifier == "prompting_technique"
-                ),
-                None,
-            )
-            llm_config = next(
-                (p for p in node.data.parameters or [] if p.identifier == "llm"),
-                None,
-            )
-            demonstrations = next(
-                (
-                    p
-                    for p in node.data.parameters or []
-                    if p.identifier == "demonstrations"
-                ),
-                None,
-            )
+            prompting_technique = parameters.get("prompting_technique")
+            llm_config = parameters.get("llm")
+            demonstrations = parameters.get("demonstrations")
             demonstrations_dict = (
-                transpose_inline_dataset_to_object_list(demonstrations.value.inline)
-                if demonstrations
-                and demonstrations.value
-                and demonstrations.value.inline
+                transpose_inline_dataset_to_object_list(demonstrations.inline)
+                if demonstrations and demonstrations.inline
                 else None
             )
 
@@ -162,13 +143,9 @@ def parse_component(
                 component=node.data,
                 workflow=workflow,
                 parameters=parameters,
-                prompting_technique=(
-                    prompting_technique.value if prompting_technique else None
-                ),
-                llm_config=llm_config.value if llm_config else None,
+                prompting_technique=prompting_technique,
+                llm_config=llm_config,
                 demonstrations=demonstrations_dict,
-                # PROMPTING_TECHNIQUES=PROMPTING_TECHNIQUES_FOR_TEMPLATE,
-                # FIELD_TYPE_TO_DSPY_TYPE=FIELD_TYPE_TO_DSPY_TYPE,
             )
         case "prompting_technique":
             raise NotImplementedError("Prompting techniques cannot be parsed directly")
@@ -240,12 +217,12 @@ def find_reachable_nodes(
                 if current in deps and node_id not in visited and node_id not in queue:
                     new_queue_items.append(node_id)
 
-                # If we've reached the specified until_node_id, stop the traversal
-                if until_node_id is not None and until_node_id in new_queue_items:
-                    queue.append(until_node_id)
-                    visited.add(current)
-                    reachable_node_ids.add(current)
-                    break
+            # If we've reached the specified until_node_id, stop the traversal
+            if until_node_id is not None and until_node_id in new_queue_items:
+                queue.append(until_node_id)
+                visited.add(until_node_id)
+                reachable_node_ids.add(until_node_id)
+                break
 
             queue.extend(new_queue_items)
 

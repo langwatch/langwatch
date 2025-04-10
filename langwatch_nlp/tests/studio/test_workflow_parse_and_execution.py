@@ -977,11 +977,6 @@ async def test_autoparse_fields():
 
     workflow = copy.deepcopy(simple_workflow)
 
-    generate_query_node = cast(
-        SignatureNode,
-        next(node for node in workflow.nodes if node.data.name == "GenerateQuery"),
-    )
-
     workflow.nodes.append(
         CodeNode(
             id="check_input_types",
@@ -1061,3 +1056,34 @@ class CheckInputTypes(dspy.Module):
     assert result["check_input_types"]["field_list_str"] == list
     assert result["check_input_types"]["field_float"] == float
 
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_parse_workflow_when_entry_has_special_characters():
+    disable_dsp_caching()
+
+    workflow = copy.deepcopy(simple_workflow)
+    entry_node = next(node for node in workflow.nodes if node.type == "entry")
+
+    (entry_node.data.outputs or []).append(
+        Field(
+            identifier="question (2)",
+            type=FieldType.str,
+            optional=None,
+        )
+    )
+
+    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+    Module = get_component_class(component_code=code, class_name=class_name)
+    instance = Module(run_evaluations=True)  # type: ignore
+    result: PredictionWithEvaluationAndMetadata = await instance(
+        question="What is the capital of France? Reply in a single word with no period.",
+        gold_answer="Paris",
+    )
+    assert "Paris" in result["end"]["result"]
+    assert result.cost > 0
+    assert result.duration > 0
+
+    assert result.total_score() == 1.0
+    assert result.evaluations["exact_match_evaluator"].status == "processed"
+    assert result.evaluations["exact_match_evaluator"].score == 1.0

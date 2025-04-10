@@ -86,11 +86,7 @@ class PredictionWithEvaluationAndMetadata(PredictionWithMetadata):
         self._cost = cost
         self._duration = duration
         self._error = error
-        self._evaluations = evaluations
-
-    @property
-    def evaluations(self) -> dict[str, EvaluationResultWithMetadata]:
-        return self._evaluations
+        self.evaluations = evaluations
 
     def total_score(self, weighting: Literal["mean"] = "mean") -> float:
         def get_score(result: EvaluationResultWithMetadata) -> float:
@@ -103,7 +99,7 @@ class PredictionWithEvaluationAndMetadata(PredictionWithMetadata):
         if weighting == "mean":
             evaluation_scores = [
                 get_score(evaluation)
-                for evaluation in self._evaluations.values()
+                for evaluation in self.evaluations.values()
                 if evaluation.status == "processed"
             ]
             return sum(evaluation_scores) / max(len(evaluation_scores), 1)
