@@ -1,5 +1,5 @@
 import { Accordion, VStack } from "@chakra-ui/react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   EXECUTION_METHOD_SELECTOR_STEP_ACCORDION_VALUE,
   ExecutionMethodSelectionStepAccordion,
@@ -41,6 +41,7 @@ export function OfflineExecutionMethodSelectionStep() {
   );
 
   const updateAccordionValue = useCallback(() => {
+    console.log("updateAccordionValue", { executionMethod });
     /**
      * Force the accordion to re-render.
      * Necessary because we want to trigger the UI to expand the correct step even if
@@ -61,6 +62,12 @@ export function OfflineExecutionMethodSelectionStep() {
         setAccordionValue([EXECUTION_METHOD_SELECTOR_STEP_ACCORDION_VALUE]);
     }
   }, [setAccordionValue, executionMethod]);
+
+  // On mount, update the accordion value.
+  // This allows us to open the correct sub-accordion item on mount.
+  useEffect(() => {
+    updateAccordionValue();
+  }, [updateAccordionValue]);
 
   return (
     <Accordion.Root
