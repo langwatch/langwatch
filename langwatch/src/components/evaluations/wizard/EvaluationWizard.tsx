@@ -397,7 +397,7 @@ const WizardSidebar = memo(function WizardSidebar({
                   Show Code
                 </Button>
               )}
-            {step === "results" && !executionMethod?.startsWith("realtime") && (
+            {step === "results" && task !== "real_time" && (
               <RunTrialButton
                 runEvaluation={runEvaluation}
                 isLoading={runEvaluationIsLoading}
