@@ -202,8 +202,6 @@ class LangWatchSpan:
         ensure_setup()
         self.name = name
 
-        print("span", self._span)
-
         self._span.update_name(name)
 
     def update(
@@ -515,9 +513,9 @@ class LangWatchSpan:
             self._cleanup()
         return False  # Don't suppress exceptions
 
-    def __del__(self):
-        """Ensure span context is cleaned up if object is garbage collected."""
-        self._cleanup()
+    # def __del__(self):
+    #     """Ensure span context is cleaned up if object is garbage collected."""
+    #     self._cleanup()
 
     def __getattr__(self, name: str) -> Any:
         """Forward all other methods to the underlying span."""

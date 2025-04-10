@@ -169,6 +169,7 @@ class LangWatchTrace:
                 **self._root_span_params
             )
             
+            self.root_span.__enter__()
             return self.root_span
 
     async def _create_root_span_async(self):
@@ -190,7 +191,7 @@ class LangWatchTrace:
                 return
 
             try:
-                if hasattr(self, 'root_span'):
+                if self.root_span is not None:
                     self.root_span._cleanup()
             except Exception as e:
                 warn(f"Failed to cleanup root span: {e}")
@@ -509,9 +510,9 @@ class LangWatchTrace:
             self._cleanup()
         return False
 
-    def __del__(self):
-        """Ensure trace context is cleaned up if object is garbage collected."""
-        self._cleanup()
+    # def __del__(self):
+    #     """Ensure trace context is cleaned up if object is garbage collected."""
+    #     self._cleanup()
 
     # Forward all other methods to the underlying tracer
     def __getattr__(self, name: str) -> Any:
