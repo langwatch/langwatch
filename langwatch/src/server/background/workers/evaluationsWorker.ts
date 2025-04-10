@@ -306,10 +306,10 @@ export const runEvaluation = async ({
             {
               input: tryAndConvertTo(data.data.input, "string"),
               output: tryAndConvertTo(data.data.output, "string"),
-              contexts: tryAndConvertTo(data.data.contexts, "array"),
+              contexts: tryAndConvertTo(data.data.contexts, "string[]"),
               expected_contexts: tryAndConvertTo(
                 data.data.expected_contexts,
-                "array"
+                "string[]"
               ),
               expected_output: tryAndConvertTo(
                 data.data.expected_output,

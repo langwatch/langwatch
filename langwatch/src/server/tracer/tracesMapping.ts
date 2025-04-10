@@ -493,10 +493,17 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
     return undefined;
   }
   if (type === "string") {
-    return value.toString();
+    return (
+      typeof value === "string" ? value : JSON.stringify(value)
+    ) as StringTypeToType[T];
   }
   if (type === "number") {
     return Number(value) as StringTypeToType[T];
+  }
+  if (Array.isArray(value) && type === "string[]") {
+    return value.map((v) =>
+      tryAndConvertTo(v, "string")
+    ) as unknown as StringTypeToType[T];
   }
   if (
     typeof value === "string" &&
@@ -508,15 +515,22 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
         return parsed as unknown as StringTypeToType[T];
       }
       if (Array.isArray(parsed)) {
+        if (type === "string[]") {
+          return parsed.map((v) =>
+            tryAndConvertTo(v, "string")
+          ) as unknown as StringTypeToType[T];
+        }
         return parsed as unknown as StringTypeToType[T];
       }
       throw new Error("Failed to parse to a valid type, falling back");
     } catch (e) {
       if (type === "string[]") {
-        return [value.toString()] as unknown as StringTypeToType[T];
+        return [
+          tryAndConvertTo(value, "string"),
+        ] as unknown as StringTypeToType[T];
       }
       if (type === "array") {
-        return [value.toString()] as unknown as StringTypeToType[T];
+        return [value] as unknown as StringTypeToType[T];
       }
       if (type === "object") {
         return { _json: value } as unknown as StringTypeToType[T];
