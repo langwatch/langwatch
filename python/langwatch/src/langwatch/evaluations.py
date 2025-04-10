@@ -1,9 +1,9 @@
-from contextlib import contextmanager
 from typing import List, Literal, Optional, Union, cast, TYPE_CHECKING
 from uuid import UUID
 from warnings import warn
 
 import httpx
+import langwatch
 from langwatch.domain import SpanTimestamps
 import nanoid
 from langwatch.observability.span import LangWatchSpan, get_current_span
@@ -19,7 +19,6 @@ from langwatch.types import (
     MoneyDict,
     SpanMetrics,
     RAGChunk,
-    SpanTypes,
     TypedValueEvaluationResult,
     TypedValueGuardrailResult,
     TypedValueJson,
@@ -55,12 +54,7 @@ def evaluate(
     span: Optional['LangWatchSpan'] = None,
     api_key: Optional[str] = None,
 ):
-    with _optional_create_span(
-        trace=trace,
-        span=span,
-        name=name or slug,
-        type="guardrail" if as_guardrail else "evaluation",
-    ) as span:
+    with langwatch.span(name=name or slug, type="guardrail" if as_guardrail else "evaluation") as span:
         request_params = prepare_data(
             slug=slug,
             name=name,
@@ -100,15 +94,7 @@ async def async_evaluate(
     span: Optional['LangWatchSpan'] = None,
     api_key: Optional[str] = None,
 ):
-    print("trace", trace)
-    print("span", span)
-
-    with _optional_create_span(
-        trace=trace,
-        span=span,
-        name=name or slug,
-        type="guardrail" if as_guardrail else "evaluation",
-    ) as span:
+    with langwatch.span(name=name or slug, type="guardrail" if as_guardrail else "evaluation") as span:
         request_params = prepare_data(
             slug=slug,
             name=name,
@@ -131,32 +117,6 @@ async def async_evaluate(
             return handle_exception(e, span, as_guardrail)
 
         return handle_response(response.json(), span, as_guardrail)
-
-
-@contextmanager
-def _optional_create_span(
-    trace: Optional['LangWatchTrace'],
-    span: Optional['LangWatchSpan'],
-    name: str,
-    type: SpanTypes,
-):
-    trace_or_span = None
-    if span:
-        trace_or_span = span
-    elif trace:
-        trace_or_span = trace
-    else:
-        try:
-            from langwatch.observability.tracing import get_current_trace
-            trace_or_span = get_current_trace()
-        except:
-            pass
-
-    if trace_or_span:
-        with trace_or_span as span:
-            yield span
-    else:
-        yield None
 
 
 def prepare_data(
@@ -204,8 +164,6 @@ def prepare_data(
             input=TypedValueJson(type="json", value=data),
             params=settings,  # type: ignore
         )
-
-    print(api_key or get_api_key())
 
     return {
         "url": get_endpoint() + f"/api/evaluations/{slug}/evaluate",
