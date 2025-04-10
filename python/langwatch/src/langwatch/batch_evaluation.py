@@ -450,6 +450,7 @@ def get_dataset(
         "url": langwatch.endpoint + f"/api/dataset/{slug}",
         "headers": {"X-Auth-Token": str(langwatch.api_key)},
     }
+
     with httpx.Client(timeout=300) as client:
         response = client.get(**request_params)
         response.raise_for_status()
