@@ -5,7 +5,7 @@ export const calculateNextPosition = (position: Node<Component>["position"]) =>
   position
     ? {
         x: position.x + 300,
-        y: position.y,
+        y: position.y - 50,
       }
     : { x: 0, y: 0 };
 
