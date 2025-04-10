@@ -35,6 +35,7 @@ import { ResultsStep } from "./steps/ResultsStep";
 import { TaskStep } from "./steps/TaskStep";
 import { api } from "../../../utils/api";
 import { toaster } from "../../ui/toaster";
+import { ReactFlowProvider } from "@xyflow/react";
 
 export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
   const router = useRouter();
@@ -95,8 +96,10 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
         width="full"
         padding={0}
       >
-        <WizardSidebar isLoading={isLoading} />
-        <WizardWorkspace />
+        <ReactFlowProvider>
+          <WizardSidebar isLoading={isLoading} />
+          <WizardWorkspace />
+        </ReactFlowProvider>
       </Dialog.Body>
     </Dialog.Content>
   );

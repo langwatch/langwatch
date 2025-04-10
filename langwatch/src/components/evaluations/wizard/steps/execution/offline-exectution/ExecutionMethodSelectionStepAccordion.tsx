@@ -16,6 +16,7 @@ import {
   useEvaluationWizardStore,
 } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useAnimatedFocusElementById } from "../../../../../../hooks/useAnimatedFocusElementById";
+import { useUpdateNodeInternals } from "@xyflow/react";
 
 export const EXECUTION_METHOD_SELECTOR_STEP_ACCORDION_VALUE =
   "execution-method-selector";
@@ -25,11 +26,26 @@ export function ExecutionMethodSelectionStepAccordion({
 }: {
   onSelect: (executionMethod: OfflineExecutionMethod) => void;
 }) {
-  const { executionMethod, setWizardState } = useEvaluationWizardStore(
-    useShallow(({ wizardState, setWizardState }) => ({
-      executionMethod: wizardState.executionMethod,
-      setWizardState,
-    }))
+  const updateNodeInternals = useUpdateNodeInternals();
+  const {
+    executionMethod,
+    addCodeExecutionNodeToWorkflow,
+    setWizardState,
+    addNewSignatureNodeToWorkflow,
+  } = useEvaluationWizardStore(
+    useShallow(
+      ({
+        wizardState,
+        setWizardState,
+        addNewSignatureNodeToWorkflow,
+        addCodeExecutionNodeToWorkflow,
+      }) => ({
+        executionMethod: wizardState.executionMethod,
+        setWizardState,
+        addNewSignatureNodeToWorkflow,
+        addCodeExecutionNodeToWorkflow,
+      })
+    )
   );
 
   const focusElementById = useAnimatedFocusElementById();
@@ -72,12 +88,21 @@ export function ExecutionMethodSelectionStepAccordion({
           {...buildBaseRadioParams("offline_prompt")}
           description="Run a prompt via any LLM model to evaluate"
           icon={<LuMessageSquareCode />}
+          onClick={() => {
+            const nodeId = addNewSignatureNodeToWorkflow();
+            updateNodeInternals(nodeId);
+            handleOptionClick("offline_prompt");
+          }}
         />
         <StepRadio
           {...buildBaseRadioParams("offline_code_execution")}
           description="Run code"
           icon={<LuCode />}
-          disabled
+          onClick={() => {
+            const nodeId = addCodeExecutionNodeToWorkflow();
+            updateNodeInternals(nodeId);
+            handleOptionClick("offline_code_execution");
+          }}
         />
         <StepRadio
           {...buildBaseRadioParams("offline_http")}

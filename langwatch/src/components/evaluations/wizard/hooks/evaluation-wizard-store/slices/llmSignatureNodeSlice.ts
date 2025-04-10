@@ -1,4 +1,4 @@
-import { type Node } from "@xyflow/react";
+import { type Edge, type Node } from "@xyflow/react";
 import { type StateCreator } from "zustand";
 import type {
   LLMConfig,
@@ -6,11 +6,12 @@ import type {
 } from "../../../../../../optimization_studio/types/dsl";
 import type { BaseNodeSlice } from "./baseNodeSlice";
 import { LlmSignatureNodeFactory } from "./factories/llm-signature-node.factory";
+import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
+import { createDefaultEdge } from "./utils/edge.util";
 
 export interface LlmSignatureNodeSlice {
   createNewLlmSignatureNode: () => Node<Signature>;
   addNewSignatureNodeToWorkflow: () => string;
-  getOrCreateSignatureNode: () => Node<Signature>;
   updateSignatureNodeLLMConfigValue: (
     nodeId: string,
     llmConfig: LLMConfig
@@ -18,49 +19,36 @@ export interface LlmSignatureNodeSlice {
 }
 
 export const createLlmSignatureNodeSlice: StateCreator<
-  BaseNodeSlice,
+  BaseNodeSlice & LlmSignatureNodeSlice & { workflowStore: WorkflowStore },
   [],
   [],
   LlmSignatureNodeSlice
 > = (set, get) => {
-  const getAllSignatureNodes = (): Node<Signature>[] =>
-    get().getNodesByType("signature");
-
-  const createNewLlmSignatureNode = (): Node<Signature> =>
-    get().createNewNode(LlmSignatureNodeFactory.build());
-
-  const addNewSignatureNodeToWorkflow = (): string =>
-    get().addNodeToWorkflow(createNewLlmSignatureNode());
-
-  const getOrCreateSignatureNode = (): Node<Signature> => {
-    const signatureNodes = getAllSignatureNodes();
-
-    if (signatureNodes.length > 0) {
-      return signatureNodes[0]!;
-    }
-
-    const nodeId = addNewSignatureNodeToWorkflow();
-    return get().getNodeById(nodeId)!;
-  };
-
-  /**
-   * Specialized function to update the LLM config value for the signature node
-   */
-  const updateSignatureNodeLLMConfigValue = (
-    nodeId: string,
-    llmConfig: LLMConfig
-  ) => {
-    get().setNodeParameter(nodeId, {
-      identifier: "llm",
-      type: "llm",
-      value: llmConfig,
-    });
-  };
+  const getEntryNodeId = () => get().getNodesByType("entry")[0]?.id;
 
   return {
-    createNewLlmSignatureNode,
-    addNewSignatureNodeToWorkflow,
-    getOrCreateSignatureNode,
-    updateSignatureNodeLLMConfigValue,
+    createNewLlmSignatureNode: (): Node<Signature> =>
+      get().createNewNode(LlmSignatureNodeFactory.build()),
+
+    addNewSignatureNodeToWorkflow: (): string => {
+      const node = get().createNewLlmSignatureNode();
+      const entryNodeId = getEntryNodeId();
+      const newEdges: Edge[] = entryNodeId
+        ? [createDefaultEdge(entryNodeId, node.id)]
+        : [];
+      const nodeId = get().addNodeToWorkflow(node, newEdges);
+      return nodeId;
+    },
+
+    updateSignatureNodeLLMConfigValue: (
+      nodeId: string,
+      llmConfig: LLMConfig
+    ) => {
+      get().setNodeParameter(nodeId, {
+        identifier: "llm",
+        type: "llm",
+        value: llmConfig,
+      });
+    },
   };
 };

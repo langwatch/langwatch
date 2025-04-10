@@ -28,7 +28,7 @@ const DEFAULT_SIGNATURE_NODE_PROPERTIES: LlmSignatureNode = {
       {
         identifier: "instructions",
         type: "str" as const,
-        value: undefined,
+        value: "You are a helpful assistant.",
       },
       {
         identifier: "demonstrations",

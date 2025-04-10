@@ -12,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { Field } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   ChevronDown,
   Columns,
@@ -76,11 +76,13 @@ export function FieldsDefinition({
   title,
   field,
   readOnly = false,
+  onChange,
 }: {
   node: Node<Component>;
   title: string;
   field: "parameters" | "inputs" | "outputs";
   readOnly?: boolean;
+  onChange?: (data: FieldArrayForm) => void;
 }) {
   const { setNode } = useWorkflowStore(
     useShallow((state) => ({
@@ -111,6 +113,13 @@ export function FieldsDefinition({
       data: { [field]: data.fields },
     });
     updateNodeInternals(node.id);
+    onChange?.(data);
+  };
+
+  const handleOnChange = async (data: FieldArrayForm) => {
+    onChange?.(data);
+    // We are pretending to submit on every change
+    onSubmit(data);
   };
 
   useEffect(() => {
@@ -134,7 +143,7 @@ export function FieldsDefinition({
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onSubmit={handleSubmit(onSubmit)}
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
-      onChange={handleSubmit(onSubmit)}
+      onChange={handleSubmit(handleOnChange)}
     >
       <HStack width="full">
         <PropertySectionTitle>{title}</PropertySectionTitle>
@@ -279,15 +288,15 @@ export function FieldsForm({
   node: Node<Component>;
   field: "parameters" | "inputs" | "outputs";
 }) {
-  const { default_llm, setNode, parameters, setNodeParameter } =
-    useWorkflowStore(
-      useShallow((state) => ({
-        parameters: state.nodes.find((n) => n.id === node.id)?.data.parameters,
-        setNode: state.setNode,
-        default_llm: state.default_llm,
-        setNodeParameter: state.setNodeParameter,
-      }))
-    );
+  const parameters = node.data.parameters;
+  const { default_llm, setNode, setNodeParameter } = useWorkflowStore(
+    useShallow((state) => ({
+      parameters: state.nodes.find((n) => n.id === node.id)?.data.parameters,
+      setNode: state.setNode,
+      default_llm: state.default_llm,
+      setNodeParameter: state.setNodeParameter,
+    }))
+  );
 
   const {
     control,
@@ -388,7 +397,7 @@ export function FieldsForm({
                 </HStack>
               </Center>
               <RenderCode
-                code={stateField?.value as string}
+                code={(stateField?.value ?? "") as string}
                 language="python"
                 style={{
                   width: "100%",
