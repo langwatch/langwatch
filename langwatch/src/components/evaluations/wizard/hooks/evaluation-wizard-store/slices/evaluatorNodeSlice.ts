@@ -4,7 +4,7 @@ import type {
   Evaluator,
   Workflow,
   Component,
-} from "../../../../../../optimization_studio/types/dsl";
+} from "~/optimization_studio/types/dsl";
 import type { BaseNodeSlice } from "./baseNodeSlice";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
@@ -14,7 +14,6 @@ import {
   connectEvaluatorFields,
   createFieldMappingEdges,
 } from "~/components/evaluations/utils/field-mapping";
-import type { Component } from "~/optimization_studio/types/dsl";
 import { createDefaultEdge } from "./utils/edge.util";
 import type { ExecutorSlice } from "./executorSlice";
 
