@@ -1,6 +1,6 @@
 import { Box, Steps as ChakraSteps, VStack } from "@chakra-ui/react";
 import * as React from "react";
-import { LuCheck, LuCircleAlert } from "react-icons/lu";
+import { LuCheck } from "react-icons/lu";
 
 interface StepInfoProps {
   title?: React.ReactNode;
@@ -34,7 +34,7 @@ export const StepsItem = React.forwardRef<
                     background: "transparent",
                     borderColor: "gray.200",
                     borderWidth: "2px",
-                    color: "fg"
+                    color: "fg",
                   }
                 : {}
             }

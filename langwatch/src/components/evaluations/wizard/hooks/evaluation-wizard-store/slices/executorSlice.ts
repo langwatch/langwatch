@@ -16,10 +16,6 @@ export interface ExecutorSlice {
    */
   getFirstExecutorNode: () => Node<Component> | undefined;
   /**
-   * Delete all executor nodes and edges
-   */
-  deleteAllExecutorNodes: () => void;
-  /**
    * Upsert an executor node by type
    *
    * Since we only allow one executor node in the wizard workflow,
@@ -43,6 +39,18 @@ export const createExecutorSlice: StateCreator<
   [],
   ExecutorSlice
 > = (_set, get) => {
+  const createNodeByType = (type: "signature" | "code") => {
+    switch (type) {
+      case "signature":
+        return get().createNewLlmSignatureNode();
+      case "code":
+        return get().createNewCodeExecutionNode();
+      default:
+        // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+        throw new Error(`Unknown executor node type: ${type}`);
+    }
+  };
+
   return {
     getFirstExecutorNode: () => {
       const workflow = get().workflowStore.getWorkflow();
@@ -50,45 +58,15 @@ export const createExecutorSlice: StateCreator<
         (node) => node.type && EXECUTOR_NODE_TYPES.includes(node.type)
       );
     },
-    deleteAllExecutorNodes: () => {
-      get().workflowStore.setWorkflow((current) => {
-        // Split nodes
-        // TODO: See if this is already available somewhere
-        const [nodesToKeep, nodesToDelete] = current.nodes.reduce(
-          (acc, node) => {
-            if (!node.type) return acc;
-            if (EXECUTOR_NODE_TYPES.includes(node.type)) {
-              acc[1].push(node);
-            } else {
-              acc[0].push(node);
-            }
-
-            return acc;
-          },
-          [[], []] as [Node<Component>[], Node<Component>[]]
-        );
-
-        return {
-          ...current,
-          nodes: nodesToKeep,
-          edges: current.edges.filter((edge) => {
-            return nodesToDelete.find((node) => {
-              node.id === edge.source || edge.target;
-            });
-          }),
-        };
-      });
-    },
     upsertExecutorNodeByType: ({ type }: { type: "signature" | "code" }) => {
-      get().deleteAllExecutorNodes();
-      switch (type) {
-        case "signature":
-          return get().addNewSignatureNodeToWorkflow();
-        case "code":
-          return get().addCodeExecutionNodeToWorkflow();
-        default:
-          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-          throw new Error(`Unknown executor node type: ${type}`);
+      const existingExecutorNode = get().getFirstExecutorNode();
+
+      if (!existingExecutorNode) {
+        return createNodeByType(type).id;
+      } else {
+        const node = createNodeByType(type);
+        get().replaceNode(existingExecutorNode.id, node);
+        return node.id;
       }
     },
   };
