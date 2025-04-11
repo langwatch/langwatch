@@ -168,8 +168,8 @@ def prepare_data(
     return {
         "url": get_endpoint() + f"/api/evaluations/{slug}/evaluate",
         "json": {
-            "trace_id": span_ctx.trace_id,
-            "span_id": span_ctx.span_id,
+            "trace_id": str(span_ctx.trace_id),
+            "span_id": str(span_ctx.span_id),
             "name": name,
             "data": data,
             "settings": settings,
@@ -303,7 +303,7 @@ def add_evaluation(
 
     evaluation = Evaluation(
         evaluation_id=evaluation_id or f"eval_{nanoid.generate()}",
-        span_id=span._span.get_span_context().span_id if span else None,
+        span_id=str(span._span.get_span_context().span_id) if span else None,
         name=name,
         type=type,
         is_guardrail=is_guardrail,
