@@ -23,37 +23,9 @@ from langwatch.__version__ import __version__
 from langwatch.observability.context import stored_langwatch_trace, stored_langwatch_span
 from langwatch.utils.initialization import ensure_setup
 
-__all__ = ["trace", "get_current_trace", "get_current_span"]
+__all__ = ["trace", "LangWatchTrace"]
 
 T = TypeVar("T", bound=Callable[..., Any])
-
-def get_current_trace() -> Optional['LangWatchTrace']:
-    """Get the current trace from the LangWatch context.
-    
-    Returns:
-        The current LangWatchTrace if one exists in the context, otherwise None.
-    """
-    ensure_setup()
-    return stored_langwatch_trace.get(None)
-
-def get_current_span() -> 'LangWatchSpan':
-    """Get the current span from the LangWatch context.
-    If no span exists in LangWatch context, falls back to OpenTelemetry context.
-    
-    Returns:
-        The current LangWatchSpan if one exists in either context, otherwise None.
-    """
-    ensure_setup()
-
-    # First try getting from LangWatch context
-    span = stored_langwatch_span.get(None)
-    if span is not None:
-        return span
-        
-    # Fall back to OpenTelemetry context
-    otel_span = trace_api.get_current_span()
-    trace = get_current_trace()
-    return LangWatchSpan.wrap_otel_span(otel_span, trace)
 
 class LangWatchTrace:
     """A trace represents a complete request/response cycle in your application.

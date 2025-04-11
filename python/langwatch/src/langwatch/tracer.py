@@ -1,7 +1,7 @@
 import warnings
 from functools import wraps
-from langwatch.observability.tracing import LangWatchTrace, LangWatchSpan, get_current_span as gcs, get_current_trace as gct
-
+from langwatch.observability.tracing import LangWatchTrace, LangWatchSpan
+from langwatch.observability.context import get_current_span as gcs, get_current_trace as gct
 def _deprecated(func):
     @wraps(func)
     def wrapper(*args, **kwargs):

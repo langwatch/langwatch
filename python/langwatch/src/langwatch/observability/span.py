@@ -1,4 +1,3 @@
-import contextvars
 from copy import deepcopy
 import functools
 import json
@@ -17,7 +16,7 @@ from opentelemetry.util.types import Attributes
 from langwatch.domain import ChatMessage, Conversation, EvaluationTimestamps, Money, MoneyDict, SpanInputOutput, SpanMetrics, SpanParams, SpanTimestamps, RAGChunk, SpanTypes
 from langwatch.observability.types import SpanType, SpanInputType, ContextsType
 from langwatch.__version__ import __version__
-from .context import stored_langwatch_span, stored_langwatch_trace
+from .context import stored_langwatch_span, stored_langwatch_trace, get_current_trace
 from langwatch.utils.initialization import ensure_setup
 
 if TYPE_CHECKING:
@@ -233,12 +232,12 @@ class LangWatchSpan:
         if self.capture_input and input is not None:
             attributes[AttributeName.LangWatchInput] = json.dumps(truncate_object_recursively(
                 convert_typed_values(deepcopy(input)),
-                max_string_length=self.trace.max_string_length,
+                max_string_length=(self.trace or get_current_trace()).max_string_length,
             ), cls=SerializableWithStringFallback),
         if self.capture_output and output is not None:
             attributes[AttributeName.LangWatchOutput] = json.dumps(truncate_object_recursively(
                 convert_typed_values(deepcopy(output)),
-                max_string_length=self.trace.max_string_length,
+                max_string_length=(self.trace or get_current_trace()).max_string_length,
             ), cls=SerializableWithStringFallback),
         if error is not None:
             self.record_error(error)
@@ -250,7 +249,7 @@ class LangWatchSpan:
         if contexts is not None:
             attributes[AttributeName.LangWatchRAGContexts] = json.dumps(truncate_object_recursively(
                 rag_contexts(contexts),
-                max_string_length=self.trace.max_string_length,
+                max_string_length=(self.trace or get_current_trace()).max_string_length,
             ), cls=SerializableWithStringFallback),
         if model is not None:
             attributes[AttributeName.GenAIRequestModel] = model
@@ -353,7 +352,7 @@ class LangWatchSpan:
     def _get_span_params(self, func_name: Optional[str] = None) -> Dict[str, Any]:
         """Helper method to get common span parameters."""
         current_trace = stored_langwatch_trace.get(None)
-        current_span = stored_langwatch_span.get(None)
+        current_span = get_current_span()
 
         return {
             "name": self.name or func_name,
