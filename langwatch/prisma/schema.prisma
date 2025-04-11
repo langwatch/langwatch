@@ -204,6 +204,7 @@ model Project {
     s3AccessKeyId        String?
     s3SecretAccessKey    String?
     s3Bucket             String?
+    llmPromptConfigs     LlmPromptConfig[]
 
     @@index([teamId])
 }
@@ -704,4 +705,17 @@ model AuditLog {
     @@index([organizationId])
     @@index([action])
     @@index([ipAddress])
+}
+
+model LlmPromptConfig {
+  id            String   @id @default(nanoid())
+  name          String
+  config        Json     // Represents the jsonb configuration data
+  schemaVersion String   // Tracks the schema version of the 'config' field
+  projectId     String   // Added back for project-level scoping
+  project       Project  @relation(fields: [projectId], references: [id]) // Relation to Project
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@index([projectId]) // Index for efficient project-based queries
 }
