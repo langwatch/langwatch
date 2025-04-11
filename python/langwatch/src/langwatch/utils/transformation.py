@@ -10,7 +10,39 @@ from pydantic import BaseModel, ValidationError
 T = TypeVar("T")
 
 
-class SerializableWithStringFallback(json.JSONEncoder):
+class SerializableAndPydanticEncoder(json.JSONEncoder):
+    def default(self, o):
+        # try:
+        #     import langchain_core.messages
+        #     from langwatch.langchain import langchain_message_to_chat_message
+
+        #     if isinstance(o, langchain_core.messages.BaseMessage):
+        #         return langchain_message_to_chat_message(o)
+        # except ImportError:
+        #     pass
+
+        try:
+            from langchain_core.load.serializable import Serializable
+
+            if isinstance(o, Serializable):
+                return o.__repr__()
+        except ImportError:
+            pass
+
+        try:
+            import chainlit as cl
+
+            if isinstance(o, cl.Message):
+                return o.to_dict()
+        except ImportError:
+            pass
+
+        if isinstance(o, BaseModel):
+            return o.model_dump(exclude_unset=True)
+        return super().default(o)
+
+
+class SerializableWithStringFallback(SerializableAndPydanticEncoder):
     def default(self, o):
         try:
             if hasattr(o, "model_dump"):
