@@ -202,7 +202,7 @@ function SettingsForm({
                         <Input
                           width="full"
                           type="text"
-                          placeholder="S3 Endpoint (e.g. http://localhost:9000)"
+                          placeholder="S3 Endpoint"
                           {...register("s3Endpoint")}
                         />
                         <Input
@@ -501,7 +501,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   <Input
                     width="full"
                     type="text"
-                    placeholder="S3 Endpoint (e.g. http://localhost:9000)"
+                    placeholder="S3 Endpoint"
                     {...register("s3Endpoint")}
                   />
                   <Input
