@@ -36,7 +36,7 @@ def get_current_trace() -> Optional['LangWatchTrace']:
     ensure_setup()
     return stored_langwatch_trace.get(None)
 
-def get_current_span() -> Optional['LangWatchSpan']:
+def get_current_span() -> 'LangWatchSpan':
     """Get the current span from the LangWatch context.
     If no span exists in LangWatch context, falls back to OpenTelemetry context.
     
@@ -52,12 +52,8 @@ def get_current_span() -> Optional['LangWatchSpan']:
         
     # Fall back to OpenTelemetry context
     otel_span = trace_api.get_current_span()
-    if otel_span is not None and not isinstance(otel_span, trace_api.NonRecordingSpan):
-        # Get current trace to associate with the span
-        trace = get_current_trace()
-        return LangWatchSpan.wrap_otel_span(otel_span, trace)
-    
-    return None
+    trace = get_current_trace()
+    return LangWatchSpan.wrap_otel_span(otel_span, trace)
 
 class LangWatchTrace:
     """A trace represents a complete request/response cycle in your application.
