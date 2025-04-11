@@ -246,17 +246,11 @@ class WorkflowModule(ReportingModule):
         if prediction_error:
             return 0, {
                 node.id: EvaluationResultWithMetadata(
-                    result=EvaluationResultError(
-                        status="error",
-                        error_type=type(prediction_error).__name__,
-                        details=str(prediction_error),
-                        traceback=[],
-                    ),
+                    status="error",
+                    details=str(prediction_error),
                     inputs={},
                     duration=(
-                        prediction.duration
-                        if hasattr(prediction, "duration")
-                        else 0
+                        prediction.duration if hasattr(prediction, "duration") else 0
                     ),
                 )
                 for node in evaluation_nodes
@@ -283,8 +277,13 @@ class WorkflowModule(ReportingModule):
 
             result = cast(SingleEvaluationResult, result)
             duration = round((time.time() - start_time) * 1000)
-            evaluation_results[node.id] = EvaluationResultWithMetadata(
-                result=result, inputs=inputs, duration=duration
+            evaluation_results[node.id] = EvaluationResultWithMetadata.model_validate(
+                {
+                    "status": "processed",
+                    "inputs": inputs,
+                    "duration": duration,
+                    **result.model_dump(),
+                }
             )
             if result.status == "processed":
                 evaluation_scores[node.id] = (

@@ -1,18 +1,12 @@
 import time
 from typing import Dict, Set, cast
-from contextlib import contextmanager
 
 import asyncer
-import langwatch
 import sentry_sdk
-from langwatch_nlp.studio.dspy.langwatch_workflow_module import LangWatchWorkflowModule
 from langwatch_nlp.studio.parser_v2 import (
-    get_component_class,
-    parse_workflow,
     parse_workflow_and_get_class,
 )
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
-from langwatch_nlp.studio.dspy.workflow_module import WorkflowModule
 from langwatch_nlp.studio.types.dsl import (
     Entry,
     EntryNode,
@@ -33,8 +27,6 @@ from langwatch_nlp.studio.utils import (
     optional_langwatch_trace,
     transpose_inline_dataset_to_object_list,
 )
-
-from dspy.utils.asyncify import asyncify
 
 
 async def execute_flow(
@@ -146,7 +138,6 @@ def start_workflow_event(workflow: Workflow, trace_id: str):
 
 
 def end_workflow_event(workflow: Workflow, trace_id: str, result):
-
     return ExecutionStateChange(
         payload=ExecutionStateChangePayload(
             execution_state=WorkflowExecutionState(

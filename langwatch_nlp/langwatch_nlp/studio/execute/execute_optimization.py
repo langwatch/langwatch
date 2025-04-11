@@ -1,42 +1,31 @@
 from contextlib import contextmanager
 from io import StringIO
 from multiprocessing import Queue
-import os
-from pathlib import Path
 import sys
 import time
 from typing import Optional, cast
 import dspy
 import langwatch
+from langwatch_nlp.studio.parser_v2 import parse_workflow_and_get_class
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.dspy.evaluation import (
-    EvaluationReporting,
     PredictionWithEvaluationAndMetadata,
 )
 from langwatch_nlp.studio.dspy.patched_boostrap_few_shot import (
     ExampleWithEntryMap,
     patch_labeled_few_shot_once,
 )
-from langwatch_nlp.studio.dspy.workflow_module import (
-    WorkflowModule,
-)
 from langwatch_nlp.studio.execute.execute_flow import (
     validate_workflow,
 )
-from langwatch_nlp.studio.modules.registry import OPTIMIZERS
 from langwatch_nlp.studio.types.dsl import (
     Entry,
     EntryNode,
-    EvaluationExecutionState,
     ExecutionStatus,
-    Node,
     OptimizationExecutionState,
     Timestamps,
 )
 from langwatch_nlp.studio.types.events import (
-    EvaluationStateChange,
-    EvaluationStateChangePayload,
-    ExecuteEvaluationPayload,
     ExecuteOptimizationPayload,
     OptimizationStateChange,
     OptimizationStateChangePayload,
@@ -46,7 +35,6 @@ from langwatch_nlp.studio.utils import (
     get_input_keys,
     get_output_keys,
     node_llm_config_to_dspy_lm,
-    set_dspy_cache_dir,
     transpose_inline_dataset_to_object_list,
 )
 
@@ -86,7 +74,13 @@ async def execute_optimization(
         if event.s3_cache_key:
             setup_s3_cache(event.s3_cache_key)
 
-        module = WorkflowModule(workflow, manual_execution_mode=False)
+        Module = parse_workflow_and_get_class(
+            workflow,
+            format=False,
+            debug_level=0,
+            do_not_trace=True,
+        )
+        module = Module(run_evaluations=True)
 
         entry_node = cast(
             EntryNode,
@@ -128,7 +122,7 @@ async def execute_optimization(
             pred: PredictionWithEvaluationAndMetadata,
             trace=None,
         ):
-            score, results = pred.evaluate(example, trace=trace, return_results=True)
+            score = pred.total_score(weighting="mean")
             return score
 
         langwatch.api_key = workflow.api_key
@@ -233,12 +227,15 @@ async def execute_optimization(
         #     )
 
         # Capture error in Sentry
-        sentry_sdk.capture_exception(e, extras={
-            "run_id": run_id,
-            "workflow_id": workflow.workflow_id,
-            "workflow_version_id": event.workflow_version_id,
-            "optimizer": event.optimizer
-        })
+        sentry_sdk.capture_exception(
+            e,
+            extras={
+                "run_id": run_id,
+                "workflow_id": workflow.workflow_id,
+                "workflow_version_id": event.workflow_version_id,
+                "optimizer": event.optimizer,
+            },
+        )
 
         return
 

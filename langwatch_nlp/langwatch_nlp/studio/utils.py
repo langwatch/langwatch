@@ -2,6 +2,7 @@ import ast
 import builtins
 from contextlib import contextmanager
 import inspect
+import json
 import keyword
 import os
 import re
@@ -125,7 +126,7 @@ def get_input_keys(workflow: Workflow) -> List[str]:
         if (
             edge.source == entry_node.id
             and edge.sourceHandle.split(".")[-1] not in input_keys
-            and get_node_by_id(workflow, edge.target).type != "evaluator"
+            # and get_node_by_id(workflow, edge.target).type != "evaluator"
         ):
             input_keys.add(edge.sourceHandle.split(".")[-1])
 
@@ -231,3 +232,10 @@ def normalize_to_variable_name(node_name: str) -> str:
     """
 
     return re.sub(r"[^a-zA-Z0-9]", "", node_name).lower().replace(" ", "_")
+
+
+class SerializableAndPredictEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, dspy.Prediction):
+            return o.toDict()
+        return super().default(o)

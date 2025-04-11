@@ -42,7 +42,7 @@ from langwatch_nlp.studio.types.events import (
     component_error_event,
     get_trace_id,
 )
-from langwatch_nlp.studio.utils import shutdown_handler
+from langwatch_nlp.studio.utils import SerializableAndPredictEncoder, shutdown_handler
 
 logger = get_logger(__name__)
 
@@ -202,7 +202,7 @@ async def execute_event_on_a_subprocess(
 
 async def event_encoder(event_generator: AsyncGenerator[StudioServerEvent, None]):
     async for event in event_generator:
-        yield f"data: {json.dumps(event.model_dump(exclude_none=True))}\n\n"
+        yield f"data: {json.dumps(event.model_dump(exclude_none=True), cls=SerializableAndPredictEncoder)}\n\n"
 
 
 @app.post("/execute")

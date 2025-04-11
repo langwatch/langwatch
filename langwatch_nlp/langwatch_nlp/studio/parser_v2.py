@@ -1,8 +1,5 @@
 import copy
 from typing import Tuple, Type, cast, List, Dict, Set
-import asyncio
-import time
-import importlib
 
 from langwatch_nlp.studio.dspy.langwatch_workflow_module import LangWatchWorkflowModule
 from langwatch_nlp.studio.field_parser import parse_fields
@@ -12,20 +9,6 @@ from langwatch_nlp.studio.modules.registry import (
     PROMPTING_TECHNIQUES_FOR_TEMPLATE,
 )
 from langwatch_nlp.studio.types.dsl import Field, Node, Workflow, Edge
-from langwatch_nlp.studio.dspy.workflow_module import WorkflowModule
-from langwatch_nlp.studio.dspy.reporting_module import ReportingModule
-from langwatch_nlp.studio.dspy.llm_node import LLMNode
-from langwatch_nlp.studio.dspy.evaluation import (
-    EvaluationResultWithMetadata,
-    PredictionWithEvaluationAndMetadata,
-)
-from langwatch_nlp.studio.dspy.predict_with_metadata import PredictionWithMetadata
-from langevals_core.base_evaluator import (
-    SingleEvaluationResult,
-    EvaluationResultError,
-    EvaluationResult,
-)
-import langwatch
 from jinja2 import Environment, FileSystemLoader
 import re
 import dspy
