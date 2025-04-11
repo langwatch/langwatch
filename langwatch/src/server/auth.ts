@@ -108,6 +108,7 @@ export const authOptions = (
           clientSecret: env.AUTH0_CLIENT_SECRET ?? "",
           issuer: env.AUTH0_ISSUER ?? "",
           authorization: { params: { prompt: "login" } },
+          allowDangerousEmailAccountLinking: true,
           profile(profile: Auth0Profile) {
             return {
               id: profile.sub,
