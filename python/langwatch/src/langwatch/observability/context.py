@@ -18,7 +18,7 @@ def get_current_trace() -> 'LangWatchTrace':
     """Get the current trace from the LangWatch context.
     
     Returns:
-        The current LangWatchTrace if one exists in the context, otherwise None.
+        A LangWatchTrace.
     """
     ensure_setup()
     trace = stored_langwatch_trace.get(None)
@@ -33,7 +33,7 @@ def get_current_span() -> 'LangWatchSpan':
     If no span exists in LangWatch context, falls back to OpenTelemetry context.
     
     Returns:
-        The current LangWatchSpan if one exists in either context, otherwise None.
+        A LangWatchSpan.
     """
     ensure_setup()
 
