@@ -6,7 +6,11 @@ import asyncer
 import langwatch
 import sentry_sdk
 from langwatch_nlp.studio.dspy.langwatch_workflow_module import LangWatchWorkflowModule
-from langwatch_nlp.studio.parser_v2 import get_component_class, parse_workflow
+from langwatch_nlp.studio.parser_v2 import (
+    get_component_class,
+    parse_workflow,
+    parse_workflow_and_get_class,
+)
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.dspy.workflow_module import WorkflowModule
 from langwatch_nlp.studio.types.dsl import (
@@ -72,15 +76,14 @@ async def execute_flow(
             if not do_not_trace and trace:
                 trace.autotrack_dspy()
 
-            class_name, code = parse_workflow(
+            Module = parse_workflow_and_get_class(
                 workflow,
-                format=True,
+                format=False,
                 debug_level=0,
                 until_node_id=until_node_id,
                 do_not_trace=do_not_trace,
             )
-            Module = get_component_class(component_code=code, class_name=class_name)
-            module = cast(LangWatchWorkflowModule, Module)(run_evaluations=True)
+            module = Module(run_evaluations=True)
             module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
 
             entry_node = cast(

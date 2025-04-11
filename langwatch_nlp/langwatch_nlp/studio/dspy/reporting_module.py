@@ -32,13 +32,13 @@ class ReportingModule(dspy.Module):
         )
 
     def with_reporting(self, module, node_id):
-        node = (
-            next(node for node in self.context.workflow.nodes if node.id == node_id)
-            if self.context
-            else None
-        )
-
         def wrapper(*args, **kwargs):
+            node = (
+                next(node for node in self.context.workflow.nodes if node.id == node_id)
+                if self.context
+                else None
+            )
+
             if self.context and node:
                 self.context.queue.put_nowait(
                     start_component_event(node, self.context.trace_id, kwargs)

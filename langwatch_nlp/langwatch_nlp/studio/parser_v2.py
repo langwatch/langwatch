@@ -4,6 +4,7 @@ import asyncio
 import time
 import importlib
 
+from langwatch_nlp.studio.dspy.langwatch_workflow_module import LangWatchWorkflowModule
 from langwatch_nlp.studio.field_parser import parse_fields
 from langwatch_nlp.studio.modules.registry import (
     EVALUATORS_FOR_TEMPLATE,
@@ -109,13 +110,19 @@ def parse_workflow(
     return "WorkflowModule", module
 
 
-def parse_and_instantiate_workflow(
-    workflow: Workflow, format=False
-) -> Type[WorkflowModule]:
-    class_name, module = parse_workflow(workflow, format)
-    Module = get_component_class(class_name, module)
-    # TODO: make this an interface
-    return cast(Type[WorkflowModule], Module)
+def parse_workflow_and_get_class(
+    workflow: Workflow,
+    format=False,
+    debug_level=0,
+    until_node_id=None,
+    handle_errors=False,
+    do_not_trace=False,
+) -> Type[LangWatchWorkflowModule]:
+    class_name, code = parse_workflow(
+        workflow, format, debug_level, until_node_id, handle_errors, do_not_trace
+    )
+    Module = get_component_class(component_code=code, class_name=class_name)
+    return cast(Type[LangWatchWorkflowModule], Module)
 
 
 def parse_component(

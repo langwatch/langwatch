@@ -73,6 +73,9 @@ class EvaluationResultWithMetadata(BaseModel):
     duration: int
 
 
+Weighting = Literal["mean"]
+
+
 class PredictionWithEvaluationAndMetadata(PredictionWithMetadata):
     def __init__(
         self,
@@ -88,7 +91,7 @@ class PredictionWithEvaluationAndMetadata(PredictionWithMetadata):
         self._error = error
         self.evaluations = evaluations
 
-    def total_score(self, weighting: Literal["mean"] = "mean") -> float:
+    def total_score(self, weighting: Weighting = "mean") -> float:
         def get_score(result: EvaluationResultWithMetadata) -> float:
             return (
                 result.score
@@ -108,6 +111,8 @@ class PredictionWithEvaluationAndMetadata(PredictionWithMetadata):
 
 
 class EvaluationReporting:
+    weighting: Weighting
+
     def __init__(
         self,
         workflow: Workflow,
@@ -115,6 +120,7 @@ class EvaluationReporting:
         run_id: str,
         total: int,
         queue: "ServerEventQueue",
+        weighting: Weighting,
     ):
         self.workflow = workflow
         self.workflow_version_id = workflow_version_id
@@ -123,6 +129,7 @@ class EvaluationReporting:
         self.total = total
         self.progress = 0
         self.queue = queue
+        self.weighting = weighting
 
         self.lock = threading.Lock()
         self.batch = {"dataset": [], "evaluations": []}
@@ -136,7 +143,8 @@ class EvaluationReporting:
         pred: PredictionWithEvaluationAndMetadata,
         trace=None,
     ):
-        evaluation, evaluation_results = pred.evaluate(example, return_results=True)
+        score = pred.total_score(self.weighting)
+        evaluation_results = pred.evaluations
 
         if self.progress == 0:
             self.last_sent = 0
@@ -159,7 +167,7 @@ class EvaluationReporting:
         if time.time() - self.last_sent >= self.debounce_interval:
             self.send_batch()
 
-        return evaluation
+        return score
 
     def add_to_batch(
         self,

@@ -2,11 +2,9 @@ import time
 from typing import Optional, cast
 import dspy
 import sentry_sdk
+from langwatch_nlp.studio.parser_v2 import parse_workflow_and_get_class
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.dspy.evaluation import EvaluationReporting
-from langwatch_nlp.studio.dspy.workflow_module import (
-    WorkflowModule,
-)
 from langwatch_nlp.studio.execute.execute_flow import (
     validate_workflow,
 )
@@ -49,7 +47,13 @@ async def execute_evaluation(
         yield start_evaluation_event(run_id)
         valid = True
 
-        module = WorkflowModule(workflow, manual_execution_mode=False)
+        Module = parse_workflow_and_get_class(
+            workflow,
+            format=False,
+            debug_level=0,
+            do_not_trace=True,
+        )
+        module = Module(run_evaluations=True)
 
         entry_node = cast(
             EntryNode,
@@ -109,6 +113,7 @@ async def execute_evaluation(
             run_id=run_id,
             total=len(examples),
             queue=queue,
+            weighting="mean",
         )
         # Send initial empty batch to create the experiment in LangWatch
         reporting.send_batch()
