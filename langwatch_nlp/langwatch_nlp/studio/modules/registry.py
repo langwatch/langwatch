@@ -75,10 +75,17 @@ OPTIMIZERS: dict[
 }
 
 FIELD_TYPE_TO_DSPY_TYPE = {
-    FieldType.image: "dspy.Image",
     FieldType.str: "str",
-    FieldType.int: "int",
+    FieldType.image: "dspy.Image",
     FieldType.float: "float",
+    FieldType.int: "int",
     FieldType.bool: "bool",
+    FieldType.list: "list",
     FieldType.list_str: "list[str]",
+    FieldType.list_int: "list[int]",
+    FieldType.list_float: "list[float]",
+    FieldType.list_bool: "list[bool]",
+    FieldType.dict: "dict",
+    FieldType.signature: "dspy.Signature",
+    FieldType.llm: "LLMConfig",
 }

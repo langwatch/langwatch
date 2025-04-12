@@ -7,6 +7,8 @@ import tempfile
 from importlib import reload
 from typing import Any, Generator, Tuple, Type, cast, List, Dict, Set
 
+import langwatch
+
 from langwatch_nlp.studio.dspy.langwatch_workflow_module import LangWatchWorkflowModule
 from langwatch_nlp.studio.field_parser import parse_fields
 from langwatch_nlp.studio.modules.registry import (
@@ -217,7 +219,27 @@ def parse_component(
                 {"rm": retriever["class"], **parse_fields(node.data.parameters or [])},
             )
         case "custom":
-            raise NotImplementedError("Not implemented yet")
+            if not node.data.workflow_id:
+                raise ValueError("Workflow ID is required for custom nodes")
+
+            params = {
+                "api_key": workflow.api_key,
+                "endpoint": langwatch.endpoint,
+                "workflow_id": node.data.workflow_id,
+                "version_id": node.data.version_id,
+            }
+            if node.data.behave_as == "evaluator":
+                return (
+                    "from langwatch_nlp.studio.dspy.custom_node import CustomEvaluatorNode",
+                    "CustomEvaluatorNode",
+                    params,
+                )
+            else:
+                return (
+                    "from langwatch_nlp.studio.dspy.custom_node import CustomNode",
+                    "CustomNode",
+                    params,
+                )
         case "entry":
             return "", "None", {}
         case "end":
