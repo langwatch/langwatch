@@ -61,7 +61,7 @@ class AnswerCorrectnessEvaluator(Evaluator):
             status="processed",
             score=1 if passed else 0,
             passed=passed,
-            cost=Money(currency="USD", amount=result.cost),
+            cost=result.cost,
             inputs={
                 "input": input,
                 "output": output,

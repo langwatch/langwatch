@@ -5,7 +5,7 @@ import shutil
 import sys
 import tempfile
 from importlib import reload
-from typing import Generator, Tuple, Type, cast, List, Dict, Set
+from typing import Any, Generator, Tuple, Type, cast, List, Dict, Set
 
 from langwatch_nlp.studio.dspy.langwatch_workflow_module import LangWatchWorkflowModule
 from langwatch_nlp.studio.field_parser import parse_fields
@@ -13,6 +13,7 @@ from langwatch_nlp.studio.modules.registry import (
     EVALUATORS_FOR_TEMPLATE,
     FIELD_TYPE_TO_DSPY_TYPE,
     PROMPTING_TECHNIQUES_FOR_TEMPLATE,
+    RETRIEVERS_FOR_TEMPLATE,
 )
 from langwatch_nlp.studio.types.dsl import Field, Node, Workflow, Edge
 from jinja2 import Environment, FileSystemLoader
@@ -39,7 +40,6 @@ env = Environment(
 env.globals["raise"] = raise_helper
 env.globals["PROMPTING_TECHNIQUES"] = PROMPTING_TECHNIQUES_FOR_TEMPLATE
 env.globals["FIELD_TYPE_TO_DSPY_TYPE"] = FIELD_TYPE_TO_DSPY_TYPE
-env.globals["EVALUATORS"] = EVALUATORS_FOR_TEMPLATE
 env.globals["parse_fields"] = parse_fields
 env.keep_trailing_newline = True
 
@@ -111,13 +111,15 @@ def parsed_and_materialized_workflow_class(
     class_name, code = parse_workflow(
         workflow, format, debug_level, until_node_id, handle_errors, do_not_trace
     )
-    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+    with materialized_component_class(
+        component_code=code, class_name=class_name
+    ) as Module:
         yield cast(Type[LangWatchWorkflowModule], Module)
 
 
 def parse_component(
     node: Node, workflow: Workflow, format=False, debug_level=0
-) -> Tuple[str, str]:
+) -> Tuple[str, str, Dict[str, Any]]:
     node = copy.deepcopy(node)
     node.data.name = normalize_name_to_class_name(node.data.name or "")
 
@@ -134,23 +136,53 @@ def parse_component(
                 else None
             )
 
-            return f"{node.data.name}", render_template(
-                "llm.py.jinja",
-                format=format,
-                debug_level=debug_level,
-                node_id=node.id,
-                component=node.data,
-                workflow=workflow,
-                parameters=parameters,
-                prompting_technique=prompting_technique,
-                llm_config=llm_config,
-                demonstrations=demonstrations_dict,
+            return (
+                render_template(
+                    "llm.py.jinja",
+                    format=format,
+                    debug_level=debug_level,
+                    node_id=node.id,
+                    component=node.data,
+                    workflow=workflow,
+                    parameters=parameters,
+                    prompting_technique=prompting_technique,
+                    llm_config=llm_config,
+                    demonstrations=demonstrations_dict,
+                ),
+                f"{node.data.name}",
+                {},
             )
         case "prompting_technique":
             raise NotImplementedError("Prompting techniques cannot be parsed directly")
         case "evaluator":
-            # Evaluators are handled directly in the workflow template
-            return "None", ""
+            if not node.data.cls:
+                raise ValueError(
+                    f"Evaluator class not specified for component {node.data.name}"
+                )
+
+            if node.data.cls == "LangWatchEvaluator" and not node.data.evaluator:
+                raise ValueError(
+                    f"Evaluator not specified for LangWatchEvaluator {node.data.name}"
+                )
+
+            evaluator = EVALUATORS_FOR_TEMPLATE[node.data.cls]
+
+            return (
+                evaluator["import"],
+                evaluator["class"],
+                (
+                    {
+                        "api_key": workflow.api_key,
+                        "evaluator": node.data.evaluator,
+                        "name": node.data.name or "LangWatchEvaluator",
+                        "settings": parse_fields(
+                            node.data.parameters or [], autoparse=False
+                        ),
+                    }
+                    if node.data.cls == "LangWatchEvaluator"
+                    else parse_fields(node.data.parameters or [])
+                ),
+            )
         case "code":
             code = next(
                 (p for p in node.data.parameters or [] if p.identifier == "code"),
@@ -170,14 +202,28 @@ def parse_component(
                 )
             class_name = match.group(1)
 
-            return class_name, code
+            return code, class_name, {}
         case "retriever":
-            raise NotImplementedError("Not implemented yet")
+            if not node.data.cls:
+                raise ValueError(
+                    f"Retriever class not specified for component {node.data.name}"
+                )
+
+            retriever = RETRIEVERS_FOR_TEMPLATE[node.data.cls]
+            return (
+                retriever["import"]
+                + "\nfrom langwatch_nlp.studio.dspy.retrieve import ContextsRetriever",
+                f"ContextsRetriever",
+                {"rm": retriever["class"], **parse_fields(node.data.parameters or [])},
+            )
         case "custom":
             raise NotImplementedError("Not implemented yet")
+        case "entry":
+            return "", "None", {}
+        case "end":
+            return "", "None", {}
         case _:
-            # TODO: throw error for unknown node type
-            return "None", ""
+            raise ValueError(f"Unknown node type: {node.type}")
 
 
 @contextmanager
@@ -190,7 +236,8 @@ def materialized_component_class(
     # save to file and import
     with open(os.path.join(temp_folder, "generated_component_code.py"), "w") as f:
         f.write(component_code)
-    import generated_component_code # type: ignore
+    import generated_component_code  # type: ignore
+
     reload(generated_component_code)
 
     Module = getattr(generated_component_code, class_name)
@@ -200,7 +247,6 @@ def materialized_component_class(
         # cleanup
         shutil.rmtree(temp_folder)
         sys.path.remove(temp_folder)
-
 
 
 def find_path_until_node(

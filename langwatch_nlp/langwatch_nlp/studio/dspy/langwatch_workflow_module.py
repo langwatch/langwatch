@@ -1,5 +1,5 @@
 import time
-from typing import Any, Dict, List, Tuple, TypeVar
+from typing import Any, Dict, Tuple, TypeVar
 import dspy
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -11,6 +11,7 @@ from langwatch_nlp.studio.dspy.reporting_module import ReportingModule
 
 from langwatch_nlp.studio.field_parser import with_autoparsing
 from langwatch_nlp.studio.dspy.patched_optional_image import patch_optional_image
+from pydantic import BaseModel
 
 
 patch_optional_image()
@@ -53,8 +54,11 @@ class LangWatchWorkflowModule(ReportingModule):
                 result = module.__forward_before_metadata__(instance_self, *args, **kwargs)  # type: ignore
                 # Skip cost and duration calculation for evaluation results as those are counted separately
                 if not isinstance(result, PredictionWithEvaluationAndMetadata):
-                    self.cost += getattr(result, "cost", None) or 0
+                    cost = getattr(result, "cost", None)
+                    self.cost += cost.amount if cost else 0
                     self.duration += round(time.time() - start_time)
+                if isinstance(result, dict):
+                    result = dspy.Prediction(**result)
             except Exception as e:
                 self.duration += round(time.time() - start_time)
                 raise e

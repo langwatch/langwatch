@@ -1,4 +1,4 @@
-{% from 'macros.jinja' import evaluator_class, evaluator_args, edge_param, edge_param_dict, node_llm_config_to_dspy_lm %}
+{% from 'macros.jinja' import edge_param, edge_param_dict, node_llm_config_to_dspy_lm %}
 
 import time
 import asyncio
@@ -11,11 +11,9 @@ from langwatch_nlp.studio.dspy import (
     PredictionWithMetadata,
     EvaluationResultWithMetadata,
     PredictionWithEvaluationAndMetadata,
+    {# We can probably remove this import once we have LLM Answer Match migrated to langevals #}
+    LLMConfig,
 )
-
-{% for node in workflow.nodes|selectattr("type", "eq", "evaluator")|list %}
-{{ EVALUATORS[node.data.cls]["import"] }}
-{% endfor %}
 
 {% if workflow.default_llm %}
 lm = {{ node_llm_config_to_dspy_lm(workflow.default_llm) }}
@@ -27,13 +25,15 @@ class WorkflowModule(LangWatchWorkflowModule):
         super().__init__()
 
         {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
-        {% if node.type == "evaluator" %}
-        self.{{ node.id }} = self.wrapped({{ evaluator_class(node) }}, node_id="{{ node.id }}", run=run_evaluations){{ evaluator_args(workflow, node) }}
-        {% elif node.behave_as == "evaluator" %}
-        self.{{ node.id }} = self.wrapped({{ node_templates[node.id][0] }}, node_id="{{ node.id }}", run=run_evaluations)()
-        {% else %}
-        self.{{ node.id }} = self.wrapped({{ node_templates[node.id][0] }}, node_id="{{ node.id }}")()
-        {% endif %}
+        self.{{ node.id }} = self.wrapped({{ node_templates[node.id][1] }}, node_id="{{ node.id }}", {% if node.type == "evaluator" or node.behave_as == "evaluator" %}run=run_evaluations{% endif %})(
+            {% for key, value in node_templates[node.id][2].items() %}
+            {% if node.type == "retriever" and key == "rm" %}
+            {{ key }}={{ value }},
+            {% else %}
+            {{ key }}={{ value.__repr__() }},
+            {% endif %}
+            {% endfor %}
+        )
         {% endfor %}
 
     {% set input_args = [] %}
@@ -187,5 +187,5 @@ class WorkflowModule(LangWatchWorkflowModule):
         )
 
 {% for node_id, node_template in node_templates.items() %}
-{{ node_template[1] }}
+{{ node_template[0] }}
 {% endfor %}

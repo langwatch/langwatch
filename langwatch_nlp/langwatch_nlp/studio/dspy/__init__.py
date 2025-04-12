@@ -6,10 +6,12 @@ from langwatch_nlp.studio.dspy.evaluation import (
     EvaluationResultWithMetadata,
     PredictionWithEvaluationAndMetadata,
 )
+from langwatch_nlp.studio.types.dsl import LLMConfig
 
 __all__ = [
     "LangWatchWorkflowModule",
     "PredictionWithMetadata",
     "EvaluationResultWithMetadata",
     "PredictionWithEvaluationAndMetadata",
+    "LLMConfig",
 ]

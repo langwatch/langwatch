@@ -67,7 +67,7 @@ class ReportingModule(dspy.Module):
             if self.context and node:
                 cost = result.cost if hasattr(result, "cost") else None
                 self.context.queue.put_nowait(
-                    end_component_event(node, self.context.trace_id, dict(result), cost)
+                    end_component_event(node, self.context.trace_id, result, cost)
                 )
             return result
 

@@ -23,6 +23,7 @@ from langwatch_nlp.studio.types.dsl import (
     Workflow,
 )
 import dspy
+from pydantic import BaseModel
 
 
 def print_class_definition(cls):
@@ -234,8 +235,10 @@ def normalize_to_variable_name(node_name: str) -> str:
     return re.sub(r"[^a-zA-Z0-9]", "", node_name).lower().replace(" ", "_")
 
 
-class SerializableAndPredictEncoder(json.JSONEncoder):
+class SerializableWithPydanticAndPredictEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, dspy.Prediction):
             return o.toDict()
+        if isinstance(o, BaseModel):
+            return o.model_dump()
         return super().default(o)

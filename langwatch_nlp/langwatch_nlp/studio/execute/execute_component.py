@@ -36,16 +36,16 @@ async def execute_component(event: ExecuteComponentPayload):
         ) as trace:
             if trace:
                 trace.autotrack_dspy()
-            class_name, code = parse_component(node, event.workflow)
+            code, class_name, kwargs = parse_component(node, event.workflow)
             with materialized_component_class(component_code=code, class_name=class_name) as Module:
-                instance = Module()
+                instance = Module(**kwargs)
                 result = await dspy.asyncify(instance)(
                     **autoparse_fields(node.data.inputs or [], event.inputs)  # type: ignore
                 )
 
         cost = result.cost if hasattr(result, "cost") else None
 
-        yield end_component_event(node, event.trace_id, dict(result), cost)
+        yield end_component_event(node, event.trace_id, result, cost)
     except Exception as e:
         import traceback
 

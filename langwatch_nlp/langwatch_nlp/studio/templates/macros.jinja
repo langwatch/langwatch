@@ -32,35 +32,3 @@ dspy.LM(
     {% endif %}
 {% endif %}
 {% endmacro %}
-
-{% macro evaluator_class(node) %}
-{% if not node.data.cls %}
-{{ raise("Evaluator class not specified for " ~ node.data.name) }}
-{% endif %}
-{{ EVALUATORS[node.data.cls]["class"] }}
-{% endmacro %}
-
-{% macro evaluator_args(workflow, node) %}
-{% if not node.data.cls %}
-{{ raise("Evaluator class not specified for " ~ node.data.name) }}
-{% endif %}
-{% if node.data.cls == "LangWatchEvaluator" %}
-{% if not node.data.evaluator %}
-{{ raise("Evaluator not specified for LangWatchEvaluator") }}
-{% endif %}
-(
-    api_key="{{ workflow.api_key }}",
-    evaluator="{{ node.data.evaluator }}",
-    name="{{ node.data.name or 'LangWatchEvaluator' }}",
-    {% if node.data.parameters %}
-    settings={{ parse_fields(node.data.parameters or [], autoparse=False) }}
-    {% endif %}
-)
-{% elif node.data.parameters %}
-(
-    **{{ parse_fields(node.data.parameters or [], autoparse=False) }}
-)
-{% else %}
-()
-{% endif %}
-{% endmacro %}

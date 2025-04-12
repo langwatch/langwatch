@@ -25,7 +25,7 @@ from langwatch_nlp.studio.types.events import (
 )
 from langwatch_nlp.studio.utils import (
     ClientReadableValueError,
-    SerializableAndPredictEncoder,
+    SerializableWithPydanticAndPredictEncoder,
     disable_dsp_caching,
     optional_langwatch_trace,
     transpose_inline_dataset_to_object_list,
@@ -150,7 +150,7 @@ def end_workflow_event(workflow: Workflow, trace_id: str, result):
                 trace_id=trace_id,
                 timestamps=Timestamps(finished_at=int(time.time() * 1000)),
                 result=json.loads(
-                    json.dumps(result.toDict(), cls=SerializableAndPredictEncoder)
+                    json.dumps(result.toDict(), cls=SerializableWithPydanticAndPredictEncoder)
                 ),
             )
         )

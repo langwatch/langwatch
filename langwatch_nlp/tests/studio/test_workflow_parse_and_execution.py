@@ -1,12 +1,10 @@
 import copy
 import json
 import pytest
+from langwatch_nlp.studio.dspy.evaluation import PredictionWithEvaluationAndMetadata
 from langwatch_nlp.studio.parser_v2 import (
     materialized_component_class,
     parse_workflow,
-)
-from langwatch_nlp.studio.dspy.workflow_module import (
-    PredictionWithEvaluationAndMetadata,
 )
 from langwatch_nlp.studio.types.dataset import DatasetColumn, DatasetColumnType
 from langwatch_nlp.studio.types.dsl import (
@@ -24,6 +22,8 @@ from langwatch_nlp.studio.types.dsl import (
     Field,
     FieldType,
     LLMConfig,
+    Retriever,
+    RetrieverNode,
     Signature,
     SignatureNode,
     Workflow,
@@ -1159,3 +1159,56 @@ def test_proposes_instructions_with_grounded_proposer():
         )
 
         assert len(proposed_instructions) == 2
+
+
+@pytest.mark.integration
+def test_parse_workflow_with_retriever():
+    disable_dsp_caching()
+
+    workflow = copy.deepcopy(simple_workflow)
+    workflow.nodes.append(
+        RetrieverNode(
+            id="retriever",
+            data=Retriever(
+                name="Retriever",
+                cls="ColBERTv2",
+                parameters=[
+                    Field(
+                        identifier="k",
+                        type=FieldType.int,
+                        optional=None,
+                        value=3,
+                    ),
+                    Field(
+                        identifier="url",
+                        type=FieldType.str,
+                        optional=None,
+                        value="http://20.102.90.50:2017/wiki17_abstracts",
+                    ),
+                ],
+            ),
+            type="retriever",
+        )
+    )
+    workflow.edges.append(
+        Edge(
+            id="e0-1",
+            source="entry",
+            sourceHandle="outputs.question",
+            target="retriever",
+            targetHandle="inputs.query",
+            type="default",
+        )
+    )
+
+    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+    with materialized_component_class(
+        component_code=code, class_name=class_name
+    ) as Module:
+        instance = Module()  # type: ignore
+        result: PredictionWithEvaluationAndMetadata = instance(
+            question="What is the capital of France?",
+            gold_answer="Paris",
+        )
+
+    assert "Paris" in result["retriever"].contexts[0]
