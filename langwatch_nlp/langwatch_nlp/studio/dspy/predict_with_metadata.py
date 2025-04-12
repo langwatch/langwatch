@@ -10,7 +10,7 @@ import langwatch_nlp.studio.dspy.patched_caching
 class PredictionWithMetadata(dspy.Prediction):
     def __init__(self, *args, error: Optional[Exception] = None, **kwargs):
         super().__init__(*args, **kwargs)
-        self._cost = Money(currency="USD", amount=0)
+        self._cost = 0
         self._duration = 0
         self._error = error
 
@@ -20,7 +20,7 @@ class PredictionWithMetadata(dspy.Prediction):
 
     @property
     def cost(self):
-        return self._cost or Money(currency="USD", amount=0)
+        return self._cost or 0
 
     @property
     def duration(self):

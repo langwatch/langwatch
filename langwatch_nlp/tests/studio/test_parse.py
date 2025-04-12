@@ -1,7 +1,7 @@
 import copy
 import dspy
 from langwatch_nlp.studio.dspy.llm_node import LLMNode
-from langwatch_nlp.studio.parser_v2 import parse_component, materialized_component_class
+from langwatch_nlp.studio.parser import parse_component, materialized_component_class
 from langwatch_nlp.studio.types.dataset import DatasetColumn, DatasetColumnType
 from langwatch_nlp.studio.types.dsl import (
     Code,

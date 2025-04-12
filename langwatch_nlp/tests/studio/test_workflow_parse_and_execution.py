@@ -2,7 +2,7 @@ import copy
 import json
 import pytest
 from langwatch_nlp.studio.dspy.evaluation import PredictionWithEvaluationAndMetadata
-from langwatch_nlp.studio.parser_v2 import (
+from langwatch_nlp.studio.parser import (
     materialized_component_class,
     parse_workflow,
 )

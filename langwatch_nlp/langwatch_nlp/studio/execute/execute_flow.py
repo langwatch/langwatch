@@ -5,7 +5,7 @@ from typing import Dict, Set, cast
 import dspy
 import asyncer
 import sentry_sdk
-from langwatch_nlp.studio.parser_v2 import (
+from langwatch_nlp.studio.parser import (
     parsed_and_materialized_workflow_class,
 )
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue

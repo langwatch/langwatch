@@ -2,7 +2,7 @@ import dspy
 import asyncer
 import sentry_sdk
 from langwatch_nlp.studio.field_parser import autoparse_fields
-from langwatch_nlp.studio.parser_v2 import materialized_component_class, parse_component
+from langwatch_nlp.studio.parser import materialized_component_class, parse_component
 from langwatch_nlp.studio.utils import disable_dsp_caching, optional_langwatch_trace
 from langwatch_nlp.studio.types.events import (
     Debug,

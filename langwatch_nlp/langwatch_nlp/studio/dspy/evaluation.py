@@ -79,7 +79,7 @@ Weighting = Literal["mean"]
 class PredictionWithEvaluationAndMetadata(PredictionWithMetadata):
     def __init__(
         self,
-        cost: Money,
+        cost: float,
         duration: int,
         error: Optional[Exception] = None,
         evaluations: dict[str, EvaluationResultWithMetadata] = {},

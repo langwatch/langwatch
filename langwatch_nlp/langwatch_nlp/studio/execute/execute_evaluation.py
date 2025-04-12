@@ -2,7 +2,7 @@ import time
 from typing import Optional, cast
 import dspy
 import sentry_sdk
-from langwatch_nlp.studio.parser_v2 import parsed_and_materialized_workflow_class
+from langwatch_nlp.studio.parser import parsed_and_materialized_workflow_class
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.dspy.evaluation import EvaluationReporting
 from langwatch_nlp.studio.execute.execute_flow import (
