@@ -95,7 +95,7 @@ const evaluationResultsTableRow = (
     })),
     cost: {
       render: () => (
-        <Table.Cell>
+        <Table.Cell whiteSpace="nowrap">
           <Tooltip
             content={
               <VStack align="start" gap={0}>

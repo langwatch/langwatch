@@ -1,4 +1,4 @@
-{% from 'macros.jinja' import evaluator_instance, edge_param, node_llm_config_to_dspy_lm %}
+{% from 'macros.jinja' import evaluator_class, evaluator_args, edge_param, edge_param_dict, node_llm_config_to_dspy_lm %}
 
 import time
 import asyncio
@@ -28,11 +28,11 @@ class WorkflowModule(LangWatchWorkflowModule):
 
         {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
         {% if node.type == "evaluator" %}
-        self.{{ node.id }} = self.wrapped({{ evaluator_instance(workflow, node) }}, "{{ node.id }}", run=run_evaluations)
+        self.{{ node.id }} = self.wrapped({{ evaluator_class(node) }}, node_id="{{ node.id }}", run=run_evaluations){{ evaluator_args(workflow, node) }}
         {% elif node.behave_as == "evaluator" %}
-        self.{{ node.id }} = self.wrapped({{ node_templates[node.id][0] }}(), "{{ node.id }}", run=run_evaluations)
+        self.{{ node.id }} = self.wrapped({{ node_templates[node.id][0] }}, node_id="{{ node.id }}", run=run_evaluations)()
         {% else %}
-        self.{{ node.id }} = self.wrapped({{ node_templates[node.id][0] }}(), "{{ node.id }}")
+        self.{{ node.id }} = self.wrapped({{ node_templates[node.id][0] }}, node_id="{{ node.id }}")()
         {% endif %}
         {% endfor %}
 
@@ -51,9 +51,9 @@ class WorkflowModule(LangWatchWorkflowModule):
     @langwatch.span(type="workflow")
     {% endif %}
     {% if handle_errors %}
-    async def forward(self, {{ input_args | join(", ") }}) -> dspy.Prediction:
+    def forward(self, {{ input_args | join(", ") }}) -> dspy.Prediction:
         try:
-            return await self._forward({{ forward_args | join(", ") }})
+            return self._forward({{ forward_args | join(", ") }})
 
         except Exception as e:
             return PredictionWithEvaluationAndMetadata(
@@ -62,9 +62,9 @@ class WorkflowModule(LangWatchWorkflowModule):
                 duration=self.duration,
             )
 
-    async def _forward(self, {{ input_args | join(", ") }}) -> dspy.Prediction:
+    def _forward(self, {{ input_args | join(", ") }}) -> dspy.Prediction:
     {% else %}
-    async def forward(self, {{ input_args | join(", ") }}) -> dspy.Prediction:
+    def forward(self, {{ input_args | join(", ") }}) -> dspy.Prediction:
     {% endif %}
         self.cost = 0
         self.duration = 0
@@ -123,22 +123,22 @@ class WorkflowModule(LangWatchWorkflowModule):
         {# Generate code for each layer #}
         {% for layer in layers %}
             {% if layer|length > 1 %}
-        {{ layer|map(attribute="id")|list|join(", ") }} = await asyncio.gather(
+        {{ layer|map(attribute="id")|list|join(", ") }} = self.run_in_parallel(
                 {% for node in layer %}
-            self.{{ node.id }}(
+            (self.{{ node.id }}, {
                     {% for edge in workflow.edges %}
                         {% if edge.target == node.id %}
                             {% set source_parts = edge.sourceHandle.split(".") %}
                             {% set target_parts = edge.targetHandle.split(".") %}
-                            {{ edge_param(edge, source_parts, target_parts, use_kwargs) }}
+                            {{ edge_param_dict(edge, source_parts, target_parts, use_kwargs) }}
                         {% endif %}
                     {% endfor %}
-            ),
+            }),
                 {% endfor %}
         )
 
             {% else %}
-        {{ layer[0].id }} = await self.{{ layer[0].id }}(
+        {{ layer[0].id }} = self.{{ layer[0].id }}(
                 {% for edge in workflow.edges %}
                     {% if edge.target == layer[0].id %}
                         {% set source_parts = edge.sourceHandle.split(".") %}
@@ -152,7 +152,7 @@ class WorkflowModule(LangWatchWorkflowModule):
 
         {# Finally execute end node #}
         {% set ns = namespace(end_node=None) %}
-        {% for node in workflow.nodes %}
+        {% for node in nodes %}
             {% if node.type == "end" %}
                 {% set ns.end_node = node %}
             {% endif %}

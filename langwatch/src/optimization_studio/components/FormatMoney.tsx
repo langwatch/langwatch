@@ -1,3 +1,4 @@
+import { Text } from "@chakra-ui/react";
 import { formatMoney } from "../../utils/formatMoney";
 import type { Money } from "../../utils/types";
 import type { ReactNode } from "react";
@@ -18,7 +19,9 @@ export const FormatMoney = ({
 
   return (
     <Tooltip content={tooltip ?? (formatted.startsWith("<") ? amount : "")}>
-      {formatted}
+      <Text as="span" whiteSpace="nowrap">
+        {formatted}
+      </Text>
     </Tooltip>
   );
 };

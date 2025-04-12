@@ -23,7 +23,24 @@ dspy.LM(
 {% endif %}
 {% endmacro %}
 
-{% macro evaluator_instance(workflow, node) %}
+{% macro edge_param_dict(edge, source_parts, target_parts, use_kwargs) %}
+{% if source_parts[0] == "outputs" %}
+    {% if edge.source == "entry" %}
+"{{ target_parts[1] }}": {% if use_kwargs %}kwargs.get("{{ source_parts[1] }}"){% else %}{{ source_parts[1] }}{% endif %},
+    {% else %}
+"{{ target_parts[1] }}": {{ edge.source }}.{{ source_parts[1] }},
+    {% endif %}
+{% endif %}
+{% endmacro %}
+
+{% macro evaluator_class(node) %}
+{% if not node.data.cls %}
+{{ raise("Evaluator class not specified for " ~ node.data.name) }}
+{% endif %}
+{{ EVALUATORS[node.data.cls]["class"] }}
+{% endmacro %}
+
+{% macro evaluator_args(workflow, node) %}
 {% if not node.data.cls %}
 {{ raise("Evaluator class not specified for " ~ node.data.name) }}
 {% endif %}
@@ -31,7 +48,7 @@ dspy.LM(
 {% if not node.data.evaluator %}
 {{ raise("Evaluator not specified for LangWatchEvaluator") }}
 {% endif %}
-{{ EVALUATORS[node.data.cls]["class"] }}(
+(
     api_key="{{ workflow.api_key }}",
     evaluator="{{ node.data.evaluator }}",
     name="{{ node.data.name or 'LangWatchEvaluator' }}",
@@ -40,10 +57,10 @@ dspy.LM(
     {% endif %}
 )
 {% elif node.data.parameters %}
-{{ EVALUATORS[node.data.cls]["class"] }}(
+(
     **{{ parse_fields(node.data.parameters or [], autoparse=False) }}
 )
 {% else %}
-{{ EVALUATORS[node.data.cls]["class"] }}()
+()
 {% endif %}
 {% endmacro %}

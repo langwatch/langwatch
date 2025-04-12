@@ -1,6 +1,7 @@
 import time
 from typing import Dict, Set, cast
 
+import dspy
 import asyncer
 import sentry_sdk
 from langwatch_nlp.studio.parser_v2 import (
@@ -101,7 +102,7 @@ async def execute_flow(
                 )
 
             try:
-                result = await module.forward(**entries[0])  # type: ignore
+                result = await dspy.asyncify(module.forward)(**entries[0])  # type: ignore
 
             except Exception as e:
                 import traceback

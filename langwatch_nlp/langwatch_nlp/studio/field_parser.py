@@ -1,5 +1,5 @@
 import json
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 from langwatch_nlp.studio.types.dsl import (
     Field,
     FieldType,
@@ -7,6 +7,7 @@ from langwatch_nlp.studio.types.dsl import (
     NodeDataset,
     NodeRef,
 )
+import dspy
 
 
 def parse_fields(fields: List[Field], autoparse=True) -> Dict[str, Any]:
@@ -78,7 +79,15 @@ def autoparse_fields(fields: List[Field], values: Dict[str, Any]) -> Dict[str, A
     return parsed_values
 
 
-def with_autoparsing(func: Callable) -> Callable:
+T = TypeVar("T", bound=dspy.Module)
+
+
+def with_autoparsing(module: T) -> T:
+    # If already patched, repatch so new config can be picked up
+    if hasattr(module, "__forward_before_autoparsing__"):
+        module.forward = module.__forward_before_autoparsing__  # type: ignore
+    module.__forward_before_autoparsing__ = module.forward  # type: ignore
+
     import inspect
     from typing import get_type_hints, get_origin, get_args, List, Optional
 
@@ -105,14 +114,14 @@ def with_autoparsing(func: Callable) -> Callable:
 
         return None  # Default to no type conversion
 
-    def autoparsing_wrapper(*args, **kwargs):
-        forward = getattr(func, "forward", func)
+    def forward_with_autoparsing(instance_self, *args, **kwargs):
+        forward = module.__forward_before_autoparsing__  # type: ignore
 
         try:
             sig = inspect.signature(forward)
             type_hints = get_type_hints(forward)
         except Exception:
-            return forward(*args, **kwargs)
+            return forward(instance_self, *args, **kwargs)
 
         # Process positional arguments
         parsed_args = []
@@ -141,6 +150,7 @@ def with_autoparsing(func: Callable) -> Callable:
             else:
                 parsed_kwargs[key] = value
 
-        return func(*parsed_args, **parsed_kwargs)
+        return forward(instance_self, *parsed_args, **parsed_kwargs)
 
-    return autoparsing_wrapper
+    module.forward = forward_with_autoparsing  # type: ignore
+    return module

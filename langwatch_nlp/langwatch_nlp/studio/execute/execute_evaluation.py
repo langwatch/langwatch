@@ -101,7 +101,7 @@ async def execute_evaluation(
 
         evaluator = Evaluate(
             devset=examples,
-            num_threads=5,
+            num_threads=10,
             display_progress=True,
             display_table=False,
             provide_traceback=True,

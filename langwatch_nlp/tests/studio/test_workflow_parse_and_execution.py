@@ -310,14 +310,13 @@ simple_workflow = Workflow(
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
-async def test_parse_workflow():
+def test_parse_workflow():
     disable_dsp_caching()
 
     class_name, code = parse_workflow(simple_workflow, format=True, debug_level=1)
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module(run_evaluations=True)  # type: ignore
-    result: PredictionWithEvaluationAndMetadata = await instance(
+    result: PredictionWithEvaluationAndMetadata = instance(
         question="What is the capital of France? Reply in a single word with no period.",
         gold_answer="Paris",
     )
@@ -331,8 +330,7 @@ async def test_parse_workflow():
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
-async def test_parse_parallel_execution_workflow():
+def test_parse_parallel_execution_workflow():
     disable_dsp_caching()
     workflow = Workflow(
         workflow_id="simple-rag",
@@ -600,7 +598,7 @@ async def test_parse_parallel_execution_workflow():
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
-    result: PredictionWithEvaluationAndMetadata = await instance(
+    result: PredictionWithEvaluationAndMetadata = instance(
         question="What is the capital of France?",
         gold_answer="Paris",
     )
@@ -611,8 +609,7 @@ async def test_parse_parallel_execution_workflow():
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
-async def test_parse_workflow_with_orphan_nodes():
+def test_parse_workflow_with_orphan_nodes():
     disable_dsp_caching()
     workflow = copy.deepcopy(simple_workflow)
     workflow.nodes.append(
@@ -631,7 +628,7 @@ async def test_parse_workflow_with_orphan_nodes():
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
-    result: PredictionWithEvaluationAndMetadata = await instance(
+    result: PredictionWithEvaluationAndMetadata = instance(
         question="What is the capital of France?",
         gold_answer="Paris",
     )
@@ -641,8 +638,7 @@ async def test_parse_workflow_with_orphan_nodes():
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
-async def test_parse_workflow_with_infinite_loop():
+def test_parse_workflow_with_infinite_loop():
     disable_dsp_caching()
     workflow = copy.deepcopy(simple_workflow)
     workflow.nodes.append(
@@ -726,8 +722,7 @@ async def test_parse_workflow_with_infinite_loop():
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
-async def test_langwatch_evaluator_with_settings():
+def test_langwatch_evaluator_with_settings():
     disable_dsp_caching()
     workflow = copy.deepcopy(simple_workflow)
     workflow.nodes.append(
@@ -791,7 +786,7 @@ async def test_langwatch_evaluator_with_settings():
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
-    result: PredictionWithEvaluationAndMetadata = await instance(
+    result: PredictionWithEvaluationAndMetadata = instance(
         question="What is the capital of France?",
         gold_answer="Paris",
     )
@@ -801,8 +796,7 @@ async def test_langwatch_evaluator_with_settings():
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
-async def test_parse_workflow_with_until_node():
+def test_parse_workflow_with_until_node():
     disable_dsp_caching()
 
     class_name, code = parse_workflow(
@@ -810,7 +804,7 @@ async def test_parse_workflow_with_until_node():
     )
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
-    result: PredictionWithEvaluationAndMetadata = await instance(
+    result: PredictionWithEvaluationAndMetadata = instance(
         question="What is the capital of France?",
         gold_answer="Paris",
     )
@@ -820,8 +814,7 @@ async def test_parse_workflow_with_until_node():
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
-async def test_parse_workflow_with_default_llm():
+def test_parse_workflow_with_default_llm():
     disable_dsp_caching()
 
     workflow = copy.deepcopy(simple_workflow)
@@ -843,7 +836,7 @@ async def test_parse_workflow_with_default_llm():
 
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
-    result: PredictionWithEvaluationAndMetadata = await instance(
+    result: PredictionWithEvaluationAndMetadata = instance(
         question="What is the capital of France?",
         gold_answer="Paris",
     )
@@ -854,8 +847,7 @@ async def test_parse_workflow_with_default_llm():
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
-async def test_blows_up_with_execution_error():
+def test_blows_up_with_execution_error():
     disable_dsp_caching()
 
     workflow = copy.deepcopy(simple_workflow)
@@ -903,7 +895,7 @@ class BlowsUp(dspy.Module):
     instance = Module()  # type: ignore
 
     with pytest.raises(Exception) as e:
-        await instance(
+        instance(
             question="What is the capital of France?",
             gold_answer="Paris",
         )
@@ -912,8 +904,7 @@ class BlowsUp(dspy.Module):
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
-async def test_does_not_blow_up_with_error_handling():
+def test_does_not_blow_up_with_error_handling():
     disable_dsp_caching()
 
     workflow = copy.deepcopy(simple_workflow)
@@ -962,7 +953,7 @@ class BlowsUp(dspy.Module):
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
 
-    result = await instance(
+    result = instance(
         question="What is the capital of France?",
         gold_answer="Paris",
     )
@@ -971,8 +962,7 @@ class BlowsUp(dspy.Module):
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
-async def test_autoparse_fields():
+def test_autoparse_fields():
     disable_dsp_caching()
 
     workflow = copy.deepcopy(simple_workflow)
@@ -1046,7 +1036,7 @@ class CheckInputTypes(dspy.Module):
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module()  # type: ignore
-    result: PredictionWithEvaluationAndMetadata = await instance(
+    result: PredictionWithEvaluationAndMetadata = instance(
         question=json.dumps(
             ["What is the capital of France?", "What is the capital of Germany?"]
         ),
@@ -1058,8 +1048,7 @@ class CheckInputTypes(dspy.Module):
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
-async def test_parse_workflow_when_entry_has_special_characters():
+def test_parse_workflow_when_entry_has_special_characters():
     disable_dsp_caching()
 
     workflow = copy.deepcopy(simple_workflow)
@@ -1076,7 +1065,7 @@ async def test_parse_workflow_when_entry_has_special_characters():
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
     Module = get_component_class(component_code=code, class_name=class_name)
     instance = Module(run_evaluations=True)  # type: ignore
-    result: PredictionWithEvaluationAndMetadata = await instance(
+    result: PredictionWithEvaluationAndMetadata = instance(
         question="What is the capital of France? Reply in a single word with no period.",
         gold_answer="Paris",
     )
