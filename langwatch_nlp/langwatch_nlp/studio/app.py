@@ -172,7 +172,14 @@ async def execute_event_on_a_subprocess(
         while time_since_last_message < timeout_without_messages:
             time_since_last_message = time.time() - last_message_time
             try:
-                result = queue.get_nowait()
+                try:
+                    result = queue.get_nowait()
+
+                # for generated_component_code not found as it's generated on the fly
+                except ModuleNotFoundError as e:
+                    if "generated_component_code" in str(e):
+                        continue
+                    raise e
                 yield result
                 last_message_time = time.time()
 
@@ -193,6 +200,9 @@ async def execute_event_on_a_subprocess(
             runtime.kill_process(process)
 
     except Exception as e:
+        import traceback
+
+        traceback.print_exc()
         yield Error(payload=ErrorPayload(message=f"Unexpected error: {repr(e)}"))
     finally:
         # Ensure the process is terminated and resources are cleaned up

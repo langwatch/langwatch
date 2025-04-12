@@ -39,6 +39,9 @@ async def execute_event(
                     async for event_ in execute_component(event.payload):
                         yield event_
                 except Exception as e:
+                    import traceback
+
+                    traceback.print_exc()
                     yield component_error_event(
                         trace_id=event.payload.trace_id,
                         node_id=event.payload.node_id,
@@ -49,6 +52,8 @@ async def execute_event(
                     async for event_ in execute_flow(event.payload, queue):
                         yield event_
                 except Exception as e:
+                    import traceback
+
                     traceback.print_exc()
                     yield Error(payload=ErrorPayload(message=repr(e)))
             case "execute_evaluation":
@@ -71,6 +76,9 @@ async def execute_event(
                 )
 
     except Exception as e:
+        import traceback
+
+        traceback.print_exc()
         yield Error(payload=ErrorPayload(message=repr(e)))
 
     yield Done()

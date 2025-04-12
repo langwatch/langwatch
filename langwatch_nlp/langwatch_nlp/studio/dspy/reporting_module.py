@@ -56,6 +56,9 @@ class ReportingModule(dspy.Module):
             try:
                 result = module.__forward_before_reporting__(instance_self, *args, **kwargs)  # type: ignore
             except Exception as e:
+                import traceback
+
+                traceback.print_exc()
                 if self.context and node:
                     self.context.queue.put_nowait(
                         component_error_event(node.id, self.context.trace_id, repr(e))
