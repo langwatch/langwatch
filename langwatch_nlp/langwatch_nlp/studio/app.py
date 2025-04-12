@@ -172,14 +172,7 @@ async def execute_event_on_a_subprocess(
         while time_since_last_message < timeout_without_messages:
             time_since_last_message = time.time() - last_message_time
             try:
-                try:
-                    result = queue.get_nowait()
-
-                # for generated_component_code not found as it's generated on the fly
-                except ModuleNotFoundError as e:
-                    if "generated_component_code" in str(e):
-                        continue
-                    raise e
+                result = queue.get_nowait()
                 yield result
                 last_message_time = time.time()
 

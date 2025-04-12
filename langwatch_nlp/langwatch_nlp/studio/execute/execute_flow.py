@@ -1,3 +1,4 @@
+import json
 import time
 from typing import Dict, Set, cast
 
@@ -24,6 +25,7 @@ from langwatch_nlp.studio.types.events import (
 )
 from langwatch_nlp.studio.utils import (
     ClientReadableValueError,
+    SerializableAndPredictEncoder,
     disable_dsp_caching,
     optional_langwatch_trace,
     transpose_inline_dataset_to_object_list,
@@ -81,7 +83,9 @@ async def execute_flow(
 
                 entry_node = cast(
                     EntryNode,
-                    next(node for node in workflow.nodes if isinstance(node.data, Entry)),
+                    next(
+                        node for node in workflow.nodes if isinstance(node.data, Entry)
+                    ),
                 )
                 if not entry_node.data.dataset:
                     raise ValueError("Missing dataset in entry node")
@@ -145,7 +149,9 @@ def end_workflow_event(workflow: Workflow, trace_id: str, result):
                 status=ExecutionStatus.success,
                 trace_id=trace_id,
                 timestamps=Timestamps(finished_at=int(time.time() * 1000)),
-                result=result.toDict(),
+                result=json.loads(
+                    json.dumps(result.toDict(), cls=SerializableAndPredictEncoder)
+                ),
             )
         )
     )
