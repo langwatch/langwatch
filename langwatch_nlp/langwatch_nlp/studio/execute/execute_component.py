@@ -2,7 +2,7 @@ import dspy
 import asyncer
 import sentry_sdk
 from langwatch_nlp.studio.field_parser import autoparse_fields
-from langwatch_nlp.studio.parser_v2 import get_component_class, parse_component
+from langwatch_nlp.studio.parser_v2 import materialized_component_class, parse_component
 from langwatch_nlp.studio.utils import disable_dsp_caching, optional_langwatch_trace
 from langwatch_nlp.studio.types.events import (
     Debug,
@@ -37,11 +37,11 @@ async def execute_component(event: ExecuteComponentPayload):
             if trace:
                 trace.autotrack_dspy()
             class_name, code = parse_component(node, event.workflow)
-            Module = get_component_class(component_code=code, class_name=class_name)
-            instance = Module()
-            result = await dspy.asyncify(instance)(
-                **autoparse_fields(node.data.inputs or [], event.inputs)  # type: ignore
-            )
+            with materialized_component_class(component_code=code, class_name=class_name) as Module:
+                instance = Module()
+                result = await dspy.asyncify(instance)(
+                    **autoparse_fields(node.data.inputs or [], event.inputs)  # type: ignore
+                )
 
         cost = result.cost if hasattr(result, "cost") else None
 

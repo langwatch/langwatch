@@ -1,7 +1,7 @@
 import copy
 import dspy
 from langwatch_nlp.studio.dspy.llm_node import LLMNode
-from langwatch_nlp.studio.parser_v2 import parse_component, get_component_class
+from langwatch_nlp.studio.parser_v2 import parse_component, materialized_component_class
 from langwatch_nlp.studio.types.dataset import DatasetColumn, DatasetColumnType
 from langwatch_nlp.studio.types.dsl import (
     Code,
@@ -94,9 +94,8 @@ def test_parse_signature():
     )
 
     class_name, code = parse_component(node, basic_workflow)
-    Module = get_component_class(code, class_name)
-
-    assert issubclass(Module, LLMNode)
+    with materialized_component_class(code, class_name) as Module:
+        assert issubclass(Module, LLMNode)
 
 
 def test_parse_signature_empty_inputs_and_outputs():
@@ -114,9 +113,8 @@ def test_parse_signature_empty_inputs_and_outputs():
     )
 
     class_name, code = parse_component(node, basic_workflow, format=True)
-    Module = get_component_class(code, class_name)
-
-    assert issubclass(Module, LLMNode)
+    with materialized_component_class(code, class_name) as Module:
+        assert issubclass(Module, LLMNode)
 
 
 def test_parse_signature_with_prompting_technique():
@@ -153,9 +151,8 @@ def test_parse_signature_with_prompting_technique():
     workflow.nodes.append(prompting_technique)
 
     class_name, code = parse_component(node, workflow, format=True)
-    Module = get_component_class(code, class_name)
-
-    assert issubclass(Module, LLMNode)
+    with materialized_component_class(code, class_name) as Module:
+        assert issubclass(Module, LLMNode)
 
 
 def test_parse_signature_with_demonstrations():
@@ -174,7 +171,10 @@ def test_parse_signature_with_demonstrations():
                         name="Demonstrations",
                         inline=DatasetInline(
                             records={
-                                "question": ["What is the capital of France?", "What is the capital of Germany?"],
+                                "question": [
+                                    "What is the capital of France?",
+                                    "What is the capital of Germany?",
+                                ],
                                 "answer": ["Paris", "Berlin"],
                             },
                             columnTypes=[
@@ -199,9 +199,9 @@ def test_parse_signature_with_demonstrations():
     )
 
     class_name, code = parse_component(node, basic_workflow, format=True)
-    Module = get_component_class(code, class_name)
+    with materialized_component_class(code, class_name) as Module:
+        assert issubclass(Module, LLMNode)
 
-    assert issubclass(Module, LLMNode)
 
 def test_parse_signature_with_default_workflow_llm():
     node = SignatureNode(
@@ -220,33 +220,34 @@ def test_parse_signature_with_default_workflow_llm():
     workflow.default_llm = LLMConfig(model="gpt-4o", temperature=0.0, max_tokens=100)
 
     class_name, code = parse_component(node, workflow)
-    print("\n\ncode", code, "\n\n")
-    Module = get_component_class(code, class_name)
-
-    assert issubclass(Module, LLMNode)
+    with materialized_component_class(code, class_name) as Module:
+        assert issubclass(Module, LLMNode)
 
 
 def test_parse_code():
     node = CodeNode(
         id="generate_answer",
-        data=Code(name="GenerateAnswer", cls="GenerateAnswer", parameters=[
-            Field(
-                identifier="code",
-                type=FieldType.str,
-                optional=None,
-                value="""
+        data=Code(
+            name="GenerateAnswer",
+            cls="GenerateAnswer",
+            parameters=[
+                Field(
+                    identifier="code",
+                    type=FieldType.str,
+                    optional=None,
+                    value="""
 import dspy
 
 class GenerateAnswer(dspy.Module):
     def forward(self, **kwargs):
         return "Hello, world!"
                 """,
-                desc=None,
-            ),
-        ]),
+                    desc=None,
+                ),
+            ],
+        ),
     )
 
     class_name, code = parse_component(node, basic_workflow, format=True)
-    Module = get_component_class(code, class_name)
-
-    assert issubclass(Module, dspy.Module)
+    with materialized_component_class(code, class_name) as Module:
+        assert issubclass(Module, dspy.Module)

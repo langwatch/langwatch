@@ -1,5 +1,11 @@
+from contextlib import contextmanager
 import copy
-from typing import Tuple, Type, cast, List, Dict, Set
+import os
+import shutil
+import sys
+import tempfile
+from importlib import reload
+from typing import Generator, Tuple, Type, cast, List, Dict, Set
 
 from langwatch_nlp.studio.dspy.langwatch_workflow_module import LangWatchWorkflowModule
 from langwatch_nlp.studio.field_parser import parse_fields
@@ -93,19 +99,20 @@ def parse_workflow(
     return "WorkflowModule", module
 
 
-def parse_workflow_and_get_class(
+@contextmanager
+def parsed_and_materialized_workflow_class(
     workflow: Workflow,
     format=False,
     debug_level=0,
     until_node_id=None,
     handle_errors=False,
     do_not_trace=False,
-) -> Type[LangWatchWorkflowModule]:
+) -> Generator[Type[LangWatchWorkflowModule], None, None]:
     class_name, code = parse_workflow(
         workflow, format, debug_level, until_node_id, handle_errors, do_not_trace
     )
-    Module = get_component_class(component_code=code, class_name=class_name)
-    return cast(Type[LangWatchWorkflowModule], Module)
+    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+        yield cast(Type[LangWatchWorkflowModule], Module)
 
 
 def parse_component(
@@ -173,10 +180,27 @@ def parse_component(
             return "None", ""
 
 
-def get_component_class(component_code: str, class_name: str) -> Type[dspy.Module]:
-    namespace = {}
-    exec(component_code, namespace)
-    return namespace[class_name]
+@contextmanager
+def materialized_component_class(
+    component_code: str, class_name: str
+) -> Generator[Type[dspy.Module], None, None]:
+    temp_folder = tempfile.mkdtemp()
+    sys.path.insert(0, temp_folder)
+
+    # save to file and import
+    with open(os.path.join(temp_folder, "generated_component_code.py"), "w") as f:
+        f.write(component_code)
+    import generated_component_code # type: ignore
+    reload(generated_component_code)
+
+    Module = getattr(generated_component_code, class_name)
+    try:
+        yield Module
+    finally:
+        # cleanup
+        shutil.rmtree(temp_folder)
+        sys.path.remove(temp_folder)
+
 
 
 def find_path_until_node(

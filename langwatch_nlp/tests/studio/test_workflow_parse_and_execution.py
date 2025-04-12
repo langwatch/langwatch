@@ -1,9 +1,8 @@
 import copy
 import json
-from typing import cast
 import pytest
 from langwatch_nlp.studio.parser_v2 import (
-    get_component_class,
+    materialized_component_class,
     parse_workflow,
 )
 from langwatch_nlp.studio.dspy.workflow_module import (
@@ -314,12 +313,12 @@ def test_parse_workflow():
     disable_dsp_caching()
 
     class_name, code = parse_workflow(simple_workflow, format=True, debug_level=1)
-    Module = get_component_class(component_code=code, class_name=class_name)
-    instance = Module(run_evaluations=True)  # type: ignore
-    result: PredictionWithEvaluationAndMetadata = instance(
-        question="What is the capital of France? Reply in a single word with no period.",
-        gold_answer="Paris",
-    )
+    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+        instance = Module(run_evaluations=True)  # type: ignore
+        result: PredictionWithEvaluationAndMetadata = instance(
+            question="What is the capital of France? Reply in a single word with no period.",
+            gold_answer="Paris",
+        )
     assert "Paris" in result["end"]["result"]
     assert result.cost > 0
     assert result.duration > 0
@@ -596,12 +595,12 @@ def test_parse_parallel_execution_workflow():
     )
 
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
-    Module = get_component_class(component_code=code, class_name=class_name)
-    instance = Module()  # type: ignore
-    result: PredictionWithEvaluationAndMetadata = instance(
-        question="What is the capital of France?",
-        gold_answer="Paris",
-    )
+    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+        instance = Module()  # type: ignore
+        result: PredictionWithEvaluationAndMetadata = instance(
+            question="What is the capital of France?",
+            gold_answer="Paris",
+        )
     assert "Paris" in result["end"]["correct_answer"]
     assert "Paris" not in result["end"]["wrong_answer"]
     assert result.cost > 0
@@ -626,12 +625,12 @@ def test_parse_workflow_with_orphan_nodes():
         )
     )
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
-    Module = get_component_class(component_code=code, class_name=class_name)
-    instance = Module()  # type: ignore
-    result: PredictionWithEvaluationAndMetadata = instance(
-        question="What is the capital of France?",
-        gold_answer="Paris",
-    )
+    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+        instance = Module()  # type: ignore
+        result: PredictionWithEvaluationAndMetadata = instance(
+            question="What is the capital of France?",
+            gold_answer="Paris",
+        )
     assert "Paris" in result["end"]["result"]
     assert result.cost > 0
     assert result.duration > 0
@@ -784,12 +783,12 @@ def test_langwatch_evaluator_with_settings():
     )
 
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
-    Module = get_component_class(component_code=code, class_name=class_name)
-    instance = Module()  # type: ignore
-    result: PredictionWithEvaluationAndMetadata = instance(
-        question="What is the capital of France?",
-        gold_answer="Paris",
-    )
+    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+        instance = Module()  # type: ignore
+        result: PredictionWithEvaluationAndMetadata = instance(
+            question="What is the capital of France?",
+            gold_answer="Paris",
+        )
 
     assert result.cost > 0
     assert result.duration > 0
@@ -802,12 +801,12 @@ def test_parse_workflow_with_until_node():
     class_name, code = parse_workflow(
         simple_workflow, format=True, debug_level=1, until_node_id="generate_query"
     )
-    Module = get_component_class(component_code=code, class_name=class_name)
-    instance = Module()  # type: ignore
-    result: PredictionWithEvaluationAndMetadata = instance(
-        question="What is the capital of France?",
-        gold_answer="Paris",
-    )
+    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+        instance = Module()  # type: ignore
+        result: PredictionWithEvaluationAndMetadata = instance(
+            question="What is the capital of France?",
+            gold_answer="Paris",
+        )
     assert "Paris" in result["generate_query"]["query"]
     assert result.cost > 0
     assert result.duration > 0
@@ -834,12 +833,12 @@ def test_parse_workflow_with_default_llm():
 
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
 
-    Module = get_component_class(component_code=code, class_name=class_name)
-    instance = Module()  # type: ignore
-    result: PredictionWithEvaluationAndMetadata = instance(
-        question="What is the capital of France?",
-        gold_answer="Paris",
-    )
+    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+        instance = Module()  # type: ignore
+        result: PredictionWithEvaluationAndMetadata = instance(
+            question="What is the capital of France?",
+            gold_answer="Paris",
+        )
 
     assert not result.error
     assert result.cost > 0
@@ -891,8 +890,8 @@ class BlowsUp(dspy.Module):
     )
 
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
-    Module = get_component_class(component_code=code, class_name=class_name)
-    instance = Module()  # type: ignore
+    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+        instance = Module()  # type: ignore
 
     with pytest.raises(Exception) as e:
         instance(
@@ -950,8 +949,8 @@ class BlowsUp(dspy.Module):
     class_name, code = parse_workflow(
         workflow, format=True, debug_level=1, handle_errors=True
     )
-    Module = get_component_class(component_code=code, class_name=class_name)
-    instance = Module()  # type: ignore
+    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+        instance = Module()  # type: ignore
 
     result = instance(
         question="What is the capital of France?",
@@ -1034,8 +1033,8 @@ class CheckInputTypes(dspy.Module):
     )
 
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
-    Module = get_component_class(component_code=code, class_name=class_name)
-    instance = Module()  # type: ignore
+    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+        instance = Module()  # type: ignore
     result: PredictionWithEvaluationAndMetadata = instance(
         question=json.dumps(
             ["What is the capital of France?", "What is the capital of Germany?"]
@@ -1063,12 +1062,12 @@ def test_parse_workflow_when_entry_has_special_characters():
     )
 
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
-    Module = get_component_class(component_code=code, class_name=class_name)
-    instance = Module(run_evaluations=True)  # type: ignore
-    result: PredictionWithEvaluationAndMetadata = instance(
-        question="What is the capital of France? Reply in a single word with no period.",
-        gold_answer="Paris",
-    )
+    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+        instance = Module(run_evaluations=True)  # type: ignore
+        result: PredictionWithEvaluationAndMetadata = instance(
+            question="What is the capital of France? Reply in a single word with no period.",
+            gold_answer="Paris",
+        )
     assert "Paris" in result["end"]["result"]
     assert result.cost > 0
     assert result.duration > 0
@@ -1076,3 +1075,30 @@ def test_parse_workflow_when_entry_has_special_characters():
     assert result.total_score() == 1.0
     assert result.evaluations["exact_match_evaluator"].status == "processed"
     assert result.evaluations["exact_match_evaluator"].score == 1.0
+
+
+@pytest.mark.integration
+def test_proposes_instructions_with_grounded_proposer():
+    disable_dsp_caching()
+
+    class_name, code = parse_workflow(simple_workflow, format=True, debug_level=1)
+    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+        instance = Module(run_evaluations=True)  # type: ignore
+
+        from dspy.propose.grounded_proposer import GroundedProposer
+
+        proposer = GroundedProposer(
+            prompt_model=dspy.LM(model="openai/gpt-4o-mini"),
+            program=instance,
+            trainset=[],
+        )
+        proposed_instructions = proposer.propose_instructions_for_program(
+            trainset=[],
+            program=instance,
+            demo_candidates=[],
+            trial_logs=[],
+            N=2,
+            T=1,
+        )
+
+        assert len(proposed_instructions) == 2

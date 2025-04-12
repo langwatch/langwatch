@@ -5,7 +5,7 @@ import dspy
 import asyncer
 import sentry_sdk
 from langwatch_nlp.studio.parser_v2 import (
-    parse_workflow_and_get_class,
+    parsed_and_materialized_workflow_class,
 )
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.types.dsl import (
@@ -69,54 +69,54 @@ async def execute_flow(
             if not do_not_trace and trace:
                 trace.autotrack_dspy()
 
-            Module = parse_workflow_and_get_class(
+            with parsed_and_materialized_workflow_class(
                 workflow,
                 format=False,
                 debug_level=0,
                 until_node_id=until_node_id,
                 do_not_trace=do_not_trace,
-            )
-            module = Module(run_evaluations=True)
-            module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
+            ) as Module:
+                module = Module(run_evaluations=True)
+                module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
 
-            entry_node = cast(
-                EntryNode,
-                next(node for node in workflow.nodes if isinstance(node.data, Entry)),
-            )
-            if not entry_node.data.dataset:
-                raise ValueError("Missing dataset in entry node")
-
-            if inputs:
-                entries = inputs
-
-            else:
-                if not entry_node.data.dataset.inline:
-                    raise ValueError("Missing inline dataset in entry node")
-                entries = transpose_inline_dataset_to_object_list(
-                    entry_node.data.dataset.inline
+                entry_node = cast(
+                    EntryNode,
+                    next(node for node in workflow.nodes if isinstance(node.data, Entry)),
                 )
+                if not entry_node.data.dataset:
+                    raise ValueError("Missing dataset in entry node")
 
-            if len(entries) == 0:
-                raise ClientReadableValueError(
-                    "Dataset is empty, please add at least one entry and try again"
-                )
+                if inputs:
+                    entries = inputs
 
-            try:
-                result = await dspy.asyncify(module.forward)(**entries[0])  # type: ignore
+                else:
+                    if not entry_node.data.dataset.inline:
+                        raise ValueError("Missing inline dataset in entry node")
+                    entries = transpose_inline_dataset_to_object_list(
+                        entry_node.data.dataset.inline
+                    )
 
-            except Exception as e:
-                import traceback
+                if len(entries) == 0:
+                    raise ClientReadableValueError(
+                        "Dataset is empty, please add at least one entry and try again"
+                    )
 
-                traceback.print_exc()
-                yield error_workflow_event(trace_id, str(e))
-                sentry_sdk.capture_exception(
-                    e,
-                    extras={
-                        "trace_id": trace_id,
-                        "workflow_id": workflow.workflow_id,
-                    },
-                )
-                return
+                try:
+                    result = await dspy.asyncify(module.forward)(**entries[0])  # type: ignore
+
+                except Exception as e:
+                    import traceback
+
+                    traceback.print_exc()
+                    yield error_workflow_event(trace_id, str(e))
+                    sentry_sdk.capture_exception(
+                        e,
+                        extras={
+                            "trace_id": trace_id,
+                            "workflow_id": workflow.workflow_id,
+                        },
+                    )
+                    return
 
         # cost = result.cost if hasattr(result, "cost") else None
 
