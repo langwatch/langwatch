@@ -52,7 +52,11 @@ class {{ class_name }}(LLMNode):
 
         {# Process demonstrations if available #}
         {% if demonstrations %}
-        demos = {{ demonstrations.__repr__() }}
+        demos = [
+            {% for d in demonstrations %}
+                dspy.Example({% for k, v in d.items() %}{{ k }}={{ v.__repr__() }}, {% endfor %}),
+            {% endfor %}
+        ]
         {% endif %}
 
         super().__init__(

@@ -313,7 +313,9 @@ def test_parse_workflow():
     disable_dsp_caching()
 
     class_name, code = parse_workflow(simple_workflow, format=True, debug_level=1)
-    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+    with materialized_component_class(
+        component_code=code, class_name=class_name
+    ) as Module:
         instance = Module(run_evaluations=True)  # type: ignore
         result: PredictionWithEvaluationAndMetadata = instance(
             question="What is the capital of France? Reply in a single word with no period.",
@@ -595,7 +597,9 @@ def test_parse_parallel_execution_workflow():
     )
 
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
-    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+    with materialized_component_class(
+        component_code=code, class_name=class_name
+    ) as Module:
         instance = Module()  # type: ignore
         result: PredictionWithEvaluationAndMetadata = instance(
             question="What is the capital of France?",
@@ -625,7 +629,9 @@ def test_parse_workflow_with_orphan_nodes():
         )
     )
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
-    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+    with materialized_component_class(
+        component_code=code, class_name=class_name
+    ) as Module:
         instance = Module()  # type: ignore
         result: PredictionWithEvaluationAndMetadata = instance(
             question="What is the capital of France?",
@@ -783,7 +789,9 @@ def test_langwatch_evaluator_with_settings():
     )
 
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
-    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+    with materialized_component_class(
+        component_code=code, class_name=class_name
+    ) as Module:
         instance = Module()  # type: ignore
         result: PredictionWithEvaluationAndMetadata = instance(
             question="What is the capital of France?",
@@ -801,7 +809,9 @@ def test_parse_workflow_with_until_node():
     class_name, code = parse_workflow(
         simple_workflow, format=True, debug_level=1, until_node_id="generate_query"
     )
-    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+    with materialized_component_class(
+        component_code=code, class_name=class_name
+    ) as Module:
         instance = Module()  # type: ignore
         result: PredictionWithEvaluationAndMetadata = instance(
             question="What is the capital of France?",
@@ -833,7 +843,9 @@ def test_parse_workflow_with_default_llm():
 
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
 
-    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+    with materialized_component_class(
+        component_code=code, class_name=class_name
+    ) as Module:
         instance = Module()  # type: ignore
         result: PredictionWithEvaluationAndMetadata = instance(
             question="What is the capital of France?",
@@ -890,7 +902,9 @@ class BlowsUp(dspy.Module):
     )
 
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
-    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+    with materialized_component_class(
+        component_code=code, class_name=class_name
+    ) as Module:
         instance = Module()  # type: ignore
 
     with pytest.raises(Exception) as e:
@@ -949,7 +963,9 @@ class BlowsUp(dspy.Module):
     class_name, code = parse_workflow(
         workflow, format=True, debug_level=1, handle_errors=True
     )
-    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+    with materialized_component_class(
+        component_code=code, class_name=class_name
+    ) as Module:
         instance = Module()  # type: ignore
 
     result = instance(
@@ -1033,7 +1049,9 @@ class CheckInputTypes(dspy.Module):
     )
 
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
-    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+    with materialized_component_class(
+        component_code=code, class_name=class_name
+    ) as Module:
         instance = Module()  # type: ignore
     result: PredictionWithEvaluationAndMetadata = instance(
         question=json.dumps(
@@ -1062,7 +1080,9 @@ def test_parse_workflow_when_entry_has_special_characters():
     )
 
     class_name, code = parse_workflow(workflow, format=True, debug_level=1)
-    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+    with materialized_component_class(
+        component_code=code, class_name=class_name
+    ) as Module:
         instance = Module(run_evaluations=True)  # type: ignore
         result: PredictionWithEvaluationAndMetadata = instance(
             question="What is the capital of France? Reply in a single word with no period.",
@@ -1081,8 +1101,45 @@ def test_parse_workflow_when_entry_has_special_characters():
 def test_proposes_instructions_with_grounded_proposer():
     disable_dsp_caching()
 
-    class_name, code = parse_workflow(simple_workflow, format=True, debug_level=1)
-    with materialized_component_class(component_code=code, class_name=class_name) as Module:
+    workflow = copy.deepcopy(simple_workflow)
+    generate_answer_node = next(
+        node for node in workflow.nodes if node.data.name == "GenerateAnswer"
+    )
+    generate_answer_node.data.parameters = [
+        llm_field,
+        Field(
+            identifier="demonstrations",
+            type=FieldType.dataset,
+            optional=None,
+            value=NodeDataset(
+                name="Demonstrations",
+                inline=DatasetInline(
+                    records={
+                        "question": [
+                            "What is the capital of France?",
+                            "What is the capital of Germany?",
+                        ],
+                        "answer": ["Paris", "Berlin"],
+                    },
+                    columnTypes=[
+                        DatasetColumn(
+                            name="question",
+                            type=DatasetColumnType.string,
+                        ),
+                        DatasetColumn(
+                            name="answer",
+                            type=DatasetColumnType.string,
+                        ),
+                    ],
+                ),
+            ),
+        ),
+    ]
+
+    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+    with materialized_component_class(
+        component_code=code, class_name=class_name
+    ) as Module:
         instance = Module(run_evaluations=True)  # type: ignore
 
         from dspy.propose.grounded_proposer import GroundedProposer
