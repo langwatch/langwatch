@@ -1,11 +1,14 @@
+import json
 import time
 from typing import Dict, Set, cast
-from contextlib import contextmanager
 
-import langwatch
+import dspy
+import asyncer
 import sentry_sdk
+from langwatch_nlp.studio.parser import (
+    parsed_and_materialized_workflow_class,
+)
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
-from langwatch_nlp.studio.dspy.workflow_module import WorkflowModule
 from langwatch_nlp.studio.types.dsl import (
     Entry,
     EntryNode,
@@ -19,16 +22,14 @@ from langwatch_nlp.studio.types.events import (
     ExecuteFlowPayload,
     ExecutionStateChange,
     ExecutionStateChangePayload,
-    StudioServerEvent,
 )
 from langwatch_nlp.studio.utils import (
     ClientReadableValueError,
+    SerializableWithPydanticAndPredictEncoder,
     disable_dsp_caching,
     optional_langwatch_trace,
     transpose_inline_dataset_to_object_list,
 )
-
-from dspy.utils.asyncify import asyncify
 
 
 async def execute_flow(
@@ -70,59 +71,63 @@ async def execute_flow(
             if not do_not_trace and trace:
                 trace.autotrack_dspy()
 
-            module = WorkflowModule(
+            with parsed_and_materialized_workflow_class(
                 workflow,
-                manual_execution_mode=manual_execution_mode,
+                format=False,
+                debug_level=0,
                 until_node_id=until_node_id,
-                inputs=inputs[0] if inputs else None,
-            )
-            module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
+                do_not_trace=do_not_trace,
+            ) as Module:
+                module = Module(run_evaluations=True)
+                module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
 
-            entry_node = cast(
-                EntryNode,
-                next(node for node in workflow.nodes if isinstance(node.data, Entry)),
-            )
-            if not entry_node.data.dataset:
-                raise ValueError("Missing dataset in entry node")
-
-            if inputs:
-                entries = inputs
-
-            else:
-                if not entry_node.data.dataset.inline:
-                    raise ValueError("Missing inline dataset in entry node")
-                entries = transpose_inline_dataset_to_object_list(
-                    entry_node.data.dataset.inline
+                entry_node = cast(
+                    EntryNode,
+                    next(
+                        node for node in workflow.nodes if isinstance(node.data, Entry)
+                    ),
                 )
+                if not entry_node.data.dataset:
+                    raise ValueError("Missing dataset in entry node")
 
-            if len(entries) == 0:
-                raise ClientReadableValueError(
-                    "Dataset is empty, please add at least one entry and try again"
-                )
+                if inputs:
+                    entries = inputs
 
-            try:
-                result = await asyncify(module)(**entries[0])
+                else:
+                    if not entry_node.data.dataset.inline:
+                        raise ValueError("Missing inline dataset in entry node")
+                    entries = transpose_inline_dataset_to_object_list(
+                        entry_node.data.dataset.inline
+                    )
 
-            except Exception as e:
-                import traceback
+                if len(entries) == 0:
+                    raise ClientReadableValueError(
+                        "Dataset is empty, please add at least one entry and try again"
+                    )
 
-                traceback.print_exc()
-                yield error_workflow_event(trace_id, str(e))
-                sentry_sdk.capture_exception(
-                    e,
-                    extras={
-                        "trace_id": trace_id,
-                        "workflow_id": workflow.workflow_id,
-                    },
-                )
-                return
+                try:
+                    result = await dspy.asyncify(module.forward)(**entries[0])  # type: ignore
 
-        # cost = result.get_cost() if hasattr(result, "get_cost") else None
+                except Exception as e:
+                    import traceback
+
+                    traceback.print_exc()
+                    yield error_workflow_event(trace_id, str(e))
+                    sentry_sdk.capture_exception(
+                        e,
+                        extras={
+                            "trace_id": trace_id,
+                            "workflow_id": workflow.workflow_id,
+                        },
+                    )
+                    return
+
+        # cost = result.cost if hasattr(result, "cost") else None
 
         yield end_workflow_event(workflow, trace_id, result)
     finally:
         if trace:
-            await asyncify(trace.send_spans)()
+            await asyncer.asyncify(trace.send_spans)()
 
 
 def start_workflow_event(workflow: Workflow, trace_id: str):
@@ -138,14 +143,15 @@ def start_workflow_event(workflow: Workflow, trace_id: str):
 
 
 def end_workflow_event(workflow: Workflow, trace_id: str, result):
-
     return ExecutionStateChange(
         payload=ExecutionStateChangePayload(
             execution_state=WorkflowExecutionState(
                 status=ExecutionStatus.success,
                 trace_id=trace_id,
                 timestamps=Timestamps(finished_at=int(time.time() * 1000)),
-                result=result.toDict(),
+                result=json.loads(
+                    json.dumps(result.toDict(), cls=SerializableWithPydanticAndPredictEncoder)
+                ),
             )
         )
     )

@@ -1,6 +1,7 @@
 import time
 from typing import Optional, cast
 import dspy
+from langevals_core.base_evaluator import Money
 
 # Remove @functools.lru_cache for cached_litellm_completion for proper PredictionWithMetadata info
 import langwatch_nlp.studio.dspy.patched_caching
@@ -13,18 +14,21 @@ class PredictionWithMetadata(dspy.Prediction):
         self._duration = 0
         self._error = error
 
-    def get_error(self):
+    @property
+    def error(self):
         return self._error
 
-    def get_cost(self):
+    @property
+    def cost(self):
         return self._cost or 0
 
-    def get_duration(self):
+    @property
+    def duration(self):
         return self._duration or 0
 
 
 class ModuleWithMetadata:
-    _cost = 0
+    _cost = Money(currency="USD", amount=0)
     _duration = 0
     _error: Optional[Exception] = None
 
@@ -42,12 +46,12 @@ class ModuleWithMetadata:
         duration = round((time.time() - start_time) * 1000)
 
         dspy.settings.configure(experimental=True)
-        lm = cast(dspy.LM, self.get_lm())
+        lm = cast(dspy.LM, self.get_lm()) or dspy.settings.lm
         response.__class__ = PredictionWithMetadata
         last_response = lm.history[-1]
-        response._cost = 0
+        response._cost = Money(currency="USD", amount=0)
         if last_response:
-            response._cost = last_response.get("cost", 0)
+            response._cost = Money(currency="USD", amount=last_response.get("cost", 0))
         response._duration = duration
 
         return response

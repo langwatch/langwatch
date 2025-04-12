@@ -1,0 +1,82 @@
+{% from 'macros.jinja' import node_llm_config_to_dspy_lm %}
+
+import dspy
+from typing import Dict, Any, List, Optional
+from langwatch_nlp.studio.dspy.llm_node import LLMNode
+
+{% set class_name = component.name or "Anonymous" %}
+
+{% set ns = namespace(decorator_node=None) %}
+{% for node in workflow.nodes %}
+    {% if node.id == prompting_technique.ref %}
+        {% set ns.decorator_node = node %}
+{{ PROMPTING_TECHNIQUES[node.data.cls]["import"] }}
+    {% endif %}
+{% endfor %}
+
+class {{ class_name }}Signature(dspy.Signature):
+    {% if parameters.get('instructions', '') %}
+    """{{ parameters.get('instructions', '') }}"""
+
+    {% endif %}
+    {% for input_field in component.inputs or [] %}
+    {{ input_field.identifier }}: {{ FIELD_TYPE_TO_DSPY_TYPE[input_field.type.value] }} = dspy.InputField()
+    {% endfor %}
+    {% for output_field in component.outputs or [] %}
+    {{ output_field.identifier }}: {{ FIELD_TYPE_TO_DSPY_TYPE[output_field.type.value] }} = dspy.OutputField()
+    {% endfor %}
+    {% if not component.inputs and not component.outputs %}
+    pass
+    {% endif %}
+
+
+class {{ class_name }}(LLMNode):
+    def __init__(self):
+        {% if prompting_technique %}
+        {# Apply prompting technique decorator #}
+        {% if ns.decorator_node %}
+        predict = {{ PROMPTING_TECHNIQUES[ns.decorator_node.data.cls]["class"] }}({{ class_name }}Signature)
+        {% else %}
+        {# Decorator node {{ prompting_technique.ref }} not found #}
+        predict = dspy.Predict({{ class_name }}Signature)
+        {% endif %}
+        {% else %}
+        {# Standard prediction #}
+        predict = dspy.Predict({{ class_name }}Signature)
+        {% endif %}
+
+        {# Configure LLM #}
+        {% if llm_config %}
+        lm = {{ node_llm_config_to_dspy_lm(llm_config) }}
+        {% endif %}
+
+        {# Process demonstrations if available #}
+        {% if demonstrations %}
+        demos = [
+            {% for d in demonstrations %}
+                dspy.Example({% for k, v in d.items() %}{{ k }}={{ v.__repr__() }}, {% endfor %}),
+            {% endfor %}
+        ]
+        {% endif %}
+
+        super().__init__(
+            node_id="{{ node_id }}",
+            name="{{ class_name }}",
+            predict=predict,
+            {% if llm_config %}
+            lm=lm,
+            {% endif %}
+            {% if demonstrations %}
+            demos=demos
+            {% endif %}
+        )
+
+    {% set input_args = [] %}
+    {% set forward_args = [] %}
+    {% for input_field in component.inputs or [] %}
+        {% set _ = input_args.append(input_field.identifier + ": " + FIELD_TYPE_TO_DSPY_TYPE[input_field.type.value]) %}
+        {% set _ = forward_args.append(input_field.identifier + "=" + input_field.identifier) %}
+    {% endfor %}
+
+    def forward(self, {{ input_args | join(", ") }}):
+        return super().forward({{ forward_args | join(", ") }})

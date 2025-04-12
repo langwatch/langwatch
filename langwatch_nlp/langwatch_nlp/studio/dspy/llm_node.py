@@ -1,8 +1,9 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import dspy
 import langwatch
 
 from langwatch_nlp.studio.dspy.predict_with_metadata import PredictWithMetadata
+from langwatch_nlp.studio.field_parser import with_autoparsing
 
 
 class LLMNode(dspy.Module):
@@ -11,8 +12,8 @@ class LLMNode(dspy.Module):
         node_id: str,
         name: str,
         predict: dspy.Module,
-        lm: dspy.LM,
-        demos: List[Dict[str, Any]],
+        lm: Optional[dspy.LM] = None,
+        demos: List[Dict[str, Any]] = [],
     ):
         super().__init__()
 
@@ -24,8 +25,9 @@ class LLMNode(dspy.Module):
         )
         nested_predict.__class__ = PredictWithMetadata
 
-        dspy.settings.configure(experimental=True)
-        nested_predict.set_lm(lm=lm)
+        if lm is not None:
+            dspy.settings.configure(experimental=True)
+            nested_predict.set_lm(lm=lm)
         nested_predict.demos = demos
         # LabeledFewShot patch
         nested_predict._node_id = node_id  # type: ignore

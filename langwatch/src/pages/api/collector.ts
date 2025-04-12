@@ -129,6 +129,8 @@ export default async function handler(
 
   for (const evaluation of req.body.evaluations ?? []) {
     if (
+      evaluation.status !== "error" &&
+      evaluation.status !== "skipped" &&
       (evaluation.passed === undefined || evaluation.passed === null) &&
       (evaluation.score === undefined || evaluation.score === null) &&
       (evaluation.label === undefined || evaluation.label === null)
