@@ -11,7 +11,7 @@ export const simpleRagTemplate: Workflow = {
   default_llm: {
     model: "openai/gpt-4o-mini",
     temperature: 0,
-    max_tokens: 2048,
+    max_tokens: 8192,
   },
   enable_tracing: true,
   nodes: [

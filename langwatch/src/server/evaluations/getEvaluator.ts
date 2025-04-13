@@ -1,3 +1,4 @@
+import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL } from "../../utils/constants";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,
@@ -13,10 +14,17 @@ export const getEvaluatorDefinitions = (evaluator: string) => {
 };
 
 export const getEvaluatorDefaultSettings = <T extends EvaluatorTypes>(
-  evaluator: EvaluatorDefinition<T>
+  evaluator: EvaluatorDefinition<T>,
+  project?: { defaultModel?: string | null; embeddingsModel?: string | null }
 ) => {
   return Object.fromEntries(
     Object.entries(evaluator.settings).map(([key, setting]) => {
+      if (key === "model") {
+        return [key, project?.defaultModel ?? DEFAULT_MODEL];
+      }
+      if (key === "embeddings_model") {
+        return [key, project?.embeddingsModel ?? DEFAULT_EMBEDDINGS_MODEL];
+      }
       return [key, (setting as any).default];
     })
   ) as Evaluators[T]["settings"];
