@@ -13,10 +13,9 @@ export function TaskStep() {
   const { wizardState, setWizardState, setDSL } = useEvaluationWizardStore();
 
   const handleTaskSelection = (task: State["wizardState"]["task"]) => {
-    if (task === wizardState.task) {
-      return;
-    } else {
+    if (task !== wizardState.task) {
       // Reset the workflow
+      // TODO: delete the executor node only
       setDSL({
         nodes: [],
         edges: [],

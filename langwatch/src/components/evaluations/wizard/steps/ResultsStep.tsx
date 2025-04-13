@@ -141,7 +141,9 @@ function StepStatus({
       justifyContent="start"
       _icon={{
         color: value ? "green.400" : "yellow.500",
+        minWidth: "20px",
         maxWidth: "20px",
+        minHeight: "20px",
         maxHeight: "20px",
         width: "20px",
         height: "20px",
@@ -154,7 +156,7 @@ function StepStatus({
           <Text fontWeight="medium" fontSize="14px">
             {name}
           </Text>
-          <Text fontSize="13px" fontWeight="normal">
+          <Text fontSize="13px" fontWeight="normal" lineClamp={1}>
             {value ?? `No ${action} selected`}
           </Text>
         </VStack>

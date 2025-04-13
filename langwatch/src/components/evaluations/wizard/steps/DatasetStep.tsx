@@ -80,9 +80,9 @@ export function DatasetStep() {
     columnTypes: DatasetColumns
   ) => {
     setDatasetId(datasetId, columnTypes);
-    setWizardState({
-      step: "execution",
-    });
+    setTimeout(() => {
+      focusElementById("js-next-step-button");
+    }, 2000);
   };
 
   return (
