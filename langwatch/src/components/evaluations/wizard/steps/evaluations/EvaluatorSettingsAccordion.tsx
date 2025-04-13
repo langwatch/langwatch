@@ -9,8 +9,10 @@ import { getEvaluatorDefaultSettings } from "../../../../../server/evaluations/g
 import DynamicZodForm from "../../../../checks/DynamicZodForm";
 import type { Field } from "../../../../../optimization_studio/types/dsl";
 import { StepAccordion } from "../../components/StepAccordion";
+import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
 
 export const EvaluatorSettingsAccordion = () => {
+  const { project } = useOrganizationTeamProject();
   const { wizardState, getFirstEvaluatorNode, setFirstEvaluator } =
     useEvaluationWizardStore();
 
@@ -41,7 +43,10 @@ export const EvaluatorSettingsAccordion = () => {
     Object.keys(settingsFromParameters).length > 0
       ? (settingsFromParameters as any)
       : evaluatorType
-      ? getEvaluatorDefaultSettings(AVAILABLE_EVALUATORS[evaluatorType])
+      ? getEvaluatorDefaultSettings(
+          AVAILABLE_EVALUATORS[evaluatorType],
+          project
+        )
       : undefined;
 
   const form = useForm<{

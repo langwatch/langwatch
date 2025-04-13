@@ -1,9 +1,5 @@
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
-import {
-  EvaluationExecutionMode,
-  ExperimentType,
-  type Monitor,
-} from "@prisma/client";
+import { EvaluationExecutionMode, ExperimentType } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import type { Node } from "@xyflow/react";
