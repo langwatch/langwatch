@@ -7,7 +7,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { useLoadWorkflow } from "../hooks/useLoadWorkflow";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import { hasDSLChange } from "./History";
+import { hasDSLChanged } from "../utils/dslUtils";
 
 let saveTimeout: NodeJS.Timeout;
 
@@ -43,6 +43,8 @@ export function AutoSave() {
     useShallow((state) => state.getWorkflow())
   );
 
+  const trpc = api.useContext();
+
   const saveIfChanged = useDebouncedCallback(
     () => {
       if (!project || !workflow.data) return;
@@ -51,7 +53,7 @@ export function AutoSave() {
       if (hasPendingChanges()) {
         const previousWorkflow = getPreviousWorkflow()!;
 
-        const setAsLatestVersion = hasDSLChange(
+        const setAsLatestVersion = hasDSLChanged(
           previousWorkflow,
           stateWorkflow,
           false
@@ -73,11 +75,16 @@ export function AutoSave() {
               saveTimeout = setTimeout(() => {
                 setRecentlySaved(false);
               }, 5000);
+              void (async () => {
+                await trpc.workflow.getVersions.refetch();
+                setPreviousWorkflow(stateWorkflow);
+              })();
             },
           }
         );
+      } else {
+        setPreviousWorkflow(stateWorkflow);
       }
-      setPreviousWorkflow(stateWorkflow);
     },
     1000,
     { leading: false, trailing: true, maxWait: 30_000 }

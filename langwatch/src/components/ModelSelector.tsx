@@ -47,7 +47,7 @@ export const useModelSelectionOptions = (
   const { project } = useOrganizationTeamProject();
   const modelProviders = api.modelProvider.getAllForProject.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id }
+    { enabled: !!project?.id, refetchOnMount: false }
   );
 
   const customModels = getCustomModels(

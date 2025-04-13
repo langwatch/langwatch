@@ -161,6 +161,7 @@ export const workflowJsonSchema = z
         "Version must be in the format 'number.number' (e.g. 1.0)"
       ),
     nodes: z.array(z.any()),
+    edges: z.array(z.any()),
     default_llm: llmConfigSchema,
   })
   .passthrough();

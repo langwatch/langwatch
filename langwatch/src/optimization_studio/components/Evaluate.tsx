@@ -132,6 +132,7 @@ export function EvaluateModalContent({
   });
 
   const evaluateOn = form.watch("evaluateOn");
+  const commitMessage = form.watch("commitMessage");
 
   useEffect(() => {
     if (!evaluateOn) {
@@ -326,10 +327,14 @@ export function EvaluateModalContent({
     );
   }
 
+  const needsACommitMessage = canSaveNewVersion && !commitMessage;
+
   const isDisabled = hasProvidersWithoutCustomKeys
     ? "Set up your API keys to run evaluations"
     : !estimatedTotal || estimatedTotal < 1
     ? "You need at least 1 dataset entry to run evaluations"
+    : needsACommitMessage
+    ? "You need to provide a version description"
     : false;
 
   return (
