@@ -1,32 +1,35 @@
 import {
+  Avatar,
   Box,
   Button,
   Field,
   HStack,
   Input,
   Separator,
+  Spinner,
   Tag,
   Text,
+  useDisclosure,
   VStack,
   type BoxProps,
-  useDisclosure,
 } from "@chakra-ui/react";
-import { Avatar } from "@chakra-ui/react";
 
+import type { Project } from "@prisma/client";
 import { useCallback, useEffect, useMemo } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
+import { useDebounceCallback } from "usehooks-ts";
 import { HistoryIcon } from "../../components/icons/History";
 import { SmallLabel } from "../../components/SmallLabel";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
-import { formatTimeAgo } from "../../utils/formatTimeAgo";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import isDeepEqual from "fast-deep-equal";
-import type { Workflow } from "../types/dsl";
-import type { Project } from "@prisma/client";
+import { InputGroup } from "../../components/ui/input-group";
+import { Popover } from "../../components/ui/popover";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
-import { Popover } from "../../components/ui/popover";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
+import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import type { Workflow } from "../types/dsl";
+import { hasDSLChanged } from "../utils/dslUtils";
+import { AISparklesLoader } from "../../components/icons/AISparklesLoader";
 
 export function History() {
   const { open, onToggle, onClose, setOpen } = useDisclosure();
@@ -305,35 +308,6 @@ export const VersionBox = ({
   );
 };
 
-export const hasDSLChange = (
-  dslCurrent: Workflow,
-  dslPrevious: Workflow,
-  includeExecutionStates: boolean
-) => {
-  const clearDsl = (dsl: Workflow) => {
-    return {
-      ...dsl,
-      version: undefined,
-      edges: dsl.edges.map((edge) => {
-        const edge_ = { ...edge };
-        delete edge_.selected;
-        return edge_;
-      }),
-      nodes: dsl.nodes.map((node) => {
-        const node_ = { ...node, data: { ...node.data } };
-        delete node_.selected;
-        if (!includeExecutionStates) {
-          delete node_.data.execution_state;
-        }
-        return node_;
-      }),
-      state: includeExecutionStates ? dsl.state : undefined,
-    };
-  };
-
-  return !isDeepEqual(clearDsl(dslCurrent), clearDsl(dslPrevious));
-};
-
 export const useVersionState = ({
   project,
   form,
@@ -356,17 +330,21 @@ export const useVersionState = ({
     {
       projectId: project?.id ?? "",
       workflowId: workflowId ?? "",
+      returnDSL: "previousVersion",
     },
     { enabled: !!project?.id && !!workflowId }
   );
   const currentVersion = versions.data?.find(
     (version) => version.isCurrentVersion
   );
+  const previousVersion = versions.data?.find(
+    (version) => version.isPreviousVersion
+  );
   const latestVersion = versions.data?.find(
     (version) => version.isLatestVersion
   );
   const hasChanges = previousWorkflow
-    ? hasDSLChange(getWorkflow(), previousWorkflow, true)
+    ? hasDSLChanged(getWorkflow(), previousWorkflow, true)
     : false;
   const canSaveNewVersion = !!(
     !!latestVersion?.autoSaved ||
@@ -423,6 +401,7 @@ export const useVersionState = ({
   return {
     versions,
     currentVersion,
+    previousVersion,
     latestVersion,
     hasChanges,
     canSaveNewVersion,
@@ -440,6 +419,59 @@ export function NewVersionFields({
   nextVersion: string;
   canSaveNewVersion: boolean;
 }) {
+  const { project } = useOrganizationTeamProject();
+  const { previousVersion } = useVersionState({
+    project,
+    form,
+  });
+  const { getWorkflow } = useWorkflowStore(({ getWorkflow }) => ({
+    getWorkflow,
+  }));
+
+  const generateCommitMessage =
+    api.workflow.generateCommitMessage.useMutation();
+
+  const generateCommitMessageCallback = useCallback(() => {
+    generateCommitMessage.mutate(
+      {
+        projectId: project?.id ?? "",
+        prevDsl: previousVersion.dsl,
+        newDsl: getWorkflow(),
+      },
+      {
+        onSuccess: (data) => {
+          if (data) {
+            form.setValue("commitMessage", data);
+          }
+        },
+        onError: (e) => {
+          toaster.create({
+            title: "Error auto-generating version description",
+            description: e.message,
+            type: "error",
+            duration: 5000,
+            meta: { closable: true },
+            placement: "top-end",
+          });
+        },
+      }
+    );
+  }, [form, generateCommitMessage, getWorkflow, previousVersion, project?.id]);
+
+  const debouncedGenerateCommitMessage = useDebounceCallback(() => {
+    generateCommitMessageCallback();
+  }, 500);
+
+  useEffect(() => {
+    if (canSaveNewVersion && previousVersion?.dsl) {
+      form.setValue("commitMessage", "");
+      debouncedGenerateCommitMessage();
+    } else if (canSaveNewVersion && !previousVersion) {
+      form.setValue("commitMessage", "First version");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canSaveNewVersion]);
+
   return (
     <HStack width="full">
       <Field.Root width="fit-content" invalid={!!form.formState.errors.version}>
@@ -464,14 +496,25 @@ export function NewVersionFields({
           <Field.Label as={SmallLabel} color="gray.600">
             Description
           </Field.Label>
-          <Input
-            {...form.register("commitMessage", {
-              required: true,
-            })}
-            placeholder="What changes have you made?"
+          <InputGroup
             width="full"
-            disabled={!canSaveNewVersion}
-          />
+            endElement={
+              generateCommitMessage.isLoading ? <AISparklesLoader /> : undefined
+            }
+          >
+            <Input
+              {...form.register("commitMessage", {
+                required: true,
+              })}
+              placeholder={
+                generateCommitMessage.isLoading
+                  ? "Generating..."
+                  : "What changes have you made?"
+              }
+              width="full"
+              disabled={!canSaveNewVersion}
+            />
+          </InputGroup>
         </VStack>
       </Field.Root>
     </HStack>

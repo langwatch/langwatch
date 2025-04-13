@@ -8,10 +8,11 @@ import {
   applyEdgeChanges,
   applyNodeChanges,
 } from "@xyflow/react";
-import { temporal } from "zundo";
-import { create } from "zustand";
 import isDeepEqual from "fast-deep-equal";
 import debounce from "lodash.debounce";
+import { temporal } from "zundo";
+import { create } from "zustand";
+import { snakeCaseToPascalCase } from "../../utils/stringCasing";
 import type {
   BaseComponent,
   Component,
@@ -20,8 +21,7 @@ import type {
   Workflow,
 } from "../types/dsl";
 import { findLowestAvailableName } from "../utils/nodeUtils";
-import { snakeCaseToPascalCase } from "../../utils/stringCasing";
-import { hasDSLChange } from "../components/History";
+import { hasDSLChanged } from "../utils/dslUtils";
 
 export type SocketStatus =
   | "disconnected"
@@ -181,7 +181,7 @@ export const store = (
     if (!previousWorkflow || !currentWorkflow) {
       return false;
     }
-    return hasDSLChange(previousWorkflow, currentWorkflow, true);
+    return hasDSLChanged(previousWorkflow, currentWorkflow, true);
   },
   setWorkflow: (
     workflow: Partial<Workflow> | ((current: Workflow) => Partial<Workflow>)

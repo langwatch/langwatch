@@ -7,7 +7,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { useLoadWorkflow } from "../hooks/useLoadWorkflow";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import { hasDSLChange } from "./History";
+import { hasDSLChanged } from "../utils/dslUtils";
 
 let saveTimeout: NodeJS.Timeout;
 
@@ -51,7 +51,7 @@ export function AutoSave() {
       if (hasPendingChanges()) {
         const previousWorkflow = getPreviousWorkflow()!;
 
-        const setAsLatestVersion = hasDSLChange(
+        const setAsLatestVersion = hasDSLChanged(
           previousWorkflow,
           stateWorkflow,
           false
