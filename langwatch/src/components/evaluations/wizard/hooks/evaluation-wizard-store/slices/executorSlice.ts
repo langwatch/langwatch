@@ -70,7 +70,7 @@ export const createExecutorSlice: StateCreator<
       if (!existingExecutorNode) {
         switch (type) {
           case "signature":
-            return get().addNewSignatureNodeToWorkflow();
+            return get().addNewSignatureNodeToWorkflow({ project });
           case "code":
             return get().addCodeExecutionNodeToWorkflow();
           default:

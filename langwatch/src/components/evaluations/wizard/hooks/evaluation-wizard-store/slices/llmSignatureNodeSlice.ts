@@ -17,7 +17,11 @@ export interface LlmSignatureNodeSlice {
   }: {
     project?: { defaultModel?: string | null };
   }) => Node<Signature>;
-  addNewSignatureNodeToWorkflow: () => string;
+  addNewSignatureNodeToWorkflow: ({
+    project,
+  }: {
+    project?: { defaultModel?: string | null };
+  }) => string;
   updateSignatureNodeLLMConfigValue: (
     nodeId: string,
     llmConfig: LLMConfig
@@ -49,8 +53,8 @@ export const createLlmSignatureNodeSlice: StateCreator<
       );
     },
 
-    addNewSignatureNodeToWorkflow: (): string => {
-      const node = get().createNewLlmSignatureNode();
+    addNewSignatureNodeToWorkflow: ({ project }): string => {
+      const node = get().createNewLlmSignatureNode({ project });
       const entryNode = getEntryNode();
       const newEdges: Edge[] = entryNode
         ? buildEntryToTargetEdges(entryNode, node)
