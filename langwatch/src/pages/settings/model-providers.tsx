@@ -44,6 +44,7 @@ import { toaster } from "../../components/ui/toaster";
 import {
   DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
+  DEFAULT_MODEL,
 } from "../../utils/constants";
 
 export default function ModelsPage() {
@@ -110,6 +111,7 @@ export default function ModelsPage() {
             </VStack>
           </Card.Body>
         </Card.Root>
+        <DefaultModel />
         <TopicClusteringModel />
         <EmbeddingsModel />
       </VStack>
@@ -376,6 +378,7 @@ function ModelProviderForm({
               </Field.Root>
               <Field.Root>
                 <Checkbox
+                  // eslint-disable-next-line @typescript-eslint/no-misused-promises
                   onChange={onUseCustomKeysChange}
                   checked={isUseCustomKeys}
                   flexShrink={0}
@@ -502,6 +505,79 @@ function ModelProviderForm({
   );
 }
 
+type DefaultModelForm = {
+  defaultModel: string;
+};
+
+function DefaultModel() {
+  const { project } = useOrganizationTeamProject();
+  const updateDefaultModel = api.project.updateDefaultModel.useMutation();
+
+  const { register, handleSubmit, control } = useForm<DefaultModelForm>({
+    defaultValues: {
+      defaultModel: project?.defaultModel ?? DEFAULT_MODEL,
+    },
+  });
+
+  const defaultModelField = register("defaultModel");
+
+  const onUpdateSubmit = useCallback(
+    async (data: DefaultModelForm) => {
+      await updateDefaultModel.mutateAsync({
+        projectId: project?.id ?? "",
+        defaultModel: data.defaultModel,
+      });
+      toaster.create({
+        title: "Default Model Updated",
+        type: "success",
+        duration: 3000,
+        meta: {
+          closable: true,
+        },
+      });
+    },
+    [updateDefaultModel, project?.id]
+  );
+
+  return (
+    <>
+      <HStack width="full" marginTop={6}>
+        <Heading size="md" as="h2">
+          Default Model
+        </Heading>
+        <Spacer />
+        {updateDefaultModel.isLoading && <Spinner />}
+      </HStack>
+      <Text>
+        Select the default model to be used for general tasks within LangWatch.
+      </Text>
+      <Card.Root width="full">
+        <Card.Body width="full">
+          <HorizontalFormControl label="Default Model" helper="">
+            <Controller
+              name={defaultModelField.name}
+              control={control}
+              render={({ field }) => (
+                <ModelSelector
+                  model={field.value}
+                  options={modelSelectorOptions
+                    .filter((option) => option.mode === "chat")
+                    .map((option) => option.value)}
+                  onChange={(model) => {
+                    field.onChange(model);
+                    void handleSubmit(onUpdateSubmit)();
+                  }}
+                  mode="chat"
+                />
+              )}
+            />
+          </HorizontalFormControl>
+        </Card.Body>
+      </Card.Root>
+    </>
+  );
+}
+
 type TopicClusteringModelForm = {
   topicClusteringModel: string;
 };
@@ -532,6 +608,14 @@ function TopicClusteringModel() {
         projectId: project?.id ?? "",
         topicClusteringModel: data.topicClusteringModel,
       });
+      toaster.create({
+        title: "Topic Clustering Model Updated",
+        type: "success",
+        duration: 3000,
+        meta: {
+          closable: true,
+        },
+      });
     },
     [updateTopicClusteringModel, project?.id]
   );
@@ -559,7 +643,6 @@ function TopicClusteringModel() {
                 <ModelSelector
                   model={field.value}
                   options={allowedTopicClusteringModels}
-                  // eslint-disable-next-line @typescript-eslint/no-misused-promises
                   onChange={(model) => {
                     field.onChange(model);
                     void handleSubmit(onUpdateSubmit)();
@@ -593,6 +676,14 @@ function EmbeddingsModel() {
         projectId: project?.id ?? "",
         embeddingsModel: data.embeddingsModel,
       });
+      toaster.create({
+        title: "Embeddings Model Updated",
+        type: "success",
+        duration: 3000,
+        meta: {
+          closable: true,
+        },
+      });
     },
     [updateEmbeddingsModel, project?.id]
   );
@@ -621,7 +712,6 @@ function EmbeddingsModel() {
                   options={modelSelectorOptions
                     .filter((option) => option.mode === "embedding")
                     .map((option) => option.value)}
-                  // eslint-disable-next-line @typescript-eslint/no-misused-promises
                   onChange={(model) => {
                     field.onChange(model);
                     void handleSubmit(onUpdateSubmit)();
