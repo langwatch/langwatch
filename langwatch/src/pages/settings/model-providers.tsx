@@ -111,9 +111,27 @@ export default function ModelsPage() {
             </VStack>
           </Card.Body>
         </Card.Root>
-        <DefaultModel />
-        <TopicClusteringModel />
-        <EmbeddingsModel />
+
+        <VStack width="full" align="start" gap={6}>
+          <VStack gap={2} marginTop={2} align="start" width="full">
+            <Heading size="md" as="h2">
+              Default Models
+            </Heading>
+            <Text>
+              Configure the default models used on workflows, evaluations and
+              other LangWatch features.
+            </Text>
+          </VStack>
+          <Card.Root width="full">
+            <Card.Body width="full">
+              <VStack gap={0} width="full" align="stretch">
+                <DefaultModel />
+                <TopicClusteringModel />
+                <EmbeddingsModel />
+              </VStack>
+            </Card.Body>
+          </Card.Root>
+        </VStack>
       </VStack>
     </SettingsLayout>
   );
@@ -269,7 +287,6 @@ function ModelProviderForm({
       await refetch();
     },
     [
-      enabledField,
       updateMutation,
       provider.id,
       provider.provider,
@@ -319,14 +336,7 @@ function ModelProviderForm({
         )
       );
     },
-    [
-      useCustomKeysField,
-      setValue,
-      provider,
-      deleteMutation,
-      project?.id,
-      refetch,
-    ]
+    [setValue, provider, deleteMutation, project?.id, refetch]
   );
 
   const providerKeys =
@@ -540,41 +550,33 @@ function DefaultModel() {
   );
 
   return (
-    <>
-      <HStack width="full" marginTop={6}>
-        <Heading size="md" as="h2">
-          Default Model
-        </Heading>
-        <Spacer />
-        {updateDefaultModel.isLoading && <Spinner />}
-      </HStack>
-      <Text>
-        Select the default model to be used for general tasks within LangWatch.
-      </Text>
-      <Card.Root width="full">
-        <Card.Body width="full">
-          <HorizontalFormControl label="Default Model" helper="">
-            <Controller
-              name={defaultModelField.name}
-              control={control}
-              render={({ field }) => (
-                <ModelSelector
-                  model={field.value}
-                  options={modelSelectorOptions
-                    .filter((option) => option.mode === "chat")
-                    .map((option) => option.value)}
-                  onChange={(model) => {
-                    field.onChange(model);
-                    void handleSubmit(onUpdateSubmit)();
-                  }}
-                  mode="chat"
-                />
-              )}
+    <HorizontalFormControl
+      label="Default Model"
+      helper="For general tasks within LangWatch"
+      paddingY={4}
+      borderBottomWidth="1px"
+    >
+      <HStack>
+        <Controller
+          name={defaultModelField.name}
+          control={control}
+          render={({ field }) => (
+            <ModelSelector
+              model={field.value}
+              options={modelSelectorOptions
+                .filter((option) => option.mode === "chat")
+                .map((option) => option.value)}
+              onChange={(model) => {
+                field.onChange(model);
+                void handleSubmit(onUpdateSubmit)();
+              }}
+              mode="chat"
             />
-          </HorizontalFormControl>
-        </Card.Body>
-      </Card.Root>
-    </>
+          )}
+        />
+        {updateDefaultModel.isLoading && <Spinner size="sm" marginRight={2} />}
+      </HStack>
+    </HorizontalFormControl>
   );
 }
 
@@ -621,40 +623,33 @@ function TopicClusteringModel() {
   );
 
   return (
-    <>
-      <HStack width="full" marginTop={6}>
-        <Heading size="md" as="h2">
-          Topic Clustering Model
-        </Heading>
-        <Spacer />
-        {updateTopicClusteringModel.isLoading && <Spinner />}
-      </HStack>
-      <Text>
-        Select which model will be used to generate the topic names based on the
-        messages
-      </Text>
-      <Card.Root width="full">
-        <Card.Body width="full">
-          <HorizontalFormControl label="Topic Clustering Model" helper="">
-            <Controller
-              name={topicClusteringModelField.name}
-              control={control}
-              render={({ field }) => (
-                <ModelSelector
-                  model={field.value}
-                  options={allowedTopicClusteringModels}
-                  onChange={(model) => {
-                    field.onChange(model);
-                    void handleSubmit(onUpdateSubmit)();
-                  }}
-                  mode="chat"
-                />
-              )}
+    <HorizontalFormControl
+      label="Topic Clustering Model"
+      helper="For generating topic names"
+      paddingY={4}
+      borderBottomWidth="1px"
+    >
+      <HStack>
+        <Controller
+          name={topicClusteringModelField.name}
+          control={control}
+          render={({ field }) => (
+            <ModelSelector
+              model={field.value}
+              options={allowedTopicClusteringModels}
+              onChange={(model) => {
+                field.onChange(model);
+                void handleSubmit(onUpdateSubmit)();
+              }}
+              mode="chat"
             />
-          </HorizontalFormControl>
-        </Card.Body>
-      </Card.Root>
-    </>
+          )}
+        />
+        {updateTopicClusteringModel.isLoading && (
+          <Spinner size="sm" marginRight={2} />
+        )}
+      </HStack>
+    </HorizontalFormControl>
   );
 }
 
@@ -689,40 +684,33 @@ function EmbeddingsModel() {
   );
 
   return (
-    <>
-      <HStack width="full" marginTop={6}>
-        <Heading size="md" as="h2">
-          Embeddings Model
-        </Heading>
-        <Spacer />
-        {updateEmbeddingsModel.isLoading && <Spinner />}
-      </HStack>
-      <Text>
-        Select which model will be used to generate embeddings for the messages
-      </Text>
-      <Card.Root width="full">
-        <Card.Body width="full">
-          <HorizontalFormControl label="Embeddings Model" helper="">
-            <Controller
-              name={embeddingsModelField.name}
-              control={control}
-              render={({ field }) => (
-                <ModelSelector
-                  model={field.value}
-                  options={modelSelectorOptions
-                    .filter((option) => option.mode === "embedding")
-                    .map((option) => option.value)}
-                  onChange={(model) => {
-                    field.onChange(model);
-                    void handleSubmit(onUpdateSubmit)();
-                  }}
-                  mode="embedding"
-                />
-              )}
+    <HorizontalFormControl
+      label="Embeddings Model"
+      helper="For embeddings to be used in topic clustering and evaluations"
+      paddingY={4}
+    >
+      <HStack>
+        <Controller
+          name={embeddingsModelField.name}
+          control={control}
+          render={({ field }) => (
+            <ModelSelector
+              model={field.value}
+              options={modelSelectorOptions
+                .filter((option) => option.mode === "embedding")
+                .map((option) => option.value)}
+              onChange={(model) => {
+                field.onChange(model);
+                void handleSubmit(onUpdateSubmit)();
+              }}
+              mode="embedding"
             />
-          </HorizontalFormControl>
-        </Card.Body>
-      </Card.Root>
-    </>
+          )}
+        />
+        {updateEmbeddingsModel.isLoading && (
+          <Spinner size="sm" marginRight={2} />
+        )}
+      </HStack>
+    </HorizontalFormControl>
   );
 }
