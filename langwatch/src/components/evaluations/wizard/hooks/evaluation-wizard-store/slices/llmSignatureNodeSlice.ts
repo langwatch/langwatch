@@ -12,7 +12,11 @@ import { buildEntryToTargetEdges } from "./utils/edge.util";
 import { calculateNextPosition } from "./utils/node.util";
 
 export interface LlmSignatureNodeSlice {
-  createNewLlmSignatureNode: () => Node<Signature>;
+  createNewLlmSignatureNode: ({
+    project,
+  }: {
+    project?: { defaultModel?: string | null };
+  }) => Node<Signature>;
   addNewSignatureNodeToWorkflow: () => string;
   updateSignatureNodeLLMConfigValue: (
     nodeId: string,
@@ -30,15 +34,18 @@ export const createLlmSignatureNodeSlice: StateCreator<
     get().getNodesByType("entry")[0] as Node<Entry> | undefined;
 
   return {
-    createNewLlmSignatureNode: (): Node<Signature> => {
+    createNewLlmSignatureNode: ({ project }): Node<Signature> => {
       const entryNode = getEntryNode();
       const position = entryNode
         ? calculateNextPosition(entryNode.position)
         : { x: 0, y: 0 };
       return get().createNewNode(
-        LlmSignatureNodeFactory.build({
-          position,
-        })
+        LlmSignatureNodeFactory.build(
+          {
+            position,
+          },
+          project
+        )
       );
     },
 

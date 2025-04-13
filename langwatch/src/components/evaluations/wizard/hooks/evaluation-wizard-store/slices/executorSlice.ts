@@ -25,8 +25,10 @@ export interface ExecutorSlice {
    */
   upsertExecutorNodeByType: ({
     type,
+    project,
   }: {
     type: "signature" | "code";
+    project?: { defaultModel?: string | null };
   }) => NodeId;
 }
 
@@ -39,10 +41,13 @@ export const createExecutorSlice: StateCreator<
   [],
   ExecutorSlice
 > = (_set, get) => {
-  const createNodeByType = (type: "signature" | "code") => {
+  const createNodeByType = (
+    type: "signature" | "code",
+    project?: { defaultModel?: string | null }
+  ) => {
     switch (type) {
       case "signature":
-        return get().createNewLlmSignatureNode();
+        return get().createNewLlmSignatureNode({ project });
       case "code":
         return get().createNewCodeExecutionNode();
       default:
@@ -58,10 +63,9 @@ export const createExecutorSlice: StateCreator<
         (node) => node.type && EXECUTOR_NODE_TYPES.includes(node.type)
       );
     },
-    upsertExecutorNodeByType: ({ type }: { type: "signature" | "code" }) => {
+    upsertExecutorNodeByType: ({ type, project }) => {
       const existingExecutorNode = get().getFirstExecutorNode();
-      const node = createNodeByType(type);
-      console.log({ existingExecutorNode, node });
+      const node = createNodeByType(type, project);
 
       if (!existingExecutorNode) {
         switch (type) {

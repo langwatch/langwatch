@@ -1,13 +1,12 @@
 import type { Signature } from "~/optimization_studio/types/dsl";
 import type { NodeWithOptionalPosition } from "../types";
+import { DEFAULT_MODEL } from "../../../../../../../utils/constants";
 
 type LlmSignatureNode = NodeWithOptionalPosition<Signature>;
 
-const DEFAULT_LLM_CONFIG = {
-  model: "openai/gpt-4o-mini",
-};
-
-const DEFAULT_SIGNATURE_NODE_PROPERTIES: LlmSignatureNode = {
+const DEFAULT_SIGNATURE_NODE_PROPERTIES = (
+  model: string
+): LlmSignatureNode => ({
   type: "signature",
   id: "signature_node",
   deletable: false,
@@ -18,7 +17,9 @@ const DEFAULT_SIGNATURE_NODE_PROPERTIES: LlmSignatureNode = {
       {
         identifier: "llm",
         type: "llm" as const,
-        value: DEFAULT_LLM_CONFIG,
+        value: {
+          model,
+        },
       },
       {
         identifier: "prompting_technique",
@@ -49,15 +50,20 @@ const DEFAULT_SIGNATURE_NODE_PROPERTIES: LlmSignatureNode = {
       },
     ],
   },
-};
+});
 
 /**
  * Simple factory for creating LLM Signature Nodes
  */
 export class LlmSignatureNodeFactory {
-  static build(overrides?: Partial<LlmSignatureNode>): LlmSignatureNode {
+  static build(
+    overrides?: Partial<LlmSignatureNode>,
+    project?: { defaultModel?: string | null }
+  ): LlmSignatureNode {
     return {
-      ...DEFAULT_SIGNATURE_NODE_PROPERTIES,
+      ...DEFAULT_SIGNATURE_NODE_PROPERTIES(
+        project?.defaultModel ?? DEFAULT_MODEL
+      ),
       ...overrides,
     };
   }

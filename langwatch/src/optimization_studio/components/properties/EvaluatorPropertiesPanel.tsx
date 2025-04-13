@@ -4,18 +4,17 @@ import { BasePropertiesPanel } from "./BasePropertiesPanel";
 import { z } from "zod";
 import { FormProvider, useForm } from "react-hook-form";
 import DynamicZodForm from "../../../components/checks/DynamicZodForm";
-import {
-  AVAILABLE_EVALUATORS,
-  type Evaluators,
-} from "../../../server/evaluations/evaluators.generated";
+import { AVAILABLE_EVALUATORS } from "../../../server/evaluations/evaluators.generated";
 import { evaluatorsSchema } from "../../../server/evaluations/evaluators.zod.generated";
 import { VStack } from "@chakra-ui/react";
 import { useCallback, useEffect } from "react";
 import { getEvaluatorDefaultSettings } from "../../../server/evaluations/getEvaluator";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import { useDebouncedCallback } from "use-debounce";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
 export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
+  const { project } = useOrganizationTeamProject();
   const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
 
   const settingsFromParameters = Object.fromEntries(
@@ -34,15 +33,14 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
 
   const schema =
     evaluator && evaluator in AVAILABLE_EVALUATORS
-      ? evaluatorsSchema.shape[evaluator as keyof Evaluators].shape.settings
+      ? evaluatorsSchema.shape[evaluator].shape.settings
       : undefined;
 
   useEffect(() => {
     if (!evaluator || !(evaluator in AVAILABLE_EVALUATORS)) return;
     if (node.data.parameters) return;
 
-    const evaluatorDefinition =
-      AVAILABLE_EVALUATORS[evaluator as keyof Evaluators];
+    const evaluatorDefinition = AVAILABLE_EVALUATORS[evaluator];
 
     const setDefaultSettings = (
       defaultValues: Record<string, any>,
@@ -65,7 +63,7 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
     };
 
     setDefaultSettings(
-      getEvaluatorDefaultSettings(evaluatorDefinition),
+      getEvaluatorDefaultSettings(evaluatorDefinition, project),
       "settings"
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,7 +116,7 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
           <VStack width="full" gap={3}>
             <DynamicZodForm
               schema={schema}
-              evaluatorType={evaluator as keyof Evaluators}
+              evaluatorType={evaluator}
               prefix="settings"
               errors={form.formState.errors.settings}
               variant="studio"

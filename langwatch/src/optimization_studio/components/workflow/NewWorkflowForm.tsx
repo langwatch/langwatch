@@ -17,6 +17,7 @@ import { EmojiPickerModal } from "../properties/modals/EmojiPickerModal";
 import { trackEvent } from "../../../utils/tracking";
 import { toaster } from "../../../components/ui/toaster";
 import { Dialog } from "../../../components/ui/dialog";
+import { DEFAULT_MODEL } from "../../../utils/constants";
 
 type FormData = {
   name: string;
@@ -59,6 +60,10 @@ export const NewWorkflowForm = ({
         name: data.name,
         description: data.description,
         icon: data.icon ?? "🧩",
+        default_llm: {
+          ...template.default_llm,
+          model: project?.defaultModel ?? DEFAULT_MODEL,
+        },
       };
       const createdWorkflow = await createWorkflowMutation.mutateAsync(
         {

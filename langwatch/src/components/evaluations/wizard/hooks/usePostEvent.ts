@@ -134,7 +134,7 @@ export const usePostEvent = () => {
         }
       })();
     },
-    [project]
+    [handleServerMessage, handleTimeout, project]
   );
 
   return { postEvent, isLoading };

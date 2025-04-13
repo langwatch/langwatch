@@ -17,6 +17,7 @@ import {
 } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useAnimatedFocusElementById } from "../../../../../../hooks/useAnimatedFocusElementById";
 import { useUpdateNodeInternals } from "@xyflow/react";
+import { useOrganizationTeamProject } from "../../../../../../hooks/useOrganizationTeamProject";
 
 export const EXECUTION_METHOD_SELECTOR_STEP_ACCORDION_VALUE =
   "execution-method-selector";
@@ -26,6 +27,7 @@ export function ExecutionMethodSelectionStepAccordion({
 }: {
   onSelect: (executionMethod: OfflineExecutionMethod) => void;
 }) {
+  const { project } = useOrganizationTeamProject();
   const updateNodeInternals = useUpdateNodeInternals();
   const { executionMethod, upsertExecutorNodeByType, setWizardState } =
     useEvaluationWizardStore(
@@ -79,7 +81,7 @@ export function ExecutionMethodSelectionStepAccordion({
           description="Run a prompt via any LLM model to evaluate"
           icon={<LuMessageSquareCode />}
           onClick={() => {
-            const nodeId = upsertExecutorNodeByType({ type: "signature" });
+            const nodeId = upsertExecutorNodeByType({ type: "signature", project });
             updateNodeInternals(nodeId);
             handleOptionClick("offline_prompt");
           }}
@@ -89,7 +91,10 @@ export function ExecutionMethodSelectionStepAccordion({
           description="Run code"
           icon={<LuCode />}
           onClick={() => {
-            const nodeId = upsertExecutorNodeByType({ type: "code" });
+            const nodeId = upsertExecutorNodeByType({
+              type: "code",
+              project,
+            });
             updateNodeInternals(nodeId);
             handleOptionClick("offline_code_execution");
           }}

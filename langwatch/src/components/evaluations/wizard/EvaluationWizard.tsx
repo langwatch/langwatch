@@ -126,6 +126,7 @@ const WizardSidebar = memo(function WizardSidebar({
     executionMethod,
     isAutosaving,
     experimentId,
+    evaluatorNode,
   } = useEvaluationWizardStore(
     useShallow((state) => {
       return {
@@ -137,6 +138,7 @@ const WizardSidebar = memo(function WizardSidebar({
         executionMethod: state.wizardState.executionMethod,
         isAutosaving: state.isAutosaving,
         experimentId: state.experimentId,
+        evaluatorNode: state.getFirstEvaluatorNode(),
       };
     })
   );
@@ -192,10 +194,13 @@ const WizardSidebar = memo(function WizardSidebar({
   const saveAsMonitor = api.experiments.saveAsMonitor.useMutation();
   const router = useRouter();
 
-  // When step changes, if it's execution or evaluation,
-  // Update the view to show the workflow tab
+  // When state changes, update the view to show the tab user
+  // should be paying attention to at the moment
   useEffect(() => {
-    if (step === "execution" || step === "evaluation") {
+    if (step === "execution" && executionMethod) {
+      setWizardState({ workspaceTab: "workflow" });
+    }
+    if (step === "evaluation" && evaluatorNode) {
       setWizardState({ workspaceTab: "workflow" });
     }
     if (step === "dataset") {
@@ -204,7 +209,7 @@ const WizardSidebar = memo(function WizardSidebar({
     if (step === "results") {
       setWizardState({ workspaceTab: "results" });
     }
-  }, [step, setWizardState]);
+  }, [step, setWizardState, executionMethod, evaluatorNode]);
 
   return (
     <VStack

@@ -357,6 +357,36 @@ export const projectRouter = createTRPCRouter({
 
       return { success: true, projectSlug: updatedProject.slug };
     }),
+  updateDefaultModel: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        defaultModel: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      const project = await prisma.project.findUnique({
+        where: { id: input.projectId },
+      });
+
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+
+      const updatedProject = await prisma.project.update({
+        where: { id: input.projectId },
+        data: {
+          defaultModel: input.defaultModel,
+        },
+      });
+
+      return { success: true, projectSlug: updatedProject.slug };
+    }),
 });
 
 const generateApiKey = (): string => {
