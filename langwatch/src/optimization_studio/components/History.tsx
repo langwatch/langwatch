@@ -352,20 +352,12 @@ export const useVersionState = ({
     !!latestVersion?.autoSaved ||
     (allowSaveIfAutoSaveIsCurrentButNotLatest && !!currentVersion?.autoSaved);
 
-  const [versionMajor, versionMinor] = latestVersion?.version.split(".") ?? [
-    "0",
-    "0",
-  ];
+  const [versionMajor] = latestVersion?.version.split(".") ?? ["0"];
   const nextVersion = useMemo(() => {
     return latestVersion?.autoSaved
       ? latestVersion.version
-      : `${versionMajor}.${parseInt(versionMinor ?? "0") + 1}`;
-  }, [
-    latestVersion?.autoSaved,
-    latestVersion?.version,
-    versionMajor,
-    versionMinor,
-  ]);
+      : `${parseInt(versionMajor ?? "0") + 1}`;
+  }, [latestVersion?.autoSaved, latestVersion?.version, versionMajor]);
 
   const versionToBeEvaluated = useMemo(() => {
     return canSaveNewVersion
@@ -494,12 +486,12 @@ export function NewVersionFields({
           <Input
             {...form.register("version", {
               required: true,
-              pattern: /^\d+\.\d+$/,
+              pattern: /^\d+(\.\d+)?$/,
             })}
             placeholder={nextVersion}
-            maxWidth="90px"
-            pattern="\d+\.\d+"
-            disabled={!canSaveNewVersion}
+            maxWidth="60px"
+            pattern="\d+(\.\d+)?"
+            readOnly
           />
         </VStack>
       </Field.Root>

@@ -467,10 +467,8 @@ export const saveOrCommitWorkflowVersion = async ({
 
   const latestVersion = workflow.latestVersion;
 
-  const [versionMajor, versionMinor] = (latestVersion?.version ?? "1.0").split(
-    "."
-  );
-  const nextVersion = `${versionMajor}.${parseInt(versionMinor ?? "0") + 1}`;
+  const [versionMajor] = (latestVersion?.version ?? "1.0").split(".");
+  const nextVersion = `${parseInt(versionMajor ?? "0") + 1}`;
 
   const dslWithoutStates = JSON.parse(
     JSON.stringify({
