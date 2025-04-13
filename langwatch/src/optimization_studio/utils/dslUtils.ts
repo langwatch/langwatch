@@ -1,7 +1,6 @@
 import type { workflowJsonSchema } from "../types/dsl";
 import type { z } from "zod";
 import type { Node } from "@xyflow/react";
-import isDeepEqual from "fast-deep-equal";
 
 export const clearDsl = (
   dsl: z.infer<typeof workflowJsonSchema>,
@@ -40,8 +39,8 @@ export const hasDSLChanged = (
   dslPrevious: z.infer<typeof workflowJsonSchema>,
   includeExecutionStates: boolean
 ) => {
-  return !isDeepEqual(
-    clearDsl(dslCurrent, includeExecutionStates),
-    clearDsl(dslPrevious, includeExecutionStates)
+  return (
+    JSON.stringify(clearDsl(dslCurrent, includeExecutionStates)) !==
+    JSON.stringify(clearDsl(dslPrevious, includeExecutionStates))
   );
 };

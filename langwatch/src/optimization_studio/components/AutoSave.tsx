@@ -43,6 +43,8 @@ export function AutoSave() {
     useShallow((state) => state.getWorkflow())
   );
 
+  const trpc = api.useContext();
+
   const saveIfChanged = useDebouncedCallback(
     () => {
       if (!project || !workflow.data) return;
@@ -73,11 +75,16 @@ export function AutoSave() {
               saveTimeout = setTimeout(() => {
                 setRecentlySaved(false);
               }, 5000);
+              void (async () => {
+                await trpc.workflow.getVersions.refetch();
+                setPreviousWorkflow(stateWorkflow);
+              })();
             },
           }
         );
+      } else {
+        setPreviousWorkflow(stateWorkflow);
       }
-      setPreviousWorkflow(stateWorkflow);
     },
     1000,
     { leading: false, trailing: true, maxWait: 30_000 }

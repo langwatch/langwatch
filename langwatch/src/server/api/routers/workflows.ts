@@ -363,7 +363,7 @@ export const workflowRouter = createTRPCRouter({
       const prevDsl_ = JSON.stringify(clearDsl(input.prevDsl), null, 2);
       const newDsl_ = JSON.stringify(clearDsl(input.newDsl), null, 2);
       if (prevDsl_ === newDsl_) {
-        return undefined;
+        return "no changes";
       }
 
       const diff = createPatch(
@@ -373,8 +373,6 @@ export const workflowRouter = createTRPCRouter({
         "Previous Version",
         "New Version"
       );
-
-      console.log("diff", diff);
 
       const commitMessage = await generateText({
         model: await getVercelAIModel(input.projectId),
@@ -419,6 +417,9 @@ ${diff}
       });
 
       const result = commitMessage.toolCalls[0]?.args.message;
+
+      // TODO: save call costs to user account
+
       return result;
     }),
 });

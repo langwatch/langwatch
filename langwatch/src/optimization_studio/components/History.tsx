@@ -346,10 +346,11 @@ export const useVersionState = ({
   const hasChanges = previousWorkflow
     ? hasDSLChanged(getWorkflow(), previousWorkflow, true)
     : false;
-  const canSaveNewVersion = !!(
+
+  const canSaveNewVersion =
+    hasChanges ||
     !!latestVersion?.autoSaved ||
-    (allowSaveIfAutoSaveIsCurrentButNotLatest && currentVersion?.autoSaved)
-  );
+    (allowSaveIfAutoSaveIsCurrentButNotLatest && !!currentVersion?.autoSaved);
 
   const [versionMajor, versionMinor] = latestVersion?.version.split(".") ?? [
     "0",
@@ -431,41 +432,52 @@ export function NewVersionFields({
   const generateCommitMessage =
     api.workflow.generateCommitMessage.useMutation();
 
-  const generateCommitMessageCallback = useCallback(() => {
-    generateCommitMessage.mutate(
-      {
-        projectId: project?.id ?? "",
-        prevDsl: previousVersion.dsl,
-        newDsl: getWorkflow(),
-      },
-      {
-        onSuccess: (data) => {
-          if (data) {
-            form.setValue("commitMessage", data);
-          }
+  const generateCommitMessageCallback = useCallback(
+    (prevDsl: Workflow, newDsl: Workflow) => {
+      generateCommitMessage.mutate(
+        {
+          projectId: project?.id ?? "",
+          prevDsl,
+          newDsl,
         },
-        onError: (e) => {
-          toaster.create({
-            title: "Error auto-generating version description",
-            description: e.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-            placement: "top-end",
-          });
-        },
-      }
-    );
-  }, [form, generateCommitMessage, getWorkflow, previousVersion, project?.id]);
+        {
+          onSuccess: (data) => {
+            if (data) {
+              form.setValue("commitMessage", data);
+            }
+          },
+          onError: (e) => {
+            toaster.create({
+              title: "Error auto-generating version description",
+              description: e.message,
+              type: "error",
+              duration: 5000,
+              meta: { closable: true },
+              placement: "top-end",
+            });
+          },
+        }
+      );
+    },
+    [form, generateCommitMessage, project?.id]
+  );
 
-  const debouncedGenerateCommitMessage = useDebounceCallback(() => {
-    generateCommitMessageCallback();
-  }, 500);
+  const debouncedGenerateCommitMessage = useDebounceCallback(
+    (prevDsl: Workflow, newDsl: Workflow) => {
+      generateCommitMessageCallback(prevDsl, newDsl);
+    },
+    500,
+    { leading: true, trailing: false }
+  );
 
   useEffect(() => {
     if (canSaveNewVersion && previousVersion?.dsl) {
       form.setValue("commitMessage", "");
-      debouncedGenerateCommitMessage();
+      setTimeout(() => {
+        debouncedGenerateCommitMessage(previousVersion.dsl!, getWorkflow());
+
+        // Seems like the mutation onSuccess does not work unless we send this call to the end of the callstack for some reason
+      }, 0);
     } else if (canSaveNewVersion && !previousVersion) {
       form.setValue("commitMessage", "First version");
     }
