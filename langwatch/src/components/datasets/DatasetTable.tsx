@@ -465,28 +465,38 @@ export function DatasetTable({
   return (
     <>
       <HStack width="full" verticalAlign={"middle"} paddingBottom={6} gap={6}>
-        {insideWizard ? (
-          <Heading as="h3" size="md" fontWeight="600">
-            {dataset?.name ?? DEFAULT_DATASET_NAME}
-          </Heading>
-        ) : (
-          <Heading as="h1" size="lg">
-            {title ? (
-              title
-            ) : (
-              <>
-                {isEmbedded ? "Edit Dataset" : "Dataset"}{" "}
-                {`- ${
-                  dataset?.name
-                    ? dataset.name
-                    : datasetId
-                    ? ""
-                    : DEFAULT_DATASET_NAME
-                }`}
-              </>
-            )}
-          </Heading>
-        )}
+        <HStack gap={2}>
+          {insideWizard ? (
+            <Heading as="h3" size="md" fontWeight="600">
+              {dataset?.name ?? DEFAULT_DATASET_NAME}
+            </Heading>
+          ) : (
+            <Heading as="h1" size="lg">
+              {title ? (
+                title
+              ) : (
+                <>
+                  {isEmbedded ? "Edit Dataset" : "Dataset"}{" "}
+                  {`- ${
+                    dataset?.name
+                      ? dataset.name
+                      : datasetId
+                      ? ""
+                      : DEFAULT_DATASET_NAME
+                  }`}
+                </>
+              )}
+            </Heading>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => editDataset.onOpen()}
+            minWidth="fit-content"
+          >
+            <Edit2 />
+          </Button>
+        </HStack>
         <Text fontSize={"14px"} color="gray.400">
           {databaseDataset.data?.count ?? parentRowData?.length} records
         </Text>
