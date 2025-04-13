@@ -190,6 +190,7 @@ model Project {
     experiments          Experiment[]
     annotations          Annotation[]
     modelProviders       ModelProvider[]
+    defaultModel         String?
     topicClusteringModel String?
     embeddingsModel      String?
     TriggerSent          TriggerSent[]
