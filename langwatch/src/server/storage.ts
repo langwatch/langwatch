@@ -157,6 +157,7 @@ export const createS3Client = async (projectId: string) => {
   };
 
   const s3Client = new S3Client({
+    region: "auto",
     endpoint: s3Config.endpoint,
     credentials: {
       accessKeyId: s3Config.accessKeyId,
