@@ -123,12 +123,9 @@ export const usePromptConfigForm = ({
     });
   };
 
-  console.log({ config });
-
   return {
     methods,
     handleSubmit: () => {
-      console.log("handleSubmit outside", methods.getValues());
       void methods.handleSubmit(handleSubmit, (error) => {
         console.error("handleSubmit error", error);
       })();
