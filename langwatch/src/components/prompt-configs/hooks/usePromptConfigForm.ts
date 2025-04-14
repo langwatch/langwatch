@@ -78,7 +78,6 @@ export const usePromptConfigForm = ({
   // Once we have the config, reset the form
   useEffect(() => {
     if (config) {
-      console.log("resetting form", convertConfigToFormValues(config));
       methods.reset(convertConfigToFormValues(config));
     }
   }, [config, methods]);

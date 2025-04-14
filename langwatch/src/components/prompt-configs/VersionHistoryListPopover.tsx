@@ -80,7 +80,7 @@ function VersionHistoryItem({
       <HStack width="full" gap={3}>
         <VersionNumberBox version={version} minWidth="48px" />
         <VStack align="start" width="full" gap={1}>
-          <HStack>
+          <HStack width="full" justify="space-between">
             <Text fontWeight={600} fontSize="13px" lineClamp={1}>
               {version.commitMessage}
             </Text>
