@@ -344,7 +344,7 @@ export const useVersionState = ({
     (version) => version.isLatestVersion
   );
   const hasChanges = previousWorkflow
-    ? hasDSLChanged(getWorkflow(), previousWorkflow, true)
+    ? hasDSLChanged(getWorkflow(), previousWorkflow, false)
     : false;
 
   const canSaveNewVersion =
