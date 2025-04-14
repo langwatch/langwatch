@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Container,
-  HStack,
-  Heading,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Container, HStack, Heading, VStack } from "@chakra-ui/react";
 import { Plus } from "react-feather";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -18,6 +10,8 @@ import {
 } from "~/components/prompt-configs/PromptConfigTable";
 import { PromptConfigPanel } from "~/components/prompt-configs/PromptConfigPanel";
 import { toaster } from "~/components/ui/toaster";
+import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
+import { type LlmPromptConfig } from "@prisma/client";
 // You'll need more imports when implementing the drawer/modal, etc.
 
 export default function PromptConfigsPage() {
@@ -25,27 +19,28 @@ export default function PromptConfigsPage() {
   const { project } = useOrganizationTeamProject();
   const [isPromptConfigPanelOpen, setIsPromptConfigPanelOpen] = useState(false);
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [configToDelete, setConfigToDelete] = useState<LlmPromptConfig | null>(
+    null
+  );
 
   // Fetch prompt configs
-  const {
-    data: promptConfigs,
-    isLoading: isLoadingPromptConfigs,
-    refetch: refetchPromptConfigs,
-  } = api.llmConfigs.getPromptConfigs.useQuery(
-    {
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project?.id,
-      onError: (error) => {
-        toaster.create({
-          title: "Error loading prompt configs",
-          description: error.message,
-          type: "error",
-        });
+  const { data: promptConfigs, refetch: refetchPromptConfigs } =
+    api.llmConfigs.getPromptConfigs.useQuery(
+      {
+        projectId: project?.id ?? "",
       },
-    }
-  );
+      {
+        enabled: !!project?.id,
+        onError: (error) => {
+          toaster.create({
+            title: "Error loading prompt configs",
+            description: error.message,
+            type: "error",
+          });
+        },
+      }
+    );
 
   const createConfigMutation = api.llmConfigs.createPromptConfig.useMutation({
     onSuccess: ({ id }) => {
@@ -65,6 +60,23 @@ export default function PromptConfigsPage() {
   const deleteConfigMutation = api.llmConfigs.deletePromptConfig.useMutation({
     onSuccess: () => {
       void utils.llmConfigs.getPromptConfigs.invalidate();
+      toaster.create({
+        title: "Prompt config deleted",
+        type: "success",
+        meta: {
+          closable: true,
+        },
+      });
+    },
+    onError: (error) => {
+      toaster.create({
+        title: "Error deleting prompt config",
+        description: error instanceof Error ? error.message : "Unknown error",
+        type: "error",
+        meta: {
+          closable: true,
+        },
+      });
     },
   });
 
@@ -91,6 +103,30 @@ export default function PromptConfigsPage() {
     });
   };
 
+  const handleDeleteConfig = (config: LlmPromptConfig) => {
+    setConfigToDelete(config);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteConfig = async () => {
+    if (!configToDelete) return;
+
+    try {
+      await deleteConfigMutation.mutateAsync({
+        id: configToDelete.id,
+        projectId: configToDelete.projectId,
+      });
+
+      await refetchPromptConfigs();
+    } catch (error) {
+      toaster.create({
+        title: "Error deleting prompt config",
+        description: error instanceof Error ? error.message : "Unknown error",
+        type: "error",
+      });
+    }
+  };
+
   useEffect(() => {
     if (selectedConfigId) {
       setIsPromptConfigPanelOpen(true);
@@ -99,25 +135,12 @@ export default function PromptConfigsPage() {
 
   const defaultColumns = useMemo(() => {
     return createDefaultColumns({
-      onDelete: async (config) => {
-        try {
-          await deleteConfigMutation.mutateAsync({
-            id: config.id,
-            projectId: config.projectId,
-          });
-
-          await refetchPromptConfigs();
-        } catch (error) {
-          toaster.create({
-            title: "Error deleting prompt config",
-            description:
-              error instanceof Error ? error.message : "Unknown error",
-            type: "error",
-          });
-        }
+      onDelete: (config) => {
+        handleDeleteConfig(config);
+        return Promise.resolve();
       },
     });
-  }, [deleteConfigMutation, refetchPromptConfigs]);
+  }, []);
 
   return (
     <DashboardLayout>
@@ -153,6 +176,16 @@ export default function PromptConfigsPage() {
           isOpen={isPromptConfigPanelOpen}
           onClose={() => setIsPromptConfigPanelOpen(false)}
           configId={selectedConfigId ?? ""}
+        />
+
+        <DeleteConfirmationDialog
+          title="Are you really sure?"
+          description="There is no going back, and you will lose all versions of this prompt. If you're sure you want to delete this prompt, type 'delete' below:"
+          open={isDeleteDialogOpen}
+          onClose={() => setIsDeleteDialogOpen(false)}
+          onConfirm={() => {
+            void confirmDeleteConfig();
+          }}
         />
 
         {/* You'll need to implement drawer/modal components for:
