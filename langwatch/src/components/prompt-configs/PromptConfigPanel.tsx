@@ -1,11 +1,6 @@
-import { Box, HStack, Text, Button } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 import { PanelHeader } from "./ui/PanelHeader";
-import { PromptConfigVersionFieldGroup } from "./forms/PromptConfigVersionFieldGroup";
-import { FormProvider } from "react-hook-form";
-import { PromptNameField } from "./forms/fields/PromptNameField";
-import { CommitMessageField } from "./forms/fields/CommitMessageField";
-import { VersionHistoryListPopover } from "./VersionHistoryListPopover";
-import { SaveIcon } from "lucide-react";
+import { PromptConfigForm } from "./forms/PromptConfigForm";
 import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
 
 interface PromptConfigPanelProps {
@@ -19,7 +14,7 @@ export function PromptConfigPanel({
   onClose,
   configId,
 }: PromptConfigPanelProps) {
-  const { methods, handleSubmit, isLoading } = usePromptConfigForm({
+  const { isLoading } = usePromptConfigForm({
     configId,
   });
 
@@ -45,37 +40,7 @@ export function PromptConfigPanel({
       minWidth="600px"
     >
       <PanelHeader title="Prompt Configuration" onClose={onClose} />
-      <FormProvider {...methods}>
-        <form>
-          <PromptNameField />
-          <PromptConfigVersionFieldGroup />
-          <HStack
-            marginTop={4}
-            marginBottom={6}
-            justify="space-between"
-            width="full"
-          >
-            <CommitMessageField />
-            <Button
-              type="submit"
-              colorScheme="gray"
-              aria-label="Save"
-              marginTop={9}
-              onClick={(e) => {
-                e.preventDefault();
-                handleSubmit();
-              }}
-            >
-              <SaveIcon />
-              Save Version
-            </Button>
-          </HStack>
-          <HStack>
-            <VersionHistoryListPopover />
-            <Text>Prompt Version History</Text>
-          </HStack>
-        </form>
-      </FormProvider>
+      <PromptConfigForm configId={configId} />
     </Box>
   );
 }
