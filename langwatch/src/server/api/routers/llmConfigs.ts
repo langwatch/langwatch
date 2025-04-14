@@ -3,6 +3,8 @@ import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup } from "../permission";
 import { checkUserPermissionForProject } from "../permission";
+import type { LlmPromptConfigVersion } from "@prisma/client";
+import type { JsonValue } from "@prisma/client/runtime/library";
 
 // Basic schema for the config JSON - adjust as needed for specific structure
 const configJsonSchema = z
@@ -196,6 +198,49 @@ export const llmConfigVersionsRouter = createTRPCRouter({
       }
 
       return latestVersion;
+    }),
+
+  /**
+   * Restore a version
+   */
+  restore: protectedProcedure
+    .input(idSchema.merge(projectIdSchema))
+    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      const { id, projectId } = input;
+
+      // Find the version to restore
+      const version = await ctx.prisma.llmPromptConfigVersion.findUnique({
+        where: { id, projectId },
+      });
+
+      if (!version) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Version not found.",
+        });
+      }
+
+      // Create a new version with the same config data
+      const newVersion = await ctx.prisma.llmPromptConfigVersion.create({
+        data: {
+          commitMessage: `Restore from version ${version.version}`,
+          authorId: ctx.session?.user?.id ?? null,
+          configId: version.configId,
+          schemaVersion: version.schemaVersion,
+          projectId: version.projectId,
+          // This any shouldn't be needed, but I don't know what is the difference between JsonInputValue and JsonValue
+          configData: version.configData as any,
+        },
+      });
+
+      // Update the parent config's updatedAt timestamp
+      await ctx.prisma.llmPromptConfig.update({
+        where: { id: version.configId, projectId },
+        data: { updatedAt: new Date() },
+      });
+
+      return newVersion;
     }),
 });
 
