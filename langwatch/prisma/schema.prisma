@@ -724,7 +724,7 @@ model LlmPromptConfig {
 
 model LlmPromptConfigVersion {
   id            String          @id @default(nanoid())
-  version       String          // e.g., "1", "2", or potentially semantic like "v1.1"
+  version       Int             @default(autoincrement())
   commitMessage String?         // Optional: Describe changes in this version
   authorId      String?         // Optional: User who created this version
   author        User?           @relation(fields: [authorId], references: [id])
