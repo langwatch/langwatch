@@ -24,6 +24,7 @@ import dspy
 
 from langwatch_nlp.studio.utils import (
     normalize_name_to_class_name,
+    normalize_to_variable_name,
     transpose_inline_dataset_to_object_list,
 )
 import isort
@@ -69,6 +70,8 @@ def parse_workflow(
     handle_errors=False,
     do_not_trace=False,
 ) -> Tuple[str, str]:
+    workflow = normalized_workflow(workflow)
+
     # Find all reachable nodes from entry
     nodes = (
         find_path_until_node(until_node_id, workflow.nodes, workflow.edges)
@@ -122,9 +125,6 @@ def parsed_and_materialized_workflow_class(
 def parse_component(
     node: Node, workflow: Workflow, format=False, debug_level=0
 ) -> Tuple[str, str, Dict[str, Any]]:
-    node = copy.deepcopy(node)
-    node.data.name = normalize_name_to_class_name(node.data.name or "")
-
     match node.type:
         case "signature":
             parameters = parse_fields(node.data.parameters or [], autoparse=True)
@@ -443,3 +443,33 @@ def workflow_inputs(workflow: Workflow) -> List[Field]:
         raise Exception("Entry node not found in workflow")
 
     return [field for field in (entry_node.data.outputs or [])]
+
+
+def normalized_workflow(workflow: Workflow) -> Workflow:
+    workflow = copy.deepcopy(workflow)
+    for node in workflow.nodes:
+        normalized_node(node, mutate=True)
+
+    for edge in workflow.edges:
+        edge.source = normalize_to_variable_name(edge.source)
+        [handle, field] = edge.sourceHandle.split(".")
+        edge.sourceHandle = f"{handle}.{normalize_to_variable_name(field)}"
+        edge.target = normalize_to_variable_name(edge.target)
+        [handle, field] = edge.targetHandle.split(".")
+        edge.targetHandle = f"{handle}.{normalize_to_variable_name(field)}"
+
+    return workflow
+
+
+def normalized_node(node: Node, mutate=False) -> Node:
+    if not mutate:
+        node = copy.deepcopy(node)
+    node.id = normalize_to_variable_name(node.id)
+    node.data.name = normalize_name_to_class_name(node.data.name or "")
+    for field in node.data.parameters or []:
+        field.identifier = normalize_to_variable_name(field.identifier)
+    for field in node.data.inputs or []:
+        field.identifier = normalize_to_variable_name(field.identifier)
+    for field in node.data.outputs or []:
+        field.identifier = normalize_to_variable_name(field.identifier)
+    return node

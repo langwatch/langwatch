@@ -224,15 +224,55 @@ def normalize_name_to_class_name(node_name: str) -> str:
     return class_name
 
 
-def normalize_to_variable_name(node_name: str) -> str:
+def normalize_to_variable_name(name: str) -> str:
     """
-    Converts a node name like "LLM Signature (2)" to a valid Python variable name like "llm_signature_2".
+    Converts a name like "LLM Signature (2)" to a valid Python variable name like "llm_signature_2".
 
     Args:
-        node_name: A string representing the node name
+        name: A string representing the name
     """
 
-    return re.sub(r"[^a-zA-Z0-9]", "", node_name).lower().replace(" ", "_")
+    reserved_keywords = [
+        "and",
+        "as",
+        "assert",
+        "async",
+        "await",
+        "break",
+        "class",
+        "continue",
+        "def",
+        "del",
+        "elif",
+        "else",
+        "except",
+        "finally",
+        "for",
+        "from",
+        "global",
+        "if",
+        "import",
+        "in",
+        "is",
+        "lambda",
+        "nonlocal",
+        "not",
+        "or",
+        "pass",
+        "raise",
+        "return",
+        "try",
+        "while",
+        "with",
+        "yield",
+    ]
+
+    name = re.sub(r"[^a-zA-Z0-9_]", "", name.strip().replace(" ", "_")).lower()
+
+    if name in reserved_keywords:
+        name = f"{name}_"
+
+    return name
 
 
 class SerializableWithPydanticAndPredictEncoder(json.JSONEncoder):

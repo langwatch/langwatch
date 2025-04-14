@@ -70,7 +70,6 @@ def generate_embeddings_threaded(
     # Process in smaller chunks to handle errors properly
     chunk_size = 20
     for i in range(0, len(texts), chunk_size):
-        print("\n\ni", i, "\n\n")
         chunk = texts[i:i + chunk_size]
         futures = []
 

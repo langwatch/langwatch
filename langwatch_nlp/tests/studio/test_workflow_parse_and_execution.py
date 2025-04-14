@@ -1212,3 +1212,65 @@ def test_parse_workflow_with_retriever():
         )
 
     assert "Paris" in result["retriever"].contexts[0]
+
+
+@pytest.mark.integration
+def test_parse_node_with_reserved_keywords():
+    disable_dsp_caching()
+
+    workflow = copy.deepcopy(simple_workflow)
+    workflow.nodes.append(
+        SignatureNode(
+            id="and",
+            data=Signature(
+                name="And",
+                cls=None,
+                parameters=[llm_field],
+                inputs=[
+                    Field(
+                        identifier="question",
+                        type=FieldType.str,
+                        optional=None,
+                        value=None,
+                        desc=None,
+                        prefix=None,
+                        hidden=None,
+                    )
+                ],
+                outputs=[
+                    Field(
+                        identifier="pass",
+                        type=FieldType.str,
+                        optional=None,
+                        value=None,
+                        desc=None,
+                        prefix=None,
+                        hidden=None,
+                    )
+                ],
+            ),
+            type="signature",
+        )
+    )
+    workflow.edges.append(
+        Edge(
+            id="e0-1",
+            source="entry",
+            sourceHandle="outputs.question",
+            target="and",
+            targetHandle="inputs.question",
+            type="default",
+        )
+    )
+
+    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+    with materialized_component_class(
+        component_code=code, class_name=class_name
+    ) as Module:
+        instance = Module()  # type: ignore
+        result: PredictionWithEvaluationAndMetadata = instance(
+            question="What is the capital of France?",
+            gold_answer="Paris",
+        )
+
+    assert "pass_" in result["and_"]
