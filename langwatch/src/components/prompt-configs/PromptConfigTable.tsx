@@ -68,8 +68,9 @@ export function PromptConfigTable({
         borderWidth="1px"
         borderRadius="md"
         borderStyle="dashed"
+        width="full"
       >
-        <Text fontSize="lg" color="gray.600">
+        <Text fontSize="lg" color="gray.600" textAlign="center">
           No prompt configurations found. Create your first one!
         </Text>
       </Box>
