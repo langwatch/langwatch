@@ -20,7 +20,6 @@ export function VerticalFormControl({
   error?: FieldErrors<any>[0];
 }> &
   SystemStyleObject) {
-  console.log("error vvv", error);
   return (
     <Field.Root
       borderBottomWidth="1px"

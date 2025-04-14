@@ -42,14 +42,14 @@ interface UsePromptConfigFormProps {
   onSuccess?: () => void;
 }
 
-function convertConfigToFormValues(
+function convertConfigToDefaultValues(
   config: LlmPromptConfig & { versions: LlmPromptConfigVersion[] }
 ): PromptConfigFormValues {
   return {
     ...config,
     version: {
       ...(config?.versions[0]?.configData as PromptConfigFormValues["version"]),
-      commitMessage: config?.versions[0]?.commitMessage ?? "",
+      commitMessage: "",
     },
   };
 }
@@ -60,7 +60,7 @@ export const usePromptConfigForm = ({
   onSuccess,
 }: UsePromptConfigFormProps) => {
   const { project } = useOrganizationTeamProject();
-  const { data: config } = api.llmConfigs.getPromptConfigById.useQuery(
+  const { data: config, refetch } = api.llmConfigs.getPromptConfigById.useQuery(
     {
       id: configId,
       projectId: project?.id ?? "",
@@ -71,14 +71,14 @@ export const usePromptConfigForm = ({
   );
 
   const methods = useForm<PromptConfigFormValues>({
-    defaultValues: config ? convertConfigToFormValues(config) : undefined,
+    defaultValues: config ? convertConfigToDefaultValues(config) : undefined,
     resolver: zodResolver(formSchema),
   });
 
   // Once we have the config, reset the form
   useEffect(() => {
     if (config) {
-      methods.reset(convertConfigToFormValues(config));
+      methods.reset(convertConfigToDefaultValues(config));
     }
   }, [config, methods]);
 
@@ -121,6 +121,8 @@ export const usePromptConfigForm = ({
       schemaVersion: "1.0.0",
       commitMessage: data.version.commitMessage,
     });
+
+    await refetch();
   };
 
   return {

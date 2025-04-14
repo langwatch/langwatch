@@ -1,9 +1,9 @@
-import { HStack, Text, Button } from "@chakra-ui/react";
+import { HStack, Button, Spinner } from "@chakra-ui/react";
 import { FormProvider } from "react-hook-form";
 import { PromptNameField } from "./fields/PromptNameField";
 import { CommitMessageField } from "./fields/CommitMessageField";
 import { VersionHistoryListPopover } from "../VersionHistoryListPopover";
-import { SaveIcon, HistoryIcon } from "lucide-react";
+import { SaveIcon } from "lucide-react";
 import { usePromptConfigForm } from "../hooks/usePromptConfigForm";
 import { PromptConfigVersionFieldGroup } from "./fields/PromptConfigVersionFieldGroup";
 
@@ -12,13 +12,16 @@ interface PromptConfigFormProps {
 }
 
 export function PromptConfigForm({ configId }: PromptConfigFormProps) {
-  const { methods, handleSubmit, isLoading } = usePromptConfigForm({
-    configId,
-  });
+  const { methods, handleSubmit, isLoading, isSubmitting } =
+    usePromptConfigForm({
+      configId,
+    });
 
   if (isLoading) {
     return null;
   }
+
+  const formIsDirty = methods.formState.isDirty;
 
   return (
     <FormProvider {...methods}>
@@ -34,15 +37,16 @@ export function PromptConfigForm({ configId }: PromptConfigFormProps) {
           <CommitMessageField />
           <Button
             type="submit"
-            colorScheme="gray"
+            colorPalette={formIsDirty ? "orange" : "gray"}
             aria-label="Save"
             marginTop={9}
+            disabled={!formIsDirty}
             onClick={(e) => {
               e.preventDefault();
               handleSubmit();
             }}
           >
-            <SaveIcon />
+            {isSubmitting ? <Spinner /> : <SaveIcon />}
             Save Version
           </Button>
         </HStack>
