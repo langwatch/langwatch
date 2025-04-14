@@ -14,7 +14,7 @@ export const usePromptConfigVersionMutation = ({
   const { project } = useOrganizationTeamProject();
   const utils = api.useContext();
 
-  return api.llmConfigs.createPromptConfigVersion.useMutation({
+  return api.llmConfigs.versions.create.useMutation({
     onSuccess: () => {
       toaster.create({
         title: "Success",
@@ -24,8 +24,8 @@ export const usePromptConfigVersionMutation = ({
         meta: { closable: true },
       });
       void utils.llmConfigs.getPromptConfigs.invalidate();
-      void utils.llmConfigs.getPromptConfigVersions.invalidate({
-        configId,
+      void utils.llmConfigs.versions.getById.invalidate({
+        id: configId,
         projectId: project?.id ?? "",
       });
       onSuccess?.();

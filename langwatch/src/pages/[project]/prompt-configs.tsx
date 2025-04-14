@@ -27,27 +27,31 @@ export default function PromptConfigsPage() {
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
 
   // Fetch prompt configs
-  const { data: promptConfigs, isLoading: isLoadingPromptConfigs } =
-    api.llmConfigs.getPromptConfigs.useQuery(
-      {
-        projectId: project?.id ?? "",
+  const {
+    data: promptConfigs,
+    isLoading: isLoadingPromptConfigs,
+    refetch: refetchPromptConfigs,
+  } = api.llmConfigs.getPromptConfigs.useQuery(
+    {
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project?.id,
+      onError: (error) => {
+        toaster.create({
+          title: "Error loading prompt configs",
+          description: error.message,
+          type: "error",
+        });
       },
-      {
-        enabled: !!project?.id,
-        onError: (error) => {
-          toaster.create({
-            title: "Error loading prompt configs",
-            description: error.message,
-            type: "error",
-          });
-        },
-      }
-    );
+    }
+  );
 
   const createConfigMutation = api.llmConfigs.createPromptConfig.useMutation({
     onSuccess: ({ id }) => {
       void utils.llmConfigs.getPromptConfigs.invalidate();
       setSelectedConfigId(id);
+      void refetchPromptConfigs();
     },
     onError: (error) => {
       toaster.create({
@@ -93,18 +97,27 @@ export default function PromptConfigsPage() {
     }
   }, [selectedConfigId]);
 
-  console.log(promptConfigs);
-
   const defaultColumns = useMemo(() => {
     return createDefaultColumns({
-      onDelete: (config) => {
-        deleteConfigMutation.mutate({
-          id: config.id,
-          projectId: config.projectId,
-        });
+      onDelete: async (config) => {
+        try {
+          await deleteConfigMutation.mutateAsync({
+            id: config.id,
+            projectId: config.projectId,
+          });
+
+          await refetchPromptConfigs();
+        } catch (error) {
+          toaster.create({
+            title: "Error deleting prompt config",
+            description:
+              error instanceof Error ? error.message : "Unknown error",
+            type: "error",
+          });
+        }
       },
     });
-  }, [deleteConfigMutation]);
+  }, [deleteConfigMutation, refetchPromptConfigs]);
 
   return (
     <DashboardLayout>

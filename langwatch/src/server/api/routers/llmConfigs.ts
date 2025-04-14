@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { nanoid } from "nanoid";
 import { TeamRoleGroup } from "../permission";
 import { checkUserPermissionForProject } from "../permission";
 
@@ -94,6 +93,7 @@ export const llmConfigVersionsRouter = createTRPCRouter({
       const version = await ctx.prisma.llmPromptConfigVersion.findFirst({
         where: {
           id: input.id,
+          projectId: input.projectId,
           config: {
             projectId: input.projectId,
           },
@@ -131,52 +131,21 @@ export const llmConfigVersionsRouter = createTRPCRouter({
       const { configData, schemaVersion, commitMessage, configId, projectId } =
         input;
 
-      // First, verify the config exists within the project
-      const config = await ctx.prisma.llmPromptConfig.findUnique({
-        where: { id: configId, projectId },
-      });
-
-      if (!config) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Prompt config not found.",
-        });
-      }
-
-      // Find the maximum version to determine next version number
-      const maxVersionResult =
-        await ctx.prisma.llmPromptConfigVersion.findFirst({
-          where: { configId },
-          orderBy: { version: "desc" },
-          select: { version: true },
-        });
-
-      // Parse the current max version and increment
-      let nextVersion = 1;
-      if (maxVersionResult) {
-        // Assuming versions are numeric
-        const currentMaxVersion = parseInt(maxVersionResult.version, 10);
-        if (!isNaN(currentMaxVersion)) {
-          nextVersion = currentMaxVersion + 1;
-        }
-      }
-
       // Create the new version
       const version = await ctx.prisma.llmPromptConfigVersion.create({
         data: {
-          id: `llmver_${nanoid()}`,
-          version: nextVersion.toString(),
           commitMessage,
           authorId: ctx.session?.user?.id || null,
           configId,
           configData,
           schemaVersion,
+          projectId,
         },
       });
 
       // Update the parent config's updatedAt timestamp
       await ctx.prisma.llmPromptConfig.update({
-        where: { id: configId },
+        where: { id: configId, projectId },
         data: { updatedAt: new Date() },
       });
 
@@ -204,7 +173,7 @@ export const llmConfigVersionsRouter = createTRPCRouter({
 
       // Get the latest version
       const latestVersion = await ctx.prisma.llmPromptConfigVersion.findFirst({
-        where: { configId: input.configId },
+        where: { configId: input.configId, projectId: input.projectId },
         orderBy: { createdAt: "desc" },
         include: {
           author: {
@@ -265,6 +234,14 @@ export const llmConfigsRouter = createTRPCRouter({
           id: input.id,
           projectId: input.projectId,
         },
+        include: {
+          versions: {
+            orderBy: {
+              createdAt: "desc",
+            },
+            take: 1,
+          },
+        },
       });
 
       if (!config) {
@@ -274,30 +251,7 @@ export const llmConfigsRouter = createTRPCRouter({
         });
       }
 
-      // Get the latest version
-      const latestVersion = await ctx.prisma.llmPromptConfigVersion.findFirst({
-        where: {
-          configId: config.id,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-        include: {
-          author: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-        },
-      });
-
-      return {
-        ...config,
-        latestVersion,
-      };
+      return config;
     }),
 
   /**
@@ -357,7 +311,7 @@ export const llmConfigsRouter = createTRPCRouter({
 
       // Update only the parent config metadata (name)
       const updatedConfig = await ctx.prisma.llmPromptConfig.update({
-        where: { id: input.id },
+        where: { id: input.id, projectId: input.projectId },
         data: { name: input.name },
       });
 
@@ -371,21 +325,9 @@ export const llmConfigsRouter = createTRPCRouter({
     .input(idSchema.merge(projectIdSchema))
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      // First, verify the config exists within the project
-      const existingConfig = await ctx.prisma.llmPromptConfig.findUnique({
-        where: { id: input.id, projectId: input.projectId },
-      });
-
-      if (!existingConfig) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Prompt config not found.",
-        });
-      }
-
       // Delete the parent config (all versions will be cascade deleted)
       await ctx.prisma.llmPromptConfig.delete({
-        where: { id: input.id },
+        where: { id: input.id, projectId: input.projectId },
       });
 
       return { success: true };

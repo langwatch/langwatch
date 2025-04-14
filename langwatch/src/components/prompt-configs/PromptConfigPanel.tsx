@@ -19,11 +19,11 @@ export function PromptConfigPanel({
   onClose,
   configId,
 }: PromptConfigPanelProps) {
-  const { methods, handleSubmit } = usePromptConfigForm({
+  const { methods, handleSubmit, isLoading } = usePromptConfigForm({
     configId,
   });
 
-  if (!isOpen) {
+  if (!isOpen || isLoading) {
     return null;
   }
 

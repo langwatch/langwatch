@@ -5,12 +5,15 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { toaster } from "~/components/ui/toaster";
 import { usePromptConfigVersionMutation } from "./usePromptConfigVersionMutation";
 import { api } from "~/utils/api";
+import { useEffect } from "react";
+import type { LlmPromptConfig, LlmPromptConfigVersion } from "@prisma/client";
 
-// Types and Schemas ===========================================
-
-export const promptConfigSchema = z.object({
+const promptConfigSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  description: z.string().optional(),
+});
+
+const versionSchema = z.object({
+  commitMessage: z.string().min(1, "Commit message is required"),
   prompt: z.string().default("You are a helpful assistant"),
   model: z.string().default("openai/gpt4-o-mini"),
   inputs: z.array(
@@ -27,44 +30,28 @@ export const promptConfigSchema = z.object({
   ),
 });
 
-export const versionSchema = z.object({
-  commitMessage: z.string().min(1, "Commit message is required"),
-  schemaVersion: z.string().min(1, "Schema version is required"),
-});
-
-export const formSchema = promptConfigSchema.extend({
+const formSchema = promptConfigSchema.extend({
   version: versionSchema,
 });
 
 export type PromptConfigFormValues = z.infer<typeof formSchema>;
 
-// Default Values ============================================
-
-export const DEFAULT_CONFIG = {
-  name: "",
-  description: "",
-  prompt: "You are a helpful assistant",
-  model: "openai/gpt4-o-mini",
-  inputs: [{ identifier: "input", type: "str" }],
-  outputs: [{ identifier: "output", type: "str" }],
-};
-
-export const DEFAULT_VERSION = {
-  commitMessage: "",
-  schemaVersion: "1.0",
-};
-
-export const DEFAULT_VALUES = {
-  ...DEFAULT_CONFIG,
-  version: DEFAULT_VERSION,
-};
-
-// Form Hook ================================================
-
 interface UsePromptConfigFormProps {
   configId: string;
   currentName?: string;
   onSuccess?: () => void;
+}
+
+function convertConfigToFormValues(
+  config: LlmPromptConfig & { versions: LlmPromptConfigVersion[] }
+): PromptConfigFormValues {
+  return {
+    ...config,
+    version: {
+      ...(config?.versions[0]?.configData as PromptConfigFormValues["version"]),
+      commitMessage: config?.versions[0]?.commitMessage ?? "",
+    },
+  };
 }
 
 export const usePromptConfigForm = ({
@@ -73,14 +60,28 @@ export const usePromptConfigForm = ({
   onSuccess,
 }: UsePromptConfigFormProps) => {
   const { project } = useOrganizationTeamProject();
+  const { data: config } = api.llmConfigs.getPromptConfigById.useQuery(
+    {
+      id: configId,
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project?.id,
+    }
+  );
 
   const methods = useForm<PromptConfigFormValues>({
-    defaultValues: {
-      ...DEFAULT_VALUES,
-      name: currentName ?? "",
-    },
+    defaultValues: config ? convertConfigToFormValues(config) : undefined,
     resolver: zodResolver(formSchema),
   });
+
+  // Once we have the config, reset the form
+  useEffect(() => {
+    if (config) {
+      console.log("resetting form", convertConfigToFormValues(config));
+      methods.reset(convertConfigToFormValues(config));
+    }
+  }, [config, methods]);
 
   const updateConfig = api.llmConfigs.updatePromptConfig.useMutation();
   const createVersion = usePromptConfigVersionMutation({ configId, onSuccess });
@@ -108,27 +109,32 @@ export const usePromptConfigForm = ({
 
     const configData = {
       name: data.name,
-      description: data.description,
-      prompt: data.prompt,
-      model: data.model,
-      inputs: data.inputs,
-      outputs: data.outputs,
+      prompt: data.version.prompt,
+      model: data.version.model,
+      inputs: data.version.inputs,
+      outputs: data.version.outputs,
     };
 
     await createVersion.mutateAsync({
       projectId: project.id,
       configId,
       configData,
-      schemaVersion: data.version.schemaVersion,
+      schemaVersion: "1.0.0",
       commitMessage: data.version.commitMessage,
     });
   };
 
+  console.log({ config });
+
   return {
     methods,
     handleSubmit: () => {
-      void methods.handleSubmit(handleSubmit)();
+      console.log("handleSubmit outside", methods.getValues());
+      void methods.handleSubmit(handleSubmit, (error) => {
+        console.error("handleSubmit error", error);
+      })();
     },
     isSubmitting: createVersion.isLoading || updateConfig.isLoading,
+    isLoading: config === undefined,
   };
 };

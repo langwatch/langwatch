@@ -14,7 +14,7 @@ export type PromptConfigColumn = {
 export const createDefaultColumns = ({
   onDelete,
 }: {
-  onDelete: (config: LlmPromptConfig) => void;
+  onDelete: (config: LlmPromptConfig) => Promise<void>;
 }): PromptConfigColumn[] => [
   {
     key: "name",
@@ -33,7 +33,7 @@ export const createDefaultColumns = ({
         colorScheme="red"
         onClick={(e) => {
           e.stopPropagation();
-          onDelete(config);
+          void onDelete(config);
         }}
       >
         <Trash size={16} />

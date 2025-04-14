@@ -1,9 +1,10 @@
 import { Input } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
 import { VerticalFormControl } from "../../../VerticalFormControl";
+import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
 
-export function ModelSelectField({ id = "model" }: { id?: string } = {}) {
-  const { register, formState } = useFormContext();
+export function ModelSelectField() {
+  const { register, formState } = useFormContext<PromptConfigFormValues>();
   const { errors } = formState;
 
   return (
@@ -13,7 +14,7 @@ export function ModelSelectField({ id = "model" }: { id?: string } = {}) {
       helper={errors.model?.message?.toString()}
       error={errors.model}
     >
-      <Input id={id} placeholder="openai/gpt4-o-mini" {...register("model")} />
+      <Input placeholder="openai/gpt4-o-mini" {...register("model")} />
     </VerticalFormControl>
   );
 }

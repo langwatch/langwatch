@@ -12,17 +12,14 @@ import { useFieldArray, useFormContext } from "react-hook-form";
 import { Plus } from "lucide-react";
 import { Trash2 } from "react-feather";
 import { TypeSelector } from "../ui/TypeSelector";
-import {
-  type EnhancedFieldArrayWithId,
-  type PromptConfigContentFormValues,
-} from "../types";
 import { ModelSelectField } from "./fields/ModelSelectField";
+import type { PromptConfigFormValues } from "../hooks/usePromptConfigForm";
 
 /**
  * Dumb Form Component for editing the config content
  */
 export function PromptConfigVersionFieldGroup() {
-  const form = useFormContext<PromptConfigContentFormValues>();
+  const form = useFormContext<PromptConfigFormValues>();
   const { register, formState } = form;
   const { errors } = formState;
 
@@ -30,15 +27,15 @@ export function PromptConfigVersionFieldGroup() {
     <VStack align="stretch" gap={6}>
       <ModelSelectField />
 
-      <Field.Root invalid={!!errors.prompt}>
+      <Field.Root invalid={!!errors.version?.prompt}>
         <Field.Label>Prompt</Field.Label>
         <Textarea
-          {...register("prompt")}
+          {...register("version.prompt")}
           placeholder="You are a helpful assistant"
           rows={4}
         />
-        {errors.prompt && (
-          <Field.ErrorText>{errors.prompt.message}</Field.ErrorText>
+        {errors.version?.prompt && (
+          <Field.ErrorText>{errors.version?.prompt.message}</Field.ErrorText>
         )}
       </Field.Root>
 
@@ -62,12 +59,12 @@ function ConfigFieldGroup({
   readOnly?: boolean;
 }) {
   const { control, formState, setValue, getValues } =
-    useFormContext<PromptConfigContentFormValues>();
+    useFormContext<PromptConfigFormValues>();
   const { errors } = formState;
 
   const { fields, append, remove } = useFieldArray({
     control,
-    name,
+    name: `version.${name}`,
   });
 
   const handleAddField = () => {
@@ -79,7 +76,7 @@ function ConfigFieldGroup({
   };
 
   const validateIdentifier = (index: number, value: string) => {
-    const currentFields = getValues(name);
+    const currentFields = getValues(`version.${name}`);
 
     if (Array.isArray(currentFields)) {
       const identifierCount = currentFields.filter(
@@ -87,7 +84,7 @@ function ConfigFieldGroup({
       ).length;
 
       if (identifierCount > 0) {
-        setValue(`${name}.${index}.identifier` as any, value, {
+        setValue(`version.${name}.${index}.identifier` as any, value, {
           shouldValidate: true,
         });
         return "Duplicate identifier";
@@ -108,13 +105,13 @@ function ConfigFieldGroup({
       {fields.map((field, index) => (
         <FieldRow
           key={field.id}
-          field={field as unknown as EnhancedFieldArrayWithId}
+          field={field}
           index={index}
           name={name}
           onChange={handleSetValue}
           onRemove={() => remove(index)}
           readOnly={readOnly}
-          error={(errors[name] as any)?.[index]?.identifier}
+          // error={errors[`version.${name}`]?.[index]?.identifier}
           validateIdentifier={(value) => validateIdentifier(index, value)}
         />
       ))}
@@ -162,7 +159,7 @@ function FieldRow({
   error,
   validateIdentifier,
 }: {
-  field: EnhancedFieldArrayWithId;
+  field: { id: string; identifier: string; type: string };
   index: number;
   name: "inputs" | "outputs";
   onChange: (indexOrPath: string, value: any) => void;
