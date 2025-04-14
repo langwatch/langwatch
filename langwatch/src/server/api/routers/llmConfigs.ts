@@ -63,6 +63,7 @@ export const llmConfigVersionsRouter = createTRPCRouter({
       const versions = await ctx.prisma.llmPromptConfigVersion.findMany({
         where: {
           configId: input.configId,
+          projectId: input.projectId,
         },
         orderBy: {
           createdAt: "desc",

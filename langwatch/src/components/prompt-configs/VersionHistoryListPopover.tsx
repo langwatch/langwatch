@@ -17,36 +17,62 @@ import { HistoryIcon } from "../icons/History";
 import { SmallLabel } from "../SmallLabel";
 import { Tooltip } from "../ui/tooltip";
 import { Popover } from "../ui/popover";
+import type { LlmPromptConfigVersion, User } from "@prisma/client";
+import { api } from "~/utils/api";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
-const DUMMY_VERSIONS_DATA = [
-  {
-    id: "1",
-    version: "1",
-    commitMessage: "My first version",
-    createdAt: new Date("2021-01-01"),
-    isCurrentVersion: true,
-    author: {
-      name: "John Doe",
+// Type for simplified User from API response
+type AuthorUser = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  image: string | null;
+};
+
+interface VersionHistoryListPopoverProps {
+  configId: string;
+  children: React.ReactNode;
+}
+
+export function VersionHistoryListPopover({
+  configId,
+  children,
+}: VersionHistoryListPopoverProps) {
+  const { open, onClose, setOpen } = useDisclosure();
+  const { project } = useOrganizationTeamProject();
+  const {
+    data: versions,
+    isLoading,
+    refetch,
+  } = api.llmConfigs.versions.getVersions.useQuery(
+    {
+      configId,
+      projectId: project?.id ?? "",
     },
-  },
-];
+    {
+      enabled: !!project?.id,
+    }
+  );
 
-export function VersionHistoryListPopover() {
-  const { open, onToggle, onClose, setOpen } = useDisclosure();
+  console.log({ versions, isLoading, configId, projectId: project?.id });
+
+  const handleTriggerClick = () => {
+    void refetch();
+  };
 
   return (
     <Popover.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
-      <Popover.Trigger asChild>
-        <Button variant="ghost" color="gray.500" size="xs" onClick={onToggle}>
-          <HistoryIcon size={16} />
-        </Button>
-      </Popover.Trigger>
+      <VersionHistoryListPopoverTrigger onClick={handleTriggerClick} />
       {open && (
         <HistoryPopover
           onClose={onClose}
-          onRestore={() => {}}
-          versions={DUMMY_VERSIONS_DATA}
-          onSubmit={() => {}}
+          onRestore={() => {
+            // TODO: Implement restore
+          }}
+          versions={versions ?? []}
+          onSubmit={() => {
+            // TODO: Implement submit
+          }}
           isLoading={false}
           nextVersion="1"
           canSaveNewVersion={false}
@@ -54,6 +80,33 @@ export function VersionHistoryListPopover() {
       )}
     </Popover.Root>
   );
+}
+
+export function VersionHistoryListPopoverTrigger({
+  children,
+  onClick,
+}: {
+  children?: React.ReactNode;
+  onClick?: () => void;
+}) {
+  return (
+    <Popover.Trigger asChild onClick={onClick}>
+      <Button variant="ghost" color="gray.500" size="xs">
+        <HistoryIcon size={16} />
+        <Text>Prompt Version History</Text>
+      </Button>
+    </Popover.Trigger>
+  );
+}
+
+interface HistoryPopoverProps {
+  onClose: () => void;
+  onRestore: (versionId: string) => void;
+  versions: (LlmPromptConfigVersion & { author: AuthorUser | null })[];
+  onSubmit: (data: { version: string; commitMessage: string }) => void;
+  isLoading: boolean;
+  nextVersion: string;
+  canSaveNewVersion: boolean;
 }
 
 function HistoryPopover({
@@ -64,65 +117,13 @@ function HistoryPopover({
   isLoading,
   nextVersion,
   canSaveNewVersion,
-}: {
-  onClose: () => void;
-  onRestore: (versionId: string) => void;
-  nextVersion: string;
-  canSaveNewVersion: boolean;
-  versions: {
-    id: string;
-    version: string;
-    commitMessage: string | null;
-    createdAt: Date;
-    isCurrentVersion: boolean;
-    author: {
-      name: string;
-    };
-  }[];
-  onSubmit: (data: { version: string; commitMessage: string }) => void;
-  isLoading: boolean;
-}) {
-  const form = useForm<{ version: string; commitMessage: string }>({
-    defaultValues: {
-      version: "",
-      commitMessage: "",
-    },
-  });
-
+}: HistoryPopoverProps) {
   return (
     <Popover.Content width="500px">
       <Popover.Arrow />
       <Popover.Header fontWeight={600}>Workflow Versions</Popover.Header>
       <Popover.CloseTrigger />
       <Popover.Body padding={0}>
-        <form
-          // eslint-disable-next-line @typescript-eslint/no-misused-promises
-          onSubmit={form.handleSubmit(onSubmit)}
-          style={{ width: "100%", padding: "20px" }}
-        >
-          <VStack align="start" width="full">
-            <NewVersionFields
-              form={form}
-              nextVersion={nextVersion}
-              canSaveNewVersion={canSaveNewVersion}
-            />
-            <Tooltip
-              content={!canSaveNewVersion ? "No changes to save" : ""}
-              positioning={{ placement: "top" }}
-            >
-              <Button
-                type="submit"
-                alignSelf="end"
-                colorPalette="orange"
-                size="sm"
-                loading={isLoading}
-              >
-                Save new version
-              </Button>
-            </Tooltip>
-          </VStack>
-        </form>
-        <Separator />
         <VStack
           align="start"
           width="full"
@@ -133,12 +134,13 @@ function HistoryPopover({
           <Text fontWeight={600} fontSize="16px" paddingTop={2}>
             Previous Versions
           </Text>
-          {versions.map((version) => (
+          {versions.map((version, index) => (
             <VersionHistoryItem
               key={version.id}
               version={version}
               onRestore={onRestore}
               isLoading={isLoading}
+              isCurrent={index === 0}
             />
           ))}
         </VStack>
@@ -151,19 +153,12 @@ export function VersionHistoryItem({
   version,
   onRestore,
   isLoading,
+  isCurrent,
 }: {
-  version: {
-    id: string;
-    version: string;
-    commitMessage: string | null;
-    createdAt: Date;
-    isCurrentVersion: boolean;
-    author: {
-      name: string;
-    };
-  };
+  version: LlmPromptConfigVersion & { author: AuthorUser | null };
   onRestore: (versionId: string) => void;
   isLoading: boolean;
+  isCurrent: boolean;
 }) {
   return (
     <VStack key={version.id} width="full" align="start" paddingBottom={2}>
@@ -175,7 +170,7 @@ export function VersionHistoryItem({
             <Text fontWeight={600} fontSize="13px" lineClamp={1}>
               {version.commitMessage}
             </Text>
-            {version.isCurrentVersion && (
+            {isCurrent && (
               <Tag.Root colorPalette="green" size="sm" paddingX={2}>
                 <Tag.Label>current</Tag.Label>
               </Tag.Root>
@@ -205,7 +200,7 @@ export function VersionHistoryItem({
           </Tooltip> */}
           </HStack>
         </VStack>
-        {!version.isCurrentVersion && (
+        {!isCurrent && (
           <Tooltip
             content="Restore this version"
             positioning={{ placement: "top" }}
@@ -229,11 +224,11 @@ export const VersionBox = ({
   children,
   ...props
 }: {
-  version?: { autoSaved?: boolean; version: string };
+  version?: LlmPromptConfigVersion;
 } & BoxProps) => {
   return (
     <Box
-      backgroundColor={version?.autoSaved ? "orange.50" : "orange.100"}
+      backgroundColor={"orange.100"}
       paddingY={3}
       paddingX={2}
       borderRadius={4}
@@ -246,7 +241,7 @@ export const VersionBox = ({
       height="44px"
       {...props}
     >
-      {version?.autoSaved ? " " : version?.version}
+      {version?.version}
       {children}
     </Box>
   );
