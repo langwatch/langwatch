@@ -121,31 +121,42 @@ function HistoryPopover({
   return (
     <Popover.Content width="500px">
       <Popover.Arrow />
-      <Popover.Header fontWeight={600}>Workflow Versions</Popover.Header>
+      <Popover.Header fontWeight={600} fontSize="16px">
+        Prompt Version History
+      </Popover.Header>
       <Popover.CloseTrigger />
       <Popover.Body padding={0}>
-        <VStack
-          align="start"
-          width="full"
-          padding={5}
-          maxHeight="350px"
-          overflowY="auto"
-        >
-          <Text fontWeight={600} fontSize="16px" paddingTop={2}>
-            Previous Versions
-          </Text>
-          {versions.map((version, index) => (
-            <VersionHistoryItem
-              key={version.id}
-              version={version}
-              onRestore={onRestore}
-              isLoading={isLoading}
-              isCurrent={index === 0}
-            />
-          ))}
-        </VStack>
+        <VersionHistory versions={versions} />
       </Popover.Body>
     </Popover.Content>
+  );
+}
+
+function VersionHistory({
+  versions,
+}: {
+  versions: (LlmPromptConfigVersion & { author: AuthorUser | null })[];
+}) {
+  return (
+    <VStack
+      align="start"
+      width="full"
+      padding={5}
+      maxHeight="350px"
+      overflowY="auto"
+    >
+      {versions.map((version, index) => (
+        <VersionHistoryItem
+          key={version.id}
+          version={version}
+          onRestore={() => {
+            // TODO: Implement restore
+          }}
+          isCurrent={index === 0}
+          isLoading={false}
+        />
+      ))}
+    </VStack>
   );
 }
 
@@ -244,82 +255,5 @@ export const VersionBox = ({
       {version?.version}
       {children}
     </Box>
-  );
-};
-
-export function NewVersionFields({
-  form,
-  nextVersion,
-  canSaveNewVersion,
-}: {
-  form: UseFormReturn<{ version: string; commitMessage: string }>;
-  nextVersion: string;
-  canSaveNewVersion: boolean;
-}) {
-  return (
-    <HStack width="full">
-      <Field.Root width="fit-content" invalid={!!form.formState.errors.version}>
-        <VStack align="start">
-          <Field.Label as={SmallLabel} color="gray.600">
-            Version
-          </Field.Label>
-          <Text>{nextVersion}</Text>
-        </VStack>
-      </Field.Root>
-      <Field.Root width="full" invalid={!!form.formState.errors.commitMessage}>
-        <VStack align="start" width="full">
-          <Field.Label as={SmallLabel} color="gray.600">
-            Description
-          </Field.Label>
-          <Input
-            {...form.register("commitMessage", {
-              required: true,
-            })}
-            placeholder="What changes have you made?"
-            width="full"
-            disabled={!canSaveNewVersion}
-          />
-        </VStack>
-      </Field.Root>
-    </HStack>
-  );
-}
-
-export const VersionToBeUsed = ({
-  form,
-  nextVersion,
-  canSaveNewVersion,
-  versionToBeEvaluated,
-}: {
-  form: UseFormReturn<{ version: string; commitMessage: string }>;
-  nextVersion: string;
-  canSaveNewVersion: boolean;
-  versionToBeEvaluated: {
-    id: string | undefined;
-    version: string | undefined;
-    commitMessage: string | undefined;
-  };
-}) => {
-  if (canSaveNewVersion) {
-    return (
-      <NewVersionFields
-        form={form}
-        nextVersion={nextVersion}
-        canSaveNewVersion={canSaveNewVersion}
-      />
-    );
-  }
-
-  return (
-    <HStack width="full">
-      <VStack align="start">
-        <SmallLabel color="gray.600">Version</SmallLabel>
-        <Text width="74px">{versionToBeEvaluated.version}</Text>
-      </VStack>
-      <VStack align="start" width="full">
-        <SmallLabel color="gray.600">Description</SmallLabel>
-        <Text>{versionToBeEvaluated.commitMessage}</Text>
-      </VStack>
-    </HStack>
   );
 };
