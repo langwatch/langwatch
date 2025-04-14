@@ -1,5 +1,4 @@
 import {
-  Box,
   Button,
   Field,
   HStack,
@@ -9,91 +8,44 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useFieldArray, useForm, type UseFormReturn } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useFieldArray, useFormContext } from "react-hook-form";
 import { Plus } from "lucide-react";
 import { Trash2 } from "react-feather";
 import { TypeSelector } from "../ui/TypeSelector";
 import {
   type EnhancedFieldArrayWithId,
   type PromptConfigContentFormValues,
-  promptConfigContentSchema,
 } from "../types";
+import { ModelSelectField } from "./fields/ModelSelectField";
 
 /**
  * Dumb Form Component for editing the config content
  */
-export function PromptConfigVersionForm({
-  initialValues,
-  onSubmit,
-  readOnly = false,
-}: {
-  initialValues: Partial<PromptConfigContentFormValues>;
-  onSubmit: (values: PromptConfigContentFormValues) => void;
-  isSubmitting: boolean;
-  submitLabel?: string;
-  readOnly?: boolean;
-}) {
-  // Form setup with schema validation
-  const form = useForm<PromptConfigContentFormValues>({
-    resolver: zodResolver(promptConfigContentSchema),
-    defaultValues: {
-      name: initialValues.name || "",
-      description: initialValues.description || "",
-      prompt: initialValues.prompt || "You are a helpful assistant",
-      model: initialValues.model || "openai/gpt4-o-mini",
-      inputs: initialValues.inputs || [{ identifier: "input", type: "str" }],
-      outputs: initialValues.outputs || [{ identifier: "output", type: "str" }],
-    },
-  });
-
-  const { handleSubmit, register, formState } = form;
+export function PromptConfigVersionFieldGroup() {
+  const form = useFormContext<PromptConfigContentFormValues>();
+  const { register, formState } = form;
   const { errors } = formState;
 
   return (
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <VStack align="stretch" gap={6}>
-        <Field.Root invalid={!!errors.model}>
-          <Field.Label>Model</Field.Label>
-          <Input
-            {...register("model")}
-            placeholder="openai/gpt4-o-mini"
-            readOnly={readOnly}
-          />
-          {errors.model && (
-            <Field.ErrorText>{errors.model.message}</Field.ErrorText>
-          )}
-        </Field.Root>
+    <VStack align="stretch" gap={6}>
+      <ModelSelectField />
 
-        <Field.Root invalid={!!errors.prompt}>
-          <Field.Label>Prompt</Field.Label>
-          <Textarea
-            {...register("prompt")}
-            placeholder="You are a helpful assistant"
-            rows={4}
-            readOnly={readOnly}
-          />
-          {errors.prompt && (
-            <Field.ErrorText>{errors.prompt.message}</Field.ErrorText>
-          )}
-        </Field.Root>
-
-        <ConfigFieldGroup
-          title="Inputs"
-          name="inputs"
-          form={form}
-          readOnly={readOnly}
+      <Field.Root invalid={!!errors.prompt}>
+        <Field.Label>Prompt</Field.Label>
+        <Textarea
+          {...register("prompt")}
+          placeholder="You are a helpful assistant"
+          rows={4}
         />
+        {errors.prompt && (
+          <Field.ErrorText>{errors.prompt.message}</Field.ErrorText>
+        )}
+      </Field.Root>
 
-        <ConfigFieldGroup
-          title="Outputs"
-          name="outputs"
-          form={form}
-          readOnly={readOnly}
-        />
-      </VStack>
-    </form>
+      <ConfigFieldGroup title="Inputs" name="inputs" />
+
+      <ConfigFieldGroup title="Outputs" name="outputs" />
+    </VStack>
   );
 }
 
@@ -103,15 +55,14 @@ export function PromptConfigVersionForm({
 function ConfigFieldGroup({
   title,
   name,
-  form,
   readOnly,
 }: {
   title: string;
   name: "inputs" | "outputs";
-  form: UseFormReturn<PromptConfigContentFormValues>;
   readOnly?: boolean;
 }) {
-  const { control, formState, setValue, getValues } = form;
+  const { control, formState, setValue, getValues } =
+    useFormContext<PromptConfigContentFormValues>();
   const { errors } = formState;
 
   const { fields, append, remove } = useFieldArray({

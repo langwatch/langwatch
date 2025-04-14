@@ -1,23 +1,28 @@
-import { Box, HStack, Separator, Text } from "@chakra-ui/react";
-import {
-  VersionHistoryItem,
-  VersionHistoryListPopover,
-} from "./VersionHistoryListPopover";
+import { Box, HStack, Text, Button } from "@chakra-ui/react";
 import { PanelHeader } from "./ui/PanelHeader";
-import { PromptForm } from "./forms/PromptForm";
-import { PromptConfigVersionForm } from "./forms/PromptConfigVersionForm";
+import { PromptConfigVersionFieldGroup } from "./forms/PromptConfigVersionFieldGroup";
+import { FormProvider } from "react-hook-form";
+import { PromptNameField } from "./forms/fields/PromptNameField";
+import { CommitMessageField } from "./forms/fields/CommitMessageField";
+import { VersionHistoryListPopover } from "./VersionHistoryListPopover";
+import { SaveIcon } from "lucide-react";
+import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
 
 interface PromptConfigPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  config: any;
+  configId: string;
 }
 
 export function PromptConfigPanel({
   isOpen,
   onClose,
-  config,
+  configId,
 }: PromptConfigPanelProps) {
+  const { methods, handleSubmit } = usePromptConfigForm({
+    configId,
+  });
+
   if (!isOpen) {
     return null;
   }
@@ -40,19 +45,37 @@ export function PromptConfigPanel({
       minWidth="600px"
     >
       <PanelHeader title="Prompt Configuration" onClose={onClose} />
-      <PromptForm
-        initialValues={config}
-        onSubmit={(values) => {
-          console.log(values);
-        }}
-      />
-      <PromptConfigVersionForm
-        initialValues={config}
-        onSubmit={(values) => {
-          console.log(values);
-        }}
-        isSubmitting={false}
-      />
+      <FormProvider {...methods}>
+        <form>
+          <PromptNameField />
+          <PromptConfigVersionFieldGroup />
+          <HStack
+            marginTop={4}
+            marginBottom={6}
+            justify="space-between"
+            width="full"
+          >
+            <CommitMessageField />
+            <Button
+              type="submit"
+              colorScheme="gray"
+              aria-label="Save"
+              marginTop={9}
+              onClick={(e) => {
+                e.preventDefault();
+                handleSubmit();
+              }}
+            >
+              <SaveIcon />
+              Save Version
+            </Button>
+          </HStack>
+          <HStack>
+            <VersionHistoryListPopover />
+            <Text>Prompt Version History</Text>
+          </HStack>
+        </form>
+      </FormProvider>
     </Box>
   );
 }

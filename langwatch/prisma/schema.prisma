@@ -737,6 +737,9 @@ model LlmPromptConfigVersion {
 
   createdAt     DateTime        @default(now()) // Used to determine the latest version
 
+  // Required for multi-tenancy
+  projectId String
+
   @@unique([configId, version]) // Each version number must be unique per config
   @@index([configId])
   @@index([authorId])

@@ -1,5 +1,6 @@
 import { Box, Field, VStack, type SystemStyleObject } from "@chakra-ui/react";
 import { type PropsWithChildren, type ReactNode } from "react";
+import type { FieldErrors } from "react-hook-form";
 
 export function VerticalFormControl({
   label,
@@ -8,6 +9,7 @@ export function VerticalFormControl({
   children,
   inputWidth,
   onClick,
+  error,
   ...props
 }: PropsWithChildren<{
   label: string | ReactNode;
@@ -15,6 +17,7 @@ export function VerticalFormControl({
   invalid?: boolean;
   inputWidth?: string;
   onClick?: () => void;
+  error?: FieldErrors<any>[0];
 }> &
   SystemStyleObject) {
   return (
@@ -35,6 +38,9 @@ export function VerticalFormControl({
         </VStack>
         <Box width="full" minWidth={inputWidth ?? "full"}>
           {children}
+          {error && (
+            <Field.ErrorText>{error.message?.toString()}</Field.ErrorText>
+          )}
         </Box>
       </VStack>
     </Field.Root>
