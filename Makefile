@@ -12,3 +12,7 @@ python-build:
 
 python-install:
 	pip install --no-cache-dir --force-reinstall dist/langwatch_server-*-py3-none-any.whl
+
+start/postgres:
+	@echo "Starting Postgres..."
+	@docker compose up -d postgres
