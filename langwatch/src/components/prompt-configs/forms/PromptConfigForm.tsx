@@ -1,7 +1,6 @@
 import { HStack, Button, Spinner, Text, Input } from "@chakra-ui/react";
 import { FormProvider } from "react-hook-form";
 import { PromptNameField } from "./fields/PromptNameField";
-import { CommitMessageField } from "./fields/CommitMessageField";
 import { VersionHistoryListPopover } from "../VersionHistoryListPopover";
 import { SaveIcon } from "lucide-react";
 import { usePromptConfigForm } from "../hooks/usePromptConfigForm";

@@ -34,7 +34,6 @@ const versionSchema = z.object({
       columns: z
         .array(
           z.object({
-            id: z.string(),
             name: z.string(),
             type: z.custom<DatasetColumnType>(),
           })
@@ -42,10 +41,11 @@ const versionSchema = z.object({
         .default([]),
       rows: z
         .array(
-          z.object({
-            id: z.string().min(1),
-            values: z.record(z.string(), z.any()),
-          })
+          z
+            .object({
+              id: z.string().min(1),
+            })
+            .catchall(z.any())
         )
         .default([]),
     })
@@ -129,11 +129,8 @@ export const usePromptConfigForm = ({
     }
 
     const configData = {
+      ...data.version,
       name: data.name,
-      prompt: data.version.prompt,
-      model: data.version.model,
-      inputs: data.version.inputs,
-      outputs: data.version.outputs,
     };
 
     await createVersion.mutateAsync({

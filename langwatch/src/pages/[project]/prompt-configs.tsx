@@ -12,6 +12,7 @@ import { PromptConfigPanel } from "~/components/prompt-configs/PromptConfigPanel
 import { toaster } from "~/components/ui/toaster";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { type LlmPromptConfig } from "@prisma/client";
+import type { DatasetColumns } from "~/server/datasets/types";
 
 const DEFAULT_NEW_CONFIG_VERSION = {
   name: "New Prompt Config",
@@ -23,9 +24,9 @@ const DEFAULT_NEW_CONFIG_VERSION = {
     outputs: [{ identifier: "output", type: "str" }],
     demonstrations: {
       columns: [
-        { id: "input", name: "input", type: "str" },
-        { id: "output", name: "output", type: "str" },
-      ],
+        { name: "input", type: "string" },
+        { name: "output", type: "string" },
+      ] as DatasetColumns,
       rows: [],
     },
   },

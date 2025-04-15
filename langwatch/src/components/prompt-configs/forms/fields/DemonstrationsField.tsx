@@ -1,21 +1,11 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Spacer,
-  Text,
-  useDisclosure,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, HStack, Spacer, Text, useDisclosure } from "@chakra-ui/react";
 import { Edit2, Info } from "react-feather";
 import { useFormContext, Controller } from "react-hook-form";
 import { DatasetPreview } from "../../../datasets/DatasetPreview";
 import { Tooltip } from "../../../ui/tooltip";
 import { VerticalFormControl } from "../../../VerticalFormControl";
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
-import { useGetDatasetData } from "../../../../optimization_studio/hooks/useGetDatasetData";
-import { DemonstrationsModal } from "../../../../optimization_studio/components/DemonstrationsModal";
-import type { DatasetColumnType } from "~/server/datasets/types";
+import { DemonstrationsModal } from "../../modals/DemonstrationsModal";
 
 /**
  * Field for managing demonstrations (few-shot examples) in prompt configurations
@@ -28,7 +18,6 @@ export function DemonstrationsField() {
     useFormContext<PromptConfigFormValues>();
   const { errors } = formState;
   const { open, onOpen, onClose } = useDisclosure();
-
   const demonstrations = watch("version.demonstrations");
   const total = demonstrations?.rows?.length;
 
@@ -44,15 +33,19 @@ export function DemonstrationsField() {
           error={errors.version?.demonstrations}
         >
           <DatasetPreview
-            rows={demonstrations.rows}
-            columns={demonstrations.columns}
-            minHeight={`${36 + 29 * (demonstrations.rows?.length ?? 0)}px`}
+            rows={demonstrations?.rows ?? []}
+            columns={demonstrations?.columns ?? []}
+            minHeight={`${36 + 29 * (demonstrations?.rows?.length ?? 0)}px`}
           />
-          {/* <DemonstrationsModal
-              open={open}
-              onClose={onClose}
-              onChange={field.onChange}
-            /> */}
+          <DemonstrationsModal
+            open={open}
+            onClose={onClose}
+            demonstrations={demonstrations}
+            onChange={(demonstrations) => {
+              console.log("in change demonstrations", demonstrations);
+              field.onChange(demonstrations);
+            }}
+          />
         </VerticalFormControl>
       )}
     />
