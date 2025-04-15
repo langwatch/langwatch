@@ -12,7 +12,24 @@ import { PromptConfigPanel } from "~/components/prompt-configs/PromptConfigPanel
 import { toaster } from "~/components/ui/toaster";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { type LlmPromptConfig } from "@prisma/client";
-// You'll need more imports when implementing the drawer/modal, etc.
+
+const DEFAULT_NEW_CONFIG_VERSION = {
+  name: "New Prompt Config",
+  schemaVersion: "1.0",
+  configData: {
+    prompt: "You are a helpful assistant",
+    model: "openai/gpt4-o-mini",
+    inputs: [{ identifier: "input", type: "str" }],
+    outputs: [{ identifier: "output", type: "str" }],
+    demonstrations: {
+      columns: [
+        { id: "input", name: "input", type: "str" },
+        { id: "output", name: "output", type: "str" },
+      ],
+      rows: [],
+    },
+  },
+};
 
 export default function PromptConfigsPage() {
   const utils = api.useContext();
@@ -91,14 +108,7 @@ export default function PromptConfigsPage() {
 
     createConfigMutation.mutate({
       projectId: project.id,
-      configData: {
-        prompt: "You are a helpful assistant",
-        model: "openai/gpt4-o-mini",
-        inputs: [{ identifier: "input", type: "str" }],
-        outputs: [{ identifier: "output", type: "str" }],
-      },
-      name: "New Prompt Config",
-      schemaVersion: "1.0",
+      ...DEFAULT_NEW_CONFIG_VERSION,
     });
   };
 

@@ -7,6 +7,7 @@ import { usePromptConfigVersionMutation } from "./usePromptConfigVersionMutation
 import { api } from "~/utils/api";
 import { useEffect } from "react";
 import type { LlmPromptConfig, LlmPromptConfigVersion } from "@prisma/client";
+import type { DatasetColumnType } from "~/server/datasets/types";
 
 const promptConfigSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -28,6 +29,27 @@ const versionSchema = z.object({
       type: z.string(),
     })
   ),
+  demonstrations: z
+    .object({
+      columns: z
+        .array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            type: z.custom<DatasetColumnType>(),
+          })
+        )
+        .default([]),
+      rows: z
+        .array(
+          z.object({
+            id: z.string().min(1),
+            values: z.record(z.string(), z.any()),
+          })
+        )
+        .default([]),
+    })
+    .default({ columns: [], rows: [] }),
 });
 
 const formSchema = promptConfigSchema.extend({
