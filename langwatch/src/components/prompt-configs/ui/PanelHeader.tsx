@@ -4,7 +4,7 @@ import { Columns } from "react-feather";
 
 // Component for the panel header
 interface PanelHeaderProps {
-  title: string;
+  title: React.ReactNode;
   onClose?: () => void;
   showExpandButton?: boolean;
   onExpand?: () => void;
@@ -38,7 +38,7 @@ export function PanelHeader({
 
 // Component for displaying the panel title/name
 interface PanelTitleProps {
-  title: string;
+  title: React.ReactNode;
   isEditing?: boolean;
   value?: string;
   onEdit?: () => void;
