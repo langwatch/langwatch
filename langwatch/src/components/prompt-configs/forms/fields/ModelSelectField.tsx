@@ -1,20 +1,32 @@
-import { Input } from "@chakra-ui/react";
-import { useFormContext } from "react-hook-form";
+import { useFormContext, Controller } from "react-hook-form";
 import { VerticalFormControl } from "../../../VerticalFormControl";
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
+import { ModelSelector, allModelOptions } from "../../../ModelSelector";
 
 export function ModelSelectField() {
-  const { register, formState } = useFormContext<PromptConfigFormValues>();
+  const { control, formState } = useFormContext<PromptConfigFormValues>();
   const { errors } = formState;
 
   return (
     <VerticalFormControl
       label="Model"
-      invalid={!!errors.model}
-      helper={errors.model?.message?.toString()}
-      error={errors.model}
+      invalid={!!errors.version?.model}
+      helper={errors.version?.model?.message?.toString()}
+      error={errors.version?.model}
     >
-      <Input placeholder="openai/gpt4-o-mini" {...register("model")} />
+      <Controller
+        name="version.model"
+        control={control}
+        render={({ field }) => (
+          <ModelSelector
+            model={field.value}
+            options={allModelOptions}
+            onChange={field.onChange}
+            size="full"
+            mode="chat"
+          />
+        )}
+      />
     </VerticalFormControl>
   );
 }
