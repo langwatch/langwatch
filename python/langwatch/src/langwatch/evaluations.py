@@ -165,9 +165,6 @@ def prepare_data(
             params=settings,  # type: ignore
         )
 
-    print("trace_id", span_ctx.trace_id)
-    print("span_id", span_ctx.span_id)
-
     return {
         "url": get_endpoint() + f"/api/evaluations/{slug}/evaluate",
         "json": {
@@ -250,7 +247,7 @@ def add_evaluation(
     timestamps: Optional[EvaluationTimestamps] = None,
 ):
     if not span or not span.trace:
-        raise ValueError("No trace found, could not add evaluation to span")
+        raise ValueError("No span or trace found, could not add evaluation to span")
 
     evaluation_result = EvaluationResult(
         status=status,
@@ -274,9 +271,11 @@ def add_evaluation(
         else:
             evaluation_result["cost"] = cost
 
+    ns = None
     if span.type != "evaluation":
-        span = span.span(type="evaluation")
-    span.update(
+        ns = span.span(type="evaluation")
+
+    (ns or span).update(
         name=name,
         output=TypedValueEvaluationResult(
             type="evaluation_result",
@@ -301,12 +300,11 @@ def add_evaluation(
         ),
     )
     if "cost" in evaluation_result and evaluation_result["cost"]:
-        span.update(metrics=SpanMetrics(cost=evaluation_result["cost"]["amount"]))
-    span.end()
+        (ns or span).update(metrics=SpanMetrics(cost=evaluation_result["cost"]["amount"]))
 
     evaluation = Evaluation(
         evaluation_id=evaluation_id or f"eval_{nanoid.generate()}",
-        span_id=format(span._span.get_span_context().span_id, 'x') if span else None,
+        span_id=format((ns or span)._span.get_span_context().span_id, 'x') if (ns or span) else None,
         name=name,
         type=type,
         is_guardrail=is_guardrail,
@@ -321,7 +319,7 @@ def add_evaluation(
 
     current_evaluation_index = [
         i
-        for i, e in enumerate(span.trace.evaluations)
+        for i, e in enumerate((ns or span).trace.evaluations)
         if evaluation_id
         and "evaluation_id" in e
         and e["evaluation_id"] == evaluation_id
@@ -330,12 +328,14 @@ def add_evaluation(
         current_evaluation_index[0] if len(current_evaluation_index) > 0 else None
     )
     current_evaluation = (
-        span.trace.evaluations[current_evaluation_index]
+        (ns or span).trace.evaluations[current_evaluation_index]
         if current_evaluation_index is not None
         else None
     )
 
     if current_evaluation and current_evaluation_index is not None:
-        span.trace.evaluations[current_evaluation_index] = current_evaluation | evaluation
+        (ns or span).trace.evaluations[current_evaluation_index] = current_evaluation | evaluation
     else:
-        span.trace.evaluations.append(evaluation)
+        (ns or span).trace.evaluations.append(evaluation)
+
+    (ns or span).end()
