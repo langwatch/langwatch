@@ -10,14 +10,14 @@ T = TypeVar("T")
 
 class SerializableAndPydanticEncoder(json.JSONEncoder):
     def default(self, o):
-        # try:
-        #     import langchain_core.messages
-        #     from langwatch.langchain import langchain_message_to_chat_message
+        try:
+            import langchain_core.messages
+            from langwatch.langchain import langchain_message_to_chat_message
 
-        #     if isinstance(o, langchain_core.messages.BaseMessage):
-        #         return langchain_message_to_chat_message(o)
-        # except ImportError:
-        #     pass
+            if isinstance(o, langchain_core.messages.BaseMessage):
+                return langchain_message_to_chat_message(o)
+        except ImportError:
+            pass
 
         try:
             from langchain_core.load.serializable import Serializable
@@ -53,27 +53,46 @@ class SerializableWithStringFallback(SerializableAndPydanticEncoder):
 
 
 def validate_safe(type_, item: dict, min_required_keys_for_pydantic_1: List[str]):
-    import pydantic
-
+    """Safely validate a dictionary against a type, handling both TypedDict and BaseModel."""
     if type(item) != dict or not all(
         key in item for key in min_required_keys_for_pydantic_1
     ):
         return False
 
+    # Handle TypedDict
+    if hasattr(type_, "__annotations__"):
+        try:
+            # Check if all required fields are present
+            required_fields = getattr(type_, "__required_keys__", set())
+            if not all(key in item for key in required_fields):
+                return False
+            
+            # Check if all values match their annotations
+            annotations = type_.__annotations__
+            return all(
+                key not in item or isinstance(item[key], annotations[key])
+                for key in annotations
+            )
+        except (AttributeError, TypeError):
+            pass
+
+    # Handle Pydantic models
     if pydantic.__version__.startswith("2."):
         from pydantic import TypeAdapter
 
         try:
             TypeAdapter(type_).validate_python(item)
             return True
-        except ValidationError:
+        except (ValidationError, AttributeError, TypeError):
             try:
                 TypeAdapter(type_).validate_json(
                     json.dumps(item, cls=SerializableWithStringFallback)
                 )
                 return True
-            except ValidationError:
+            except (ValidationError, AttributeError, TypeError):
                 return False
+
+    return False
 
 
 def rag_contexts(value: Union[List[RAGChunk], List[str]]) -> List[RAGChunk]:
