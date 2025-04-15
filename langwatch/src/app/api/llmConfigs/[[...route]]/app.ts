@@ -3,9 +3,9 @@ import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { describeRoute } from "hono-openapi";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
-import { appRouter } from "../../../../server/api/root";
 import { prisma } from "../../../../server/db";
 import type { Project } from "@prisma/client";
+import { LlmConfigRepository } from "../../../../server/repositories/llm-config.repository";
 
 patchZodOpenapi();
 
@@ -23,24 +23,12 @@ const baseVersionSchema = z.object({
 // Define types for our Hono context variables
 type Variables = {
   project: Project;
-  caller: ReturnType<typeof appRouter.createCaller>;
+  llmConfigRepository: LlmConfigRepository;
 };
 
 export const app = new Hono<{
   Variables: Variables;
 }>().basePath("/api/llmConfigs");
-
-// Create TRPC caller with project context
-const createCaller = () => {
-  return appRouter.createCaller({
-    prisma,
-    session: null,
-    req: undefined,
-    res: undefined,
-    permissionChecked: true, // Skip permission check since we do our own
-    publiclyShared: false,
-  });
-};
 
 // Unified auth middleware that validates API key and project ID
 app.use("/project/:projectId/*", async (c, next) => {
@@ -61,9 +49,9 @@ app.use("/project/:projectId/*", async (c, next) => {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  // Store project and caller for use in route handlers
+  // Store project and repository for use in route handlers
   c.set("project", project);
-  c.set("caller", createCaller());
+  c.set("llmConfigRepository", new LlmConfigRepository(prisma));
 
   return next();
 });
@@ -75,10 +63,10 @@ app.get(
     description: "Get all LLM configs for a project",
   }),
   async (c) => {
-    const caller = c.get("caller");
+    const repository = c.get("llmConfigRepository");
     const { projectId } = c.req.param();
 
-    const configs = await caller.llmConfigs.getPromptConfigs({ projectId });
+    const configs = await repository.getAllConfigs(projectId);
     return c.json(configs);
   }
 );
@@ -90,14 +78,11 @@ app.get(
     description: "Get a specific LLM config",
   }),
   async (c) => {
-    const caller = c.get("caller");
+    const repository = c.get("llmConfigRepository");
     const { id, projectId } = c.req.param();
 
     try {
-      const config = await caller.llmConfigs.getPromptConfigById({
-        id,
-        projectId,
-      });
+      const config = await repository.getConfigById(id, projectId);
       return c.json(config);
     } catch (error: any) {
       return c.json({ error: error.message }, 404);
@@ -113,14 +98,16 @@ app.post(
   }),
   zValidator("json", baseConfigSchema.merge(baseVersionSchema)),
   async (c) => {
-    const caller = c.get("caller");
+    const repository = c.get("llmConfigRepository");
     const { projectId } = c.req.param();
     const data = c.req.valid("json");
 
-    const newConfig = await caller.llmConfigs.createPromptConfig({
-      ...data,
-      projectId,
-    });
+    const { name, configData, schemaVersion, commitMessage } = data;
+
+    const newConfig = await repository.createConfig(
+      { name, projectId },
+      { projectId, configData, schemaVersion, commitMessage }
+    );
 
     return c.json(newConfig);
   }
@@ -133,14 +120,14 @@ app.get(
     description: "Get all versions for an LLM config",
   }),
   async (c) => {
-    const caller = c.get("caller");
+    const repository = c.get("llmConfigRepository");
     const { configId, projectId } = c.req.param();
 
     try {
-      const versions = await caller.llmConfigs.versions.getVersions({
+      const versions = await repository.versions.getVersions(
         configId,
-        projectId,
-      });
+        projectId
+      );
       return c.json(versions);
     } catch (error: any) {
       return c.json({ error: error.message }, 404);
@@ -156,15 +143,17 @@ app.post(
   }),
   zValidator("json", baseVersionSchema),
   async (c) => {
-    const caller = c.get("caller");
+    const repository = c.get("llmConfigRepository");
     const { configId, projectId } = c.req.param();
     const data = c.req.valid("json");
 
     try {
-      const version = await caller.llmConfigs.versions.create({
-        ...data,
+      const version = await repository.versions.createVersion({
         configId,
         projectId,
+        configData: data.configData,
+        schemaVersion: data.schemaVersion,
+        commitMessage: data.commitMessage,
       });
       return c.json(version);
     } catch (error: any) {
@@ -181,16 +170,12 @@ app.put(
   }),
   zValidator("json", baseConfigSchema.partial()),
   async (c) => {
-    const caller = c.get("caller");
+    const repository = c.get("llmConfigRepository");
     const { id, projectId } = c.req.param();
     const data = c.req.valid("json");
 
     try {
-      const updatedConfig = await caller.llmConfigs.updatePromptConfig({
-        ...data,
-        id,
-        projectId,
-      });
+      const updatedConfig = await repository.updateConfig(id, projectId, data);
       return c.json(updatedConfig);
     } catch (error: any) {
       return c.json({ error: error.message }, 404);
@@ -205,12 +190,12 @@ app.delete(
     description: "Delete an LLM config",
   }),
   async (c) => {
-    const caller = c.get("caller");
+    const repository = c.get("llmConfigRepository");
     const { id, projectId } = c.req.param();
 
     try {
-      await caller.llmConfigs.deletePromptConfig({ id, projectId });
-      return c.json({ success: true });
+      const result = await repository.deleteConfig(id, projectId);
+      return c.json(result);
     } catch (error: any) {
       return c.json({ error: error.message }, 404);
     }
