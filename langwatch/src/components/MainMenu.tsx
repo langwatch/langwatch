@@ -23,6 +23,7 @@ import {
   Shield,
   Table,
   TrendingUp,
+  Layers,
 } from "react-feather";
 import { useLocalStorage } from "usehooks-ts";
 import { useAnnotationQueues } from "../hooks/useAnnotationQueues";
@@ -152,6 +153,14 @@ export const MainMenu = React.memo(
               path={projectRoutes.workflows.path}
               icon={PuzzleIcon}
               label={projectRoutes.workflows.title}
+              project={project}
+              isExpanded={isExpanded}
+            />
+
+            <PageMenuLink
+              path={projectRoutes.promptConfigs.path}
+              icon={Layers} // Use an appropriate icon
+              label={projectRoutes.promptConfigs.title}
               project={project}
               isExpanded={isExpanded}
             />

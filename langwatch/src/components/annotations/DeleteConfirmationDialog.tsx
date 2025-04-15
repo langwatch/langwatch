@@ -3,10 +3,14 @@ import { useEffect, useRef, useState } from "react";
 import { Dialog } from "../ui/dialog";
 
 export function DeleteConfirmationDialog({
+  title = "Are you really sure?",
+  description = "There is no going back, so if you're sure you want to delete this annotation score, type 'delete' below:",
   open,
   onClose,
   onConfirm,
 }: {
+  title?: string;
+  description?: string;
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
@@ -30,15 +34,12 @@ export function DeleteConfirmationDialog({
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">
-            Are you really sure?
+            {title}
           </Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           <VStack align="start" gap={4}>
-            <Text>
-              There is no going back, so if you're sure you want to delete this
-              annotation score, type <Code>delete</Code> below:
-            </Text>
+            <Text>{description}</Text>
             <Input
               placeholder="Type 'delete' to confirm"
               value={confirmationText}
@@ -76,4 +77,4 @@ export function DeleteConfirmationDialog({
       </Dialog.Content>
     </Dialog.Root>
   );
-} 
+}
