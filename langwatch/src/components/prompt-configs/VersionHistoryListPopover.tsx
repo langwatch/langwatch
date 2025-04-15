@@ -17,7 +17,6 @@ import type { LlmPromptConfigVersion } from "@prisma/client";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
-// Types
 type AuthorUser = {
   id: string;
   name: string | null;
@@ -26,8 +25,6 @@ type AuthorUser = {
 };
 
 type PromptVersion = LlmPromptConfigVersion & { author: AuthorUser | null };
-
-// UI Components
 
 /**
  * Displays a version number in a styled box
@@ -248,7 +245,7 @@ export function VersionHistoryListPopover({ configId }: { configId: string }) {
     }
   );
 
-  const { mutate: restoreVersion, isLoading: isRestoring } =
+  const { mutate: restoreVersion } =
     api.llmConfigs.versions.restore.useMutation({
       onSuccess: () => {
         void refetch();

@@ -157,7 +157,6 @@ export const MainMenu = React.memo(
               isExpanded={isExpanded}
             />
 
-            {/* Add our new Prompt Configs link here, after Workflows */}
             <PageMenuLink
               path={projectRoutes.promptConfigs.path}
               icon={Layers} // Use an appropriate icon
