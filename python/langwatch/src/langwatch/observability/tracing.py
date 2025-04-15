@@ -130,23 +130,37 @@ class LangWatchTrace:
 
     def _create_root_span(self):
         """Create the root span if parameters were provided."""
-
         if self._root_span_params is not None:
+            # Pre-serialize timestamps if present
+            root_span_params = dict(self._root_span_params)
+            if "timestamps" in root_span_params and root_span_params["timestamps"] is not None:
+                root_span_params["timestamps"] = json.dumps(
+                    root_span_params["timestamps"],
+                    cls=SerializableWithStringFallback
+                )
+
             self.root_span = LangWatchSpan(
                 trace=self,
-                **self._root_span_params
+                **root_span_params
             )
-            
+
             self.root_span.__enter__()
             return self.root_span
 
     async def _create_root_span_async(self):
         """Create the root span asynchronously if parameters were provided."""
-
         if self._root_span_params is not None:
+            # Pre-serialize timestamps if present
+            root_span_params = dict(self._root_span_params)
+            if "timestamps" in root_span_params and root_span_params["timestamps"] is not None:
+                root_span_params["timestamps"] = json.dumps(
+                    root_span_params["timestamps"],
+                    cls=SerializableWithStringFallback
+                )
+
             self.root_span = LangWatchSpan(
                 trace=self,
-                **self._root_span_params
+                **root_span_params
             )
             # Ensure the span is properly initialized before returning
             await self.root_span.__aenter__()
@@ -164,14 +178,22 @@ class LangWatchTrace:
             except Exception as e:
                 warn(f"Failed to cleanup root span: {e}")
 
-            try:
-                if self._context_token is not None:
+            if self._context_token is not None:
+                try:
                     stored_langwatch_trace.reset(self._context_token)
+                except Exception as e:
+                    # Only warn if it's not a context error
+                    if "different Context" not in str(e):
+                        warn(f"Failed to reset LangWatch trace context: {e}")
+                finally:
                     self._context_token = None
-            except Exception as e:
-                warn(f"Failed to reset LangWatch trace context: {e}")
 
             self._cleaned_up = True
+
+
+    def get_langchain_callback(self):
+        from langwatch.langchain import LangChainTracer
+        return LangChainTracer(trace=self)
 
     @deprecated(
         reason="This method of instrumenting OpenAI is deprecated and will be removed in a future version. Please refer to the docs to see the new way to instrument OpenAI."
@@ -279,22 +301,27 @@ class LangWatchTrace:
         if disable_sending is not None:
             get_instance().disable_sending = disable_sending
 
+        # Serialize metadata before setting as attribute
         self.root_span.set_attributes({
             "metadata": json.dumps(metadata, cls=SerializableWithStringFallback),
         })
 
-        self.root_span.update(
-            name=name,
-            type=type,
-            input=input,
-            output=output,
-            error=error,
-            timestamps=timestamps,
-            contexts=contexts,
-            model=model,
-            params=params,
-            metrics=metrics,
-        )
+        # Pre-serialize timestamps if present
+        update_kwargs = {
+            "name": name,
+            "type": type,
+            "input": input,
+            "output": output,
+            "error": error,
+            "contexts": contexts,
+            "model": model,
+            "params": params,
+            "metrics": metrics,
+        }
+        if timestamps is not None:
+            update_kwargs["timestamps"] = json.dumps(timestamps, cls=SerializableWithStringFallback)
+
+        self.root_span.update(**update_kwargs)
 
     def add_evaluation(
         self,
@@ -385,11 +412,10 @@ class LangWatchTrace:
 
     def __call__(self, func: T) -> T:
         """Makes the trace callable as a decorator."""
-
         if inspect.isasyncgenfunction(func):
             @functools.wraps(func)
             async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                with self:
+                async with self:
                     self._set_callee_input_information(func, *args, **kwargs)
                     items = []
                     async for item in func(*args, **kwargs):
@@ -405,7 +431,7 @@ class LangWatchTrace:
             return wrapper
         elif inspect.isgeneratorfunction(func):
             @functools.wraps(func)
-            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            def wrapper(*args: Any, **kwargs: Any) -> Any:
                 with self:
                     self._set_callee_input_information(func, *args, **kwargs)
                     items = []
@@ -421,6 +447,7 @@ class LangWatchTrace:
                     self._set_callee_output_information(func, output)
             return wrapper
         elif inspect.iscoroutinefunction(func):
+            @functools.wraps(func)
             async def wrapper(*args: Any, **kwargs: Any) -> Any:
                 async with self:
                     self._set_callee_input_information(func, *args, **kwargs)
@@ -440,47 +467,67 @@ class LangWatchTrace:
 
     def __enter__(self) -> 'LangWatchTrace':
         """Makes the trace usable as a context manager."""
-        self._context_token = stored_langwatch_trace.set(self)
-        self._create_root_span().__enter__()
+        try:
+            # Store the old token and set the new one
+            old_token = self._context_token
+            self._context_token = stored_langwatch_trace.set(self)
+            
+            # Try to clean up the old token if it exists
+            if old_token is not None:
+                try:
+                    stored_langwatch_trace.reset(old_token)
+                except Exception:
+                    pass
+        except Exception as e:
+            warn(f"Failed to set LangWatch trace context: {e}")
 
-        self.span = cast(
-            Type[LangWatchSpan], lambda **kwargs: LangWatchSpan(trace=self, **kwargs)
-        )
+        if self._root_span_params is not None and self.root_span is None:
+            self._create_root_span()
 
         return self
 
     def __exit__(self, exc_type: Optional[type], exc_value: Optional[BaseException], traceback: Any) -> bool:
-        """Exit the trace context, cleaning up resources."""
+        """Exit the trace context, recording any errors that occurred."""
         try:
-            if hasattr(self, 'root_span'):
+            if self.root_span is not None:
                 self.root_span.__exit__(exc_type, exc_value, traceback)
         finally:
             self._cleanup()
-        return False
+        return False  # Don't suppress exceptions
 
     async def __aenter__(self) -> 'LangWatchTrace':
         """Makes the trace usable as an async context manager."""
-        self._context_token = stored_langwatch_trace.set(self)
-        await self._create_root_span_async()
+        try:
+            # Store the old token and set the new one
+            old_token = self._context_token
+            self._context_token = stored_langwatch_trace.set(self)
+            
+            # Try to clean up the old token if it exists
+            if old_token is not None:
+                try:
+                    stored_langwatch_trace.reset(old_token)
+                except Exception:
+                    pass
+        except Exception as e:
+            warn(f"Failed to set LangWatch trace context: {e}")
 
-        self.span = cast(
-            Type[LangWatchSpan], lambda **kwargs: LangWatchSpan(trace=self, **kwargs)
-        )
+        if self._root_span_params is not None and self.root_span is None:
+            await self._create_root_span_async()
 
         return self
 
     async def __aexit__(self, exc_type: Optional[type], exc_value: Optional[BaseException], traceback: Any) -> bool:
-        """Exit the async trace context, cleaning up resources."""
+        """Exit the async trace context, recording any errors that occurred."""
         try:
-            if hasattr(self, 'root_span'):
+            if self.root_span is not None:
                 await self.root_span.__aexit__(exc_type, exc_value, traceback)
         finally:
             self._cleanup()
-        return False
+        return False  # Don't suppress exceptions
 
-    # def __del__(self):
-    #     """Ensure trace context is cleaned up if object is garbage collected."""
-    #     self._cleanup()
+    def __del__(self):
+        """Ensure trace context is cleaned up if object is garbage collected."""
+        self._cleanup()
 
     # Forward all other methods to the underlying tracer
     def __getattr__(self, name: str) -> Any:
