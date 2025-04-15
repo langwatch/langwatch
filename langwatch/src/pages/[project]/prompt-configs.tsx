@@ -3,7 +3,7 @@ import { Plus } from "react-feather";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   createDefaultColumns,
   PromptConfigTable,
@@ -17,7 +17,6 @@ import { type LlmPromptConfig } from "@prisma/client";
 export default function PromptConfigsPage() {
   const utils = api.useContext();
   const { project } = useOrganizationTeamProject();
-  const [isPromptConfigPanelOpen, setIsPromptConfigPanelOpen] = useState(false);
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [configToDelete, setConfigToDelete] = useState<LlmPromptConfig | null>(
@@ -127,12 +126,6 @@ export default function PromptConfigsPage() {
     }
   };
 
-  useEffect(() => {
-    if (selectedConfigId) {
-      setIsPromptConfigPanelOpen(true);
-    }
-  }, [selectedConfigId]);
-
   const defaultColumns = useMemo(() => {
     return createDefaultColumns({
       onDelete: (config) => {
@@ -173,8 +166,8 @@ export default function PromptConfigsPage() {
           />
         </VStack>
         <PromptConfigPanel
-          isOpen={isPromptConfigPanelOpen}
-          onClose={() => setIsPromptConfigPanelOpen(false)}
+          isOpen={!!selectedConfigId}
+          onClose={() => setSelectedConfigId(null)}
           configId={selectedConfigId ?? ""}
         />
 

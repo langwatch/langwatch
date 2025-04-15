@@ -1,4 +1,4 @@
-import { HStack, Button, Spinner } from "@chakra-ui/react";
+import { HStack, Button, Spinner, Text, Input } from "@chakra-ui/react";
 import { FormProvider } from "react-hook-form";
 import { PromptNameField } from "./fields/PromptNameField";
 import { CommitMessageField } from "./fields/CommitMessageField";
@@ -6,6 +6,7 @@ import { VersionHistoryListPopover } from "../VersionHistoryListPopover";
 import { SaveIcon } from "lucide-react";
 import { usePromptConfigForm } from "../hooks/usePromptConfigForm";
 import { PromptConfigVersionFieldGroup } from "./fields/PromptConfigVersionFieldGroup";
+import { VerticalFormControl } from "~/components/VerticalFormControl";
 
 interface PromptConfigFormProps {
   configId: string;
@@ -16,6 +17,9 @@ export function PromptConfigForm({ configId }: PromptConfigFormProps) {
     usePromptConfigForm({
       configId,
     });
+
+  const { register, formState } = methods;
+  const { errors } = formState;
 
   if (isLoading) {
     return null;
@@ -34,24 +38,37 @@ export function PromptConfigForm({ configId }: PromptConfigFormProps) {
           justify="space-between"
           width="full"
         >
-          <CommitMessageField />
-          <Button
-            type="submit"
-            colorPalette={formIsDirty ? "orange" : "gray"}
-            aria-label="Save"
-            marginTop={9}
-            disabled={!formIsDirty}
-            onClick={(e) => {
-              e.preventDefault();
-              handleSubmit();
-            }}
+          <VerticalFormControl
+            label={
+              <HStack justify="space-between" width="full">
+                <Text>Description</Text>
+                <VersionHistoryListPopover configId={configId} />
+              </HStack>
+            }
+            invalid={!!errors.version?.commitMessage}
+            helper={errors.version?.commitMessage?.message?.toString()}
+            error={errors.version?.commitMessage}
           >
-            {isSubmitting ? <Spinner /> : <SaveIcon />}
-            Save Version
-          </Button>
-        </HStack>
-        <HStack>
-          <VersionHistoryListPopover configId={configId} />
+            <HStack>
+              <Input
+                placeholder="Enter a description for this version"
+                {...register("version.commitMessage")}
+              />
+              <Button
+                type="submit"
+                colorPalette={formIsDirty ? "orange" : "gray"}
+                aria-label="Save"
+                disabled={!formIsDirty}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleSubmit();
+                }}
+              >
+                {isSubmitting ? <Spinner /> : <SaveIcon />}
+                Save Version
+              </Button>
+            </HStack>
+          </VerticalFormControl>
         </HStack>
       </form>
     </FormProvider>

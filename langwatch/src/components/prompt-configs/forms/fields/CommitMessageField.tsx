@@ -3,13 +3,17 @@ import { useFormContext } from "react-hook-form";
 import { VerticalFormControl } from "../../../VerticalFormControl";
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
 
-export function CommitMessageField() {
+interface CommitMessageFieldProps {
+  label: React.ReactNode;
+}
+
+export function CommitMessageField({ label }: CommitMessageFieldProps) {
   const { register, formState } = useFormContext<PromptConfigFormValues>();
   const { errors } = formState;
 
   return (
     <VerticalFormControl
-      label="Description"
+      label={label ?? "Description"}
       invalid={!!errors.version?.commitMessage}
       helper={errors.version?.commitMessage?.message?.toString()}
       error={errors.version?.commitMessage}
