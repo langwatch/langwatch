@@ -32,44 +32,38 @@ export function PromptConfigForm({ configId }: PromptConfigFormProps) {
       <form>
         <PromptNameField />
         <PromptConfigVersionFieldGroup />
-        <HStack
-          marginTop={4}
-          marginBottom={6}
-          justify="space-between"
-          width="full"
-        >
-          <VerticalFormControl
-            label={
-              <HStack justify="space-between" width="full">
-                <Text>Description</Text>
-                <VersionHistoryListPopover configId={configId} />
-              </HStack>
-            }
-            invalid={!!errors.version?.commitMessage}
-            helper={errors.version?.commitMessage?.message?.toString()}
-            error={errors.version?.commitMessage}
-          >
-            <HStack>
-              <Input
-                placeholder="Enter a description for this version"
-                {...register("version.commitMessage")}
-              />
-              <Button
-                type="submit"
-                colorPalette={formIsDirty ? "orange" : "gray"}
-                aria-label="Save"
-                disabled={!formIsDirty}
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleSubmit();
-                }}
-              >
-                {isSubmitting ? <Spinner /> : <SaveIcon />}
-                Save Version
-              </Button>
+        <VerticalFormControl
+          label={
+            <HStack justify="space-between" width="full">
+              <Text>Description</Text>
+              <VersionHistoryListPopover configId={configId} />
             </HStack>
-          </VerticalFormControl>
-        </HStack>
+          }
+          invalid={!!errors.version?.commitMessage}
+          helper={errors.version?.commitMessage?.message?.toString()}
+          error={errors.version?.commitMessage}
+          borderTopWidth={1}
+        >
+          <HStack>
+            <Input
+              placeholder="Enter a description for this version"
+              {...register("version.commitMessage")}
+            />
+            <Button
+              type="submit"
+              colorPalette={formIsDirty ? "orange" : "gray"}
+              aria-label="Save"
+              disabled={!formIsDirty}
+              onClick={(e) => {
+                e.preventDefault();
+                handleSubmit();
+              }}
+            >
+              {isSubmitting ? <Spinner /> : <SaveIcon />}
+              Save Version
+            </Button>
+          </HStack>
+        </VerticalFormControl>
       </form>
     </FormProvider>
   );
