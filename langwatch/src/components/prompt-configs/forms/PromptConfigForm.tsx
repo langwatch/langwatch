@@ -1,12 +1,12 @@
 import { HStack, Button, Spinner, Text, Input } from "@chakra-ui/react";
 import { FormProvider } from "react-hook-form";
 import { PromptNameField } from "./fields/PromptNameField";
-import { CommitMessageField } from "./fields/CommitMessageField";
 import { VersionHistoryListPopover } from "../VersionHistoryListPopover";
 import { SaveIcon } from "lucide-react";
 import { usePromptConfigForm } from "../hooks/usePromptConfigForm";
 import { PromptConfigVersionFieldGroup } from "./fields/PromptConfigVersionFieldGroup";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
+import { DemonstrationsField } from "./fields/DemonstrationsField";
 
 interface PromptConfigFormProps {
   configId: string;
@@ -32,6 +32,9 @@ export function PromptConfigForm({ configId }: PromptConfigFormProps) {
       <form>
         <PromptNameField />
         <PromptConfigVersionFieldGroup />
+        <DemonstrationsField />
+
+        {/* Manage the commit message and saving */}
         <VerticalFormControl
           label={
             <HStack justify="space-between" width="full">
