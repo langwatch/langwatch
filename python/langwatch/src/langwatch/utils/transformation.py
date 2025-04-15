@@ -1,10 +1,8 @@
-
-
-from ctypes import Union
 from langwatch.domain import ChatMessage, EvaluationResult, SpanInputOutput, TypedValueChatMessages, TypedValueEvaluationResult, TypedValueJson, TypedValueRaw, TypedValueText, RAGChunk
 import json
 from typing import List, Optional, TypeVar, Union, cast
 from pydantic import BaseModel, ValidationError
+import pydantic
 
 
 T = TypeVar("T")
