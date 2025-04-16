@@ -10,7 +10,7 @@ import {
   TeamRoleGroup,
 } from "../permission";
 import { nanoid } from "nanoid";
-import slugify from "slugify";
+import { slugify } from "~/utils/slugify";
 
 export const teamRouter = createTRPCRouter({
   getBySlug: protectedProcedure

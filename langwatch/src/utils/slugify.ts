@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-restricted-imports
 import originalSlugify from "slugify";
 
 // TODO: use only that for the whole project and prevent the package from being imported elsewhere
@@ -6,11 +7,12 @@ export const slugify = (
   options: Parameters<typeof originalSlugify>[1] = {}
 ) => {
   return originalSlugify(
-    str.replaceAll("_", "-"),
+    str.replaceAll(/[:\?&_]/g, "-"),
     typeof options === "object"
       ? {
           lower: true,
           strict: true,
+          replacement: "-",
           ...options,
         }
       : options
