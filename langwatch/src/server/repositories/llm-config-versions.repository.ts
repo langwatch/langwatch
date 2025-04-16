@@ -8,10 +8,12 @@ import { TRPCError } from "@trpc/server";
 import { type z } from "zod";
 import {
   LATEST_SCHEMA_VERSION,
+  type LatestConfigVersionSchema,
   type SchemaVersion,
+  getLatestConfigVersionSchema,
   type schemaValidators,
   validateConfig,
-} from "./llm-config-schema";
+} from "./llm-config-version-schema";
 /**
  * Interface for LLM Config Version data transfer objects
  */
@@ -139,10 +141,10 @@ export class LlmConfigVersionsRepository {
    * Create a new version for an existing config
    */
   async createVersion(
-    versionData: LlmConfigVersionDTO
+    versionData: LatestConfigVersionSchema
   ): Promise<LlmPromptConfigVersion> {
     // Validate the config data
-    validateConfig(versionData.configData);
+    validateConfig(versionData);
     // Create the new version
     const version = await this.prisma.llmPromptConfigVersion.create({
       data: versionData,

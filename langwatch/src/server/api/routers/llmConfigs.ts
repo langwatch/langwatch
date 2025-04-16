@@ -4,11 +4,7 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup } from "../permission";
 import { checkUserPermissionForProject } from "../permission";
 import { LlmConfigRepository } from "../../repositories/llm-config.repository";
-import {
-  LATEST_SCHEMA_VERSION,
-  schemaValidators,
-  SchemaVersion,
-} from "../../repositories/llm-config-schema";
+import { getLatestConfigVersionSchema } from "~/server/repositories/llm-config-version-schema";
 
 const idSchema = z.object({
   id: z.string(),
@@ -21,15 +17,6 @@ const projectIdSchema = z.object({
 const configIdSchema = z.object({
   configId: z.string(),
 });
-
-const versionSchema = z
-  .object({
-    configData: schemaValidators[LATEST_SCHEMA_VERSION],
-    schemaVersion: z.nativeEnum(SchemaVersion),
-    commitMessage: z.string().optional(),
-    configId: z.string(),
-  })
-  .merge(projectIdSchema);
 
 const configDataSchema = z
   .object({
@@ -97,7 +84,7 @@ export const llmConfigVersionsRouter = createTRPCRouter({
    * Create a new version for an existing config.
    */
   create: protectedProcedure
-    .input(versionSchema)
+    .input(getLatestConfigVersionSchema())
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);

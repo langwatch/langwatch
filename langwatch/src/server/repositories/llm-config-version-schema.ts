@@ -39,12 +39,21 @@ const demonstrationsSchema = z.object({
  * Validates the configData JSON field in LlmPromptConfigVersion
  */
 const configSchemaV1_0 = z.object({
-  version: z.literal(SchemaVersion.V1_0),
-  prompt: z.string().min(1, "Prompt cannot be empty"),
-  model: z.string().min(1, "Model identifier cannot be empty"),
-  inputs: z.array(inputOutputSchema).min(1, "At least one input is required"),
-  outputs: z.array(inputOutputSchema).min(1, "At least one output is required"),
-  demonstrations: demonstrationsSchema,
+  authorId: z.string().nullable(),
+  projectId: z.string().min(1, "Project ID cannot be empty"),
+  configId: z.string().min(1, "Config ID cannot be empty"),
+  schemaVersion: z.literal(SchemaVersion.V1_0),
+  commitMessage: z.string(),
+  configData: z.object({
+    version: z.literal(SchemaVersion.V1_0),
+    prompt: z.string().min(1, "Prompt cannot be empty"),
+    model: z.string().min(1, "Model identifier cannot be empty"),
+    inputs: z.array(inputOutputSchema).min(1, "At least one input is required"),
+    outputs: z
+      .array(inputOutputSchema)
+      .min(1, "At least one output is required"),
+    demonstrations: demonstrationsSchema,
+  }),
 });
 
 /**
@@ -55,11 +64,13 @@ export const schemaValidators = {
   [SchemaVersion.V1_0]: configSchemaV1_0,
 };
 
+export type LatestConfigVersionSchema = z.infer<typeof configSchemaV1_0>;
+
 /**
  * Returns the latest schema version for LlmPromptConfigVersion
  */
-export function getLatestVersion(): SchemaVersion {
-  return LATEST_SCHEMA_VERSION;
+export function getLatestConfigVersionSchema() {
+  return configSchemaV1_0;
 }
 
 /**
@@ -69,15 +80,13 @@ export function getLatestVersion(): SchemaVersion {
  * @param version - The schema version to validate against
  * @returns True if validation succeeds, throws error otherwise
  */
-export function validateConfig(
-  configData: Record<string, any> & { version: SchemaVersion }
-): boolean {
-  const { version } = configData;
-  const validator = schemaValidators[version];
+export function validateConfig(configData: LatestConfigVersionSchema): boolean {
+  const { schemaVersion } = configData;
+  const validator = schemaValidators[schemaVersion];
   if (!validator) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: `Unknown schema version: ${version}`,
+      message: `Unknown schema version: ${schemaVersion}`,
     });
   }
 

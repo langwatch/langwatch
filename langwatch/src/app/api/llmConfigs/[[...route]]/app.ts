@@ -6,6 +6,7 @@ import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import { prisma } from "../../../../server/db";
 import type { Project } from "@prisma/client";
 import { LlmConfigRepository } from "../../../../server/repositories/llm-config.repository";
+import { getLatestConfigVersionSchema } from "~/server/repositories/llm-config-version-schema";
 
 patchZodOpenapi();
 
@@ -13,13 +14,6 @@ patchZodOpenapi();
 const baseConfigSchema = z.object({
   name: z.string().min(1, "Name cannot be empty."),
   projectId: z.string().min(1, "Project ID cannot be empty."),
-});
-const baseVersionSchema = z.object({
-  schemaVersion: z.string().min(1, "Schema version cannot be empty."),
-  commitMessage: z.string().optional(),
-  projectId: z.string().min(1, "Project ID cannot be empty."),
-  configId: z.string().min(1, "Config ID cannot be empty."),
-  configData: z.record(z.any()),
 });
 
 // Define types for our Hono context variables
@@ -138,7 +132,7 @@ app.post(
   describeRoute({
     description: "Create a new version for an LLM config",
   }),
-  zValidator("json", baseVersionSchema),
+  zValidator("json", getLatestConfigVersionSchema()),
   async (c) => {
     const repository = c.get("llmConfigRepository");
     const { configId, projectId } = c.req.param();
@@ -146,11 +140,9 @@ app.post(
 
     try {
       const version = await repository.versions.createVersion({
+        ...data,
         configId,
         projectId,
-        configData: data.configData as any,
-        schemaVersion: data.schemaVersion as any,
-        commitMessage: data.commitMessage,
       });
       return c.json(version);
     } catch (error: any) {

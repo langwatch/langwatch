@@ -9,7 +9,7 @@ import {
   type SchemaVersion,
   validateConfig,
   type schemaValidators,
-} from "~/server/repositories/llm-config-schema";
+} from "~/server/repositories/llm-config-version-schema";
 import type { z } from "zod";
 
 /**

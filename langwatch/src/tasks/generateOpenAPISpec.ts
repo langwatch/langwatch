@@ -15,7 +15,23 @@ export default async function execute() {
     JSON.stringify(
       {
         ...datasetSpec,
-        ...llmConfigsSpec,
+        paths: {
+          ...datasetSpec.paths,
+          ...llmConfigsSpec.paths,
+        },
+        components: {
+          ...datasetSpec.components,
+          ...llmConfigsSpec.components,
+          schemas: {
+            ...(datasetSpec.components?.schemas || {}),
+            ...(llmConfigsSpec.components?.schemas || {}),
+          },
+          securitySchemes: {
+            ...(datasetSpec.components?.securitySchemes || {}),
+            ...(llmConfigsSpec.components?.securitySchemes || {}),
+          },
+        },
+        tags: [...(datasetSpec.tags || []), ...(llmConfigsSpec.tags || [])],
       },
       null,
       2
