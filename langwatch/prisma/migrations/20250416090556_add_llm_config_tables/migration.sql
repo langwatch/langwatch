@@ -1,6 +1,3 @@
--- AlterTable
-ALTER TABLE "Monitor" RENAME CONSTRAINT "Check_pkey" TO "Monitor_pkey";
-
 -- CreateTable
 CREATE TABLE "LlmPromptConfig" (
     "id" TEXT NOT NULL,
