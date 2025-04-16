@@ -171,9 +171,13 @@ export const createEvaluatorNodeSlice: StateCreator<
           nodes: current.nodes.map((node, index) =>
             index === firstEvaluatorIndex ? evaluatorNode : node
           ),
-          // Remove old edges targeting the evaluator and add new connections
+          // Remove old edges targeting the old and current evaluator and add new connections
           edges: [
-            ...current.edges.filter((edge) => edge.target !== evaluatorNode.id),
+            ...current.edges.filter(
+              (edge) =>
+                edge.target !== previousEvaluator?.id &&
+                edge.target !== evaluatorNode.id
+            ),
             ...newEdges,
           ],
         };
