@@ -1,8 +1,8 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import { prisma } from "../../../server/db";
+import { prisma } from "~/server/db";
 
-import { getDebugger } from "../../../utils/logger";
+import { getDebugger } from "~/utils/logger";
 
 import {
   type Experiment,
@@ -12,7 +12,7 @@ import {
 import * as Sentry from "@sentry/nextjs";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { slugify } from "../../../utils/slugify";
+import { slugify } from "~/utils/slugify";
 
 export const debug = getDebugger("langwatch:dspy:init");
 
