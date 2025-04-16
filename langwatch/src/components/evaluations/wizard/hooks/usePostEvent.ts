@@ -20,9 +20,12 @@ const debug = getDebugger("langwatch:wizard:usePostEvent");
 
 export const usePostEvent = () => {
   const { project } = useOrganizationTeamProject();
-  const { workflowStore } = useEvaluationWizardStore(({ workflowStore }) => ({
-    workflowStore,
-  }));
+  const { workflowStore, setEvaluationState } = useEvaluationWizardStore(
+    ({ workflowStore }) => ({
+      workflowStore,
+      setEvaluationState: workflowStore.setEvaluationState,
+    })
+  );
 
   const handleServerMessage = useHandleServerMessage({
     workflowStore,
@@ -31,18 +34,29 @@ export const usePostEvent = () => {
 
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleTimeout = useCallback(() => {
-    console.error("Timeout");
-    toaster.create({
-      title: "Timeout",
-      type: "error",
-      duration: 5000,
-      meta: {
-        closable: true,
-      },
-    });
-    setIsLoading(false);
-  }, []);
+  const handleTimeout = useCallback(
+    (event: StudioClientEvent) => {
+      console.error("Timeout");
+      toaster.create({
+        title: "Timeout",
+        type: "error",
+        duration: 5000,
+        meta: {
+          closable: true,
+        },
+      });
+      setIsLoading(false);
+      if (event.type === "execute_evaluation") {
+        setEvaluationState({
+          status: "error",
+          run_id: undefined,
+          error: "Timeout",
+          timestamps: { finished_at: Date.now() },
+        });
+      }
+    },
+    [setEvaluationState]
+  );
 
   const postEvent = useCallback(
     (event: StudioClientEvent) => {
@@ -54,7 +68,7 @@ export const usePostEvent = () => {
         let timeout: NodeJS.Timeout | undefined;
         try {
           timeout = setTimeout(() => {
-            handleTimeout();
+            handleTimeout(event);
           }, 20_000);
 
           setIsLoading(true);
@@ -84,14 +98,25 @@ export const usePostEvent = () => {
 
           const processChunk = (chunk: string) => {
             const events = chunk.split("\n\n").filter(Boolean);
-            for (const event of events) {
-              if (event.startsWith("data: ")) {
+            for (const event_ of events) {
+              if (event_.startsWith("data: ")) {
                 const serverEvent: StudioServerEvent = JSON.parse(
-                  event.slice(6)
+                  event_.slice(6)
                 );
                 debug("Received SSE event:", serverEvent);
 
                 handleServerMessage(serverEvent);
+                if (serverEvent.type === "error") {
+                  setIsLoading(false);
+                  if (event.type === "execute_evaluation") {
+                    setEvaluationState({
+                      status: "error",
+                      run_id: undefined,
+                      error: serverEvent.payload.message,
+                      timestamps: { finished_at: Date.now() },
+                    });
+                  }
+                }
               }
             }
           };
@@ -126,6 +151,14 @@ export const usePostEvent = () => {
               closable: true,
             },
           });
+          if (event.type === "execute_evaluation") {
+            setEvaluationState({
+              status: "error",
+              run_id: undefined,
+              error: error instanceof Error ? error.message : "Unknown error",
+              timestamps: { finished_at: Date.now() },
+            });
+          }
         } finally {
           if (timeout) {
             clearTimeout(timeout);
@@ -134,7 +167,7 @@ export const usePostEvent = () => {
         }
       })();
     },
-    [handleServerMessage, handleTimeout, project]
+    [handleServerMessage, handleTimeout, project, setEvaluationState]
   );
 
   return { postEvent, isLoading };
