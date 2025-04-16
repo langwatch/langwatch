@@ -1,16 +1,15 @@
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
-import type { Component, Field, LLMConfig, Signature } from "../types/dsl";
+import type { Component, LLMConfig, Signature, Workflow } from "../types/dsl";
 
-export const useModelProviderKeys = (extra_llms?: LLMConfig[]) => {
+export const useModelProviderKeys = ({
+  workflow,
+  extra_llms,
+}: {
+  workflow: Workflow;
+  extra_llms?: LLMConfig[];
+}) => {
   const { modelProviders } = useOrganizationTeamProject();
-  const { getWorkflow, nodes } = useWorkflowStore((state) => ({
-    getWorkflow: state.getWorkflow,
-    nodes: state.nodes,
-  }));
-
-  const workflow = getWorkflow();
 
   const modelProvidersWithoutCustomKeys = Object.values(
     modelProviders ?? {}
@@ -18,7 +17,7 @@ export const useModelProviderKeys = (extra_llms?: LLMConfig[]) => {
 
   const defaultModelProvider = workflow.default_llm.model.split("/")[0];
 
-  const nodesWithLLMParameter = nodes.filter(
+  const nodesWithLLMParameter = workflow.nodes.filter(
     (node) => node.data.parameters?.find((p) => p.type === "llm")
   );
 

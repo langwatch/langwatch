@@ -7,27 +7,33 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { LuCircleAlert, LuCircleCheck, LuCirclePlay } from "react-icons/lu";
+import { LuCircleAlert, LuCircleCheck } from "react-icons/lu";
 import {
   useEvaluationWizardStore,
   type Step,
 } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { FullWidthFormControl } from "../../../FullWidthFormControl";
-import { useRunEvalution } from "../hooks/useRunEvalution";
-import { useStepCompletedValue } from "../hooks/useStepCompletedValue";
 import { Tooltip } from "../../../ui/tooltip";
-import { useEffect } from "react";
-import { RunTrialButton } from "../components/RunTrialEvaluationButton";
+import { RunEvaluationButton } from "../components/RunTrialEvaluationButton";
+import { useStepCompletedValue } from "../hooks/useStepCompletedValue";
+import { useModelProviderKeys } from "../../../../optimization_studio/hooks/useModelProviderKeys";
+import { AddModelProviderKey } from "../../../../optimization_studio/components/AddModelProviderKey";
 
 export function ResultsStep() {
-  const { name, wizardState, setWizardState } = useEvaluationWizardStore(
-    ({ wizardState, setWizardState }) => ({
+  const { name, wizardState, setWizardState, getDSL } =
+    useEvaluationWizardStore(({ wizardState, setWizardState, getDSL }) => ({
       name: wizardState.name,
       wizardState,
       setWizardState,
-    })
-  );
+      getDSL,
+    }));
+
+  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
+    useModelProviderKeys({
+      workflow: getDSL(),
+    });
 
   const form = useForm<{
     name: string;
@@ -85,6 +91,12 @@ export function ResultsStep() {
           />
           <StepStatus name="Evaluation" step="evaluation" />
         </VStack>
+        {hasProvidersWithoutCustomKeys && (
+          <AddModelProviderKey
+            runWhat="run evaluations"
+            nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
+          />
+        )}
         {wizardState.executionMethod?.startsWith("realtime") && (
           <Alert.Root colorPalette="blue">
             <Alert.Content>
@@ -102,7 +114,9 @@ export function ResultsStep() {
                       placement: "top",
                     }}
                   >
-                    <RunTrialButton />
+                    <RunEvaluationButton colorPalette="blue">
+                      Run Trial Evaluation
+                    </RunEvaluationButton>
                   </Tooltip>
                 </VStack>
               </Alert.Description>

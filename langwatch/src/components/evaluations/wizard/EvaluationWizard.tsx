@@ -8,6 +8,7 @@ import {
   Spinner,
   VStack,
 } from "@chakra-ui/react";
+import { ReactFlowProvider } from "@xyflow/react";
 import { useRouter } from "next/router";
 import { memo, useEffect, useRef, useState } from "react";
 import {
@@ -22,21 +23,20 @@ import {
   useEvaluationWizardStore,
 } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { api } from "../../../utils/api";
 import { LogoIcon } from "../../icons/LogoIcon";
 import { Dialog } from "../../ui/dialog";
 import { Steps } from "../../ui/steps";
+import { toaster } from "../../ui/toaster";
 import { Tooltip } from "../../ui/tooltip";
 import { WizardWorkspace } from "./WizardWorkspace";
+import { RunEvaluationButton } from "./components/RunTrialEvaluationButton";
 import { useStepCompletedValue } from "./hooks/useStepCompletedValue";
 import { DatasetStep } from "./steps/DatasetStep";
 import { EvaluationStep } from "./steps/EvaluationStep";
 import { ExecutionStep } from "./steps/ExecutionStep";
 import { ResultsStep } from "./steps/ResultsStep";
 import { TaskStep } from "./steps/TaskStep";
-import { api } from "../../../utils/api";
-import { toaster } from "../../ui/toaster";
-import { ReactFlowProvider } from "@xyflow/react";
-import { RunTrialButton } from "./components/RunTrialEvaluationButton";
 
 export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
   const router = useRouter();
@@ -398,7 +398,11 @@ const WizardSidebar = memo(function WizardSidebar({
                   Show Code
                 </Button>
               )}
-            {step === "results" && task !== "real_time" && <RunTrialButton />}
+            {step === "results" && task !== "real_time" && (
+              <RunEvaluationButton colorPalette="green">
+                Run Evaluation
+              </RunEvaluationButton>
+            )}
           </HStack>
         </>
       )}
