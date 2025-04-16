@@ -3,7 +3,6 @@ import { nanoid } from "nanoid";
 import { beforeAll, afterAll, describe, expect, test } from "vitest";
 import { prisma } from "../../../../server/db";
 import { getTestProject } from "../../../../utils/testUtils";
-import { fetchHonoRequest } from "../../../api-test-utils";
 import { app } from "./app";
 
 /**
@@ -53,16 +52,15 @@ describe("LLM Configs API", () => {
   });
 
   // Test the creation of a new LLM config
-  test("should create a new LLM config with initial version", async () => {
+  test.only("should create a new LLM config with initial version", async () => {
     // Test data
     const configName = `Test Config ${nanoid(6)}`;
     const configData = { model: "gpt-4", temperature: 0.7 };
     const schemaVersion = "1.0";
 
     // Send request to create config
-    const response = await fetchHonoRequest(
-      app,
-      `/project/${project.id}/configs`,
+    const response = await fetch(
+      `http://localhost:5560/project/${project.id}/configs`,
       {
         method: "POST",
         headers: {
@@ -93,9 +91,8 @@ describe("LLM Configs API", () => {
   // Test getting all configs for a project
   test("should get all configs for a project", async () => {
     // Send request to get all configs
-    const response = await fetchHonoRequest(
-      app,
-      `/project/${project.id}/configs`,
+    const response = await fetch(
+      `http://localhost:3000/project/${project.id}/configs`,
       {
         method: "GET",
         headers: {
@@ -112,7 +109,7 @@ describe("LLM Configs API", () => {
     expect(configs.length).toBeGreaterThan(0);
 
     // Verify the previously created config is in the list
-    const foundConfig = configs.find((config) => config.id === configId);
+    const foundConfig = configs.find((config: any) => config.id === configId);
     expect(foundConfig).toBeDefined();
     expect(foundConfig).toHaveProperty("projectId", project.id);
   });
@@ -120,9 +117,8 @@ describe("LLM Configs API", () => {
   // Test getting a specific config by ID
   test("should get a specific config by ID", async () => {
     // Send request to get the config by ID
-    const response = await fetchHonoRequest(
-      app,
-      `/project/${project.id}/configs/${configId}`,
+    const response = await fetch(
+      `http://localhost:3000/project/${project.id}/configs/${configId}`,
       {
         method: "GET",
         headers: {
@@ -152,9 +148,8 @@ describe("LLM Configs API", () => {
     const updatedName = `Updated Config ${nanoid(6)}`;
 
     // Send request to update the config
-    const response = await fetchHonoRequest(
-      app,
-      `/project/${project.id}/configs/${configId}`,
+    const response = await fetch(
+      `http://localhost:3000/project/${project.id}/configs/${configId}`,
       {
         method: "PUT",
         headers: {
@@ -178,9 +173,8 @@ describe("LLM Configs API", () => {
   // Test getting versions for a config
   test("should get all versions for a config", async () => {
     // Send request to get versions
-    const response = await fetchHonoRequest(
-      app,
-      `/project/${project.id}/configs/${configId}/versions`,
+    const response = await fetch(
+      `http://localhost:3000/project/${project.id}/configs/${configId}/versions`,
       {
         method: "GET",
         headers: {
@@ -211,9 +205,8 @@ describe("LLM Configs API", () => {
     const commitMessage = "Updated config settings";
 
     // Send request to create a new version
-    const response = await fetchHonoRequest(
-      app,
-      `/project/${project.id}/configs/${configId}/versions`,
+    const response = await fetch(
+      `http://localhost:3000/project/${project.id}/configs/${configId}/versions`,
       {
         method: "POST",
         headers: {
@@ -241,9 +234,8 @@ describe("LLM Configs API", () => {
   // Test deleting a config
   test("should delete a config", async () => {
     // Send request to delete the config
-    const response = await fetchHonoRequest(
-      app,
-      `/project/${project.id}/configs/${configId}`,
+    const response = await fetch(
+      `http://localhost:3000/project/${project.id}/configs/${configId}`,
       {
         method: "DELETE",
         headers: {
@@ -259,9 +251,8 @@ describe("LLM Configs API", () => {
     expect(result).toHaveProperty("success", true);
 
     // Verify the config is actually deleted
-    const verifyResponse = await fetchHonoRequest(
-      app,
-      `/project/${project.id}/configs/${configId}`,
+    const verifyResponse = await fetch(
+      `http://localhost:3000/project/${project.id}/configs/${configId}`,
       {
         method: "GET",
         headers: {
