@@ -7,18 +7,17 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { LuCircleAlert, LuCircleCheck, LuCirclePlay } from "react-icons/lu";
+import { LuCircleAlert, LuCircleCheck } from "react-icons/lu";
 import {
   useEvaluationWizardStore,
   type Step,
 } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { FullWidthFormControl } from "../../../FullWidthFormControl";
-import { useRunEvalution } from "../hooks/useRunEvalution";
-import { useStepCompletedValue } from "../hooks/useStepCompletedValue";
 import { Tooltip } from "../../../ui/tooltip";
-import { useEffect } from "react";
-import { RunTrialButton } from "../components/RunTrialEvaluationButton";
+import { RunEvaluationButton } from "../components/RunTrialEvaluationButton";
+import { useStepCompletedValue } from "../hooks/useStepCompletedValue";
 
 export function ResultsStep() {
   const { name, wizardState, setWizardState } = useEvaluationWizardStore(
@@ -102,7 +101,9 @@ export function ResultsStep() {
                       placement: "top",
                     }}
                   >
-                    <RunTrialButton />
+                    <RunEvaluationButton colorPalette="blue">
+                      Run Trial Evaluation
+                    </RunEvaluationButton>
                   </Tooltip>
                 </VStack>
               </Alert.Description>
