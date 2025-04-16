@@ -36,7 +36,6 @@ import {
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppliedOptimization } from "../../server/experiments/types";
-import { experimentSlugify } from "../../server/experiments/utils";
 import { api } from "../../utils/api";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
@@ -44,6 +43,7 @@ import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Field, Signature, Workflow } from "../types/dsl";
 import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
 import { OptimizationProgressBar } from "./ProgressToast";
+import { slugify } from "../../utils/slugify";
 
 export function ResultsPanel({
   isCollapsed,
@@ -153,9 +153,7 @@ export function EvaluationResults({
     {
       projectId: project?.id ?? "",
       experimentId: experimentId,
-      experimentSlug: experimentId
-        ? undefined
-        : experimentSlugify(workflowId ?? ""),
+      experimentSlug: experimentId ? undefined : slugify(workflowId ?? ""),
     },
     {
       enabled: !!project && !!workflowId,
@@ -311,7 +309,7 @@ export function OptimizationResults() {
   const experiment = api.experiments.getExperimentBySlugOrId.useQuery(
     {
       projectId: project?.id ?? "",
-      experimentSlug: experimentSlugify(`${workflowId ?? ""}-optimizations`),
+      experimentSlug: slugify(`${workflowId ?? ""}-optimizations`),
     },
     {
       enabled: !!project && !!workflowId,
