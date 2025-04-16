@@ -10,14 +10,16 @@ import { LlmConfigRepository } from "../../../../server/repositories/llm-config.
 patchZodOpenapi();
 
 // Reuse schema definitions
-const configJsonSchema = z.record(z.any());
 const baseConfigSchema = z.object({
   name: z.string().min(1, "Name cannot be empty."),
+  projectId: z.string().min(1, "Project ID cannot be empty."),
 });
 const baseVersionSchema = z.object({
-  configData: configJsonSchema,
   schemaVersion: z.string().min(1, "Schema version cannot be empty."),
   commitMessage: z.string().optional(),
+  projectId: z.string().min(1, "Project ID cannot be empty."),
+  configId: z.string().min(1, "Config ID cannot be empty."),
+  configData: z.record(z.any()),
 });
 
 // Define types for our Hono context variables
@@ -119,10 +121,10 @@ app.get(
     const { configId, projectId } = c.req.param();
 
     try {
-      const versions = await repository.versions.getVersions(
+      const versions = await repository.versions.getVersions({
         configId,
-        projectId
-      );
+        projectId,
+      });
       return c.json(versions);
     } catch (error: any) {
       return c.json({ error: error.message }, 404);
@@ -146,8 +148,8 @@ app.post(
       const version = await repository.versions.createVersion({
         configId,
         projectId,
-        configData: data.configData,
-        schemaVersion: data.schemaVersion,
+        configData: data.configData as any,
+        schemaVersion: data.schemaVersion as any,
         commitMessage: data.commitMessage,
       });
       return c.json(version);
