@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import slugify from "slugify";
+import { slugify } from "~/utils/slugify";
 import { z } from "zod";
 import {
   createTRPCRouter,

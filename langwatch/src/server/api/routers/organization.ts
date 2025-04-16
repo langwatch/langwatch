@@ -10,7 +10,7 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
-import slugify from "slugify";
+import { slugify } from "~/utils/slugify";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { sendInviteEmail } from "../../mailer/inviteEmail";

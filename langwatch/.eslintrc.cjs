@@ -65,6 +65,11 @@ const config = {
             message:
               "Component must be imported from 'components/ui' instead of '@chakra-ui/react'.",
           },
+          {
+            name: "slugify",
+            importNames: ["default"],
+            message: "Use 'utils/slugify' instead of 'slugify' directly.",
+          },
         ],
       },
     ],

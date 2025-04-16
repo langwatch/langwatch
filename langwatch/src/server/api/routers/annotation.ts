@@ -4,7 +4,7 @@ import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { PublicShareResourceTypes } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
-import slugify from "slugify";
+import { slugify } from "~/utils/slugify";
 import {
   TeamRoleGroup,
   checkPermissionOrPubliclyShared,

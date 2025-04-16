@@ -13,7 +13,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { Trash2 } from "react-feather";
 import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
-import slugify from "slugify";
+import { slugify } from "~/utils/slugify";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";

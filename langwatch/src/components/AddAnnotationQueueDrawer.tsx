@@ -14,7 +14,7 @@ import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { useState } from "react";
 import { Plus } from "react-feather";
 import { useForm } from "react-hook-form";
-import slugify from "slugify";
+import { slugify } from "~/utils/slugify";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { Drawer } from "../components/ui/drawer";
