@@ -715,6 +715,7 @@ model LlmPromptConfig {
   project   Project  @relation(fields: [projectId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
+  deletedAt DateTime?
 
   // Relation to all versions - latest is determined by query
   versions  LlmPromptConfigVersion[] @relation("Versions")
