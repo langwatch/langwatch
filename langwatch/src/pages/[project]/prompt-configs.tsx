@@ -12,25 +12,8 @@ import { PromptConfigPanel } from "~/components/prompt-configs/PromptConfigPanel
 import { toaster } from "~/components/ui/toaster";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { type LlmPromptConfig } from "@prisma/client";
-import type { DatasetColumns } from "~/server/datasets/types";
-
-const DEFAULT_NEW_CONFIG_VERSION = {
-  name: "New Prompt Config",
-  schemaVersion: "1.0",
-  configData: {
-    prompt: "You are a helpful assistant",
-    model: "openai/gpt4-o-mini",
-    inputs: [{ identifier: "input", type: "str" }],
-    outputs: [{ identifier: "output", type: "str" }],
-    demonstrations: {
-      columns: [
-        { name: "input", type: "string" },
-        { name: "output", type: "string" },
-      ] as DatasetColumns,
-      rows: [],
-    },
-  },
-};
+import { llmPromptConfigVersionFactory } from "~/factories/llm-config.factory";
+import { LATEST_SCHEMA_VERSION } from "~/server/repositories/llm-config-schema";
 
 export default function PromptConfigsPage() {
   const utils = api.useContext();
@@ -97,6 +80,14 @@ export default function PromptConfigsPage() {
     },
   });
 
+  const createConfigVersionMutation =
+    api.llmConfigs.versions.create.useMutation({
+      onSuccess: () => {
+        void utils.llmConfigs.getPromptConfigs.invalidate();
+        void refetchPromptConfigs();
+      },
+    });
+
   const handleCreateButtonClick = async () => {
     if (!project?.id) {
       toaster.create({
@@ -107,9 +98,24 @@ export default function PromptConfigsPage() {
       return;
     }
 
-    createConfigMutation.mutate({
+    // Default config version data
+    const defaultPromptVersionConfig = llmPromptConfigVersionFactory.build({
+      schemaVersion: LATEST_SCHEMA_VERSION,
+    });
+
+    // Create with defaults
+    const newConfig = await createConfigMutation.mutateAsync({
+      name: "New Prompt Config",
       projectId: project.id,
-      ...DEFAULT_NEW_CONFIG_VERSION,
+    });
+
+    // Create with defaults
+    await createConfigVersionMutation.mutateAsync({
+      configId: newConfig.id,
+      projectId: project.id,
+      configData: defaultPromptVersionConfig.configData,
+      schemaVersion: LATEST_SCHEMA_VERSION,
+      commitMessage: "Initial version",
     });
   };
 

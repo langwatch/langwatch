@@ -2,7 +2,6 @@ import {
   type PrismaClient,
   type LlmPromptConfig,
   type LlmPromptConfigVersion,
-  type User,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { LlmConfigVersionsRepository } from "./llm-config-versions.repository";

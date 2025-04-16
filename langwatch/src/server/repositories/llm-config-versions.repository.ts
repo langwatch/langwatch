@@ -5,15 +5,21 @@ import {
   type LlmPromptConfig,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-
+import { type z } from "zod";
+import {
+  LATEST_SCHEMA_VERSION,
+  type SchemaVersion,
+  type schemaValidators,
+  validateConfig,
+} from "./llm-config-schema";
 /**
  * Interface for LLM Config Version data transfer objects
  */
 interface LlmConfigVersionDTO {
   configId: string;
   projectId: string;
-  configData: Record<string, any>;
-  schemaVersion: string;
+  configData: z.infer<(typeof schemaValidators)[typeof LATEST_SCHEMA_VERSION]>;
+  schemaVersion: SchemaVersion;
   commitMessage?: string;
   authorId?: string | null;
 }
@@ -28,10 +34,13 @@ export class LlmConfigVersionsRepository {
   /**
    * Get all versions for a specific config
    */
-  async getVersions(
-    configId: string,
-    projectId: string
-  ): Promise<(LlmPromptConfigVersion & { author: User | null })[]> {
+  async getVersions({
+    configId,
+    projectId,
+  }: {
+    configId: string;
+    projectId: string;
+  }): Promise<(LlmPromptConfigVersion & { author: User | null })[]> {
     // Verify the config exists
     const config = await this.prisma.llmPromptConfig.findUnique({
       where: { id: configId, projectId },
@@ -57,15 +66,18 @@ export class LlmConfigVersionsRepository {
   /**
    * Get a specific version by ID
    */
-  async getVersionById(
-    id: string,
-    projectId: string
-  ): Promise<
+  async getVersionById({
+    versionId,
+    projectId,
+  }: {
+    versionId: string;
+    projectId: string;
+  }): Promise<
     LlmPromptConfigVersion & { author: User | null; config: LlmPromptConfig }
   > {
     const version = await this.prisma.llmPromptConfigVersion.findFirst({
       where: {
-        id,
+        id: versionId,
         projectId,
         config: { projectId },
       },
@@ -129,21 +141,17 @@ export class LlmConfigVersionsRepository {
   async createVersion(
     versionData: LlmConfigVersionDTO
   ): Promise<LlmPromptConfigVersion> {
+    // Validate the config data
+    validateConfig(versionData.configData);
     // Create the new version
     const version = await this.prisma.llmPromptConfigVersion.create({
-      data: {
-        commitMessage: versionData.commitMessage,
-        authorId: versionData.authorId ?? null,
-        configId: versionData.configId,
-        configData: versionData.configData,
-        schemaVersion: versionData.schemaVersion,
-        projectId: versionData.projectId,
-      },
+      data: versionData,
     });
 
     // Update the parent config's updatedAt timestamp
+    const { configId, projectId } = versionData;
     await this.prisma.llmPromptConfig.update({
-      where: { id: versionData.configId, projectId: versionData.projectId },
+      where: { id: configId, projectId },
       data: { updatedAt: new Date() },
     });
 
@@ -189,5 +197,33 @@ export class LlmConfigVersionsRepository {
     });
 
     return newVersion;
+  }
+
+  /**
+   * Build default version for a new config
+   */
+  async buildDefaultVersion(
+    configId: string,
+    projectId: string
+  ): Promise<LlmPromptConfigVersion> {
+    return {
+      commitMessage: "Initial version",
+      authorId: null,
+      configId,
+      projectId,
+      configData: {
+        prompt: "You are a helpful assistant",
+        model: "openai/gpt4-o-mini",
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+        demonstrations: {
+          columns: [],
+        },
+      } as z.infer<(typeof schemaValidators)[typeof LATEST_SCHEMA_VERSION]>,
+      schemaVersion: LATEST_SCHEMA_VERSION,
+      createdAt: new Date(),
+      id: "",
+      version: 1,
+    };
   }
 }
