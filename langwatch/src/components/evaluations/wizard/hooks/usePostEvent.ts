@@ -105,6 +105,10 @@ export const usePostEvent = () => {
                 );
                 debug("Received SSE event:", serverEvent);
 
+                if (timeout) {
+                  clearTimeout(timeout);
+                }
+
                 handleServerMessage(serverEvent);
                 if (serverEvent.type === "error") {
                   setIsLoading(false);
