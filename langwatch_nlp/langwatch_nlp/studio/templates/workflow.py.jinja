@@ -39,7 +39,7 @@ class WorkflowModule(LangWatchWorkflowModule):
     {% set input_args = [] %}
     {% set forward_args = [] %}
     {% for input_field in inputs %}
-        {% set _ = input_args.append(input_field.identifier + ": " + FIELD_TYPE_TO_DSPY_TYPE[input_field.type.value]) %}
+        {% set _ = input_args.append(input_field.identifier + ": " + FIELD_TYPE_TO_DSPY_TYPE[input_field.type.value] + " = None") %}
         {% set _ = forward_args.append(input_field.identifier + "=" + input_field.identifier) %}
     {% endfor %}
     {% if use_kwargs %}

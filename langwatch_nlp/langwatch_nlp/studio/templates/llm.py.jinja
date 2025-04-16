@@ -74,7 +74,7 @@ class {{ class_name }}(LLMNode):
     {% set input_args = [] %}
     {% set forward_args = [] %}
     {% for input_field in component.inputs or [] %}
-        {% set _ = input_args.append(input_field.identifier + ": " + FIELD_TYPE_TO_DSPY_TYPE[input_field.type.value]) %}
+        {% set _ = input_args.append(input_field.identifier + ": " + FIELD_TYPE_TO_DSPY_TYPE[input_field.type.value] + " = None") %}
         {% set _ = forward_args.append(input_field.identifier + "=" + input_field.identifier) %}
     {% endfor %}
 
