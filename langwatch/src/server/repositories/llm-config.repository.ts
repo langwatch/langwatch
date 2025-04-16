@@ -86,9 +86,20 @@ export class LlmConfigRepository {
   }
 
   /**
-   * Create a new LLM config with its initial version
+   * Create config with no versions
    */
-  async createConfig(
+  async createConfig(configData: LlmConfigDTO): Promise<LlmPromptConfig> {
+    return this.prisma.llmPromptConfig.create({
+      data: {
+        name: configData.name,
+        projectId: configData.projectId,
+      },
+    });
+  }
+
+  /**
+   */
+  async initConfig(
     configData: LlmConfigDTO,
     versionData: Omit<LlmConfigVersionDTO, "configId">
   ): Promise<LlmConfigWithLatestVersion> {
@@ -101,7 +112,7 @@ export class LlmConfigRepository {
     });
 
     // Create the initial version using the versions repository
-    const version = await this.versionsRepository.createVersion({
+    const version = await this.versions.createVersion({
       projectId: config.projectId,
       commitMessage: versionData.commitMessage ?? "Initial version",
       authorId: versionData.authorId ?? null,

@@ -37,16 +37,16 @@ app.use("/project/:projectId/*", async (c, next) => {
     c.req.header("X-Auth-Token") ??
     c.req.header("Authorization")?.split(" ")[1];
 
-  if (!apiKey) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-
   const project = await prisma.project.findUnique({
     where: { apiKey },
   });
 
-  if (!project || project.id !== projectId) {
+  if (apiKey !== project?.apiKey) {
     return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  if (project?.id !== projectId) {
+    return c.json({ error: "Resource not found" }, 404);
   }
 
   // Store project and repository for use in route handlers
@@ -96,18 +96,13 @@ app.post(
   describeRoute({
     description: "Create a new LLM config",
   }),
-  zValidator("json", baseConfigSchema.merge(baseVersionSchema)),
+  zValidator("json", baseConfigSchema),
   async (c) => {
     const repository = c.get("llmConfigRepository");
     const { projectId } = c.req.param();
     const data = c.req.valid("json");
-
-    const { name, configData, schemaVersion, commitMessage } = data;
-
-    const newConfig = await repository.createConfig(
-      { name, projectId },
-      { projectId, configData, schemaVersion, commitMessage }
-    );
+    const { name } = data;
+    const newConfig = await repository.createConfig({ name, projectId });
 
     return c.json(newConfig);
   }

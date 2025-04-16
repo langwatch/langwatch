@@ -216,7 +216,7 @@ export const llmConfigsRouter = createTRPCRouter({
       const repository = new LlmConfigRepository(ctx.prisma);
 
       try {
-        const newConfig = await repository.createConfig(
+        const newConfig = await repository.initConfig(
           { name, projectId },
           {
             projectId,

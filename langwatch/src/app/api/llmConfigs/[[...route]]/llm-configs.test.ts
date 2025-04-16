@@ -1,0 +1,171 @@
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { app } from "./app";
+import { projectFactory } from "~/factories/project.factory";
+import { prisma } from "../../../../server/db";
+import { nanoid } from "nanoid";
+import { llmPromptConfigFactory } from "~/factories/llm-config.factory";
+
+describe("LLM Configs API", () => {
+  // Test data setup
+  let mockProject = projectFactory.build({
+    slug: nanoid(),
+  });
+  let mockConfig = llmPromptConfigFactory.build({
+    projectId: mockProject.id,
+  });
+  let testApiKey: string;
+  let testProjectId: string;
+
+  // Setup and teardown
+  beforeEach(async () => {
+    // Create test project in the database
+    mockProject = await prisma.project.create({
+      data: {
+        ...mockProject,
+      },
+    });
+
+    // Update variables after project creation to ensure they have the correct values
+    testApiKey = mockProject.apiKey;
+    testProjectId = mockProject.id;
+
+    // Update the mock config with the correct project ID
+    mockConfig = llmPromptConfigFactory.build({
+      projectId: testProjectId,
+    });
+  });
+
+  afterEach(async () => {
+    // Clean up test data
+    await prisma.llmPromptConfig.deleteMany({
+      where: { projectId: testProjectId },
+    });
+
+    await prisma.project.delete({
+      where: { id: testProjectId },
+    });
+  });
+
+  // Authentication tests
+  describe("Authentication", () => {
+    it("should return 401 with invalid API key", async () => {
+      const res = await app.request(
+        `/api/llmConfigs/project/${testProjectId}/configs`,
+        {
+          headers: { "X-Auth-Token": "invalid-key" },
+        }
+      );
+
+      expect(res.status).toBe(401);
+      const body = await res.json();
+      expect(body).toHaveProperty("error");
+    });
+  });
+
+  // GET endpoints tests
+  describe("GET endpoints", () => {
+    describe("when there are no configs", () => {
+      it("should get empty array for a project with no configs", async () => {
+        const res = await app.request(
+          `/api/llmConfigs/project/${testProjectId}/configs`,
+          {
+            headers: { "X-Auth-Token": testApiKey },
+          }
+        );
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(Array.isArray(body)).toBe(true);
+        expect(body.length).toBe(0);
+      });
+    });
+
+    describe("when there are configs", () => {
+      beforeEach(async () => {
+        // Create a config in the database
+        await prisma.llmPromptConfig.create({
+          data: {
+            ...mockConfig,
+          },
+        });
+      });
+
+      afterEach(async () => {
+        // Clean up configs
+        await prisma.llmPromptConfig.deleteMany({
+          where: { projectId: testProjectId },
+        });
+      });
+
+      it("should get all configs for a project", async () => {
+        const res = await app.request(
+          `/api/llmConfigs/project/${testProjectId}/configs`,
+          {
+            headers: { "X-Auth-Token": testApiKey },
+          }
+        );
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(Array.isArray(body)).toBe(true);
+        expect(body.length).toBe(1);
+        expect(body[0].id).toBe(mockConfig.id);
+        expect(body[0].projectId).toBe(testProjectId);
+      });
+    });
+  });
+
+  // POST endpoints tests
+  describe("POST endpoints", () => {
+    it("should create a new config", async () => {
+      const res = await app.request(
+        `/api/llmConfigs/project/${testProjectId}/configs`,
+        {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": testApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(mockConfig),
+        }
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toHaveProperty("id");
+      expect(body).toHaveProperty("name", mockConfig.name);
+      expect(body).toHaveProperty("projectId", testProjectId);
+
+      // Verify the config was actually created in the database
+      const createdConfig = await prisma.llmPromptConfig.findUnique({
+        where: { id: body.id, projectId: testProjectId },
+      });
+      expect(createdConfig).not.toBeNull();
+      expect(createdConfig?.name).toBe(mockConfig.name);
+    });
+
+    it("should validate input when creating a config", async () => {
+      const invalidData = {
+        // Missing required name field
+        configData: { model: "gpt-4" },
+        schemaVersion: "1.0",
+      };
+
+      const res = await app.request(
+        `/api/llmConfigs/project/${testProjectId}/configs`,
+        {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": testApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(invalidData),
+        }
+      );
+
+      expect(res.status).toBe(400); // Should be 400 Bad Request
+      const body = await res.json();
+      expect(body).toHaveProperty("error");
+    });
+  });
+});
