@@ -368,14 +368,17 @@ function PublishModalContent({
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
 
-  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
-    useModelProviderKeys();
   const { workflowId, getWorkflow } = useWorkflowStore(
     ({ workflow_id: workflowId, getWorkflow }) => ({
       workflowId,
       getWorkflow,
     })
   );
+
+  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
+    useModelProviderKeys({
+      workflow: getWorkflow(),
+    });
 
   const form = useForm<{
     version: string;

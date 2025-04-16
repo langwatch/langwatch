@@ -291,11 +291,13 @@ export function OptimizeModalContent({
   );
 
   const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
-    useModelProviderKeys(
-      "llm" in optimizer.params && "llm" in params
-        ? [params.llm ?? default_llm]
-        : undefined
-    );
+    useModelProviderKeys({
+      workflow: getWorkflow(),
+      extra_llms:
+        "llm" in optimizer.params && "llm" in params
+          ? [params.llm ?? default_llm]
+          : undefined,
+    });
 
   const isRunning = optimizationState?.status === "running";
 

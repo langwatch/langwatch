@@ -69,7 +69,13 @@ export const usePostEvent = () => {
           });
 
           if (!response.ok) {
-            throw new Error(`Failed to post message: ${response.statusText}`);
+            let responseJson: { error: string };
+            try {
+              responseJson = await response.json();
+            } catch (error) {
+              throw new Error(response.statusText);
+            }
+            throw new Error(responseJson.error);
           }
 
           // Process the SSE stream

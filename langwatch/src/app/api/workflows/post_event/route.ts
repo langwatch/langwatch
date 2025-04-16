@@ -12,6 +12,7 @@ import { studioBackendPostEvent } from "../../../../optimization_studio/server/s
 import { streamSSE } from "hono/streaming";
 import {
   studioClientEventSchema,
+  type StudioClientEvent,
   type StudioServerEvent,
 } from "../../../../optimization_studio/types/events";
 import { getDebugger } from "../../../../utils/logger";
@@ -57,11 +58,24 @@ app.post(
       );
     }
 
-    const message = await loadDatasets(
-      await addEnvs(eventWithoutEnvs, projectId),
-      projectId
-    );
-
+    let message: StudioClientEvent;
+    try {
+      message = await loadDatasets(
+        await addEnvs(eventWithoutEnvs, projectId),
+        projectId
+      );
+    } catch (error) {
+      console.error("error", error);
+      Sentry.captureException(error, {
+        extra: {
+          projectId,
+        },
+      });
+      return c.json(
+        { error: (error as Error).message },
+        { status: 500 }
+      );
+    }
     // Use streamSSE to create an SSE stream response
     return streamSSE(c, async (stream) => {
       // Create a promise that will resolve when the stream should end

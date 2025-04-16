@@ -18,15 +18,22 @@ import { FullWidthFormControl } from "../../../FullWidthFormControl";
 import { Tooltip } from "../../../ui/tooltip";
 import { RunEvaluationButton } from "../components/RunTrialEvaluationButton";
 import { useStepCompletedValue } from "../hooks/useStepCompletedValue";
+import { useModelProviderKeys } from "../../../../optimization_studio/hooks/useModelProviderKeys";
+import { AddModelProviderKey } from "../../../../optimization_studio/components/AddModelProviderKey";
 
 export function ResultsStep() {
-  const { name, wizardState, setWizardState } = useEvaluationWizardStore(
-    ({ wizardState, setWizardState }) => ({
+  const { name, wizardState, setWizardState, getDSL } =
+    useEvaluationWizardStore(({ wizardState, setWizardState, getDSL }) => ({
       name: wizardState.name,
       wizardState,
       setWizardState,
-    })
-  );
+      getDSL,
+    }));
+
+  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
+    useModelProviderKeys({
+      workflow: getDSL(),
+    });
 
   const form = useForm<{
     name: string;
@@ -84,6 +91,12 @@ export function ResultsStep() {
           />
           <StepStatus name="Evaluation" step="evaluation" />
         </VStack>
+        {hasProvidersWithoutCustomKeys && (
+          <AddModelProviderKey
+            runWhat="run evaluations"
+            nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
+          />
+        )}
         {wizardState.executionMethod?.startsWith("realtime") && (
           <Alert.Root colorPalette="blue">
             <Alert.Content>
