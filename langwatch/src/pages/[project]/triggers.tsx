@@ -29,10 +29,8 @@ import { useDrawer } from "~/components/CurrentDrawer";
 import { HoverableBigText } from "~/components/HoverableBigText";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { SmallLabel } from "~/components/SmallLabel";
-import {
-  DashboardLayout,
-  ProjectSelector,
-} from "../../components/DashboardLayout";
+import { ProjectSelector } from "../../components/DashboardLayout";
+import SettingsLayout from "../../components/SettingsLayout";
 import { Drawer } from "../../components/ui/drawer";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
@@ -297,7 +295,7 @@ export default function Members() {
   };
 
   return (
-    <DashboardLayout>
+    <SettingsLayout>
       <Container maxW={"calc(100vw - 200px)"} padding={6} marginTop={8}>
         <HStack width="full" align="top" gap={6} paddingBottom={6}>
           <Heading size="lg" as="h1">
@@ -505,7 +503,7 @@ export default function Members() {
           </Drawer.Body>
         </Drawer.Content>
       </Drawer.Root>
-    </DashboardLayout>
+    </SettingsLayout>
   );
 }
 

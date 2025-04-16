@@ -302,7 +302,7 @@ export const DashboardLayout = ({
 
   const user = session?.user;
   const currentRoute = findCurrentRoute(router.pathname);
-  const menuWidth = 73;
+  const menuWidth = 88;
 
   return (
     <HStack

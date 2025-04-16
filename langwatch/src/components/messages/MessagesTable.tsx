@@ -1011,14 +1011,9 @@ export function MessagesTable() {
     }
   };
 
-  const [isExpanded] = useLocalStorage("main-menu-expanded", false);
-
   return (
     <>
-      <Container
-        maxWidth={isExpanded ? "calc(100vw - 200px)" : "calc(100vw - 50px)"}
-        padding={6}
-      >
+      <Container maxWidth="calc(100vw - 50px)" padding={6}>
         <HStack width="full" align="top" paddingBottom={6}>
           <HStack align="center" gap={6}>
             <Heading as="h1" size="lg" paddingTop={1}>
@@ -1141,13 +1136,7 @@ export function MessagesTable() {
                 <Card.Body
                   padding={0}
                   maxWidth={
-                    showFilters && isExpanded
-                      ? "calc(100vw - 580px)"
-                      : showFilters
-                      ? "calc(100vw - 450px)"
-                      : isExpanded
-                      ? "calc(100vw - 260px)"
-                      : "calc(100vw - 130px)"
+                    showFilters ? "calc(100vw - 450px)" : "calc(100vw - 130px)"
                   }
                 >
                   {downloadProgress > 0 && (

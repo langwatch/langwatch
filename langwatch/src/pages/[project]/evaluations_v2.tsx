@@ -121,7 +121,7 @@ export default function EvaluationsV2() {
 
   return (
     <DashboardLayout>
-      <Container maxWidth="1200" padding={6}>
+      <Container maxW={"calc(min(1440px, 100vw - 200px))"} padding={6}>
         <VStack width="fill" gap={4} align="stretch">
           <HStack paddingTop={4}>
             <VStack align="start" gap={1}>
