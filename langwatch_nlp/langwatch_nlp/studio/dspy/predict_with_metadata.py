@@ -50,7 +50,7 @@ class ModuleWithMetadata:
         response.__class__ = PredictionWithMetadata
         last_response = lm.history[-1]
         response._cost = Money(currency="USD", amount=0)
-        if last_response:
+        if last_response and last_response.get("cost"):
             response._cost = Money(currency="USD", amount=last_response.get("cost", 0))
         response._duration = duration
 
