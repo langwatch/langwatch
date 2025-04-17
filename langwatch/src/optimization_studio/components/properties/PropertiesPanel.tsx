@@ -15,7 +15,7 @@ import { EntryPointPropertiesPanel } from "./EntryPointPropertiesPanel";
 import { EvaluatorPropertiesPanel } from "./EvaluatorPropertiesPanel";
 import { PromptingTechniquePropertiesPanel } from "./PromptingTechniquePropertiesPanel";
 import { RetrievePropertiesPanel } from "./RetrievePropertiesPanel";
-import { SignaturePropertiesPanel } from "./SignaturePropertiesPanel";
+import { SignaturePropertiesPanel } from "./llm-configs/SignaturePropertiesPanel";
 import { WorkflowPropertiesPanel } from "./WorkflowPropertiesPanel";
 
 export function PropertiesPanel() {
