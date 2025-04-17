@@ -32,7 +32,7 @@ import { CurrentDrawer } from "./CurrentDrawer";
 import { HoverableBigText } from "./HoverableBigText";
 import { IntegrationChecks, useIntegrationChecks } from "./IntegrationChecks";
 import { LoadingScreen } from "./LoadingScreen";
-import { MainMenu } from "./MainMenu";
+import { MainMenu, MENU_WIDTH } from "./MainMenu";
 import { ProjectTechStackIcon } from "./TechStack";
 import { ChecklistIcon } from "./icons/Checklist";
 import { useColorRawValue } from "./ui/color-mode";
@@ -302,7 +302,6 @@ export const DashboardLayout = ({
 
   const user = session?.user;
   const currentRoute = findCurrentRoute(router.pathname);
-  const menuWidth = 73;
 
   return (
     <HStack
@@ -320,10 +319,10 @@ export const DashboardLayout = ({
             : ""}
         </title>
       </Head>
-      <MainMenu menuWidth={menuWidth} />
+      <MainMenu />
       <VStack
-        width={`calc(100vw - ${menuWidth}px)`}
-        maxWidth={`calc(100vw - ${menuWidth}px)`}
+        width={`calc(100vw - ${MENU_WIDTH})`}
+        maxWidth={`calc(100vw - ${MENU_WIDTH})`}
         gap={0}
         background="gray.100"
         {...props}

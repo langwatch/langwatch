@@ -16,7 +16,7 @@ export const projectRoutes = {
     title: "Analytics",
   },
   evaluations: {
-    path: "/[project]/evaluations",
+    path: "/[project]/evaluations_v2",
     title: "Evaluations",
   },
   evaluations_new_choose: {

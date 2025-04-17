@@ -1,7 +1,7 @@
 import {
   Badge,
   Box,
-  Button,
+  Center,
   HStack,
   Spacer,
   Text,
@@ -11,21 +11,15 @@ import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
 import React, { useMemo } from "react";
 import {
-  Bell,
   BookOpen,
   CheckSquare,
-  ChevronLeft,
-  ChevronRight,
   Edit,
   GitHub,
   MessageSquare,
   Settings,
-  Shield,
   Table,
   TrendingUp,
-  Layers,
 } from "react-feather";
-import { useLocalStorage } from "usehooks-ts";
 import { useAnnotationQueues } from "../hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { OrganizationRoleGroup } from "../server/api/permission";
@@ -41,280 +35,201 @@ import { useColorRawValue } from "./ui/color-mode";
 import { Link } from "./ui/link";
 import { Tooltip } from "./ui/tooltip";
 
-export const MainMenu = React.memo(
-  function MainMenu({ menuWidth }: { menuWidth: number }) {
-    const [isExpanded, setIsExpanded] = useLocalStorage(
-      "main-menu-expanded",
-      false
-    );
+export const MENU_WIDTH = "88px";
 
-    const { project, hasOrganizationPermission, isPublicRoute } =
-      useOrganizationTeamProject();
-    const { assignedQueueItems, memberAccessibleQueueItems } =
-      useAnnotationQueues();
-    const totalQueueItems = useMemo(
-      () =>
-        (assignedQueueItems?.filter((item) => !item.doneAt)?.length ?? 0) +
-        (memberAccessibleQueueItems?.filter((item) => !item.doneAt)?.length ??
-          0),
-      [assignedQueueItems, memberAccessibleQueueItems]
-    );
+export const MainMenu = React.memo(function MainMenu() {
+  const { project, hasOrganizationPermission, isPublicRoute } =
+    useOrganizationTeamProject();
+  const { assignedQueueItems, memberAccessibleQueueItems } =
+    useAnnotationQueues();
+  const totalQueueItems = useMemo(
+    () =>
+      (assignedQueueItems?.filter((item) => !item.doneAt)?.length ?? 0) +
+      (memberAccessibleQueueItems?.filter((item) => !item.doneAt)?.length ?? 0),
+    [assignedQueueItems, memberAccessibleQueueItems]
+  );
 
-    return (
-      <Box
-        borderRightWidth="1px"
-        borderRightColor="gray.300"
-        background="white"
-        transition="all 0.2s ease-in-out"
-        width={isExpanded ? "200px" : menuWidth + "px"}
-        minWidth={isExpanded ? "200px" : menuWidth + "px"}
-        overflowX="hidden"
+  return (
+    <Box
+      borderRightWidth="1px"
+      borderRightColor="gray.300"
+      background="white"
+      transition="all 0.2s ease-in-out"
+      width={MENU_WIDTH}
+      minWidth={MENU_WIDTH}
+      overflowX="hidden"
+      height="100vh"
+      position="sticky"
+      top={0}
+    >
+      <VStack
+        paddingX={0}
+        paddingTop={4}
+        paddingBottom={0}
+        gap={4}
         height="100vh"
-        position="sticky"
-        top={0}
+        align="start"
+        width="full"
       >
-        <VStack
-          paddingX={0}
-          paddingTop={4}
-          paddingBottom={3}
-          gap={6}
-          height="100vh"
-          align="start"
-          width={isExpanded ? "200px" : "full"}
-        >
-          <Box width="full" paddingX="6px">
-            <Button
-              asChild
-              className="group"
-              variant="plain"
-              onClick={() => setIsExpanded(!isExpanded)}
-              width="full"
-              minWidth="0"
-              padding={2}
-              paddingRight={isExpanded ? "6px" : "2px"}
-              size="lg"
-              _icon={{
-                width: "auto",
-                height: "auto",
-                maxWidth: "none",
-                maxHeight: "none",
-              }}
-              backgroundColor="white"
-              _hover={{
-                backgroundColor: isExpanded ? undefined : "gray.50",
-              }}
-            >
-              <HStack fontSize="32px" fontWeight="bold" gap={0}>
-                <LogoIcon width={25} height={34} />
-                <Spacer />
-                <Box
-                  padding={isExpanded ? 2 : 0}
-                  borderRadius="md"
-                  backgroundColor="white"
-                  _groupHover={{
-                    backgroundColor: isExpanded ? "gray.50" : undefined,
-                  }}
-                >
-                  {isExpanded ? (
-                    <ChevronLeft size={16} />
-                  ) : (
-                    <ChevronRight size={16} />
-                  )}
-                </Box>
-              </HStack>
-            </Button>
-          </Box>
+        <Center width="full" paddingX="6px">
+          <LogoIcon width={25} height={34} />
+        </Center>
 
-          <VStack width="full" height="full" gap={0} align="start">
-            <PageMenuLink
-              path={projectRoutes.home.path}
-              icon={TrendingUp}
-              label={projectRoutes.home.title}
-              project={project}
-              isExpanded={isExpanded}
-            />
-            <PageMenuLink
-              path={projectRoutes.messages.path}
-              icon={MessageSquare}
-              label={projectRoutes.messages.title}
-              project={project}
-              isExpanded={isExpanded}
-            />
+        <VStack width="full" height="full" gap={0} align="start">
+          <PageMenuLink
+            path={projectRoutes.home.path}
+            icon={TrendingUp}
+            label={projectRoutes.home.title}
+            project={project}
+          />
+          <PageMenuLink
+            path={projectRoutes.messages.path}
+            icon={MessageSquare}
+            label={projectRoutes.messages.title}
+            project={project}
+          />
 
-            <PageMenuLink
-              path={projectRoutes.evaluations.path}
-              icon={Shield}
-              label={projectRoutes.evaluations.title}
-              project={project}
-              isExpanded={isExpanded}
-            />
+          <PageMenuLink
+            path={projectRoutes.evaluations.path}
+            icon={CheckSquare}
+            label={projectRoutes.evaluations.title}
+            project={project}
+          />
 
-            <PageMenuLink
-              path={projectRoutes.workflows.path}
-              icon={PuzzleIcon}
-              label={projectRoutes.workflows.title}
-              project={project}
-              isExpanded={isExpanded}
-            />
+          <PageMenuLink
+            path={projectRoutes.workflows.path}
+            icon={PuzzleIcon}
+            label={projectRoutes.workflows.title}
+            project={project}
+          />
 
-            <PageMenuLink
+          {/* <PageMenuLink
               path={projectRoutes.promptConfigs.path}
               icon={Layers} // Use an appropriate icon
               label={projectRoutes.promptConfigs.title}
               project={project}
-              isExpanded={isExpanded}
-            />
-
-            <PageMenuLink
-              path={projectRoutes.datasets.path}
-              icon={Table}
-              label={projectRoutes.datasets.title}
-              project={project}
-              isExpanded={isExpanded}
-            />
-            <PageMenuLink
-              path={projectRoutes.annotations.path}
-              icon={Edit}
-              label={projectRoutes.annotations.title}
-              project={project}
-              badgeNumber={totalQueueItems}
-              isExpanded={isExpanded}
-              iconStyle={{ marginLeft: "1px" }}
-            />
-
-            <PageMenuLink
-              path={projectRoutes.experiments.path}
-              icon={CheckSquare}
-              label={projectRoutes.experiments.title}
-              project={project}
-              isExpanded={isExpanded}
-            />
-
-            <PageMenuLink
-              path={projectRoutes.triggers.path}
-              icon={Bell}
-              label={projectRoutes.triggers.title}
-              project={project}
-              isExpanded={isExpanded}
-            />
-
-            {/*<SideMenuLink
-              path={projectRoutes.prompts.path}
-              icon={Database}
-              label={projectRoutes.prompts.title}
-              project={project}
             /> */}
-            {(!!hasOrganizationPermission(
-              OrganizationRoleGroup.ORGANIZATION_VIEW
-            ) ||
-              isPublicRoute) && (
-              <PageMenuLink
-                path={projectRoutes.settings.path}
-                icon={Settings}
-                label={projectRoutes.settings.title}
-                project={project}
-                isExpanded={isExpanded}
-              />
-            )}
 
-            <Spacer />
+          <PageMenuLink
+            path={projectRoutes.datasets.path}
+            icon={Table}
+            label={projectRoutes.datasets.title}
+            project={project}
+          />
+          <PageMenuLink
+            path={projectRoutes.annotations.path}
+            icon={Edit}
+            label={projectRoutes.annotations.title}
+            project={project}
+            badgeNumber={totalQueueItems}
+            iconStyle={{ marginLeft: "1px" }}
+          />
+
+          {(!!hasOrganizationPermission(
+            OrganizationRoleGroup.ORGANIZATION_VIEW
+          ) ||
+            isPublicRoute) && (
+            <PageMenuLink
+              path={projectRoutes.settings.path}
+              icon={Settings}
+              label={projectRoutes.settings.title}
+              project={project}
+            />
+          )}
+
+          <Spacer />
+
+          {(window as any)?.$crisp && project && (
+            <SideMenuLink
+              size="sm"
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                (window as any)?.$crisp.push(["do", "chat:show"]);
+                (window as any)?.$crisp.push(["do", "chat:toggle"]);
+              }}
+              icon={
+                <Box
+                  position="relative"
+                  color="white"
+                  padding={2}
+                  marginX={-2}
+                  borderRadius="full"
+                  minWidth={0}
+                  minHeight={0}
+                  backgroundColor="blue.500"
+                  transition="all 0.2s ease-in-out"
+                  _groupHover={{
+                    transform: "scale(1.2)",
+                  }}
+                  _active={{
+                    color: "white",
+                  }}
+                >
+                  <ChatBalloonIcon width={20} height={20} />
+                  <Box
+                    position="absolute"
+                    bottom="0px"
+                    right="0px"
+                    width="10px"
+                    height="10px"
+                    borderRadius="full"
+                    backgroundColor="green.500"
+                    border="1px solid"
+                    borderColor="white"
+                  />
+                </Box>
+              }
+              label="Live Help"
+              isActive={false}
+              project={project}
+            />
+          )}
+          <HStack width="full" gap={0} paddingX={2} paddingTop={2}>
             <SideMenuLink
               size="sm"
               href="https://docs.langwatch.ai"
               icon={
-                <IconWrapper width="18px" height="18px" marginLeft="1px">
+                <IconWrapper width="14px" height="14px" marginLeft="1px">
                   <BookOpen />
                 </IconWrapper>
               }
               label="Documentation"
               isActive={false}
               project={project}
-              isExpanded={isExpanded}
             />
 
             <SideMenuLink
               size="sm"
               href="https://github.com/langwatch/langwatch"
               icon={
-                <IconWrapper width="18px" height="18px">
+                <IconWrapper width="14px" height="14px">
                   <GitHub />
                 </IconWrapper>
               }
               label="GitHub"
               isActive={false}
               project={project}
-              isExpanded={isExpanded}
             />
 
             <SideMenuLink
               size="sm"
               href="https://discord.gg/kT4PhDS2gH"
               icon={
-                <IconWrapper width="18px" height="18px">
+                <IconWrapper width="14px" height="14px">
                   <DiscordOutlineIcon />
                 </IconWrapper>
               }
               label="Community"
               isActive={false}
               project={project}
-              isExpanded={isExpanded}
             />
-            {(window as any)?.$crisp && project && (
-              <SideMenuLink
-                size="sm"
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  (window as any)?.$crisp.push(["do", "chat:show"]);
-                  (window as any)?.$crisp.push(["do", "chat:toggle"]);
-                }}
-                icon={
-                  <Box
-                    position="relative"
-                    color="white"
-                    padding={2}
-                    marginX={-2}
-                    borderRadius="full"
-                    minWidth={0}
-                    minHeight={0}
-                    backgroundColor="blue.500"
-                    transition="all 0.2s ease-in-out"
-                    _groupHover={{
-                      transform: "scale(1.2)",
-                    }}
-                    _active={{
-                      color: "white",
-                    }}
-                  >
-                    <ChatBalloonIcon width={20} height={20} />
-                    <Box
-                      position="absolute"
-                      bottom="0px"
-                      right="0px"
-                      width="10px"
-                      height="10px"
-                      borderRadius="full"
-                      backgroundColor="green.500"
-                      border="1px solid"
-                      borderColor="white"
-                    />
-                  </Box>
-                }
-                label="Live Help"
-                isActive={false}
-                project={project}
-                isExpanded={isExpanded}
-              />
-            )}
-          </VStack>
+          </HStack>
         </VStack>
-      </Box>
-    );
-  },
-  (prevProps, nextProps) => {
-    return prevProps.menuWidth === nextProps.menuWidth;
-  }
-);
+      </VStack>
+    </Box>
+  );
+});
 
 const PageMenuLink = ({
   icon,
@@ -322,7 +237,6 @@ const PageMenuLink = ({
   path,
   project,
   badgeNumber,
-  isExpanded,
   iconStyle,
 }: {
   icon: React.ComponentType<{ size?: string | number; color?: string }>;
@@ -330,7 +244,6 @@ const PageMenuLink = ({
   path: string;
   project?: Project;
   badgeNumber?: number;
-  isExpanded?: boolean;
   iconStyle?: React.CSSProperties;
 }) => {
   const router = useRouter();
@@ -372,7 +285,6 @@ const PageMenuLink = ({
       }
       isActive={isActive}
       badgeNumber={badgeNumber}
-      isExpanded={isExpanded}
       iconStyle={iconStyle}
     />
   );
@@ -386,7 +298,6 @@ const SideMenuLink = ({
   project,
   isActive,
   badgeNumber,
-  isExpanded,
   onClick,
   iconStyle,
 }: {
@@ -399,7 +310,6 @@ const SideMenuLink = ({
   project?: Project;
   isActive: boolean;
   badgeNumber?: number;
-  isExpanded?: boolean;
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
   iconStyle?: React.CSSProperties;
 }) => {
@@ -436,15 +346,17 @@ const SideMenuLink = ({
   return (
     <Tooltip
       content={label}
-      positioning={{ placement: "right" }}
-      disabled={isExpanded}
+      positioning={{
+        placement: "top",
+      }}
+      disabled={size !== "sm"}
+      openDelay={0}
     >
       <Link
-        role="group"
         variant="plain"
         width="full"
-        paddingX={6}
-        paddingY={size === "sm" ? 2 : 3}
+        paddingX={4}
+        paddingY={3}
         href={href}
         aria-label={label}
         onClick={(e) => {
@@ -454,13 +366,17 @@ const SideMenuLink = ({
           });
           onClick?.(e);
         }}
-        fontSize={size === "sm" ? 13 : 14}
+        fontSize={11}
         _hover={{
           backgroundColor: "gray.50",
         }}
-        cursor="pointer"
+        {...(size === "sm" && {
+          paddingX: 0,
+          paddingY: 2,
+          fontSize: 10,
+        })}
       >
-        <HStack align="center" gap={4} minHeight="21px">
+        <VStack width="full" align="center" gap={1} minHeight="21px">
           <VStack align="start" position="relative">
             {iconNode}
 
@@ -470,12 +386,10 @@ const SideMenuLink = ({
               </Box>
             )}
           </VStack>
-          {isExpanded && (
-            <Text color={isActive ? "orange.600" : "gray.900"} marginTop="-1px">
-              {label}
-            </Text>
+          {size === "md" && (
+            <Text color={isActive ? "orange.600" : "gray.600"}>{label}</Text>
           )}
-        </HStack>
+        </VStack>
       </Link>
     </Tooltip>
   );
