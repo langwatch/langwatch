@@ -1,0 +1,1134 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LangWatch API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://app.langwatch.ai"
+    }
+  ],
+  "security": [
+    {
+      "api_key": []
+    }
+  ],
+  "paths": {
+    "/api/annotations": {
+      "get": {
+        "description": "Returns all annotations for project",
+        "responses": {
+          "200": {
+            "description": "Annotation response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Annotation"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unexpected error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/annotations/trace/{id}": {
+      "get": {
+        "description": "Returns all annotations for single trace",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of trace to fetch",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Annotation response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Annotation"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unexpected error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Create an annotation for a single trace",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of the trace to annotate",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Annotation data",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comment": {
+                    "type": "string"
+                  },
+                  "isThumbsUp": {
+                    "type": "boolean"
+                  },
+                  "email": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Annotation created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Annotation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/annotations/{id}": {
+      "get": {
+        "description": "Returns a single annotation based on the ID supplied",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of annotation to fetch",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Annotation response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Annotation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unexpected error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "Deletes a single annotation based on the ID supplied",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of annotation to delete",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Annotation response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unexpected error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "description": "Updates a single annotation based on the ID supplied",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of annotation to delete",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comment": {
+                    "type": "string"
+                  },
+                  "isThumbsUp": {
+                    "type": "boolean"
+                  },
+                  "email": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Annotation response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unexpected error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trace/{id}": {
+      "get": {
+        "description": "Returns single trace details based on the ID supplied",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of trace to share",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Trace details with spans and evaluations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "trace_id": {
+                      "type": "string",
+                      "example": "trace_BKZL_X0TKSD4oa1aBJTc_"
+                    },
+                    "project_id": {
+                      "type": "string",
+                      "example": "KAXYxPR8MUgTcP8CF193y"
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "properties": {
+                        "sdk_version": {
+                          "type": "string",
+                          "example": "0.1.11"
+                        },
+                        "sdk_language": {
+                          "type": "string",
+                          "example": "python"
+                        }
+                      }
+                    },
+                    "timestamps": {
+                      "type": "object",
+                      "properties": {
+                        "started_at": {
+                          "type": "integer",
+                          "example": 1721382486868
+                        },
+                        "inserted_at": {
+                          "type": "integer",
+                          "example": 1721382492894
+                        },
+                        "updated_at": {
+                          "type": "integer",
+                          "example": 1721382492894
+                        }
+                      }
+                    },
+                    "input": {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "string",
+                          "example": "hi"
+                        }
+                      }
+                    },
+                    "output": {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "string",
+                          "example": "Hey there! 👋😊"
+                        }
+                      }
+                    },
+                    "metrics": {
+                      "type": "object",
+                      "properties": {
+                        "first_token_ms": {
+                          "type": "integer",
+                          "example": 1449
+                        },
+                        "total_time_ms": {
+                          "type": "integer",
+                          "example": 1543
+                        },
+                        "prompt_tokens": {
+                          "type": "integer",
+                          "example": 20
+                        },
+                        "completion_tokens": {
+                          "type": "integer",
+                          "example": 7
+                        },
+                        "tokens_estimated": {
+                          "type": "boolean",
+                          "example": true
+                        }
+                      }
+                    },
+                    "error": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "stacktrace": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "has_error": {
+                          "type": "boolean"
+                        }
+                      },
+                      "example": null
+                    },
+                    "indexing_md5s": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "example": ["cccd21e0b70c706034dfd9f7772816a3"]
+                    },
+                    "spans": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "trace_id": {
+                            "type": "string",
+                            "example": "trace_BKZL_X0TKSD4oa1aBJTc_"
+                          },
+                          "span_id": {
+                            "type": "string",
+                            "example": "span_h1xUkcUJilhudDrLeQbR_"
+                          },
+                          "timestamps": {
+                            "type": "object",
+                            "properties": {
+                              "finished_at": {
+                                "type": "integer",
+                                "example": 1721382488392
+                              },
+                              "updated_at": {
+                                "type": "integer",
+                                "example": 1721382492027
+                              },
+                              "started_at": {
+                                "type": "integer",
+                                "example": 1721382486895
+                              },
+                              "first_token_at": {
+                                "type": "integer",
+                                "example": 1721382488317
+                              },
+                              "inserted_at": {
+                                "type": "integer",
+                                "example": 1721382492027
+                              }
+                            }
+                          },
+                          "type": {
+                            "type": "string",
+                            "example": "llm"
+                          },
+                          "error": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "stacktrace": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "has_error": {
+                                "type": "boolean"
+                              }
+                            },
+                            "example": null
+                          },
+                          "params": {
+                            "type": "object",
+                            "properties": {
+                              "stream": {
+                                "type": "boolean",
+                                "example": true
+                              },
+                              "temperature": {
+                                "type": "number",
+                                "example": 1
+                              }
+                            }
+                          },
+                          "project_id": {
+                            "type": "string",
+                            "example": "KAXYxPR8MUgTcP8CF193y"
+                          },
+                          "parent_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "example": "span_ijZNjUMTz3ys0Z0YKwF_T"
+                          },
+                          "name": {
+                            "type": "string",
+                            "nullable": true,
+                            "example": null
+                          },
+                          "model": {
+                            "type": "string",
+                            "example": "openai/gpt-4o"
+                          },
+                          "metrics": {
+                            "type": "object",
+                            "properties": {
+                              "tokens_estimated": {
+                                "type": "boolean",
+                                "example": true
+                              },
+                              "completion_tokens": {
+                                "type": "integer",
+                                "example": 7
+                              },
+                              "prompt_tokens": {
+                                "type": "integer",
+                                "example": 20
+                              }
+                            }
+                          },
+                          "input": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "example": "chat_messages"
+                              },
+                              "value": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "role": {
+                                      "type": "string",
+                                      "example": "system"
+                                    },
+                                    "content": {
+                                      "type": "string",
+                                      "example": "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis."
+                                    }
+                                  }
+                                },
+                                "example": [
+                                  {
+                                    "role": "system",
+                                    "content": "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis."
+                                  },
+                                  {
+                                    "role": "user",
+                                    "content": "hi"
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "output": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "example": "chat_messages"
+                              },
+                              "value": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "role": {
+                                      "type": "string",
+                                      "example": "assistant"
+                                    },
+                                    "content": {
+                                      "type": "string",
+                                      "example": "Hey there! 👋😊"
+                                    }
+                                  }
+                                },
+                                "example": [
+                                  {
+                                    "role": "assistant",
+                                    "content": "Hey there! 👋😊"
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "evaluations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "evaluation_id": {
+                            "type": "string",
+                            "example": "check_VCagriZHNWICSOM09dXjM"
+                          },
+                          "name": {
+                            "type": "string",
+                            "example": "Ragas Answer Relevancy"
+                          },
+                          "type": {
+                            "type": "string",
+                            "example": "ragas/answer_relevancy"
+                          },
+                          "trace_id": {
+                            "type": "string",
+                            "example": "trace_BKZL_X0TKSD4oa1aBJTc_"
+                          },
+                          "project_id": {
+                            "type": "string",
+                            "example": "KAXYxPR8MUgTcP8CF193y"
+                          },
+                          "status": {
+                            "type": "string",
+                            "example": "error"
+                          },
+                          "timestamps": {
+                            "type": "object",
+                            "properties": {
+                              "updated_at": {
+                                "type": "integer",
+                                "example": 1721383657788
+                              },
+                              "inserted_at": {
+                                "type": "integer",
+                                "example": 1721382493358
+                              }
+                            }
+                          },
+                          "error": {
+                            "type": "object",
+                            "properties": {
+                              "stacktrace": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "example": ["TypeError: fetch failed"]
+                              },
+                              "message": {
+                                "type": "string",
+                                "example": "fetch failed"
+                              },
+                              "has_error": {
+                                "type": "boolean",
+                                "example": true
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unexpected error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trace/search": {
+      "post": {
+        "summary": "Search traces",
+        "description": "Search for traces based on given criteria",
+        "tags": ["Traces"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trace/{id}/share": {
+      "post": {
+        "description": "Returns a public path for a trace",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of trace to share",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Public path created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unexpected error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trace/{id}/unshare": {
+      "post": {
+        "description": "Deletes a public path for a trace",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "ID of trace to unshare",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Public path deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unexpected error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/api/dataset/{slug}/entries": {
+      "post": {
+        "responses": {},
+        "operationId": "postApiDatasetBySlugEntries",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slug",
+            "required": true
+          }
+        ],
+        "description": "Add entries to a dataset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatasetPostEntries"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Annotation": {
+        "required": ["name"],
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The ID of the annotation",
+            "type": "string"
+          },
+          "projectId": {
+            "description": "The ID of the project",
+            "type": "string"
+          },
+          "traceId": {
+            "description": "The ID of the trace",
+            "type": "string"
+          },
+          "comment": {
+            "description": "The comment of the annotation",
+            "type": "string"
+          },
+          "isThumbsUp": {
+            "description": "The thumbs up status of the annotation",
+            "type": "boolean"
+          },
+          "userId": {
+            "description": "The ID of the user",
+            "type": "string"
+          },
+          "createdAt": {
+            "description": "The created at of the annotation",
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "The updated at of the annotation",
+            "type": "string"
+          },
+          "email": {
+            "description": "The email of the user",
+            "type": "string"
+          }
+        }
+      },
+      "Error": {
+        "required": ["error", "message"],
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "SearchRequest": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "pageSize": {
+            "type": "integer",
+            "example": 1000
+          },
+          "scrollId": {
+            "type": "string",
+            "example": "123"
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "SearchResponse": {
+        "type": "object",
+        "properties": {
+          "traces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Trace"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        }
+      },
+      "Trace": {
+        "type": "object",
+        "properties": {
+          "trace_id": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "timestamps": {
+            "$ref": "#/components/schemas/Timestamps"
+          },
+          "input": {
+            "$ref": "#/components/schemas/Input"
+          },
+          "output": {
+            "$ref": "#/components/schemas/Output"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/Metadata"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/Metrics"
+          },
+          "indexing_md5s": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "evaluations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Evaluation"
+            }
+          },
+          "contexts": {
+            "type": "array",
+            "items": {}
+          }
+        }
+      },
+      "Timestamps": {
+        "type": "object",
+        "properties": {
+          "inserted_at": {
+            "type": "integer"
+          },
+          "started_at": {
+            "type": "integer"
+          },
+          "updated_at": {
+            "type": "integer"
+          }
+        }
+      },
+      "Input": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "satisfaction_score": {
+            "type": "number"
+          }
+        }
+      },
+      "Output": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "Metadata": {
+        "type": "object",
+        "properties": {
+          "sdk_language": {
+            "type": "string"
+          },
+          "sdk_version": {
+            "type": "string"
+          }
+        }
+      },
+      "Metrics": {
+        "type": "object",
+        "properties": {
+          "tokens_estimated": {
+            "type": "boolean"
+          },
+          "completion_tokens": {
+            "type": "integer"
+          },
+          "prompt_tokens": {
+            "type": "integer"
+          },
+          "total_cost": {
+            "type": "number"
+          },
+          "total_time_ms": {
+            "type": "integer"
+          },
+          "first_token_ms": {
+            "type": "integer",
+            "nullable": true
+          }
+        }
+      },
+      "Evaluation": {
+        "type": "object",
+        "properties": {
+          "evaluation_id": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "timestamps": {
+            "$ref": "#/components/schemas/EvaluationTimestamps"
+          },
+          "evaluator_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "details": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "EvaluationTimestamps": {
+        "type": "object",
+        "properties": {
+          "finished_at": {
+            "type": "integer"
+          },
+          "updated_at": {
+            "type": "integer"
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "scrollId": {
+            "type": "string",
+            "example": "123"
+          },
+          "totalHits": {
+            "type": "integer",
+            "example": 1254
+          }
+        }
+      },
+
+      "DatasetPostEntries": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            },
+            "example": [
+              {
+                "input": "hi",
+                "output": "Hello, how can I help you today?"
+              }
+            ]
+          }
+        },
+        "required": ["entries"]
+      }
+    },
+    "securitySchemes": {
+      "api_key": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Auth-Token"
+      }
+    }
+  }
+}
