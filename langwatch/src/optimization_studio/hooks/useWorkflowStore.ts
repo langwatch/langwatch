@@ -521,20 +521,6 @@ export const store = (
       get().setSocketStatus("connecting-python");
     }
   },
-
-  // Signature Specific Methods
-  // TODO: Move to slice
-  setSignatureConfig: (
-    nodeId: string,
-    config: LlmPromptConfig,
-    version: LatestConfigVersionSchema
-  ) => {
-    set({
-      nodes: get().nodes.map((node) =>
-        node.id === nodeId ? { ...node, data: { ...node.data, config } } : node
-      ),
-    });
-  },
 });
 
 export const useWorkflowStore = create<WorkflowStore>()(

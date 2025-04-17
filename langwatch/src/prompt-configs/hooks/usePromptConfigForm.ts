@@ -10,14 +10,28 @@ import type { LlmPromptConfig, LlmPromptConfigVersion } from "@prisma/client";
 import {
   getLatestConfigVersionSchema,
   SchemaVersion,
+  type LatestConfigVersionSchema,
 } from "~/server/repositories/llm-config-version-schema";
+import { versions } from "process";
 
 const promptConfigSchema = z.object({
   name: z.string().min(1, "Name is required"),
 });
 
+const latestConfigVersionSchema = getLatestConfigVersionSchema();
+
 const formSchema = promptConfigSchema.extend({
-  version: getLatestConfigVersionSchema(),
+  version: z.object({
+    commitMessage: latestConfigVersionSchema.shape.commitMessage,
+    configData: z.object({
+      model: latestConfigVersionSchema.shape.configData.shape.model,
+      prompt: latestConfigVersionSchema.shape.configData.shape.prompt,
+      inputs: latestConfigVersionSchema.shape.configData.shape.inputs,
+      outputs: latestConfigVersionSchema.shape.configData.shape.outputs,
+      demonstrations:
+        latestConfigVersionSchema.shape.configData.shape.demonstrations,
+    }),
+  }),
 });
 
 export type PromptConfigFormValues = z.infer<typeof formSchema>;
@@ -29,14 +43,11 @@ interface UsePromptConfigFormProps {
 }
 
 function convertConfigToDefaultValues(
-  config: LlmPromptConfig & { versions: LlmPromptConfigVersion[] }
+  config: LlmPromptConfig & { versions: LatestConfigVersionSchema[] }
 ): PromptConfigFormValues {
   return {
     ...config,
-    version: {
-      ...(config?.versions[0]?.configData as PromptConfigFormValues["version"]),
-      commitMessage: "",
-    },
+    version: config.versions[0] as PromptConfigFormValues["version"],
   };
 }
 
@@ -95,13 +106,7 @@ export const usePromptConfigForm = ({
     await createVersion.mutateAsync({
       projectId: project.id,
       configId,
-      configData: {
-        prompt: data.version.configData.prompt,
-        model: data.version.configData.model,
-        inputs: data.version.configData.inputs,
-        outputs: data.version.configData.outputs,
-        demonstrations: data.version.configData.demonstrations,
-      },
+      configData: data.version.configData,
       schemaVersion: SchemaVersion.V1_0,
       commitMessage: data.version.commitMessage,
     });

@@ -29,7 +29,11 @@ import {
 import { LLMConfigField } from "../modals/llm-config/LLMConfigField";
 import { ComponentIcon } from "../../ColorfulBlockIcons";
 import { PromptSource } from "./PromptSource";
-import { PromptConfigForm } from "~/components/prompt-configs/forms/PromptConfigForm";
+import { PromptConfigForm } from "~/prompt-configs/forms/PromptConfigForm";
+import { api } from "~/utils/api";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { llmConfigToNodeData } from "~/optimization_studio/utils/registryUtils";
+import type { LatestConfigVersionSchema } from "~/server/repositories/llm-config-version-schema";
 
 /**
  * Properties panel for the Signature node in the optimization studio.
@@ -47,19 +51,16 @@ import { PromptConfigForm } from "~/components/prompt-configs/forms/PromptConfig
  * that can be connected with other nodes to build complex LLM-powered applications.
  */
 export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
-  const { default_llm, setNodeParameter } = useWorkflowStore(
-    ({ default_llm, setNodeParameter, setWorkflowSelected }) => ({
-      default_llm,
-      setNodeParameter,
-      setWorkflowSelected,
-    })
-  );
+  const { project } = useOrganizationTeamProject();
+  const { setNode } = useWorkflowStore((state) => ({
+    setNode: state.setNode,
+  }));
 
   const parameters = node.data.parameters
     ? Object.fromEntries(node.data.parameters.map((p) => [p.identifier, p]))
     : {};
 
-  const { open, onOpen, onClose } = useDisclosure();
+  // Figure this out and how to handle it
   const {
     rows: demonstrationRows,
     columns: demonstrationColumns,
@@ -68,6 +69,31 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
     dataset: parameters.demonstrations?.value as NodeDataset | undefined,
     preview: true,
   });
+
+  const { data: config, refetch } = api.llmConfigs.getPromptConfigById.useQuery(
+    {
+      id: node.data.configId,
+      projectId: project?.id ?? "",
+    }
+  );
+
+  const handleSubmitSuccess = async () => {
+    const latestConfig = await refetch();
+
+    setNode({
+      ...node,
+      data: llmConfigToNodeData(
+        latestConfig.data as any,
+        latestConfig.data?.versions[0] as any
+      ),
+    });
+
+    if (!project?.id) {
+      throw new Error("Project ID is required");
+    }
+
+    console.log("latest", config);
+  };
 
   return (
     <BasePropertiesPanel node={node} hideParameters>
@@ -79,9 +105,9 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
         />
       )}
       <PromptConfigForm
-        configId={node.data.config?.id}
+        configId={node.data.configId}
         onSubmitSuccess={() => {
-          console.log("success");
+          void handleSubmitSuccess();
         }}
       />
     </BasePropertiesPanel>
