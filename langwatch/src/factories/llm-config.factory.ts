@@ -44,7 +44,7 @@ export const llmPromptConfigVersionFactory = Factory.define<
     ? validateConfig(params?.configData as any)
     : {
         prompt: "You are a helpful assistant",
-        model: "gpt-3.5-turbo",
+        model: "gpt-4o-mini",
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         demonstrations: {

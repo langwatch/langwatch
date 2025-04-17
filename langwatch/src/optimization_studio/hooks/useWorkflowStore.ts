@@ -65,6 +65,13 @@ export type WorkflowStore = State & {
   onConnect: (connection: Connection) => void;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
+  /**
+   * Update a node in the workflow.
+   * This will find the node by id and update it.
+   * If the id is not found, nothing will be updated.
+   * @param node - The new node data
+   * @param newId - Optional new id for the node once it updated
+   */
   setNode: (node: Partial<Node> & { id: string }, newId?: string) => void;
   setNodeParameter: (
     nodeId: string,

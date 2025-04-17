@@ -12,12 +12,7 @@ import { PromptConfigPanel } from "~/components/prompt-configs/PromptConfigPanel
 import { toaster } from "~/components/ui/toaster";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { type LlmPromptConfig } from "@prisma/client";
-import { llmPromptConfigVersionFactory } from "~/factories/llm-config.factory";
-import {
-  getSchemaValidator,
-  LATEST_SCHEMA_VERSION,
-  type LatestConfigVersionSchema,
-} from "~/server/repositories/llm-config-version-schema";
+import { LATEST_SCHEMA_VERSION } from "~/server/repositories/llm-config-version-schema";
 
 export default function PromptConfigsPage() {
   const utils = api.useContext();
@@ -102,11 +97,6 @@ export default function PromptConfigsPage() {
       return;
     }
 
-    // Default config version data
-    const defaultPromptVersionConfig = llmPromptConfigVersionFactory.build({
-      schemaVersion: LATEST_SCHEMA_VERSION,
-    });
-
     // Create with defaults
     const newConfig = await createConfigMutation.mutateAsync({
       name: "New Prompt Config",
@@ -117,7 +107,16 @@ export default function PromptConfigsPage() {
     await createConfigVersionMutation.mutateAsync({
       configId: newConfig.id,
       projectId: project.id,
-      configData: defaultPromptVersionConfig.configData as any,
+      configData: {
+        model: "gpt-4o-mini",
+        prompt: "You are a helpful assistant",
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+        demonstrations: {
+          columns: [],
+          rows: [],
+        },
+      },
       schemaVersion: LATEST_SCHEMA_VERSION,
       commitMessage: "Initial version",
     });
