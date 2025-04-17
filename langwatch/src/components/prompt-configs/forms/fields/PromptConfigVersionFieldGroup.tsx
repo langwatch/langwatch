@@ -27,15 +27,17 @@ export function PromptConfigVersionFieldGroup() {
     <VStack align="stretch" gap={6}>
       <ModelSelectField />
 
-      <Field.Root invalid={!!errors.version?.prompt}>
+      <Field.Root invalid={!!errors.version?.configData?.prompt}>
         <Field.Label>Prompt</Field.Label>
         <Textarea
-          {...register("version.prompt")}
+          {...register("version.configData.prompt")}
           placeholder="You are a helpful assistant"
           rows={4}
         />
-        {errors.version?.prompt && (
-          <Field.ErrorText>{errors.version?.prompt.message}</Field.ErrorText>
+        {errors.version?.configData?.prompt && (
+          <Field.ErrorText>
+            {errors.version?.configData?.prompt.message}
+          </Field.ErrorText>
         )}
       </Field.Root>
 
@@ -58,13 +60,12 @@ function ConfigFieldGroup({
   name: "inputs" | "outputs";
   readOnly?: boolean;
 }) {
-  const { control, formState, setValue, getValues } =
+  const { control, setValue, getValues } =
     useFormContext<PromptConfigFormValues>();
-  const { errors } = formState;
 
   const { fields, append, remove } = useFieldArray({
     control,
-    name: `version.${name}`,
+    name: `version.configData.${name}`,
   });
 
   const handleAddField = () => {
@@ -76,7 +77,7 @@ function ConfigFieldGroup({
   };
 
   const validateIdentifier = (index: number, value: string) => {
-    const currentFields = getValues(`version.${name}`);
+    const currentFields = getValues(`version.configData.${name}`);
 
     if (Array.isArray(currentFields)) {
       const identifierCount = currentFields.filter(
@@ -84,9 +85,13 @@ function ConfigFieldGroup({
       ).length;
 
       if (identifierCount > 0) {
-        setValue(`version.${name}.${index}.identifier` as any, value, {
-          shouldValidate: true,
-        });
+        setValue(
+          `version.configData.${name}.${index}.identifier` as any,
+          value,
+          {
+            shouldValidate: true,
+          }
+        );
         return "Duplicate identifier";
       }
     }

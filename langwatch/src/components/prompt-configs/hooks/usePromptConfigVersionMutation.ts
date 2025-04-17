@@ -1,17 +1,13 @@
 import { api } from "~/utils/api";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { toaster } from "~/components/ui/toaster";
 
 interface UsePromptConfigVersionMutationProps {
-  configId: string;
   onSuccess?: () => void;
 }
 
 export const usePromptConfigVersionMutation = ({
-  configId,
   onSuccess,
 }: UsePromptConfigVersionMutationProps) => {
-  const { project } = useOrganizationTeamProject();
   const utils = api.useContext();
 
   return api.llmConfigs.versions.create.useMutation({
@@ -24,10 +20,7 @@ export const usePromptConfigVersionMutation = ({
         meta: { closable: true },
       });
       void utils.llmConfigs.getPromptConfigs.invalidate();
-      void utils.llmConfigs.versions.getById.invalidate({
-        versionId: configId,
-        projectId: project?.id ?? "",
-      });
+      void utils.llmConfigs.versions.getById.invalidate();
       onSuccess?.();
     },
     onError: (error) => {

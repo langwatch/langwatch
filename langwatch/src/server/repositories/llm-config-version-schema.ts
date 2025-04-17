@@ -1,6 +1,7 @@
 // src/server/schemas/llm-config-schema.ts
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { DATASET_COLUMN_TYPES } from "../datasets/types";
 
 /**
  * Schema version enum for LLM configuration
@@ -27,11 +28,20 @@ const inputOutputSchema = z.object({
 const demonstrationsSchema = z.object({
   columns: z.array(
     z.object({
+      id: z.string().min(1, "Column ID cannot be empty"),
       name: z.string().min(1, "Column name cannot be empty"),
-      type: z.string().min(1, "Column type cannot be empty"),
+      type: z.enum(DATASET_COLUMN_TYPES),
     })
   ),
-  rows: z.array(z.record(z.any())).default([]),
+  rows: z
+    .array(
+      z
+        .object({
+          id: z.string().min(1, "Row ID cannot be empty"),
+        })
+        .and(z.record(z.any()))
+    )
+    .default([]),
 });
 
 /**
@@ -39,7 +49,7 @@ const demonstrationsSchema = z.object({
  * Validates the configData JSON field in LlmPromptConfigVersion
  */
 const configSchemaV1_0 = z.object({
-  authorId: z.string().nullable(),
+  authorId: z.string().optional(),
   projectId: z.string().min(1, "Project ID cannot be empty"),
   configId: z.string().min(1, "Config ID cannot be empty"),
   schemaVersion: z.literal(SchemaVersion.V1_0),
