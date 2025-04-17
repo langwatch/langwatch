@@ -74,7 +74,6 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
       hideParameters
       fieldsAfter={
         <>
-          <PromptSource configId="" onSelect={console.log} />
           <VStack width="full" align="start" gap={2}>
             <HStack width="full">
               <PropertySectionTitle>
@@ -113,6 +112,7 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
         </>
       }
     >
+      <PromptSource configId="" onSelect={console.log} />
       {(parameters.prompting_technique?.value as { ref: string }) && (
         <PromptingTechniqueField
           value={(parameters.prompting_technique?.value as { ref: string }).ref}
