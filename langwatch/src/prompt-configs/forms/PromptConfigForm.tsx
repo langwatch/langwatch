@@ -35,6 +35,8 @@ export function PromptConfigForm({
 
   const formIsDirty = methods.formState.isDirty;
 
+  console.log(methods.getValues());
+
   return (
     <FormProvider {...methods}>
       <form style={{ width: "100%" }}>

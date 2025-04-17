@@ -7,8 +7,8 @@ import { useState, useMemo } from "react";
 import {
   createDefaultColumns,
   PromptConfigTable,
-} from "~/components/prompt-configs/PromptConfigTable";
-import { PromptConfigPanel } from "~/components/prompt-configs/PromptConfigPanel";
+} from "~/prompt-configs/PromptConfigTable";
+import { PromptConfigPanel } from "~/prompt-configs/PromptConfigPanel";
 import { toaster } from "~/components/ui/toaster";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { type LlmPromptConfig } from "@prisma/client";

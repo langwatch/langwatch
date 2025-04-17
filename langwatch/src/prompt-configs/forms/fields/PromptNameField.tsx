@@ -1,6 +1,6 @@
 import { Input } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
-import { VerticalFormControl } from "../../../VerticalFormControl";
+import { VerticalFormControl } from "~/components/VerticalFormControl";
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
 
 export function PromptNameField() {

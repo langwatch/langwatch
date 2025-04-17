@@ -10,9 +10,9 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import { Avatar } from "@chakra-ui/react";
-import { HistoryIcon } from "../icons/History";
-import { Tooltip } from "../ui/tooltip";
-import { Popover } from "../ui/popover";
+import { HistoryIcon } from "~/components/icons/History";
+import { Tooltip } from "~/components/ui/tooltip";
+import { Popover } from "~/components/ui/popover";
 import type { LlmPromptConfigVersion } from "@prisma/client";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
