@@ -98,11 +98,6 @@ export default function PromptConfigsPage() {
       return;
     }
 
-    // Default config version data
-    const defaultPromptVersionConfig = llmPromptConfigVersionFactory.build({
-      schemaVersion: LATEST_SCHEMA_VERSION,
-    });
-
     // Create with defaults
     const newConfig = await createConfigMutation.mutateAsync({
       name: "New Prompt Config",
@@ -113,7 +108,16 @@ export default function PromptConfigsPage() {
     await createConfigVersionMutation.mutateAsync({
       configId: newConfig.id,
       projectId: project.id,
-      configData: defaultPromptVersionConfig.configData,
+      configData: {
+        model: "gpt-4o-mini",
+        prompt: "You are a helpful assistant",
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+        demonstrations: {
+          columns: [],
+          rows: [],
+        },
+      },
       schemaVersion: LATEST_SCHEMA_VERSION,
       commitMessage: "Initial version",
     });

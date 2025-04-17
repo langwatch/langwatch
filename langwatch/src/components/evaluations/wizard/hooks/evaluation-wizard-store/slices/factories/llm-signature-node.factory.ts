@@ -1,5 +1,5 @@
 import type { Signature } from "~/optimization_studio/types/dsl";
-import type { NodeWithOptionalPosition } from "../types";
+import type { NodeWithOptionalPosition } from "../../../../../../../types";
 import { DEFAULT_MODEL } from "../../../../../../../utils/constants";
 
 type LlmSignatureNode = NodeWithOptionalPosition<Signature>;

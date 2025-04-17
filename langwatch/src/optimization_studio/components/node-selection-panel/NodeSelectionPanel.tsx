@@ -16,29 +16,31 @@ import { BookOpen, Box as BoxIcon, ChevronsLeft, GitHub } from "react-feather";
 import { LuGripVertical } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { HoverableBigText } from "../../components/HoverableBigText";
-import { IconWrapper } from "../../components/IconWrapper";
-import { DiscordOutlineIcon } from "../../components/icons/DiscordOutline";
+import { HoverableBigText } from "../../../components/HoverableBigText";
+import { IconWrapper } from "../../../components/IconWrapper";
+import { DiscordOutlineIcon } from "../../../components/icons/DiscordOutline";
 import {
   updateCodeClassName,
   useWorkflowStore,
-} from "../hooks/useWorkflowStore";
-import { MODULES } from "../registry";
+} from "../../hooks/useWorkflowStore";
+import { MODULES } from "../../registry";
 import {
   type Component,
   type ComponentType,
   type Custom,
   type Field,
-} from "../types/dsl";
+} from "../../types/dsl";
 import {
   findLowestAvailableName,
   getInputsOutputs,
   nameToId,
-} from "../utils/nodeUtils";
-import { ComponentIcon } from "./ColorfulBlockIcons";
-import { NodeComponents } from "./nodes";
-import { PromptingTechniqueDraggingNode } from "./nodes/PromptingTechniqueNode";
-import { Tooltip } from "../../components/ui/tooltip";
+} from "../../utils/nodeUtils";
+import { ComponentIcon } from "../ColorfulBlockIcons";
+import { NodeComponents } from "../nodes";
+import { PromptingTechniqueDraggingNode } from "../nodes/PromptingTechniqueNode";
+import { Tooltip } from "../../../components/ui/tooltip";
+import { NodeDraggable } from "./NodeDraggable";
+import { LlmSignatureNodeDraggable } from "./LlmSignatureNodeDraggable";
 
 export function NodeSelectionPanelButton({
   isOpen,
@@ -147,7 +149,7 @@ export const NodeSelectionPanel = ({
             Components
           </Text>
 
-          <NodeDraggable component={MODULES.signature} type="signature" />
+          <LlmSignatureNodeDraggable />
 
           <NodeDraggable component={MODULES.code} type="code" />
 
@@ -280,159 +282,6 @@ export const NodeSelectionPanel = ({
         </HStack>
       </VStack>
     </Box>
-  );
-};
-
-export const NodeDraggable = (props: {
-  component: Component;
-  type: ComponentType;
-  behave_as?: "evaluator";
-  disableDrag?: boolean;
-}) => {
-  const { setNodes, setNodeParameter, deleteNode, nodes } = useWorkflowStore(
-    (state) => ({
-      setWorkflow: state.setWorkflow,
-      setNodes: state.setNodes,
-      setNodeParameter: state.setNodeParameter,
-      deleteNode: state.deleteNode,
-      nodes: state.nodes,
-      propertiesExpanded: state.propertiesExpanded,
-    })
-  );
-  const { newNode } = useMemo(() => {
-    const { name: newName, id: newId } = findLowestAvailableName(
-      nodes,
-      props.component.name ?? "Component"
-    );
-    const newNode = {
-      id: newId,
-      type: props.type,
-      data: {
-        ...props.component,
-        name: newName,
-        behave_as: props.behave_as,
-        ...(props.type === "code"
-          ? {
-              parameters: updateCodeClassName(
-                props.component.parameters ?? [],
-                nameToId(props.component.name ?? ""),
-                newId
-              ),
-            }
-          : {}),
-      },
-    };
-
-    return { newName, newId, newNode };
-  }, [nodes, props.component, props.type, props.behave_as]);
-
-  const { screenToFlowPosition } = useReactFlow();
-
-  const handleSetNodes = (newNode: Node, x: number, y: number) => {
-    const position = screenToFlowPosition({ x: x, y: y });
-
-    if (newNode) {
-      newNode.position = {
-        x: position.x - (newNode.width ?? 0) / 2,
-        y: position.y - (newNode.height ?? 0) / 2,
-      };
-      setNodes([...nodes, newNode]);
-    }
-  };
-
-  const handleSetPromptingTechnique = (newNode: Node, id: string) => {
-    if (newNode) {
-      newNode.position = {
-        x: 0,
-        y: 0,
-      };
-      setNodes([...nodes, newNode]);
-
-      const currentNode = nodes.find((node) => node.id === id);
-      for (const parameter of currentNode?.data.parameters ?? []) {
-        if (parameter.type === "prompting_technique") {
-          if (parameter.value) {
-            deleteNode((parameter.value as { ref: string }).ref);
-          }
-          setNodeParameter(id, {
-            identifier: parameter.identifier,
-            type: "prompting_technique",
-            value: {
-              ref: newNode.id,
-            },
-          });
-        }
-      }
-    }
-  };
-
-  const [collected, drag, preview] = useDrag({
-    type:
-      newNode.type === "prompting_technique" ? "prompting_technique" : "node",
-    item: {
-      node: newNode,
-    },
-    collect: (monitor) => ({
-      isDragging: !!monitor.isDragging(),
-      clientOffset: monitor.getClientOffset(),
-    }),
-    end: (item, monitor) => {
-      const dropResult = monitor.getDropResult();
-
-      if (item && dropResult) {
-        if (item.node.type === "prompting_technique") {
-          // @ts-ignore
-          handleSetPromptingTechnique(item.node, dropResult.id);
-        } else {
-          // @ts-ignore
-          handleSetNodes(item.node, dropResult.x, dropResult.y);
-        }
-      }
-    },
-  });
-
-  useEffect(() => {
-    preview(getEmptyImage(), { captureDraggingState: true });
-  }, [preview]);
-
-  return (
-    <>
-      <Tooltip
-        showArrow
-        positioning={{ gutter: 16, placement: "right" }}
-        content={
-          props.disableDrag
-            ? "You cannot add the same component as your workflow"
-            : props.component.description ?? ""
-        }
-      >
-        <Box
-          background="white"
-          ref={props.disableDrag ? undefined : drag}
-          borderRadius={4}
-          padding={1}
-          cursor={props.disableDrag ? "not-allowed" : "grab"}
-          width="full"
-          opacity={collected.isDragging ? 0.5 : 1}
-        >
-          <HStack width="full">
-            <ComponentIcon
-              type={props.type}
-              cls={props.component.cls}
-              behave_as={props.behave_as}
-              size="md"
-            />
-            <HoverableBigText lineClamp={1} expandable={false}>
-              {props.component.name}
-            </HoverableBigText>
-            <Spacer />
-            <Box color="gray.350">
-              <LuGripVertical size={18} />
-            </Box>
-          </HStack>
-        </Box>
-      </Tooltip>
-    </>
   );
 };
 

@@ -52,7 +52,7 @@ import {
   CustomDragLayer,
   NodeSelectionPanel,
   NodeSelectionPanelButton,
-} from "./NodeSelectionPanel";
+} from "./node-selection-panel/NodeSelectionPanel";
 import { Optimize } from "./Optimize";
 import { ProgressToast } from "./ProgressToast";
 import { PropertiesPanel } from "./properties/PropertiesPanel";
