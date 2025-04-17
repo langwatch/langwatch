@@ -15,7 +15,7 @@ from opentelemetry.trace import SpanKind, Context, _Links, Span as OtelSpan, Sta
 from opentelemetry.util.types import Attributes
 
 from langwatch.domain import ChatMessage, Conversation, EvaluationTimestamps, Money, MoneyDict, SpanInputOutput, SpanMetrics, SpanParams, SpanTimestamps, RAGChunk, SpanTypes
-from langwatch.observability.types import SpanType, SpanInputType, ContextsType
+from langwatch.telemetry.types import SpanType, SpanInputType, ContextsType
 from langwatch.__version__ import __version__
 from .context import stored_langwatch_span, stored_langwatch_trace, get_current_trace
 from langwatch.utils.initialization import ensure_setup
@@ -109,102 +109,146 @@ class LangWatchSpan:
 
     def _create_span(self):
         """Internal method to create and start the OpenTelemetry span."""
-        if self.trace:
-            tracer = self.trace.tracer
-        else:
-            if not self.ignore_missing_trace_warning:
-                warn("No current trace found, some spans will not be sent to LangWatch")
-            tracer = trace_api.get_tracer("langwatch", __version__)
-
-        # Handle parent span
-        parent = self.parent
-        if parent is None:
-            # If no explicit parent, try to get from context
-            current_span = stored_langwatch_span.get(None)
-            if current_span is not None:
-                parent = current_span._span
-            else:
-                # If still no parent, use the current span from OpenTelemetry context
-                parent = get_current_span()
-
-        if parent is not None:
-            if isinstance(parent, LangWatchSpan):
-                parent = parent._span
-
-        # Create the underlying OpenTelemetry span
-        self._span = tracer.start_span(
-            name=self.name or self.type,
-            context=self.span_context,
-            kind=self.kind,
-            links=self.links,
-            start_time=self.start_time,
-            record_exception=self.record_exception,
-            set_status_on_exception=self.set_status_on_exception,
-        )
-
-        self.update(
-            name=self.name,
-            type=self.type,
-            input=self.input,
-            output=self.output,
-            error=self.error,
-            timestamps=self.timestamps,
-            contexts=self.contexts,
-            model=self.model,
-            params=self.params,
-            metrics=self.metrics,
-            **(self.attributes or {}),
-        )
-
         try:
-            # Set our LangWatch context
-            self._context_token = stored_langwatch_span.set(self)
-            
-            # Instead of using OpenTelemetry's context management directly,
-            # we'll store the span in a way that survives async boundaries
+            if self.trace:
+                tracer = self.trace.tracer
+            else:
+                if not self.ignore_missing_trace_warning:
+                    warn("No current trace found, some spans will not be sent to LangWatch")
+                tracer = trace_api.get_tracer("langwatch", __version__)
+
+            if not tracer:
+                warn("No tracer available - span operations will be no-ops")
+                return
+
+            # Handle parent span
+            parent = self.parent
+            if parent is None:
+                # If no explicit parent, try to get from context
+                current_span = stored_langwatch_span.get(None)
+                if current_span is not None and current_span._span is not None:
+                    parent = current_span._span
+                else:
+                    # If still no parent, use the current span from OpenTelemetry context
+                    parent = get_current_span()
+
+            if parent is not None:
+                if isinstance(parent, LangWatchSpan):
+                    parent = parent._span
+
+            # Create the underlying OpenTelemetry span
             try:
-                # Create a new context with our span
-                new_context = set_span_in_context(self._span)
-                # Store the context itself rather than attaching it
-                self._otel_context = new_context
-                # We still need to attach it for OpenTelemetry's APIs to work
-                # but we won't try to detach it later since that's causing issues
-                context.attach(new_context)
+                self._span = tracer.start_span(
+                    name=self.name or self.type,
+                    context=self.span_context,
+                    kind=self.kind,
+                    links=self.links,
+                    start_time=self.start_time,
+                    record_exception=self.record_exception,
+                    set_status_on_exception=self.set_status_on_exception,
+                )
+
+                if not self._span:
+                    warn("Failed to create span - got None from tracer")
+                    return
+
             except Exception as e:
-                warn(f"Failed to set OpenTelemetry context (span will still work): {e}")
+                warn(f"Failed to create span: {str(e)}. Span operations will be no-ops.")
+                return
+
+            try:
+                self.update(
+                    name=self.name,
+                    type=self.type,
+                    input=self.input,
+                    output=self.output,
+                    error=self.error,
+                    timestamps=self.timestamps,
+                    contexts=self.contexts,
+                    model=self.model,
+                    params=self.params,
+                    metrics=self.metrics,
+                    **(self.attributes or {}),
+                )
+            except Exception as e:
+                warn(f"Failed to update span attributes: {str(e)}")
+
+            try:
+                # Set our LangWatch context
+                self._context_token = stored_langwatch_span.set(self)
+                
+                # Instead of using OpenTelemetry's context management directly,
+                # we'll store the span in a way that survives async boundaries
+                try:
+                    # Create a new context with our span
+                    new_context = set_span_in_context(self._span)
+                    # Store the context itself rather than attaching it
+                    self._otel_context = new_context
+                    # We still need to attach it for OpenTelemetry's APIs to work
+                    # but we won't try to detach it later since that's causing issues
+                    context.attach(new_context)
+                except Exception as e:
+                    warn(f"Failed to set OpenTelemetry context (span will still work): {e}")
+                    self._otel_context = None
+            except Exception as e:
+                warn(f"Failed to set LangWatch span context: {e}")
+                self._context_token = None
                 self._otel_context = None
+
         except Exception as e:
-            warn(f"Failed to set LangWatch span context: {e}")
-            self._context_token = None
-            self._otel_context = None
+            warn(f"Unexpected error creating span: {str(e)}. Span operations will be no-ops.")
 
     def record_error(self, error: Exception) -> None:
         """Record an error in this span."""
-        ensure_setup()
-        self._span.set_status(Status(StatusCode.ERROR))
-        self._span.record_exception(error)
+        if self._span is None:
+            warn("Cannot record error - no span available")
+            return
+        try:
+            self._span.set_status(Status(StatusCode.ERROR))
+            self._span.record_exception(error)
+        except Exception as e:
+            warn(f"Failed to record error on span: {str(e)}")
 
     def add_event(self, name: str, attributes: Optional[Dict[str, Any]] = None) -> None:
         """Add an event to this span."""
-        ensure_setup()
-        self._span.add_event(name, attributes)
+        if self._span is None:
+            warn("Cannot add event - no span available")
+            return
+        try:
+            self._span.add_event(name, attributes)
+        except Exception as e:
+            warn(f"Failed to add event to span: {str(e)}")
 
     def set_status(self, status: Status, description: Optional[str] = None) -> None:
         """Set the status of this span."""
-        ensure_setup()
-        self._span.set_status(status, description)
+        if self._span is None:
+            warn("Cannot set status - no span available")
+            return
+        try:
+            self._span.set_status(status, description)
+        except Exception as e:
+            warn(f"Failed to set status on span: {str(e)}")
 
     def set_attributes(self, attributes: Dict[str, Any]) -> None:
-        """Update the span's attributes."""
-        ensure_setup()
-        self._span.set_attributes(attributes)
+        """Set attributes on this span."""
+        if self._span is None:
+            warn("Cannot set attributes - no span available")
+            return
+        try:
+            self._span.set_attributes(attributes)
+        except Exception as e:
+            warn(f"Failed to set attributes on span: {str(e)}")
 
     def update_name(self, name: str) -> None:
         """Update the name of the span."""
-        ensure_setup()
-        self.name = name
-
-        self._span.update_name(name)
+        if self._span is None:
+            warn("Cannot update name - no span available")
+            return
+        try:
+            self.name = name
+            self._span.update_name(name)
+        except Exception as e:
+            warn(f"Failed to update name on span: {str(e)}")
 
     def update(
         self,

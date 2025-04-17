@@ -5,13 +5,10 @@ from opentelemetry import trace as trace_api
 from langwatch.utils.initialization import ensure_setup
 
 if TYPE_CHECKING:
-    from langwatch.observability.span import LangWatchSpan
-    from langwatch.observability.tracing import LangWatchTrace
+    from langwatch.telemetry.span import LangWatchSpan
+    from langwatch.telemetry.tracing import LangWatchTrace
 
-# Context variable for the current trace
 stored_langwatch_trace = contextvars.ContextVar('stored_langwatch_trace')
-
-# Context variable for the current span
 stored_langwatch_span = contextvars.ContextVar('stored_langwatch_span') 
 
 def get_current_trace() -> 'LangWatchTrace':
@@ -25,7 +22,7 @@ def get_current_trace() -> 'LangWatchTrace':
     if trace is not None:
         return trace
 
-    from langwatch.observability.tracing import LangWatchTrace
+    from langwatch.telemetry.tracing import LangWatchTrace
     return LangWatchTrace()
 
 def get_current_span() -> 'LangWatchSpan':
@@ -41,8 +38,9 @@ def get_current_span() -> 'LangWatchSpan':
     span = stored_langwatch_span.get(None)
     if span is not None:
         return span
-        
+
     # Fall back to OpenTelemetry context
     otel_span = trace_api.get_current_span()
     trace = get_current_trace()
+
     return LangWatchSpan.wrap_otel_span(otel_span, trace)

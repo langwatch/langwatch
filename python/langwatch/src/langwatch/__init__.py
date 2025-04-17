@@ -1,10 +1,8 @@
-import sys
-
 from .utils.module import module_property
-from .observability.tracing import trace
-from .observability.samping import sampling_rate
-from .observability.context import get_current_trace, get_current_span
-from .observability.span import span
+from .telemetry.tracing import trace
+from .telemetry.sampling import sampling_rate
+from .telemetry.context import get_current_trace, get_current_span
+from .telemetry.span import span
 from .state import get_api_key, get_endpoint
 from .__version__ import __version__
 from .utils.initialization import ensure_setup, setup
