@@ -1,4 +1,3 @@
-import contextvars
 import functools
 import json
 from logging import warn
@@ -9,19 +8,22 @@ import threading
 from deprecated import deprecated
 from langwatch.attributes import AttributeName
 from langwatch.utils.transformation import SerializableWithStringFallback, convert_typed_values
-import nanoid
 from opentelemetry import trace as trace_api
 from opentelemetry.sdk.trace import TracerProvider
-from typing import Dict, List, Literal, Optional, Callable, Any, Type, TypeVar, Union, cast
+from typing import Dict, List, Literal, Optional, Callable, Any, Type, TypeVar, Union, cast, TYPE_CHECKING
 from warnings import warn
 import inspect
 
 from langwatch.state import get_api_key, get_endpoint, get_instance
 from langwatch.domain import ChatMessage, Conversation, Evaluation, EvaluationTimestamps, Money, MoneyDict, RAGChunk, SpanInputOutput, SpanMetrics, SpanParams, SpanTimestamps, SpanTypes, TraceMetadata
-from langwatch.observability.span import LangWatchSpan
+from langwatch.telemetry.span import LangWatchSpan
 from langwatch.__version__ import __version__
-from langwatch.observability.context import stored_langwatch_trace, stored_langwatch_span
+from langwatch.telemetry.context import stored_langwatch_trace
 from langwatch.utils.initialization import ensure_setup
+
+if TYPE_CHECKING:
+    from openai import OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI
+    from dspy import Teleprompter
 
 __all__ = ["trace", "LangWatchTrace"]
 
@@ -90,20 +92,12 @@ class LangWatchTrace:
         # Determine which tracer provider to use
         if tracer_provider is not None:
             # Use the explicitly provided tracer provider
-            pass
-        else:
-            # Get the client instance which will have the properly initialized tracer provider
-            client = get_instance()
-            if client is not None and client.tracer_provider is not None:
-                tracer_provider = client.tracer_provider
-            else:
-                # Fall back to global tracer provider
-                tracer_provider = trace_api.get_tracer_provider()
+            trace_api.set_tracer_provider(tracer_provider)
 
+        # Use the global tracer provider
         self.tracer = trace_api.get_tracer(
             instrumenting_module_name="langwatch",
             instrumenting_library_version=__version__,
-            tracer_provider=tracer_provider,
             attributes=metadata,
         )
 
@@ -195,22 +189,15 @@ class LangWatchTrace:
         from langwatch.langchain import LangChainTracer
         return LangChainTracer(trace=self)
 
-    @deprecated(
-        reason="This method of instrumenting OpenAI is deprecated and will be removed in a future version. Please refer to the docs to see the new way to instrument OpenAI."
-    )
     def autotrack_openai_calls(
-        self,
-        client: Any,
+        self, client: Union["OpenAI", "AsyncOpenAI", "AzureOpenAI", "AsyncAzureOpenAI"]
     ):
-        from openinference.instrumentation.openai import OpenAIInstrumentor
-        OpenAIInstrumentor().instrument()
+        import langwatch.openai  # import dynamically here instead of top-level because, believe it or not, users might not have openai installed
+        langwatch.openai.OpenAITracer(trace=self, client=client)
 
-    @deprecated(
-        reason="This method of instrumenting LiteLLM is deprecated and will be removed in a future version. Please refer to the docs to see the new way to instrument LiteLLM."
-    )
     def autotrack_litellm_calls(self, client: ModuleType):
-        from openinference.instrumentation.litellm import LiteLLMInstrumentor
-        LiteLLMInstrumentor().instrument()
+        import langwatch.litellm  # import dynamically here instead of top-level because users might not have litellm installed
+        langwatch.litellm.LiteLLMPatch(trace=self, client=client)
 
     def autotrack_dspy(
         self,
@@ -233,7 +220,7 @@ class LangWatchTrace:
         """
         ensure_setup()
 
-        from langwatch.instrumentation.dspy import langwatch_dspy
+        from langwatch.dspy import langwatch_dspy
         
         with self:
             langwatch_dspy.init(
