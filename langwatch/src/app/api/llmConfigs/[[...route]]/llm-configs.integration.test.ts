@@ -210,4 +210,93 @@ describe("Prompts API", () => {
       expect(body).toHaveProperty("error");
     });
   });
+
+  // Validation/unhappy path tests
+  describe("Validation tests", () => {
+    it("should validate input when creating a prompt", async () => {
+      const invalidData = {
+        name: "", // Empty name should be rejected
+      };
+
+      const res = await app.request(`/api/prompts`, {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(invalidData),
+      });
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body).toHaveProperty("error");
+    });
+
+    it("should validate input when creating a prompt version", async () => {
+      // Create a valid prompt first
+      const promptRes = await app.request(`/api/prompts`, {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: "Test Prompt" }),
+      });
+
+      const prompt = await promptRes.json();
+
+      const invalidData = {
+        schemaVersion: "1.0",
+        configData: {
+          // Missing required model field
+          temperature: 0.7,
+        },
+        commitMessage: "Invalid schema",
+      };
+
+      const res = await app.request(`/api/prompts/${prompt.id}/versions`, {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(invalidData),
+      });
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body).toHaveProperty("error");
+    });
+
+    it("should validate input when updating a prompt", async () => {
+      // Create a valid prompt first
+      const promptRes = await app.request(`/api/prompts`, {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: "Test Prompt" }),
+      });
+
+      const prompt = await promptRes.json();
+
+      const invalidData = {
+        name: "", // Empty name should be rejected
+      };
+
+      const res = await app.request(`/api/prompts/${prompt.id}`, {
+        method: "PUT",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(invalidData),
+      });
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body).toHaveProperty("error");
+    });
+  });
 });
