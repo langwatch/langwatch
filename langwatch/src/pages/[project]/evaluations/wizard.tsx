@@ -2,7 +2,7 @@ import { useDisclosure } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { EvaluationWizard as EvaluationWizardComponent } from "../../../components/evaluations/wizard/EvaluationWizard";
 import { Dialog } from "../../../components/ui/dialog";
-import EvaluationsV2 from "../evaluations_v2";
+import EvaluationsV2 from "../evaluations";
 import { useRouter } from "next/router";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
@@ -61,7 +61,7 @@ export default function EvaluationWizard() {
         open={open}
         onOpenChange={({ open }) => {
           if (!open) {
-            void router.push(`/${project?.slug}/evaluations_v2`);
+            void router.push(`/${project?.slug}/evaluations`);
           }
         }}
         size="full"

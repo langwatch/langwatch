@@ -70,7 +70,7 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
         <HStack width="full" justifyContent="start">
           <Box
             role="button"
-            onClick={() => void router.push(`/${project?.slug}/evaluations_v2`)}
+            onClick={() => void router.push(`/${project?.slug}/evaluations`)}
             cursor="pointer"
           >
             <LogoIcon width={24} height={24} />
@@ -343,7 +343,7 @@ const WizardSidebar = memo(function WizardSidebar({
                         },
                         {
                           onSuccess: () => {
-                            void router.push(`/${project.slug}/evaluations_v2`);
+                            void router.push(`/${project.slug}/evaluations`);
 
                             toaster.create({
                               title: "Monitor saved successfully",
