@@ -1,5 +1,4 @@
 import json
-import time
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Optional, TypedDict, Union
 from langchain.schema import (
     LLMResult,
@@ -13,14 +12,13 @@ from langchain.schema import (
     ChatGeneration,
 )
 from langchain.callbacks.base import BaseCallbackHandler
+from langwatch.telemetry.span import LangWatchSpan
+from langwatch.telemetry.tracing import LangWatchTrace
 from langwatch.utils.transformation import SerializableWithStringFallback, convert_typed_values
+from langwatch.utils.utils import list_get, milliseconds_timestamp
 import nanoid
 import langwatch
-from langwatch.tracer import (
-    ContextTrace,
-    ContextSpan,
-)
-from langwatch.types import (
+from langwatch.domain import (
     ChatMessage,
     ChatRole,
     SpanParams,
@@ -37,17 +35,6 @@ from langwatch.types import (
 
 from uuid import UUID
 from langchain.tools import BaseTool
-
-
-def list_get(l, i, default=None):
-    try:
-        return l[i]
-    except IndexError:
-        return default
-
-
-def milliseconds_timestamp():
-    return int(time.time() * 1000)
 
 
 class SpanParams(TypedDict, total=False):
@@ -109,13 +96,13 @@ def langchain_message_to_chat_message(message: BaseMessage) -> ChatMessage:
 class LangChainTracer(BaseCallbackHandler):
     """LangWatch callback handler that can be used to handle callbacks from langchain."""
 
-    trace: ContextTrace
+    trace: LangWatchTrace
 
-    spans: Dict[str, ContextSpan] = {}
+    spans: Dict[str, LangWatchSpan] = {}
 
     def __init__(
         self,
-        trace: Optional[ContextTrace] = None,
+        trace: Optional[LangWatchTrace] = None,
         # Deprecated: mantained for retrocompatibility
         trace_id: Optional[str] = None,
         # Deprecated: mantained for retrocompatibility
@@ -184,7 +171,7 @@ class LangChainTracer(BaseCallbackHandler):
         parent_run_id: Optional[UUID],
         input: SpanInputOutput,
         **kwargs: Any,
-    ) -> ContextSpan:
+    ) -> LangWatchSpan:
         span_params = SpanParams()
         params = [
             "frequency_penalty",
@@ -342,7 +329,7 @@ class LangChainTracer(BaseCallbackHandler):
         parent_run_id: Optional[UUID],
         name: Optional[str],
         input: Optional[SpanInputOutput],
-    ) -> ContextSpan:
+    ) -> LangWatchSpan:
         span = langwatch.span(
             type=type,
             name=name,
