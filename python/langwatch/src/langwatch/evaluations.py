@@ -6,7 +6,7 @@ import httpx
 import langwatch
 from langwatch.domain import SpanTimestamps
 import nanoid
-from langwatch.observability.span import LangWatchSpan, get_current_span
+from langwatch.telemetry.span import LangWatchSpan, get_current_span
 from langwatch.state import get_api_key, get_endpoint
 from pydantic import BaseModel
 
@@ -26,7 +26,7 @@ from langwatch.types import (
 from langwatch.utils.exceptions import capture_exception
 
 if TYPE_CHECKING:
-    from langwatch.observability.tracing import LangWatchTrace
+    from langwatch.telemetry.tracing import LangWatchTrace
 
 
 class EvaluationResultModel(BaseModel):
