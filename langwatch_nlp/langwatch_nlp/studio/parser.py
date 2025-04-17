@@ -40,6 +40,7 @@ env = Environment(
     trim_blocks=True,
     lstrip_blocks=True,
 )
+env.globals["os"] = os
 env.globals["raise"] = raise_helper
 env.globals["PROMPTING_TECHNIQUES"] = PROMPTING_TECHNIQUES_FOR_TEMPLATE
 env.globals["FIELD_TYPE_TO_DSPY_TYPE"] = FIELD_TYPE_TO_DSPY_TYPE
