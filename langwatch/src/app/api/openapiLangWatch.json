@@ -2,7 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "LangWatch API",
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "description": "LangWatch openapi spec"
   },
   "servers": [
     {
@@ -418,7 +419,9 @@
                       "items": {
                         "type": "string"
                       },
-                      "example": ["cccd21e0b70c706034dfd9f7772816a3"]
+                      "example": [
+                        "cccd21e0b70c706034dfd9f7772816a3"
+                      ]
                     },
                     "spans": {
                       "type": "array",
@@ -648,7 +651,9 @@
                                 "items": {
                                   "type": "string"
                                 },
-                                "example": ["TypeError: fetch failed"]
+                                "example": [
+                                  "TypeError: fetch failed"
+                                ]
                               },
                               "message": {
                                 "type": "string",
@@ -685,7 +690,9 @@
       "post": {
         "summary": "Search traces",
         "description": "Search for traces based on given criteria",
-        "tags": ["Traces"],
+        "tags": [
+          "Traces"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -796,7 +803,6 @@
         }
       }
     },
-
     "/api/dataset/{slug}/entries": {
       "post": {
         "responses": {},
@@ -822,12 +828,283 @@
           }
         }
       }
+    },
+    "/api/prompts": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiPrompts",
+        "parameters": [],
+        "description": "Get all prompts for a project"
+      },
+      "post": {
+        "responses": {},
+        "operationId": "postApiPrompts",
+        "parameters": [],
+        "description": "Create a new prompt",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/prompts/{id}": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiPromptsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Get a specific prompt"
+      },
+      "put": {
+        "responses": {},
+        "operationId": "putApiPromptsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Update a prompt",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "responses": {},
+        "operationId": "deleteApiPromptsById",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Delete a prompt"
+      }
+    },
+    "/api/prompts/{id}/versions": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiPromptsByIdVersions",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Get all versions for a prompt"
+      },
+      "post": {
+        "responses": {},
+        "operationId": "postApiPromptsByIdVersions",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Create a new version for a prompt",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "authorId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "projectId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "configId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "schemaVersion": {
+                    "type": "string",
+                    "const": "1.0"
+                  },
+                  "commitMessage": {
+                    "type": "string"
+                  },
+                  "configData": {
+                    "type": "object",
+                    "properties": {
+                      "version": {
+                        "type": "string",
+                        "const": "1.0"
+                      },
+                      "prompt": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "inputs": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "identifier": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "type": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "identifier",
+                            "type"
+                          ]
+                        },
+                        "minItems": 1
+                      },
+                      "outputs": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "identifier": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "type": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "identifier",
+                            "type"
+                          ]
+                        },
+                        "minItems": 1
+                      },
+                      "demonstrations": {
+                        "type": "object",
+                        "properties": {
+                          "columns": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "type"
+                              ]
+                            }
+                          },
+                          "rows": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "additionalProperties": {}
+                            },
+                            "default": []
+                          }
+                        },
+                        "required": [
+                          "columns"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "version",
+                      "prompt",
+                      "model",
+                      "inputs",
+                      "outputs",
+                      "demonstrations"
+                    ]
+                  }
+                },
+                "required": [
+                  "authorId",
+                  "projectId",
+                  "configId",
+                  "schemaVersion",
+                  "commitMessage",
+                  "configData"
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
       "Annotation": {
-        "required": ["name"],
+        "required": [
+          "name"
+        ],
         "type": "object",
         "properties": {
           "id": {
@@ -869,7 +1146,10 @@
         }
       },
       "Error": {
-        "required": ["error", "message"],
+        "required": [
+          "error",
+          "message"
+        ],
         "type": "object",
         "properties": {
           "error": {
@@ -1102,7 +1382,6 @@
           }
         }
       },
-
       "DatasetPostEntries": {
         "type": "object",
         "properties": {
@@ -1120,7 +1399,9 @@
             ]
           }
         },
-        "required": ["entries"]
+        "required": [
+          "entries"
+        ]
       }
     },
     "securitySchemes": {
