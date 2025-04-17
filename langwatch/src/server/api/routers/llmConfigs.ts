@@ -3,25 +3,8 @@ import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup } from "../permission";
 import { checkUserPermissionForProject } from "../permission";
-import type { LlmPromptConfigVersion } from "@prisma/client";
-import type { JsonValue } from "@prisma/client/runtime/library";
-
-// Basic schema for the config JSON - adjust as needed for specific structure
-const configJsonSchema = z
-  .record(z.any())
-  .describe("JSON configuration object");
-
-// Base schema for parent LlmPromptConfig
-const baseConfigSchema = z.object({
-  name: z.string().min(1, "Name cannot be empty."),
-});
-
-// Base schema for LlmPromptConfigVersion
-const baseVersionSchema = z.object({
-  configData: configJsonSchema, // The actual config data for this version
-  schemaVersion: z.string().min(1, "Schema version cannot be empty."),
-  commitMessage: z.string().optional(),
-});
+import { LlmConfigRepository } from "../../repositories/llm-config.repository";
+import { getLatestConfigVersionSchema } from "~/server/repositories/llm-config-version-schema";
 
 const idSchema = z.object({
   id: z.string(),
@@ -35,124 +18,91 @@ const configIdSchema = z.object({
   configId: z.string(),
 });
 
+const configDataSchema = z
+  .object({
+    name: z.string(),
+  })
+  .merge(projectIdSchema);
+
 /**
- * Router for handling LLM Prompt Config Versions
+ * Router for handling LLM prompt config versions
  */
 export const llmConfigVersionsRouter = createTRPCRouter({
   /**
    * Get all versions for a specific config.
    */
   getVersions: protectedProcedure
-    .input(configIdSchema.merge(projectIdSchema))
+    .input(
+      projectIdSchema.merge(
+        z.object({
+          configId: z.string(),
+        })
+      )
+    )
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
     .query(async ({ ctx, input }) => {
-      // First verify the config exists within the project
-      const config = await ctx.prisma.llmPromptConfig.findUnique({
-        where: {
-          id: input.configId,
-          projectId: input.projectId,
-        },
-      });
+      const repository = new LlmConfigRepository(ctx.prisma);
 
-      if (!config) {
+      try {
+        const versions = await repository.versions.getVersions(input);
+        return versions;
+      } catch (error) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Prompt config not found.",
         });
       }
-
-      // Get all versions for this config
-      const versions = await ctx.prisma.llmPromptConfigVersion.findMany({
-        where: {
-          configId: input.configId,
-          projectId: input.projectId,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-        include: {
-          author: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-        },
-      });
-
-      return versions;
     }),
 
   /**
-   * Get a specific version by ID.
+   * Get a specific version by id.
    */
   getById: protectedProcedure
-    .input(idSchema.merge(projectIdSchema))
+    .input(
+      projectIdSchema.merge(
+        z.object({
+          versionId: z.string(),
+        })
+      )
+    )
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
     .query(async ({ ctx, input }) => {
-      // Find the version, but join to config to check project permission
-      const version = await ctx.prisma.llmPromptConfigVersion.findFirst({
-        where: {
-          id: input.id,
-          projectId: input.projectId,
-          config: {
-            projectId: input.projectId,
-          },
-        },
-        include: {
-          author: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-          config: true,
-        },
-      });
+      const repository = new LlmConfigRepository(ctx.prisma);
 
-      if (!version) {
+      try {
+        const version = await repository.versions.getVersionById(input);
+        return version;
+      } catch (error) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Prompt config version not found.",
         });
       }
-
-      return version;
     }),
 
   /**
    * Create a new version for an existing config.
    */
   create: protectedProcedure
-    .input(baseVersionSchema.merge(configIdSchema).merge(projectIdSchema))
+    .input(getLatestConfigVersionSchema())
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      const { configData, schemaVersion, commitMessage, configId, projectId } =
-        input;
+      const repository = new LlmConfigRepository(ctx.prisma);
+      const authorId = ctx.session?.user?.id || null;
 
-      // Create the new version
-      const version = await ctx.prisma.llmPromptConfigVersion.create({
-        data: {
-          commitMessage,
-          authorId: ctx.session?.user?.id || null,
-          configId,
-          configData,
-          schemaVersion,
-          projectId,
-        },
-      });
+      try {
+        const version = await repository.versions.createVersion({
+          ...input,
+          authorId,
+        });
 
-      // Update the parent config's updatedAt timestamp
-      await ctx.prisma.llmPromptConfig.update({
-        where: { id: configId, projectId },
-        data: { updatedAt: new Date() },
-      });
-
-      return version;
+        return version;
+      } catch (error) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Failed to create version.",
+        });
+      }
     }),
 
   /**
@@ -162,42 +112,20 @@ export const llmConfigVersionsRouter = createTRPCRouter({
     .input(configIdSchema.merge(projectIdSchema))
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
     .query(async ({ ctx, input }) => {
-      // First verify the config exists within the project
-      const config = await ctx.prisma.llmPromptConfig.findUnique({
-        where: { id: input.configId, projectId: input.projectId },
-      });
+      const repository = new LlmConfigRepository(ctx.prisma);
 
-      if (!config) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Prompt config not found.",
-        });
-      }
-
-      // Get the latest version
-      const latestVersion = await ctx.prisma.llmPromptConfigVersion.findFirst({
-        where: { configId: input.configId, projectId: input.projectId },
-        orderBy: { createdAt: "desc" },
-        include: {
-          author: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-        },
-      });
-
-      if (!latestVersion) {
+      try {
+        const latestVersion = await repository.versions.getLatestVersion(
+          input.configId,
+          input.projectId
+        );
+        return latestVersion;
+      } catch (error) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "No versions found for this config.",
         });
       }
-
-      return latestVersion;
     }),
 
   /**
@@ -208,174 +136,134 @@ export const llmConfigVersionsRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       const { id, projectId } = input;
+      const repository = new LlmConfigRepository(ctx.prisma);
 
-      // Find the version to restore
-      const version = await ctx.prisma.llmPromptConfigVersion.findUnique({
-        where: { id, projectId },
-      });
+      try {
+        const newVersion = await repository.versions.restoreVersion(
+          id,
+          projectId,
+          ctx.session?.user?.id || null
+        );
 
-      if (!version) {
+        return newVersion;
+      } catch (error) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Version not found.",
         });
       }
-
-      // Create a new version with the same config data
-      const newVersion = await ctx.prisma.llmPromptConfigVersion.create({
-        data: {
-          commitMessage: `Restore from version ${version.version}`,
-          authorId: ctx.session?.user?.id ?? null,
-          configId: version.configId,
-          schemaVersion: version.schemaVersion,
-          projectId: version.projectId,
-          // This any shouldn't be needed, but I don't know what is the difference between JsonInputValue and JsonValue
-          configData: version.configData as any,
-        },
-      });
-
-      // Update the parent config's updatedAt timestamp
-      await ctx.prisma.llmPromptConfig.update({
-        where: { id: version.configId, projectId },
-        data: { updatedAt: new Date() },
-      });
-
-      return newVersion;
     }),
 });
 
 /**
- * Router for handling LLM Prompt Configs
+ * Router for handling LLM prompt configs
  */
 export const llmConfigsRouter = createTRPCRouter({
   versions: llmConfigVersionsRouter,
 
   /**
-   * Get all LLM Prompt Configs for a specific project.
+   * Get all LLM prompt configs for a specific project.
    */
   getPromptConfigs: protectedProcedure
     .input(projectIdSchema)
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
     .query(async ({ ctx, input }) => {
-      // Get all configs for this project
-      return await ctx.prisma.llmPromptConfig.findMany({
-        where: {
-          projectId: input.projectId,
-        },
-        orderBy: {
-          updatedAt: "desc",
-        },
-      });
+      const repository = new LlmConfigRepository(ctx.prisma);
+      return await repository.getAllConfigs(input.projectId);
     }),
 
   /**
-   * Get a single LLM Prompt Config by its ID.
+   * Get a single LLM prompt config by its id.
    */
   getPromptConfigById: protectedProcedure
     .input(idSchema.merge(projectIdSchema))
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
     .query(async ({ ctx, input }) => {
-      const config = await ctx.prisma.llmPromptConfig.findUnique({
-        where: {
-          id: input.id,
-          projectId: input.projectId,
-        },
-        include: {
-          versions: {
-            orderBy: {
-              createdAt: "desc",
-            },
-            take: 1,
-          },
-        },
-      });
+      const repository = new LlmConfigRepository(ctx.prisma);
 
-      if (!config) {
+      try {
+        const config = await repository.getConfigById(
+          input.id,
+          input.projectId
+        );
+        return config;
+      } catch (error) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Prompt config not found.",
         });
       }
-
-      return config;
     }),
 
   /**
-   * Create a new LLM Prompt Config with its initial version.
+   * Create a new LLM prompt config with its initial version.
    */
   createPromptConfig: protectedProcedure
-    .input(baseConfigSchema.merge(baseVersionSchema).merge(projectIdSchema))
+    .input(configDataSchema)
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      const { name, configData, schemaVersion, commitMessage, projectId } =
-        input;
+      const repository = new LlmConfigRepository(ctx.prisma);
 
-      // Create the parent config
-      const config = await ctx.prisma.llmPromptConfig.create({
-        data: {
-          name,
-          projectId,
-        },
-      });
+      try {
+        const newConfig = await repository.createConfig(input);
 
-      const version = await ctx.prisma.llmPromptConfigVersion.create({
-        data: {
-          projectId: config.projectId,
-          commitMessage: commitMessage ?? "Initial version",
-          authorId: ctx.session?.user?.id ?? null,
-          configId: config.id,
-          configData,
-          schemaVersion,
-        },
-      });
-
-      return {
-        ...config,
-        projectId,
-        latestVersion: version,
-      };
+        return newConfig;
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Failed to create config.",
+        });
+      }
     }),
 
   /**
-   * Update an LLM Prompt Config's metadata (name only).
+   * Update an LLM prompt config's metadata (name only).
    */
   updatePromptConfig: protectedProcedure
-    .input(baseConfigSchema.partial().merge(idSchema).merge(projectIdSchema))
+    .input(
+      projectIdSchema.merge(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+        })
+      )
+    )
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      // First, verify the config exists within the project
-      const existingConfig = await ctx.prisma.llmPromptConfig.findUnique({
-        where: { id: input.id, projectId: input.projectId },
-      });
+      const repository = new LlmConfigRepository(ctx.prisma);
 
-      if (!existingConfig) {
+      try {
+        const updatedConfig = await repository.updateConfig(
+          input.id,
+          input.projectId,
+          { name: input.name }
+        );
+
+        return updatedConfig;
+      } catch (error) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Prompt config not found.",
         });
       }
-
-      // Update only the parent config metadata (name)
-      const updatedConfig = await ctx.prisma.llmPromptConfig.update({
-        where: { id: input.id, projectId: input.projectId },
-        data: { name: input.name },
-      });
-
-      return updatedConfig;
     }),
 
   /**
-   * Delete an LLM Prompt Config and all its versions.
+   * Delete an LLM prompt config and all its versions.
    */
   deletePromptConfig: protectedProcedure
     .input(idSchema.merge(projectIdSchema))
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      // Delete the parent config (all versions will be cascade deleted)
-      await ctx.prisma.llmPromptConfig.delete({
-        where: { id: input.id, projectId: input.projectId },
-      });
+      const repository = new LlmConfigRepository(ctx.prisma);
 
-      return { success: true };
+      try {
+        return await repository.deleteConfig(input.id, input.projectId);
+      } catch (error) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Prompt config not found.",
+        });
+      }
     }),
 });
