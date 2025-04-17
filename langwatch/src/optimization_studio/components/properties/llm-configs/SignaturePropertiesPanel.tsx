@@ -29,6 +29,7 @@ import {
 import { LLMConfigField } from "../modals/llm-config/LLMConfigField";
 import { ComponentIcon } from "../../ColorfulBlockIcons";
 import { PromptSource } from "./PromptSource";
+import { PromptConfigForm } from "~/components/prompt-configs/forms/PromptConfigForm";
 
 /**
  * Properties panel for the Signature node in the optimization studio.
@@ -69,84 +70,20 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
   });
 
   return (
-    <BasePropertiesPanel
-      node={node}
-      hideParameters
-      fieldsAfter={
-        <>
-          <VStack width="full" align="start" gap={2}>
-            <HStack width="full">
-              <PropertySectionTitle>
-                Demonstrations{" "}
-                {total !== undefined && total > 0 && (
-                  <Text as="span" color="gray.400">
-                    ({total} rows)
-                  </Text>
-                )}
-              </PropertySectionTitle>
-              <Tooltip content="Few-shot examples to guide the LLM to generate the correct output.">
-                <Box paddingTop={1}>
-                  <Info size={14} />
-                </Box>
-              </Tooltip>
-              <Spacer />
-              <Button
-                size="xs"
-                variant="ghost"
-                marginBottom={-1}
-                onClick={() => {
-                  onOpen();
-                }}
-              >
-                <Edit2 size={14} />
-                <Text>Edit</Text>
-              </Button>
-            </HStack>
-            <DatasetPreview
-              rows={demonstrationRows}
-              columns={demonstrationColumns}
-              minHeight={`${36 + 29 * (demonstrationRows?.length ?? 0)}px`}
-            />
-            <DemonstrationsModal open={open} onClose={onClose} node={node} />
-          </VStack>
-        </>
-      }
-    >
+    <BasePropertiesPanel node={node} hideParameters>
       <PromptSource configId="" onSelect={console.log} />
+      {/* TODO: What's this? */}
       {(parameters.prompting_technique?.value as { ref: string }) && (
         <PromptingTechniqueField
           value={(parameters.prompting_technique?.value as { ref: string }).ref}
         />
       )}
-      <PropertyField title="LLM">
-        <LLMConfigField
-          allowDefault={true}
-          defaultLLMConfig={default_llm}
-          llmConfig={parameters.llm?.value as LLMConfig | undefined}
-          onChange={(llmConfig) => {
-            setNodeParameter(node.id, {
-              identifier: "llm",
-              type: "llm",
-              value: llmConfig,
-            });
-          }}
-        />
-      </PropertyField>
-      <PropertyField title="Instructions">
-        <Textarea
-          height="100px"
-          fontFamily="monospace"
-          fontSize="13px"
-          value={(parameters.instructions?.value as string | undefined) ?? ""}
-          onChange={(e) =>
-            setNodeParameter(node.id, {
-              identifier: "instructions",
-              type: "str",
-              value: e.target.value,
-            })
-          }
-        />
-      </PropertyField>
+      <PromptConfigForm
+        configId={node.data.config?.id}
+        onSubmitSuccess={() => {
+          console.log("success");
+        }}
+      />
     </BasePropertiesPanel>
   );
 }

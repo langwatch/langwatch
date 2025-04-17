@@ -22,6 +22,8 @@ import type {
 } from "../types/dsl";
 import { findLowestAvailableName } from "../utils/nodeUtils";
 import { hasDSLChanged } from "../utils/dslUtils";
+import type { LlmPromptConfig } from "@prisma/client";
+import type { LatestConfigVersionSchema } from "~/server/repositories/llm-config-version-schema";
 
 export type SocketStatus =
   | "disconnected"
@@ -518,6 +520,20 @@ export const store = (
     ) {
       get().setSocketStatus("connecting-python");
     }
+  },
+
+  // Signature Specific Methods
+  // TODO: Move to slice
+  setSignatureConfig: (
+    nodeId: string,
+    config: LlmPromptConfig,
+    version: LatestConfigVersionSchema
+  ) => {
+    set({
+      nodes: get().nodes.map((node) =>
+        node.id === nodeId ? { ...node, data: { ...node.data, config } } : node
+      ),
+    });
   },
 });
 
