@@ -13,7 +13,6 @@ patchZodOpenapi();
 // Reuse schema definitions
 const baseConfigSchema = z.object({
   name: z.string().min(1, "Name cannot be empty."),
-  projectId: z.string().min(1, "Project ID cannot be empty."),
 });
 
 // Define types for our Hono context variables
@@ -24,11 +23,10 @@ type Variables = {
 
 export const app = new Hono<{
   Variables: Variables;
-}>().basePath("/api/llmConfigs");
+}>().basePath("/api/prompts");
 
-// Unified auth middleware that validates API key and project ID
-app.use("/project/:projectId/*", async (c, next) => {
-  const { projectId } = c.req.param();
+// Auth middleware that validates API key and extracts project
+app.use("/*", async (c, next) => {
   const apiKey =
     c.req.header("X-Auth-Token") ??
     c.req.header("Authorization")?.split(" ")[1];
@@ -37,12 +35,8 @@ app.use("/project/:projectId/*", async (c, next) => {
     where: { apiKey },
   });
 
-  if (apiKey !== project?.apiKey) {
+  if (!project || apiKey !== project.apiKey) {
     return c.json({ error: "Unauthorized" }, 401);
-  }
-
-  if (project?.id !== projectId) {
-    return c.json({ error: "Resource not found" }, 404);
   }
 
   // Store project and repository for use in route handlers
@@ -52,33 +46,34 @@ app.use("/project/:projectId/*", async (c, next) => {
   return next();
 });
 
-// Get all configs
+// Get all prompts
 app.get(
-  "/project/:projectId/configs",
+  "/",
   describeRoute({
-    description: "Get all LLM configs for a project",
+    description: "Get all prompts for a project",
   }),
   async (c) => {
     const repository = c.get("llmConfigRepository");
-    const { projectId } = c.req.param();
+    const project = c.get("project");
 
-    const configs = await repository.getAllConfigs(projectId);
+    const configs = await repository.getAllConfigs(project.id);
     return c.json(configs);
   }
 );
 
-// Get config by ID
+// Get prompt by ID
 app.get(
-  "/project/:projectId/configs/:id",
+  "/:id",
   describeRoute({
-    description: "Get a specific LLM config",
+    description: "Get a specific prompt",
   }),
   async (c) => {
     const repository = c.get("llmConfigRepository");
-    const { id, projectId } = c.req.param();
+    const project = c.get("project");
+    const { id } = c.req.param();
 
     try {
-      const config = await repository.getConfigById(id, projectId);
+      const config = await repository.getConfigById(id, project.id);
       return c.json(config);
     } catch (error: any) {
       return c.json({ error: error.message }, 404);
@@ -86,19 +81,23 @@ app.get(
   }
 );
 
-// Create config
+// Create prompt
 app.post(
-  "/project/:projectId/configs",
+  "/",
   describeRoute({
-    description: "Create a new LLM config",
+    description: "Create a new prompt",
   }),
   zValidator("json", baseConfigSchema),
   async (c) => {
     const repository = c.get("llmConfigRepository");
-    const { projectId } = c.req.param();
+    const project = c.get("project");
     const data = c.req.valid("json");
     const { name } = data;
-    const newConfig = await repository.createConfig({ name, projectId });
+
+    const newConfig = await repository.createConfig({
+      name,
+      projectId: project.id,
+    });
 
     return c.json(newConfig);
   }
@@ -106,18 +105,19 @@ app.post(
 
 // Get versions
 app.get(
-  "/project/:projectId/configs/:configId/versions",
+  "/:id/versions",
   describeRoute({
-    description: "Get all versions for an LLM config",
+    description: "Get all versions for a prompt",
   }),
   async (c) => {
     const repository = c.get("llmConfigRepository");
-    const { configId, projectId } = c.req.param();
+    const project = c.get("project");
+    const { id } = c.req.param();
 
     try {
       const versions = await repository.versions.getVersions({
-        configId,
-        projectId,
+        configId: id,
+        projectId: project.id,
       });
       return c.json(versions);
     } catch (error: any) {
@@ -128,21 +128,22 @@ app.get(
 
 // Create version
 app.post(
-  "/project/:projectId/configs/:configId/versions",
+  "/:id/versions",
   describeRoute({
-    description: "Create a new version for an LLM config",
+    description: "Create a new version for a prompt",
   }),
   zValidator("json", getLatestConfigVersionSchema()),
   async (c) => {
     const repository = c.get("llmConfigRepository");
-    const { configId, projectId } = c.req.param();
+    const project = c.get("project");
+    const { id } = c.req.param();
     const data = c.req.valid("json");
 
     try {
       const version = await repository.versions.createVersion({
         ...data,
-        configId,
-        projectId,
+        configId: id,
+        projectId: project.id,
       });
       return c.json(version);
     } catch (error: any) {
@@ -151,20 +152,21 @@ app.post(
   }
 );
 
-// Update config
+// Update prompt
 app.put(
-  "/project/:projectId/configs/:id",
+  "/:id",
   describeRoute({
-    description: "Update an LLM config",
+    description: "Update a prompt",
   }),
   zValidator("json", baseConfigSchema.partial()),
   async (c) => {
     const repository = c.get("llmConfigRepository");
-    const { id, projectId } = c.req.param();
+    const project = c.get("project");
+    const { id } = c.req.param();
     const data = c.req.valid("json");
 
     try {
-      const updatedConfig = await repository.updateConfig(id, projectId, data);
+      const updatedConfig = await repository.updateConfig(id, project.id, data);
       return c.json(updatedConfig);
     } catch (error: any) {
       return c.json({ error: error.message }, 404);
@@ -172,18 +174,19 @@ app.put(
   }
 );
 
-// Delete config
+// Delete prompt
 app.delete(
-  "/project/:projectId/configs/:id",
+  "/:id",
   describeRoute({
-    description: "Delete an LLM config",
+    description: "Delete a prompt",
   }),
   async (c) => {
     const repository = c.get("llmConfigRepository");
-    const { id, projectId } = c.req.param();
+    const project = c.get("project");
+    const { id } = c.req.param();
 
     try {
-      const result = await repository.deleteConfig(id, projectId);
+      const result = await repository.deleteConfig(id, project.id);
       return c.json(result);
     } catch (error: any) {
       return c.json({ error: error.message }, 404);
