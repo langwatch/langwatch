@@ -12,11 +12,17 @@ import {
   type DatasetColumns,
   type DatasetRecordEntry,
 } from "../../server/datasets/types";
-import { formatFileSize, useCSVReader } from "react-papaparse";
+import {
+  formatFileSize,
+  jsonToCSV,
+  useCSVReader,
+  usePapaParse,
+} from "react-papaparse";
 import type { InMemoryDataset } from "./DatasetTable";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
 import { useDrawer } from "../CurrentDrawer";
 import { Dialog } from "../../components/ui/dialog";
+import { toaster } from "../ui/toaster";
 
 export const MAX_ROWS_LIMIT = 10_000;
 
@@ -220,6 +226,7 @@ export function CSVReaderComponent({
   const [zoneHover, setZoneHover] = useState(false);
   const [acceptedFile, setAcceptedFile] = useState<File | null>(null);
   const [results, setResults] = useState<{ data: string[][] } | null>(null);
+  const { readString } = usePapaParse();
 
   useEffect(() => {
     if (acceptedFile && results) {
@@ -232,9 +239,49 @@ export function CSVReaderComponent({
 
   return (
     <CSVReader
-      onUploadAccepted={(results: { data: string[][] }) => {
-        setResults(results);
-        setZoneHover(false);
+      accept=".csv,.json,.jsonl"
+      onUploadAccepted={async (results: { data: string[][] }, file: File) => {
+        if (file.name.endsWith(".jsonl") || file.name.endsWith(".json")) {
+          try {
+            const contents = await file.text();
+            let jsonContents;
+            console.log("contents", contents);
+            try {
+              jsonContents = JSON.parse(contents);
+            } catch (error) {
+              // If the file is not a valid JSON, try to parse it as a JSONL file
+              jsonContents = JSON.parse(
+                "[" +
+                  contents
+                    .trim()
+                    .split("\n")
+                    .filter((line) => line.trim() !== "")
+                    .join(", ") +
+                  "]"
+              );
+            }
+            readString(jsonToCSV(jsonContents), {
+              complete: (results) => {
+                console.log("results", results);
+                setResults({ data: results.data as string[][] });
+              },
+            });
+          } catch (error) {
+            console.error("error", error);
+            toaster.create({
+              title: "Error",
+              description: "Failed to parse JSON file",
+              type: "error",
+              meta: {
+                closable: true,
+              },
+              placement: "top-end",
+            });
+          }
+        } else {
+          setResults(results);
+          setZoneHover(false);
+        }
       }}
       onDragOver={(event: DragEvent) => {
         event.preventDefault();
@@ -329,7 +376,7 @@ function CSVReaderBox({
           </Box>
         </>
       ) : (
-        <Text>Drop CSV file or click here to upload</Text>
+        <Text>Drop CSV or JSONL file or click here to upload</Text>
       )}
     </Box>
   );
