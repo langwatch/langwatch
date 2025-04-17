@@ -1,7 +1,11 @@
 import { MODULES } from "~/optimization_studio/registry";
 import { NodeDraggable } from "./NodeDraggable";
 import type { NodeWithOptionalPosition } from "~/types";
-import type { Component, Field } from "~/optimization_studio/types/dsl";
+import type {
+  Component,
+  Field,
+  Signature,
+} from "~/optimization_studio/types/dsl";
 import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import { useInitializeNewLlmConfig } from "~/components/prompt-configs/hooks/useCreateNewLlmConfig";
 import {
@@ -19,8 +23,10 @@ import type { LatestConfigVersionSchema } from "~/server/repositories/llm-config
 function configToData(
   config: LlmPromptConfig,
   version: LatestConfigVersionSchema
-): Node<Component>["data"] {
+): Node<Signature>["data"] {
   return {
+    // We need this to be able to update the config
+    configId: config.id,
     name: config.name,
     description: version.commitMessage,
     inputs: version.configData.inputs as Field[],
@@ -62,6 +68,13 @@ export function LlmSignatureNodeDraggable() {
       void (async () => {
         const { name: workflowName } = getWorkflow();
         const promptName = `${workflowName} Prompt`;
+        // Do this right away so that it appears snappy
+        setNode({
+          id: item.node.id,
+          data: {
+            name: promptName,
+          },
+        });
         const { config, version } = await initializeNewLlmConfigWithVersion({
           name: promptName,
         });

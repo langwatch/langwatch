@@ -3,19 +3,27 @@ import { FormProvider } from "react-hook-form";
 import { PromptNameField } from "./fields/PromptNameField";
 import { VersionHistoryListPopover } from "../VersionHistoryListPopover";
 import { SaveIcon } from "lucide-react";
-import { usePromptConfigForm } from "../hooks/usePromptConfigForm";
+import {
+  usePromptConfigForm,
+  type PromptConfigFormValues,
+} from "../hooks/usePromptConfigForm";
 import { PromptConfigVersionFieldGroup } from "./fields/PromptConfigVersionFieldGroup";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { DemonstrationsField } from "./fields/DemonstrationsField";
 
 interface PromptConfigFormProps {
   configId: string;
+  onSubmitSuccess?: () => void;
 }
 
-export function PromptConfigForm({ configId }: PromptConfigFormProps) {
+export function PromptConfigForm({
+  configId,
+  onSubmitSuccess,
+}: PromptConfigFormProps) {
   const { methods, handleSubmit, isLoading, isSubmitting } =
     usePromptConfigForm({
       configId,
+      onSuccess: onSubmitSuccess,
     });
 
   const { register, formState } = methods;
@@ -29,10 +37,10 @@ export function PromptConfigForm({ configId }: PromptConfigFormProps) {
 
   return (
     <FormProvider {...methods}>
-      <form>
+      <form style={{ width: "100%" }}>
         <PromptNameField />
         <PromptConfigVersionFieldGroup />
-        <DemonstrationsField />
+        {/* <DemonstrationsField /> */}
 
         {/* Manage the commit message and saving */}
         <VerticalFormControl

@@ -2,6 +2,8 @@ import type { Edge, Node } from "@xyflow/react";
 import type { DatasetColumns } from "../../server/datasets/types";
 import { z } from "zod";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import type { LlmPromptConfig } from "@prisma/client";
+import type { LatestConfigVersionSchema } from "~/server/repositories/llm-config-version-schema";
 
 export type Field = {
   identifier: string;
@@ -83,7 +85,10 @@ export const llmConfigSchema = z.object({
 
 export type LLMConfig = z.infer<typeof llmConfigSchema>;
 
-export type Signature = BaseComponent;
+// This is maybe not the best way to handle this
+export type Signature = BaseComponent & {
+  configId: string;
+};
 
 export type Code = BaseComponent;
 
