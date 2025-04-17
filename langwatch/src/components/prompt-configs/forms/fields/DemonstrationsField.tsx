@@ -18,19 +18,19 @@ export function DemonstrationsField() {
     useFormContext<PromptConfigFormValues>();
   const { errors } = formState;
   const { open, onOpen, onClose } = useDisclosure();
-  const demonstrations = watch("version.demonstrations");
+  const demonstrations = watch("version.configData.demonstrations");
   const total = demonstrations?.rows?.length;
 
   return (
     <Controller
-      name="version.demonstrations"
+      name="version.configData.demonstrations"
       control={control}
       render={({ field }) => (
         <VerticalFormControl
           label={<DemonstrationsLabel total={total} onOpen={onOpen} />}
-          invalid={!!errors.version?.demonstrations}
-          helper={errors.version?.demonstrations?.message?.toString()}
-          error={errors.version?.demonstrations}
+          invalid={!!errors.version?.configData?.demonstrations}
+          helper={errors.version?.configData?.demonstrations?.message?.toString()}
+          error={errors.version?.configData?.demonstrations}
         >
           <DatasetPreview
             rows={demonstrations?.rows ?? []}

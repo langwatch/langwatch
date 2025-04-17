@@ -7,53 +7,17 @@ import { usePromptConfigVersionMutation } from "./usePromptConfigVersionMutation
 import { api } from "~/utils/api";
 import { useEffect } from "react";
 import type { LlmPromptConfig, LlmPromptConfigVersion } from "@prisma/client";
-import type { DatasetColumnType } from "~/server/datasets/types";
+import {
+  getLatestConfigVersionSchema,
+  SchemaVersion,
+} from "~/server/repositories/llm-config-version-schema";
 
 const promptConfigSchema = z.object({
   name: z.string().min(1, "Name is required"),
 });
 
-const versionSchema = z.object({
-  commitMessage: z.string().min(1, "Commit message is required"),
-  prompt: z.string().default("You are a helpful assistant"),
-  model: z.string().default("openai/gpt4-o-mini"),
-  inputs: z.array(
-    z.object({
-      identifier: z.string(),
-      type: z.string(),
-    })
-  ),
-  outputs: z.array(
-    z.object({
-      identifier: z.string(),
-      type: z.string(),
-    })
-  ),
-  demonstrations: z
-    .object({
-      columns: z
-        .array(
-          z.object({
-            name: z.string(),
-            type: z.custom<DatasetColumnType>(),
-          })
-        )
-        .default([]),
-      rows: z
-        .array(
-          z
-            .object({
-              id: z.string().min(1),
-            })
-            .catchall(z.any())
-        )
-        .default([]),
-    })
-    .default({ columns: [], rows: [] }),
-});
-
 const formSchema = promptConfigSchema.extend({
-  version: versionSchema,
+  version: getLatestConfigVersionSchema(),
 });
 
 export type PromptConfigFormValues = z.infer<typeof formSchema>;
@@ -105,7 +69,7 @@ export const usePromptConfigForm = ({
   }, [config, methods]);
 
   const updateConfig = api.llmConfigs.updatePromptConfig.useMutation();
-  const createVersion = usePromptConfigVersionMutation({ configId, onSuccess });
+  const createVersion = usePromptConfigVersionMutation({ onSuccess });
 
   const handleSubmit = async (data: PromptConfigFormValues) => {
     if (!project?.id) {
@@ -128,16 +92,17 @@ export const usePromptConfigForm = ({
       });
     }
 
-    const configData = {
-      ...data.version,
-      name: data.name,
-    };
-
     await createVersion.mutateAsync({
       projectId: project.id,
       configId,
-      configData,
-      schemaVersion: "1.0.0",
+      configData: {
+        prompt: data.version.configData.prompt,
+        model: data.version.configData.model,
+        inputs: data.version.configData.inputs,
+        outputs: data.version.configData.outputs,
+        demonstrations: data.version.configData.demonstrations,
+      },
+      schemaVersion: SchemaVersion.V1_0,
       commitMessage: data.version.commitMessage,
     });
 
