@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-import { api } from "~/utils/api";
-=======
->>>>>>> 2e50a6d7 (Clean up source select)
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -10,9 +6,11 @@ interface UsePromptConfigVersionMutationProps {
   onSuccess?: () => void;
 }
 
-export const usePromptConfigVersionMutation = ({
-  onSuccess,
-}: UsePromptConfigVersionMutationProps) => {
+export const usePromptConfigVersionMutation = (
+  props?: UsePromptConfigVersionMutationProps
+) => {
+  const { onSuccess } = props ?? {};
+  const { project } = useOrganizationTeamProject();
   const utils = api.useContext();
 
   return api.llmConfigs.versions.create.useMutation({

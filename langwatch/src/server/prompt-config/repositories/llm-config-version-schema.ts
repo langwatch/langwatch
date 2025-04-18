@@ -101,6 +101,10 @@ export function getLatestConfigVersionSchema() {
   return configSchemaV1_0;
 }
 
+export function getVersionValidator(schemaVersion: SchemaVersion) {
+  return schemaValidators[schemaVersion];
+}
+
 /**
  * Parses configuration data against a specific schema version
  * Used to validate configData in LlmPromptConfigVersion before saving
@@ -110,14 +114,11 @@ export function getLatestConfigVersionSchema() {
  * @throws ZodError if the config data is invalid
  */
 export function parseLlmConfigVersion(
-  llmConfigVersion: LlmPromptConfigVersion | LlmConfigVersionDTO,
-  omit?: Partial<Record<keyof LatestConfigVersionSchema, true | undefined>>
+  llmConfigVersion: LlmPromptConfigVersion | LlmConfigVersionDTO
 ): LatestConfigVersionSchema {
   const { schemaVersion } = llmConfigVersion;
 
-  const validator = schemaValidators[schemaVersion as SchemaVersion].omit(
-    omit ?? {}
-  );
+  const validator = getVersionValidator(schemaVersion as SchemaVersion);
 
   if (!validator) {
     throw new TRPCError({

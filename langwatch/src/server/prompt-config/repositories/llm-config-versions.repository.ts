@@ -9,7 +9,7 @@ import { TRPCError } from "@trpc/server";
 import {
   type LatestConfigVersionSchema,
   type SchemaVersion,
-  parseLlmConfigVersion,
+  getVersionValidator,
 } from "./llm-config-version-schema";
 
 /**
@@ -134,10 +134,13 @@ export class LlmConfigVersionsRepository {
   async createVersion(
     versionData: LlmConfigVersionDTO
   ): Promise<LlmPromptConfigVersion & { schemaVersion: SchemaVersion }> {
-    // Validate the config data
-    parseLlmConfigVersion(versionData, {
+    // Omit the version field from the validator since auto-incremented by the database
+    const validator = getVersionValidator(versionData.schemaVersion).omit({
       version: true,
     });
+
+    // Validate the config data
+    validator.parse(versionData);
 
     // Use a transaction to ensure both operations succeed or fail together
     const { configId, projectId } = versionData;
