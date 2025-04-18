@@ -15,7 +15,7 @@ import {
 /**
  * Interface for LLM Config Version data transfer objects
  */
-export type LlmConfigVersionDTO = LatestConfigVersionSchema;
+export type LlmConfigVersionDTO = Omit<LatestConfigVersionSchema, "version">;
 
 /**
  * Repository for managing LLM Configuration Versions
