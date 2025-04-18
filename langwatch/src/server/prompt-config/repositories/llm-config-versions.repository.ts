@@ -5,20 +5,17 @@ import {
   type LlmPromptConfig,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { type z } from "zod";
+
 import {
-  type LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
   type SchemaVersion,
-  getLatestConfigVersionSchema,
-  type schemaValidators,
   parseLlmConfigVersion,
 } from "./llm-config-version-schema";
 
 /**
  * Interface for LLM Config Version data transfer objects
  */
-type LlmConfigVersionDTO = LatestConfigVersionSchema;
+export type LlmConfigVersionDTO = LatestConfigVersionSchema;
 
 /**
  * Repository for managing LLM Configuration Versions

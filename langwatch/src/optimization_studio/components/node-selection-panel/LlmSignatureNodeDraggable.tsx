@@ -1,12 +1,13 @@
-import { MODULES } from "~/optimization_studio/registry";
-import { NodeDraggable } from "./NodeDraggable";
-import type { NodeWithOptionalPosition } from "~/types";
-import type { Component } from "~/optimization_studio/types/dsl";
-import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
-import { useInitializeNewLlmConfig } from "~/prompt-configs/hooks/useCreateNewLlmConfig";
 import { useCallback } from "react";
+
+import { NodeDraggable } from "./NodeDraggable";
+
+import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
+import { MODULES } from "~/optimization_studio/registry";
+import type { Component } from "~/optimization_studio/types/dsl";
 import { llmConfigToNodeData } from "~/optimization_studio/utils/registryUtils";
-import type { LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+import { useInitializeNewLlmConfig } from "~/prompt-configs/hooks/useCreateNewLlmConfig";
+import type { NodeWithOptionalPosition } from "~/types";
 
 export function LlmSignatureNodeDraggable() {
   const { setNode, getWorkflow } = useWorkflowStore((state) => ({
@@ -38,10 +39,10 @@ export function LlmSignatureNodeDraggable() {
 
         setNode({
           id: item.node.id,
-          data: llmConfigToNodeData(
-            config,
-            version as unknown as LatestConfigVersionSchema
-          ),
+          data: llmConfigToNodeData({
+            ...config,
+            latestVersion: version,
+          }),
         });
       })();
     },

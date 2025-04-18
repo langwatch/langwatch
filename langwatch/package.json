@@ -89,6 +89,7 @@
     "cookie": "^0.7.0",
     "date-fns": "^2.30.0",
     "debug": "^4.3.5",
+    "deepmerge": "^4.3.1",
     "diff": "^7.0.0",
     "dotenv": "^16.3.1",
     "emoji-picker-react": "^4.12.0",
