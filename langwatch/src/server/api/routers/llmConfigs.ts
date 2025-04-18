@@ -104,8 +104,11 @@ export const llmConfigVersionsRouter = createTRPCRouter({
         return version;
       } catch (error) {
         throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Failed to create version.",
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to create version: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+          cause: error,
         });
       }
     }),

@@ -110,10 +110,15 @@ export function getLatestConfigVersionSchema() {
  * @throws ZodError if the config data is invalid
  */
 export function parseLlmConfigVersion(
-  llmConfigVersion: LlmPromptConfigVersion | LlmConfigVersionDTO
+  llmConfigVersion: LlmPromptConfigVersion | LlmConfigVersionDTO,
+  omit?: Partial<Record<keyof LatestConfigVersionSchema, true | undefined>>
 ): LatestConfigVersionSchema {
   const { schemaVersion } = llmConfigVersion;
-  const validator = schemaValidators[schemaVersion as SchemaVersion];
+
+  const validator = schemaValidators[schemaVersion as SchemaVersion].omit(
+    omit ?? {}
+  );
+
   if (!validator) {
     throw new TRPCError({
       code: "BAD_REQUEST",

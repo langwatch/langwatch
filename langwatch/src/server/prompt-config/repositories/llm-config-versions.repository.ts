@@ -135,17 +135,25 @@ export class LlmConfigVersionsRepository {
     versionData: LlmConfigVersionDTO
   ): Promise<LlmPromptConfigVersion & { schemaVersion: SchemaVersion }> {
     // Validate the config data
-    parseLlmConfigVersion(versionData);
-    // Create the new version
-    const version = await this.prisma.llmPromptConfigVersion.create({
-      data: versionData,
+    parseLlmConfigVersion(versionData, {
+      version: true,
     });
 
-    // Update the parent config's updatedAt timestamp
+    // Use a transaction to ensure both operations succeed or fail together
     const { configId, projectId } = versionData;
-    await this.prisma.llmPromptConfig.update({
-      where: { id: configId, projectId },
-      data: { updatedAt: new Date() },
+    const version = await this.prisma.$transaction(async (tx) => {
+      // Create the new version
+      const newVersion = await tx.llmPromptConfigVersion.create({
+        data: versionData,
+      });
+
+      // Update the parent config's updatedAt timestamp
+      await tx.llmPromptConfig.update({
+        where: { id: configId, projectId },
+        data: { updatedAt: new Date() },
+      });
+
+      return newVersion;
     });
 
     return {
