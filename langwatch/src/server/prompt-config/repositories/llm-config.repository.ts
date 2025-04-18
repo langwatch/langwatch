@@ -4,6 +4,8 @@ import {
   type LlmPromptConfigVersion,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+
+import { type SchemaVersion } from "./llm-config-version-schema";
 import { LlmConfigVersionsRepository } from "./llm-config-versions.repository";
 
 /**
@@ -12,6 +14,15 @@ import { LlmConfigVersionsRepository } from "./llm-config-versions.repository";
 interface LlmConfigDTO {
   name: string;
   projectId: string;
+}
+
+/**
+ * Interface for LLM Config with its latest version
+ */
+export interface LlmConfigWithLatestVersion extends LlmPromptConfig {
+  latestVersion: LlmPromptConfigVersion & {
+    schemaVersion: SchemaVersion;
+  };
 }
 
 /**
@@ -41,10 +52,10 @@ export class LlmConfigRepository {
   /**
    * Get a single LLM config by ID
    */
-  async getConfigById(
+  async getConfigByIdWithLatestVersions(
     id: string,
     projectId: string
-  ): Promise<LlmPromptConfig & { versions: LlmPromptConfigVersion[] }> {
+  ): Promise<LlmConfigWithLatestVersion> {
     const config = await this.prisma.llmPromptConfig.findUnique({
       where: { id, projectId },
       include: {
@@ -62,7 +73,20 @@ export class LlmConfigRepository {
       });
     }
 
-    return config;
+    // This should never happen, but if it does, we want to know about it
+    if (!config.versions[0]) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Prompt config has no versions.",
+      });
+    }
+
+    return {
+      ...config,
+      latestVersion: config.versions[0] as LlmPromptConfigVersion & {
+        schemaVersion: SchemaVersion;
+      },
+    };
   }
 
   /**

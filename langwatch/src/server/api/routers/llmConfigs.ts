@@ -3,8 +3,8 @@ import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup } from "../permission";
 import { checkUserPermissionForProject } from "../permission";
-import { LlmConfigRepository } from "../../repositories/llm-config.repository";
-import { getLatestConfigVersionSchema } from "~/server/repositories/llm-config-version-schema";
+import { LlmConfigRepository } from "../../prompt-config/repositories/llm-config.repository";
+import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 const idSchema = z.object({
   id: z.string(),
@@ -176,14 +176,14 @@ export const llmConfigsRouter = createTRPCRouter({
   /**
    * Get a single LLM prompt config by its id.
    */
-  getPromptConfigById: protectedProcedure
+  getByIdWithLatestVersion: protectedProcedure
     .input(idSchema.merge(projectIdSchema))
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
     .query(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
 
       try {
-        const config = await repository.getConfigById(
+        const config = await repository.getConfigByIdWithLatestVersions(
           input.id,
           input.projectId
         );

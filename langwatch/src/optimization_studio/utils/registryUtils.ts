@@ -1,5 +1,4 @@
-import type { LatestConfigVersionSchema } from "~/server/repositories/llm-config-version-schema";
-import type { LlmPromptConfig } from "@prisma/client";
+import { parseLlmConfigVersion } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import { evaluatorTempNameMap } from "../../components/checks/EvaluatorSelection";
 import {
   AVAILABLE_EVALUATORS,
@@ -7,6 +6,7 @@ import {
 } from "../../server/evaluations/evaluators.generated";
 import type { Evaluator, Field, Signature } from "../types/dsl";
 import type { Node } from "@xyflow/react";
+import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 
 export const convertEvaluators = (
   evaluators: typeof AVAILABLE_EVALUATORS
@@ -100,16 +100,18 @@ export const buildEvaluatorFromType = (
 };
 
 export function llmConfigToNodeData(
-  config: LlmPromptConfig,
-  version: LatestConfigVersionSchema
+  config: LlmConfigWithLatestVersion
 ): Node<Signature>["data"] {
+  const { latestVersion } = config;
+  const version = parseLlmConfigVersion(latestVersion);
+
   return {
     // We need this to be able to update the config
     configId: config.id,
     name: config.name,
-    description: version.commitMessage,
-    inputs: version.configData.inputs as Field[],
-    outputs: version.configData.outputs as Field[],
+    description: latestVersion.commitMessage ?? "",
+    inputs: version.configData.inputs,
+    outputs: version.configData.outputs,
     parameters: [
       {
         identifier: "llm",

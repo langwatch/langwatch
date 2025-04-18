@@ -16,6 +16,7 @@ import { convertEvaluators } from "./utils/registryUtils";
  * Use this when adding a new signature node to the workspace.
  */
 const signature: Signature = {
+  configId: "",
   name: "LLM Signature",
   description: "LLM calling node",
   parameters: [

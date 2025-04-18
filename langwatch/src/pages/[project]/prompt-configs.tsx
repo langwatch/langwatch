@@ -1,18 +1,20 @@
 import { Button, Container, HStack, Heading, VStack } from "@chakra-ui/react";
-import { Plus } from "react-feather";
-import { DashboardLayout } from "~/components/DashboardLayout";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { type LlmPromptConfig } from "@prisma/client";
 import { useState, useMemo } from "react";
+import { Plus } from "react-feather";
+
+import { LATEST_SCHEMA_VERSION } from "~/server/prompt-config/repositories/llm-config-version-schema";
+
+import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
+import { DashboardLayout } from "~/components/DashboardLayout";
+import { toaster } from "~/components/ui/toaster";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { PromptConfigPanel } from "~/prompt-configs/PromptConfigPanel";
 import {
   createDefaultColumns,
   PromptConfigTable,
 } from "~/prompt-configs/PromptConfigTable";
-import { PromptConfigPanel } from "~/prompt-configs/PromptConfigPanel";
-import { toaster } from "~/components/ui/toaster";
-import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
-import { type LlmPromptConfig } from "@prisma/client";
-import { LATEST_SCHEMA_VERSION } from "~/server/repositories/llm-config-version-schema";
+import { api } from "~/utils/api";
 
 export default function PromptConfigsPage() {
   const utils = api.useContext();

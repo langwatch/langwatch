@@ -5,10 +5,17 @@ import {
   type LlmPromptConfig,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+
 import {
   type LatestConfigVersionSchema,
-  validateConfig,
+  type SchemaVersion,
+  parseLlmConfigVersion,
 } from "./llm-config-version-schema";
+
+/**
+ * Interface for LLM Config Version data transfer objects
+ */
+type LlmConfigVersionDTO = LatestConfigVersionSchema;
 
 /**
  * Repository for managing LLM Configuration Versions
@@ -125,10 +132,10 @@ export class LlmConfigVersionsRepository {
    * Create a new version for an existing config
    */
   async createVersion(
-    versionData: LatestConfigVersionSchema
-  ): Promise<LlmPromptConfigVersion> {
+    versionData: LlmConfigVersionDTO
+  ): Promise<LlmPromptConfigVersion & { schemaVersion: SchemaVersion }> {
     // Validate the config data
-    validateConfig(versionData);
+    parseLlmConfigVersion(versionData);
     // Create the new version
     const version = await this.prisma.llmPromptConfigVersion.create({
       data: versionData,
@@ -141,7 +148,10 @@ export class LlmConfigVersionsRepository {
       data: { updatedAt: new Date() },
     });
 
-    return version;
+    return {
+      ...version,
+      schemaVersion: version.schemaVersion as SchemaVersion,
+    };
   }
 
   /**

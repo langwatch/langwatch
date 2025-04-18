@@ -1,7 +1,9 @@
 // src/server/schemas/llm-config-schema.ts
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { DATASET_COLUMN_TYPES } from "../datasets/types";
+import { DATASET_COLUMN_TYPES } from "../../datasets/types";
+import type { LlmPromptConfigVersion } from "@prisma/client";
+import { FIELD_TYPES } from "~/optimization_studio/types/dsl";
 
 /**
  * Schema version enum for LLM configuration
@@ -19,7 +21,7 @@ export const LATEST_SCHEMA_VERSION = SchemaVersion.V1_0 as const;
  */
 const inputOutputSchema = z.object({
   identifier: z.string().min(1, "Identifier cannot be empty"),
-  type: z.string().min(1, "Type cannot be empty"),
+  type: z.enum(FIELD_TYPES),
 });
 
 /**
@@ -95,29 +97,24 @@ export function getLatestConfigVersionSchema() {
 }
 
 /**
- * Validates configuration data against a specific schema version
+ * Parses configuration data against a specific schema version
  * Used to validate configData in LlmPromptConfigVersion before saving
- * @param configData - The configuration data to validate
- * @param version - The schema version to validate against
- * @returns True if validation succeeds, throws error otherwise
+ * @param llmConfigVersion - The configuration data to parse
+ * @returns The parsed config data
+ * @throws TRPCError if the schema llmConfigVersion is unknown
+ * @throws ZodError if the config data is invalid
  */
-export function validateConfig(configData: LatestConfigVersionSchema): boolean {
-  const { schemaVersion } = configData;
-  const validator = schemaValidators[schemaVersion];
+export function parseLlmConfigVersion(
+  llmConfigVersion: LlmPromptConfigVersion
+): LatestConfigVersionSchema {
+  const { schemaVersion } = llmConfigVersion;
+  const validator = schemaValidators[schemaVersion as SchemaVersion];
   if (!validator) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: `Unknown schema version: ${schemaVersion}`,
+      message: `Unknown schema llmConfigVersion: ${schemaVersion}`,
     });
   }
 
-  const result = validator.safeParse(configData);
-  if (!result.success) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: `Invalid config data: ${result.error.message}`,
-    });
-  }
-
-  return true;
+  return validator.parse(llmConfigVersion);
 }

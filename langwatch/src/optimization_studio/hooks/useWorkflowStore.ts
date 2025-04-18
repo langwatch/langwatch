@@ -23,7 +23,7 @@ import type {
 import { findLowestAvailableName } from "../utils/nodeUtils";
 import { hasDSLChanged } from "../utils/dslUtils";
 import type { LlmPromptConfig } from "@prisma/client";
-import type { LatestConfigVersionSchema } from "~/server/repositories/llm-config-version-schema";
+import type { LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 export type SocketStatus =
   | "disconnected"
@@ -334,7 +334,7 @@ export const store = (
     }
 
     const { name: newName, id: newId } = findLowestAvailableName(
-      get().nodes,
+      get().nodes.map((node) => node.id),
       currentNode.data.name?.replace(/ \(.*?\)$/, "") ?? "Component"
     );
 

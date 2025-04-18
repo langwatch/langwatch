@@ -6,7 +6,7 @@ import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import { useInitializeNewLlmConfig } from "~/prompt-configs/hooks/useCreateNewLlmConfig";
 import { useCallback } from "react";
 import { llmConfigToNodeData } from "~/optimization_studio/utils/registryUtils";
-import type { LatestConfigVersionSchema } from "~/server/repositories/llm-config-version-schema";
+import type { LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 export function LlmSignatureNodeDraggable() {
   const { setNode, getWorkflow } = useWorkflowStore((state) => ({

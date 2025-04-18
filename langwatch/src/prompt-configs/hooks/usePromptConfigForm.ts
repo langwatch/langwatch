@@ -6,13 +6,11 @@ import { toaster } from "~/components/ui/toaster";
 import { usePromptConfigVersionMutation } from "./usePromptConfigVersionMutation";
 import { api } from "~/utils/api";
 import { useEffect } from "react";
-import type { LlmPromptConfig, LlmPromptConfigVersion } from "@prisma/client";
 import {
   getLatestConfigVersionSchema,
   SchemaVersion,
-  type LatestConfigVersionSchema,
-} from "~/server/repositories/llm-config-version-schema";
-import { versions } from "process";
+} from "~/server/prompt-config/repositories/llm-config-version-schema";
+import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 
 const promptConfigSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -43,11 +41,20 @@ interface UsePromptConfigFormProps {
 }
 
 function convertConfigToDefaultValues(
-  config: LlmPromptConfig & { versions: LatestConfigVersionSchema[] }
-): PromptConfigFormValues {
+  config: LlmConfigWithLatestVersion
+): PromptConfigFormValues & {
+  version: PromptConfigFormValues["version"] & {
+    commitMessage?: string;
+  };
+} {
   return {
     ...config,
-    version: config.versions[0] as PromptConfigFormValues["version"],
+    version: {
+      ...config.latestVersion,
+      commitMessage: config.latestVersion.commitMessage ?? "",
+      configData: config.latestVersion
+        .configData as PromptConfigFormValues["version"]["configData"],
+    },
   };
 }
 
@@ -57,15 +64,16 @@ export const usePromptConfigForm = ({
   onSuccess,
 }: UsePromptConfigFormProps) => {
   const { project } = useOrganizationTeamProject();
-  const { data: config, refetch } = api.llmConfigs.getPromptConfigById.useQuery(
-    {
-      id: configId,
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project?.id,
-    }
-  );
+  const { data: config, refetch } =
+    api.llmConfigs.getByIdWithLatestVersion.useQuery(
+      {
+        id: configId,
+        projectId: project?.id ?? "",
+      },
+      {
+        enabled: !!project?.id,
+      }
+    );
 
   const methods = useForm<PromptConfigFormValues>({
     defaultValues: config ? convertConfigToDefaultValues(config) : undefined,
