@@ -30,7 +30,7 @@ export function PromptConfigForm({
   const { errors } = formState;
 
   if (isLoading) {
-    return null;
+    return <Spinner />;
   }
 
   const formIsDirty = methods.formState.isDirty;

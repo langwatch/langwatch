@@ -1,7 +1,7 @@
-import { Box, Spinner, HStack, Text } from "@chakra-ui/react";
-import { PanelHeader } from "./ui/PanelHeader";
+import { Box, Text } from "@chakra-ui/react";
+
 import { PromptConfigForm } from "./forms/PromptConfigForm";
-import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
+import { PanelHeader } from "./ui/PanelHeader";
 
 interface PromptConfigPanelProps {
   isOpen: boolean;
@@ -14,10 +14,6 @@ export function PromptConfigPanel({
   onClose,
   configId,
 }: PromptConfigPanelProps) {
-  const { isLoading } = usePromptConfigForm({
-    configId,
-  });
-
   if (!isOpen) {
     return null;
   }
@@ -40,15 +36,10 @@ export function PromptConfigPanel({
       minWidth="600px"
     >
       <PanelHeader
-        title={
-          <HStack>
-            <Text>Prompt Configuration</Text>
-            {isLoading && <Spinner />}
-          </HStack>
-        }
+        title={<Text>Prompt Configuration</Text>}
         onClose={onClose}
       />
-      {!isLoading && <PromptConfigForm configId={configId} />}
+      <PromptConfigForm configId={configId} onSubmitSuccess={onClose} />
     </Box>
   );
 }
