@@ -1,16 +1,15 @@
-import { api } from "~/utils/api";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { toaster } from "~/components/ui/toaster";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 
 interface UsePromptConfigVersionMutationProps {
-  configId: string;
   onSuccess?: () => void;
 }
 
-export const usePromptConfigVersionMutation = ({
-  configId,
-  onSuccess,
-}: UsePromptConfigVersionMutationProps) => {
+export const usePromptConfigVersionMutation = (
+  props?: UsePromptConfigVersionMutationProps
+) => {
+  const { onSuccess } = props ?? {};
   const { project } = useOrganizationTeamProject();
   const utils = api.useContext();
 
@@ -25,7 +24,6 @@ export const usePromptConfigVersionMutation = ({
       });
       void utils.llmConfigs.getPromptConfigs.invalidate();
       void utils.llmConfigs.versions.getById.invalidate({
-        id: configId,
         projectId: project?.id ?? "",
       });
       onSuccess?.();

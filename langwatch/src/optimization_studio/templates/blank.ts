@@ -47,6 +47,7 @@ export const blankTemplate: Workflow = {
       type: "signature",
       position: { x: 300, y: 0 },
       data: {
+        configId: "",
         name: "LLM Call",
         parameters: [
           {

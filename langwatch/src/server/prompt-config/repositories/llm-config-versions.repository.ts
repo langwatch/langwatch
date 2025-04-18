@@ -5,26 +5,17 @@ import {
   type LlmPromptConfig,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { type z } from "zod";
+
 import {
-  LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
   type SchemaVersion,
-  getLatestConfigVersionSchema,
-  type schemaValidators,
-  validateConfig,
+  getVersionValidator,
 } from "./llm-config-version-schema";
+
 /**
  * Interface for LLM Config Version data transfer objects
  */
-interface LlmConfigVersionDTO {
-  configId: string;
-  projectId: string;
-  configData: z.infer<(typeof schemaValidators)[typeof LATEST_SCHEMA_VERSION]>;
-  schemaVersion: SchemaVersion;
-  commitMessage?: string;
-  authorId?: string | null;
-}
+export type LlmConfigVersionDTO = Omit<LatestConfigVersionSchema, "version">;
 
 /**
  * Repository for managing LLM Configuration Versions
@@ -141,23 +132,37 @@ export class LlmConfigVersionsRepository {
    * Create a new version for an existing config
    */
   async createVersion(
-    versionData: LatestConfigVersionSchema
-  ): Promise<LlmPromptConfigVersion> {
+    versionData: LlmConfigVersionDTO
+  ): Promise<LlmPromptConfigVersion & { schemaVersion: SchemaVersion }> {
+    // Omit the version field from the validator since auto-incremented by the database
+    const validator = getVersionValidator(versionData.schemaVersion).omit({
+      version: true,
+    });
+
     // Validate the config data
-    validateConfig(versionData);
-    // Create the new version
-    const version = await this.prisma.llmPromptConfigVersion.create({
-      data: versionData,
-    });
+    validator.parse(versionData);
 
-    // Update the parent config's updatedAt timestamp
+    // Use a transaction to ensure both operations succeed or fail together
     const { configId, projectId } = versionData;
-    await this.prisma.llmPromptConfig.update({
-      where: { id: configId, projectId },
-      data: { updatedAt: new Date() },
+    const version = await this.prisma.$transaction(async (tx) => {
+      // Create the new version
+      const newVersion = await tx.llmPromptConfigVersion.create({
+        data: versionData,
+      });
+
+      // Update the parent config's updatedAt timestamp
+      await tx.llmPromptConfig.update({
+        where: { id: configId, projectId },
+        data: { updatedAt: new Date() },
+      });
+
+      return newVersion;
     });
 
-    return version;
+    return {
+      ...version,
+      schemaVersion: version.schemaVersion as SchemaVersion,
+    };
   }
 
   /**
@@ -199,33 +204,5 @@ export class LlmConfigVersionsRepository {
     });
 
     return newVersion;
-  }
-
-  /**
-   * Build default version for a new config
-   */
-  async buildDefaultVersion(
-    configId: string,
-    projectId: string
-  ): Promise<LlmPromptConfigVersion> {
-    return {
-      commitMessage: "Initial version",
-      authorId: null,
-      configId,
-      projectId,
-      configData: {
-        prompt: "You are a helpful assistant",
-        model: "openai/gpt4-o-mini",
-        inputs: [{ identifier: "input", type: "str" }],
-        outputs: [{ identifier: "output", type: "str" }],
-        demonstrations: {
-          columns: [],
-        },
-      } as z.infer<(typeof schemaValidators)[typeof LATEST_SCHEMA_VERSION]>,
-      schemaVersion: LATEST_SCHEMA_VERSION,
-      createdAt: new Date(),
-      id: "",
-      version: 1,
-    };
   }
 }

@@ -1,35 +1,43 @@
 import { HStack, Button, Spinner, Text, Input } from "@chakra-ui/react";
-import { FormProvider } from "react-hook-form";
-import { PromptNameField } from "./fields/PromptNameField";
-import { VersionHistoryListPopover } from "../VersionHistoryListPopover";
 import { SaveIcon } from "lucide-react";
+import { FormProvider } from "react-hook-form";
+
 import { usePromptConfigForm } from "../hooks/usePromptConfigForm";
-import { PromptConfigVersionFieldGroup } from "./fields/PromptConfigVersionFieldGroup";
-import { VerticalFormControl } from "~/components/VerticalFormControl";
+import { VersionHistoryListPopover } from "../VersionHistoryListPopover";
+
 import { DemonstrationsField } from "./fields/DemonstrationsField";
+import { PromptConfigVersionFieldGroup } from "./fields/PromptConfigVersionFieldGroup";
+import { PromptNameField } from "./fields/PromptNameField";
+
+import { VerticalFormControl } from "~/components/VerticalFormControl";
 
 interface PromptConfigFormProps {
   configId: string;
+  onSubmitSuccess?: () => void;
 }
 
-export function PromptConfigForm({ configId }: PromptConfigFormProps) {
+export function PromptConfigForm({
+  configId,
+  onSubmitSuccess,
+}: PromptConfigFormProps) {
   const { methods, handleSubmit, isLoading, isSubmitting } =
     usePromptConfigForm({
       configId,
+      onSuccess: onSubmitSuccess,
     });
 
   const { register, formState } = methods;
   const { errors } = formState;
 
   if (isLoading) {
-    return null;
+    return <Spinner />;
   }
 
   const formIsDirty = methods.formState.isDirty;
 
   return (
     <FormProvider {...methods}>
-      <form>
+      <form style={{ width: "100%" }}>
         <PromptNameField />
         <PromptConfigVersionFieldGroup />
         <DemonstrationsField />

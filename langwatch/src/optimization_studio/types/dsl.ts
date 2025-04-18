@@ -3,25 +3,28 @@ import type { DatasetColumns } from "../../server/datasets/types";
 import { z } from "zod";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 
+export const FIELD_TYPES = [
+  "str",
+  "image",
+  "float",
+  "int",
+  "bool",
+  "list",
+  "list[str]",
+  "list[float]",
+  "list[int]",
+  "list[bool]",
+  "dict",
+  "signature",
+  "llm",
+  "prompting_technique",
+  "dataset",
+  "code",
+] as const;
+
 export type Field = {
   identifier: string;
-  type:
-    | "str"
-    | "image"
-    | "float"
-    | "int"
-    | "bool"
-    | "list"
-    | "list[str]"
-    | "list[float]"
-    | "list[int]"
-    | "list[bool]"
-    | "dict"
-    | "signature"
-    | "llm"
-    | "prompting_technique"
-    | "dataset"
-    | "code";
+  type: (typeof FIELD_TYPES)[number];
   optional?: boolean;
   value?: unknown;
   desc?: string;
@@ -83,7 +86,10 @@ export const llmConfigSchema = z.object({
 
 export type LLMConfig = z.infer<typeof llmConfigSchema>;
 
-export type Signature = BaseComponent;
+// This is maybe not the best way to handle this
+export type Signature = BaseComponent & {
+  configId: string;
+};
 
 export type Code = BaseComponent;
 

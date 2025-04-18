@@ -1,10 +1,12 @@
-import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { z } from "zod";
+
+import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+
+import { LlmConfigRepository } from "../../prompt-config/repositories/llm-config.repository";
 import { TeamRoleGroup } from "../permission";
 import { checkUserPermissionForProject } from "../permission";
-import { LlmConfigRepository } from "../../repositories/llm-config.repository";
-import { getLatestConfigVersionSchema } from "~/server/repositories/llm-config-version-schema";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const idSchema = z.object({
   id: z.string(),
@@ -84,11 +86,11 @@ export const llmConfigVersionsRouter = createTRPCRouter({
    * Create a new version for an existing config.
    */
   create: protectedProcedure
-    .input(getLatestConfigVersionSchema())
+    .input(getLatestConfigVersionSchema().omit({ version: true }))
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
-      const authorId = ctx.session?.user?.id || null;
+      const authorId = ctx.session?.user?.id;
 
       try {
         const version = await repository.versions.createVersion({
@@ -99,8 +101,11 @@ export const llmConfigVersionsRouter = createTRPCRouter({
         return version;
       } catch (error) {
         throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Failed to create version.",
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to create version: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+          cause: error,
         });
       }
     }),
@@ -169,20 +174,20 @@ export const llmConfigsRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
     .query(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
-      return await repository.getAllConfigs(input.projectId);
+      return await repository.getAllWithLatestVersion(input.projectId);
     }),
 
   /**
    * Get a single LLM prompt config by its id.
    */
-  getPromptConfigById: protectedProcedure
+  getByIdWithLatestVersion: protectedProcedure
     .input(idSchema.merge(projectIdSchema))
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
     .query(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
 
       try {
-        const config = await repository.getConfigById(
+        const config = await repository.getConfigByIdWithLatestVersions(
           input.id,
           input.projectId
         );

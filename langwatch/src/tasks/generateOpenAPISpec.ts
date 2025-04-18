@@ -1,12 +1,18 @@
-import { generateSpecs } from "hono-openapi";
-import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
-import { app as llmConfigsApp } from "../app/api/llmConfigs/[[...route]]/app";
-import deepmerge from "deepmerge";
-import currentSpec from "../app/api/openapiLangWatch.json";
 import fs from "fs";
 import path from "path";
 
-const overwriteMerge = (destinationArray, sourceArray, options) => sourceArray;
+import deepmerge from "deepmerge";
+import { generateSpecs } from "hono-openapi";
+
+import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
+import { app as llmConfigsApp } from "../app/api/llmConfigs/[[...route]]/app";
+import currentSpec from "../app/api/openapiLangWatch.json";
+
+const overwriteMerge = (
+  destinationArray: any,
+  sourceArray: any,
+  options: any
+) => sourceArray;
 
 const langwatchSpec = {
   openapi: "3.1.0",

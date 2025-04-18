@@ -1,10 +1,13 @@
-import { Dialog } from "../../ui/dialog";
+import { Dialog } from "~/components/ui/dialog";
 import { Box, Heading } from "@chakra-ui/react";
 import {
   DatasetTable,
   type InMemoryDataset,
-} from "../../datasets/DatasetTable";
+} from "~/components/datasets/DatasetTable";
 import type { PromptConfigFormValues } from "../hooks/usePromptConfigForm";
+
+type Demonstrations =
+  PromptConfigFormValues["version"]["configData"]["demonstrations"];
 
 /**
  * Component to render the dataset table with demonstrations
@@ -13,7 +16,7 @@ function DemonstrationsDatasetTable({
   demonstrations,
   onUpdate,
 }: {
-  demonstrations: PromptConfigFormValues["version"]["demonstrations"];
+  demonstrations: Demonstrations;
   onUpdate: (dataset: InMemoryDataset) => void;
 }) {
   return (
@@ -47,10 +50,8 @@ export function DemonstrationsModal({
 }: {
   open: boolean;
   onClose: () => void;
-  demonstrations: PromptConfigFormValues["version"]["demonstrations"];
-  onChange: (
-    demonstrations: PromptConfigFormValues["version"]["demonstrations"]
-  ) => void;
+  demonstrations: Demonstrations;
+  onChange: (demonstrations: Demonstrations) => void;
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()}>
@@ -73,7 +74,10 @@ export function DemonstrationsModal({
             demonstrations={demonstrations}
             onUpdate={(dataset) =>
               onChange({
-                columns: dataset.columnTypes,
+                columns: dataset.columnTypes.map((column) => ({
+                  ...column,
+                  id: column.name,
+                })),
                 rows: dataset.datasetRecords,
               })
             }

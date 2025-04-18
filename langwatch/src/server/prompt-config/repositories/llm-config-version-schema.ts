@@ -1,6 +1,13 @@
 // src/server/schemas/llm-config-schema.ts
-import { z } from "zod";
+import type { LlmPromptConfigVersion } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+
+import { DATASET_COLUMN_TYPES } from "../../datasets/types";
+
+import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
+
+import { FIELD_TYPES } from "~/optimization_studio/types/dsl";
 
 /**
  * Schema version enum for LLM configuration
@@ -18,7 +25,7 @@ export const LATEST_SCHEMA_VERSION = SchemaVersion.V1_0 as const;
  */
 const inputOutputSchema = z.object({
   identifier: z.string().min(1, "Identifier cannot be empty"),
-  type: z.string().min(1, "Type cannot be empty"),
+  type: z.enum(FIELD_TYPES),
 });
 
 /**
@@ -27,11 +34,20 @@ const inputOutputSchema = z.object({
 const demonstrationsSchema = z.object({
   columns: z.array(
     z.object({
+      id: z.string().min(1, "Column ID cannot be empty"),
       name: z.string().min(1, "Column name cannot be empty"),
-      type: z.string().min(1, "Column type cannot be empty"),
+      type: z.enum(DATASET_COLUMN_TYPES),
     })
   ),
-  rows: z.array(z.record(z.any())).default([]),
+  rows: z
+    .array(
+      z
+        .object({
+          id: z.string().min(1, "Row ID cannot be empty"),
+        })
+        .and(z.record(z.any()))
+    )
+    .default([]),
 });
 
 /**
@@ -39,13 +55,13 @@ const demonstrationsSchema = z.object({
  * Validates the configData JSON field in LlmPromptConfigVersion
  */
 const configSchemaV1_0 = z.object({
-  authorId: z.string().nullable(),
+  authorId: z.string().optional(),
   projectId: z.string().min(1, "Project ID cannot be empty"),
   configId: z.string().min(1, "Config ID cannot be empty"),
   schemaVersion: z.literal(SchemaVersion.V1_0),
   commitMessage: z.string(),
+  version: z.number(),
   configData: z.object({
-    version: z.literal(SchemaVersion.V1_0),
     prompt: z.string().min(1, "Prompt cannot be empty"),
     model: z.string().min(1, "Model identifier cannot be empty"),
     inputs: z.array(inputOutputSchema).min(1, "At least one input is required"),
@@ -73,30 +89,31 @@ export function getLatestConfigVersionSchema() {
   return configSchemaV1_0;
 }
 
+export function getVersionValidator(schemaVersion: SchemaVersion) {
+  return schemaValidators[schemaVersion];
+}
+
 /**
- * Validates configuration data against a specific schema version
+ * Parses configuration data against a specific schema version
  * Used to validate configData in LlmPromptConfigVersion before saving
- * @param configData - The configuration data to validate
- * @param version - The schema version to validate against
- * @returns True if validation succeeds, throws error otherwise
+ * @param llmConfigVersion - The configuration data to parse
+ * @returns The parsed config data
+ * @throws TRPCError if the schema llmConfigVersion is unknown
+ * @throws ZodError if the config data is invalid
  */
-export function validateConfig(configData: LatestConfigVersionSchema): boolean {
-  const { schemaVersion } = configData;
-  const validator = schemaValidators[schemaVersion];
+export function parseLlmConfigVersion(
+  llmConfigVersion: LlmPromptConfigVersion | LlmConfigVersionDTO
+): LatestConfigVersionSchema {
+  const { schemaVersion } = llmConfigVersion;
+
+  const validator = getVersionValidator(schemaVersion as SchemaVersion);
+
   if (!validator) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: `Unknown schema version: ${schemaVersion}`,
+      message: `Unknown schema llmConfigVersion: ${schemaVersion}`,
     });
   }
 
-  const result = validator.safeParse(configData);
-  if (!result.success) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: `Invalid config data: ${result.error.message}`,
-    });
-  }
-
-  return true;
+  return validator.parse(llmConfigVersion);
 }

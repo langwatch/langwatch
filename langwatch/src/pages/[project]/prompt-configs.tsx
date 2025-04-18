@@ -1,19 +1,20 @@
 import { Button, Container, HStack, Heading, VStack } from "@chakra-ui/react";
-import { Plus } from "react-feather";
-import { DashboardLayout } from "~/components/DashboardLayout";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { type LlmPromptConfig } from "@prisma/client";
 import { useState, useMemo } from "react";
+import { Plus } from "react-feather";
+
+import { LATEST_SCHEMA_VERSION } from "~/server/prompt-config/repositories/llm-config-version-schema";
+
+import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
+import { DashboardLayout } from "~/components/DashboardLayout";
+import { toaster } from "~/components/ui/toaster";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { PromptConfigPanel } from "~/prompt-configs/PromptConfigPanel";
 import {
   createDefaultColumns,
   PromptConfigTable,
-} from "~/components/prompt-configs/PromptConfigTable";
-import { PromptConfigPanel } from "~/components/prompt-configs/PromptConfigPanel";
-import { toaster } from "~/components/ui/toaster";
-import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
-import { type LlmPromptConfig } from "@prisma/client";
-import { llmPromptConfigVersionFactory } from "~/factories/llm-config.factory";
-import { LATEST_SCHEMA_VERSION } from "~/server/repositories/llm-config-version-schema";
+} from "~/prompt-configs/PromptConfigTable";
+import { api } from "~/utils/api";
 
 export default function PromptConfigsPage() {
   const utils = api.useContext();
@@ -23,6 +24,9 @@ export default function PromptConfigsPage() {
   const [configToDelete, setConfigToDelete] = useState<LlmPromptConfig | null>(
     null
   );
+  const closePanel = () => {
+    setSelectedConfigId(null);
+  };
 
   // Fetch prompt configs
   const { data: promptConfigs, refetch: refetchPromptConfigs } =
@@ -43,9 +47,8 @@ export default function PromptConfigsPage() {
     );
 
   const createConfigMutation = api.llmConfigs.createPromptConfig.useMutation({
-    onSuccess: ({ id }) => {
+    onSuccess: () => {
       void utils.llmConfigs.getPromptConfigs.invalidate();
-      setSelectedConfigId(id);
       void refetchPromptConfigs();
     },
     onError: (error) => {
@@ -89,34 +92,46 @@ export default function PromptConfigsPage() {
     });
 
   const handleCreateButtonClick = async () => {
-    if (!project?.id) {
+    try {
+      if (!project?.id) {
+        toaster.create({
+          title: "Error",
+          description: "Project ID is required",
+          type: "error",
+        });
+        return;
+      }
+
+      // Create with defaults
+      const newConfig = await createConfigMutation.mutateAsync({
+        name: "New Prompt Config",
+        projectId: project.id,
+      });
+
+      // Create with defaults
+      await createConfigVersionMutation.mutateAsync({
+        configId: newConfig.id,
+        projectId: project.id,
+        configData: {
+          model: "gpt-4o-mini",
+          prompt: "You are a helpful assistant",
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+          demonstrations: {
+            columns: [],
+            rows: [],
+          },
+        },
+        schemaVersion: LATEST_SCHEMA_VERSION,
+        commitMessage: "Initial version",
+      });
+    } catch (error) {
       toaster.create({
-        title: "Error",
-        description: "Project ID is required",
+        title: "Error creating prompt config",
+        description: error instanceof Error ? error.message : "Unknown error",
         type: "error",
       });
-      return;
     }
-
-    // Default config version data
-    const defaultPromptVersionConfig = llmPromptConfigVersionFactory.build({
-      schemaVersion: LATEST_SCHEMA_VERSION,
-    });
-
-    // Create with defaults
-    const newConfig = await createConfigMutation.mutateAsync({
-      name: "New Prompt Config",
-      projectId: project.id,
-    });
-
-    // Create with defaults
-    await createConfigVersionMutation.mutateAsync({
-      configId: newConfig.id,
-      projectId: project.id,
-      configData: defaultPromptVersionConfig.configData,
-      schemaVersion: LATEST_SCHEMA_VERSION,
-      commitMessage: "Initial version",
-    });
   };
 
   const handleDeleteConfig = (config: LlmPromptConfig) => {
@@ -184,7 +199,7 @@ export default function PromptConfigsPage() {
         </VStack>
         <PromptConfigPanel
           isOpen={!!selectedConfigId}
-          onClose={() => setSelectedConfigId(null)}
+          onClose={closePanel}
           configId={selectedConfigId ?? ""}
         />
 
@@ -197,13 +212,6 @@ export default function PromptConfigsPage() {
             void confirmDeleteConfig();
           }}
         />
-
-        {/* You'll need to implement drawer/modal components for:
-          - Creating a new config
-          - Editing a config name
-          - Viewing/managing versions
-          - Creating a new version
-      */}
       </Container>
     </DashboardLayout>
   );

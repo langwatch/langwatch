@@ -1,9 +1,10 @@
-import {
-  type PrismaClient,
-  type LlmPromptConfig,
-  type LlmPromptConfigVersion,
-} from "@prisma/client";
+import { type PrismaClient, type LlmPromptConfig } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+
+import {
+  parseLlmConfigVersion,
+  type LatestConfigVersionSchema,
+} from "./llm-config-version-schema";
 import { LlmConfigVersionsRepository } from "./llm-config-versions.repository";
 
 /**
@@ -17,20 +18,13 @@ interface LlmConfigDTO {
 /**
  * Interface for LLM Config Version data transfer objects
  */
-interface LlmConfigVersionDTO {
-  configId: string;
-  projectId: string;
-  configData: Record<string, any>;
-  schemaVersion: string;
-  commitMessage?: string;
-  authorId?: string | null;
-}
+type LlmConfigVersionDTO = LatestConfigVersionSchema;
 
 /**
  * Interface for LLM Config with its latest version
  */
-interface LlmConfigWithLatestVersion extends LlmPromptConfig {
-  latestVersion: LlmPromptConfigVersion;
+export interface LlmConfigWithLatestVersion extends LlmPromptConfig {
+  latestVersion: LatestConfigVersionSchema;
 }
 
 /**
@@ -50,20 +44,44 @@ export class LlmConfigRepository {
   /**
    * Get all LLM configs for a project
    */
-  async getAllConfigs(projectId: string): Promise<LlmPromptConfig[]> {
-    return this.prisma.llmPromptConfig.findMany({
+  async getAllWithLatestVersion(
+    projectId: string
+  ): Promise<LlmConfigWithLatestVersion[]> {
+    const configs = await this.prisma.llmPromptConfig.findMany({
       where: { projectId },
       orderBy: { updatedAt: "desc" },
+      include: {
+        versions: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+    });
+
+    return configs.map((config) => {
+      if (!config.versions[0]) {
+        console.log("THIS CONFIG", config);
+
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Prompt config has no versions.",
+        });
+      }
+
+      return {
+        ...config,
+        latestVersion: parseLlmConfigVersion(config.versions[0]),
+      };
     });
   }
 
   /**
    * Get a single LLM config by ID
    */
-  async getConfigById(
+  async getConfigByIdWithLatestVersions(
     id: string,
     projectId: string
-  ): Promise<LlmPromptConfig & { versions: LlmPromptConfigVersion[] }> {
+  ): Promise<LlmConfigWithLatestVersion> {
     const config = await this.prisma.llmPromptConfig.findUnique({
       where: { id, projectId },
       include: {
@@ -81,7 +99,18 @@ export class LlmConfigRepository {
       });
     }
 
-    return config;
+    // This should never happen, but if it does, we want to know about it
+    if (!config.versions[0]) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Prompt config has no versions.",
+      });
+    }
+
+    return {
+      ...config,
+      latestVersion: parseLlmConfigVersion(config.versions[0]),
+    };
   }
 
   /**
@@ -114,7 +143,7 @@ export class LlmConfigRepository {
     const version = await this.versions.createVersion({
       projectId: config.projectId,
       commitMessage: versionData.commitMessage ?? "Initial version",
-      authorId: versionData.authorId ?? null,
+      authorId: versionData.authorId,
       configId: config.id,
       configData: versionData.configData,
       schemaVersion: versionData.schemaVersion,
@@ -122,7 +151,7 @@ export class LlmConfigRepository {
 
     return {
       ...config,
-      latestVersion: version,
+      latestVersion: parseLlmConfigVersion(version),
     };
   }
 

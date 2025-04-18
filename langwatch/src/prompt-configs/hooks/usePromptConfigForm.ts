@@ -1,59 +1,40 @@
-import { z } from "zod";
-import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { toaster } from "~/components/ui/toaster";
-import { usePromptConfigVersionMutation } from "./usePromptConfigVersionMutation";
-import { api } from "~/utils/api";
 import { useEffect } from "react";
-import type { LlmPromptConfig, LlmPromptConfigVersion } from "@prisma/client";
-import type { DatasetColumnType } from "~/server/datasets/types";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
+import {
+  getLatestConfigVersionSchema,
+  SchemaVersion,
+} from "~/server/prompt-config/repositories/llm-config-version-schema";
+import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
+
+import { usePromptConfigVersionMutation } from "./usePromptConfigVersionMutation";
+
+import { toaster } from "~/components/ui/toaster";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 
 const promptConfigSchema = z.object({
   name: z.string().min(1, "Name is required"),
 });
 
-const versionSchema = z.object({
-  commitMessage: z.string().min(1, "Commit message is required"),
-  prompt: z.string().default("You are a helpful assistant"),
-  model: z.string().default("openai/gpt4-o-mini"),
-  inputs: z.array(
-    z.object({
-      identifier: z.string(),
-      type: z.string(),
-    })
-  ),
-  outputs: z.array(
-    z.object({
-      identifier: z.string(),
-      type: z.string(),
-    })
-  ),
-  demonstrations: z
-    .object({
-      columns: z
-        .array(
-          z.object({
-            name: z.string(),
-            type: z.custom<DatasetColumnType>(),
-          })
-        )
-        .default([]),
-      rows: z
-        .array(
-          z
-            .object({
-              id: z.string().min(1),
-            })
-            .catchall(z.any())
-        )
-        .default([]),
-    })
-    .default({ columns: [], rows: [] }),
-});
+const latestConfigVersionSchema = getLatestConfigVersionSchema();
 
 const formSchema = promptConfigSchema.extend({
-  version: versionSchema,
+  version: z.object({
+    commitMessage: latestConfigVersionSchema.shape.commitMessage.min(1, {
+      message: "Commit message is required",
+    }),
+    configData: z.object({
+      model: latestConfigVersionSchema.shape.configData.shape.model,
+      prompt: latestConfigVersionSchema.shape.configData.shape.prompt,
+      inputs: latestConfigVersionSchema.shape.configData.shape.inputs,
+      outputs: latestConfigVersionSchema.shape.configData.shape.outputs,
+      demonstrations:
+        latestConfigVersionSchema.shape.configData.shape.demonstrations,
+    }),
+  }),
 });
 
 export type PromptConfigFormValues = z.infer<typeof formSchema>;
@@ -65,13 +46,19 @@ interface UsePromptConfigFormProps {
 }
 
 function convertConfigToDefaultValues(
-  config: LlmPromptConfig & { versions: LlmPromptConfigVersion[] }
-): PromptConfigFormValues {
+  config: LlmConfigWithLatestVersion
+): PromptConfigFormValues & {
+  version: PromptConfigFormValues["version"] & {
+    commitMessage?: string;
+  };
+} {
   return {
     ...config,
     version: {
-      ...(config?.versions[0]?.configData as PromptConfigFormValues["version"]),
+      ...config.latestVersion,
       commitMessage: "",
+      configData: config.latestVersion
+        .configData as PromptConfigFormValues["version"]["configData"],
     },
   };
 }
@@ -82,15 +69,16 @@ export const usePromptConfigForm = ({
   onSuccess,
 }: UsePromptConfigFormProps) => {
   const { project } = useOrganizationTeamProject();
-  const { data: config, refetch } = api.llmConfigs.getPromptConfigById.useQuery(
-    {
-      id: configId,
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project?.id,
-    }
-  );
+  const { data: config, refetch } =
+    api.llmConfigs.getByIdWithLatestVersion.useQuery(
+      {
+        id: configId,
+        projectId: project?.id ?? "",
+      },
+      {
+        enabled: !!project?.id && !!configId,
+      }
+    );
 
   const methods = useForm<PromptConfigFormValues>({
     defaultValues: config ? convertConfigToDefaultValues(config) : undefined,
@@ -105,7 +93,7 @@ export const usePromptConfigForm = ({
   }, [config, methods]);
 
   const updateConfig = api.llmConfigs.updatePromptConfig.useMutation();
-  const createVersion = usePromptConfigVersionMutation({ configId, onSuccess });
+  const createVersion = usePromptConfigVersionMutation();
 
   const handleSubmit = async (data: PromptConfigFormValues) => {
     if (!project?.id) {
@@ -128,20 +116,17 @@ export const usePromptConfigForm = ({
       });
     }
 
-    const configData = {
-      ...data.version,
-      name: data.name,
-    };
-
     await createVersion.mutateAsync({
       projectId: project.id,
       configId,
-      configData,
-      schemaVersion: "1.0.0",
+      configData: data.version.configData,
+      schemaVersion: SchemaVersion.V1_0,
       commitMessage: data.version.commitMessage,
     });
 
     await refetch();
+
+    onSuccess?.();
   };
 
   return {
