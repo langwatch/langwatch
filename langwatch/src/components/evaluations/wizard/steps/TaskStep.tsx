@@ -47,21 +47,6 @@ export function TaskStep() {
       >
         <VStack width="full" gap={3}>
           <StepButton
-            colorPalette="green"
-            value="real_time"
-            title={TASK_TYPES.real_time}
-            description="Evaluate messages as they arrive in production or as a guardrail to protect your application"
-            onClick={() => handleTaskSelection("real_time")}
-            icon={
-              <ColorfulBlockIcon
-                color="green.400"
-                size="md"
-                icon={<Activity />}
-                marginTop="-2px"
-              />
-            }
-          />
-          <StepButton
             colorPalette="blue"
             value="llm_app"
             title={TASK_TYPES.llm_app}
@@ -72,6 +57,21 @@ export function TaskStep() {
                 color="blue.400"
                 size="md"
                 icon={<LuListChecks />}
+                marginTop="-2px"
+              />
+            }
+          />
+          <StepButton
+            colorPalette="green"
+            value="real_time"
+            title={TASK_TYPES.real_time}
+            description="Evaluate messages as they arrive in production or as a guardrail to protect your application"
+            onClick={() => handleTaskSelection("real_time")}
+            icon={
+              <ColorfulBlockIcon
+                color="green.400"
+                size="md"
+                icon={<Activity />}
                 marginTop="-2px"
               />
             }

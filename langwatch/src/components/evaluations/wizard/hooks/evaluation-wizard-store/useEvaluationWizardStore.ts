@@ -42,7 +42,7 @@ export type PartialEdge = Omit<Workflow["edges"][number], "target"> & {
 };
 
 export const TASK_TYPES = {
-  real_time: "Set up real-time evaluation",
+  real_time: "Real-time evaluation",
   llm_app: "Offline evaluation",
   prompt_creation: "Prompt Creation",
   custom_evaluator: "Evaluate your Evaluator",
