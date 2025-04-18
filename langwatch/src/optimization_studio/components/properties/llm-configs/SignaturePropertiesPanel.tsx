@@ -1,10 +1,11 @@
+import { Separator } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 
 import { useWorkflowStore } from "../../../hooks/useWorkflowStore";
 import type { Signature } from "../../../types/dsl";
 import { BasePropertiesPanel } from "../BasePropertiesPanel";
 
-import { PromptSource } from "./PromptSource";
+import { PromptSource } from "./prompt-source-select/PromptSource";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { llmConfigToNodeData } from "~/optimization_studio/utils/registryUtils";
@@ -54,10 +55,25 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
     }
   };
 
+  const handlePromptSourceSelect = (config: { id: string; name: string }) => {
+    setNode({
+      ...node,
+      data: {
+        ...node.data,
+        name: config.name,
+        configId: config.id,
+      },
+    });
+  };
+
   // TODO: Consider refactoring the BasePropertiesPanel so that we don't need to hide everything like this
   return (
     <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs>
-      <PromptSource configId="" onSelect={console.log} />
+      <PromptSource
+        configId={node.data.configId}
+        onSelect={handlePromptSourceSelect}
+      />
+      <Separator />
       <PromptConfigForm
         configId={node.data.configId}
         onSubmitSuccess={() => {
