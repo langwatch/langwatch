@@ -5,11 +5,6 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { LlmConfigVersionsRepository } from "./llm-config-versions.repository";
-import {
-  getLatestConfigVersionSchema,
-  getSchemaValidator,
-  schemaValidators,
-} from "./llm-config-version-schema";
 
 /**
  * Interface for LLM Config data transfer objects
@@ -17,25 +12,6 @@ import {
 interface LlmConfigDTO {
   name: string;
   projectId: string;
-}
-
-/**
- * Interface for LLM Config Version data transfer objects
- */
-interface LlmConfigVersionDTO {
-  configId: string;
-  projectId: string;
-  configData: Record<string, any>;
-  schemaVersion: string;
-  commitMessage?: string;
-  authorId?: string | null;
-}
-
-/**
- * Interface for LLM Config with its latest version
- */
-interface LlmConfigWithLatestVersion extends LlmPromptConfig {
-  latestVersion: LlmPromptConfigVersion;
 }
 
 /**

@@ -5,26 +5,10 @@ import {
   type LlmPromptConfig,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { type z } from "zod";
 import {
-  type LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
-  type SchemaVersion,
-  getLatestConfigVersionSchema,
-  type schemaValidators,
   validateConfig,
 } from "./llm-config-version-schema";
-/**
- * Interface for LLM Config Version data transfer objects
- */
-interface LlmConfigVersionDTO {
-  configId: string;
-  projectId: string;
-  configData: z.infer<(typeof schemaValidators)[typeof LATEST_SCHEMA_VERSION]>;
-  schemaVersion: SchemaVersion;
-  commitMessage?: string;
-  authorId?: string | null;
-}
 
 /**
  * Repository for managing LLM Configuration Versions
