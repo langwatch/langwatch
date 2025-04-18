@@ -2,6 +2,7 @@ import type { LlmPromptConfig } from "@prisma/client";
 
 import {
   LATEST_SCHEMA_VERSION,
+  parseLlmConfigVersion,
   type LatestConfigVersionSchema,
 } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
@@ -53,7 +54,7 @@ export function useInitializeNewLlmConfig() {
 
     return {
       config,
-      version,
+      version: parseLlmConfigVersion(version),
     };
   };
 

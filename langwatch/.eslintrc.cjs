@@ -85,34 +85,6 @@ const config = deepmerge(
           ],
         },
       ],
-      //   // Imports
-      //   "import/order": [
-      //     "error",
-      //     {
-      //       groups: [
-      //         "builtin",
-      //         "external",
-      //         "internal",
-      //         "parent",
-      //         "sibling",
-      //         "index",
-      //       ],
-      //       "newlines-between": "always",
-      //       alphabetize: { order: "asc", caseInsensitive: true },
-      //     },
-      //   ],
-      //   "import/no-extraneous-dependencies": "error",
-      //   "no-unused-vars": "off", // or "@typescript-eslint/no-unused-vars": "off",
-      //   "unused-imports/no-unused-imports": "error",
-      //   "unused-imports/no-unused-vars": [
-      //     "warn",
-      //     {
-      //       vars: "all",
-      //       varsIgnorePattern: "^_",
-      //       args: "after-used",
-      //       argsIgnorePattern: "^_",
-      //     },
-      //   ],
     },
   },
   localConfig

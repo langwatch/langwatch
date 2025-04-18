@@ -1,11 +1,10 @@
-import {
-  type PrismaClient,
-  type LlmPromptConfig,
-  type LlmPromptConfigVersion,
-} from "@prisma/client";
+import { type PrismaClient, type LlmPromptConfig } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
-import { type SchemaVersion } from "./llm-config-version-schema";
+import {
+  parseLlmConfigVersion,
+  type LatestConfigVersionSchema,
+} from "./llm-config-version-schema";
 import { LlmConfigVersionsRepository } from "./llm-config-versions.repository";
 
 /**
@@ -20,9 +19,7 @@ interface LlmConfigDTO {
  * Interface for LLM Config with its latest version
  */
 export interface LlmConfigWithLatestVersion extends LlmPromptConfig {
-  latestVersion: LlmPromptConfigVersion & {
-    schemaVersion: SchemaVersion;
-  };
+  latestVersion: LatestConfigVersionSchema;
 }
 
 /**
@@ -42,10 +39,32 @@ export class LlmConfigRepository {
   /**
    * Get all LLM configs for a project
    */
-  async getAllConfigs(projectId: string): Promise<LlmPromptConfig[]> {
-    return this.prisma.llmPromptConfig.findMany({
+  async getAllWithLatestVersion(
+    projectId: string
+  ): Promise<LlmConfigWithLatestVersion[]> {
+    const configs = await this.prisma.llmPromptConfig.findMany({
       where: { projectId },
       orderBy: { updatedAt: "desc" },
+      include: {
+        versions: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+    });
+
+    return configs.map((config) => {
+      if (!config.versions[0]) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Prompt config has no versions.",
+        });
+      }
+
+      return {
+        ...config,
+        latestVersion: parseLlmConfigVersion(config.versions[0]),
+      };
     });
   }
 
@@ -83,9 +102,7 @@ export class LlmConfigRepository {
 
     return {
       ...config,
-      latestVersion: config.versions[0] as LlmPromptConfigVersion & {
-        schemaVersion: SchemaVersion;
-      },
+      latestVersion: parseLlmConfigVersion(config.versions[0]),
     };
   }
 

@@ -1,10 +1,12 @@
-import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { z } from "zod";
+
+import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+
+import { LlmConfigRepository } from "../../prompt-config/repositories/llm-config.repository";
 import { TeamRoleGroup } from "../permission";
 import { checkUserPermissionForProject } from "../permission";
-import { LlmConfigRepository } from "../../prompt-config/repositories/llm-config.repository";
-import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const idSchema = z.object({
   id: z.string(),
@@ -170,7 +172,7 @@ export const llmConfigsRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
     .query(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
-      return await repository.getAllConfigs(input.projectId);
+      return await repository.getAllWithLatestVersion(input.projectId);
     }),
 
   /**

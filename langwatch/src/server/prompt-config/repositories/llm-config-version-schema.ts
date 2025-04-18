@@ -60,6 +60,7 @@ const configSchemaV1_0 = z.object({
   configId: z.string().min(1, "Config ID cannot be empty"),
   schemaVersion: z.literal(SchemaVersion.V1_0),
   commitMessage: z.string(),
+  version: z.number(),
   configData: z.object({
     version: z.number().min(1, "Version must be greater than 0").optional(),
     prompt: z.string().min(1, "Prompt cannot be empty"),

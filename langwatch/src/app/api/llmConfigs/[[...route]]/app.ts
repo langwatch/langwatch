@@ -1,12 +1,14 @@
+import type { Project } from "@prisma/client";
 import { Hono } from "hono";
+import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
-import { describeRoute } from "hono-openapi";
-import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
-import { prisma } from "../../../../server/db";
-import type { Project } from "@prisma/client";
-import { LlmConfigRepository } from "../../../../server/prompt-config/repositories/llm-config.repository";
+
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+
+import { prisma } from "../../../../server/db";
+import { LlmConfigRepository } from "../../../../server/prompt-config/repositories/llm-config.repository";
+import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 
 patchZodOpenapi();
 
@@ -56,7 +58,7 @@ app.get(
     const repository = c.get("llmConfigRepository");
     const project = c.get("project");
 
-    const configs = await repository.getAllConfigs(project.id);
+    const configs = await repository.getAllWithLatestVersion(project.id);
     return c.json(configs);
   }
 );

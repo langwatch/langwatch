@@ -1,15 +1,14 @@
 import { HStack, Button, Spinner, Text, Input } from "@chakra-ui/react";
-import { FormProvider } from "react-hook-form";
-import { PromptNameField } from "./fields/PromptNameField";
-import { VersionHistoryListPopover } from "../VersionHistoryListPopover";
 import { SaveIcon } from "lucide-react";
-import {
-  usePromptConfigForm,
-  type PromptConfigFormValues,
-} from "../hooks/usePromptConfigForm";
+import { FormProvider } from "react-hook-form";
+
+import { usePromptConfigForm } from "../hooks/usePromptConfigForm";
+import { VersionHistoryListPopover } from "../VersionHistoryListPopover";
+
 import { PromptConfigVersionFieldGroup } from "./fields/PromptConfigVersionFieldGroup";
+import { PromptNameField } from "./fields/PromptNameField";
+
 import { VerticalFormControl } from "~/components/VerticalFormControl";
-import { DemonstrationsField } from "./fields/DemonstrationsField";
 
 interface PromptConfigFormProps {
   configId: string;
