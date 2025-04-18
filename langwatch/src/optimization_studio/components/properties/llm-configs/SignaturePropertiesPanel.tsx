@@ -95,8 +95,9 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
     console.log("latest", config);
   };
 
+  // TODO: Consider refactoring the BasePropertiesPanel so that we don't need to hide everything like this
   return (
-    <BasePropertiesPanel node={node} hideParameters>
+    <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs>
       <PromptSource configId="" onSelect={console.log} />
       {/* TODO: What's this? */}
       {(parameters.prompting_technique?.value as { ref: string }) && (
