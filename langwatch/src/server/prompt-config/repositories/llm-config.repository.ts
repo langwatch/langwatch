@@ -55,6 +55,8 @@ export class LlmConfigRepository {
 
     return configs.map((config) => {
       if (!config.versions[0]) {
+        console.log("THIS CONFIG", config);
+
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Prompt config has no versions.",
