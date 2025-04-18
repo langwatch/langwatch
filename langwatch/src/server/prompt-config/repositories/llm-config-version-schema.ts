@@ -1,8 +1,12 @@
 // src/server/schemas/llm-config-schema.ts
-import { z } from "zod";
-import { TRPCError } from "@trpc/server";
-import { DATASET_COLUMN_TYPES } from "../../datasets/types";
 import type { LlmPromptConfigVersion } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+
+import { DATASET_COLUMN_TYPES } from "../../datasets/types";
+
+import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
+
 import { FIELD_TYPES } from "~/optimization_studio/types/dsl";
 
 /**
@@ -105,7 +109,7 @@ export function getLatestConfigVersionSchema() {
  * @throws ZodError if the config data is invalid
  */
 export function parseLlmConfigVersion(
-  llmConfigVersion: LlmPromptConfigVersion
+  llmConfigVersion: LlmPromptConfigVersion | LlmConfigVersionDTO
 ): LatestConfigVersionSchema {
   const { schemaVersion } = llmConfigVersion;
   const validator = schemaValidators[schemaVersion as SchemaVersion];

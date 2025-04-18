@@ -1,10 +1,12 @@
-import { api } from "~/utils/api";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { LlmPromptConfig } from "@prisma/client";
+
 import {
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
 } from "~/server/prompt-config/repositories/llm-config-version-schema";
+
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 
 type InitializeNewLlmConfigProps = Partial<LlmPromptConfig>;
 
