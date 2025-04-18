@@ -45,7 +45,7 @@ const configSchemaV1_0 = z.object({
   schemaVersion: z.literal(SchemaVersion.V1_0),
   commitMessage: z.string(),
   configData: z.object({
-    version: z.literal(SchemaVersion.V1_0),
+    version: z.number().min(1, "Version must be greater than 0").optional(),
     prompt: z.string().min(1, "Prompt cannot be empty"),
     model: z.string().min(1, "Model identifier cannot be empty"),
     inputs: z.array(inputOutputSchema).min(1, "At least one input is required"),
