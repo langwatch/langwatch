@@ -6,7 +6,8 @@ import currentSpec from "../app/api/openapiLangWatch.json";
 import fs from "fs";
 import path from "path";
 
-const overwriteMerge = (destinationArray, sourceArray, options) => sourceArray;
+const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) =>
+  sourceArray;
 
 const langwatchSpec = {
   openapi: "3.1.0",
