@@ -103,13 +103,14 @@ const usePrompSourceController = ({
   const { open, onOpen, onClose } = useDisclosure();
   const { project } = useOrganizationTeamProject();
 
-  const { data: selectedConfig } = api.llmConfigs.getPromptConfigById.useQuery(
-    {
-      id: configId ?? "",
-      projectId: project?.id ?? "",
-    },
-    { enabled: !!configId && !!project?.id }
-  );
+  const { data: selectedConfig } =
+    api.llmConfigs.getByIdWithLatestVersion.useQuery(
+      {
+        id: configId ?? "",
+        projectId: project?.id ?? "",
+      },
+      { enabled: !!configId && !!project?.id }
+    );
 
   // Fetch all prompt configs
   const { data: promptConfigs, isLoading } =

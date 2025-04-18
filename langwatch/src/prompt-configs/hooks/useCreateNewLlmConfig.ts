@@ -4,7 +4,7 @@ import type { LlmPromptConfig } from "@prisma/client";
 import {
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
-} from "~/server/repositories/llm-config-version-schema";
+} from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 type InitializeNewLlmConfigProps = Partial<LlmPromptConfig>;
 

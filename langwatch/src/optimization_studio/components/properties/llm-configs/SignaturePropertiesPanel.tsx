@@ -1,39 +1,19 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Spacer,
-  Text,
-  Textarea,
-  useDisclosure,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, HStack, Spacer, Text } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { Edit2, Info, X } from "react-feather";
-import { DatasetPreview } from "../../../../components/datasets/DatasetPreview";
-import { Tooltip } from "../../../../components/ui/tooltip";
+import { X } from "react-feather";
+
 import { useGetDatasetData } from "../../../hooks/useGetDatasetData";
 import { useWorkflowStore } from "../../../hooks/useWorkflowStore";
-import type {
-  ComponentType,
-  LLMConfig,
-  NodeDataset,
-  Signature,
-} from "../../../types/dsl";
-import { DemonstrationsModal } from "../../DemonstrationsModal";
-import {
-  BasePropertiesPanel,
-  PropertyField,
-  PropertySectionTitle,
-} from "../BasePropertiesPanel";
-import { LLMConfigField } from "../modals/llm-config/LLMConfigField";
+import type { ComponentType, NodeDataset, Signature } from "../../../types/dsl";
 import { ComponentIcon } from "../../ColorfulBlockIcons";
+import { BasePropertiesPanel, PropertyField } from "../BasePropertiesPanel";
+
 import { PromptSource } from "./PromptSource";
-import { PromptConfigForm } from "~/prompt-configs/forms/PromptConfigForm";
-import { api } from "~/utils/api";
+
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { llmConfigToNodeData } from "~/optimization_studio/utils/registryUtils";
-import type { LatestConfigVersionSchema } from "~/server/repositories/llm-config-version-schema";
+import { PromptConfigForm } from "~/prompt-configs/forms/PromptConfigForm";
+import { api } from "~/utils/api";
 
 /**
  * Properties panel for the Signature node in the optimization studio.
@@ -70,22 +50,20 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
     preview: true,
   });
 
-  const { data: config, refetch } = api.llmConfigs.getPromptConfigById.useQuery(
-    {
+  const { data: config, refetch } =
+    api.llmConfigs.getByIdWithLatestVersion.useQuery({
       id: node.data.configId,
       projectId: project?.id ?? "",
-    }
-  );
+    });
 
   const handleSubmitSuccess = async () => {
     const latestConfig = await refetch();
 
+    if (!latestConfig.data) return;
+
     setNode({
       ...node,
-      data: llmConfigToNodeData(
-        latestConfig.data as any,
-        latestConfig.data?.versions[0] as any
-      ),
+      data: llmConfigToNodeData(latestConfig.data),
     });
 
     if (!project?.id) {

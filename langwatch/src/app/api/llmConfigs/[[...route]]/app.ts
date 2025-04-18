@@ -5,8 +5,8 @@ import { describeRoute } from "hono-openapi";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import { prisma } from "../../../../server/db";
 import type { Project } from "@prisma/client";
-import { LlmConfigRepository } from "../../../../server/repositories/llm-config.repository";
-import { getLatestConfigVersionSchema } from "~/server/repositories/llm-config-version-schema";
+import { LlmConfigRepository } from "../../../../server/prompt-config/repositories/llm-config.repository";
+import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 patchZodOpenapi();
 
@@ -73,7 +73,10 @@ app.get(
     const { id } = c.req.param();
 
     try {
-      const config = await repository.getConfigById(id, project.id);
+      const config = await repository.getConfigByIdWithLatestVersions(
+        id,
+        project.id
+      );
       return c.json(config);
     } catch (error: any) {
       return c.json({ error: error.message }, 404);

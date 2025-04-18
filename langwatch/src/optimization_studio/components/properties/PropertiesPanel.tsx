@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { useWindowSize } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Component, ComponentType } from "../../types/dsl";
+import type { Component, ComponentType, Signature } from "../../types/dsl";
 import { InputPanel } from "../component_execution/InputPanel";
 import { OutputPanel } from "../component_execution/OutputPanel";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
@@ -39,7 +39,7 @@ export function PropertiesPanel() {
   > = {
     entry: EntryPointPropertiesPanel as React.FC<{ node: Node<Component> }>,
     end: EndPropertiesPanel as React.FC<{ node: Node<Component> }>,
-    signature: SignaturePropertiesPanel,
+    signature: SignaturePropertiesPanel as React.FC<{ node: Node<Component> }>,
     code: BasePropertiesPanel,
     custom: CustomPropertiesPanel,
     retriever: RetrievePropertiesPanel,

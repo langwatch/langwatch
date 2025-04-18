@@ -2,28 +2,29 @@ import type { Edge, Node } from "@xyflow/react";
 import type { DatasetColumns } from "../../server/datasets/types";
 import { z } from "zod";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
-import type { LlmPromptConfig } from "@prisma/client";
-import type { LatestConfigVersionSchema } from "~/server/repositories/llm-config-version-schema";
+
+export const FIELD_TYPES = [
+  "str",
+  "image",
+  "float",
+  "int",
+  "bool",
+  "list",
+  "list[str]",
+  "list[float]",
+  "list[int]",
+  "list[bool]",
+  "dict",
+  "signature",
+  "llm",
+  "prompting_technique",
+  "dataset",
+  "code",
+] as const;
 
 export type Field = {
   identifier: string;
-  type:
-    | "str"
-    | "image"
-    | "float"
-    | "int"
-    | "bool"
-    | "list"
-    | "list[str]"
-    | "list[float]"
-    | "list[int]"
-    | "list[bool]"
-    | "dict"
-    | "signature"
-    | "llm"
-    | "prompting_technique"
-    | "dataset"
-    | "code";
+  type: (typeof FIELD_TYPES)[number];
   optional?: boolean;
   value?: unknown;
   desc?: string;

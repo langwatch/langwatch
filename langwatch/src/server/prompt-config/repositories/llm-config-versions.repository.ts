@@ -7,24 +7,18 @@ import {
 import { TRPCError } from "@trpc/server";
 import { type z } from "zod";
 import {
-  LATEST_SCHEMA_VERSION,
+  type LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
   type SchemaVersion,
   getLatestConfigVersionSchema,
   type schemaValidators,
-  validateConfig,
+  parseLlmConfigVersion,
 } from "./llm-config-version-schema";
+
 /**
  * Interface for LLM Config Version data transfer objects
  */
-interface LlmConfigVersionDTO {
-  configId: string;
-  projectId: string;
-  configData: z.infer<(typeof schemaValidators)[typeof LATEST_SCHEMA_VERSION]>;
-  schemaVersion: SchemaVersion;
-  commitMessage?: string;
-  authorId?: string | null;
-}
+type LlmConfigVersionDTO = LatestConfigVersionSchema;
 
 /**
  * Repository for managing LLM Configuration Versions
@@ -141,10 +135,10 @@ export class LlmConfigVersionsRepository {
    * Create a new version for an existing config
    */
   async createVersion(
-    versionData: LatestConfigVersionSchema
-  ): Promise<LlmPromptConfigVersion> {
+    versionData: LlmConfigVersionDTO
+  ): Promise<LlmPromptConfigVersion & { schemaVersion: SchemaVersion }> {
     // Validate the config data
-    validateConfig(versionData);
+    parseLlmConfigVersion(versionData);
     // Create the new version
     const version = await this.prisma.llmPromptConfigVersion.create({
       data: versionData,
@@ -157,7 +151,10 @@ export class LlmConfigVersionsRepository {
       data: { updatedAt: new Date() },
     });
 
-    return version;
+    return {
+      ...version,
+      schemaVersion: version.schemaVersion as SchemaVersion,
+    };
   }
 
   /**
@@ -199,33 +196,5 @@ export class LlmConfigVersionsRepository {
     });
 
     return newVersion;
-  }
-
-  /**
-   * Build default version for a new config
-   */
-  async buildDefaultVersion(
-    configId: string,
-    projectId: string
-  ): Promise<LlmPromptConfigVersion> {
-    return {
-      commitMessage: "Initial version",
-      authorId: null,
-      configId,
-      projectId,
-      configData: {
-        prompt: "You are a helpful assistant",
-        model: "openai/gpt4-o-mini",
-        inputs: [{ identifier: "input", type: "str" }],
-        outputs: [{ identifier: "output", type: "str" }],
-        demonstrations: {
-          columns: [],
-        },
-      } as z.infer<(typeof schemaValidators)[typeof LATEST_SCHEMA_VERSION]>,
-      schemaVersion: LATEST_SCHEMA_VERSION,
-      createdAt: new Date(),
-      id: "",
-      version: 1,
-    };
   }
 }
