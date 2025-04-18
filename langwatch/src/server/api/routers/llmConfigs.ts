@@ -84,13 +84,14 @@ export const llmConfigVersionsRouter = createTRPCRouter({
    * Create a new version for an existing config.
    */
   create: protectedProcedure
-    .input(getLatestConfigVersionSchema())
+    .input(getLatestConfigVersionSchema().omit({ authorId: true }))
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
       const authorId = ctx.session?.user?.id || null;
 
       try {
+        // TODO: Validate the config data against the schema before saving
         const version = await repository.versions.createVersion({
           ...input,
           authorId,

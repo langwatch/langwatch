@@ -42,7 +42,7 @@ export const llmPromptConfigVersionFactory = Factory.define<
 
   const configData = params?.configData
     ? validateConfig(params?.configData as any)
-    : ({
+    : {
         prompt: "You are a helpful assistant",
         model: "gpt-3.5-turbo",
         inputs: [{ identifier: "input", type: "str" }],
@@ -51,7 +51,7 @@ export const llmPromptConfigVersionFactory = Factory.define<
           columns: [],
           rows: [],
         },
-      } as z.infer<(typeof schemaValidators)[typeof LATEST_SCHEMA_VERSION]>);
+      };
 
   return {
     id: nanoid(),

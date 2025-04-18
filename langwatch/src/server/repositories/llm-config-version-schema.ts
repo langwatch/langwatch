@@ -45,7 +45,7 @@ const configSchemaV1_0 = z.object({
   schemaVersion: z.literal(SchemaVersion.V1_0),
   commitMessage: z.string(),
   configData: z.object({
-    version: z.literal(SchemaVersion.V1_0),
+    version: z.number().min(1, "Version must be greater than 0").optional(),
     prompt: z.string().min(1, "Prompt cannot be empty"),
     model: z.string().min(1, "Model identifier cannot be empty"),
     inputs: z.array(inputOutputSchema).min(1, "At least one input is required"),
@@ -63,6 +63,17 @@ const configSchemaV1_0 = z.object({
 export const schemaValidators = {
   [SchemaVersion.V1_0]: configSchemaV1_0,
 };
+
+export function getSchemaValidator(version: SchemaVersion | string) {
+  const validator = schemaValidators[version as SchemaVersion];
+  if (!validator) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Unknown schema version: ${version}`,
+    });
+  }
+  return validator;
+}
 
 export type LatestConfigVersionSchema = z.infer<typeof configSchemaV1_0>;
 

@@ -19,3 +19,7 @@ start/postgres:
 
 print/openApiSpec:
 	cd langwatch && npx tsx src/tasks/generateOpenAPISpec.ts
+
+tsc-watch:
+	cd langwatch && npm run tsc-watch
+	

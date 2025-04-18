@@ -8,6 +8,7 @@ import { api } from "~/utils/api";
 import { useEffect } from "react";
 import type { LlmPromptConfig, LlmPromptConfigVersion } from "@prisma/client";
 import type { DatasetColumnType } from "~/server/datasets/types";
+import { SchemaVersion } from "~/server/repositories/llm-config-version-schema";
 
 const promptConfigSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -137,7 +138,7 @@ export const usePromptConfigForm = ({
       projectId: project.id,
       configId,
       configData,
-      schemaVersion: "1.0.0",
+      schemaVersion: SchemaVersion.V1_0,
       commitMessage: data.version.commitMessage,
     });
 

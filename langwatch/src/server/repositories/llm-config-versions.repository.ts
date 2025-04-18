@@ -5,26 +5,10 @@ import {
   type LlmPromptConfig,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { type z } from "zod";
 import {
-  LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
-  type SchemaVersion,
-  getLatestConfigVersionSchema,
-  type schemaValidators,
   validateConfig,
 } from "./llm-config-version-schema";
-/**
- * Interface for LLM Config Version data transfer objects
- */
-interface LlmConfigVersionDTO {
-  configId: string;
-  projectId: string;
-  configData: z.infer<(typeof schemaValidators)[typeof LATEST_SCHEMA_VERSION]>;
-  schemaVersion: SchemaVersion;
-  commitMessage?: string;
-  authorId?: string | null;
-}
 
 /**
  * Repository for managing LLM Configuration Versions
@@ -199,33 +183,5 @@ export class LlmConfigVersionsRepository {
     });
 
     return newVersion;
-  }
-
-  /**
-   * Build default version for a new config
-   */
-  async buildDefaultVersion(
-    configId: string,
-    projectId: string
-  ): Promise<LlmPromptConfigVersion> {
-    return {
-      commitMessage: "Initial version",
-      authorId: null,
-      configId,
-      projectId,
-      configData: {
-        prompt: "You are a helpful assistant",
-        model: "openai/gpt4-o-mini",
-        inputs: [{ identifier: "input", type: "str" }],
-        outputs: [{ identifier: "output", type: "str" }],
-        demonstrations: {
-          columns: [],
-        },
-      } as z.infer<(typeof schemaValidators)[typeof LATEST_SCHEMA_VERSION]>,
-      schemaVersion: LATEST_SCHEMA_VERSION,
-      createdAt: new Date(),
-      id: "",
-      version: 1,
-    };
   }
 }

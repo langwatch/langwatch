@@ -13,7 +13,11 @@ import { toaster } from "~/components/ui/toaster";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { type LlmPromptConfig } from "@prisma/client";
 import { llmPromptConfigVersionFactory } from "~/factories/llm-config.factory";
-import { LATEST_SCHEMA_VERSION } from "~/server/repositories/llm-config-version-schema";
+import {
+  getSchemaValidator,
+  LATEST_SCHEMA_VERSION,
+  type LatestConfigVersionSchema,
+} from "~/server/repositories/llm-config-version-schema";
 
 export default function PromptConfigsPage() {
   const utils = api.useContext();
@@ -113,7 +117,7 @@ export default function PromptConfigsPage() {
     await createConfigVersionMutation.mutateAsync({
       configId: newConfig.id,
       projectId: project.id,
-      configData: defaultPromptVersionConfig.configData,
+      configData: defaultPromptVersionConfig.configData as any,
       schemaVersion: LATEST_SCHEMA_VERSION,
       commitMessage: "Initial version",
     });
