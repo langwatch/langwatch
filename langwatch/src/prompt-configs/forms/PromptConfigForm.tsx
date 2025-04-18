@@ -5,6 +5,7 @@ import { FormProvider } from "react-hook-form";
 import { usePromptConfigForm } from "../hooks/usePromptConfigForm";
 import { VersionHistoryListPopover } from "../VersionHistoryListPopover";
 
+import { DemonstrationsField } from "./fields/DemonstrationsField";
 import { PromptConfigVersionFieldGroup } from "./fields/PromptConfigVersionFieldGroup";
 import { PromptNameField } from "./fields/PromptNameField";
 
@@ -34,14 +35,12 @@ export function PromptConfigForm({
 
   const formIsDirty = methods.formState.isDirty;
 
-  console.log(methods.getValues());
-
   return (
     <FormProvider {...methods}>
       <form style={{ width: "100%" }}>
         <PromptNameField />
         <PromptConfigVersionFieldGroup />
-        {/* <DemonstrationsField /> */}
+        <DemonstrationsField />
 
         {/* Manage the commit message and saving */}
         <VerticalFormControl

@@ -23,7 +23,9 @@ const latestConfigVersionSchema = getLatestConfigVersionSchema();
 
 const formSchema = promptConfigSchema.extend({
   version: z.object({
-    commitMessage: latestConfigVersionSchema.shape.commitMessage,
+    commitMessage: latestConfigVersionSchema.shape.commitMessage.min(1, {
+      message: "Commit message is required",
+    }),
     configData: z.object({
       model: latestConfigVersionSchema.shape.configData.shape.model,
       prompt: latestConfigVersionSchema.shape.configData.shape.prompt,
@@ -54,7 +56,7 @@ function convertConfigToDefaultValues(
     ...config,
     version: {
       ...config.latestVersion,
-      commitMessage: config.latestVersion.commitMessage ?? "",
+      commitMessage: "",
       configData: config.latestVersion
         .configData as PromptConfigFormValues["version"]["configData"],
     },
@@ -91,7 +93,7 @@ export const usePromptConfigForm = ({
   }, [config, methods]);
 
   const updateConfig = api.llmConfigs.updatePromptConfig.useMutation();
-  const createVersion = usePromptConfigVersionMutation({ onSuccess });
+  const createVersion = usePromptConfigVersionMutation();
 
   const handleSubmit = async (data: PromptConfigFormValues) => {
     if (!project?.id) {
@@ -123,6 +125,8 @@ export const usePromptConfigForm = ({
     });
 
     await refetch();
+
+    await onSuccess?.();
   };
 
   return {

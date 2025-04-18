@@ -6,9 +6,10 @@ interface UsePromptConfigVersionMutationProps {
   onSuccess?: () => void;
 }
 
-export const usePromptConfigVersionMutation = ({
-  onSuccess,
-}: UsePromptConfigVersionMutationProps) => {
+export const usePromptConfigVersionMutation = (
+  props?: UsePromptConfigVersionMutationProps
+) => {
+  const { onSuccess } = props ?? {};
   const { project } = useOrganizationTeamProject();
   const utils = api.useContext();
 

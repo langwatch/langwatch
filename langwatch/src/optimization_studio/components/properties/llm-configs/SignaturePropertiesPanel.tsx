@@ -41,17 +41,21 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
   });
 
   const handleSubmitSuccess = async () => {
-    const latestConfig = await refetch();
+    try {
+      const latestConfig = await refetch();
 
-    if (!latestConfig.data) return;
+      if (!latestConfig.data) return;
 
-    setNode({
-      ...node,
-      data: llmConfigToNodeData(latestConfig.data),
-    });
+      setNode({
+        ...node,
+        data: llmConfigToNodeData(latestConfig.data),
+      });
 
-    if (!project?.id) {
-      throw new Error("Project ID is required");
+      if (!project?.id) {
+        throw new Error("Project ID is required");
+      }
+    } catch (error) {
+      console.error("Error updating node data", error);
     }
   };
 
