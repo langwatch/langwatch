@@ -26,7 +26,7 @@
     "copy:langevals-types": "cd src/server/evaluations && curl -L \"https://raw.githubusercontent.com/langwatch/langevals/main/ts-integration/evaluators.generated.ts?$(date +%s)\" -o evaluators.generated.ts",
     "copy:llm-model-costs": "cd src/server/modelProviders && curl -L \"https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json\" -o llmModelCosts.json",
     "setup:quickwit": "./scripts/install-quickwit.sh",
-    "tsc-watch": "tsc --noEmit --watch --noImplicitAny false"
+    "tsc-watch": "tsc --noEmit --watch"
   },
   "dependencies": {
     "@ag-grid-community/client-side-row-model": "^32.3.3",
