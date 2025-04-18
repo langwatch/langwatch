@@ -74,7 +74,7 @@ export const usePromptConfigForm = ({
         projectId: project?.id ?? "",
       },
       {
-        enabled: !!project?.id,
+        enabled: !!project?.id && !!configId,
       }
     );
 

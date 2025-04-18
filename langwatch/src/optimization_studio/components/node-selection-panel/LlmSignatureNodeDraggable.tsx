@@ -3,6 +3,7 @@ import { useCallback } from "react";
 
 import { NodeDraggable } from "./NodeDraggable";
 
+import { toaster } from "~/components/ui/toaster";
 import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import { MODULES } from "~/optimization_studio/registry";
 import type { Component } from "~/optimization_studio/types/dsl";
@@ -35,17 +36,27 @@ export function LlmSignatureNodeDraggable() {
             name: promptName,
           },
         });
-        const { config, version } = await initializeNewLlmConfigWithVersion({
-          name: promptName,
-        });
 
-        setNode({
-          id: item.node.id,
-          data: llmConfigToNodeData({
-            ...config,
-            latestVersion: version,
-          }),
-        });
+        try {
+          const { config, version } = await initializeNewLlmConfigWithVersion({
+            name: promptName,
+          });
+
+          setNode({
+            id: item.node.id,
+            data: llmConfigToNodeData({
+              ...config,
+              latestVersion: version,
+            }),
+          });
+        } catch (error) {
+          console.error("Error creating new prompt", error);
+          toaster.error({
+            title: "Error",
+            description: "Error creating new prompt",
+            type: "error",
+          });
+        }
       })();
     },
     [getWorkflow, initializeNewLlmConfigWithVersion, setNode]
