@@ -1,10 +1,10 @@
-import { VStack, useDisclosure } from "@chakra-ui/react";
+import { useDisclosure } from "@chakra-ui/react";
 import { useMemo } from "react";
 
 import { PromptList } from "./ui/PromptList";
 import { PromptSelectionButton } from "./ui/PromptSelectButton";
+import { PromptSourceDialog } from "./ui/PromptSourceDialog";
 
-import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -93,26 +93,13 @@ export function PromptSourceSelect({
     <>
       <PromptSelectionButton selectedConfig={selectedConfig} onClick={onOpen} />
 
-      <Dialog.Root
-        open={open}
-        onOpenChange={({ open }) => (open ? onOpen() : onClose())}
-      >
-        <Dialog.Content>
-          <Dialog.Header>
-            <Dialog.Title>Select a Prompt</Dialog.Title>
-            <Dialog.CloseTrigger />
-          </Dialog.Header>
-          <Dialog.Body>
-            <VStack align="stretch" gap={4} width="full">
-              <PromptList
-                isLoading={isLoading}
-                promptConfigs={promptConfigs}
-                onSelect={handleSelectPrompt}
-              />
-            </VStack>
-          </Dialog.Body>
-        </Dialog.Content>
-      </Dialog.Root>
+      <PromptSourceDialog open={open} onOpen={onOpen} onClose={onClose}>
+        <PromptList
+          isLoading={isLoading}
+          promptConfigs={promptConfigs}
+          onSelect={handleSelectPrompt}
+        />
+      </PromptSourceDialog>
     </>
   );
 }
