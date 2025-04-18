@@ -8,12 +8,14 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useFieldArray, useFormContext } from "react-hook-form";
 import { Plus } from "lucide-react";
 import { Trash2 } from "react-feather";
-import { TypeSelector } from "../../ui/TypeSelector";
-import { ModelSelectField } from "./ModelSelectField";
+import { useFieldArray, useFormContext } from "react-hook-form";
+
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
+import { TypeSelector } from "../../ui/TypeSelector";
+
+import { ModelSelectField } from "./ModelSelectField";
 
 /**
  * Dumb Form Component for editing the config content
@@ -189,7 +191,11 @@ function FieldRow({
                 const normalized = e.target.value
                   .replace(/ /g, "_")
                   .toLowerCase();
-                onChange(`${name}.${index}.identifier`, normalized);
+
+                onChange(
+                  `version.configData.${name}.${index}.identifier`,
+                  normalized
+                );
               }}
               onBlur={(e) => {
                 validateIdentifier(e.target.value);
