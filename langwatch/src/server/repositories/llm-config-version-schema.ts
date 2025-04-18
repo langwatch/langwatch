@@ -64,6 +64,17 @@ export const schemaValidators = {
   [SchemaVersion.V1_0]: configSchemaV1_0,
 };
 
+export function getSchemaValidator(version: SchemaVersion | string) {
+  const validator = schemaValidators[version as SchemaVersion];
+  if (!validator) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Unknown schema version: ${version}`,
+    });
+  }
+  return validator;
+}
+
 export type LatestConfigVersionSchema = z.infer<typeof configSchemaV1_0>;
 
 /**

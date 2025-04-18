@@ -25,7 +25,7 @@ export const usePromptConfigVersionMutation = ({
       });
       void utils.llmConfigs.getPromptConfigs.invalidate();
       void utils.llmConfigs.versions.getById.invalidate({
-        id: configId,
+        versionId: configId,
         projectId: project?.id ?? "",
       });
       onSuccess?.();
