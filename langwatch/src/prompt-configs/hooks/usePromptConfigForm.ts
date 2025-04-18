@@ -126,7 +126,7 @@ export const usePromptConfigForm = ({
 
     await refetch();
 
-    await onSuccess?.();
+    onSuccess?.();
   };
 
   return {

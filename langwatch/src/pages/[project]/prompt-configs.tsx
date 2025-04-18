@@ -24,6 +24,9 @@ export default function PromptConfigsPage() {
   const [configToDelete, setConfigToDelete] = useState<LlmPromptConfig | null>(
     null
   );
+  const closePanel = () => {
+    setSelectedConfigId(null);
+  };
 
   // Fetch prompt configs
   const { data: promptConfigs, refetch: refetchPromptConfigs } =
@@ -44,9 +47,8 @@ export default function PromptConfigsPage() {
     );
 
   const createConfigMutation = api.llmConfigs.createPromptConfig.useMutation({
-    onSuccess: ({ id }) => {
+    onSuccess: () => {
       void utils.llmConfigs.getPromptConfigs.invalidate();
-      setSelectedConfigId(id);
       void refetchPromptConfigs();
     },
     onError: (error) => {
@@ -90,38 +92,46 @@ export default function PromptConfigsPage() {
     });
 
   const handleCreateButtonClick = async () => {
-    if (!project?.id) {
+    try {
+      if (!project?.id) {
+        toaster.create({
+          title: "Error",
+          description: "Project ID is required",
+          type: "error",
+        });
+        return;
+      }
+
+      // Create with defaults
+      const newConfig = await createConfigMutation.mutateAsync({
+        name: "New Prompt Config",
+        projectId: project.id,
+      });
+
+      // Create with defaults
+      await createConfigVersionMutation.mutateAsync({
+        configId: newConfig.id,
+        projectId: project.id,
+        configData: {
+          model: "gpt-4o-mini",
+          prompt: "You are a helpful assistant",
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+          demonstrations: {
+            columns: [],
+            rows: [],
+          },
+        },
+        schemaVersion: LATEST_SCHEMA_VERSION,
+        commitMessage: "Initial version",
+      });
+    } catch (error) {
       toaster.create({
-        title: "Error",
-        description: "Project ID is required",
+        title: "Error creating prompt config",
+        description: error instanceof Error ? error.message : "Unknown error",
         type: "error",
       });
-      return;
     }
-
-    // Create with defaults
-    const newConfig = await createConfigMutation.mutateAsync({
-      name: "New Prompt Config",
-      projectId: project.id,
-    });
-
-    // Create with defaults
-    await createConfigVersionMutation.mutateAsync({
-      configId: newConfig.id,
-      projectId: project.id,
-      configData: {
-        model: "gpt-4o-mini",
-        prompt: "You are a helpful assistant",
-        inputs: [{ identifier: "input", type: "str" }],
-        outputs: [{ identifier: "output", type: "str" }],
-        demonstrations: {
-          columns: [],
-          rows: [],
-        },
-      },
-      schemaVersion: LATEST_SCHEMA_VERSION,
-      commitMessage: "Initial version",
-    });
   };
 
   const handleDeleteConfig = (config: LlmPromptConfig) => {
@@ -189,7 +199,7 @@ export default function PromptConfigsPage() {
         </VStack>
         <PromptConfigPanel
           isOpen={!!selectedConfigId}
-          onClose={() => setSelectedConfigId(null)}
+          onClose={closePanel}
           configId={selectedConfigId ?? ""}
         />
 
@@ -202,13 +212,6 @@ export default function PromptConfigsPage() {
             void confirmDeleteConfig();
           }}
         />
-
-        {/* You'll need to implement drawer/modal components for:
-          - Creating a new config
-          - Editing a config name
-          - Viewing/managing versions
-          - Creating a new version
-      */}
       </Container>
     </DashboardLayout>
   );

@@ -1,13 +1,13 @@
 import { useFormContext, Controller } from "react-hook-form";
-import { VerticalFormControl } from "~/components/VerticalFormControl";
+
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
+
 import { ModelSelector, allModelOptions } from "~/components/ModelSelector";
+import { VerticalFormControl } from "~/components/VerticalFormControl";
 
 export function ModelSelectField() {
   const { control, formState } = useFormContext<PromptConfigFormValues>();
   const { errors } = formState;
-
-  console.log("formState", formState);
 
   return (
     <VerticalFormControl
