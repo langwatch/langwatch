@@ -5,6 +5,11 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { LlmConfigVersionsRepository } from "./llm-config-versions.repository";
+import {
+  getLatestConfigVersionSchema,
+  getSchemaValidator,
+  schemaValidators,
+} from "./llm-config-version-schema";
 
 /**
  * Interface for LLM Config data transfer objects
@@ -94,36 +99,6 @@ export class LlmConfigRepository {
         projectId: configData.projectId,
       },
     });
-  }
-
-  /**
-   */
-  async initConfig(
-    configData: LlmConfigDTO,
-    versionData: Omit<LlmConfigVersionDTO, "configId">
-  ): Promise<LlmConfigWithLatestVersion> {
-    // Create the parent config
-    const config = await this.prisma.llmPromptConfig.create({
-      data: {
-        name: configData.name,
-        projectId: configData.projectId,
-      },
-    });
-
-    // Create the initial version using the versions repository
-    const version = await this.versions.createVersion({
-      projectId: config.projectId,
-      commitMessage: versionData.commitMessage ?? "Initial version",
-      authorId: versionData.authorId ?? null,
-      configId: config.id,
-      configData: versionData.configData,
-      schemaVersion: versionData.schemaVersion,
-    });
-
-    return {
-      ...config,
-      latestVersion: version,
-    };
   }
 
   /**

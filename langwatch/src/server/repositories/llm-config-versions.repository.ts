@@ -7,7 +7,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import { type z } from "zod";
 import {
-  LATEST_SCHEMA_VERSION,
+  type LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
   type SchemaVersion,
   getLatestConfigVersionSchema,
@@ -199,33 +199,5 @@ export class LlmConfigVersionsRepository {
     });
 
     return newVersion;
-  }
-
-  /**
-   * Build default version for a new config
-   */
-  async buildDefaultVersion(
-    configId: string,
-    projectId: string
-  ): Promise<LlmPromptConfigVersion> {
-    return {
-      commitMessage: "Initial version",
-      authorId: null,
-      configId,
-      projectId,
-      configData: {
-        prompt: "You are a helpful assistant",
-        model: "openai/gpt4-o-mini",
-        inputs: [{ identifier: "input", type: "str" }],
-        outputs: [{ identifier: "output", type: "str" }],
-        demonstrations: {
-          columns: [],
-        },
-      } as z.infer<(typeof schemaValidators)[typeof LATEST_SCHEMA_VERSION]>,
-      schemaVersion: LATEST_SCHEMA_VERSION,
-      createdAt: new Date(),
-      id: "",
-      version: 1,
-    };
   }
 }
