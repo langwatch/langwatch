@@ -36,7 +36,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             child: {
               terms: {
                 field: "metadata.topic_id",
-                size: 100,
+                size: 10_000,
                 order: { _key: "asc" },
               },
             },
@@ -79,7 +79,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             child: {
               terms: {
                 field: "metadata.subtopic_id",
-                size: 100,
+                size: 10_000,
                 order: { _key: "asc" },
               },
             },
@@ -122,7 +122,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             child: {
               terms: {
                 field: "metadata.user_id",
-                size: 100,
+                size: 10_000,
                 order: { _key: "asc" },
               },
             },
@@ -165,7 +165,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             child: {
               terms: {
                 field: "metadata.thread_id",
-                size: 100,
+                size: 10_000,
                 order: { _key: "asc" },
               },
             },
@@ -208,7 +208,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             child: {
               terms: {
                 field: "metadata.customer_id",
-                size: 100,
+                size: 10_000,
                 order: { _key: "asc" },
               },
             },
@@ -267,7 +267,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                       },
                     }
                   : { field: "metadata.labels" }),
-                size: 100,
+                size: 10_000,
                 order: { _key: "asc" },
               },
             },
@@ -337,7 +337,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                       },
                     }
                   : { field: "metadata.all_keys" }),
-                size: 100,
+                size: 10_000,
                 order: { _key: "asc" },
               },
             },
@@ -416,7 +416,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                         : {
                             field: metadataKey(key),
                           }),
-                      size: 100,
+                      size: 10_000,
                       order: { _key: "asc" },
                     },
                   },
@@ -520,7 +520,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                 child: {
                   terms: {
                     field: "spans.type",
-                    size: 100,
+                    size: 10_000,
                     order: { _key: "asc" },
                   },
                 },
@@ -573,7 +573,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                 child: {
                   terms: {
                     field: "spans.model",
-                    size: 100,
+                    size: 10_000,
                     order: { _key: "asc" },
                   },
                 },
@@ -612,7 +612,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             child: {
               terms: {
                 field: "evaluations.evaluator_id",
-                size: 1000,
+                size: 10_000,
                 order: { _key: "asc" },
               },
               aggs: {
@@ -688,7 +688,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             child: {
               terms: {
                 field: "evaluations.evaluator_id",
-                size: 100,
+                size: 10_000,
                 order: { _key: "asc" },
               },
               aggs: {
@@ -1078,7 +1078,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                 child: {
                   terms: {
                     field: "events.event_type",
-                    size: 100,
+                    size: 10_000,
                     order: { _key: "asc" },
                   },
                 },
@@ -1159,7 +1159,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                         child: {
                           terms: {
                             field: "events.metrics.key",
-                            size: 100,
+                            size: 10_000,
                             order: { _key: "asc" },
                           },
                         },
@@ -1337,7 +1337,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                         child: {
                           terms: {
                             field: "events.event_details.key",
-                            size: 100,
+                            size: 10_000,
                             order: { _key: "asc" },
                           },
                         },
