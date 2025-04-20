@@ -145,7 +145,7 @@ const createIndexes = async (lastMigration: string, client: ElasticClient) => {
   const traceExists = await getLastIndexForBase(TRACE_INDEX.base, client);
   if (!traceExists) {
     const settings: any = {
-      number_of_shards: 1,
+      number_of_shards: 4,
       number_of_replicas: 0,
     };
 
@@ -180,7 +180,7 @@ const createIndexes = async (lastMigration: string, client: ElasticClient) => {
     await client.indices.create({
       index: DSPY_STEPS_INDEX.base,
       settings: {
-        number_of_shards: 1,
+        number_of_shards: 4,
         number_of_replicas: 0,
       },
       mappings: {
@@ -207,7 +207,7 @@ const createIndexes = async (lastMigration: string, client: ElasticClient) => {
     await client.indices.create({
       index: BATCH_EVALUATION_INDEX.base,
       settings: {
-        number_of_shards: 1,
+        number_of_shards: 4,
         number_of_replicas: 0,
       },
       mappings: {
@@ -233,7 +233,7 @@ const createIndexes = async (lastMigration: string, client: ElasticClient) => {
     await client.indices.create({
       index: MIGRATION_INDEX,
       settings: {
-        number_of_shards: 1,
+        number_of_shards: 4,
         number_of_replicas: 0,
       },
       mappings: {
