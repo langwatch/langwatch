@@ -203,7 +203,14 @@ def parse_component(
                 raise ValueError(
                     f"Could not find a class that inherits from dspy.Module for component {node.data.name}"
                 )
+
             class_name = match.group(1)
+            try:
+                code = black.format_str(code, mode=black.Mode())
+            except Exception as e:
+                raise ValueError(
+                    f"{node.data.name} has invalid code: {e}"
+                )
 
             return code, class_name, {}
         case "retriever":
