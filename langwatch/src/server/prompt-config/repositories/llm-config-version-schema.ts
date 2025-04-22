@@ -121,6 +121,10 @@ export function parseLlmConfigVersion(
   const validator = getVersionValidator(schemaVersion as SchemaVersion);
 
   if (!validator) {
+    console.error(
+      `Unknown schema llmConfigVersion: ${schemaVersion}`,
+      llmConfigVersion
+    );
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: `Unknown schema llmConfigVersion: ${schemaVersion}`,

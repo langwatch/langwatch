@@ -65,7 +65,7 @@ export class LlmConfigRepository {
 
       return {
         ...config,
-        latestVersion: this.parseLlmConfigVersion(config.versions[0]),
+        latestVersion: parseLlmConfigVersion(config.versions[0]),
       };
     });
   }
@@ -212,23 +212,8 @@ export class LlmConfigRepository {
 
       return {
         ...updatedConfig,
-        latestVersion: this.parseLlmConfigVersion(newVersion),
+        latestVersion: parseLlmConfigVersion(newVersion),
       };
     });
-  }
-
-  private parseLlmConfigVersion(version: {
-    id: string;
-  }): LatestConfigVersionSchema {
-    try {
-      return parseLlmConfigVersion(version as any);
-    } catch (error) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: `Failed to parse LLM config version for version ${
-          version.id
-        }: ${error instanceof Error ? error.message : "Unknown error"}`,
-      });
-    }
   }
 }
