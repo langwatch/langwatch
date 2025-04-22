@@ -21,13 +21,12 @@ classifiers = [
 
 dependencies = [
     "coolname>=2.2.0",
-    "dspy>=2.5.29",
+    "dspy>=2.5.7",
     "httpx>=0.28.1",
-    "litellm>=1.40.15",
+    "litellm>=1.52.1",
     "openinference-instrumentation-dspy>=0.1.20",
     "openinference-instrumentation-haystack>=0.1.20",
     "openinference-instrumentation-langchain>=0.1.24",
-    "openinference-instrumentation-litellm>=0.1.16",
     "openinference-instrumentation-openai>=0.1.25",
     "openinference-semantic-conventions>=0.1.17",
     "opentelemetry-api>=1.32.1",

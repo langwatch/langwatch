@@ -732,7 +732,7 @@ wheels = [
 
 [[package]]
 name = "dspy"
-version = "2.5.29"
+version = "2.5.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "backoff" },
@@ -740,7 +740,6 @@ dependencies = [
     { name = "diskcache" },
     { name = "httpx" },
     { name = "joblib" },
-    { name = "json-repair" },
     { name = "litellm" },
     { name = "magicattr" },
     { name = "openai" },
@@ -749,13 +748,13 @@ dependencies = [
     { name = "pydantic" },
     { name = "regex" },
     { name = "requests" },
-    { name = "tenacity" },
+    { name = "structlog" },
     { name = "tqdm" },
     { name = "ujson" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/df/7b/f529c6a84b4f1e26b7430fc5e4e83088030c349d10a14621186e928cbc38/dspy-2.5.29.tar.gz", hash = "sha256:848cfbf16eccdff56cf2646d9e8d403ab2981e9322576667a2e61d8f0a797a37", size = 287643 }
+sdist = { url = "https://files.pythonhosted.org/packages/5f/71/db65b9e1a3f84d5f1e9dc9f110757a09c3e1d01cadbc7ba4d23acf50fcfb/dspy-2.5.7.tar.gz", hash = "sha256:6863f1b9bc561ce272dbcb015954582c0371c9da65e86e22f59880b418e618d5", size = 261009 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/59/cc/4fd71c82aae8214617df940c622663cca0e3bb9afac3208a66995c161117/dspy-2.5.29-py3-none-any.whl", hash = "sha256:208117e6f28eeae818db9db12d0b2dbf5b1331ce4f86dc1b258ef55c7d5d2e5a", size = 341786 },
+    { url = "https://files.pythonhosted.org/packages/60/e3/b167fbc3b5b9b9995eb79644a896bf6411174203af99463c847c1a3daf99/dspy-2.5.7-py3-none-any.whl", hash = "sha256:2b90689ae8de9fe7b16687649d1c137abff724c0b33817fa5228412e95a38294", size = 305025 },
 ]
 
 [[package]]
@@ -1642,15 +1641,6 @@ wheels = [
 ]
 
 [[package]]
-name = "json-repair"
-version = "0.40.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/88/36/e03fe9da84e04b475290f8612de7b229b78e37c80e44188b85fe56dbab66/json_repair-0.40.0.tar.gz", hash = "sha256:ce3cdef63f033d072295ca892cba51487292cd937da42dc20a8d629ecf5eb82d", size = 30098 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f4/e1/f0e63cc027669763ccc2c1e62ba69959ec02db5328c81df2508a52711ec9/json_repair-0.40.0-py3-none-any.whl", hash = "sha256:46955bfd22338ba60cc5239c0b01462ba419871b19fcd68d8881aca4fa3b0d2f", size = 20736 },
-]
-
-[[package]]
 name = "json5"
 version = "0.12.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2100,7 +2090,6 @@ dependencies = [
     { name = "openinference-instrumentation-dspy" },
     { name = "openinference-instrumentation-haystack" },
     { name = "openinference-instrumentation-langchain" },
-    { name = "openinference-instrumentation-litellm" },
     { name = "openinference-instrumentation-openai" },
     { name = "openinference-semantic-conventions" },
     { name = "opentelemetry-api" },
@@ -2143,13 +2132,12 @@ examples = [
 [package.metadata]
 requires-dist = [
     { name = "coolname", specifier = ">=2.2.0" },
-    { name = "dspy", specifier = ">=2.5.29" },
+    { name = "dspy", specifier = ">=2.5.7" },
     { name = "httpx", specifier = ">=0.28.1" },
-    { name = "litellm", specifier = ">=1.40.15" },
+    { name = "litellm", specifier = ">=1.52.1" },
     { name = "openinference-instrumentation-dspy", specifier = ">=0.1.20" },
     { name = "openinference-instrumentation-haystack", specifier = ">=0.1.20" },
     { name = "openinference-instrumentation-langchain", specifier = ">=0.1.24" },
-    { name = "openinference-instrumentation-litellm", specifier = ">=0.1.16" },
     { name = "openinference-instrumentation-openai", specifier = ">=0.1.25" },
     { name = "openinference-semantic-conventions", specifier = ">=0.1.17" },
     { name = "opentelemetry-api", specifier = ">=1.32.1" },
@@ -2205,24 +2193,24 @@ wheels = [
 
 [[package]]
 name = "litellm"
-version = "1.51.0"
+version = "1.67.0.post1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "click" },
+    { name = "httpx" },
     { name = "importlib-metadata" },
     { name = "jinja2" },
     { name = "jsonschema" },
     { name = "openai" },
     { name = "pydantic" },
     { name = "python-dotenv" },
-    { name = "requests" },
     { name = "tiktoken" },
     { name = "tokenizers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ae/f4/48b9cb08cf815c67ea7b7609b80364de6214dd8542ed3d529464c249ab23/litellm-1.51.0.tar.gz", hash = "sha256:8bf648677ee145a8fe5054a2e3f3a34895b9ab65a6015e4b94efca7ef406f466", size = 6101223 }
+sdist = { url = "https://files.pythonhosted.org/packages/3d/05/6f71548f24b8e5eb4a04080a10c37d8ff5f34e00f624df7b425b8a03bb79/litellm-1.67.0.post1.tar.gz", hash = "sha256:1adf69769ee5df93c834c093fad760f406feeb6c59e79638c3f448226887554d", size = 7245557 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b2/a5/475033a2f15f6e30e879e87d50cbada588e2af4ea36eec1fd66f3bd996c3/litellm-1.51.0-py3-none-any.whl", hash = "sha256:0b2c20d116834166c8440e5698d7d927dbcc78fcaa08ce0c5cbea2d0de55ec6c", size = 6329724 },
+    { url = "https://files.pythonhosted.org/packages/49/f5/9cecf2a6d50c6febf1f363af6145038868fe5945c684394d5ee542c5414a/litellm-1.67.0.post1-py3-none-any.whl", hash = "sha256:b7b3c6a6a032b059a45b326673d24318dc8b65b1016a93194c9ea7ee94b0e00d", size = 7600342 },
 ]
 
 [[package]]
@@ -2725,24 +2713,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/6b/d4/ac312302aa5c3da53206be49ab305f934cc6f30765057f29e6668fd530f4/openinference_instrumentation_langchain-0.1.41.tar.gz", hash = "sha256:b5037aef7378e8cbeb6072cdfabfa973a0fbcdf3ce4f36cec0c42ac24e88243a", size = 50905 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a8/0f/4bacb4a733339e03d023c289a7a739dce386e30968a2aa84c7fe8c49a924/openinference_instrumentation_langchain-0.1.41-py3-none-any.whl", hash = "sha256:b93089320f545001ea0135e1ddb3dde884556f8534e6a2a9b1edf29a5ed91d35", size = 18695 },
-]
-
-[[package]]
-name = "openinference-instrumentation-litellm"
-version = "0.1.16"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "openinference-instrumentation" },
-    { name = "openinference-semantic-conventions" },
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-instrumentation" },
-    { name = "opentelemetry-sdk" },
-    { name = "setuptools" },
-    { name = "wrapt" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/56/fb/01fdcb041e3de01303b89f049f105af001761a4db90f9482f61f3b2df61c/openinference_instrumentation_litellm-0.1.16.tar.gz", hash = "sha256:f6dd0483be4787998f9a0631b53fa1325e4c5c9c83ec3442d5f13bb4a18c3a1e", size = 16365 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/58/b9/b8fc004647b2bc39d70c44fcac8cf6b41f98db29144847a1087cc3d170aa/openinference_instrumentation_litellm-0.1.16-py3-none-any.whl", hash = "sha256:670632ff2b2d2626b25215ba82c5bf5b6785b318389eb0097996634580cef1a7", size = 12318 },
 ]
 
 [[package]]
@@ -4332,6 +4302,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/3e/c0/7286284567e5045f0c587c426d0c41aee5d10c0a2e360e627a83037e9f0c/streamlit-1.44.1.tar.gz", hash = "sha256:c6914ed6d5b76870b461510476806db370f36425ae0e6654d227c988288198d3", size = 9423685 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/eb/17/fc425e1d4d86e31b2aaf0812a2ef2163763a0670d671720c7c36e8679323/streamlit-1.44.1-py3-none-any.whl", hash = "sha256:9fe355f58b11f4eb71e74f115ce1f38c4c9eaff2733e6bcffb510ac1298a5990", size = 9812242 },
+]
+
+[[package]]
+name = "structlog"
+version = "25.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/78/b8/d3670aec25747e32d54cd5258102ae0d69b9c61c79e7aa326be61a570d0d/structlog-25.2.0.tar.gz", hash = "sha256:d9f9776944207d1035b8b26072b9b140c63702fd7aa57c2f85d28ab701bd8e92", size = 1367438 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/51/eb/244741c1abf7b4092686db0798a4c43491298f40ddec4226f5c4f6b5d3eb/structlog-25.2.0-py3-none-any.whl", hash = "sha256:0fecea2e345d5d491b72f3db2e5fcd6393abfc8cd06a4851f21fcd4d1a99f437", size = 68448 },
 ]
 
 [[package]]
