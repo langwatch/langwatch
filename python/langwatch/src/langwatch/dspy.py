@@ -5,6 +5,7 @@ import time
 import warnings
 import dspy
 from typing import Callable, List, Optional, Any, Type, Union
+from langwatch.utils.transformation import truncate_object_recursively
 from typing_extensions import TypedDict
 import langwatch
 import httpx
@@ -27,7 +28,6 @@ from retry import retry
 from dspy.evaluate.evaluate import Evaluate
 
 from langwatch.tracer import ContextTrace
-from langwatch.utils import reduce_payload_size
 
 
 class SerializableAndPydanticEncoder(json.JSONEncoder):
@@ -350,7 +350,7 @@ class LangWatchDSPy:
             json.dumps(self.steps_buffer, cls=SerializableAndPydanticEncoder)
         )
         data = [
-            reduce_payload_size(
+            truncate_object_recursively(
                 item,
                 max_string_length=5000,
                 max_list_dict_length=-1,
