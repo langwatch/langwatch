@@ -414,6 +414,38 @@ class LangWatchSpan:
             as_guardrail=as_guardrail,
         )
 
+    def end(
+        self,
+        end_time: Optional[int] = None,
+        span_id: Optional[Union[str, UUID]] = None,
+        name: Optional[str] = None,
+        type: Optional[SpanTypes] = None,
+        input: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
+        output: Optional[Union[SpanInputOutput, str, List[ChatMessage]]] = None,
+        error: Optional[Exception] = None,
+        timestamps: Optional[SpanTimestamps] = None,
+        contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
+        model: Optional[str] = None,
+        params: Optional[SpanParams] = None,
+        metrics: Optional[SpanMetrics] = None,
+        **kwargs: Any,
+    ) -> None:
+        self.update(
+            span_id=span_id,
+            name=name,
+            type=type,
+            input=input,
+            output=output,
+            error=error,
+            timestamps=timestamps,
+            contexts=contexts,
+            model=model,
+            params=params,
+            metrics=metrics,
+            **kwargs,
+        )
+        self._span.end(end_time)
+
     def _get_span_params(self, func_name: Optional[str] = None) -> Dict[str, Any]:
         """Helper method to get common span parameters."""
         current_trace = stored_langwatch_trace.get(None)
