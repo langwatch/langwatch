@@ -93,12 +93,14 @@ export function PromptSourceSelect({
   onClose,
 }: ReturnType<typeof usePrompSourceController>) {
   return (
-    <VerticalFormControl label="Prompt Source">
-      <HStack width="full">
-        <PromptSelectionButton
-          onClick={onOpen}
-          selectedConfig={selectedConfig}
-        />
+    <VerticalFormControl label="Prompt Source" width="full">
+      <HStack width="full" justifyContent="space-between">
+        <HStack flex={1} width="50%">
+          <PromptSelectionButton
+            onClick={onOpen}
+            selectedConfig={selectedConfig}
+          />
+        </HStack>
         {selectedConfig && (
           <Button variant="outline" marginLeft={2}>
             <VersionHistoryListPopover configId={selectedConfig.id} />

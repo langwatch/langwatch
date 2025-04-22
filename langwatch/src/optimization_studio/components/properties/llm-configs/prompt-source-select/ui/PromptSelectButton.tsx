@@ -12,11 +12,16 @@ export function PromptSelectionButton({
   onClick,
 }: PromptSelectionButtonProps) {
   return (
-    <Button onClick={onClick} justifyContent="space-between" variant="outline">
-      <HStack width="full" justifyContent="space-between">
-        <HStack>
+    <Button
+      onClick={onClick}
+      justifyContent="space-between"
+      variant="outline"
+      width="full"
+    >
+      <HStack justifyContent="space-between" width="full">
+        <HStack width="full">
           <Book size={16} />
-          <Text width="full" overflow="hidden" textOverflow="ellipsis">
+          <Text width="90%" overflow="hidden" textOverflow="ellipsis">
             {selectedConfig ? selectedConfig.name : "Select a prompt"}
           </Text>
         </HStack>
