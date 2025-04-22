@@ -1,5 +1,4 @@
 import { toaster } from "~/components/ui/toaster";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 interface UsePromptConfigVersionMutationProps {
@@ -10,7 +9,6 @@ export const usePromptConfigVersionMutation = (
   props?: UsePromptConfigVersionMutationProps
 ) => {
   const { onSuccess } = props ?? {};
-  const { project } = useOrganizationTeamProject();
   const utils = api.useContext();
 
   return api.llmConfigs.versions.create.useMutation({

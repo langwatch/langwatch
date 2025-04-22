@@ -55,7 +55,7 @@ const demonstrationsSchema = z.object({
  * Validates the configData JSON field in LlmPromptConfigVersion
  */
 const configSchemaV1_0 = z.object({
-  authorId: z.string().optional(),
+  authorId: z.string().nullable().optional(),
   projectId: z.string().min(1, "Project ID cannot be empty"),
   configId: z.string().min(1, "Config ID cannot be empty"),
   schemaVersion: z.literal(SchemaVersion.V1_0),

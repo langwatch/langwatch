@@ -33,7 +33,7 @@ export const llmConfigVersionsRouter = createTRPCRouter({
   /**
    * Get all versions for a specific config.
    */
-  getVersions: protectedProcedure
+  getVersionsForConfigById: protectedProcedure
     .input(
       projectIdSchema.merge(
         z.object({
@@ -46,7 +46,8 @@ export const llmConfigVersionsRouter = createTRPCRouter({
       const repository = new LlmConfigRepository(ctx.prisma);
 
       try {
-        const versions = await repository.versions.getVersions(input);
+        const versions =
+          await repository.versions.getVersionsForConfigById(input);
         return versions;
       } catch (error) {
         throw new TRPCError({
@@ -206,14 +207,18 @@ export const llmConfigsRouter = createTRPCRouter({
   /**
    * Create a new LLM prompt config with its initial version.
    */
-  createPromptConfig: protectedProcedure
+  createConfigWithInitialVersion: protectedProcedure
     .input(configDataSchema)
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
+      const authorId = ctx.session?.user?.id;
 
       try {
-        const newConfig = await repository.createConfig(input);
+        const newConfig = await repository.createConfigWithInitialVersion({
+          ...input,
+          authorId,
+        });
 
         return newConfig;
       } catch (error) {

@@ -86,11 +86,12 @@ app.get(
   }
 );
 
-// Create prompt
+// Create prompt with initial version
+// TODO: Consider allowing for the initial version to be customized via params
 app.post(
   "/",
   describeRoute({
-    description: "Create a new prompt",
+    description: "Create a new prompt with default initial version",
   }),
   zValidator("json", baseConfigSchema),
   async (c) => {
@@ -99,7 +100,7 @@ app.post(
     const data = c.req.valid("json");
     const { name } = data;
 
-    const newConfig = await repository.createConfig({
+    const newConfig = await repository.createConfigWithInitialVersion({
       name,
       projectId: project.id,
     });
@@ -120,7 +121,7 @@ app.get(
     const { id } = c.req.param();
 
     try {
-      const versions = await repository.versions.getVersions({
+      const versions = await repository.versions.getVersionsForConfigById({
         configId: id,
         projectId: project.id,
       });

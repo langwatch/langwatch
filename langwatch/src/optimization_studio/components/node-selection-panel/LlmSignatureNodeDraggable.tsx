@@ -4,21 +4,24 @@ import { useCallback } from "react";
 import { NodeDraggable } from "./NodeDraggable";
 
 import { toaster } from "~/components/ui/toaster";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import { MODULES } from "~/optimization_studio/registry";
 import type { Component } from "~/optimization_studio/types/dsl";
 import { llmConfigToNodeData } from "~/optimization_studio/utils/registryUtils";
-import { useInitializeNewLlmConfig } from "~/prompt-configs/hooks/useCreateNewLlmConfig";
 import type { NodeWithOptionalPosition } from "~/types";
+import { api } from "~/utils/api";
 import { kebabCase } from "~/utils/stringCasing";
 
 export function LlmSignatureNodeDraggable() {
+  const { project } = useOrganizationTeamProject();
   const { setNode, getWorkflow } = useWorkflowStore((state) => ({
     setNode: state.setNode,
     getWorkflow: state.getWorkflow,
   }));
 
-  const { initializeNewLlmConfigWithVersion } = useInitializeNewLlmConfig();
+  const createConfigWithInitialVersion =
+    api.llmConfigs.createConfigWithInitialVersion.useMutation();
 
   /**
    * When the node is dropped, we want to create
@@ -27,6 +30,10 @@ export function LlmSignatureNodeDraggable() {
   const handleDragEnd = useCallback(
     (item: { node: NodeWithOptionalPosition<Component> }) => {
       void (async () => {
+        if (!project?.id) {
+          throw new Error("Project ID is required");
+        }
+
         const { name: workflowName, nodes } = getWorkflow();
         const promptName = createNewPromptName(workflowName, nodes);
         // Do this right away so that it appears snappy
@@ -38,16 +45,14 @@ export function LlmSignatureNodeDraggable() {
         });
 
         try {
-          const { config, version } = await initializeNewLlmConfigWithVersion({
+          const config = await createConfigWithInitialVersion.mutateAsync({
             name: promptName,
+            projectId: project.id,
           });
 
           setNode({
             id: item.node.id,
-            data: llmConfigToNodeData({
-              ...config,
-              latestVersion: version,
-            }),
+            data: llmConfigToNodeData(config),
           });
         } catch (error) {
           console.error("Error creating new prompt", error);
@@ -59,7 +64,7 @@ export function LlmSignatureNodeDraggable() {
         }
       })();
     },
-    [getWorkflow, initializeNewLlmConfigWithVersion, setNode]
+    [getWorkflow, createConfigWithInitialVersion, setNode, project?.id]
   );
 
   return (

@@ -2,6 +2,7 @@ import { type PrismaClient, type LlmPromptConfig } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import {
+  LATEST_SCHEMA_VERSION,
   parseLlmConfigVersion,
   type LatestConfigVersionSchema,
 } from "./llm-config-version-schema";
@@ -13,6 +14,7 @@ import { LlmConfigVersionsRepository } from "./llm-config-versions.repository";
 interface LlmConfigDTO {
   name: string;
   projectId: string;
+  authorId?: string;
 }
 
 /**
@@ -55,17 +57,15 @@ export class LlmConfigRepository {
 
     return configs.map((config) => {
       if (!config.versions[0]) {
-        console.log("THIS CONFIG", config);
-
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Prompt config has no versions.",
+          message: `Prompt config ${config.id} has no versions.`,
         });
       }
 
       return {
         ...config,
-        latestVersion: parseLlmConfigVersion(config.versions[0]),
+        latestVersion: this.parseLlmConfigVersion(config.versions[0]),
       };
     });
   }
@@ -102,22 +102,19 @@ export class LlmConfigRepository {
       });
     }
 
-    return {
-      ...config,
-      latestVersion: parseLlmConfigVersion(config.versions[0]),
-    };
-  }
-
-  /**
-   * Create config with no versions
-   */
-  async createConfig(configData: LlmConfigDTO): Promise<LlmPromptConfig> {
-    return this.prisma.llmPromptConfig.create({
-      data: {
-        name: configData.name,
-        projectId: configData.projectId,
-      },
-    });
+    try {
+      return {
+        ...config,
+        latestVersion: parseLlmConfigVersion(config.versions[0]),
+      };
+    } catch (error) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Failed to parse LLM config version: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      });
+    }
   }
 
   /**
@@ -159,5 +156,74 @@ export class LlmConfigRepository {
     });
 
     return { success: true };
+  }
+
+  /**
+   * Create config with initial version
+   *
+   * We want to use this method to create a config with an initial version
+   * because it ensures that the config and version are created in the same
+   * transaction, which is important for maintaining data integrity,
+   * and because all configs should have an initial version.
+   */
+  async createConfigWithInitialVersion(
+    configData: LlmConfigDTO
+  ): Promise<LlmConfigWithLatestVersion> {
+    return await this.prisma.$transaction(async (tx) => {
+      // Create the config within the transaction
+      const newConfig = await tx.llmPromptConfig.create({
+        data: {
+          name: configData.name,
+          projectId: configData.projectId,
+        },
+      });
+
+      // Create the initial version within the same transaction
+      const newVersion = await tx.llmPromptConfigVersion.create({
+        data: {
+          configId: newConfig.id,
+          projectId: configData.projectId,
+          authorId: configData.authorId,
+          configData: {
+            model: "gpt-4o-mini",
+            prompt: "You are a helpful assistant",
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+            demonstrations: {
+              columns: [],
+              rows: [],
+            },
+          },
+          schemaVersion: LATEST_SCHEMA_VERSION,
+          commitMessage: "Initial version",
+        },
+      });
+
+      // Update the config's updatedAt timestamp
+      const updatedConfig = await tx.llmPromptConfig.update({
+        where: { id: newConfig.id, projectId: configData.projectId },
+        data: { updatedAt: new Date() },
+      });
+
+      return {
+        ...updatedConfig,
+        latestVersion: this.parseLlmConfigVersion(newVersion),
+      };
+    });
+  }
+
+  private parseLlmConfigVersion(version: {
+    id: string;
+  }): LatestConfigVersionSchema {
+    try {
+      return parseLlmConfigVersion(version as any);
+    } catch (error) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Failed to parse LLM config version for version ${
+          version.id
+        }: ${error instanceof Error ? error.message : "Unknown error"}`,
+      });
+    }
   }
 }

@@ -94,7 +94,7 @@ export const workflowRouter = createTRPCRouter({
       return workflow;
     }),
 
-  getVersions: protectedProcedure
+  getVersionsForConfigById: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),

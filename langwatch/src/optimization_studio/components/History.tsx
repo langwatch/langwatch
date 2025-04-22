@@ -326,7 +326,7 @@ export const useVersionState = ({
     })
   );
 
-  const versions = api.workflow.getVersions.useQuery(
+  const versions = api.workflow.getVersionsForConfigById.useQuery(
     {
       projectId: project?.id ?? "",
       workflowId: workflowId ?? "",

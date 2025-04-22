@@ -3,8 +3,6 @@ import { type LlmPromptConfig } from "@prisma/client";
 import { useState, useMemo } from "react";
 import { Plus } from "react-feather";
 
-import { LATEST_SCHEMA_VERSION } from "~/server/prompt-config/repositories/llm-config-version-schema";
-
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { toaster } from "~/components/ui/toaster";
@@ -38,7 +36,7 @@ export default function PromptConfigsPage() {
         enabled: !!project?.id,
         onError: (error) => {
           toaster.create({
-            title: "Error loading prompt configs",
+            title: "Error loading prompt configs from here",
             description: error.message,
             type: "error",
           });
@@ -46,19 +44,8 @@ export default function PromptConfigsPage() {
       }
     );
 
-  const createConfigMutation = api.llmConfigs.createPromptConfig.useMutation({
-    onSuccess: () => {
-      void utils.llmConfigs.getPromptConfigs.invalidate();
-      void refetchPromptConfigs();
-    },
-    onError: (error) => {
-      toaster.create({
-        title: "Error creating prompt config",
-        description: error.message,
-        type: "error",
-      });
-    },
-  });
+  const createConfigWithInitialVersionMutation =
+    api.llmConfigs.createConfigWithInitialVersion.useMutation();
 
   const deleteConfigMutation = api.llmConfigs.deletePromptConfig.useMutation({
     onSuccess: () => {
@@ -83,14 +70,6 @@ export default function PromptConfigsPage() {
     },
   });
 
-  const createConfigVersionMutation =
-    api.llmConfigs.versions.create.useMutation({
-      onSuccess: () => {
-        void utils.llmConfigs.getPromptConfigs.invalidate();
-        void refetchPromptConfigs();
-      },
-    });
-
   const handleCreateButtonClick = async () => {
     try {
       if (!project?.id) {
@@ -103,27 +82,9 @@ export default function PromptConfigsPage() {
       }
 
       // Create with defaults
-      const newConfig = await createConfigMutation.mutateAsync({
+      await createConfigWithInitialVersionMutation.mutateAsync({
         name: "New Prompt Config",
         projectId: project.id,
-      });
-
-      // Create with defaults
-      await createConfigVersionMutation.mutateAsync({
-        configId: newConfig.id,
-        projectId: project.id,
-        configData: {
-          model: "gpt-4o-mini",
-          prompt: "You are a helpful assistant",
-          inputs: [{ identifier: "input", type: "str" }],
-          outputs: [{ identifier: "output", type: "str" }],
-          demonstrations: {
-            columns: [],
-            rows: [],
-          },
-        },
-        schemaVersion: LATEST_SCHEMA_VERSION,
-        commitMessage: "Initial version",
       });
     } catch (error) {
       toaster.create({
@@ -132,6 +93,15 @@ export default function PromptConfigsPage() {
         type: "error",
       });
     }
+
+    void refetchPromptConfigs();
+    toaster.create({
+      title: "Prompt config created",
+      type: "success",
+      meta: {
+        closable: true,
+      },
+    });
   };
 
   const handleDeleteConfig = (config: LlmPromptConfig) => {

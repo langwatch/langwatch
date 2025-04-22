@@ -14,22 +14,23 @@ export const useComponentVersion = (
 
   const componentsVersionId = node.data.version_id;
 
-  const getVersions = api.workflow.getVersions.useQuery(
-    {
-      projectId: project?.id ?? "",
-      workflowId: node.data.workflow_id ?? "",
-      returnDSL: true,
-    },
-    {
-      enabled: !!project?.id && !!node.data.workflow_id,
-    }
-  );
+  const getVersionsForConfigById =
+    api.workflow.getVersionsForConfigById.useQuery(
+      {
+        projectId: project?.id ?? "",
+        workflowId: node.data.workflow_id ?? "",
+        returnDSL: true,
+      },
+      {
+        enabled: !!project?.id && !!node.data.workflow_id,
+      }
+    );
 
-  const currentVersion = getVersions.data?.find(
+  const currentVersion = getVersionsForConfigById.data?.find(
     (v) => String(v.id).trim() === String(componentsVersionId).trim()
   );
 
-  const publishedVersion = getVersions.data?.find(
+  const publishedVersion = getVersionsForConfigById.data?.find(
     (v) => v.isPublishedVersion === true
   );
 

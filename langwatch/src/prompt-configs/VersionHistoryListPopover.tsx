@@ -235,7 +235,7 @@ export function VersionHistoryListPopover({ configId }: { configId: string }) {
     data: versions,
     isLoading,
     refetch,
-  } = api.llmConfigs.versions.getVersions.useQuery(
+  } = api.llmConfigs.versions.getVersionsForConfigById.useQuery(
     {
       configId,
       projectId: project?.id ?? "",

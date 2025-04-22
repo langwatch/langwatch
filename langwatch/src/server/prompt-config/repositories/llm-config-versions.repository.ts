@@ -20,6 +20,9 @@ export type LlmConfigVersionDTO = Omit<LatestConfigVersionSchema, "version">;
 /**
  * Repository for managing LLM Configuration Versions
  * Follows Single Responsibility Principle by focusing only on LLM config versions data access
+ *
+ * Generally, you should be using the LlmConfigRepository to get the latest version of a config
+ * instead of this repository.
  */
 export class LlmConfigVersionsRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -27,7 +30,7 @@ export class LlmConfigVersionsRepository {
   /**
    * Get all versions for a specific config
    */
-  async getVersions({
+  async getVersionsForConfigById({
     configId,
     projectId,
   }: {
