@@ -1,4 +1,5 @@
 import type { Node, NodeProps } from "@xyflow/react";
+
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import type { Custom } from "../types/dsl";
@@ -14,23 +15,22 @@ export const useComponentVersion = (
 
   const componentsVersionId = node.data.version_id;
 
-  const getVersionsForConfigById =
-    api.workflow.getVersionsForConfigById.useQuery(
-      {
-        projectId: project?.id ?? "",
-        workflowId: node.data.workflow_id ?? "",
-        returnDSL: true,
-      },
-      {
-        enabled: !!project?.id && !!node.data.workflow_id,
-      }
-    );
+  const getVersions = api.workflow.getVersions.useQuery(
+    {
+      projectId: project?.id ?? "",
+      workflowId: node.data.workflow_id ?? "",
+      returnDSL: true,
+    },
+    {
+      enabled: !!project?.id && !!node.data.workflow_id,
+    }
+  );
 
-  const currentVersion = getVersionsForConfigById.data?.find(
+  const currentVersion = getVersions.data?.find(
     (v) => String(v.id).trim() === String(componentsVersionId).trim()
   );
 
-  const publishedVersion = getVersionsForConfigById.data?.find(
+  const publishedVersion = getVersions.data?.find(
     (v) => v.isPublishedVersion === true
   );
 
