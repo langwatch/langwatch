@@ -186,51 +186,28 @@ class LangWatchTrace:
 
 
     def get_langchain_callback(self):
+        ensure_setup()
         from langwatch.langchain import LangChainTracer
         return LangChainTracer(trace=self)
 
     def autotrack_openai_calls(
         self, client: Union["OpenAI", "AsyncOpenAI", "AzureOpenAI", "AsyncAzureOpenAI"]
     ):
-        import langwatch.openai  # import dynamically here instead of top-level because, believe it or not, users might not have openai installed
+        ensure_setup()
+        import langwatch.openai
         langwatch.openai.OpenAITracer(trace=self, client=client)
 
     def autotrack_litellm_calls(self, client: ModuleType):
-        import langwatch.litellm  # import dynamically here instead of top-level because users might not have litellm installed
+        ensure_setup()
+        import langwatch.litellm
         langwatch.litellm.LiteLLMPatch(trace=self, client=client)
 
     def autotrack_dspy(
         self,
-        experiment: str,
-        optimizer: Optional["Teleprompter"] = None,
-        run_id: Optional[str] = None,
-        slug: Optional[str] = None,
-        workflow_id: Optional[str] = None,
-        workflow_version_id: Optional[str] = None,
     ):
-        """Automatically track DSPy experiments with LangWatch.
-        
-        Args:
-            experiment: Name of the experiment
-            optimizer: Optional DSPy optimizer (Teleprompter) to track
-            run_id: Optional run identifier
-            slug: Optional experiment slug
-            workflow_id: Optional workflow identifier
-            workflow_version_id: Optional workflow version identifier
-        """
         ensure_setup()
-
-        from langwatch.dspy import langwatch_dspy
-        
-        with self:
-            langwatch_dspy.init(
-                experiment=experiment,
-                optimizer=optimizer,
-                run_id=run_id,
-                slug=slug,
-                workflow_id=workflow_id,
-                workflow_version_id=workflow_version_id
-            )
+        import langwatch.dspy
+        langwatch.dspy.tracer(trace=self)
 
     def share(self) -> str:
         """Share this trace and get a shareable URL."""
