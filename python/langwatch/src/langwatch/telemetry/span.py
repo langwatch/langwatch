@@ -66,6 +66,12 @@ class LangWatchSpan:
     ):
         ensure_setup()
 
+        attributes = attributes or {}
+
+        if span_id is not None:
+            warn("span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the spans's metadata.")
+            attributes[AttributeName.DeprecatedSpanId] = str(span_id)
+
         # Initialize critical instance attributes first
         self._lock = threading.Lock()
         self._span = None
