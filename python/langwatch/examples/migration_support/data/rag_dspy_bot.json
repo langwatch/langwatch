@@ -1,0 +1,21 @@
+{
+  "retrieve": {
+    "k": 3
+  },
+  "generate_answer": {
+    "lm": null,
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "question": "At My Window was released by which American singer-songwriter?",
+        "answer": "John Townes Van Zandt"
+      }
+    ],
+    "signature_instructions": "Answer questions with short factoid answers.",
+    "signature_prefix": "Answer:",
+    "extended_signature_instructions": "Provide concise and accurate answers to a variety of trivia questions that cover a wide range of topics, including pop culture, historical events, notable individuals, and geographical references. Ensure that your responses include key facts, significant accomplishments, and contextual details where relevant, to enhance the understanding of the topic being queried.",
+    "extended_signature_prefix": "Answer:"
+  }
+}
