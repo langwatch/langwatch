@@ -1,7 +1,11 @@
 import { Box, Text } from "@chakra-ui/react";
 
 import { PromptConfigForm } from "./forms/PromptConfigForm";
+import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
 import { PanelHeader } from "./ui/PanelHeader";
+
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 
 interface PromptConfigPanelProps {
   isOpen: boolean;
@@ -14,6 +18,23 @@ export function PromptConfigPanel({
   onClose,
   configId,
 }: PromptConfigPanelProps) {
+  const { project } = useOrganizationTeamProject();
+  const { data: llmConfig } = api.llmConfigs.getByIdWithLatestVersion.useQuery(
+    {
+      id: configId,
+      projectId: project?.id ?? "",
+    },
+    { enabled: !!project?.id && !!configId }
+  );
+  const formProps = usePromptConfigForm({
+    configId,
+    projectId: project?.id ?? "",
+    initialConfigValues: {
+      name: llmConfig?.name,
+      version: llmConfig?.latestVersion,
+    },
+  });
+
   if (!isOpen) {
     return null;
   }
@@ -39,7 +60,7 @@ export function PromptConfigPanel({
         title={<Text>Prompt Configuration</Text>}
         onClose={onClose}
       />
-      <PromptConfigForm configId={configId} onSubmitSuccess={onClose} />
+      <PromptConfigForm {...formProps} />
     </Box>
   );
 }
