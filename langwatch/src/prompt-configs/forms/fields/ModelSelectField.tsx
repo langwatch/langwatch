@@ -20,7 +20,6 @@ export function ModelSelectField() {
         name="version.configData.model"
         control={control}
         render={({ field }) => {
-          console.log("model", field.value);
           return (
             <ModelSelector
               model={field.value}

@@ -8,7 +8,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import { MODULES } from "~/optimization_studio/registry";
 import type { Component } from "~/optimization_studio/types/dsl";
-import { llmConfigToNodeData } from "~/optimization_studio/utils/registryUtils";
+import { llmConfigToNodeData } from "~/optimization_studio/utils/llmPromptConfigUtils";
 import type { NodeWithOptionalPosition } from "~/types";
 import { api } from "~/utils/api";
 import { kebabCase } from "~/utils/stringCasing";

@@ -2,7 +2,7 @@ import { HStack, Button, Spinner, Text, Input } from "@chakra-ui/react";
 import { SaveIcon } from "lucide-react";
 import { FormProvider } from "react-hook-form";
 
-import { usePromptConfigForm } from "../hooks/usePromptConfigForm";
+import { type usePromptConfigForm } from "../hooks/usePromptConfigForm";
 import { VersionHistoryListPopover } from "../VersionHistoryListPopover";
 
 import { DemonstrationsField } from "./fields/DemonstrationsField";
@@ -11,28 +11,12 @@ import { PromptNameField } from "./fields/PromptNameField";
 
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 
-interface PromptConfigFormProps {
-  configId: string;
-  onSubmitSuccess?: () => void;
-}
+type PromptConfigFormProps = ReturnType<typeof usePromptConfigForm>;
 
-export function PromptConfigForm({
-  configId,
-  onSubmitSuccess,
-}: PromptConfigFormProps) {
-  const { methods, handleSubmit, isLoading, isSubmitting } =
-    usePromptConfigForm({
-      configId,
-      onSuccess: onSubmitSuccess,
-    });
-
+export function PromptConfigForm(formProps: PromptConfigFormProps) {
+  const { methods, handleSubmit, isSubmitting, configId } = formProps;
   const { register, formState } = methods;
   const { errors } = formState;
-
-  if (isLoading) {
-    return <Spinner />;
-  }
-
   const formIsDirty = methods.formState.isDirty;
 
   return (

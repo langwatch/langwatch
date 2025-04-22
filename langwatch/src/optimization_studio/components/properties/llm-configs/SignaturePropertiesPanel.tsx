@@ -1,5 +1,6 @@
 import { Separator } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
+import { useCallback } from "react";
 
 import { useWorkflowStore } from "../../../hooks/useWorkflowStore";
 import type { Signature } from "../../../types/dsl";
@@ -8,9 +9,15 @@ import { BasePropertiesPanel } from "../BasePropertiesPanel";
 import { PromptSource } from "./prompt-source-select/PromptSource";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { llmConfigToNodeData } from "~/optimization_studio/utils/registryUtils";
+import {
+  nodeDataToPromptConfigFormValues,
+  promptConfigFormValuesToNodeData,
+} from "~/optimization_studio/utils/llmPromptConfigUtils";
 import { PromptConfigForm } from "~/prompt-configs/forms/PromptConfigForm";
-import { api } from "~/utils/api";
+import {
+  usePromptConfigForm,
+  type PromptConfigFormValues,
+} from "~/prompt-configs/hooks/usePromptConfigForm";
 
 /**
  * Properties panel for the Signature node in the optimization studio.
@@ -33,31 +40,38 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
     setNode: state.setNode,
   }));
 
-  // We need to refetch the latest config to update the node data
-  // TODO: Consider moving this to a listener tied to the store
-  const { refetch } = api.llmConfigs.getByIdWithLatestVersion.useQuery({
-    id: node.data.configId,
-    projectId: project?.id ?? "",
-  });
-
-  const handleSubmitSuccess = async () => {
-    try {
-      const latestConfig = await refetch();
-
-      if (!latestConfig.data) return;
-
+  /**
+   * Syncs the node data with the form values.
+   * formValues => nodeData
+   */
+  const syncNodeDataWithFormValues = useCallback(
+    (formValues: PromptConfigFormValues) => {
+      const newNodeData = promptConfigFormValuesToNodeData(
+        node.data.configId,
+        formValues
+      );
       setNode({
         ...node,
-        data: llmConfigToNodeData(latestConfig.data),
+        data: newNodeData,
       });
+    },
+    [node, setNode]
+  );
 
-      if (!project?.id) {
-        throw new Error("Project ID is required");
+  const initialConfigValues = nodeDataToPromptConfigFormValues(node.data);
+  const formProps = usePromptConfigForm({
+    configId: node.data.configId,
+    initialConfigValues,
+    projectId: project?.id ?? "",
+    onChange: (formValues) => {
+      // If the form values have changed, update the node data
+      const shouldUpdate = isEqual(formValues, initialConfigValues);
+
+      if (shouldUpdate) {
+        syncNodeDataWithFormValues(formValues);
       }
-    } catch (error) {
-      console.error("Error updating node data", error);
-    }
-  };
+    },
+  });
 
   const handlePromptSourceSelect = (config: { id: string; name: string }) => {
     setNode({
@@ -78,12 +92,11 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
         onSelect={handlePromptSourceSelect}
       />
       <Separator />
-      <PromptConfigForm
-        configId={node.data.configId}
-        onSubmitSuccess={() => {
-          void handleSubmitSuccess();
-        }}
-      />
+      <PromptConfigForm {...formProps} />
     </BasePropertiesPanel>
   );
+}
+
+function isEqual(a: any, b: any) {
+  return JSON.stringify(a) !== JSON.stringify(b);
 }

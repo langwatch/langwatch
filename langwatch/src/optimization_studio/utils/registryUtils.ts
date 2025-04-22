@@ -1,14 +1,9 @@
-import type { Node } from "@xyflow/react";
-
-import { parseLlmConfigVersion } from "~/server/prompt-config/repositories/llm-config-version-schema";
-import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
-
 import { evaluatorTempNameMap } from "../../components/checks/EvaluatorSelection";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
-import type { Evaluator, Field, Signature } from "../types/dsl";
+import type { Evaluator, Field } from "../types/dsl";
 
 export const convertEvaluators = (
   evaluators: typeof AVAILABLE_EVALUATORS
@@ -100,35 +95,3 @@ export const buildEvaluatorFromType = (
     outputs,
   } satisfies Evaluator;
 };
-
-export function llmConfigToNodeData(
-  config: LlmConfigWithLatestVersion
-): Node<Signature>["data"] {
-  const { latestVersion } = config;
-  const version = parseLlmConfigVersion(latestVersion);
-
-  return {
-    // We need this to be able to update the config
-    configId: config.id,
-    name: config.name,
-    inputs: version.configData.inputs,
-    outputs: version.configData.outputs,
-    parameters: [
-      {
-        identifier: "llm",
-        type: "llm",
-        value: version.configData.model,
-      },
-      {
-        identifier: "instructions",
-        type: "str",
-        value: version.configData.prompt,
-      },
-      {
-        identifier: "demonstrations",
-        type: "dataset",
-        value: version.configData.demonstrations,
-      },
-    ],
-  };
-}

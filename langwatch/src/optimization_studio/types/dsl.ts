@@ -1,7 +1,9 @@
 import type { Edge, Node } from "@xyflow/react";
-import type { DatasetColumns } from "../../server/datasets/types";
 import { z } from "zod";
+
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+
+import type { DatasetColumns } from "../../server/datasets/types";
 
 export const FIELD_TYPES = [
   "str",
@@ -89,6 +91,10 @@ export type LLMConfig = z.infer<typeof llmConfigSchema>;
 // This is maybe not the best way to handle this
 export type Signature = BaseComponent & {
   configId: string;
+  name: string;
+  inputs: Field[];
+  outputs: Field[];
+  parameters: Field[];
 };
 
 export type Code = BaseComponent;

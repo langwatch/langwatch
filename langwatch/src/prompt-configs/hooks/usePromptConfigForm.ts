@@ -7,12 +7,10 @@ import {
   getLatestConfigVersionSchema,
   SchemaVersion,
 } from "~/server/prompt-config/repositories/llm-config-version-schema";
-import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 
 import { usePromptConfigVersionMutation } from "./usePromptConfigVersionMutation";
 
 import { toaster } from "~/components/ui/toaster";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 const promptConfigSchema = z.object({
@@ -43,60 +41,34 @@ interface UsePromptConfigFormProps {
   configId: string;
   currentName?: string;
   onSuccess?: () => void;
-}
-
-function convertConfigToDefaultValues(
-  config: LlmConfigWithLatestVersion
-): PromptConfigFormValues & {
-  version: PromptConfigFormValues["version"] & {
-    commitMessage?: string;
-  };
-} {
-  return {
-    ...config,
-    version: {
-      ...config.latestVersion,
-      commitMessage: "",
-      configData: config.latestVersion
-        .configData as PromptConfigFormValues["version"]["configData"],
-    },
-  };
+  initialConfigValues: PromptConfigFormValues;
+  projectId: string;
+  onChange?: (formValues: PromptConfigFormValues) => void;
 }
 
 export const usePromptConfigForm = ({
+  projectId,
   configId,
   currentName,
   onSuccess,
+  onChange,
+  initialConfigValues,
 }: UsePromptConfigFormProps) => {
-  const { project } = useOrganizationTeamProject();
-  const { data: config, refetch } =
-    api.llmConfigs.getByIdWithLatestVersion.useQuery(
-      {
-        id: configId,
-        projectId: project?.id ?? "",
-      },
-      {
-        enabled: !!project?.id && !!configId,
-      }
-    );
-
   const methods = useForm<PromptConfigFormValues>({
-    defaultValues: config ? convertConfigToDefaultValues(config) : undefined,
+    defaultValues: initialConfigValues,
     resolver: zodResolver(formSchema),
   });
 
-  // Once we have the config, reset the form
-  useEffect(() => {
-    if (config) {
-      methods.reset(convertConfigToDefaultValues(config));
-    }
-  }, [config, methods]);
-
   const updateConfig = api.llmConfigs.updatePromptConfig.useMutation();
   const createVersion = usePromptConfigVersionMutation();
+  const formData = methods.watch();
+
+  useEffect(() => {
+    onChange?.(formData);
+  }, [formData, onChange]);
 
   const handleSubmit = async (data: PromptConfigFormValues) => {
-    if (!project?.id) {
+    if (!projectId) {
       toaster.create({
         title: "Error",
         description: "Project ID is required",
@@ -110,21 +82,19 @@ export const usePromptConfigForm = ({
     // Only update name if it changed
     if (data.name !== currentName) {
       await updateConfig.mutateAsync({
-        projectId: project.id,
+        projectId,
         id: configId,
         name: data.name,
       });
     }
 
     await createVersion.mutateAsync({
-      projectId: project.id,
+      projectId,
       configId,
       configData: data.version.configData,
       schemaVersion: SchemaVersion.V1_0,
       commitMessage: data.version.commitMessage,
     });
-
-    await refetch();
 
     onSuccess?.();
   };
@@ -137,6 +107,6 @@ export const usePromptConfigForm = ({
       })();
     },
     isSubmitting: createVersion.isLoading || updateConfig.isLoading,
-    isLoading: config === undefined,
+    configId,
   };
 };
