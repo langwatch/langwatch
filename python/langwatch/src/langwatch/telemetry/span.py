@@ -96,6 +96,7 @@ class LangWatchSpan:
         self.params = params
         self.metrics = metrics
         self.evaluations = evaluations
+        self._span_id = span_id or f"{type}_{id(self)}"  # Add a unique identifier for logging
 
         # Store OpenTelemetry-specific parameters
         self.kind = kind
@@ -271,7 +272,13 @@ class LangWatchSpan:
         metrics: Optional[SpanMetrics] = None,
         **kwargs: Any,
     ) -> None:
+        print(f"[LangWatchSpan][span:{self._span_id}] update called - name: {name}, type: {type}")
         ensure_setup()
+
+        if self._span is None:
+            print(f"[LangWatchSpan][span:{self._span_id}] WARNING: Cannot update - no span available")
+            warn("Cannot set attributes - no span available")
+            return
 
         attributes = dict(kwargs)
 
@@ -542,11 +549,14 @@ class LangWatchSpan:
 
     def _cleanup(self) -> None:
         """Internal method to cleanup resources with proper locking."""
+        print(f"[LangWatchSpan][span:{self._span_id}] _cleanup called")
         with self._lock:
             if self._cleaned_up:
+                print(f"[LangWatchSpan][span:{self._span_id}] Already cleaned up, skipping")
                 return
             
             if self._context_token is not None:
+                print(f"[LangWatchSpan][span:{self._span_id}] Resetting context token")
                 try:
                     stored_langwatch_span.reset(self._context_token)
                 except Exception as e:
@@ -561,6 +571,7 @@ class LangWatchSpan:
             self._otel_context = None
 
             if self._span is not None:
+                print(f"[LangWatchSpan][span:{self._span_id}] Ending span")
                 try:
                     self._span.end()
                 except Exception as e:
@@ -569,10 +580,11 @@ class LangWatchSpan:
                     self._span = None
 
             self._cleaned_up = True
+            print(f"[LangWatchSpan][span:{self._span_id}] Cleanup complete")
 
     def __enter__(self) -> 'LangWatchSpan':
         """Makes the span usable as a context manager."""
-
+        print(f"[LangWatchSpan][span:{self._span_id}] __enter__ called")
         self.trace = self.trace or stored_langwatch_trace.get(None)
         if not self.ignore_missing_trace_warning and not self.trace:
             warn("No current trace found, some spans will may not be sent to LangWatch")
@@ -586,6 +598,7 @@ class LangWatchSpan:
 
     def __exit__(self, exc_type: Optional[type], exc_value: Optional[BaseException], traceback: Any) -> bool:
         """Exit the span context, recording any errors that occurred."""
+        print(f"[LangWatchSpan][span:{self._span_id}] __exit__ called - exc_type: {exc_type}")
         try:
             if exc_value is not None:
                 self.record_error(exc_value)
@@ -595,7 +608,7 @@ class LangWatchSpan:
 
     async def __aenter__(self) -> 'LangWatchSpan':
         """Makes the span usable as an async context manager."""
-
+        print(f"[LangWatchSpan][span:{self._span_id}] __aenter__ called")
         self.trace = self.trace or stored_langwatch_trace.get(None)
         if not self.ignore_missing_trace_warning and not self.trace:
             warn("No current trace found, some spans may not be sent to LangWatch")
@@ -609,6 +622,7 @@ class LangWatchSpan:
 
     async def __aexit__(self, exc_type: Optional[type], exc_value: Optional[BaseException], traceback: Any) -> bool:
         """Exit the async span context, recording any errors that occurred."""
+        print(f"[LangWatchSpan][span:{self._span_id}] __aexit__ called - exc_type: {exc_type}")
         try:
             if exc_value is not None:
                 self.record_error(exc_value)

@@ -65,14 +65,18 @@ async def on_chat_start():
 @cl.on_message
 @langwatch.trace()
 async def main(message: cl.Message):
+    trace = langwatch.get_current_trace()
+    print(f"[RAGBot][trace:{trace.root_span.name}] Starting main function")
     agent: AgentExecutor = cl.user_session.get("agent")  # type: ignore
 
     msg = cl.Message(content="")
 
-    langwatch.get_current_trace().update(
+    print(f"[RAGBot][trace:{trace.root_span.name}] Setting up trace metadata")
+    trace.update(
         metadata={"user_id": "user_example", "labels": ["v1.0.0"]}
     )
 
+    print(f"[RAGBot][trace:{trace.root_span.name}] Starting agent stream")
     async for chunk in agent.astream(
         {
             "question": message.content,
@@ -81,10 +85,11 @@ async def main(message: cl.Message):
         config=RunnableConfig(
             callbacks=[
                 cl.LangchainCallbackHandler(),
-                langwatch.get_current_trace().get_langchain_callback(),
+                trace.get_langchain_callback(),
             ]
         ),
     ):
+        print(f"[RAGBot][trace:{trace.root_span.name}] Processing chunk type: {list(chunk.keys())}")
         if "output" in chunk:
             await msg.stream_token(chunk["output"])
         elif "actions" in chunk:
@@ -94,4 +99,6 @@ async def main(message: cl.Message):
         else:
             await msg.stream_token("<unammaped chunk>")
 
+    print(f"[RAGBot][trace:{trace.root_span.name}] Finished processing chunks, sending message")
     await msg.send()
+    print(f"[RAGBot][trace:{trace.root_span.name}] Main function complete")
