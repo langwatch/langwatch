@@ -1,5 +1,6 @@
 import os
 import logging
+import threading
 from typing import Optional, Sequence, List
 from requests.exceptions import RequestException
 
@@ -9,7 +10,7 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider, ReadableSpan
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExportResult
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor, SpanExportResult
 from opentelemetry.sdk.trace.sampling import TraceIdRatioBased, ALWAYS_OFF
 
 from .typings import Instrumentor
@@ -19,6 +20,11 @@ logger = logging.getLogger(__name__)
 
 class GracefulBatchSpanProcessor(BatchSpanProcessor):
 	"""A BatchSpanProcessor that handles export failures gracefully by logging them instead of raising exceptions."""
+
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self._lock = threading.Lock()
+		self._export_lock = threading.Lock()
 
 	def _export(self, spans: List[ReadableSpan]) -> None:
 		"""
@@ -30,31 +36,34 @@ class GracefulBatchSpanProcessor(BatchSpanProcessor):
 		if not spans:
 			return
 
-		try:
-			logger.debug(f"Attempting to export {len(spans)} spans to {self.span_exporter}")
-
-			result = self.span_exporter.export(spans)
-
-			if result != SpanExportResult.SUCCESS:
-				logger.warning(f"Failed to export spans batch: got result {result}")
-			else:
+		with self._export_lock:
+			try:
+				result = self.span_exporter.export(spans)
 				logger.debug(f"Successfully exported {len(spans)} spans")
 
-		except RequestException as ex:
-			logger.warning(f"Network error while exporting spans: {str(ex)}")
-		except Exception as ex:
-			logger.error(f"Unexpected error in span export: {str(ex)}", exc_info=True)
+				if result != SpanExportResult.SUCCESS:
+					logger.warning(f"Failed to export spans batch: got result {result}")
+
+			except RequestException as ex:
+				logger.warning(f"Network error while exporting spans: {str(ex)}")
+			except Exception as ex:
+				logger.error(f"Unexpected error in span export: {str(ex)}", exc_info=True)
 
 	def _export_batch(self) -> None:
 		"""Export the current batch of spans with proper cleanup."""
-		if not self.spans_list:
-			logger.debug("No spans to export in batch")
-			return
-
-		spans_to_export = [span for span in self.spans_list if span is not None]
-		logger.debug(f"Preparing to export {len(spans_to_export)} spans")
+		spans_to_export = []
 		
-		self.spans_list.clear()
+		with self._lock:
+			if not self.spans_list:
+				logger.debug("No spans to export in batch")
+				return
+
+			# Take all spans that are ready for export
+			spans_to_export = [span for span in self.spans_list if span is not None]
+			if spans_to_export:
+				logger.debug(f"Preparing to export {len(spans_to_export)} spans")
+				# Only remove the spans we're actually exporting
+				self.spans_list = [span for span in self.spans_list if span not in spans_to_export]
 
 		if spans_to_export:
 			self._export(spans_to_export)
@@ -64,11 +73,14 @@ class GracefulBatchSpanProcessor(BatchSpanProcessor):
 		if span is None:
 			return
 
-		self.spans_list.append(span)
-		logger.debug(f"Added span to export queue. Queue size: {len(self.spans_list)}")
+		should_export = False
+		with self._lock:
+			self.spans_list.append(span)
+			current_size = len(self.spans_list)
+			logger.debug(f"Added span to export queue. Queue size: {current_size}")
+			should_export = current_size >= self.max_export_batch_size
 
-		# Force export if we've accumulated enough spans
-		if len(self.spans_list) >= self.max_export_batch_size:
+		if should_export:
 			logger.debug("Batch size limit reached, forcing export")
 			self._export_batch()
 
@@ -204,9 +216,9 @@ class Client(LangWatchClientProtocol):
 			# Configure processor with more aggressive settings
 			processor = GracefulBatchSpanProcessor(
 				span_exporter=otlp_exporter,
-				max_queue_size=512,  # Smaller queue to force more frequent exports
-				schedule_delay_millis=1000,  # Export every second instead of 5
-				max_export_batch_size=128,  # Smaller batch size for more frequent exports
+				max_queue_size=512,
+				schedule_delay_millis=5000,
+				max_export_batch_size=128,
 			)
 
 			provider.add_span_processor(processor)
