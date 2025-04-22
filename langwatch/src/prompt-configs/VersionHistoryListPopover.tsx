@@ -10,12 +10,13 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import { Avatar } from "@chakra-ui/react";
-import { HistoryIcon } from "~/components/icons/History";
-import { Tooltip } from "~/components/ui/tooltip";
-import { Popover } from "~/components/ui/popover";
 import type { LlmPromptConfigVersion } from "@prisma/client";
-import { api } from "~/utils/api";
+
+import { HistoryIcon } from "~/components/icons/History";
+import { Popover } from "~/components/ui/popover";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 
 type AuthorUser = {
   id: string;
@@ -159,7 +160,6 @@ function VersionHistoryTrigger({ onClick }: { onClick?: () => void }) {
     <Popover.Trigger asChild onClick={onClick}>
       <Button variant="ghost" color="gray.500" size="xs">
         <HistoryIcon size={16} />
-        <Text>Prompt Version History</Text>
       </Button>
     </Popover.Trigger>
   );

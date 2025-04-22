@@ -41,7 +41,7 @@ interface UsePromptConfigFormProps {
   configId: string;
   currentName?: string;
   onSuccess?: () => void;
-  initialConfigValues: Partial<PromptConfigFormValues>;
+  initialConfigValues?: Partial<PromptConfigFormValues>;
   projectId: string;
   onChange?: (formValues: PromptConfigFormValues) => void;
 }

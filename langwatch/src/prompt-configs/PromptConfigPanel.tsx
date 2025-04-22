@@ -1,4 +1,5 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Text, Spinner } from "@chakra-ui/react";
+import { useEffect, useMemo } from "react";
 
 import { PromptConfigForm } from "./forms/PromptConfigForm";
 import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
@@ -26,14 +27,30 @@ export function PromptConfigPanel({
     },
     { enabled: !!project?.id && !!configId }
   );
+  const initialConfigValues = useMemo(() => {
+    return llmConfig
+      ? {
+          name: llmConfig.name,
+          version: {
+            ...llmConfig.latestVersion,
+            commitMessage: "",
+            configData: {
+              ...llmConfig.latestVersion.configData,
+            },
+          },
+        }
+      : undefined;
+  }, [llmConfig]);
+
   const formProps = usePromptConfigForm({
     configId,
     projectId: project?.id ?? "",
-    initialConfigValues: {
-      name: llmConfig?.name,
-      version: llmConfig?.latestVersion,
-    },
+    initialConfigValues,
   });
+
+  useEffect(() => {
+    formProps.methods.reset(initialConfigValues);
+  }, [configId, formProps.methods, initialConfigValues]);
 
   if (!isOpen) {
     return null;
@@ -60,7 +77,7 @@ export function PromptConfigPanel({
         title={<Text>Prompt Configuration</Text>}
         onClose={onClose}
       />
-      <PromptConfigForm {...formProps} />
+      {llmConfig ? <PromptConfigForm {...formProps} /> : <Spinner />}
     </Box>
   );
 }
