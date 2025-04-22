@@ -1,15 +1,12 @@
-import { HStack, Button, useDisclosure } from "@chakra-ui/react";
+import { useDisclosure } from "@chakra-ui/react";
 import { useMemo } from "react";
-import { Save } from "react-feather";
 
 import { PromptList } from "./ui/PromptList";
 import { PromptSelectionButton } from "./ui/PromptSelectButton";
 import { PromptSourceDialog } from "./ui/PromptSourceDialog";
 
 import { toaster } from "~/components/ui/toaster";
-import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { VersionHistoryListPopover } from "~/prompt-configs/VersionHistoryListPopover";
 import { api } from "~/utils/api";
 
 interface PromptSourceProps {
@@ -93,23 +90,8 @@ export function PromptSourceSelect({
   onClose,
 }: ReturnType<typeof usePrompSourceController>) {
   return (
-    <VerticalFormControl label="Prompt Source" width="full">
-      <HStack width="full" justifyContent="space-between">
-        <HStack flex={1} width="50%">
-          <PromptSelectionButton
-            onClick={onOpen}
-            selectedConfig={selectedConfig}
-          />
-        </HStack>
-        {selectedConfig && (
-          <Button variant="outline" marginLeft={2}>
-            <VersionHistoryListPopover configId={selectedConfig.id} />
-          </Button>
-        )}
-        <Button variant="outline">
-          <Save />
-        </Button>
-      </HStack>
+    <>
+      <PromptSelectionButton onClick={onOpen} selectedConfig={selectedConfig} />
 
       <PromptSourceDialog open={open} onOpen={onOpen} onClose={onClose}>
         <PromptList
@@ -118,7 +100,7 @@ export function PromptSourceSelect({
           onSelect={handleSelectPrompt}
         />
       </PromptSourceDialog>
-    </VerticalFormControl>
+    </>
   );
 }
 

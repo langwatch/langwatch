@@ -8,8 +8,6 @@ import {
   SchemaVersion,
 } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
-import { usePromptConfigVersionMutation } from "./usePromptConfigVersionMutation";
-
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 
@@ -21,9 +19,6 @@ const latestConfigVersionSchema = getLatestConfigVersionSchema();
 
 const formSchema = promptConfigSchema.extend({
   version: z.object({
-    commitMessage: latestConfigVersionSchema.shape.commitMessage.min(1, {
-      message: "Commit message is required",
-    }),
     configData: z.object({
       model: latestConfigVersionSchema.shape.configData.shape.model,
       prompt: latestConfigVersionSchema.shape.configData.shape.prompt,
@@ -60,7 +55,7 @@ export const usePromptConfigForm = ({
   });
 
   const updateConfig = api.llmConfigs.updatePromptConfig.useMutation();
-  const createVersion = usePromptConfigVersionMutation();
+  const createVersion = api.llmConfigs.versions.create.useMutation();
   const formData = methods.watch();
 
   useEffect(() => {

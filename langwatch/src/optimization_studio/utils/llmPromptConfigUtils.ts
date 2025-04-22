@@ -68,13 +68,12 @@ export function promptConfigFormValuesToNodeData(
   };
 }
 
-export function nodeDataToPromptConfigFormValues(
+export function nodeDataToPromptConfigFormInitialValues(
   nodeData: Node<Signature>["data"]
 ): PromptConfigFormValues {
   return {
     name: nodeData.name ?? "",
     version: {
-      commitMessage: "",
       configData: {
         inputs: nodeData.inputs ?? [],
         outputs: nodeData.outputs ?? [],
