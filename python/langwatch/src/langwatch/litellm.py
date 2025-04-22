@@ -22,11 +22,13 @@ from langwatch.domain import (
     SpanParams,
     SpanTimestamps,
 )
-from langwatch.utils import (
-    capture_async_chunks_with_timings_and_reyield,
-    capture_chunks_with_timings_and_reyield,
+from langwatch.utils.utils import (
     milliseconds_timestamp,
     safe_get,
+)
+from langwatch.utils.capture import (
+    capture_async_chunks_with_timings_and_reyield,
+    capture_chunks_with_timings_and_reyield,
 )
 
 from litellm import CustomStreamWrapper
@@ -68,7 +70,6 @@ class LiteLLMPatch:
         span = trace.span(
             type="llm",
             span_id=f"span_{nanoid.generate()}",
-            parent=trace.get_current_span(),
         )
 
         started_at = milliseconds_timestamp()
