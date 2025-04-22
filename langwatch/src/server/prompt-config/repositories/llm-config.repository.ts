@@ -178,6 +178,11 @@ export class LlmConfigRepository {
         },
       });
 
+      // Get the default model for the project
+      const defaultModel = await tx.project.findUnique({
+        where: { id: configData.projectId },
+      });
+
       // Create the initial version within the same transaction
       const newVersion = await tx.llmPromptConfigVersion.create({
         data: {
@@ -185,7 +190,7 @@ export class LlmConfigRepository {
           projectId: configData.projectId,
           authorId: configData.authorId,
           configData: {
-            model: "gpt-4o-mini",
+            model: defaultModel?.defaultModel ?? "gpt-4o-mini",
             prompt: "You are a helpful assistant",
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],

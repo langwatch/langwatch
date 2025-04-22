@@ -1,4 +1,11 @@
-import { Button, Container, HStack, Heading, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  Container,
+  HStack,
+  Heading,
+  VStack,
+  Flex,
+} from "@chakra-ui/react";
 import { type LlmPromptConfig } from "@prisma/client";
 import { useState, useMemo } from "react";
 import { Plus } from "react-feather";
@@ -138,51 +145,52 @@ export default function PromptConfigsPage() {
   }, []);
 
   return (
-    <DashboardLayout>
-      <Container
-        maxW={"calc(100vw - 200px)"}
-        padding={6}
-        // marginTop={8}
+    <DashboardLayout position="relative">
+      <Flex
+        flexDirection="column"
+        height="100%"
+        width="100%"
         position="relative"
-        height="full"
       >
-        <VStack align="start" width="full">
-          {/* Header with title and "Create New" button */}
-          <HStack width="full" justifyContent="space-between">
-            <Heading as="h1" size="lg">
-              Prompts
-            </Heading>
-            <Button
-              colorPalette="blue"
-              minWidth="fit-content"
-              onClick={() => void handleCreateButtonClick()}
-            >
-              <Plus height={16} /> Create New
-            </Button>
-          </HStack>
-          <PromptConfigTable
-            configs={promptConfigs ?? []}
-            isLoading={false}
-            onRowClick={(config) => setSelectedConfigId(config.id)}
-            columns={defaultColumns}
+        <Container padding={6} height="full" width="full">
+          <VStack align="start" width="full">
+            {/* Header with title and "Create New" button */}
+            <HStack width="full" justifyContent="space-between">
+              <Heading as="h1" size="lg">
+                Prompts
+              </Heading>
+              <Button
+                colorPalette="blue"
+                minWidth="fit-content"
+                onClick={() => void handleCreateButtonClick()}
+              >
+                <Plus height={16} /> Create New
+              </Button>
+            </HStack>
+            <PromptConfigTable
+              configs={promptConfigs ?? []}
+              isLoading={false}
+              onRowClick={(config) => setSelectedConfigId(config.id)}
+              columns={defaultColumns}
+            />
+          </VStack>
+
+          <DeleteConfirmationDialog
+            title="Are you really sure?"
+            description="There is no going back, and you will lose all versions of this prompt. If you're sure you want to delete this prompt, type 'delete' below:"
+            open={isDeleteDialogOpen}
+            onClose={() => setIsDeleteDialogOpen(false)}
+            onConfirm={() => {
+              void confirmDeleteConfig();
+            }}
           />
-        </VStack>
+        </Container>
         <PromptConfigPanel
           isOpen={!!selectedConfigId}
           onClose={closePanel}
           configId={selectedConfigId ?? ""}
         />
-
-        <DeleteConfirmationDialog
-          title="Are you really sure?"
-          description="There is no going back, and you will lose all versions of this prompt. If you're sure you want to delete this prompt, type 'delete' below:"
-          open={isDeleteDialogOpen}
-          onClose={() => setIsDeleteDialogOpen(false)}
-          onConfirm={() => {
-            void confirmDeleteConfig();
-          }}
-        />
-      </Container>
+      </Flex>
     </DashboardLayout>
   );
 }
