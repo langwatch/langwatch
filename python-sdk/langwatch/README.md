@@ -78,9 +78,11 @@ Set the following environment variables:
 ```python
 import langwatch
 import os
+from openai import OpenAI
 
 @langwatch.trace()
 def main():
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     langwatch.get_current_trace().autotrack_openai_calls(client)
 
     # Any calls to OpenAI will now be tracked by LangWatch
@@ -101,13 +103,9 @@ We welcome contributions to LangWatch! Here's how you can help:
 
 Please make sure to update tests as appropriate and follow our coding standards.
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## Support
 
 - Documentation: [docs.langwatch.ai](https://docs.langwatch.ai)
-- Issues: [GitHub Issues](https://github.com/langwatch/langwatch-saas/issues)
+- Issues: [GitHub Issues](https://github.com/langwatch/langwatch/issues)
 - Discord: [Join our community](https://discord.gg/langwatch)
-- Email: support@langwatch.ai
+- Email: [support@langwatch.ai](mailto:support@langwatch.ai)

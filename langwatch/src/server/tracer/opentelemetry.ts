@@ -362,7 +362,7 @@ const addOpenTelemetrySpanAsSpan = (
       const metadata = json.metadata;
       const { reservedTraceMetadata, customMetadata } =
         extractReservedAndCustomMetadata(metadata);
-      
+
       if (Object.keys(reservedTraceMetadata).length > 0) {
         trace.reservedTraceMetadata = {
           ...trace.reservedTraceMetadata,
@@ -577,8 +577,6 @@ const addOpenTelemetrySpanAsSpan = (
     typeof attributesMap.metadata === "object" &&
     !Array.isArray(attributesMap.metadata)
   ) {
-    console.log(attributesMap.metadata);
-
     // @ts-ignore
     const metadata = attributesMap.metadata;
     const { reservedTraceMetadata, customMetadata } =
