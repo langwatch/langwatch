@@ -1,7 +1,6 @@
 from copy import deepcopy
 import functools
 import json
-from traceback import print_stack
 from warnings import warn
 from typing import List, Literal, Optional, Callable, Any, Type, TypeVar, Dict, Union, TYPE_CHECKING, cast
 from uuid import UUID
@@ -11,8 +10,7 @@ import inspect
 from langwatch.attributes import AttributeName
 from langwatch.utils.transformation import SerializableWithStringFallback, rag_contexts, convert_typed_values, truncate_object_recursively
 from opentelemetry import trace as trace_api, context
-from opentelemetry.trace import SpanKind, Context, _Links, Span as OtelSpan, Status, StatusCode, set_span_in_context, get_current_span
-from opentelemetry.util.types import Attributes
+from opentelemetry.trace import SpanKind, Context, _Links, Span as OtelSpan, Status, StatusCode, set_span_in_context, get_current_span, SpanContext
 
 from langwatch.domain import ChatMessage, Conversation, EvaluationTimestamps, Money, MoneyDict, SpanInputOutput, SpanMetrics, SpanParams, SpanTimestamps, RAGChunk, SpanTypes
 from langwatch.telemetry.types import SpanType, SpanInputType, ContextsType
@@ -256,6 +254,13 @@ class LangWatchSpan:
             self._span.update_name(name)
         except Exception as e:
             warn(f"Failed to update name on span: {str(e)}")
+
+    def get_span_context(self) -> SpanContext:
+        """Get the span context of this span."""
+        if self._span is None:
+            warn("Cannot get span context - no span available")
+            return None
+        return self._span.get_span_context()
 
     def update(
         self,
