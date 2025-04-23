@@ -3,7 +3,7 @@
 A Python SDK to monitor and observe your LLM applications using LangWatch.
 
 > [!CAUTION]
-> This SDK is currently being developed and is not yet ready for production use.
+> This SDK is currently being developed and is not yet ready for production use. Please use the [legacy SDK](../../python-sdk-legacy/) until this notice is removed.
 
 ## Migration progress
 
@@ -15,7 +15,7 @@ A Python SDK to monitor and observe your LLM applications using LangWatch.
 -   ⚰: Deprecated
 -   🗑️: Removed
 
-### Progress breakdown
+### Migration progress
 
 | Feature                                | Status | Tested | Description                                               |
 | -------------------------------------- | ------ | ------ | --------------------------------------------------------- |
@@ -64,12 +64,50 @@ A Python SDK to monitor and observe your LLM applications using LangWatch.
 
 ## Installation
 
+```bash
+pip install langwatch==0.3.0rc1
+```
+
 ## Usage
 
-## API reference
+Set the following environment variables:
+
+- `LANGWATCH_API_KEY`: Your LangWatch API key.
+- `LANGWATCH_ENDPOINT`: Your LangWatch endpoint, this is only required if you are using a self-hosted LangWatch instance.
+
+```python
+import langwatch
+import os
+
+@langwatch.trace()
+def main():
+    langwatch.get_current_trace().autotrack_openai_calls(client)
+
+    # Any calls to OpenAI will now be tracked by LangWatch
+
+```
 
 ## Contributing
 
+We welcome contributions to LangWatch! Here's how you can help:
+
+1. Fork the repository
+2. Create a new branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run the tests (`pytest`)
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+Please make sure to update tests as appropriate and follow our coding standards.
+
 ## License
 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
 ## Support
+
+- Documentation: [docs.langwatch.ai](https://docs.langwatch.ai)
+- Issues: [GitHub Issues](https://github.com/langwatch/langwatch-saas/issues)
+- Discord: [Join our community](https://discord.gg/langwatch)
+- Email: support@langwatch.ai
