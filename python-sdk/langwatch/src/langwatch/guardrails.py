@@ -13,6 +13,9 @@ def evaluate(
     conversation: Conversation = [],
     settings: Optional[dict] = None,
 ):
+    contexts = contexts or []
+    conversation = conversation or []
+
     return langwatch.evaluations.evaluate(
         slug=slug,
         input=input,
@@ -34,6 +37,9 @@ async def async_evaluate(
     conversation: Conversation = [],
     settings: Optional[dict] = None,
 ):
+    contexts = contexts or []
+    conversation = conversation or []
+
     return await langwatch.evaluations.async_evaluate(
         slug=slug,
         input=input,
