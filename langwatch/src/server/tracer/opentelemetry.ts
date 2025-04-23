@@ -182,7 +182,7 @@ const addOpenTelemetrySpanAsSpan = (
   }
   if (started_at && attributesMap.ai?.response?.msToFirstChunk) {
     first_token_at =
-      started_at + parseInt(attributesMap.ai.response.msToFirstChunk, 10);
+      started_at + parseInt((attributesMap as any).ai.response.msToFirstChunk, 10);
   }
 
   // Type
@@ -212,18 +212,18 @@ const addOpenTelemetrySpanAsSpan = (
   }
 
   if (attributesMap.openinference?.span?.kind) {
-    const kind_ = attributesMap.openinference.span.kind.toLowerCase();
+    const kind_ = (attributesMap as any).openinference.span.kind.toLowerCase();
     if (allowedSpanTypes.includes(kind_ as SpanTypes)) {
       type = kind_ as SpanTypes;
-      delete attributesMap.openinference.span.kind;
+      delete (attributesMap as any).openinference.span.kind;
     }
   }
 
   if (attributesMap.traceloop?.span?.kind) {
-    const kind_ = attributesMap.traceloop.span.kind.toLowerCase();
+    const kind_ = (attributesMap as any).traceloop.span.kind.toLowerCase();
     if (allowedSpanTypes.includes(kind_ as SpanTypes)) {
       type = kind_ as SpanTypes;
-      delete attributesMap.traceloop.span.kind;
+      delete (attributesMap as any).traceloop.span.kind;
     }
   }
 
@@ -249,17 +249,17 @@ const addOpenTelemetrySpanAsSpan = (
 
   // Model
   if (attributesMap.llm?.model_name) {
-    model = attributesMap.llm.model_name;
+    model = (attributesMap as any).llm.model_name;
     attributesMap.llm.model_name = void 0;
   }
 
   if (attributesMap.gen_ai?.request?.model) {
-    model = attributesMap.gen_ai.request.model;
+    model = (attributesMap as any).gen_ai.request.model;
     attributesMap.gen_ai.request.model = void 0;
   }
 
   if (attributesMap.gen_ai?.response?.model) {
-    model = attributesMap.gen_ai.response.model;
+    model = (attributesMap as any).gen_ai.response.model;
     attributesMap.gen_ai.response.model = void 0;
   }
 
@@ -271,7 +271,7 @@ const addOpenTelemetrySpanAsSpan = (
   ) {
     const provider =
       (attributesMap.ai.model as any).provider?.split(".")[0] ?? "";
-    model = [provider, (attributesMap.ai.model as any).id]
+    model = [provider, (attributesMap as any).ai.model.id]
       .filter(Boolean)
       .join("/");
     delete attributesMap.ai.model;
@@ -475,12 +475,12 @@ const addOpenTelemetrySpanAsSpan = (
     if (attributesMap.ai.response.text) {
       messages_.push({
         role: "assistant",
-        content: attributesMap.ai.response.text,
+        content: (attributesMap as any).ai.response.text,
       });
     }
     if (attributesMap.ai.response.toolCalls) {
       messages_.push({
-        tool_calls: attributesMap.ai.response.toolCalls as any,
+        tool_calls: (attributesMap as any).ai.response.toolCalls,
       });
     }
 
@@ -494,9 +494,9 @@ const addOpenTelemetrySpanAsSpan = (
   if (!output && attributesMap.ai?.response?.object) {
     output = {
       type: "json",
-      value: attributesMap.ai.response.object,
+      value: (attributesMap as any).ai.response.object,
     };
-    delete attributesMap.ai.response.object;
+    delete (attributesMap as any).ai.response.object;
   }
 
   if (!output && attributesMap.llm?.output_messages) {
@@ -504,13 +504,13 @@ const addOpenTelemetrySpanAsSpan = (
       typeof attributesMap.llm.output_messages === "string"
         ? {
             type: "text",
-            value: attributesMap.llm.output_messages,
+            value: (attributesMap as any).llm.output_messages,
           }
         : {
             type: "json",
-            value: attributesMap.llm.output_messages,
+            value: (attributesMap as any).llm.output_messages,
           };
-    delete attributesMap.llm.output_messages;
+    delete (attributesMap as any).llm.output_messages;
   }
 
   if (!output && attributesMap.traceloop?.entity?.output) {
@@ -518,13 +518,13 @@ const addOpenTelemetrySpanAsSpan = (
       typeof attributesMap.traceloop.entity.output === "string"
         ? {
             type: "text",
-            value: attributesMap.traceloop.entity.output,
+            value: (attributesMap as any).traceloop.entity.output,
           }
         : {
             type: "json",
-            value: attributesMap.traceloop.entity.output,
+            value: (attributesMap as any).traceloop.entity.output,
           };
-    delete attributesMap.traceloop.entity.output;
+    delete (attributesMap as any).traceloop.entity.output;
   }
 
   if (!output && attributesMap.output?.value) {
@@ -532,14 +532,14 @@ const addOpenTelemetrySpanAsSpan = (
       typeof attributesMap.output.value === "string"
         ? {
             type: "text",
-            value: attributesMap.output.value,
+            value: (attributesMap as any).output.value,
           }
         : {
             type: "json",
-            value: attributesMap.output.value,
+            value: (attributesMap as any).output.value,
           };
   }
-  delete attributesMap.output;
+  delete (attributesMap as any).output;
 
   // logfire
   if (!output) {
@@ -558,18 +558,18 @@ const addOpenTelemetrySpanAsSpan = (
 
   // Metadata
   if (attributesMap.user?.id) {
-    trace.reservedTraceMetadata.user_id = attributesMap.user.id;
-    delete attributesMap.user.id;
+    trace.reservedTraceMetadata.user_id = (attributesMap as any).user.id;
+    delete (attributesMap as any).user.id;
   }
 
   if (attributesMap.session?.id) {
-    trace.reservedTraceMetadata.thread_id = attributesMap.session.id;
-    delete attributesMap.session.id;
+    trace.reservedTraceMetadata.thread_id = (attributesMap as any).session.id;
+    delete (attributesMap as any).session.id;
   }
 
   if (attributesMap.tag?.tags && Array.isArray(attributesMap.tag.tags)) {
-    trace.reservedTraceMetadata.labels = attributesMap.tag.tags;
-    delete attributesMap.tag.tags;
+    trace.reservedTraceMetadata.labels = (attributesMap as any).tag.tags;
+    delete (attributesMap as any).tag.tags;
   }
 
   if (
@@ -578,7 +578,7 @@ const addOpenTelemetrySpanAsSpan = (
     !Array.isArray(attributesMap.metadata)
   ) {
     // @ts-ignore
-    const metadata = attributesMap.metadata;
+    const metadata = (attributesMap as any).metadata;
     const { reservedTraceMetadata, customMetadata } =
       extractReservedAndCustomMetadata(metadata);
 
@@ -700,7 +700,7 @@ const addOpenTelemetrySpanAsSpan = (
     name = model;
   }
   if (type === "tool" && attributesMap.ai?.toolCall?.name) {
-    name = attributesMap.ai.toolCall.name;
+    name = (attributesMap as any).ai.toolCall.name;
   }
 
   const contexts: RAGChunk[] = [];
@@ -721,30 +721,30 @@ const addOpenTelemetrySpanAsSpan = (
   // langwatch
   if (attributesMap.langwatch) {
     if (attributesMap.langwatch.span?.type) {
-      type = attributesMap.langwatch.span.type;
-      attributesMap.langwatch.span.type = void 0;
+      type = (attributesMap as any).langwatch.span.type;
+      (attributesMap as any).langwatch.span.type = void 0;
     }
     if (attributesMap.langwatch.input) {
       if (Array.isArray(attributesMap.langwatch.input) && attributesMap.langwatch.input.length === 1) {
-        input = attributesMap.langwatch.input[0];
+        input = (attributesMap as any).langwatch.input[0];
       } else {
-        input = attributesMap.langwatch.input;
+        input = (attributesMap as any).langwatch.input;
       }
-      attributesMap.langwatch.input = void 0;
+      (attributesMap as any).langwatch.input = void 0;
     }
     if (attributesMap.langwatch.output) {
       if (Array.isArray(attributesMap.langwatch.output) && attributesMap.langwatch.output.length === 1) {
-        output = attributesMap.langwatch.output[0];
+        output = (attributesMap as any).langwatch.output[0];
       } else {
-        output = attributesMap.langwatch.output;
+        output = (attributesMap as any).langwatch.output;
       }
-      attributesMap.langwatch.output = void 0;
+      (attributesMap as any).langwatch.output = void 0;
     }
     if (Array.isArray(attributesMap.langwatch.rag_contexts)) {
       for (const ragContext of attributesMap.langwatch.rag_contexts as any) {
         contexts.push(ragContext);
       }
-      attributesMap.langwatch.rag_contexts = void 0;
+      (attributesMap as any).langwatch.rag_contexts = void 0;
     }
   }
 
