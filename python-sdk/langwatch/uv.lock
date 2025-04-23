@@ -2092,7 +2092,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.2.0"
+version = "0.3.0rc1"
 source = { editable = "." }
 dependencies = [
     { name = "coolname" },
