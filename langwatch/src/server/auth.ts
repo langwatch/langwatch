@@ -119,10 +119,12 @@ export const authOptions = (
         })
       : env.NEXTAUTH_PROVIDER === "azure-ad"
       ? AzureADProvider({
-          clientId: env.AZURE_AD_CLIENT_ID ?? "",
-          clientSecret: env.AZURE_AD_CLIENT_SECRET ?? "",
-          tenantId: env.AZURE_AD_TENANT_ID, // Optional: "common", "organizations", or your Azure tenant ID
-          authorization: { params: { prompt: "login" } },
+          clientId: env.AZURE_CLIENT_ID ?? "",
+          clientSecret: env.AZURE_CLIENT_SECRET ?? "",
+          tenantId: env.AZURE_TENANT_ID ?? "",
+          authorization: {
+            params: { prompt: "login", scope: "openid email profile" },
+          },
           profile(profile) {
             return {
               id: profile.sub ?? profile.id,
