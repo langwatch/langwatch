@@ -227,6 +227,11 @@ const addOpenTelemetrySpanAsSpan = (
     }
   }
 
+  if (attributesMap?.type) {
+    type = attributesMap.type as SpanTypes;
+    attributesMap.type = void 0;
+  }
+
   if (
     attributesMap.llm?.request?.type === "chat" ||
     attributesMap.llm?.request?.type === "completion"
@@ -245,17 +250,17 @@ const addOpenTelemetrySpanAsSpan = (
   // Model
   if (attributesMap.llm?.model_name) {
     model = attributesMap.llm.model_name;
-    delete attributesMap.llm.model_name;
+    attributesMap.llm.model_name = void 0;
   }
 
   if (attributesMap.gen_ai?.request?.model) {
     model = attributesMap.gen_ai.request.model;
-    delete attributesMap.gen_ai.request.model;
+    attributesMap.gen_ai.request.model = void 0;
   }
 
   if (attributesMap.gen_ai?.response?.model) {
     model = attributesMap.gen_ai.response.model;
-    delete attributesMap.gen_ai.response.model;
+    attributesMap.gen_ai.response.model = void 0;
   }
 
   if (
@@ -357,7 +362,7 @@ const addOpenTelemetrySpanAsSpan = (
       const metadata = json.metadata;
       const { reservedTraceMetadata, customMetadata } =
         extractReservedAndCustomMetadata(metadata);
-
+      
       if (Object.keys(reservedTraceMetadata).length > 0) {
         trace.reservedTraceMetadata = {
           ...trace.reservedTraceMetadata,
@@ -572,6 +577,8 @@ const addOpenTelemetrySpanAsSpan = (
     typeof attributesMap.metadata === "object" &&
     !Array.isArray(attributesMap.metadata)
   ) {
+    console.log(attributesMap.metadata);
+
     // @ts-ignore
     const metadata = attributesMap.metadata;
     const { reservedTraceMetadata, customMetadata } =
@@ -698,8 +705,8 @@ const addOpenTelemetrySpanAsSpan = (
     name = attributesMap.ai.toolCall.name;
   }
 
-  // haystack RAG
   const contexts: RAGChunk[] = [];
+  // haystack RAG
   if (Array.isArray((attributesMap.retrieval as any)?.documents)) {
     type = "rag";
     for (const document of (attributesMap.retrieval as any).documents) {
@@ -710,6 +717,36 @@ const addOpenTelemetrySpanAsSpan = (
           content: document_.content,
         });
       }
+    }
+  }
+
+  // langwatch
+  if (attributesMap.langwatch) {
+    if (attributesMap.langwatch.span?.type) {
+      type = attributesMap.langwatch.span.type;
+      attributesMap.langwatch.span.type = void 0;
+    }
+    if (attributesMap.langwatch.input) {
+      if (Array.isArray(attributesMap.langwatch.input) && attributesMap.langwatch.input.length === 1) {
+        input = attributesMap.langwatch.input[0];
+      } else {
+        input = attributesMap.langwatch.input;
+      }
+      attributesMap.langwatch.input = void 0;
+    }
+    if (attributesMap.langwatch.output) {
+      if (Array.isArray(attributesMap.langwatch.output) && attributesMap.langwatch.output.length === 1) {
+        output = attributesMap.langwatch.output[0];
+      } else {
+        output = attributesMap.langwatch.output;
+      }
+      attributesMap.langwatch.output = void 0;
+    }
+    if (Array.isArray(attributesMap.langwatch.rag_contexts)) {
+      for (const ragContext of attributesMap.langwatch.rag_contexts as any) {
+        contexts.push(ragContext);
+      }
+      attributesMap.langwatch.rag_contexts = void 0;
     }
   }
 
@@ -742,7 +779,7 @@ const addOpenTelemetrySpanAsSpan = (
 };
 
 type RecursiveRecord = {
-  [key: string]: (RecursiveRecord & string) | undefined;
+  [key: string]: (RecursiveRecord & (string | {})) | undefined;
 };
 
 const keyValueToObject = (
