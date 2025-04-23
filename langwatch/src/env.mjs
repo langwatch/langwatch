@@ -15,7 +15,7 @@ export const env = createEnv({
     DATABASE_URL: optionalIfBuildTime(z.string().url()),
     NODE_ENV: z.enum(["development", "test", "production"]),
     BASE_HOST: optionalIfBuildTime(z.string().min(1)),
-    NEXTAUTH_PROVIDER: z.enum(["auth0", "email"]),
+    NEXTAUTH_PROVIDER: z.enum(["auth0", "email", "azure-ad"]),
     NEXTAUTH_SECRET: optionalIfBuildTime(z.string().min(1)),
     NEXTAUTH_URL: optionalIfBuildTime(
       z.preprocess(

@@ -14,7 +14,7 @@ import { prisma } from "~/server/db";
 import { dependencies } from "../injection/dependencies.server";
 import type { NextRequest } from "next/server";
 import { getNextAuthSessionToken } from "../utils/auth";
-
+import AzureADProvider from "next-auth/providers/azure-ad";
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
  * object and keep type safety.
@@ -114,6 +114,21 @@ export const authOptions = (
               name: (profile.name as string) ?? profile.nickname,
               email: profile.email,
               image: profile.picture,
+            };
+          },
+        })
+      : env.NEXTAUTH_PROVIDER === "azure-ad"
+      ? AzureADProvider({
+          clientId: env.AZURE_AD_CLIENT_ID ?? "",
+          clientSecret: env.AZURE_AD_CLIENT_SECRET ?? "",
+          tenantId: env.AZURE_AD_TENANT_ID, // Optional: "common", "organizations", or your Azure tenant ID
+          authorization: { params: { prompt: "login" } },
+          profile(profile) {
+            return {
+              id: profile.sub ?? profile.id,
+              name: profile.displayName,
+              email: profile.mail ?? profile.userPrincipalName,
+              image: null, // Microsoft Graph doesn't return image by default
             };
           },
         })
