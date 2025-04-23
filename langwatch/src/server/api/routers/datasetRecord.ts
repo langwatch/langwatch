@@ -283,18 +283,24 @@ const updateDatasetRecord = async ({
       (record: any) => record.id === recordId
     );
     if (recordIndex === -1) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Record not found",
-      });
+      // Create a new record
+      const newRecord = {
+        id: recordId,
+        entry: updatedRecord,
+        datasetId,
+        projectId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      records.push(newRecord);
+    } else {
+      // Update the record
+      records[recordIndex] = {
+        ...records[recordIndex],
+        entry: updatedRecord,
+        updatedAt: new Date().toISOString(),
+      };
     }
-
-    // Update the record
-    records[recordIndex] = {
-      ...records[recordIndex],
-      entry: updatedRecord,
-      updatedAt: new Date().toISOString(),
-    };
 
     // Save back to S3
     await storageService.putObject(
