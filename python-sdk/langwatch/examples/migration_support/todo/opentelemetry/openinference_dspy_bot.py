@@ -5,18 +5,43 @@ load_dotenv()
 
 import chainlit as cl
 
-import langwatch
-
 import dspy
 
+import os
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk import trace as trace_sdk
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
 
-lm = dspy.LM("openai/gpt-4o-mini", api_key=os.environ["OPENAI_API_KEY"])
+from openinference.instrumentation.dspy import DSPyInstrumentor
+
+# Set up OpenTelemetry trace provider with LangWatch as the endpoint
+tracer_provider = trace_sdk.TracerProvider()
+tracer_provider.add_span_processor(
+    SimpleSpanProcessor(
+        OTLPSpanExporter(
+            endpoint=f"{os.environ.get('LANGWATCH_ENDPOINT', 'https://app.langwatch.ai')}/api/otel/v1/traces",
+            headers={"Authorization": "Bearer " + os.environ["LANGWATCH_API_KEY"]},
+        )
+    )
+)
+# Optionally, you can also print the spans to the console.
+tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+
+DSPyInstrumentor().instrument(tracer_provider=tracer_provider)
+
+
+llm = dspy.OpenAI(
+    model="gpt-4o-mini",
+    max_tokens=2048,
+    temperature=0,
+    api_key=os.environ["OPENAI_API_KEY"],
+)
 
 colbertv2_wiki17_abstracts = dspy.ColBERTv2(
     url="http://20.102.90.50:2017/wiki17_abstracts"
 )
 
-dspy.settings.configure(lm=lm, rm=colbertv2_wiki17_abstracts)
+dspy.settings.configure(lm=llm, rm=colbertv2_wiki17_abstracts)
 
 
 class GenerateAnswer(dspy.Signature):
@@ -41,17 +66,14 @@ class RAG(dspy.Module):
 
 
 @cl.on_message
-@langwatch.trace()
 async def main(message: cl.Message):
-    langwatch.get_current_trace().autotrack_dspy()
-
     msg = cl.Message(
         content="",
     )
 
     program = RAG()
     program.load(
-        f"{os.path.dirname(os.path.abspath(__file__))}/data/rag_dspy_bot.json",
+        f"{os.path.dirname(os.path.abspath(__file__))}/../data/rag_dspy_bot.json",
         use_legacy_loading=True,
     )
     program = program.reset_copy()

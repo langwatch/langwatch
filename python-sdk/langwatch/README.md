@@ -3,12 +3,11 @@
 A Python SDK to monitor and observe your LLM applications using LangWatch.
 
 > [!CAUTION]
-> This SDK is currently being developed and is not yet ready for production, or even
-> development use.
+> This SDK is currently being developed and is not yet ready for production use.
 
 ## Migration progress
 
-### Legend 🦵🔚
+### Legend
 
 -   ✅: Complete
 -   🚧: Migration in progress
@@ -37,7 +36,7 @@ A Python SDK to monitor and observe your LLM applications using LangWatch.
 | `evaluations`                          | ✅     | 🔄     |                                                           |
 | `guardrails`                           | ✅     | 🔄     |                                                           |
 | `openai`                               | ✅     | 🔄     |                                                           |
-| `litellm`                              | ❌     | 🔄     |                                                           |
+| `litellm`                              | ✅     | 🔄     |                                                           |
 | `ContextSpan`                          | ✅     | 🔄     |                                                           |
 | `ContextSpan.update`                   | ✅     | 🔄     |                                                           |
 | `ContextSpan.add_evaluation`           | ✅     | 🔄     |                                                           |
