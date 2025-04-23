@@ -162,7 +162,7 @@ class Client(LangWatchClientProtocol):
 		if value:
 			self.tracer_provider.shutdown()
 		else:
-			self.tracer_provider
+			self.tracer_provider = self.__ensure_otel_setup()
 
 	def __ensure_otel_setup(self, tracer_provider: Optional[TracerProvider] = None) -> TracerProvider:
 		try:

@@ -20,7 +20,7 @@ A Python SDK to monitor and observe your LLM applications using LangWatch.
 | Feature                                | Status | Tested | Description                                               |
 | -------------------------------------- | ------ | ------ | --------------------------------------------------------- |
 | `endpoint`                             | ✅     | 🔄     |                                                           |
-| `api_key`                              | 🗑️     | 🔄     | This has been removed.                                    |
+| `api_key`                              | ✅     | 🔄     |                                                           |
 | `enabled`                              | 🗑️     | 🔄     |                                                           |
 | `sampling_rate`                        | ✅     | 🔄     |                                                           |
 | `logger`                               | ✅     | 🔄     |                                                           |
