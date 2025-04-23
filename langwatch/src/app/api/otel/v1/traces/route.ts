@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   const authToken =
     xAuthToken ??
-    (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
+    (authHeader?.toLowerCase().startsWith("bearer ") ? authHeader.slice(7) : null);
 
   if (!authToken) {
     return NextResponse.json(

@@ -1,0 +1,75 @@
+[project]
+name = "langwatch"
+version = "0.3.0rc1"
+description = "LangWatch Python SDK, for monitoring your LLMs"
+authors = [{ name = "Langwatch Engineers", email = "engineering@langwatch.ai" }]
+requires-python = ">=3.9,<3.13,!=3.9.7"
+license = { text = "MIT" }
+readme = "README.md"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "dspy-ai>=2.5.2,<3.0.0",
+    "coolname>=2.2.0",
+    "httpx>=0.28.1",
+    "litellm>=1.52.1",
+    "openinference-instrumentation-haystack>=0.1.20",
+    "openinference-instrumentation-langchain>=0.1.24",
+    "openinference-instrumentation-openai>=0.1.25",
+    "openinference-semantic-conventions>=0.1.17",
+    "opentelemetry-api>=1.32.1",
+    "opentelemetry-exporter-otlp-proto-http>=1.32.1",
+    "opentelemetry-sdk>=1.32.1",
+    "retry>=0.9.2",
+]
+
+[project.optional-dependencies]
+dspy = ["dspy-ai>=2.5.2,<3.0.0"]
+dev = [
+    "ruff>=0.11.1",
+]
+test = [
+    "pytest>=7.4.2,<8.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/langwatch"]
+
+[dependency-groups]
+examples = [
+    "anthropic>=0.36.0,<0.37.0",
+    "chainlit>=1.3.0,<2",
+    "faiss-cpu>=1.8.0,<2.0.0",
+    "fastapi>=0.115.12",
+    "haystack-ai>=2.7.0,<3.0.0",
+    "jupyter>=1.0.0,<2.0.0",
+    "langchain>=0.2.11",
+    "langchain_community>=0.2.11",
+    "langchain-openai>=0.1.19",
+    "langchain-text-splitters>=0.3.0,<0.4.0",
+    "langchain-google-vertexai>=1.0.7",
+    "openinference-instrumentation-dspy>=0.1.12,<0.2.0",
+    "langgraph>=0.2.35,<0.3.0",
+    "nanoid>=2.0.0",
+    "openai>=1.68.2",
+    "pydantic>=1,<2.10.2", # v2.10.2 is broken for chainlit
+    "pytest>=7.4.2,<8.0.0",
+    "python-dotenv==1.0.1",
+    "streamlit>=1.37.1,<2.0.0",
+    "uvicorn>=0.25.0,<0.26.0",
+]

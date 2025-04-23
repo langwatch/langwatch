@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   publish-pypi:
-    if: startsWith(github.event.release.tag_name, 'python-sdk-') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    if: startsWith(github.event.release.tag_name, 'python-sdk@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
 
     steps:
@@ -27,18 +27,18 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd python-sdk
+          cd python-sdk/langwatch
           make install
           uv pip install build
 
       - name: Build package
         run: |
-          cd python-sdk
+          cd python-sdk/langwatch
           uv run python -m build
 
       - name: Publish package
         uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
         with:
-          packages_dir: python-sdk/dist/
+          packages_dir: python-sdk/langwatch/dist/
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
