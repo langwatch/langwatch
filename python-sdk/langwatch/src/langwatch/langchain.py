@@ -109,7 +109,6 @@ class LangChainTracer(BaseCallbackHandler):
         self.span_contexts: Dict[str, SpanContext] = {}
         self.spans: Dict[str, LangWatchSpan] = {}
 
-        print(f"[LangChainTracer] Initializing with trace_id: {trace.root_span.name if trace else 'None'}")
         ensure_setup()
 
         if trace:
@@ -138,7 +137,6 @@ class LangChainTracer(BaseCallbackHandler):
         metadata: Union[Dict[str, Any], None] = None,  # TODO?
         **kwargs: Any,
     ) -> Any:
-        print(f"[LangChainTracer][span:{run_id}] on_llm_start - parent_run_id: {parent_run_id}")
         self.spans[str(run_id)] = self._build_llm_span(
             serialized=serialized,
             run_id=run_id,
@@ -240,10 +238,8 @@ class LangChainTracer(BaseCallbackHandler):
         pass
 
     def on_llm_end(self, response: LLMResult, *, run_id: UUID, **kwargs: Any) -> Any:
-        print(f"[LangChainTracer][span:{run_id}] on_llm_end")
         span = self.spans.get(str(run_id))
         if span == None:
-            print(f"[LangChainTracer][span:{run_id}] WARNING: No span found")
             return
 
         outputs: List[SpanInputOutput] = []
@@ -275,7 +271,6 @@ class LangChainTracer(BaseCallbackHandler):
             )
         )
 
-        print(f"[LangChainTracer][span:{run_id}] Updating span with output")
         span.update(output=output)
         if response.llm_output and "token_usage" in response.llm_output:
             usage = response.llm_output["token_usage"]
@@ -285,7 +280,6 @@ class LangChainTracer(BaseCallbackHandler):
                     completion_tokens=usage.get("completion_tokens"),
                 )
             )
-        print(f"[LangChainTracer][span:{run_id}] Ending span")
         span.__exit__(None, None, None)
 
     def on_llm_error(self, error: Exception, *, run_id: UUID, **kwargs: Any) -> Any:
