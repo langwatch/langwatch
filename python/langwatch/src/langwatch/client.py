@@ -176,6 +176,9 @@ class Client(LangWatchClientProtocol):
 			if global_provider is not None and not isinstance(global_provider, trace.ProxyTracerProvider):
 				if not isinstance(global_provider, TracerProvider):
 					raise ValueError("Global tracer provider must be an instance of TracerProvider")
+				
+				logger.warning("There is already a global tracer provider set. LangWatch will not override it automatically, but this may result in telemetry not being sent to LangWatch if you have not configured it to do so yourself.")
+
 				return global_provider
 
 			provider = self.__create_new_tracer_provider()
