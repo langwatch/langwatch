@@ -50,12 +50,8 @@ import { api } from "~/utils/api";
  * that can be connected with other nodes to build complex LLM-powered applications.
  */
 export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
-  const {
-    open: isSaveVersionDialogOpen,
-    onOpen,
-    onClose,
-    setOpen: setIsSaveVersionDialogOpen,
-  } = useDisclosure();
+  const { open: isSaveVersionDialogOpen, setOpen: setIsSaveVersionDialogOpen } =
+    useDisclosure();
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const configId = node.data.configId;

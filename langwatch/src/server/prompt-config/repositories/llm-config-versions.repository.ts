@@ -148,9 +148,16 @@ export class LlmConfigVersionsRepository {
     // Use a transaction to ensure both operations succeed or fail together
     const { configId, projectId } = versionData;
     const version = await this.prisma.$transaction(async (tx) => {
+      const latestVersionNumber = await tx.llmPromptConfigVersion.count({
+        where: { configId, projectId },
+      });
+
       // Create the new version
       const newVersion = await tx.llmPromptConfigVersion.create({
-        data: versionData,
+        data: {
+          ...versionData,
+          version: latestVersionNumber + 1,
+        },
       });
 
       // Update the parent config's updatedAt timestamp
@@ -188,10 +195,15 @@ export class LlmConfigVersionsRepository {
       });
     }
 
+    const latestVersionNumber = await this.prisma.llmPromptConfigVersion.count({
+      where: { configId: version.configId, projectId },
+    });
+
     // Create a new version with the same config data
     const newVersion = await this.prisma.llmPromptConfigVersion.create({
       data: {
         commitMessage: `Restore from version ${version.version}`,
+        version: latestVersionNumber + 1,
         authorId,
         configId: version.configId,
         schemaVersion: version.schemaVersion,

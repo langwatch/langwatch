@@ -1,15 +1,23 @@
 import { Input } from "@chakra-ui/react";
+import { type ReactNode } from "react";
 import { useFormContext } from "react-hook-form";
-import { VerticalFormControl } from "~/components/VerticalFormControl";
+
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
 
-export function PromptNameField() {
+import { VerticalFormControl } from "~/components/VerticalFormControl";
+
+interface PromptNameFieldProps {
+  // Optional label to override the default "Prompt Name" label
+  label?: string | ReactNode;
+}
+
+export function PromptNameField({ label }: PromptNameFieldProps) {
   const { register, formState } = useFormContext<PromptConfigFormValues>();
   const { errors } = formState;
 
   return (
     <VerticalFormControl
-      label="Prompt Name"
+      label={label ?? "Prompt Name"}
       invalid={!!errors.name}
       helper={errors.name?.message?.toString()}
       error={errors.name}

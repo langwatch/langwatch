@@ -244,11 +244,19 @@ export function VersionHistoryListPopover({ configId }: { configId: string }) {
       enabled: !!project?.id,
     }
   );
-
+  const { refetch: refetchPromptConfig } =
+    api.llmConfigs.getByIdWithLatestVersion.useQuery(
+      {
+        id: configId,
+        projectId: project?.id ?? "",
+      },
+      { enabled: !!project?.id }
+    );
   const { mutate: restoreVersion } =
     api.llmConfigs.versions.restore.useMutation({
       onSuccess: () => {
         void refetch();
+        void refetchPromptConfig();
       },
     });
 

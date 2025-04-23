@@ -189,6 +189,7 @@ export class LlmConfigRepository {
           configId: newConfig.id,
           projectId: configData.projectId,
           authorId: configData.authorId,
+          version: 0,
           configData: {
             model: defaultModel?.defaultModel ?? "gpt-4o-mini",
             prompt: "You are a helpful assistant",

@@ -15,15 +15,17 @@ export type SaveDialogFormValues = {
   commitMessage: string;
 };
 
+export interface SaveVersionDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: SaveDialogFormValues) => Promise<void>;
+}
+
 export function SaveVersionDialog({
   isOpen,
   onClose,
   onSubmit,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (data: SaveDialogFormValues) => Promise<void>;
-}) {
+}: SaveVersionDialogProps) {
   const {
     register,
     handleSubmit,
@@ -59,11 +61,17 @@ export function SaveVersionDialog({
         <Dialog.Header>Save Version</Dialog.Header>
         <Dialog.CloseTrigger />
         <Dialog.Body>
-          <form onSubmit={() => void handleSubmit(submitCallback)()}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleSubmit(submitCallback)();
+            }}
+          >
             <Field.Root>
               <Field.Label>Description</Field.Label>
               <Input
                 placeholder="Enter a description for this version"
+                autoFocus
                 {...register("commitMessage", {
                   required: "Description is required",
                 })}
