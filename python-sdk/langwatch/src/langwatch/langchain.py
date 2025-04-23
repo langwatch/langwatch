@@ -97,10 +97,6 @@ def langchain_message_to_chat_message(message: BaseMessage) -> ChatMessage:
 class LangChainTracer(BaseCallbackHandler):
     """LangWatch callback handler that can be used to handle callbacks from langchain."""
 
-    trace: LangWatchTrace
-    span_contexts: Dict[str, SpanContext] = {}
-    spans: Dict[str, LangWatchSpan] = {}
-
     def __init__(
         self,
         trace: Optional[LangWatchTrace] = None,
@@ -109,6 +105,10 @@ class LangChainTracer(BaseCallbackHandler):
         # Deprecated: mantained for retrocompatibility
         metadata: Optional[TraceMetadata] = None,
     ) -> None:
+        self.trace: LangWatchTrace
+        self.span_contexts: Dict[str, SpanContext] = {}
+        self.spans: Dict[str, LangWatchSpan] = {}
+
         print(f"[LangChainTracer] Initializing with trace_id: {trace.root_span.name if trace else 'None'}")
         ensure_setup()
 
@@ -230,10 +230,10 @@ class LangChainTracer(BaseCallbackHandler):
         return span
 
     def get_span_context(self, run_id: UUID) -> Union[SpanContext, None]:
-        self.span_contexts[run_id]
+        return self.span_contexts[str(run_id)]
 
     def set_span_context(self, run_id: UUID, span_context: SpanContext):
-        self.span_contexts[run_id] = span_context
+        self.span_contexts[str(run_id)] = span_context
 
     def on_llm_new_token(self, token: str, **kwargs: Any) -> Any:
         # TODO: capture first_token_at, copy from TypeScript implementation and test it

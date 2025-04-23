@@ -1,6 +1,5 @@
 import functools
 import json
-from logging import warn
 from types import ModuleType
 from uuid import UUID
 import httpx

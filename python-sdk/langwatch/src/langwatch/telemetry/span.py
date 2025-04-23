@@ -392,6 +392,9 @@ class LangWatchSpan:
         settings: Optional[dict] = None,
         as_guardrail: bool = False,
     ):
+        contexts = contexts or []
+        conversation = conversation or []
+
         from langwatch import evaluations
         return evaluations.evaluate(
             span=self,
@@ -418,6 +421,9 @@ class LangWatchSpan:
         settings: Optional[dict] = None,
         as_guardrail: bool = False,
     ):
+        contexts = contexts or []
+        conversation = conversation or []
+
         from langwatch import evaluations
         return await evaluations.async_evaluate(
             span=self,
@@ -519,7 +525,7 @@ class LangWatchSpan:
             return wrapper
         elif inspect.isgeneratorfunction(func):
             @functools.wraps(func)
-            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            def wrapper(*args: Any, **kwargs: Any):
                 with self:
                     self._set_callee_input_information(func, *args, **kwargs)
                     items = []

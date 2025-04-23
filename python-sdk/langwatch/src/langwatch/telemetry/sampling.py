@@ -1,6 +1,6 @@
 import opentelemetry.trace as trace_api
 
-__all__ = ["trace", "get_current_trace", "get_current_span", "sampling_rate"]
+__all__ = ["sampling_rate"]
 
 from typing import Any, Callable, TypeVar
 

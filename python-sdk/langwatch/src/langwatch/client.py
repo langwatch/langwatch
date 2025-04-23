@@ -25,6 +25,7 @@ class GracefulBatchSpanProcessor(BatchSpanProcessor):
 		super().__init__(*args, **kwargs)
 		self._lock = threading.Lock()
 		self._export_lock = threading.Lock()
+		self._spans_list: List[ReadableSpan] = []
 
 	def _export(self, spans: List[ReadableSpan]) -> None:
 		"""
@@ -54,16 +55,16 @@ class GracefulBatchSpanProcessor(BatchSpanProcessor):
 		spans_to_export = []
 		
 		with self._lock:
-			if not self.spans_list:
+			if not self._spans_list:
 				logger.debug("No spans to export in batch")
 				return
 
 			# Take all spans that are ready for export
-			spans_to_export = [span for span in self.spans_list if span is not None]
+			spans_to_export = [span for span in self._spans_list if span is not None]
 			if spans_to_export:
 				logger.debug(f"Preparing to export {len(spans_to_export)} spans")
 				# Only remove the spans we're actually exporting
-				self.spans_list = [span for span in self.spans_list if span not in spans_to_export]
+				self._spans_list = [span for span in self._spans_list if span not in spans_to_export]
 
 		if spans_to_export:
 			self._export(spans_to_export)
@@ -75,8 +76,8 @@ class GracefulBatchSpanProcessor(BatchSpanProcessor):
 
 		should_export = False
 		with self._lock:
-			self.spans_list.append(span)
-			current_size = len(self.spans_list)
+			self._spans_list.append(span)
+			current_size = len(self._spans_list)
 			logger.debug(f"Added span to export queue. Queue size: {current_size}")
 			should_export = current_size >= self.max_export_batch_size
 
@@ -139,7 +140,7 @@ class Client(LangWatchClientProtocol):
 
 		self.instrumentors = instrumentors or []
 		for instrumentor in self.instrumentors:
-			instrumentor.instrument(tracer_provider=tracer_provider)
+			instrumentor.instrument(tracer_provider=self.tracer_provider)
 
 	@property
 	def endpoint_url(self) -> str:
