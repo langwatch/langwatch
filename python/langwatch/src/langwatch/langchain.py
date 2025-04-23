@@ -12,13 +12,12 @@ from langchain.schema import (
     ChatGeneration,
 )
 from langwatch.utils.initialization import ensure_setup
-from opentelemetry.trace import get_current_span
+from opentelemetry.trace import get_current_span, SpanContext
 from langchain.callbacks.base import BaseCallbackHandler
 from langwatch.telemetry.span import LangWatchSpan
 from langwatch.telemetry.tracing import LangWatchTrace
 from langwatch.utils.transformation import SerializableWithStringFallback, convert_typed_values
 from langwatch.utils.utils import list_get, milliseconds_timestamp
-import nanoid
 import langwatch
 from langwatch.domain import (
     ChatMessage,
@@ -99,7 +98,7 @@ class LangChainTracer(BaseCallbackHandler):
     """LangWatch callback handler that can be used to handle callbacks from langchain."""
 
     trace: LangWatchTrace
-
+    span_contexts: Dict[str, SpanContext] = {}
     spans: Dict[str, LangWatchSpan] = {}
 
     def __init__(
@@ -110,7 +109,7 @@ class LangChainTracer(BaseCallbackHandler):
         # Deprecated: mantained for retrocompatibility
         metadata: Optional[TraceMetadata] = None,
     ) -> None:
-        print(f"[LangChainTracer] Initializing with trace_id: {trace.id if trace else 'None'}")
+        print(f"[LangChainTracer] Initializing with trace_id: {trace.root_span.name if trace else 'None'}")
         ensure_setup()
 
         if trace:
@@ -216,16 +215,25 @@ class LangChainTracer(BaseCallbackHandler):
 
         span = langwatch.span(
             type="llm",
-            parent=get_current_span(),
             trace=self.trace,
             model=(vendor + "/" + model),
             input=input,
             timestamps=SpanTimestamps(started_at=milliseconds_timestamp()),
             params=span_params,
+            span_context=self.get_span_context(parent_run_id),
         )
         span.__enter__()
 
+        self.spans[str(run_id)] = span
+        self.set_span_context(run_id, span.get_span_context())
+
         return span
+
+    def get_span_context(self, run_id: UUID) -> Union[SpanContext, None]:
+        self.span_contexts[run_id]
+
+    def set_span_context(self, run_id: UUID, span_context: SpanContext):
+        self.span_contexts[run_id] = span_context
 
     def on_llm_new_token(self, token: str, **kwargs: Any) -> Any:
         # TODO: capture first_token_at, copy from TypeScript implementation and test it
