@@ -20,12 +20,13 @@ export function PromptConfigPanel({
   configId,
 }: PromptConfigPanelProps) {
   const { project } = useOrganizationTeamProject();
+  const projectId = project?.id ?? "";
   const { data: llmConfig } = api.llmConfigs.getByIdWithLatestVersion.useQuery(
     {
       id: configId,
-      projectId: project?.id ?? "",
+      projectId,
     },
-    { enabled: !!project?.id && !!configId }
+    { enabled: !!projectId && !!configId }
   );
   const initialConfigValues = useMemo(() => {
     return llmConfig
@@ -44,7 +45,6 @@ export function PromptConfigPanel({
 
   const formProps = usePromptConfigForm({
     configId,
-    projectId: project?.id ?? "",
     initialConfigValues,
   });
 

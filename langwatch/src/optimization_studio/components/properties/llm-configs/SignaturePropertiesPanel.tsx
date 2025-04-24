@@ -1,10 +1,8 @@
-import { Separator, HStack, Button, useDisclosure } from "@chakra-ui/react";
+import { Separator, HStack, Button } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useCallback, useMemo } from "react";
 import { Save } from "react-feather";
 import { FormProvider } from "react-hook-form";
-
-import { SchemaVersion } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 import { useWorkflowStore } from "../../../hooks/useWorkflowStore";
 import type { Signature } from "../../../types/dsl";
@@ -12,7 +10,6 @@ import { BasePropertiesPanel } from "../BasePropertiesPanel";
 
 import { PromptSource } from "./prompt-source-select/PromptSource";
 
-import { toaster } from "~/components/ui/toaster";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
@@ -24,46 +21,43 @@ import { DemonstrationsField } from "~/prompt-configs/forms/fields/Demonstration
 import { PromptConfigVersionFieldGroup } from "~/prompt-configs/forms/fields/PromptConfigVersionFieldGroup";
 import { PromptNameField } from "~/prompt-configs/forms/fields/PromptNameField";
 import {
-  SaveVersionDialog,
-  type SaveDialogFormValues,
-} from "~/prompt-configs/forms/SaveVersionDialog";
-import {
   usePromptConfigForm,
   type PromptConfigFormValues,
 } from "~/prompt-configs/hooks/usePromptConfigForm";
+import { PromptConfigProvider } from "~/prompt-configs/providers/PromptConfigProvider";
+import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import { VersionHistoryListPopover } from "~/prompt-configs/VersionHistoryListPopover";
 import { api } from "~/utils/api";
 
 /**
  * Properties panel for the Signature node in the optimization studio.
  *
- * A Signature in this context is based on the DSPy concept, which defines
- * an interface for LLM interactions with inputs, outputs, and parameters.
+ * A Signature node represents an LLM calling component in the workflow
+ * that can be connected with other nodes to build complex LLM-powered applications.
+ * It is based on the DSPy concept, which defines an interface for LLM interactions.
  *
  * This panel allows users to configure:
- * - The LLM model to use for this signature
- * - Instructions for the LLM
+ * - Prompt source selection and version history
+ * - The LLM model to use
+ * - Prompt template with input variables
+ * - Output schema definition
  * - Demonstrations (few-shot examples)
- * - Prompting techniques (like Chain of Thought)
- *
- * The Signature node represents an LLM calling component in the workflow
- * that can be connected with other nodes to build complex LLM-powered applications.
+ * - Advanced prompting techniques
  */
-export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
-  const { open: isSaveVersionDialogOpen, setOpen: setIsSaveVersionDialogOpen } =
-    useDisclosure();
+function SignaturePropertiesPanelInner({ node }: { node: Node<Signature> }) {
+  const { triggerSaveVersion } = usePromptConfigContext();
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const configId = node.data.configId;
   const { setNode } = useWorkflowStore((state) => ({
     setNode: state.setNode,
   }));
-  const updateConfig = api.llmConfigs.updatePromptConfig.useMutation();
-  const createVersion = api.llmConfigs.versions.create.useMutation();
 
   /**
-   * Syncs the node data with the form values.
-   * formValues => nodeData
+   * Converts form values to node data and updates the workflow store.
+   * This ensures the node's data stays in sync with the form state.
+   *
+   * @param formValues - The current form values to sync with node data
    */
   const syncNodeDataWithFormValues = useCallback(
     (formValues: PromptConfigFormValues) => {
@@ -76,26 +70,29 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
         data: newNodeData,
       });
     },
-    [node, setNode]
+    [configId, node, setNode]
   );
 
+  // Initialize form with values from node data
   const initialConfigValues = nodeDataToPromptConfigFormInitialValues(
     node.data
   );
   const formProps = usePromptConfigForm({
     configId,
     initialConfigValues,
-    projectId,
     onChange: (formValues) => {
       const shouldUpdate = !isEqual(formValues, initialConfigValues);
 
-      // If the form values have changed, update the node data
+      // Only update node data if form values have actually changed
       if (shouldUpdate) {
         syncNodeDataWithFormValues(formValues);
       }
     },
   });
 
+  /**
+   * Updates node data when a new prompt source is selected
+   */
   const handlePromptSourceSelect = (config: { id: string; name: string }) => {
     setNode({
       ...node,
@@ -107,6 +104,7 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
     });
   };
 
+  // Fetch the saved configuration to compare with current node data
   const { data: savedConfig } =
     api.llmConfigs.getByIdWithLatestVersion.useQuery(
       {
@@ -116,67 +114,20 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
       { enabled: !!configId && !!projectId }
     );
 
+  /**
+   * Determines if the current node data has changed from the saved configuration
+   * Used to enable/disable the save button
+   */
   const hasDrifted = useMemo(() => {
     if (!savedConfig) return false;
     const savedConfigData = llmConfigToNodeData(savedConfig);
     return !isEqual(node.data, savedConfigData);
   }, [node.data, savedConfig]);
 
-  const handleSaveTrigger = useCallback(async () => {
-    const isValid = await formProps.methods.trigger();
-    if (!isValid) return;
-    setIsSaveVersionDialogOpen(true);
-  }, [formProps.methods, setIsSaveVersionDialogOpen]);
-
-  const handleSaveVersion = useCallback(
-    async (formValues: SaveDialogFormValues) => {
-      console.log("handleSaveVersion", formValues);
-      if (!savedConfig) return;
-
-      const formData = formProps.methods.getValues();
-
-      try {
-        // Only update name if it changed
-        if (formData.name !== savedConfig.name) {
-          await updateConfig.mutateAsync({
-            projectId,
-            id: configId,
-            name: formData.name,
-          });
-        }
-
-        await createVersion.mutateAsync({
-          projectId,
-          configId,
-          configData: formData.version.configData,
-          schemaVersion: SchemaVersion.V1_0,
-          commitMessage: formValues.commitMessage,
-        });
-
-        setIsSaveVersionDialogOpen(false);
-      } catch (error) {
-        console.error(error);
-        toaster.create({
-          title: "Error",
-          description: "Failed to save version",
-          type: "error",
-        });
-      }
-    },
-    [
-      savedConfig,
-      formProps.methods,
-      createVersion,
-      projectId,
-      configId,
-      setIsSaveVersionDialogOpen,
-      updateConfig,
-    ]
-  );
-
   // TODO: Consider refactoring the BasePropertiesPanel so that we don't need to hide everything like this
   return (
     <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs>
+      {/* Prompt Source Selection and Version Controls */}
       <VerticalFormControl label="Prompt Source" width="full">
         <HStack justifyContent="space-between">
           <HStack flex={1} width="50%">
@@ -194,13 +145,17 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
             variant="outline"
             disabled={!hasDrifted}
             colorPalette="green"
-            onClick={() => void handleSaveTrigger()}
+            onClick={() =>
+              void triggerSaveVersion(formProps.methods.getValues())
+            }
           >
             <Save />
           </Button>
         </HStack>
       </VerticalFormControl>
       <Separator />
+
+      {/* Prompt Configuration Form */}
       <FormProvider {...formProps.methods}>
         <form style={{ width: "100%" }}>
           <PromptNameField />
@@ -208,15 +163,26 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
           <DemonstrationsField />
         </form>
       </FormProvider>
-      <SaveVersionDialog
-        isOpen={isSaveVersionDialogOpen}
-        onClose={() => setIsSaveVersionDialogOpen(false)}
-        onSubmit={handleSaveVersion}
-      />
     </BasePropertiesPanel>
   );
 }
 
+/**
+ * Wrapper component that provides the PromptConfigProvider context
+ * to the inner panel component
+ */
+export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
+  return (
+    <PromptConfigProvider configId={node.data.configId}>
+      <SignaturePropertiesPanelInner node={node} />
+    </PromptConfigProvider>
+  );
+}
+
+/**
+ * Utility function to compare objects for equality
+ * Used to determine if form values have changed
+ */
 function isEqual(a: any, b: any) {
   return JSON.stringify(a, null, 2) === JSON.stringify(b, null, 2);
 }

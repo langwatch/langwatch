@@ -44,6 +44,7 @@ export const usePromptConfigForm = ({
 
   const formData = methods.watch();
 
+  // Provides on change callback to the parent component
   useEffect(() => {
     onChange?.(formData);
   }, [formData, onChange]);
