@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import langwatch.evaluations
 from langwatch.types import Conversation, RAGChunk
@@ -11,7 +11,7 @@ def evaluate(
     expected_output: Optional[str] = None,
     contexts: List[RAGChunk] = [],
     conversation: Conversation = [],
-    settings: Optional[dict] = None,
+    settings: Optional[Dict[str, Any]] = None,
 ):
     contexts = contexts or []
     conversation = conversation or []
@@ -35,7 +35,7 @@ async def async_evaluate(
     expected_output: Optional[str] = None,
     contexts: List[RAGChunk] = [],
     conversation: Conversation = [],
-    settings: Optional[dict] = None,
+    settings: Optional[Dict[str, Any]] = None,
 ):
     contexts = contexts or []
     conversation = conversation or []
