@@ -3,10 +3,10 @@ from typing_extensions import TypedDict
 from pydantic import BaseModel
 
 
-class SpanExporterRule(BaseModel):
-    rule: str
-    target: Literal["span_name"]
-    action: Literal["exclude"]
+class SpanExporterExcludeRule(BaseModel):
+    field_name: Literal["span_name"]
+    match_value: str
+    match_operation: Literal["includes", "exact_match"]
 
 
 ChatRole = Literal[

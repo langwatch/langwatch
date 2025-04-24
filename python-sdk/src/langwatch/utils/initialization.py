@@ -8,7 +8,7 @@ from opentelemetry import trace
 
 from langwatch.state import get_instance, set_instance
 from langwatch.client import Client
-from langwatch.domain import SpanExporterRule
+from langwatch.domain import SpanExporterExcludeRule
 from langwatch.types import BaseAttributes
 from langwatch.typings import Instrumentor
 
@@ -34,7 +34,7 @@ def setup(
     base_attributes: Optional[BaseAttributes] = None,
     tracer_provider: Optional[TracerProvider] = None,
     instrumentors: Optional[Sequence[Instrumentor]] = None,
-    span_exporter_rules: Optional[List[SpanExporterRule]] = [],
+    span_exporter_exclude_rules: Optional[List[SpanExporterExcludeRule]] = [],
     debug: bool = False,
 ) -> Client:
     """
@@ -46,7 +46,7 @@ def setup(
         base_attributes: The base attributes for the LangWatch client.
         tracer_provider: The tracer provider for the LangWatch client.
         instrumentors: The instrumentors for the LangWatch client.
-        span_exporter_rules: Optional. A list of rules that will be applied to spans processed by the exporter.
+        span_exporter_exclude_rules: Optional. A list of rules that will be applied to spans processed by the exporter.
         debug: Whether to enable debug logging for the LangWatch client.
 
     Returns:
@@ -64,7 +64,7 @@ def setup(
         tracer_provider=tracer_provider,
         instrumentors=instrumentors,
         debug=debug,
-        span_exporter_rules=span_exporter_rules,
+        span_exporter_exclude_rules=span_exporter_exclude_rules,
     )
 
     if debug:

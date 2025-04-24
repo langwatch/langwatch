@@ -4,7 +4,7 @@ from typing import List, Optional, Sequence
 
 from langwatch.__version__ import __version__
 from langwatch.attributes import AttributeName
-from langwatch.domain import SpanExporterRule
+from langwatch.domain import SpanExporterExcludeRule
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.resources import Resource
@@ -30,7 +30,7 @@ class Client(LangWatchClientProtocol):
 	instrumentors: Sequence[Instrumentor] = []
 	base_attributes: BaseAttributes = {}
 	_disable_sending: bool = False
-	_span_exporter_rules: List['SpanExporterRule'] = []
+	_span_exporter_exclude_rules: List[SpanExporterExcludeRule] = []
 
 	def __init__(
 		self,
@@ -41,7 +41,7 @@ class Client(LangWatchClientProtocol):
 		tracer_provider: Optional[TracerProvider] = None,
 		debug: bool = False,
 		disable_sending: bool = False,
-		span_exporter_rules: Optional[List['SpanExporterRule']] = None,
+		span_exporter_exclude_rules: Optional[List[SpanExporterExcludeRule]] = None,
 	):
 		"""
 		Initialize the LangWatch tracing client.
@@ -59,7 +59,7 @@ class Client(LangWatchClientProtocol):
 		self._endpoint_url = endpoint_url or os.getenv("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
 		self._debug = debug or os.getenv("LANGWATCH_DEBUG") == "true"
 		self._disable_sending = disable_sending
-		self._span_exporter_rules = span_exporter_rules or []
+		self._span_exporter_exclude_rules = span_exporter_exclude_rules or []
 
 		self.base_attributes = base_attributes or {}
 		self.base_attributes[AttributeName.LangWatchSDKName] = "langwatch-observability-sdk"
@@ -162,7 +162,7 @@ class Client(LangWatchClientProtocol):
 				export_interval=5.0,
 				max_export_batch_size=100,
 				max_queue_size=512,
-				span_exporter_rules=self._span_exporter_rules,
+				span_exporter_exclude_rules=self._span_exporter_exclude_rules,
 			)
 
 			provider.add_span_processor(SimpleSpanProcessor(async_exporter))

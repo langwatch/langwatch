@@ -4,7 +4,7 @@ from typing import List, Sequence
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from opentelemetry.sdk.trace import ReadableSpan
 
-from langwatch.domain import SpanExporterRule
+from langwatch.domain import SpanExporterExcludeRule
 
 
 class AsyncBatchExporter(SpanExporter):
@@ -14,7 +14,7 @@ class AsyncBatchExporter(SpanExporter):
         max_queue_size: int = 1000,
         max_export_batch_size: int = 100,
         export_interval: float = 5.0,
-        span_exporter_rules: List[SpanExporterRule] = [],
+        span_exporter_exclude_rules: List[SpanExporterExcludeRule] = [],
     ):
         """
         Initialize the async exporter.
@@ -29,7 +29,7 @@ class AsyncBatchExporter(SpanExporter):
         self.max_queue_size = max_queue_size
         self.max_export_batch_size = max_export_batch_size
         self.export_interval = export_interval
-        self.span_exporter_rules = span_exporter_rules
+        self.span_exporter_exclude_rules = span_exporter_exclude_rules
         self.queue: asyncio.Queue[ReadableSpan] = asyncio.Queue(maxsize=max_queue_size)
         self._shutdown = False
 
@@ -80,9 +80,12 @@ class AsyncBatchExporter(SpanExporter):
         """
         for span in spans:
             skip_span = False
-            for rule in self.span_exporter_rules:
-                if rule.target == "span_name":
-                    if rule.action == "exclude" and rule.rule in span.name:
+            for rule in self.span_exporter_exclude_rules:
+                if rule.field_name == "span_name":
+                    if rule.match_operation == "includes" and rule.match_value in span.name:
+                        skip_span = True
+                        continue
+                    if rule.match_operation == "exact_match" and rule.match_value == span.name:
                         skip_span = True
                         continue
             if skip_span:
