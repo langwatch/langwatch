@@ -201,7 +201,7 @@ class LLMSpan(TypedDict, total=False):
 class RAGChunk(TypedDict, total=False):
     document_id: Optional[str]
     chunk_id: Optional[str]
-    content: Union[str, dict, list]
+    content: Union[str, Dict[str, Any], List[Any]]
 
 
 class RAGSpan(TypedDict, total=False):

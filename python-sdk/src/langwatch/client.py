@@ -99,7 +99,7 @@ class Client(LangWatchClientProtocol):
 	Client for the LangWatch tracing SDK.
 	"""
 
-	debug: bool = False
+	_debug: bool = False
 	_api_key: str
 	_endpoint_url: str
 	instrumentors: Sequence[Instrumentor] = []
@@ -137,13 +137,23 @@ class Client(LangWatchClientProtocol):
 		self.base_attributes[AttributeName.LangWatchSDKVersion] = __version__
 		self.base_attributes[AttributeName.LangWatchSDKLanguage] = "python"
 
-		self.debug = debug
+		self._debug = debug
 
 		self.tracer_provider = self.__ensure_otel_setup(tracer_provider)
 
 		self.instrumentors = instrumentors or []
 		for instrumentor in self.instrumentors:
 			instrumentor.instrument(tracer_provider=self.tracer_provider)
+
+	@property
+	def debug(self) -> bool:
+		"""Get the debug flag for the client."""
+		return self._debug
+
+	@debug.setter
+	def debug(self, value: bool) -> None:
+		"""Set the debug flag for the client."""
+		self._debug = value
 
 	@property
 	def endpoint_url(self) -> str:

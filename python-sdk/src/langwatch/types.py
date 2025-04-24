@@ -45,6 +45,16 @@ class LangWatchClientProtocol(Protocol):
         """Get the API key for the client."""
         ...
 
+    @property
+    def debug(self) -> bool:
+        """Get the debug flag for the client."""
+        ...
+
+    @debug.setter
+    def debug(self, value: bool) -> None:
+        """Set the debug flag for the client."""
+        ...
+
 
 __all__ = [
     "Conversation",

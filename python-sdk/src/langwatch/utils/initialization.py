@@ -69,7 +69,7 @@ def ensure_setup(api_key: Optional[str] = None) -> None:
 
     # Verify we have a valid tracer provider
     tracer_provider = trace.get_tracer_provider()
-    if tracer_provider is None:
+    if tracer_provider is None: # type: ignore
         logger.warning("No tracer provider found, creating new one")
         client = setup(debug=True, api_key=api_key)
     elif isinstance(tracer_provider, trace.ProxyTracerProvider):

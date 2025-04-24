@@ -1,13 +1,15 @@
 import logging
 
-from .. import __instance
+from ..state import get_instance
 
 
 def get_logger():
     logger = logging.getLogger("LangWatch")
     logger.propagate = False
 
-    if __instance is not None and __instance.debug:
+    instance = get_instance()
+
+    if instance is not None and instance.debug:
         logger.setLevel(logging.DEBUG)
     else:
         logger.setLevel(logging.INFO)

@@ -9,7 +9,7 @@ def capture_chunks_with_timings_and_reyield(
     generator: Generator[T, Any, Any],
     callback: Callable[[List[T], Optional[int], int], Any],
 ) -> Generator[T, Any, Any]:
-    chunks = []
+    chunks: List[T] = []
     first_token_at: Optional[int] = None
     for chunk in generator:
         chunks.append(chunk)
@@ -24,7 +24,7 @@ async def capture_async_chunks_with_timings_and_reyield(
     generator: AsyncGenerator[T, Any],
     callback: Callable[[List[T], Optional[int], int], Any],
 ) -> AsyncGenerator[T, Any]:
-    chunks = []
+    chunks: List[T] = []
     first_token_at: Optional[int] = None
     async for chunk in generator:
         chunks.append(chunk)
