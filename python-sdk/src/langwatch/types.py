@@ -40,6 +40,11 @@ class LangWatchClientProtocol(Protocol):
         """Get the endpoint URL for the client."""
         ... 
 
+    @property
+    def api_key(self) -> str:
+        """Get the API key for the client."""
+        ...
+
 
 __all__ = [
     "Conversation",

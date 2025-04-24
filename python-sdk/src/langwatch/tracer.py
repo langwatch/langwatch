@@ -1,10 +1,12 @@
+from typing import Any, Callable
 import warnings
 from functools import wraps
 from langwatch.telemetry.tracing import LangWatchTrace, LangWatchSpan
 from langwatch.telemetry.context import get_current_span as gcs, get_current_trace as gct
-def _deprecated(func):
+
+def _deprecated(func: Callable[[], Any]) -> Callable[[], Any]:
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
         warnings.warn(f"{func.__name__} is deprecated. Use langwatch.telemetry.tracing instead.",
                      DeprecationWarning, stacklevel=2)
         return func(*args, **kwargs)

@@ -1,7 +1,7 @@
 import os
 import logging
 import threading
-from typing import Optional, Sequence, List
+from typing import Any, Optional, Sequence, List
 from requests.exceptions import RequestException
 
 from langwatch.__version__ import __version__
@@ -10,7 +10,7 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider, ReadableSpan
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor, SpanExportResult
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExportResult
 from opentelemetry.sdk.trace.sampling import TraceIdRatioBased, ALWAYS_OFF
 
 from .typings import Instrumentor
@@ -21,12 +21,12 @@ logger = logging.getLogger(__name__)
 class GracefulBatchSpanProcessor(BatchSpanProcessor):
 	"""A BatchSpanProcessor that handles export failures gracefully by logging them instead of raising exceptions."""
 
-	def __init__(self, *args, **kwargs):
+	def __init__(self, *args: Any, **kwargs: Any):
 		super().__init__(*args, **kwargs)
 		self._lock = threading.Lock()
 		self._export_lock = threading.Lock()
 
-	def _export(self, spans: List[ReadableSpan]) -> None:
+	def _export(self, spans: List[ReadableSpan]) -> None: # type: ignore
 		"""
 		Export the spans while handling errors gracefully.
 
@@ -47,35 +47,39 @@ class GracefulBatchSpanProcessor(BatchSpanProcessor):
 			except RequestException as ex:
 				logger.warning(f"Network error while exporting spans: {str(ex)}")
 			except Exception as ex:
-				logger.error(f"Unexpected error in span export: {str(ex)}", exc_info=True)
+				logger.error("Unexpected error in span export", exc_info=True)
 
-	def _export_batch(self) -> None:
+	def _export_batch(self) -> int:
 		"""Export the current batch of spans with proper cleanup."""
-		spans_to_export = []
+		spans_to_export: List[ReadableSpan] = []
 		
 		with self._lock:
 			if not self.spans_list:
 				logger.debug("No spans to export in batch")
-				return
+				return 0
 
 			# Take all spans that are ready for export
-			spans_to_export = [span for span in self.spans_list if span is not None]
+			spans_to_export = [span for span in self.spans_list if span is not None] # type: ignore
 			if spans_to_export:
 				logger.debug(f"Preparing to export {len(spans_to_export)} spans")
 				# Only remove the spans we're actually exporting
 				self.spans_list = [span for span in self.spans_list if span not in spans_to_export]
 
 		if spans_to_export:
+			span_count = len(spans_to_export)
 			self._export(spans_to_export)
+			return span_count
+		
+		return 0
 
 	def on_end(self, span: ReadableSpan) -> None:
 		"""Called when a span is ended."""
-		if span is None:
+		if span is None: # type: ignore
 			return
 
 		should_export = False
 		with self._lock:
-			self.spans_list.append(span)
+			self.spans_list.append(span) # type: ignore
 			current_size = len(self.spans_list)
 			logger.debug(f"Added span to export queue. Queue size: {current_size}")
 			should_export = current_size >= self.max_export_batch_size
@@ -96,7 +100,7 @@ class Client(LangWatchClientProtocol):
 	"""
 
 	debug: bool = False
-	api_key: str
+	_api_key: str
 	_endpoint_url: str
 	instrumentors: Sequence[Instrumentor] = []
 	base_attributes: BaseAttributes = {}
@@ -124,7 +128,7 @@ class Client(LangWatchClientProtocol):
 			disable_sending: Optional. If True, no traces will be sent to the server.
 		"""
 
-		self.api_key = api_key or os.getenv("LANGWATCH_API_KEY")
+		self._api_key = api_key or os.getenv("LANGWATCH_API_KEY") or "no api key provided"
 		self._endpoint_url = endpoint_url or os.getenv("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
 		self._disable_sending = disable_sending
 
@@ -147,6 +151,11 @@ class Client(LangWatchClientProtocol):
 		return self._endpoint_url
 
 	@property
+	def api_key(self) -> str:
+		"""Get the API key for the client."""
+		return self._api_key
+
+	@property
 	def disable_sending(self) -> bool:
 		"""Get whether sending is disabled."""
 		return self._disable_sending
@@ -167,13 +176,13 @@ class Client(LangWatchClientProtocol):
 	def __ensure_otel_setup(self, tracer_provider: Optional[TracerProvider] = None) -> TracerProvider:
 		try:
 			if tracer_provider is not None:
-				if not isinstance(tracer_provider, TracerProvider):
+				if not isinstance(tracer_provider, TracerProvider): # type: ignore
 					raise ValueError("tracer_provider must be an instance of TracerProvider")
 				trace.set_tracer_provider(tracer_provider)
 				return tracer_provider
 
 			global_provider = trace.get_tracer_provider()
-			if global_provider is not None and not isinstance(global_provider, trace.ProxyTracerProvider):
+			if global_provider is not None and not isinstance(global_provider, trace.ProxyTracerProvider): # type: ignore
 				if not isinstance(global_provider, TracerProvider):
 					raise ValueError("Global tracer provider must be an instance of TracerProvider")
 				
@@ -183,10 +192,6 @@ class Client(LangWatchClientProtocol):
 
 			provider = self.__create_new_tracer_provider()
 			trace.set_tracer_provider(provider)
-
-			test_tracer = provider.get_tracer("langwatch-test", __version__)
-			if test_tracer is None:
-				raise RuntimeError("Failed to get tracer from newly created provider")
 				
 			return provider
 			
