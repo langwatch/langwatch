@@ -13,6 +13,7 @@ import * as add_evaluation_labels from "./202408112226_add_evaluation_labels";
 import * as add_span_id_to_evaluations from "./202408232024_add_span_id_to_evaluations";
 import * as add_evaluation_id_migrate_check_id_evaluations from "./202408240457_add_evaluation_id_migrate_check_id_evaluations";
 import * as flatten_span_params from "./202408041216_flatten_span_params";
+import * as flatten_examples_trace from "./202504241534_flatten_examples_trace";
 
 // Create a mapping object with the original filenames as keys
 export const migrations = {
@@ -28,6 +29,7 @@ export const migrations = {
   "202408240457_add_evaluation_id_migrate_check_id_evaluations":
     add_evaluation_id_migrate_check_id_evaluations,
   "202408041216_flatten_span_params": flatten_span_params,
+  "202504241534_flatten_examples_trace": flatten_examples_trace,
 };
 
 // Export the migrations object for use in other modules
