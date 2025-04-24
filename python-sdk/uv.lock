@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = ">=3.9, !=3.9.7, <3.13"
 resolution-markers = [
     "python_full_version >= '3.12.4'",
@@ -2118,6 +2119,7 @@ dependencies = [
     { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "opentelemetry-sdk" },
     { name = "retry" },
+    { name = "termcolor" },
 ]
 
 [package.optional-dependencies]
@@ -2161,7 +2163,7 @@ requires-dist = [
     { name = "coolname", specifier = ">=2.2.0" },
     { name = "dspy-ai", specifier = ">=2.5.2,<3.0.0" },
     { name = "dspy-ai", marker = "extra == 'dspy'", specifier = ">=2.5.2,<3.0.0" },
-    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "httpx", specifier = ">=0.27.0" },
     { name = "litellm", specifier = ">=1.52.1" },
     { name = "openinference-instrumentation-haystack", specifier = ">=0.1.20" },
     { name = "openinference-instrumentation-langchain", specifier = ">=0.1.24" },
@@ -2173,7 +2175,9 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'test'", specifier = ">=7.4.2,<8.0.0" },
     { name = "retry", specifier = ">=0.9.2" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.1" },
+    { name = "termcolor", specifier = ">=3.0.1" },
 ]
+provides-extras = ["dspy", "dev", "test"]
 
 [package.metadata.requires-dev]
 examples = [
@@ -4397,6 +4401,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/cd/94/91fccdb4b8110642462e653d5dcb27e7b674742ad68efd146367da7bdb10/tenacity-9.0.0.tar.gz", hash = "sha256:807f37ca97d62aa361264d497b0e31e92b8027044942bfa756160d908320d73b", size = 47421 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b6/cb/b86984bed139586d01532a587464b5805f12e397594f19f931c4c2fbfa61/tenacity-9.0.0-py3-none-any.whl", hash = "sha256:93de0c98785b27fcf659856aa9f54bfbd399e29969b0621bc7f762bd441b4539", size = 28169 },
+]
+
+[[package]]
+name = "termcolor"
+version = "3.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f8/b6/8e2aaa8aeb570b5cc955cd913b083d96c5447bbe27eaf330dfd7cc8e3329/termcolor-3.0.1.tar.gz", hash = "sha256:a6abd5c6e1284cea2934443ba806e70e5ec8fd2449021be55c280f8a3731b611", size = 12935 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a6/7e/a574ccd49ad07e8b117407bac361f1e096b01f1b620365daf60ff702c936/termcolor-3.0.1-py3-none-any.whl", hash = "sha256:da1ed4ec8a5dc5b2e17476d859febdb3cccb612be1c36e64511a6f2485c10c69", size = 7157 },
 ]
 
 [[package]]
