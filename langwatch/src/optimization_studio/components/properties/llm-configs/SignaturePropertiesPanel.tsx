@@ -224,6 +224,11 @@ export function SignaturePropertiesPanel({
           });
         } catch (error) {
           console.error(error);
+          toaster.error({
+            title: "Failed to migrate legacy node",
+            description:
+              "Please contact support if this issue persists. This should not happen.",
+          });
         }
       })();
       // Set the idRef to the node id to prevent duplicate calls

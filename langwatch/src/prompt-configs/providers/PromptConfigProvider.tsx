@@ -8,6 +8,8 @@ import {
 import { usePromptConfig } from "../hooks/usePromptConfig";
 import type { PromptConfigFormValues } from "../hooks/usePromptConfigForm";
 
+import { toaster } from "~/components/ui/toaster";
+
 interface PromptConfigContextType {
   triggerSaveVersion: (
     configId: string,
@@ -58,15 +60,28 @@ export function PromptConfigProvider({
       updateConfigClosureRef.current = async (
         saveFormValues: SaveDialogFormValues
       ) => {
-        await updatePromptNameIfChanged(configId, updateConfigValues.name);
+        try {
+          await updatePromptNameIfChanged(configId, updateConfigValues.name);
 
-        await createNewVersion(
-          configId,
-          updateConfigValues.version.configData,
-          saveFormValues.commitMessage
-        );
+          const version = await createNewVersion(
+            configId,
+            updateConfigValues.version.configData,
+            saveFormValues.commitMessage
+          );
 
-        closeDialog();
+          closeDialog();
+
+          toaster.success({
+            title: "Version saved",
+            description: `Version ${version.version} has been saved successfully.`,
+          });
+        } catch (error) {
+          console.error(error);
+          toaster.error({
+            title: "Failed to save version",
+            description: "Please try again.",
+          });
+        }
       };
 
       openDialog();
