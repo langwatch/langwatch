@@ -1,4 +1,4 @@
-import { Separator, HStack } from "@chakra-ui/react";
+import { Separator, HStack, Text } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useCallback, useMemo } from "react";
 import { FormProvider } from "react-hook-form";
@@ -9,6 +9,7 @@ import { BasePropertiesPanel } from "../BasePropertiesPanel";
 
 import { PromptSource } from "./prompt-source-select/PromptSource";
 
+import { toaster } from "~/components/ui/toaster";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
@@ -129,7 +130,7 @@ function SignaturePropertiesPanelInner({ node }: { node: Node<Signature> }) {
  */
 export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
   return (
-    <PromptConfigProvider configId={node.data.configId}>
+    <PromptConfigProvider>
       <SignaturePropertiesPanelInner node={node} />
     </PromptConfigProvider>
   );
@@ -152,12 +153,18 @@ function PromptSourceHeader({
 }: {
   node: Node<Signature>;
   onPromptSourceSelect: (config: { id: string; name: string }) => void;
-  triggerSaveVersion: (formValues: PromptConfigFormValues) => void;
+  triggerSaveVersion: (
+    configId: string,
+    formValues: PromptConfigFormValues
+  ) => void;
   values: PromptConfigFormValues;
 }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const configId = node.data.configId;
+  const { setNode } = useWorkflowStore((state) => ({
+    setNode: state.setNode,
+  }));
 
   // Fetch the saved configuration to compare with current node data
   const { data: savedConfig } =
@@ -169,6 +176,9 @@ function PromptSourceHeader({
       { enabled: !!configId && !!projectId }
     );
 
+  const { mutateAsync: createConfig } =
+    api.llmConfigs.createConfigWithInitialVersion.useMutation();
+
   /**
    * Determines if the current node data has changed from the saved configuration
    * Used to enable/disable the save button
@@ -179,8 +189,51 @@ function PromptSourceHeader({
     return !isEqual(node.data, savedConfigData);
   }, [node.data, savedConfig]);
 
+  const handleSaveVersion = async () => {
+    // If no saved config, we will need to create a new one
+    if (!savedConfig) {
+      try {
+        const newConfig = await createConfig({
+          projectId,
+          name: node.data.name,
+        });
+
+        // Update the node data with the new config ID
+        setNode({
+          ...node,
+          data: {
+            ...node.data,
+            configId: newConfig.id,
+          },
+        });
+
+        // Trigger the save version mutation for the new config
+        triggerSaveVersion(newConfig.id, values);
+      } catch (error) {
+        console.error(error);
+        toaster.error({
+          title: "Failed to save prompt version",
+          description: "Please try again.",
+        });
+      }
+    } else {
+      triggerSaveVersion(configId, values);
+    }
+  };
+
   return (
-    <VerticalFormControl label="Prompt Source" width="full">
+    <VerticalFormControl
+      label="Source Prompt"
+      width="full"
+      helper={
+        !savedConfig && (
+          <Text fontSize="sm" color="red.500">
+            This node's source prompt was deleted. Please save a new prompt
+            version to continue using this configuration.
+          </Text>
+        )
+      }
+    >
       <HStack justifyContent="space-between">
         <HStack flex={1} width="50%">
           <PromptSource configId={configId} onSelect={onPromptSourceSelect} />
@@ -189,8 +242,8 @@ function PromptSourceHeader({
           <VersionHistoryButton configId={node.data.configId} />
         )}
         <VersionSaveButton
-          disabled={!hasDrifted}
-          onClick={() => void triggerSaveVersion(values)}
+          disabled={savedConfig && !hasDrifted}
+          onClick={() => void handleSaveVersion()}
         />
       </HStack>
     </VerticalFormControl>

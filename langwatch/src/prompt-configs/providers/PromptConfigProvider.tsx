@@ -9,7 +9,10 @@ import { usePromptConfig } from "../hooks/usePromptConfig";
 import type { PromptConfigFormValues } from "../hooks/usePromptConfigForm";
 
 interface PromptConfigContextType {
-  triggerSaveVersion: (updateConfigValues: PromptConfigFormValues) => void;
+  triggerSaveVersion: (
+    configId: string,
+    updateConfigValues: PromptConfigFormValues
+  ) => void;
 }
 
 const PromptConfigContext = createContext<PromptConfigContextType>({
@@ -29,10 +32,8 @@ export const usePromptConfigContext = () => {
 };
 
 export function PromptConfigProvider({
-  configId,
   children,
 }: {
-  configId: string;
   children: React.ReactNode;
 }) {
   // Dialog state
@@ -43,9 +44,7 @@ export function PromptConfigProvider({
   } = useDisclosure();
 
   // Prompt config state
-  const { updatePromptNameIfChanged, createNewVersion } = usePromptConfig({
-    configId,
-  });
+  const { updatePromptNameIfChanged, createNewVersion } = usePromptConfig();
 
   // Closure to save the function that will do the saving
   const updateConfigClosureRef = useRef<
@@ -53,15 +52,16 @@ export function PromptConfigProvider({
   >(null);
 
   const triggerSaveVersion = useCallback(
-    (updateConfigValues: PromptConfigFormValues) => {
+    (configId: string, updateConfigValues: PromptConfigFormValues) => {
       // Save a ref to the function that will do the saving
       // with the saveFormValues enclosed in the closure
       updateConfigClosureRef.current = async (
         saveFormValues: SaveDialogFormValues
       ) => {
-        await updatePromptNameIfChanged(updateConfigValues.name);
+        await updatePromptNameIfChanged(configId, updateConfigValues.name);
 
         await createNewVersion(
+          configId,
           updateConfigValues.version.configData,
           saveFormValues.commitMessage
         );

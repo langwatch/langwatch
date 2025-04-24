@@ -11,43 +11,34 @@ import { api } from "~/utils/api";
  * with a simplified interface.
  * Enforces refresh of queries when mutations are successful.
  */
-export const usePromptConfig = ({ configId }: { configId: string }) => {
+export const usePromptConfig = () => {
+  const trpc = api.useContext();
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
-  // This is only so we can refetch the prompt configs list when a new version is created
-  // Otherwise the rest of this logic is config specific
-  const getPromptConfigsQuery = api.llmConfigs.getPromptConfigs.useQuery(
-    { projectId },
-    { enabled: !!projectId }
-  );
   const updateConfig = api.llmConfigs.updatePromptConfig.useMutation();
   const createVersion = api.llmConfigs.versions.create.useMutation();
 
-  const promptConfigQuery = api.llmConfigs.getByIdWithLatestVersion.useQuery(
-    { projectId, id: configId },
-    { enabled: false } // We don't want to fetch the prompt config, we only want to refetch it when a new version is created
-  );
-  const versionHistoryQuery =
-    api.llmConfigs.versions.getVersionsForConfigById.useQuery(
-      { projectId, configId },
-      { enabled: false } // We don't want to fetch the version history, we only want to refetch it when a new version is created
-    );
-
-  const updatePromptNameIfChanged = async (name: string) => {
-    if (!promptConfigQuery.data) return;
-    if (promptConfigQuery.data.name === name) return;
+  const updatePromptNameIfChanged = async (configId: string, name: string) => {
+    const promptConfig =
+      await trpc.client.llmConfigs.getByIdWithLatestVersion.query({
+        projectId,
+        id: configId,
+      });
+    if (!promptConfig) return;
+    if (promptConfig.name === name) return;
 
     const config = await updateConfig.mutateAsync({
       projectId,
       id: configId,
       name,
     });
-    await getPromptConfigsQuery.refetch();
-    await promptConfigQuery.refetch();
+    await trpc.llmConfigs.getPromptConfigs.invalidate();
+    await trpc.llmConfigs.getByIdWithLatestVersion.invalidate();
     return config;
   };
 
   const createNewVersion = async (
+    configId: string,
     configData: LatestConfigVersionSchema["configData"],
     commitMessage: string
   ) => {
@@ -59,21 +50,16 @@ export const usePromptConfig = ({ configId }: { configId: string }) => {
       schemaVersion: SchemaVersion.V1_0,
     });
 
-    await getPromptConfigsQuery.refetch();
-    await versionHistoryQuery.refetch();
-    await promptConfigQuery.refetch();
+    await trpc.llmConfigs.getPromptConfigs.invalidate();
+    await trpc.llmConfigs.versions.getVersionsForConfigById.invalidate();
+    await trpc.llmConfigs.getByIdWithLatestVersion.invalidate();
 
     return version;
   };
 
   return {
-    promptConfig: promptConfigQuery.data,
     updatePromptNameIfChanged,
     createNewVersion,
-    isLoading:
-      updateConfig.isLoading ||
-      createVersion.isLoading ||
-      promptConfigQuery.isLoading ||
-      promptConfigQuery.isRefetching,
+    isLoading: updateConfig.isLoading || createVersion.isLoading,
   };
 };
