@@ -36,12 +36,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dspy = ["dspy-ai>=2.5.2,<3.0.0"]
-dev = [
-    "ruff>=0.11.1",
-]
-test = [
-    "pytest>=7.4.2,<8.0.0",
-]
+dev = ["ruff>=0.11.1"]
+test = ["pytest>=7.4.2,<8.0.0"]
 
 [build-system]
 requires = ["hatchling"]
@@ -64,10 +60,11 @@ examples = [
     "langchain-text-splitters>=0.3.0,<0.4.0",
     "langchain-google-vertexai>=1.0.7",
     "openinference-instrumentation-dspy>=0.1.12,<0.2.0",
+    "opentelemetry-instrumentation-fastapi>=0.53b1",
     "langgraph>=0.2.35,<0.3.0",
     "nanoid>=2.0.0",
     "openai>=1.68.2",
-    "pydantic>=1,<2.10.2", # v2.10.2 is broken for chainlit
+    "pydantic>=1,<2.10.2",                               # v2.10.2 is broken for chainlit
     "pytest>=7.4.2,<8.0.0",
     "python-dotenv==1.0.1",
     "streamlit>=1.37.1,<2.0.0",

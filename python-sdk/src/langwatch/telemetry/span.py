@@ -2,17 +2,56 @@ from copy import deepcopy
 import functools
 import json
 from warnings import warn
-from typing import List, Literal, Optional, Callable, Any, Type, TypeVar, Dict, Union, TYPE_CHECKING, cast
+from typing import (
+    List,
+    Literal,
+    Optional,
+    Callable,
+    Any,
+    Type,
+    TypeVar,
+    Dict,
+    Union,
+    TYPE_CHECKING,
+    cast,
+)
 from uuid import UUID
 import threading
 import inspect
 
 from langwatch.attributes import AttributeName
-from langwatch.utils.transformation import SerializableWithStringFallback, rag_contexts, convert_typed_values, truncate_object_recursively
-from opentelemetry import trace as trace_api, context
-from opentelemetry.trace import SpanKind, Context, _Links, Span as OtelSpan, Status, StatusCode, set_span_in_context, get_current_span, SpanContext
+from langwatch.utils.transformation import (
+    SerializableWithStringFallback,
+    rag_contexts,
+    convert_typed_values,
+    truncate_object_recursively,
+)
+from opentelemetry import trace as trace_api, context as context_api
+from opentelemetry.trace import (
+    SpanKind,
+    _Links,
+    Span as OtelSpan,
+    Status,
+    StatusCode,
+    get_current_span,
+    SpanContext,
+    set_span_in_context,
+)
+from opentelemetry.context import Context
 
-from langwatch.domain import ChatMessage, Conversation, EvaluationTimestamps, Money, MoneyDict, SpanInputOutput, SpanMetrics, SpanParams, SpanTimestamps, RAGChunk, SpanTypes
+from langwatch.domain import (
+    ChatMessage,
+    Conversation,
+    EvaluationTimestamps,
+    Money,
+    MoneyDict,
+    SpanInputOutput,
+    SpanMetrics,
+    SpanParams,
+    SpanTimestamps,
+    RAGChunk,
+    SpanTypes,
+)
 from langwatch.telemetry.types import SpanType, SpanInputType, ContextsType
 from langwatch.__version__ import __version__
 from .context import stored_langwatch_span, stored_langwatch_trace, get_current_trace
@@ -25,19 +64,20 @@ __all__ = ["span", "LangWatchSpan"]
 
 T = TypeVar("T", bound=Callable[..., Any])
 
+
 class LangWatchSpan:
     """A wrapper around the OpenTelemetry Span that adds LangWatch specific methods.
 
     This class extends OpenTelemetry's span functionality with LangWatch-specific features
     like input/output capture, model tracking, and context management."""
 
-    span: Type['LangWatchSpan']
+    span: Type["LangWatchSpan"]
 
     def __init__(
         self,
-        trace: Optional['LangWatchTrace'] = None,
+        trace: Optional["LangWatchTrace"] = None,
         span_id: Optional[Union[str, UUID]] = None,
-        parent: Optional[Union[OtelSpan, 'LangWatchSpan']] = None,
+        parent: Optional[Union[OtelSpan, "LangWatchSpan"]] = None,
         capture_input: bool = True,
         capture_output: bool = True,
         name: Optional[str] = None,
@@ -50,12 +90,13 @@ class LangWatchSpan:
         model: Optional[str] = None,
         params: Optional[SpanParams] = None,
         metrics: Optional[SpanMetrics] = None,
-        evaluations: Optional[List[Any]] = None,  # Keep this generic for backward compatibility
+        evaluations: Optional[
+            List[Any]
+        ] = None,  # Keep this generic for backward compatibility
         ignore_missing_trace_warning: bool = False,
-
         # OpenTelemetry parameters
         kind: SpanKind = SpanKind.INTERNAL,
-        span_context: Optional[Context] = None,
+        span_context: Optional[context_api.Context] = None,
         attributes: Optional[Dict[str, Any]] = None,
         links: Optional[_Links] = None,
         start_time: Optional[int] = None,
@@ -67,14 +108,14 @@ class LangWatchSpan:
         attributes = attributes or {}
 
         if span_id is not None:
-            warn("span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the spans's metadata.")
+            warn(
+                "span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the spans's metadata."
+            )
             attributes[AttributeName.DeprecatedSpanId] = str(span_id)
 
         # Initialize critical instance attributes first
         self._lock = threading.Lock()
         self._span = None
-        self._context_token = None
-        self._otel_context = None  # Store the context itself instead of just the token
         self._cleaned_up = False
 
         # Initialize other attributes
@@ -94,7 +135,9 @@ class LangWatchSpan:
         self.params = params
         self.metrics = metrics
         self.evaluations = evaluations
-        self._span_id = span_id or f"{type}_{id(self)}"  # Add a unique identifier for logging
+        self._span_id = (
+            span_id or f"{type}_{id(self)}"
+        )  # Add a unique identifier for logging
 
         # Store OpenTelemetry-specific parameters
         self.kind = kind
@@ -106,7 +149,10 @@ class LangWatchSpan:
         self.set_status_on_exception = set_status_on_exception
 
         self.span = cast(
-            Type['LangWatchSpan'], lambda **kwargs: LangWatchSpan(trace=trace or stored_langwatch_trace.get(None), **kwargs)
+            Type["LangWatchSpan"],
+            lambda **kwargs: LangWatchSpan(
+                trace=trace or stored_langwatch_trace.get(None), **kwargs
+            ),
         )
 
         if self.trace:
@@ -114,12 +160,15 @@ class LangWatchSpan:
 
     def _create_span(self):
         """Internal method to create and start the OpenTelemetry span."""
+        # print stack trace
         try:
             if self.trace:
                 tracer = self.trace.tracer
             else:
                 if not self.ignore_missing_trace_warning:
-                    warn("No current trace found, some spans will not be sent to LangWatch")
+                    warn(
+                        "No current trace found, some spans will not be sent to LangWatch"
+                    )
                 tracer = trace_api.get_tracer("langwatch", __version__)
 
             if not tracer:
@@ -136,29 +185,32 @@ class LangWatchSpan:
                 else:
                     # If still no parent, use the current span from OpenTelemetry context
                     parent = get_current_span()
-
+            parent_span_context: Optional[Context] = None
             if parent is not None:
-                if isinstance(parent, LangWatchSpan):
-                    parent = parent._span
+                if isinstance(parent, LangWatchSpan) and parent._span is not None:
+                    parent_span_context = set_span_in_context(parent._span)
 
             # Create the underlying OpenTelemetry span
             try:
-                self._span = tracer.start_span(
+                self._span_context = tracer.start_as_current_span(
                     name=self.name or self.type,
-                    context=self.span_context,
+                    context=self.span_context or parent_span_context,
                     kind=self.kind,
                     links=self.links,
                     start_time=self.start_time,
                     record_exception=self.record_exception,
                     set_status_on_exception=self.set_status_on_exception,
                 )
+                self._span = self._span_context.__enter__()
 
                 if not self._span:
                     warn("Failed to create span - got None from tracer")
                     return
 
             except Exception as e:
-                warn(f"Failed to create span: {str(e)}. Span operations will be no-ops.")
+                warn(
+                    f"Failed to create span: {str(e)}. Span operations will be no-ops."
+                )
                 return
 
             try:
@@ -178,30 +230,10 @@ class LangWatchSpan:
             except Exception as e:
                 warn(f"Failed to update span attributes: {str(e)}")
 
-            try:
-                # Set our LangWatch context
-                self._context_token = stored_langwatch_span.set(self)
-                
-                # Instead of using OpenTelemetry's context management directly,
-                # we'll store the span in a way that survives async boundaries
-                try:
-                    # Create a new context with our span
-                    new_context = set_span_in_context(self._span)
-                    # Store the context itself rather than attaching it
-                    self._otel_context = new_context
-                    # We still need to attach it for OpenTelemetry's APIs to work
-                    # but we won't try to detach it later since that's causing issues
-                    context.attach(new_context)
-                except Exception as e:
-                    warn(f"Failed to set OpenTelemetry context (span will still work): {e}")
-                    self._otel_context = None
-            except Exception as e:
-                warn(f"Failed to set LangWatch span context: {e}")
-                self._context_token = None
-                self._otel_context = None
-
         except Exception as e:
-            warn(f"Unexpected error creating span: {str(e)}. Span operations will be no-ops.")
+            warn(
+                f"Unexpected error creating span: {str(e)}. Span operations will be no-ops."
+            )
 
     def record_error(self, error: Exception) -> None:
         """Record an error in this span."""
@@ -255,7 +287,7 @@ class LangWatchSpan:
         except Exception as e:
             warn(f"Failed to update name on span: {str(e)}")
 
-    def get_span_context(self) -> SpanContext:
+    def get_span_context(self) -> Optional[SpanContext]:
         """Get the span context of this span."""
         if self._span is None:
             warn("Cannot get span context - no span available")
@@ -288,7 +320,9 @@ class LangWatchSpan:
         if name is not None:
             self.update_name(name)
         if span_id is not None:
-            warn("span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the spans's metadata.")
+            warn(
+                "span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the spans's metadata."
+            )
             attributes[AttributeName.DeprecatedSpanId] = str(span_id)
         if type is not None:
             attributes[AttributeName.LangWatchSpanType] = str(type)
@@ -296,33 +330,38 @@ class LangWatchSpan:
             attributes[AttributeName.LangWatchInput] = json.dumps(
                 truncate_object_recursively(
                     convert_typed_values(deepcopy(input)),
-                    max_string_length=(self.trace or get_current_trace()).max_string_length,
+                    max_string_length=(
+                        self.trace or get_current_trace()
+                    ).max_string_length,
                 ),
-                cls=SerializableWithStringFallback
+                cls=SerializableWithStringFallback,
             )
         if self.capture_output and output is not None:
             attributes[AttributeName.LangWatchOutput] = json.dumps(
                 truncate_object_recursively(
                     convert_typed_values(deepcopy(output)),
-                    max_string_length=(self.trace or get_current_trace()).max_string_length,
+                    max_string_length=(
+                        self.trace or get_current_trace()
+                    ).max_string_length,
                 ),
-                cls=SerializableWithStringFallback
+                cls=SerializableWithStringFallback,
             )
         if error is not None:
             self.record_error(error)
         if timestamps is not None:
             self.timestamps = timestamps
             attributes[AttributeName.LangWatchTimestamps] = json.dumps(
-                timestamps,
-                cls=SerializableWithStringFallback
+                timestamps, cls=SerializableWithStringFallback
             )
         if contexts is not None:
             attributes[AttributeName.LangWatchRAGContexts] = json.dumps(
                 truncate_object_recursively(
                     rag_contexts(contexts),
-                    max_string_length=(self.trace or get_current_trace()).max_string_length,
+                    max_string_length=(
+                        self.trace or get_current_trace()
+                    ).max_string_length,
                 ),
-                cls=SerializableWithStringFallback
+                cls=SerializableWithStringFallback,
             )
         if model is not None:
             attributes[AttributeName.GenAIRequestModel] = model
@@ -330,15 +369,13 @@ class LangWatchSpan:
             params = deepcopy(params)
             self.params = {**(self.params or {}), **params}
             attributes[AttributeName.LangWatchParams] = json.dumps(
-                self.params,
-                cls=SerializableWithStringFallback
+                self.params, cls=SerializableWithStringFallback
             )
         if metrics is not None:
             metrics = deepcopy(metrics)
             self.metrics = {**(self.metrics or {}), **metrics}
             attributes[AttributeName.LangWatchMetrics] = json.dumps(
-                self.metrics,
-                cls=SerializableWithStringFallback
+                self.metrics, cls=SerializableWithStringFallback
             )
 
         self.set_attributes(attributes)
@@ -361,6 +398,7 @@ class LangWatchSpan:
     ):
 
         from langwatch import evaluations
+
         return evaluations.add_evaluation(
             span=self,
             evaluation_id=evaluation_id,
@@ -393,6 +431,7 @@ class LangWatchSpan:
         conversation = conversation or []
 
         from langwatch import evaluations
+
         return evaluations.evaluate(
             span=self,
             slug=slug,
@@ -422,6 +461,7 @@ class LangWatchSpan:
         conversation = conversation or []
 
         from langwatch import evaluations
+
         return await evaluations.async_evaluate(
             span=self,
             slug=slug,
@@ -465,7 +505,8 @@ class LangWatchSpan:
             metrics=metrics,
             **kwargs,
         )
-        self._span.end(end_time)
+        if self._span:
+            self._span_context.__exit__(None, error, None)
 
     def _get_span_params(self, func_name: Optional[str] = None) -> Dict[str, Any]:
         """Helper method to get common span parameters."""
@@ -489,7 +530,6 @@ class LangWatchSpan:
             "metrics": self.metrics,
             "evaluations": self.evaluations,
             "ignore_missing_trace_warning": self.ignore_missing_trace_warning,
-
             # Pass through OpenTelemetry parameters
             "kind": self.kind,
             "span_context": self.span_context,
@@ -504,9 +544,10 @@ class LangWatchSpan:
         """Makes the span callable as a decorator."""
 
         if inspect.isasyncgenfunction(func):
+
             @functools.wraps(func)
-            async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                with self:
+            async def async_gen_wrapper(*args: Any, **kwargs: Any) -> Any:
+                async with self:
                     self._set_callee_input_information(func, *args, **kwargs)
                     items = []
                     async for item in func(*args, **kwargs):
@@ -519,10 +560,12 @@ class LangWatchSpan:
                         else items
                     )
                     self._set_callee_output_information(func, output)
-            return wrapper
+
+            return cast(T, async_gen_wrapper)
         elif inspect.isgeneratorfunction(func):
+
             @functools.wraps(func)
-            def wrapper(*args: Any, **kwargs: Any):
+            def sync_gen_wrapper(*args: Any, **kwargs: Any):
                 with self:
                     self._set_callee_input_information(func, *args, **kwargs)
                     items = []
@@ -536,48 +579,45 @@ class LangWatchSpan:
                         else items
                     )
                     self._set_callee_output_information(func, output)
-            return wrapper
+
+            return cast(T, sync_gen_wrapper)
         elif inspect.iscoroutinefunction(func):
-            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 async with self:
                     self._set_callee_input_information(func, *args, **kwargs)
                     output = await func(*args, **kwargs)
                     self._set_callee_output_information(func, output)
                     return output
-            return wrapper
+
+            return cast(T, async_wrapper)
         else:
+
             @functools.wraps(func)
-            def wrapper(*args: Any, **kwargs: Any) -> Any:
+            def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
                 with self:
                     self._set_callee_input_information(func, *args, **kwargs)
                     output = func(*args, **kwargs)
                     self._set_callee_output_information(func, output)
                     return output
-            return wrapper
 
-    def _cleanup(self) -> None:
+            return cast(T, sync_wrapper)
+
+    def _cleanup(
+        self,
+        exc_type: Optional[type],
+        exc_value: Optional[BaseException],
+        traceback: Any,
+    ) -> None:
         """Internal method to cleanup resources with proper locking."""
         with self._lock:
             if self._cleaned_up:
                 return
-            
-            if self._context_token is not None:
-                try:
-                    stored_langwatch_span.reset(self._context_token)
-                except Exception as e:
-                    # Only warn if it's not a context error
-                    if "different Context" not in str(e):
-                        warn(f"Failed to reset LangWatch span context: {e}")
-                finally:
-                    self._context_token = None
-
-            # We're no longer trying to detach the OpenTelemetry context
-            # since that's what's causing the cross-context issues
-            self._otel_context = None
 
             if self._span is not None:
                 try:
-                    self._span.end()
+                    self._span_context.__exit__(exc_type, exc_value, traceback)
                 except Exception as e:
                     warn(f"Failed to end span: {e}")
                 finally:
@@ -585,66 +625,88 @@ class LangWatchSpan:
 
             self._cleaned_up = True
 
-    def __enter__(self) -> 'LangWatchSpan':
+    def __enter__(self) -> "LangWatchSpan":
         """Makes the span usable as a context manager."""
         self.trace = self.trace or stored_langwatch_trace.get(None)
         if not self.ignore_missing_trace_warning and not self.trace:
             warn("No current trace found, some spans will may not be sent to LangWatch")
-        self._create_span()
 
+        self._create_span()
         self.span = cast(
-            Type['LangWatchSpan'], lambda **kwargs: LangWatchSpan(trace=self.trace or stored_langwatch_trace.get(None), **kwargs)
+            Type["LangWatchSpan"],
+            lambda **kwargs: LangWatchSpan(
+                trace=self.trace or stored_langwatch_trace.get(None), **kwargs
+            ),
         )
 
         return self
 
-    def __exit__(self, exc_type: Optional[type], exc_value: Optional[BaseException], traceback: Any) -> bool:
+    def __exit__(
+        self,
+        exc_type: Optional[type],
+        exc_value: Optional[BaseException],
+        traceback: Any,
+    ) -> bool:
         """Exit the span context, recording any errors that occurred."""
         try:
-            if exc_value is not None:
+            # Fix: Check if exc_value is an Exception before recording
+            if exc_value is not None and isinstance(exc_value, Exception):
                 self.record_error(exc_value)
         finally:
-            self._cleanup()
+            self._cleanup(exc_type, exc_value, traceback)
         return False  # Don't suppress exceptions
 
-    async def __aenter__(self) -> 'LangWatchSpan':
+    async def __aenter__(self) -> "LangWatchSpan":
         """Makes the span usable as an async context manager."""
         self.trace = self.trace or stored_langwatch_trace.get(None)
         if not self.ignore_missing_trace_warning and not self.trace:
             warn("No current trace found, some spans may not be sent to LangWatch")
-        self._create_span()
 
+        self._create_span()
         self.span = cast(
-            Type['LangWatchSpan'], lambda **kwargs: LangWatchSpan(trace=self.trace or stored_langwatch_trace.get(None), **kwargs)
+            Type["LangWatchSpan"],
+            lambda **kwargs: LangWatchSpan(
+                trace=self.trace or stored_langwatch_trace.get(None), **kwargs
+            ),
         )
 
         return self
 
-    async def __aexit__(self, exc_type: Optional[type], exc_value: Optional[BaseException], traceback: Any) -> bool:
+    async def __aexit__(
+        self,
+        exc_type: Optional[type],
+        exc_value: Optional[BaseException],
+        traceback: Any,
+    ) -> bool:
         """Exit the async span context, recording any errors that occurred."""
         try:
-            if exc_value is not None:
+            # Fix: Check if exc_value is an Exception before recording
+            if exc_value is not None and isinstance(exc_value, Exception):
                 self.record_error(exc_value)
         finally:
-            self._cleanup()
+            self._cleanup(exc_type, exc_value, traceback)
         return False  # Don't suppress exceptions
 
     def __del__(self):
         """Ensure span context is cleaned up if object is garbage collected."""
-        self._cleanup()
+        self._cleanup(None, None, None)
 
     def __getattr__(self, name: str) -> Any:
         """Forward all other methods to the underlying span."""
         try:
-            span = object.__getattribute__(self, '_span')
+            span = object.__getattribute__(self, "_span")
         except AttributeError:
             span = None
 
         if span is None:
-            raise AttributeError(f"'LangWatchSpan' object has no attribute '{name}' and no underlying span")
+            raise AttributeError(
+                f"'LangWatchSpan' object has no attribute '{name}' and no underlying span"
+            )
         return getattr(span, name)
 
-    def _set_callee_input_information(self, func: Callable[..., Any], *args: Any, **kwargs: Any):
+    def _set_callee_input_information(
+        self, func: Callable[..., Any], *args: Any, **kwargs: Any
+    ):
         """Set the name and input of the span based on the callee function and arguments."""
 
         sig = inspect.signature(func)
@@ -655,11 +717,7 @@ class LangWatchSpan:
         }
 
         # Skip self parameters because it doesn't really help with debugging, becomes just noise
-        if (
-            "self" in all_args
-            and len(all_args) > 0
-            and parameters[0].name == "self"
-        ):
+        if "self" in all_args and len(all_args) > 0 and parameters[0].name == "self":
             self_ = all_args["self"]
             if self.name is None:
                 try:
@@ -693,7 +751,9 @@ class LangWatchSpan:
         self.update(output=convert_typed_values(output))
 
     @staticmethod
-    def wrap_otel_span(otel_span: 'trace_api.Span', trace: Optional['LangWatchTrace'] = None) -> 'LangWatchSpan':
+    def wrap_otel_span(
+        otel_span: "trace_api.Span", trace: Optional["LangWatchTrace"] = None
+    ) -> "LangWatchSpan":
         """Wrap an existing OpenTelemetry span in a LangWatchSpan.
         This creates a LangWatchSpan that references the existing OpenTelemetry span
         without creating a new one.
@@ -718,8 +778,6 @@ class LangWatchSpan:
         span.type = "span"
         span.ignore_missing_trace_warning = True
         span._span = otel_span
-        span._context_token = None
-        span._otel_context = None
         span._lock = threading.Lock()
         span._cleaned_up = False
         # TODO(afr): Check if this is correct
@@ -728,8 +786,9 @@ class LangWatchSpan:
 
         return span
 
+
 def span(
-    trace: Optional['LangWatchTrace'] = None,
+    trace: Optional["LangWatchTrace"] = None,
     parent: Optional[Union[OtelSpan, LangWatchSpan]] = None,
     span_id: Optional[Union[str, UUID]] = None,
     name: Optional[str] = None,
@@ -746,7 +805,6 @@ def span(
     metrics: Optional[SpanMetrics] = None,
     evaluations: Optional[List[Any]] = None,
     ignore_missing_trace_warning: bool = False,
-
     # OpenTelemetry parameters
     kind: SpanKind = SpanKind.INTERNAL,
     span_context: Optional[Context] = None,
@@ -794,7 +852,7 @@ def span(
 
     return LangWatchSpan(
         name=name,
-        type=type,
+        type=type or "span",
         trace=trace,
         parent=parent,
         span_id=span_id,

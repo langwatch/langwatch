@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 load_dotenv()
 
 import os
+import langwatch
 from fastapi import FastAPI
 from openai import OpenAI
 from pydantic import BaseModel
@@ -45,20 +46,22 @@ class EndpointParams(BaseModel):
 
 
 @app.post("/")
+@langwatch.trace(name="fastapi_sample_endpoint")
 def fastapi_sample_endpoint(params: EndpointParams):
-    with tracer.start_as_current_span("fastapi_sample_endpoint"):
-        completion = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.",
-                },
-                {"role": "user", "content": params.input},
-            ],
-        )
+    langwatch.get_current_trace().autotrack_openai_calls(client)
 
-        return completion.choices[0].message.content
+    completion = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.",
+            },
+            {"role": "user", "content": params.input},
+        ],
+    )
+
+    return completion.choices[0].message.content
 
 
 def call_fastapi_sample_endpoint(input: str) -> str:
