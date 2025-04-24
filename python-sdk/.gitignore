@@ -1,2 +1,5 @@
 .files/
 .chainlit/
+.env
+.ruff_cache/
+.vscode/
