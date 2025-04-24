@@ -26,7 +26,6 @@ class LLMNode(dspy.Module):
         nested_predict.__class__ = PredictWithMetadata
 
         if lm is not None:
-            dspy.settings.configure(experimental=True)
             nested_predict.set_lm(lm=lm)
         nested_predict.demos = demos
         # LabeledFewShot patch
