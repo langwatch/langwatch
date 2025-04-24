@@ -318,6 +318,7 @@ class LangWatchSpan:
         attributes = dict(kwargs)
 
         if name is not None:
+            self.name = name
             self.update_name(name)
         if span_id is not None:
             warn(
@@ -325,8 +326,10 @@ class LangWatchSpan:
             )
             attributes[AttributeName.DeprecatedSpanId] = str(span_id)
         if type is not None:
+            self.type = type
             attributes[AttributeName.LangWatchSpanType] = str(type)
         if self.capture_input and input is not None:
+            self.input = input
             attributes[AttributeName.LangWatchInput] = json.dumps(
                 truncate_object_recursively(
                     convert_typed_values(deepcopy(input)),
@@ -337,6 +340,7 @@ class LangWatchSpan:
                 cls=SerializableWithStringFallback,
             )
         if self.capture_output and output is not None:
+            self.output = output
             attributes[AttributeName.LangWatchOutput] = json.dumps(
                 truncate_object_recursively(
                     convert_typed_values(deepcopy(output)),
@@ -347,6 +351,7 @@ class LangWatchSpan:
                 cls=SerializableWithStringFallback,
             )
         if error is not None:
+            self.error = error
             self.record_error(error)
         if timestamps is not None:
             self.timestamps = timestamps
@@ -354,6 +359,7 @@ class LangWatchSpan:
                 timestamps, cls=SerializableWithStringFallback
             )
         if contexts is not None:
+            self.contexts = contexts
             attributes[AttributeName.LangWatchRAGContexts] = json.dumps(
                 truncate_object_recursively(
                     rag_contexts(contexts),
@@ -364,6 +370,7 @@ class LangWatchSpan:
                 cls=SerializableWithStringFallback,
             )
         if model is not None:
+            self.model = model
             attributes[AttributeName.GenAIRequestModel] = model
         if params is not None:
             params = deepcopy(params)

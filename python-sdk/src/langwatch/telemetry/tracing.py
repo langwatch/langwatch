@@ -34,7 +34,7 @@ class LangWatchTrace:
 
     _root_span_params: Optional[Dict[str, Any]] = None
     root_span: Optional[LangWatchSpan] = None
-    span: Optional[LangWatchSpan] = None
+    span: type[LangWatchSpan]
     evaluations: List[Evaluation] = []
 
     def __init__(
@@ -67,6 +67,7 @@ class LangWatchTrace:
     ):
         ensure_setup(api_key=api_key)
 
+        self.metadata = metadata
         self.api_key = api_key
         self.max_string_length = max_string_length
         self._context_token = None
@@ -78,10 +79,10 @@ class LangWatchTrace:
         )
 
         if metadata is None:
-            metadata = {}
+            self.metadata = {}
         if trace_id is not None:
             warn("trace_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `trace_id` will be mapped to `deprecated.trace_id` in the trace's metadata.")
-            metadata["deprecated.trace_id"] = trace_id
+            self.metadata["deprecated.trace_id"] = trace_id
 
         if disable_sending:
             client = get_instance()
@@ -97,7 +98,7 @@ class LangWatchTrace:
         self.tracer = trace_api.get_tracer(
             instrumenting_module_name="langwatch",
             instrumenting_library_version=__version__,
-            attributes=metadata,
+            attributes=self.metadata,
         )
 
         # Store root span parameters for later creation
@@ -541,6 +542,7 @@ class LangWatchTrace:
         if self._root_span_params is not None:
             if self.root_span.name is None:
                 self.root_span.update_name(func.__name__)
+
             if self.root_span.capture_input is False or self.root_span.output is not None:
                 return
 
@@ -563,6 +565,12 @@ class LangWatchTrace:
         client = get_instance()
         if client is not None:
             client.disable_sending = value
+
+    @deprecated(
+        reason="Setting the current span is deprecated, this call is now redundant as creating a new span will automatically set it as the current span."
+    )
+    def set_current_span(self, span: Any):
+        self.current_span = span
 
 
 def trace(

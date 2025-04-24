@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional, Union, cast, TYPE_CHECKING
+from typing import Any, Dict, List, Literal, Optional, Union, cast, TYPE_CHECKING
 from uuid import UUID
 from warnings import warn
 
@@ -48,7 +48,7 @@ def evaluate(
     contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
     expected_contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
     conversation: Optional[Conversation] = None,
-    settings: Optional[dict] = None,
+    settings: Optional[Dict[str, Any]] = None,
     as_guardrail: bool = False,
     trace: Optional["LangWatchTrace"] = None,
     span: Optional["LangWatchSpan"] = None,
@@ -79,6 +79,8 @@ def evaluate(
             return handle_exception(e, span, as_guardrail)
 
         return handle_response(response.json(), span, as_guardrail)
+    
+    raise ValueError("Evaluate failed due to issue creating span")
 
 
 async def async_evaluate(
@@ -90,7 +92,7 @@ async def async_evaluate(
     contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
     expected_contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
     conversation: Optional[Conversation] = None,
-    settings: Optional[dict] = None,
+    settings: Optional[Dict[str, Any]] = None,
     as_guardrail: bool = False,
     trace: Optional["LangWatchTrace"] = None,
     span: Optional["LangWatchSpan"] = None,
@@ -122,6 +124,8 @@ async def async_evaluate(
 
         return handle_response(response.json(), span, as_guardrail)
 
+    raise ValueError("Async evaluate failed due to issue creating span")
+
 
 def prepare_data(
     slug: str,
@@ -132,7 +136,7 @@ def prepare_data(
     contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
     expected_contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
     conversation: Optional[Conversation] = None,
-    settings: Optional[dict] = None,
+    settings: Optional[Dict[str, Any]] = None,
     trace_id: Optional[Union[str, UUID]] = None,
     span_id: Optional[Union[str, UUID]] = None,
     span: Optional["LangWatchSpan"] = None,
@@ -161,12 +165,12 @@ def prepare_data(
         warn(
             "trace_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `trace_id` will be mapped to `deprecated.trace_id` in the data."
         )
-        data["deprecated.trace_id"] = trace_id
+        data["deprecated.trace_id"] = str(trace_id)
     if span_id is not None:
         warn(
             "span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the data."
         )
-        data["deprecated.span_id"] = span_id
+        data["deprecated.span_id"] = str(span_id)
     if span:
         span.update(
             input=TypedValueJson(type="json", value=data),
@@ -188,7 +192,7 @@ def prepare_data(
 
 
 def handle_response(
-    response: dict,
+    response: Dict[str, Any],
     span: Optional["LangWatchSpan"] = None,
     as_guardrail: bool = False,
 ) -> EvaluationResult:
@@ -225,7 +229,7 @@ def handle_response(
 def handle_exception(
     e: Exception, span: Optional["LangWatchSpan"] = None, as_guardrail: bool = False
 ):
-    response: dict = {
+    response: Dict[str, Any] = {
         "status": "error",
         "details": repr(e),
     }
