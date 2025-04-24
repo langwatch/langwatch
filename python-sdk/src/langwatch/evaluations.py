@@ -53,7 +53,7 @@ def evaluate(
     trace: Optional['LangWatchTrace'] = None,
     span: Optional['LangWatchSpan'] = None,
     api_key: Optional[str] = None,
-):
+) -> EvaluationResult:
     with langwatch.span(name=name or slug, type="guardrail" if as_guardrail else "evaluation") as span:
         request_params = prepare_data(
             slug=slug,
@@ -93,7 +93,7 @@ async def async_evaluate(
     trace: Optional['LangWatchTrace'] = None,
     span: Optional['LangWatchSpan'] = None,
     api_key: Optional[str] = None,
-):
+) -> EvaluationResult:
     with langwatch.span(name=name or slug, type="guardrail" if as_guardrail else "evaluation") as span:
         request_params = prepare_data(
             slug=slug,
@@ -183,7 +183,7 @@ def handle_response(
     response: dict,
     span: Optional['LangWatchSpan'] = None,
     as_guardrail: bool = False,
-):
+) -> EvaluationResult:
     result = EvaluationResultModel.model_validate(response)
     if span:
         span.update(
