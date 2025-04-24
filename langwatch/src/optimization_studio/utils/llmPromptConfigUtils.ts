@@ -3,13 +3,14 @@ import type { Node } from "@xyflow/react";
 import { parseLlmConfigVersion } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 
-import type { Signature } from "../types/dsl";
+import type { Component, LlmPromptConfigComponent } from "../types/dsl";
 
 import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
+import { kebabCase } from "~/utils/stringCasing";
 
 export function llmConfigToNodeData(
   config: LlmConfigWithLatestVersion
-): Node<Signature>["data"] {
+): Node<LlmPromptConfigComponent>["data"] {
   const { latestVersion } = config;
   const version = parseLlmConfigVersion(latestVersion);
 
@@ -42,7 +43,7 @@ export function llmConfigToNodeData(
 export function promptConfigFormValuesToNodeData(
   configId: string,
   formValues: PromptConfigFormValues
-): Node<Signature>["data"] {
+): Node<LlmPromptConfigComponent>["data"] {
   return {
     configId,
     name: formValues.name,
@@ -69,7 +70,7 @@ export function promptConfigFormValuesToNodeData(
 }
 
 export function nodeDataToPromptConfigFormInitialValues(
-  nodeData: Node<Signature>["data"]
+  nodeData: Node<LlmPromptConfigComponent>["data"]
 ): PromptConfigFormValues {
   return {
     name: nodeData.name ?? "",
@@ -89,4 +90,19 @@ export function nodeDataToPromptConfigFormInitialValues(
       },
     },
   };
+}
+
+export function createNewPromptName(
+  workflowName: string,
+  nodes: Node<Component>[]
+) {
+  const nodesWithSameName = nodes.filter(
+    (node) => node.data.name?.startsWith(kebabCase(workflowName))
+  ).length;
+
+  const promptName = kebabCase(
+    `${workflowName}-new-prompt-${nodesWithSameName + 1}`
+  );
+
+  return promptName;
 }

@@ -12,6 +12,7 @@ import isDeepEqual from "fast-deep-equal";
 import debounce from "lodash.debounce";
 import { temporal } from "zundo";
 import { create } from "zustand";
+
 import { snakeCaseToPascalCase } from "../../utils/stringCasing";
 import type {
   BaseComponent,
@@ -20,10 +21,8 @@ import type {
   LLMConfig,
   Workflow,
 } from "../types/dsl";
-import { findLowestAvailableName } from "../utils/nodeUtils";
 import { hasDSLChanged } from "../utils/dslUtils";
-import type { LlmPromptConfig } from "@prisma/client";
-import type { LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+import { findLowestAvailableName } from "../utils/nodeUtils";
 
 export type SocketStatus =
   | "disconnected"

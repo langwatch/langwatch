@@ -88,8 +88,9 @@ export const llmConfigSchema = z.object({
 
 export type LLMConfig = z.infer<typeof llmConfigSchema>;
 
-// This is maybe not the best way to handle this
-export type Signature = BaseComponent & {
+export type Signature = BaseComponent;
+
+export type LlmPromptConfigComponent = Signature & {
   configId: string;
   name: string;
   inputs: Field[];

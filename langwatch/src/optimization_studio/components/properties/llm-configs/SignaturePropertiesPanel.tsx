@@ -1,18 +1,21 @@
-import { Separator, HStack, Text } from "@chakra-ui/react";
+import { Separator, Spinner } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { FormProvider } from "react-hook-form";
 
+import type { LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+
 import { useWorkflowStore } from "../../../hooks/useWorkflowStore";
-import type { Signature } from "../../../types/dsl";
+import type { LlmPromptConfigComponent, Signature } from "../../../types/dsl";
 import { BasePropertiesPanel } from "../BasePropertiesPanel";
 
-import { PromptSource } from "./prompt-source-select/PromptSource";
+import { PromptSourceHeader } from "./prompt-source-select/PromptSourceHeader";
 
 import { toaster } from "~/components/ui/toaster";
-import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
 import {
+  createNewPromptName,
   llmConfigToNodeData,
   nodeDataToPromptConfigFormInitialValues,
   promptConfigFormValuesToNodeData,
@@ -20,9 +23,7 @@ import {
 import { DemonstrationsField } from "~/prompt-configs/forms/fields/DemonstrationsField";
 import { PromptConfigVersionFieldGroup } from "~/prompt-configs/forms/fields/PromptConfigVersionFieldGroup";
 import { PromptNameField } from "~/prompt-configs/forms/fields/PromptNameField";
-import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionHistoryButton";
-import { VersionSaveButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionSaveButton";
-import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
+import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import {
   usePromptConfigForm,
   type PromptConfigFormValues,
@@ -45,14 +46,16 @@ import { api } from "~/utils/api";
  * - Demonstrations (few-shot examples)
  * - Advanced prompting techniques
  */
-function SignaturePropertiesPanelInner({ node }: { node: Node<Signature> }) {
+function SignaturePropertiesPanelInner({
+  node,
+}: {
+  node: Node<LlmPromptConfigComponent>;
+}) {
   const trpc = api.useContext();
   const { project } = useOrganizationTeamProject();
   const { triggerSaveVersion } = usePromptConfigContext();
   const configId = node.data.configId;
-  const { setNode } = useWorkflowStore((state) => ({
-    setNode: state.setNode,
-  }));
+  const setNode = useSmartSetNode();
 
   /**
    * Converts form values to node data and updates the workflow store.
@@ -151,10 +154,105 @@ function SignaturePropertiesPanelInner({ node }: { node: Node<Signature> }) {
  * Wrapper component that provides the PromptConfigProvider context
  * to the inner panel component
  */
-export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
+export function SignaturePropertiesPanel({
+  node,
+}: {
+  node: Node<Signature | Node<LlmPromptConfigComponent>>;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const createMutation =
+    api.llmConfigs.createConfigWithInitialVersion.useMutation();
+  const setNode = useSmartSetNode();
+  const { name: workflowName, nodes } = useWorkflowStore((state) => ({
+    name: state.getWorkflow().name,
+    nodes: state.getWorkflow().nodes,
+  }));
+  const nodeHasConfigId = "configId" in node.data;
+  const idRef = useRef<string | null>(null);
+  const { createNewVersion } = usePromptConfig();
+
+  // For backwards compatibility, we need to check if there's a configId on the node data.
+  // If not, we need to create a new config and update the node data.
+  useEffect(() => {
+    if (!project?.id) return;
+    // If the node id is the same as the idRef, we've already checked this node
+    if (idRef.current === node.id) return;
+    // If the node has a configId, we don't need to create a new config
+    if (!nodeHasConfigId) {
+      void (async () => {
+        try {
+          // Create a new config
+          const newConfig = await createMutation.mutateAsync({
+            name:
+              (node.data as LlmPromptConfigComponent).name ??
+              createNewPromptName(workflowName, nodes),
+            projectId: project?.id ?? "",
+          });
+
+          // Convert the node data to form initial values
+          const initialValues = nodeDataToPromptConfigFormInitialValues(
+            node.data as LlmPromptConfigComponent
+          );
+
+          // Use the initial values to create a new version
+          const currentConfigData = newConfig.latestVersion.configData; // Use the defaults
+          const nodeConfigData = initialValues.version.configData; // Use the node's config data
+          const newVersion = await createNewVersion(
+            newConfig.id,
+            {
+              inputs: nodeConfigData.inputs ?? currentConfigData.inputs,
+              outputs: nodeConfigData.outputs ?? currentConfigData.outputs,
+              model: nodeConfigData.model ?? currentConfigData.model,
+              prompt: nodeConfigData.prompt ?? currentConfigData.prompt,
+              demonstrations:
+                nodeConfigData.demonstrations ??
+                currentConfigData.demonstrations,
+            },
+            "Save from legacy node"
+          );
+
+          // Convert the new config and version to node data
+          const newNodeData = llmConfigToNodeData({
+            ...newConfig,
+            latestVersion: newVersion as unknown as LatestConfigVersionSchema,
+          });
+
+          // Update the node data with the new config and version
+          setNode({
+            ...node,
+            data: newNodeData,
+          });
+        } catch (error) {
+          console.error(error);
+        }
+      })();
+      // Set the idRef to the node id to prevent duplicate calls
+      idRef.current = node.id;
+    }
+  }, [
+    project?.id,
+    createMutation,
+    node,
+    workflowName,
+    nodes,
+    setNode,
+    nodeHasConfigId,
+    createNewVersion,
+  ]);
+
+  if (!nodeHasConfigId) {
+    return (
+      <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs>
+        <Spinner />
+      </BasePropertiesPanel>
+    );
+  }
+
   return (
     <PromptConfigProvider>
-      <SignaturePropertiesPanelInner node={node} />
+      <SignaturePropertiesPanelInner
+        node={node as Node<LlmPromptConfigComponent>}
+      />
     </PromptConfigProvider>
   );
 }
@@ -165,104 +263,4 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
  */
 function isEqual(a: any, b: any) {
   return JSON.stringify(a, null, 2) === JSON.stringify(b, null, 2);
-}
-
-// TODO: Consider moving this to its own file
-function PromptSourceHeader({
-  node,
-  onPromptSourceSelect,
-  triggerSaveVersion,
-  values,
-}: {
-  node: Node<Signature>;
-  onPromptSourceSelect: (config: { id: string; name: string }) => void;
-  triggerSaveVersion: (
-    configId: string,
-    formValues: PromptConfigFormValues
-  ) => void;
-  values: PromptConfigFormValues;
-}) {
-  const { project } = useOrganizationTeamProject();
-  const projectId = project?.id ?? "";
-  const configId = node.data.configId;
-  const { setNode } = useWorkflowStore((state) => ({
-    setNode: state.setNode,
-  }));
-
-  // Fetch the saved configuration to compare with current node data
-  const { data: savedConfig } =
-    useGetPromptConfigByIdWithLatestVersionQuery(configId);
-
-  const { mutateAsync: createConfig } =
-    api.llmConfigs.createConfigWithInitialVersion.useMutation();
-
-  /**
-   * Determines if the current node data has changed from the saved configuration
-   * Used to enable/disable the save button
-   */
-  const hasDrifted = useMemo(() => {
-    if (!savedConfig) return false;
-    const savedConfigData = llmConfigToNodeData(savedConfig);
-    return !isEqual(node.data, savedConfigData);
-  }, [node.data, savedConfig]);
-
-  const handleSaveVersion = async () => {
-    // If no saved config, we will need to create a new one
-    if (!savedConfig) {
-      try {
-        const newConfig = await createConfig({
-          projectId,
-          name: node.data.name,
-        });
-
-        // Update the node data with the new config ID
-        setNode({
-          ...node,
-          data: {
-            ...node.data,
-            configId: newConfig.id,
-          },
-        });
-
-        // Trigger the save version mutation for the new config
-        triggerSaveVersion(newConfig.id, values);
-      } catch (error) {
-        console.error(error);
-        toaster.error({
-          title: "Failed to save prompt version",
-          description: "Please try again.",
-        });
-      }
-    } else {
-      triggerSaveVersion(configId, values);
-    }
-  };
-
-  return (
-    <VerticalFormControl
-      label="Source Prompt"
-      width="full"
-      helper={
-        !savedConfig && (
-          <Text fontSize="sm" color="red.500">
-            This node's source prompt was deleted. Please save a new prompt
-            version to continue using this configuration.
-          </Text>
-        )
-      }
-    >
-      <HStack justifyContent="space-between">
-        <HStack flex={1} width="50%">
-          <PromptSource configId={configId} onSelect={onPromptSourceSelect} />
-        </HStack>
-        {node.data.configId && (
-          <VersionHistoryButton configId={node.data.configId} />
-        )}
-        <VersionSaveButton
-          disabled={savedConfig && !hasDrifted}
-          onClick={() => void handleSaveVersion()}
-        />
-      </HStack>
-    </VerticalFormControl>
-  );
 }

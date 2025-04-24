@@ -1,22 +1,24 @@
-import type { Node } from "@xyflow/react";
 import { useCallback } from "react";
 
 import { NodeDraggable } from "./NodeDraggable";
 
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
 import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import { MODULES } from "~/optimization_studio/registry";
 import type { Component } from "~/optimization_studio/types/dsl";
-import { llmConfigToNodeData } from "~/optimization_studio/utils/llmPromptConfigUtils";
+import {
+  createNewPromptName,
+  llmConfigToNodeData,
+} from "~/optimization_studio/utils/llmPromptConfigUtils";
 import type { NodeWithOptionalPosition } from "~/types";
 import { api } from "~/utils/api";
-import { kebabCase } from "~/utils/stringCasing";
 
 export function LlmSignatureNodeDraggable() {
   const { project } = useOrganizationTeamProject();
-  const { setNode, getWorkflow } = useWorkflowStore((state) => ({
-    setNode: state.setNode,
+  const setNode = useSmartSetNode();
+  const { getWorkflow } = useWorkflowStore((state) => ({
     getWorkflow: state.getWorkflow,
   }));
 
@@ -74,16 +76,4 @@ export function LlmSignatureNodeDraggable() {
       onDragEnd={handleDragEnd}
     />
   );
-}
-
-function createNewPromptName(workflowName: string, nodes: Node<Component>[]) {
-  const nodesWithSameName = nodes.filter(
-    (node) => node.data.name?.startsWith(kebabCase(workflowName))
-  ).length;
-
-  const promptName = kebabCase(
-    `${workflowName}-new-prompt-${nodesWithSameName + 1}`
-  );
-
-  return promptName;
 }
