@@ -52,8 +52,9 @@ model User {
     name                    String?
     email                   String?                  @unique
     emailVerified           DateTime?
-    password                String?                  // for email/password auth without auth0
+    password                String? // for email/password auth without auth0
     image                   String?                  @db.Text
+    pendingSsoSetup         Boolean                  @default(false)
     accounts                Account[]
     sessions                Session[]
     teamMemberships         TeamUser[]
@@ -709,40 +710,40 @@ model AuditLog {
 }
 
 model LlmPromptConfig {
-  id        String   @id @default(nanoid())
-  name      String
-  projectId String
-  project   Project  @relation(fields: [projectId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
-  deletedAt DateTime?
+    id        String    @id @default(nanoid())
+    name      String
+    projectId String
+    project   Project   @relation(fields: [projectId], references: [id])
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @default(now()) @updatedAt
+    deletedAt DateTime?
 
-  // Relation to all versions - latest is determined by query
-  versions  LlmPromptConfigVersion[] @relation("Versions")
+    // Relation to all versions - latest is determined by query
+    versions LlmPromptConfigVersion[] @relation("Versions")
 
-  @@index([projectId])
+    @@index([projectId])
 }
 
 model LlmPromptConfigVersion {
-  id            String          @id @default(nanoid())
-  version       Int             @default(autoincrement())
-  commitMessage String?         // Optional: Describe changes in this version
-  authorId      String?         // Optional: User who created this version
-  author        User?           @relation(fields: [authorId], references: [id])
-  configId      String          // Foreign key to the parent LlmPromptConfig
-  config        LlmPromptConfig @relation("Versions", fields: [configId], references: [id], onDelete: Cascade) // Cascade delete versions if parent is deleted
+    id            String          @id @default(nanoid())
+    version       Int             @default(autoincrement())
+    commitMessage String? // Optional: Describe changes in this version
+    authorId      String? // Optional: User who created this version
+    author        User?           @relation(fields: [authorId], references: [id])
+    configId      String // Foreign key to the parent LlmPromptConfig
+    config        LlmPromptConfig @relation("Versions", fields: [configId], references: [id], onDelete: Cascade) // Cascade delete versions if parent is deleted
 
-  // Version specific data
-  configData    Json            @map("config") // The actual config JSON for this version
-  schemaVersion String          // Schema version for this specific configData
+    // Version specific data
+    configData    Json   @map("config") // The actual config JSON for this version
+    schemaVersion String // Schema version for this specific configData
 
-  createdAt     DateTime        @default(now()) // Used to determine the latest version
+    createdAt DateTime @default(now()) // Used to determine the latest version
 
-  // Required for multi-tenancy
-  projectId String
+    // Required for multi-tenancy
+    projectId String
 
-  @@unique([configId, version]) // Each version number must be unique per config
-  @@index([configId])
-  @@index([authorId])
-  @@index([createdAt])          // Index important for finding the latest efficiently
+    @@unique([configId, version]) // Each version number must be unique per config
+    @@index([configId])
+    @@index([authorId])
+    @@index([createdAt]) // Index important for finding the latest efficiently
 }

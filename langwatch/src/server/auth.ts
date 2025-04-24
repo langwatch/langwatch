@@ -82,19 +82,61 @@ export const authOptions = (
         },
       };
     },
-    signIn: async ({ user }) => {
-      const sessionToken = getNextAuthSessionToken(req as any);
-      if (!sessionToken) return true;
+    signIn: async ({ user, account }) => {
+      if (!user.email) return false;
 
-      const dbSession = await prisma.session.findUnique({
-        where: { sessionToken },
-      });
-      const dbUser = await prisma.user.findUnique({
-        where: { id: dbSession?.userId },
+      const existingUser = await prisma.user.findUnique({
+        where: { email: user.email },
       });
 
-      if (dbUser?.email !== user.email) {
-        throw new Error("DIFFERENT_EMAIL_NOT_ALLOWED");
+      if (existingUser?.pendingSsoSetup && account?.provider) {
+        // Wrap operations in a transaction
+        await prisma.$transaction([
+          // Create the account link first
+          prisma.account.create({
+            data: {
+              userId: existingUser.id,
+              type: account.type ?? "oauth",
+              provider: account.provider,
+              providerAccountId: user.id,
+              access_token: account.access_token,
+              refresh_token: account.refresh_token,
+              expires_at: account.expires_at,
+              token_type: account.token_type,
+              scope: account.scope,
+              id_token: account.id_token,
+            },
+          }),
+
+          // Delete old accounts with the same provider (except the one we just created)
+          prisma.account.deleteMany({
+            where: {
+              userId: existingUser.id,
+              provider: account.provider,
+              providerAccountId: { not: user.id },
+            },
+          }),
+          prisma.user.update({
+            where: { id: existingUser.id },
+            data: { pendingSsoSetup: false },
+          }),
+        ]);
+
+        return true;
+      } else {
+        const sessionToken = getNextAuthSessionToken(req as any);
+        if (!sessionToken) return true;
+
+        const dbSession = await prisma.session.findUnique({
+          where: { sessionToken },
+        });
+        const dbUser = await prisma.user.findUnique({
+          where: { id: dbSession?.userId },
+        });
+
+        if (dbUser?.email !== user.email) {
+          throw new Error("DIFFERENT_EMAIL_NOT_ALLOWED");
+        }
       }
 
       return true;
