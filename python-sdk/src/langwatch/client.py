@@ -1,98 +1,23 @@
 import os
 import logging
-import threading
-from typing import Any, Optional, Sequence, List
-from requests.exceptions import RequestException
+from typing import List, Optional, Sequence
 
 from langwatch.__version__ import __version__
 from langwatch.attributes import AttributeName
+from langwatch.domain import SpanExporterRule
 from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider, ReadableSpan
+from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExportResult
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.sampling import TraceIdRatioBased, ALWAYS_OFF
+
+from langwatch.exporters.async_batch_exporter import AsyncBatchExporter
 
 from .typings import Instrumentor
 from .types import LangWatchClientProtocol, BaseAttributes
 
 logger = logging.getLogger(__name__)
-
-class GracefulBatchSpanProcessor(BatchSpanProcessor):
-	"""A BatchSpanProcessor that handles export failures gracefully by logging them instead of raising exceptions."""
-
-	def __init__(self, *args: Any, **kwargs: Any):
-		super().__init__(*args, **kwargs)
-		self._lock = threading.Lock()
-		self._export_lock = threading.Lock()
-
-	def _export(self, spans: List[ReadableSpan]) -> None: # type: ignore
-		"""
-		Export the spans while handling errors gracefully.
-
-		Args:
-			spans: The list of spans to export.
-		"""
-		if not spans:
-			return
-
-		with self._export_lock:
-			try:
-				result = self.span_exporter.export(spans)
-				logger.debug(f"Successfully exported {len(spans)} spans")
-
-				if result != SpanExportResult.SUCCESS:
-					logger.warning(f"Failed to export spans batch: got result {result}")
-
-			except RequestException as ex:
-				logger.warning(f"Network error while exporting spans: {str(ex)}")
-			except Exception as ex:
-				logger.error("Unexpected error in span export", exc_info=True)
-
-	def _export_batch(self) -> int:
-		"""Export the current batch of spans with proper cleanup."""
-		spans_to_export: List[ReadableSpan] = []
-
-		with self._lock:
-			if not self.spans_list:
-				logger.debug("No spans to export in batch")
-				return 0
-
-			# Take all spans that are ready for export
-			spans_to_export = [span for span in self.spans_list if span is not None] # type: ignore
-			if spans_to_export:
-				logger.debug(f"Preparing to export {len(spans_to_export)} spans")
-				# Only remove the spans we're actually exporting
-				self.spans_list = [span for span in self.spans_list if span not in spans_to_export]
-
-		if spans_to_export:
-			span_count = len(spans_to_export)
-			self._export(spans_to_export)
-			return span_count
-
-		return 0
-
-	def on_end(self, span: ReadableSpan) -> None:
-		"""Called when a span is ended."""
-		if span is None: # type: ignore
-			return
-
-		should_export = False
-		with self._lock:
-			self.spans_list.append(span) # type: ignore
-			current_size = len(self.spans_list)
-			logger.debug(f"Added span to export queue. Queue size: {current_size}")
-			should_export = current_size >= self.max_export_batch_size
-
-		if should_export:
-			logger.debug("Batch size limit reached, forcing export")
-			self._export_batch()
-
-	def force_flush(self, timeout_millis: Optional[int] = None) -> bool:
-		"""Force an export of all spans."""
-		logger.debug("Force flushing spans")
-		self._export_batch()
-		return True
 
 class Client(LangWatchClientProtocol):
 	"""
@@ -105,6 +30,7 @@ class Client(LangWatchClientProtocol):
 	instrumentors: Sequence[Instrumentor] = []
 	base_attributes: BaseAttributes = {}
 	_disable_sending: bool = False
+	_span_exporter_rules: List['SpanExporterRule'] = []
 
 	def __init__(
 		self,
@@ -115,6 +41,7 @@ class Client(LangWatchClientProtocol):
 		tracer_provider: Optional[TracerProvider] = None,
 		debug: bool = False,
 		disable_sending: bool = False,
+		span_exporter_rules: Optional[List['SpanExporterRule']] = None,
 	):
 		"""
 		Initialize the LangWatch tracing client.
@@ -130,14 +57,14 @@ class Client(LangWatchClientProtocol):
 
 		self._api_key = api_key or os.getenv("LANGWATCH_API_KEY") or "no api key provided"
 		self._endpoint_url = endpoint_url or os.getenv("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
+		self._debug = debug or os.getenv("LANGWATCH_DEBUG") == "true"
 		self._disable_sending = disable_sending
+		self._span_exporter_rules = span_exporter_rules or []
 
 		self.base_attributes = base_attributes or {}
 		self.base_attributes[AttributeName.LangWatchSDKName] = "langwatch-observability-sdk"
 		self.base_attributes[AttributeName.LangWatchSDKVersion] = __version__
 		self.base_attributes[AttributeName.LangWatchSDKLanguage] = "python"
-
-		self._debug = debug
 
 		self.tracer_provider = self.__ensure_otel_setup(tracer_provider)
 
@@ -230,16 +157,15 @@ class Client(LangWatchClientProtocol):
 				headers=headers,
 				timeout=30,
 			)
-
-			# Configure processor with more aggressive settings
-			processor = GracefulBatchSpanProcessor(
-				span_exporter=otlp_exporter,
+			async_exporter = AsyncBatchExporter(
+				exporter=otlp_exporter,
+				export_interval=5.0,
+				max_export_batch_size=100,
 				max_queue_size=512,
-				schedule_delay_millis=5000,
-				max_export_batch_size=128,
+				span_exporter_rules=self._span_exporter_rules,
 			)
 
-			provider.add_span_processor(processor)
+			provider.add_span_processor(SimpleSpanProcessor(async_exporter))
 
 			if self.debug:
 				logger.info("Successfully configured tracer provider with OTLP exporter")
