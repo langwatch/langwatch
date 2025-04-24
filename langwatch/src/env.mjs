@@ -15,7 +15,7 @@ export const env = createEnv({
     DATABASE_URL: optionalIfBuildTime(z.string().url()),
     NODE_ENV: z.enum(["development", "test", "production"]),
     BASE_HOST: optionalIfBuildTime(z.string().min(1)),
-    NEXTAUTH_PROVIDER: z.enum(["auth0", "email"]),
+    NEXTAUTH_PROVIDER: z.enum(["auth0", "email", "azure-ad"]),
     NEXTAUTH_SECRET: optionalIfBuildTime(z.string().min(1)),
     NEXTAUTH_URL: optionalIfBuildTime(
       z.preprocess(
@@ -59,6 +59,9 @@ export const env = createEnv({
     S3_BUCKET_NAME: z.string().optional(),
     DATASET_STORAGE_LOCAL: z.boolean().optional(),
     CREDENTIALS_SECRET: z.string().optional(),
+    AZURE_CLIENT_ID: z.string().optional(),
+    AZURE_CLIENT_SECRET: z.string().optional(),
+    AZURE_TENANT_ID: z.string().optional(),
   },
 
   /**
@@ -128,6 +131,9 @@ export const env = createEnv({
       process.env.DATASET_STORAGE_LOCAL === "1" ||
       process.env.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",
     CREDENTIALS_SECRET: process.env.CREDENTIALS_SECRET,
+    AZURE_CLIENT_ID: process.env.AZURE_CLIENT_ID,
+    AZURE_CLIENT_SECRET: process.env.AZURE_CLIENT_SECRET,
+    AZURE_TENANT_ID: process.env.AZURE_TENANT_ID,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
