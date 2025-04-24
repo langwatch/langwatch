@@ -3,6 +3,12 @@ from typing_extensions import TypedDict
 from pydantic import BaseModel
 
 
+class SpanExporterExcludeRule(BaseModel):
+    field_name: Literal["span_name"]
+    match_value: str
+    match_operation: Literal["includes", "exact_match", "starts_with", "ends_with"]
+
+
 ChatRole = Literal[
     "system",
     "user",
@@ -201,7 +207,7 @@ class LLMSpan(TypedDict, total=False):
 class RAGChunk(TypedDict, total=False):
     document_id: Optional[str]
     chunk_id: Optional[str]
-    content: Union[str, dict, list]
+    content: Union[str, Dict[str, Any], List[Any]]
 
 
 class RAGSpan(TypedDict, total=False):

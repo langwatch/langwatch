@@ -34,7 +34,7 @@ class LangWatchTrace:
 
     _root_span_params: Optional[Dict[str, Any]] = None
     root_span: Optional[LangWatchSpan] = None
-    span: Optional[LangWatchSpan] = None
+    span: type[LangWatchSpan]
     evaluations: List[Evaluation] = []
 
     def __init__(
@@ -67,6 +67,7 @@ class LangWatchTrace:
     ):
         ensure_setup(api_key=api_key)
 
+        self.metadata = metadata
         self.api_key = api_key
         self.max_string_length = max_string_length
         self._context_token = None
@@ -78,10 +79,10 @@ class LangWatchTrace:
         )
 
         if metadata is None:
-            metadata = {}
+            self.metadata = {}
         if trace_id is not None:
             warn("trace_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `trace_id` will be mapped to `deprecated.trace_id` in the trace's metadata.")
-            metadata["deprecated.trace_id"] = trace_id
+            self.metadata["deprecated.trace_id"] = trace_id
 
         if disable_sending:
             client = get_instance()
@@ -97,7 +98,7 @@ class LangWatchTrace:
         self.tracer = trace_api.get_tracer(
             instrumenting_module_name="langwatch",
             instrumenting_library_version=__version__,
-            attributes=metadata,
+            attributes=self.metadata,
         )
 
         # Store root span parameters for later creation
@@ -118,8 +119,9 @@ class LangWatchTrace:
             "evaluations": evaluations,
         } if not skip_root_span else None
 
-        if skip_root_span is False:
-            self._create_root_span()
+        # TODO
+        # if skip_root_span is False:
+        #     self._create_root_span()
 
     def _create_root_span(self):
         """Create the root span if parameters were provided."""
@@ -134,10 +136,9 @@ class LangWatchTrace:
 
             self.root_span = LangWatchSpan(
                 trace=self,
+                # span_context=Context(),
                 **root_span_params
             )
-
-            self.root_span.__enter__()
             return self.root_span
 
     async def _create_root_span_async(self):
@@ -153,13 +154,12 @@ class LangWatchTrace:
 
             self.root_span = LangWatchSpan(
                 trace=self,
+                # span_context=Context(),
                 **root_span_params
             )
-            # Ensure the span is properly initialized before returning
-            await self.root_span.__aenter__()
             return self.root_span
 
-    def _cleanup(self) -> None:
+    def _cleanup(self, exc_type: Optional[type], exc_value: Optional[BaseException], traceback: Any) -> None:
         """Internal method to cleanup resources with proper locking."""
         with self._lock:
             if self._cleaned_up:
@@ -167,7 +167,7 @@ class LangWatchTrace:
 
             try:
                 if self.root_span is not None:
-                    self.root_span._cleanup()
+                    self.root_span._cleanup(exc_type, exc_value, traceback)
             except Exception as e:
                 warn(f"Failed to cleanup root span: {e}")
 
@@ -444,7 +444,7 @@ class LangWatchTrace:
         except Exception as e:
             warn(f"Failed to set LangWatch trace context: {e}")
 
-        if self._root_span_params is not None and self.root_span is None:
+        if self._root_span_params is not None:
             self._create_root_span()
 
         return self
@@ -455,7 +455,7 @@ class LangWatchTrace:
             if self.root_span is not None:
                 self.root_span.__exit__(exc_type, exc_value, traceback)
         finally:
-            self._cleanup()
+            self._cleanup(exc_type, exc_value, traceback)
         return False  # Don't suppress exceptions
 
     async def __aenter__(self) -> 'LangWatchTrace':
@@ -474,7 +474,7 @@ class LangWatchTrace:
         except Exception as e:
             warn(f"Failed to set LangWatch trace context: {e}")
 
-        if self._root_span_params is not None and self.root_span is None:
+        if self._root_span_params is not None:
             await self._create_root_span_async()
 
         return self
@@ -485,12 +485,12 @@ class LangWatchTrace:
             if self.root_span is not None:
                 await self.root_span.__aexit__(exc_type, exc_value, traceback)
         finally:
-            self._cleanup()
+            self._cleanup(exc_type, exc_value, traceback)
         return False  # Don't suppress exceptions
 
     def __del__(self):
         """Ensure trace context is cleaned up if object is garbage collected."""
-        self._cleanup()
+        self._cleanup(None, None, None)
 
     # Forward all other methods to the underlying tracer
     def __getattr__(self, name: str) -> Any:
@@ -542,6 +542,7 @@ class LangWatchTrace:
         if self._root_span_params is not None:
             if self.root_span.name is None:
                 self.root_span.update_name(func.__name__)
+
             if self.root_span.capture_input is False or self.root_span.output is not None:
                 return
 
@@ -564,6 +565,12 @@ class LangWatchTrace:
         client = get_instance()
         if client is not None:
             client.disable_sending = value
+
+    @deprecated(
+        reason="Setting the current span is deprecated, this call is now redundant as creating a new span will automatically set it as the current span."
+    )
+    def set_current_span(self, span: Any):
+        self.current_span = span
 
 
 def trace(
