@@ -7,7 +7,7 @@ from langwatch_nlp.studio.dspy.evaluation import (
     Money,
 )
 from langwatch.evaluations import EvaluationResultModel
-from dsp.modules.cache_utils import CacheMemory
+from dspy.dsp.cache_utils import CacheMemory
 
 
 class LangWatchEvaluator(Evaluator):

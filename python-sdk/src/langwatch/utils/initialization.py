@@ -21,7 +21,7 @@ def _setup_logging(debug: bool = False) -> None:
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
         root_logger.addHandler(handler)
-    
+
     if debug:
         root_logger.setLevel(logging.DEBUG)
     else:
@@ -37,10 +37,10 @@ def setup(
 ) -> Client:
     """Initialize the LangWatch client."""
     _setup_logging(debug)
-    
+
     if debug:
         logger.info("Setting up LangWatch client...")
-        
+
     client = Client(
         api_key=api_key,
         endpoint_url=endpoint_url,
@@ -49,29 +49,29 @@ def setup(
         instrumentors=instrumentors,
         debug=debug,
     )
-    
+
     if debug:
         logger.info("LangWatch client setup complete")
-        
+
     set_instance(client)
     return client
 
-def ensure_setup() -> None:
+def ensure_setup(api_key: Optional[str] = None) -> None:
     """Ensure LangWatch client is setup.
-    
+
     If no client is setup, this will create a default client using environment variables.
     Validates that we have a working tracer provider to prevent silent failures.
     """
     client = get_instance()
     if client is None:
         logger.debug("No LangWatch client found, creating default client")
-        client = setup(debug=True)  # Enable debug logging for auto-created clients
-    
+        client = setup(debug=True, api_key=api_key)  # Enable debug logging for auto-created clients
+
     # Verify we have a valid tracer provider
     tracer_provider = trace.get_tracer_provider()
     if tracer_provider is None:
         logger.warning("No tracer provider found, creating new one")
-        client = setup(debug=True)
+        client = setup(debug=True, api_key=api_key)
     elif isinstance(tracer_provider, trace.ProxyTracerProvider):
         logger.debug("Found proxy tracer provider, will be replaced with real provider")
         # This is fine - the client will replace it with a real provider

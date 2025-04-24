@@ -1,4 +1,6 @@
 import asyncio
+from contextlib import asynccontextmanager
+import contextlib
 import multiprocessing
 import os
 from typing import Dict, List, Optional, Union
@@ -13,7 +15,7 @@ os.environ["DSPY_CACHEDIR"] = mkdtemp()
 import langwatch_nlp.error_tracking
 from fastapi import FastAPI
 
-from langwatch_nlp.studio.app import app as studio_app, lifespan
+from langwatch_nlp.studio.app import app as studio_app, lifespan as studio_lifespan
 
 import langwatch_nlp.topic_clustering.batch_clustering as batch_clustering
 import langwatch_nlp.topic_clustering.incremental_clustering as incremental_clustering
@@ -27,6 +29,21 @@ os.environ["AZURE_API_VERSION"] = "2024-02-01"
 if "DATABASE_URL" in os.environ:
     # we need to delete this otherwise if this is present the proxy server tries to set up a db
     del os.environ["DATABASE_URL"]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    lifespans = [
+        litellm_proxy_server.proxy_startup_event,
+        studio_lifespan,
+    ]
+
+    exit_stack = contextlib.AsyncExitStack()
+    async with exit_stack:
+        for lifespan in lifespans:
+            await exit_stack.enter_async_context(lifespan(app))
+        yield
+
 
 # Config
 app = FastAPI(lifespan=lifespan)
@@ -50,10 +67,10 @@ async def proxy_startup():
     async def patched_get_available_deployment(
         self,
         model: str,
+        request_kwargs: Dict,
         messages: Optional[List[Dict[str, str]]] = None,
         input: Optional[Union[str, List]] = None,
         specific_deployment: Optional[bool] = False,
-        request_kwargs: Optional[Dict] = None,
         **kwargs,
     ):
         self.cache.flush_cache()  # prevents litellm proxing from storing failures and mark the deployment as "unhealthy" for everyone in case a single user's API key is invalid for example
@@ -61,10 +78,10 @@ async def proxy_startup():
         deployment = await original_get_available_deployment(
             self,
             model=model,
+            request_kwargs=request_kwargs,
             messages=messages,
             input=input,
             specific_deployment=specific_deployment,
-            request_kwargs=request_kwargs,
             **kwargs,
         )
         deployment = deployment.copy()
@@ -100,7 +117,6 @@ async def proxy_startup():
     litellm_proxy_server.ProxyConfig()
     litellm_proxy_server.save_worker_config(config="proxy_config.yaml")
     app.mount("/proxy", litellm_proxy_server.app)
-    await litellm_proxy_server.startup_event()
 
 
 # Dummy env vars just to get the proxy to start up

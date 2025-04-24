@@ -50,11 +50,13 @@ def evaluate(
     conversation: Optional[Conversation] = None,
     settings: Optional[dict] = None,
     as_guardrail: bool = False,
-    trace: Optional['LangWatchTrace'] = None,
-    span: Optional['LangWatchSpan'] = None,
+    trace: Optional["LangWatchTrace"] = None,
+    span: Optional["LangWatchSpan"] = None,
     api_key: Optional[str] = None,
-) -> EvaluationResult:
-    with langwatch.span(name=name or slug, type="guardrail" if as_guardrail else "evaluation") as span:
+) -> EvaluationResultModel:  # type: ignore
+    with langwatch.span(
+        name=name or slug, type="guardrail" if as_guardrail else "evaluation"
+    ) as span:
         request_params = prepare_data(
             slug=slug,
             name=name,
@@ -90,11 +92,13 @@ async def async_evaluate(
     conversation: Optional[Conversation] = None,
     settings: Optional[dict] = None,
     as_guardrail: bool = False,
-    trace: Optional['LangWatchTrace'] = None,
-    span: Optional['LangWatchSpan'] = None,
+    trace: Optional["LangWatchTrace"] = None,
+    span: Optional["LangWatchSpan"] = None,
     api_key: Optional[str] = None,
-) -> EvaluationResult:
-    with langwatch.span(name=name or slug, type="guardrail" if as_guardrail else "evaluation") as span:
+) -> EvaluationResultModel:  # type: ignore
+    with langwatch.span(
+        name=name or slug, type="guardrail" if as_guardrail else "evaluation"
+    ) as span:
         request_params = prepare_data(
             slug=slug,
             name=name,
@@ -131,15 +135,15 @@ def prepare_data(
     settings: Optional[dict] = None,
     trace_id: Optional[Union[str, UUID]] = None,
     span_id: Optional[Union[str, UUID]] = None,
-    span: Optional['LangWatchSpan'] = None,
+    span: Optional["LangWatchSpan"] = None,
     as_guardrail: bool = False,
     api_key: Optional[str] = None,
 ):
     span_ctx = get_current_span().get_span_context()
 
     data = {
-        "trace_id": format(span_ctx.trace_id, 'x'),
-        "span_id": format(span_ctx.span_id, 'x'),
+        "trace_id": format(span_ctx.trace_id, "x"),
+        "span_id": format(span_ctx.span_id, "x"),
     }
     if input is not None:
         data["input"] = input
@@ -154,10 +158,14 @@ def prepare_data(
     if conversation is not None:
         data["conversation"] = conversation
     if trace_id is not None:
-        warn("trace_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `trace_id` will be mapped to `deprecated.trace_id` in the data.")
+        warn(
+            "trace_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `trace_id` will be mapped to `deprecated.trace_id` in the data."
+        )
         data["deprecated.trace_id"] = trace_id
     if span_id is not None:
-        warn("span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the data.")
+        warn(
+            "span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the data."
+        )
         data["deprecated.span_id"] = span_id
     if span:
         span.update(
@@ -168,8 +176,8 @@ def prepare_data(
     return {
         "url": get_endpoint() + f"/api/evaluations/{slug}/evaluate",
         "json": {
-            "trace_id": format(span_ctx.trace_id, 'x'),
-            "span_id": format(span_ctx.span_id, 'x'),
+            "trace_id": format(span_ctx.trace_id, "x"),
+            "span_id": format(span_ctx.span_id, "x"),
             "name": name,
             "data": data,
             "settings": settings,
@@ -181,7 +189,7 @@ def prepare_data(
 
 def handle_response(
     response: dict,
-    span: Optional['LangWatchSpan'] = None,
+    span: Optional["LangWatchSpan"] = None,
     as_guardrail: bool = False,
 ) -> EvaluationResult:
     result = EvaluationResultModel.model_validate(response)
@@ -215,7 +223,7 @@ def handle_response(
 
 
 def handle_exception(
-    e: Exception, span: Optional['LangWatchSpan'] = None, as_guardrail: bool = False
+    e: Exception, span: Optional["LangWatchSpan"] = None, as_guardrail: bool = False
 ):
     response: dict = {
         "status": "error",
@@ -232,7 +240,7 @@ def handle_exception(
 
 def add_evaluation(
     *,
-    span: Optional['LangWatchSpan'] = None,
+    span: Optional["LangWatchSpan"] = None,
     evaluation_id: Optional[str] = None,
     name: str,
     type: Optional[str] = None,
@@ -300,11 +308,17 @@ def add_evaluation(
         ),
     )
     if "cost" in evaluation_result and evaluation_result["cost"]:
-        (ns or span).update(metrics=SpanMetrics(cost=evaluation_result["cost"]["amount"]))
+        (ns or span).update(
+            metrics=SpanMetrics(cost=evaluation_result["cost"]["amount"])
+        )
 
     evaluation = Evaluation(
         evaluation_id=evaluation_id or f"eval_{nanoid.generate()}",
-        span_id=format((ns or span)._span.get_span_context().span_id, 'x') if (ns or span) else None,
+        span_id=(
+            format((ns or span)._span.get_span_context().span_id, "x")
+            if (ns or span)
+            else None
+        ),
         name=name,
         type=type,
         is_guardrail=is_guardrail,
@@ -334,7 +348,9 @@ def add_evaluation(
     )
 
     if current_evaluation and current_evaluation_index is not None:
-        (ns or span).trace.evaluations[current_evaluation_index] = current_evaluation | evaluation
+        (ns or span).trace.evaluations[current_evaluation_index] = (
+            current_evaluation | evaluation
+        )
     else:
         (ns or span).trace.evaluations.append(evaluation)
 
