@@ -52,7 +52,7 @@ class GracefulBatchSpanProcessor(BatchSpanProcessor):
 	def _export_batch(self) -> int:
 		"""Export the current batch of spans with proper cleanup."""
 		spans_to_export: List[ReadableSpan] = []
-		
+
 		with self._lock:
 			if not self.spans_list:
 				logger.debug("No spans to export in batch")
@@ -69,7 +69,7 @@ class GracefulBatchSpanProcessor(BatchSpanProcessor):
 			span_count = len(spans_to_export)
 			self._export(spans_to_export)
 			return span_count
-		
+
 		return 0
 
 	def on_end(self, span: ReadableSpan) -> None:
@@ -108,7 +108,7 @@ class Client(LangWatchClientProtocol):
 
 	def __init__(
 		self,
-		api_key: Optional[str] = None,	
+		api_key: Optional[str] = None,
 		endpoint_url: Optional[str] = None,
 		base_attributes: Optional[BaseAttributes] = None,
 		instrumentors: Optional[Sequence[Instrumentor]] = None,
@@ -195,19 +195,19 @@ class Client(LangWatchClientProtocol):
 			if global_provider is not None and not isinstance(global_provider, trace.ProxyTracerProvider): # type: ignore
 				if not isinstance(global_provider, TracerProvider):
 					raise ValueError("Global tracer provider must be an instance of TracerProvider")
-				
+
 				logger.warning("There is already a global tracer provider set. LangWatch will not override it automatically, but this may result in telemetry not being sent to LangWatch if you have not configured it to do so yourself.")
 
 				return global_provider
 
 			provider = self.__create_new_tracer_provider()
 			trace.set_tracer_provider(provider)
-				
+
 			return provider
-			
+
 		except Exception as e:
 			raise RuntimeError(f"Failed to setup OpenTelemetry tracer provider: {str(e)}") from e
-	
+
 	def __create_new_tracer_provider(self) -> TracerProvider:
 		try:
 			resource = Resource.create(self.base_attributes)

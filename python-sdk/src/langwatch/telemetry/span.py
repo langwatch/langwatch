@@ -27,7 +27,7 @@ T = TypeVar("T", bound=Callable[..., Any])
 
 class LangWatchSpan:
     """A wrapper around the OpenTelemetry Span that adds LangWatch specific methods.
-    
+
     This class extends OpenTelemetry's span functionality with LangWatch-specific features
     like input/output capture, model tracking, and context management."""
 
@@ -76,7 +76,7 @@ class LangWatchSpan:
         self._context_token = None
         self._otel_context = None  # Store the context itself instead of just the token
         self._cleaned_up = False
-        
+
         # Initialize other attributes
         self.trace = trace
         self.type = type
@@ -639,7 +639,7 @@ class LangWatchSpan:
             span = object.__getattribute__(self, '_span')
         except AttributeError:
             span = None
-            
+
         if span is None:
             raise AttributeError(f"'LangWatchSpan' object has no attribute '{name}' and no underlying span")
         return getattr(span, name)
@@ -697,12 +697,12 @@ class LangWatchSpan:
         """Wrap an existing OpenTelemetry span in a LangWatchSpan.
         This creates a LangWatchSpan that references the existing OpenTelemetry span
         without creating a new one.
-        
+
         Args:
             otel_span: The OpenTelemetry span to wrap
             trace: Optional trace to associate with the span. If not provided,
                   will attempt to get the current trace from context.
-            
+
         Returns:
             A LangWatchSpan that wraps the provided OpenTelemetry span
         """
@@ -757,11 +757,11 @@ def span(
     set_status_on_exception: bool = True,
 ) -> LangWatchSpan:
     """Create a new span for tracking operations.
-    
+
     A span represents a single operation within a trace. It can be used to track
     specific parts of your application's execution, such as LLM calls, chain executions,
     or any other meaningful operation.
-    
+
     Args:
         name: Name of the span
         type: Type of operation this span represents
@@ -780,7 +780,7 @@ def span(
         metrics: Optional metrics
         evaluations: Optional evaluations
         ignore_missing_trace_warning: Whether to suppress missing trace warnings
-        
+
         # OpenTelemetry parameters
         kind: Kind of span (default INTERNAL)
         span_context: Optional span context

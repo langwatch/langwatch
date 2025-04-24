@@ -444,7 +444,7 @@ class LangWatchTrace:
         except Exception as e:
             warn(f"Failed to set LangWatch trace context: {e}")
 
-        if self._root_span_params is not None and self.root_span is None:
+        if self._root_span_params is not None:
             self._create_root_span()
 
         return self
@@ -474,7 +474,7 @@ class LangWatchTrace:
         except Exception as e:
             warn(f"Failed to set LangWatch trace context: {e}")
 
-        if self._root_span_params is not None and self.root_span is None:
+        if self._root_span_params is not None:
             await self._create_root_span_async()
 
         return self
