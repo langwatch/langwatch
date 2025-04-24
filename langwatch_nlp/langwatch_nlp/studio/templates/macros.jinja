@@ -20,6 +20,8 @@ dspy.LM(
     {% else %}
 {{ target_parts[1] }}={{ edge.source }}.{{ source_parts[1] }},
     {% endif %}
+{% else %}
+    {{ raise("Invalid source: " + source_parts[0] + " for edge " + edge.id) }}
 {% endif %}
 {% endmacro %}
 
@@ -30,5 +32,7 @@ dspy.LM(
     {% else %}
 "{{ target_parts[1] }}": {{ edge.source }}.{{ source_parts[1] }},
     {% endif %}
+{% else %}
+    {{ raise("Invalid source: " + source_parts[0] + " for edge " + edge.id) }}
 {% endif %}
 {% endmacro %}

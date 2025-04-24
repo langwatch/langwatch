@@ -65,7 +65,7 @@ class LangWatchTrace:
 
         tracer_provider: Optional[TracerProvider] = None,
     ):
-        ensure_setup()
+        ensure_setup(api_key=api_key)
 
         self.api_key = api_key
         self.max_string_length = max_string_length
@@ -221,7 +221,7 @@ class LangWatchTrace:
             response.raise_for_status()
             path = response.json()["path"]
             return f"{endpoint}{path}"
-        
+
     def unshare(self):
         """Make this trace private again."""
         ensure_setup()
@@ -434,7 +434,7 @@ class LangWatchTrace:
             # Store the old token and set the new one
             old_token = self._context_token
             self._context_token = stored_langwatch_trace.set(self)
-            
+
             # Try to clean up the old token if it exists
             if old_token is not None:
                 try:
@@ -464,7 +464,7 @@ class LangWatchTrace:
             # Store the old token and set the new one
             old_token = self._context_token
             self._context_token = stored_langwatch_trace.set(self)
-            
+
             # Try to clean up the old token if it exists
             if old_token is not None:
                 try:
@@ -594,12 +594,12 @@ def trace(
     tracer_provider: Optional[TracerProvider] = None,
 ) -> LangWatchTrace:
     """Create a new trace for tracking a complete request/response cycle.
-    
+
     A trace represents a complete request/response cycle in your application.
     It can contain multiple spans representing different operations within that cycle.
     """
     # Ensure client is setup
-    ensure_setup()
+    ensure_setup(api_key=api_key)
 
     return LangWatchTrace(
         trace_id=trace_id,

@@ -45,7 +45,6 @@ class ModuleWithMetadata:
         response = self._module(*args, **kwargs)
         duration = round((time.time() - start_time) * 1000)
 
-        dspy.settings.configure(experimental=True)
         lm = cast(dspy.LM, self.get_lm()) or dspy.settings.lm
         response.__class__ = PredictionWithMetadata
         last_response = lm.history[-1]

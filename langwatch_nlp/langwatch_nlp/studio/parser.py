@@ -461,7 +461,7 @@ def normalized_workflow(workflow: Workflow) -> Workflow:
     for edge in workflow.edges:
         edge.source = normalize_to_variable_name(edge.source)
         [handle, field] = edge.sourceHandle.split(".")
-        edge.sourceHandle = f"{handle}.{normalize_to_variable_name(field)}"
+        edge.sourceHandle = f"{handle}.{field}"
         edge.target = normalize_to_variable_name(edge.target)
         [handle, field] = edge.targetHandle.split(".")
         edge.targetHandle = f"{handle}.{normalize_to_variable_name(field)}"

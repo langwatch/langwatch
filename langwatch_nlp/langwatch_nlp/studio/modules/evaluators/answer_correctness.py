@@ -42,7 +42,6 @@ class AnswerCorrectnessEvaluator(Evaluator):
         self.evaluator = ModuleWithMetadata(AnswerCorrectness())
 
         lm = node_llm_config_to_dspy_lm(llm)
-        dspy.settings.configure(experimental=True)
         self.evaluator.set_lm(lm=lm)
 
     @Evaluator.trace_evaluation
