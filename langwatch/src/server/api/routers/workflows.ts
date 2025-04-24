@@ -360,8 +360,33 @@ export const workflowRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
     .mutation(async ({ input }) => {
-      const prevDsl_ = JSON.stringify(clearDsl(input.prevDsl), null, 2);
-      const newDsl_ = JSON.stringify(clearDsl(input.newDsl), null, 2);
+      const recursiveAlphabeticallySortedKeys = <T>(obj: T): T => {
+        if (typeof obj !== "object" || obj === null) {
+          return obj;
+        }
+        if (Array.isArray(obj)) {
+          return obj.map(recursiveAlphabeticallySortedKeys) as T;
+        }
+        return Object.fromEntries(
+          Object.entries(obj)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, value]) => [
+              key,
+              recursiveAlphabeticallySortedKeys(value),
+            ])
+        ) as T;
+      };
+
+      const prevDsl_ = JSON.stringify(
+        recursiveAlphabeticallySortedKeys(clearDsl(input.prevDsl)),
+        null,
+        2
+      );
+      const newDsl_ = JSON.stringify(
+        recursiveAlphabeticallySortedKeys(clearDsl(input.newDsl)),
+        null,
+        2
+      );
       if (prevDsl_ === newDsl_) {
         return "no changes";
       }
@@ -384,7 +409,8 @@ You are a diff generator for the LLM Workflow builder from LangWatch Optimizatio
 Generate very short, concise commit messages for the changes in the diff. From 1 to 5 words max, all lowercase.
 Ignore position changes unless it's the only thing that changed.
 Explain not only the keys that changed, but the content inside them, for example do not say just "updated prompt", \
-but the actual change that was made inside the prompt with as few words as possible, like "not <thing> instruction".
+but the actual change that was made inside the fields with as few words as possible, like "avoid word <example>".
+By the way, always refer to the prompt as "prompt", not "instructions".
             `,
           },
           {
