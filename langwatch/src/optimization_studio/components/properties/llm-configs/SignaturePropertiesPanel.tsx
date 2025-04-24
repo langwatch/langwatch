@@ -22,6 +22,7 @@ import { PromptConfigVersionFieldGroup } from "~/prompt-configs/forms/fields/Pro
 import { PromptNameField } from "~/prompt-configs/forms/fields/PromptNameField";
 import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionHistoryButton";
 import { VersionSaveButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionSaveButton";
+import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
 import {
   usePromptConfigForm,
   type PromptConfigFormValues,
@@ -45,6 +46,8 @@ import { api } from "~/utils/api";
  * - Advanced prompting techniques
  */
 function SignaturePropertiesPanelInner({ node }: { node: Node<Signature> }) {
+  const trpc = api.useContext();
+  const { project } = useOrganizationTeamProject();
   const { triggerSaveVersion } = usePromptConfigContext();
   const configId = node.data.configId;
   const { setNode } = useWorkflowStore((state) => ({
@@ -91,15 +94,35 @@ function SignaturePropertiesPanelInner({ node }: { node: Node<Signature> }) {
   /**
    * Updates node data when a new prompt source is selected
    */
-  const handlePromptSourceSelect = (config: { id: string; name: string }) => {
-    setNode({
-      ...node,
-      data: {
-        ...node.data,
-        name: config.name,
-        configId,
-      },
-    });
+  const handlePromptSourceSelect = async (selectedConfig: {
+    id: string;
+    name: string;
+  }) => {
+    try {
+      const config = await trpc.llmConfigs.getByIdWithLatestVersion.fetch({
+        id: selectedConfig.id,
+        projectId: project?.id ?? "",
+      });
+
+      const newNodeData = llmConfigToNodeData(config);
+
+      // Update the node data with the new config
+      setNode({
+        ...node,
+        data: newNodeData,
+      });
+
+      // Reset the form with the updated node data
+      formProps.methods.reset(
+        nodeDataToPromptConfigFormInitialValues(newNodeData)
+      );
+    } catch (error) {
+      console.error(error);
+      toaster.error({
+        title: "Failed to update prompt source",
+        description: "Please try again.",
+      });
+    }
   };
 
   // TODO: Consider refactoring the BasePropertiesPanel so that we don't need to hide everything like this
@@ -108,7 +131,7 @@ function SignaturePropertiesPanelInner({ node }: { node: Node<Signature> }) {
       <Separator />
       <PromptSourceHeader
         node={node}
-        onPromptSourceSelect={handlePromptSourceSelect}
+        onPromptSourceSelect={(config) => void handlePromptSourceSelect(config)}
         triggerSaveVersion={triggerSaveVersion}
         values={formProps.methods.getValues()}
       />
@@ -168,13 +191,7 @@ function PromptSourceHeader({
 
   // Fetch the saved configuration to compare with current node data
   const { data: savedConfig } =
-    api.llmConfigs.getByIdWithLatestVersion.useQuery(
-      {
-        id: configId,
-        projectId,
-      },
-      { enabled: !!configId && !!projectId }
-    );
+    useGetPromptConfigByIdWithLatestVersionQuery(configId);
 
   const { mutateAsync: createConfig } =
     api.llmConfigs.createConfigWithInitialVersion.useMutation();
