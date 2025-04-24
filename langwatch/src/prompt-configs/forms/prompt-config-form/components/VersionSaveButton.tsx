@@ -2,23 +2,23 @@ import { Button, Spinner } from "@chakra-ui/react";
 import { Save } from "lucide-react";
 
 export function VersionSaveButton({
-  saveEnabled,
-  onSaveClick,
+  disabled,
+  onClick,
   isSaving,
 }: {
-  saveEnabled?: boolean;
-  onSaveClick: () => void;
+  disabled?: boolean;
+  onClick: () => void;
   isSaving?: boolean;
 }) {
   return (
     <Button
       type="submit"
-      disabled={!!isSaving || !saveEnabled}
+      disabled={!!isSaving || !!disabled}
       colorPalette="green"
       loading={isSaving}
       onClick={(e) => {
         e.preventDefault();
-        onSaveClick();
+        onClick();
       }}
     >
       {isSaving ? <Spinner /> : <Save />}

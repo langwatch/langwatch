@@ -1,7 +1,6 @@
-import { Separator, HStack, Button } from "@chakra-ui/react";
+import { Separator, HStack } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useCallback, useMemo } from "react";
-import { Save } from "react-feather";
 import { FormProvider } from "react-hook-form";
 
 import { useWorkflowStore } from "../../../hooks/useWorkflowStore";
@@ -20,15 +19,15 @@ import {
 import { DemonstrationsField } from "~/prompt-configs/forms/fields/DemonstrationsField";
 import { PromptConfigVersionFieldGroup } from "~/prompt-configs/forms/fields/PromptConfigVersionFieldGroup";
 import { PromptNameField } from "~/prompt-configs/forms/fields/PromptNameField";
+import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionHistoryButton";
+import { VersionSaveButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionSaveButton";
 import {
   usePromptConfigForm,
   type PromptConfigFormValues,
 } from "~/prompt-configs/hooks/usePromptConfigForm";
 import { PromptConfigProvider } from "~/prompt-configs/providers/PromptConfigProvider";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
-import { VersionHistoryListPopover } from "~/prompt-configs/VersionHistoryListPopover";
 import { api } from "~/utils/api";
-
 /**
  * Properties panel for the Signature node in the optimization studio.
  *
@@ -46,8 +45,6 @@ import { api } from "~/utils/api";
  */
 function SignaturePropertiesPanelInner({ node }: { node: Node<Signature> }) {
   const { triggerSaveVersion } = usePromptConfigContext();
-  const { project } = useOrganizationTeamProject();
-  const projectId = project?.id ?? "";
   const configId = node.data.configId;
   const { setNode } = useWorkflowStore((state) => ({
     setNode: state.setNode,
@@ -104,57 +101,16 @@ function SignaturePropertiesPanelInner({ node }: { node: Node<Signature> }) {
     });
   };
 
-  // Fetch the saved configuration to compare with current node data
-  const { data: savedConfig } =
-    api.llmConfigs.getByIdWithLatestVersion.useQuery(
-      {
-        id: configId,
-        projectId,
-      },
-      { enabled: !!configId && !!projectId }
-    );
-
-  /**
-   * Determines if the current node data has changed from the saved configuration
-   * Used to enable/disable the save button
-   */
-  const hasDrifted = useMemo(() => {
-    if (!savedConfig) return false;
-    const savedConfigData = llmConfigToNodeData(savedConfig);
-    return !isEqual(node.data, savedConfigData);
-  }, [node.data, savedConfig]);
-
   // TODO: Consider refactoring the BasePropertiesPanel so that we don't need to hide everything like this
   return (
     <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs>
-      {/* Prompt Source Selection and Version Controls */}
-      <VerticalFormControl label="Prompt Source" width="full">
-        <HStack justifyContent="space-between">
-          <HStack flex={1} width="50%">
-            <PromptSource
-              configId={node.data.configId}
-              onSelect={handlePromptSourceSelect}
-            />
-          </HStack>
-          {node.data.configId && (
-            <Button variant="outline" marginLeft={2}>
-              <VersionHistoryListPopover configId={node.data.configId} />
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            disabled={!hasDrifted}
-            colorPalette="green"
-            onClick={() =>
-              void triggerSaveVersion(formProps.methods.getValues())
-            }
-          >
-            <Save />
-          </Button>
-        </HStack>
-      </VerticalFormControl>
       <Separator />
-
+      <PromptSourceHeader
+        node={node}
+        onPromptSourceSelect={handlePromptSourceSelect}
+        triggerSaveVersion={triggerSaveVersion}
+        values={formProps.methods.getValues()}
+      />
       {/* Prompt Configuration Form */}
       <FormProvider {...formProps.methods}>
         <form style={{ width: "100%" }}>
@@ -185,4 +141,58 @@ export function SignaturePropertiesPanel({ node }: { node: Node<Signature> }) {
  */
 function isEqual(a: any, b: any) {
   return JSON.stringify(a, null, 2) === JSON.stringify(b, null, 2);
+}
+
+// TODO: Consider moving this to its own file
+function PromptSourceHeader({
+  node,
+  onPromptSourceSelect,
+  triggerSaveVersion,
+  values,
+}: {
+  node: Node<Signature>;
+  onPromptSourceSelect: (config: { id: string; name: string }) => void;
+  triggerSaveVersion: (formValues: PromptConfigFormValues) => void;
+  values: PromptConfigFormValues;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id ?? "";
+  const configId = node.data.configId;
+
+  // Fetch the saved configuration to compare with current node data
+  const { data: savedConfig } =
+    api.llmConfigs.getByIdWithLatestVersion.useQuery(
+      {
+        id: configId,
+        projectId,
+      },
+      { enabled: !!configId && !!projectId }
+    );
+
+  /**
+   * Determines if the current node data has changed from the saved configuration
+   * Used to enable/disable the save button
+   */
+  const hasDrifted = useMemo(() => {
+    if (!savedConfig) return false;
+    const savedConfigData = llmConfigToNodeData(savedConfig);
+    return !isEqual(node.data, savedConfigData);
+  }, [node.data, savedConfig]);
+
+  return (
+    <VerticalFormControl label="Prompt Source" width="full">
+      <HStack justifyContent="space-between">
+        <HStack flex={1} width="50%">
+          <PromptSource configId={configId} onSelect={onPromptSourceSelect} />
+        </HStack>
+        {node.data.configId && (
+          <VersionHistoryButton configId={node.data.configId} />
+        )}
+        <VersionSaveButton
+          disabled={!hasDrifted}
+          onClick={() => void triggerSaveVersion(values)}
+        />
+      </HStack>
+    </VerticalFormControl>
+  );
 }

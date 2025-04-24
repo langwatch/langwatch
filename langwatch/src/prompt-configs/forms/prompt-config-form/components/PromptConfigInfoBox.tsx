@@ -48,8 +48,8 @@ export function PromptConfigInfoBox({
           <HStack gap={2} alignSelf="flex-end">
             <VersionHistoryButton configId={config.id} />
             <VersionSaveButton
-              saveEnabled={saveEnabled}
-              onSaveClick={onSaveClick}
+              disabled={!saveEnabled}
+              onClick={onSaveClick}
               isSaving={isSaving}
             />
           </HStack>
