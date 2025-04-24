@@ -84,10 +84,16 @@ class AsyncBatchExporter(SpanExporter):
                 if rule.field_name == "span_name":
                     if rule.match_operation == "includes" and rule.match_value in span.name:
                         skip_span = True
-                        continue
+                        break
                     if rule.match_operation == "exact_match" and rule.match_value == span.name:
                         skip_span = True
-                        continue
+                        break
+                    if rule.match_operation == "starts_with" and span.name.startswith(rule.match_value):
+                        skip_span = True
+                        break
+                    if rule.match_operation == "ends_with" and span.name.endswith(rule.match_value):
+                        skip_span = True
+                        break
             if skip_span:
                 continue
 

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 class SpanExporterExcludeRule(BaseModel):
     field_name: Literal["span_name"]
     match_value: str
-    match_operation: Literal["includes", "exact_match"]
+    match_operation: Literal["includes", "exact_match", "starts_with", "ends_with"]
 
 
 ChatRole = Literal[
