@@ -740,7 +740,7 @@ class LangWatchSpan:
             trace = stored_langwatch_trace.get(None)
 
         # Create a LangWatchSpan that wraps the existing span
-        span = LangWatchSpan.__new__(LangWatchSpan)
+        span = LangWatchSpan()
         span.trace = trace
         span.type = "span"
         span.ignore_missing_trace_warning = True
