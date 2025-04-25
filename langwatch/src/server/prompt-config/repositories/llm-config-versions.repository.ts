@@ -148,7 +148,7 @@ export class LlmConfigVersionsRepository {
     // Use a transaction to ensure both operations succeed or fail together
     const { configId, projectId } = versionData;
     const version = await this.prisma.$transaction(async (tx) => {
-      const count = await tx.llmPromptConfigVersion.count({
+      const latestVersionNumber = await tx.llmPromptConfigVersion.count({
         where: { configId, projectId },
       });
 
@@ -156,7 +156,7 @@ export class LlmConfigVersionsRepository {
       const newVersion = await tx.llmPromptConfigVersion.create({
         data: {
           ...versionData,
-          version: count, // Since we start at zero, this is correct
+          version: latestVersionNumber + 1,
         },
       });
 
