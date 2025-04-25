@@ -72,6 +72,7 @@ class LangWatchSpan:
     like input/output capture, model tracking, and context management."""
 
     span: Type["LangWatchSpan"]
+    metrics: Optional[SpanMetrics] = None
 
     def __init__(
         self,
@@ -88,7 +89,7 @@ class LangWatchSpan:
         timestamps: Optional[SpanTimestamps] = None,
         contexts: ContextsType = None,
         model: Optional[str] = None,
-        params: Optional[SpanParams] = None,
+        params: Optional[Union[SpanParams, Dict[str, Any]]] = None,
         metrics: Optional[SpanMetrics] = None,
         evaluations: Optional[
             List[Any]
@@ -297,7 +298,7 @@ class LangWatchSpan:
         timestamps: Optional[SpanTimestamps] = None,
         contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
         model: Optional[str] = None,
-        params: Optional[SpanParams] = None,
+        params: Optional[Union[SpanParams, Dict[str, Any]]] = None,
         metrics: Optional[SpanMetrics] = None,
         **kwargs: Any,
     ) -> None:
@@ -486,7 +487,7 @@ class LangWatchSpan:
         timestamps: Optional[SpanTimestamps] = None,
         contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
         model: Optional[str] = None,
-        params: Optional[SpanParams] = None,
+        params: Optional[Union[SpanParams, Dict[str, Any]]] = None,
         metrics: Optional[SpanMetrics] = None,
         **kwargs: Any,
     ) -> None:
@@ -511,38 +512,6 @@ class LangWatchSpan:
             self._span_context_manager.__exit__(None, error, None)
         elif hasattr(self, "_span") and self._span is not None:
             self._span.end(end_time)
-
-    def _get_span_params(self, func_name: Optional[str] = None) -> Dict[str, Any]:
-        """Helper method to get common span parameters."""
-        current_trace = stored_langwatch_trace.get(None)
-        current_span = get_current_span()
-
-        return {
-            "name": self.name or func_name,
-            "type": self.type,
-            "trace": current_trace,
-            "parent": current_span,
-            "capture_input": self.capture_input,
-            "capture_output": self.capture_output,
-            "input": self.input,
-            "output": self.output,
-            "error": self.error,
-            "timestamps": self.timestamps,
-            "contexts": self.contexts,
-            "model": self.model,
-            "params": self.params,
-            "metrics": self.metrics,
-            "evaluations": self.evaluations,
-            "ignore_missing_trace_warning": self.ignore_missing_trace_warning,
-            # Pass through OpenTelemetry parameters
-            "kind": self.kind,
-            "span_context": self.span_context,
-            "attributes": self.attributes,
-            "links": self.links,
-            "start_time": self.start_time,
-            "record_exception": self.record_exception,
-            "set_status_on_exception": self.set_status_on_exception,
-        }
 
     def __call__(self, func: T) -> T:
         """Makes the span callable as a decorator."""
@@ -799,7 +768,7 @@ def span(
     timestamps: Optional[SpanTimestamps] = None,
     contexts: ContextsType = None,
     model: Optional[str] = None,
-    params: Optional[SpanParams] = None,
+    params: Optional[Union[SpanParams, Dict[str, Any]]] = None,
     metrics: Optional[SpanMetrics] = None,
     evaluations: Optional[List[Any]] = None,
     ignore_missing_trace_warning: bool = False,

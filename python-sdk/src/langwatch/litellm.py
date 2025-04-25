@@ -67,7 +67,7 @@ class LiteLLMPatch:
         if not trace or trace not in self.tracked_traces:
             return cast(Any, self.client)._original_completion(*args, **kwargs)
 
-        span = trace.span(type="llm")
+        span = trace.span(type="llm").__enter__()
 
         started_at = milliseconds_timestamp()
         try:
@@ -121,7 +121,7 @@ class LiteLLMPatch:
         span = trace.span(
             type="llm",
             parent=trace.get_current_span(),
-        )
+        ).__enter__()
 
         started_at = milliseconds_timestamp()
 
