@@ -49,7 +49,7 @@ export const DATASET_COLUMN_TYPES = [
   "chat_messages",
   "annotations",
   "evaluations",
-] as const satisfies DatasetColumnType[];
+] as const;
 
 export type DatasetColumns = { name: string; type: DatasetColumnType }[];
 
