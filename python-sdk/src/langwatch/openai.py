@@ -155,7 +155,7 @@ class OpenAICompletionTracer:
         span = trace.span(
             type="llm",
             parent=trace.get_current_span(),
-        )
+        ).__enter__()
 
         started_at = milliseconds_timestamp()
         try:
@@ -214,7 +214,7 @@ class OpenAICompletionTracer:
         span = trace.span(
             type="llm",
             parent=trace.get_current_span(),
-        )
+        ).__enter__()
 
         started_at = milliseconds_timestamp()
         response: Union[Completion, AsyncStream[Completion]] = await cast(
@@ -433,7 +433,7 @@ class OpenAIChatCompletionTracer:
                 *args, **kwargs
             )
 
-        span = trace.span(type="llm")
+        span = trace.span(type="llm").__enter__()
 
         started_at = milliseconds_timestamp()
         try:
@@ -489,7 +489,7 @@ class OpenAIChatCompletionTracer:
                 *args, **kwargs
             )
 
-        span = trace.span(type="llm")
+        span = trace.span(type="llm").__enter__()
 
         started_at = milliseconds_timestamp()
 

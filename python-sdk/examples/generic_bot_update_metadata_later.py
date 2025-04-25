@@ -8,23 +8,27 @@ import chainlit as cl
 import langwatch
 
 
+# Deprecated, this won't be possible anymore in the future
+# Instead, you should use the trace as a context manager
+# TODO: update the examples to reflect this
+
 @cl.on_message
 async def main(message: cl.Message):
     msg = cl.Message(
         content="",
     )
 
-    trace = langwatch.trace()
+    with langwatch.trace() as trace:
+        # Create two spans, one for the RAG, and one for the "LLM call" inside it
+        with trace.span(type="rag", input=message.content) as rag_span:
+            contexts = ["context1", "context2"]
+            rag_span.update(contexts=contexts)
 
-    # Create two spans, one for the RAG, and one for the "LLM call" inside it
-    rag_span = trace.span(type="rag", input=message.content)
-    contexts = ["context1", "context2"]
-    rag_span.update(contexts=contexts)
-
-    llm_span = rag_span.span(type="llm", input=str(contexts) + " " + message.content)
-    generated_message = "Hello there! How can I help?"
-    llm_span.end(output=generated_message)
-    rag_span.end(output=generated_message)
+            with rag_span.span(
+                type="llm", input=str(contexts) + " " + message.content
+            ) as llm_span:
+                generated_message = "Hello there! How can I help?"
+                llm_span.update(output=generated_message)
 
     trace.send_spans()
 
@@ -32,12 +36,11 @@ async def main(message: cl.Message):
     time.sleep(3)
     id = trace.trace_id
 
-    trace = langwatch.trace(trace_id=id)
-
-    trace.update(
-        expected_output="Hello there! How can I be helpful?",
-        metadata={"labels": ["test"]},
-    )
+    with langwatch.trace(trace_id=id) as trace:
+        trace.update(
+            expected_output="Hello there! How can I be helpful?",
+            metadata={"labels": ["test"]},
+        )
     trace.send_spans()
     public_url = (
         trace.share()

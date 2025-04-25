@@ -1,5 +1,16 @@
 import json
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Optional, TypedDict, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    TypedDict,
+    Union,
+)
+from warnings import warn
 from langchain.schema import (
     LLMResult,
     AgentAction,
@@ -16,7 +27,10 @@ from opentelemetry.trace import get_current_span, SpanContext
 from langchain.callbacks.base import BaseCallbackHandler
 from langwatch.telemetry.span import LangWatchSpan
 from langwatch.telemetry.tracing import LangWatchTrace
-from langwatch.utils.transformation import SerializableWithStringFallback, convert_typed_values
+from langwatch.utils.transformation import (
+    SerializableWithStringFallback,
+    convert_typed_values,
+)
 from langwatch.utils.utils import list_get, milliseconds_timestamp
 import langwatch
 from langwatch.domain import (
@@ -36,6 +50,7 @@ from langwatch.domain import (
 
 from uuid import UUID
 from langchain.tools import BaseTool
+import logging
 
 
 class SpanParams(TypedDict, total=False):
@@ -106,7 +121,6 @@ class LangChainTracer(BaseCallbackHandler):
         metadata: Optional[TraceMetadata] = None,
     ) -> None:
         self.trace: LangWatchTrace
-        self.span_contexts: Dict[str, SpanContext] = {}
         self.spans: Dict[str, LangWatchSpan] = {}
 
         ensure_setup()
@@ -114,10 +128,13 @@ class LangChainTracer(BaseCallbackHandler):
         if trace:
             self.trace = trace
         else:
-            self.trace = langwatch.trace(
-                trace_id=trace_id,
-                metadata=metadata
-            )
+            self.trace = langwatch.trace(trace_id=trace_id, metadata=metadata)
+
+        # Demote the "Failed to detach context" log raised by the OpenTelemetry logger to DEBUG
+        # level so that it does not show up in the user's console. This warning may indicate
+        # some incorrect context handling, but in the case of langchain it's just a false positive.
+        # due to the way the async/generations and callback calls are handled in the langchain library.
+        self._suppress_token_detach_warning_to_debug_level()
 
     def __enter__(self):
         self.trace.__enter__()
@@ -213,25 +230,18 @@ class LangChainTracer(BaseCallbackHandler):
 
         span = langwatch.span(
             type="llm",
+            parent=self.spans.get(str(parent_run_id)),
             trace=self.trace,
             model=(vendor + "/" + model),
             input=input,
             timestamps=SpanTimestamps(started_at=milliseconds_timestamp()),
             params=span_params,
-            span_context=self.get_span_context(parent_run_id),
         )
         span.__enter__()
 
         self.spans[str(run_id)] = span
-        self.set_span_context(run_id, span.get_span_context())
 
         return span
-
-    def get_span_context(self, run_id: UUID) -> Union[SpanContext, None]:
-        return self.span_contexts[str(run_id)]
-
-    def set_span_context(self, run_id: UUID, span_context: SpanContext):
-        self.span_contexts[str(run_id)] = span_context
 
     def on_llm_new_token(self, token: str, **kwargs: Any) -> Any:
         # TODO: capture first_token_at, copy from TypeScript implementation and test it
@@ -287,7 +297,7 @@ class LangChainTracer(BaseCallbackHandler):
         if span == None:
             return
 
-        span.__exit__(None, error)
+        span.__exit__(None, error, None)
 
     def on_chain_start(
         self,
@@ -345,7 +355,7 @@ class LangChainTracer(BaseCallbackHandler):
         span = langwatch.span(
             type=type,
             name=name,
-            parent=get_current_span(),
+            parent=self.spans.get(str(parent_run_id)),
             trace=self.trace,
             input=input,
             output=None,
@@ -430,6 +440,19 @@ class LangChainTracer(BaseCallbackHandler):
             )
         else:
             return convert_typed_values(output)
+
+    def _suppress_token_detach_warning_to_debug_level(self):
+        """
+        Convert the "Failed to detach context" log raised by the OpenTelemetry logger to DEBUG
+        level so that it does not show up in the user's console.
+        """
+        from opentelemetry.context import logger as otel_logger
+
+        if not any(isinstance(f, LogDemotionFilter) for f in otel_logger.filters):
+            log_filter = LogDemotionFilter(
+                "opentelemetry.context", "Failed to detach context"
+            )
+            otel_logger.addFilter(log_filter)
 
 
 class WrappedRagTool(BaseTool):
@@ -534,3 +557,20 @@ def capture_rag_from_retriever(
     object.__setattr__(retriever, "__class__", LangWatchTrackedRetriever)
 
     return retriever
+
+
+class LogDemotionFilter(logging.Filter):
+    def __init__(self, module: str, message: str):
+        super().__init__()
+        self.module = module
+        self.message = message
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.name == self.module and self.message in record.getMessage():
+            record.levelno = logging.DEBUG  # Change the log level to DEBUG
+            record.levelname = "DEBUG"
+
+            # Check the log level for the logger is debug or not
+            logger = logging.getLogger(self.module)
+            return logger.isEnabledFor(logging.DEBUG)
+        return True

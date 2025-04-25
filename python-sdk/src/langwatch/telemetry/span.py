@@ -72,6 +72,7 @@ class LangWatchSpan:
     like input/output capture, model tracking, and context management."""
 
     span: Type["LangWatchSpan"]
+    metrics: Optional[SpanMetrics] = None
 
     def __init__(
         self,
@@ -88,7 +89,7 @@ class LangWatchSpan:
         timestamps: Optional[SpanTimestamps] = None,
         contexts: ContextsType = None,
         model: Optional[str] = None,
-        params: Optional[SpanParams] = None,
+        params: Optional[Union[SpanParams, Dict[str, Any]]] = None,
         metrics: Optional[SpanMetrics] = None,
         evaluations: Optional[
             List[Any]
@@ -154,16 +155,13 @@ class LangWatchSpan:
             ),
         )
 
-        if self.trace:
-            self._create_span()
-
     def _create_span(self):
         """Internal method to create and start the OpenTelemetry span."""
         try:
             if self.trace:
                 tracer = self.trace.tracer
             else:
-                if not self.ignore_missing_trace_warning:
+                if not self.ignore_missing_trace_warning and not self.parent:
                     warn(
                         "No current trace found, some spans may not be sent to LangWatch"
                     )
@@ -300,7 +298,7 @@ class LangWatchSpan:
         timestamps: Optional[SpanTimestamps] = None,
         contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
         model: Optional[str] = None,
-        params: Optional[SpanParams] = None,
+        params: Optional[Union[SpanParams, Dict[str, Any]]] = None,
         metrics: Optional[SpanMetrics] = None,
         **kwargs: Any,
     ) -> None:
@@ -329,7 +327,7 @@ class LangWatchSpan:
                 truncate_object_recursively(
                     convert_typed_values(deepcopy(input)),
                     max_string_length=(
-                        self.trace or get_current_trace()
+                        self.trace or get_current_trace(suppress_warning=True)
                     ).max_string_length,
                 ),
                 cls=SerializableWithStringFallback,
@@ -340,7 +338,7 @@ class LangWatchSpan:
                 truncate_object_recursively(
                     convert_typed_values(deepcopy(output)),
                     max_string_length=(
-                        self.trace or get_current_trace()
+                        self.trace or get_current_trace(suppress_warning=True)
                     ).max_string_length,
                 ),
                 cls=SerializableWithStringFallback,
@@ -359,7 +357,7 @@ class LangWatchSpan:
                 truncate_object_recursively(
                     rag_contexts(contexts),
                     max_string_length=(
-                        self.trace or get_current_trace()
+                        self.trace or get_current_trace(suppress_warning=True)
                     ).max_string_length,
                 ),
                 cls=SerializableWithStringFallback,
@@ -489,7 +487,7 @@ class LangWatchSpan:
         timestamps: Optional[SpanTimestamps] = None,
         contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
         model: Optional[str] = None,
-        params: Optional[SpanParams] = None,
+        params: Optional[Union[SpanParams, Dict[str, Any]]] = None,
         metrics: Optional[SpanMetrics] = None,
         **kwargs: Any,
     ) -> None:
@@ -507,42 +505,13 @@ class LangWatchSpan:
             metrics=metrics,
             **kwargs,
         )
-        if hasattr(self, "_span_context_manager") and self._span_context_manager is not None:
+        if (
+            hasattr(self, "_span_context_manager")
+            and self._span_context_manager is not None
+        ):
             self._span_context_manager.__exit__(None, error, None)
         elif hasattr(self, "_span") and self._span is not None:
             self._span.end(end_time)
-
-    def _get_span_params(self, func_name: Optional[str] = None) -> Dict[str, Any]:
-        """Helper method to get common span parameters."""
-        current_trace = stored_langwatch_trace.get(None)
-        current_span = get_current_span()
-
-        return {
-            "name": self.name or func_name,
-            "type": self.type,
-            "trace": current_trace,
-            "parent": current_span,
-            "capture_input": self.capture_input,
-            "capture_output": self.capture_output,
-            "input": self.input,
-            "output": self.output,
-            "error": self.error,
-            "timestamps": self.timestamps,
-            "contexts": self.contexts,
-            "model": self.model,
-            "params": self.params,
-            "metrics": self.metrics,
-            "evaluations": self.evaluations,
-            "ignore_missing_trace_warning": self.ignore_missing_trace_warning,
-            # Pass through OpenTelemetry parameters
-            "kind": self.kind,
-            "span_context": self.span_context,
-            "attributes": self.attributes,
-            "links": self.links,
-            "start_time": self.start_time,
-            "record_exception": self.record_exception,
-            "set_status_on_exception": self.set_status_on_exception,
-        }
 
     def __call__(self, func: T) -> T:
         """Makes the span callable as a decorator."""
@@ -626,7 +595,7 @@ class LangWatchSpan:
                     warn(f"Failed to end span: {e}")
                 finally:
                     self._span_context_manager = None
-            
+
             if hasattr(self, "_span") and self._span is not None:
                 self._span = None
 
@@ -635,7 +604,7 @@ class LangWatchSpan:
     def __enter__(self) -> "LangWatchSpan":
         """Makes the span usable as a context manager."""
         self.trace = self.trace or stored_langwatch_trace.get(None)
-        if not self.ignore_missing_trace_warning and not self.trace:
+        if not self.ignore_missing_trace_warning and not self.trace and not self.parent:
             warn("No current trace found, some spans will may not be sent to LangWatch")
 
         self._create_span()
@@ -659,6 +628,8 @@ class LangWatchSpan:
             # Fix: Check if exc_value is an Exception before recording
             if exc_value is not None and isinstance(exc_value, Exception):
                 self.record_error(exc_value)
+        except Exception as e:
+            warn(f"Failed to exit LangWatch span: {e}")
         finally:
             self._cleanup(exc_type, exc_value, traceback)
         return False  # Don't suppress exceptions
@@ -666,7 +637,7 @@ class LangWatchSpan:
     async def __aenter__(self) -> "LangWatchSpan":
         """Makes the span usable as an async context manager."""
         self.trace = self.trace or stored_langwatch_trace.get(None)
-        if not self.ignore_missing_trace_warning and not self.trace:
+        if not self.ignore_missing_trace_warning and not self.trace and not self.parent:
             warn("No current trace found, some spans may not be sent to LangWatch")
 
         self._create_span()
@@ -690,6 +661,8 @@ class LangWatchSpan:
             # Fix: Check if exc_value is an Exception before recording
             if exc_value is not None and isinstance(exc_value, Exception):
                 self.record_error(exc_value)
+        except Exception as e:
+            warn(f"Failed to exit LangWatch span: {e}")
         finally:
             self._cleanup(exc_type, exc_value, traceback)
         return False  # Don't suppress exceptions
@@ -767,7 +740,7 @@ class LangWatchSpan:
             trace = stored_langwatch_trace.get(None)
 
         # Create a LangWatchSpan that wraps the existing span
-        span = LangWatchSpan.__new__(LangWatchSpan)
+        span = LangWatchSpan()
         span.trace = trace
         span.type = "span"
         span.ignore_missing_trace_warning = True
@@ -795,7 +768,7 @@ def span(
     timestamps: Optional[SpanTimestamps] = None,
     contexts: ContextsType = None,
     model: Optional[str] = None,
-    params: Optional[SpanParams] = None,
+    params: Optional[Union[SpanParams, Dict[str, Any]]] = None,
     metrics: Optional[SpanMetrics] = None,
     evaluations: Optional[List[Any]] = None,
     ignore_missing_trace_warning: bool = False,

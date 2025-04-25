@@ -137,6 +137,7 @@ class LangWatchTrace:
                 trace=self,
                 **root_span_params
             )
+            self.root_span.__enter__()
             return self.root_span
 
     async def _create_root_span_async(self):
@@ -154,6 +155,7 @@ class LangWatchTrace:
                 trace=self,
                 **root_span_params
             )
+            await self.root_span.__aenter__()
             return self.root_span
 
     def _cleanup(self, exc_type: Optional[type], exc_value: Optional[BaseException], traceback: Any) -> None:
@@ -452,6 +454,8 @@ class LangWatchTrace:
         try:
             if self.root_span is not None:
                 self.root_span.__exit__(exc_type, exc_value, traceback)
+        except Exception as e:
+            warn(f"Failed to exit LangWatch trace: {e}")
         finally:
             self._cleanup(exc_type, exc_value, traceback)
         return False  # Don't suppress exceptions
@@ -482,6 +486,8 @@ class LangWatchTrace:
         try:
             if self.root_span is not None:
                 await self.root_span.__aexit__(exc_type, exc_value, traceback)
+        except Exception as e:
+            warn(f"Failed to exit LangWatch trace: {e}")
         finally:
             self._cleanup(exc_type, exc_value, traceback)
         return False  # Don't suppress exceptions
