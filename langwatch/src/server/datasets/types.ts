@@ -9,6 +9,7 @@ import {
 
 export type DatasetRecordEntry = { id: string } & Record<string, any>;
 
+// TODO: fix this list being repeated 3 times
 export const datasetColumnTypeSchema = z.union([
   z.literal("string"),
   z.literal("boolean"),
@@ -23,7 +24,18 @@ export const datasetColumnTypeSchema = z.union([
   z.literal("evaluations"),
 ]);
 
-export type DatasetColumnType = z.infer<typeof datasetColumnTypeSchema>;
+export type DatasetColumnType =
+  | "string"
+  | "boolean"
+  | "number"
+  | "date"
+  | "list"
+  | "json"
+  | "spans"
+  | "rag_contexts"
+  | "chat_messages"
+  | "annotations"
+  | "evaluations";
 
 export const DATASET_COLUMN_TYPES = [
   "string",
