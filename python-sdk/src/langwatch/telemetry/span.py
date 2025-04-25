@@ -154,9 +154,6 @@ class LangWatchSpan:
             ),
         )
 
-        if self.trace:
-            self._create_span()
-
     def _create_span(self):
         """Internal method to create and start the OpenTelemetry span."""
         try:
@@ -507,7 +504,10 @@ class LangWatchSpan:
             metrics=metrics,
             **kwargs,
         )
-        if hasattr(self, "_span_context_manager") and self._span_context_manager is not None:
+        if (
+            hasattr(self, "_span_context_manager")
+            and self._span_context_manager is not None
+        ):
             self._span_context_manager.__exit__(None, error, None)
         elif hasattr(self, "_span") and self._span is not None:
             self._span.end(end_time)
@@ -626,7 +626,7 @@ class LangWatchSpan:
                     warn(f"Failed to end span: {e}")
                 finally:
                     self._span_context_manager = None
-            
+
             if hasattr(self, "_span") and self._span is not None:
                 self._span = None
 
@@ -659,6 +659,8 @@ class LangWatchSpan:
             # Fix: Check if exc_value is an Exception before recording
             if exc_value is not None and isinstance(exc_value, Exception):
                 self.record_error(exc_value)
+        except Exception as e:
+            warn(f"Failed to exit LangWatch span: {e}")
         finally:
             self._cleanup(exc_type, exc_value, traceback)
         return False  # Don't suppress exceptions
@@ -690,6 +692,8 @@ class LangWatchSpan:
             # Fix: Check if exc_value is an Exception before recording
             if exc_value is not None and isinstance(exc_value, Exception):
                 self.record_error(exc_value)
+        except Exception as e:
+            warn(f"Failed to exit LangWatch span: {e}")
         finally:
             self._cleanup(exc_type, exc_value, traceback)
         return False  # Don't suppress exceptions
