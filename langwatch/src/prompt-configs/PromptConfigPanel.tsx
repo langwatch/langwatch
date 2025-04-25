@@ -33,6 +33,8 @@ export function PromptConfigPanel({
     return llmConfig ? llmConfigToPromptConfigFormValues(llmConfig) : undefined;
   }, [llmConfig]);
 
+  console.log("initialConfigValues", initialConfigValues);
+
   const formProps = usePromptConfigForm({
     configId,
     initialConfigValues,

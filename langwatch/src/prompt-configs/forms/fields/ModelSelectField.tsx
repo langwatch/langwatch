@@ -2,7 +2,7 @@ import { useFormContext, Controller } from "react-hook-form";
 
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
 
-import { ModelSelector, allModelOptions } from "~/components/ModelSelector";
+import { LLMConfigField } from "~/components/llmPromptConfigs/LlmConfigField";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 
 export function ModelSelectField() {
@@ -12,21 +12,19 @@ export function ModelSelectField() {
   return (
     <VerticalFormControl
       label="Model"
-      invalid={!!errors.version?.configData?.llm?.model}
-      helper={errors.version?.configData?.llm?.model?.message?.toString()}
-      error={errors.version?.configData?.llm?.model}
+      invalid={!!errors.version?.configData?.llm}
+      helper={errors.version?.configData?.llm?.message?.toString()}
+      error={errors.version?.configData?.llm}
     >
       <Controller
-        name="version.configData.llm.model"
+        name="version.configData.llm"
         control={control}
         render={({ field }) => {
           return (
-            <ModelSelector
-              model={field.value}
-              options={allModelOptions}
+            <LLMConfigField
+              llmConfig={field.value ?? {}} // Prevent a runtime error if the value is undefined
               onChange={field.onChange}
-              size="full"
-              mode="chat"
+              requiresCustomKey={false}
             />
           );
         }}

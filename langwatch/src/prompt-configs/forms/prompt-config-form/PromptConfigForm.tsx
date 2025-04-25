@@ -3,6 +3,7 @@ import { FormProvider, type UseFormReturn } from "react-hook-form";
 
 import { PromptConfigProvider } from "../../providers/PromptConfigProvider";
 import { DemonstrationsField } from "../fields/DemonstrationsField";
+import { ModelSelectField } from "../fields/ModelSelectField";
 import {
   InputsFieldGroup,
   OutputsFieldGroup,
@@ -52,6 +53,7 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
             />
           </VerticalFormControl>
           <PromptNameField />
+          <ModelSelectField />
           <PromptField />
           <InputsFieldGroup />
           <OutputsFieldGroup />
