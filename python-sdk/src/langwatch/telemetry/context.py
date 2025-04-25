@@ -8,8 +8,8 @@ if TYPE_CHECKING:
     from langwatch.telemetry.span import LangWatchSpan
     from langwatch.telemetry.tracing import LangWatchTrace
 
-stored_langwatch_trace = contextvars.ContextVar('stored_langwatch_trace')
-stored_langwatch_span = contextvars.ContextVar('stored_langwatch_span') 
+stored_langwatch_trace = contextvars.ContextVar["LangWatchTrace"]('stored_langwatch_trace')
+stored_langwatch_span = contextvars.ContextVar["LangWatchSpan"]('stored_langwatch_span') 
 
 def get_current_trace() -> 'LangWatchTrace':
     """Get the current trace from the LangWatch context.
@@ -43,4 +43,5 @@ def get_current_span() -> 'LangWatchSpan':
     otel_span = trace_api.get_current_span()
     trace = get_current_trace()
 
+    from langwatch.telemetry.span import LangWatchSpan
     return LangWatchSpan.wrap_otel_span(otel_span, trace)

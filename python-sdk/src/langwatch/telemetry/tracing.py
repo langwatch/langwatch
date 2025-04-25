@@ -22,7 +22,6 @@ from langwatch.utils.initialization import ensure_setup
 
 if TYPE_CHECKING:
     from openai import OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI
-    from dspy import Teleprompter
 
 __all__ = ["trace", "LangWatchTrace"]
 
@@ -78,11 +77,11 @@ class LangWatchTrace:
             Type[LangWatchSpan], lambda **kwargs: LangWatchSpan(trace=self, **kwargs)
         )
 
-        if metadata is None:
+        if self.metadata is None:
             self.metadata = {}
         if trace_id is not None:
             warn("trace_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `trace_id` will be mapped to `deprecated.trace_id` in the trace's metadata.")
-            self.metadata["deprecated.trace_id"] = trace_id
+            self.metadata["deprecated.trace_id"] = str(trace_id)
 
         if disable_sending:
             client = get_instance()
@@ -136,7 +135,6 @@ class LangWatchTrace:
 
             self.root_span = LangWatchSpan(
                 trace=self,
-                # span_context=Context(),
                 **root_span_params
             )
             return self.root_span
@@ -154,7 +152,6 @@ class LangWatchTrace:
 
             self.root_span = LangWatchSpan(
                 trace=self,
-                # span_context=Context(),
                 **root_span_params
             )
             return self.root_span
@@ -255,14 +252,16 @@ class LangWatchTrace:
     ) -> None:
         ensure_setup()
 
+        client = get_instance()
+
         if metadata is None:
             metadata = {}
         if trace_id is not None:
-            metadata[AttributeName.DeprecatedTraceId] = trace_id
+            metadata[AttributeName.DeprecatedTraceId] = str(trace_id)
         if expected_output is not None:
             self._expected_output = expected_output
-        if disable_sending is not None:
-            get_instance().disable_sending = disable_sending
+        if disable_sending is not None and client is not None:
+            client.disable_sending = disable_sending
 
         # Serialize metadata before setting as attribute
         self.root_span.set_attributes({
@@ -304,8 +303,7 @@ class LangWatchTrace:
         timestamps: Optional[EvaluationTimestamps] = None,
     ):
         from langwatch import evaluations
-        return evaluations.add_evaluation(
-            trace=self,
+        evaluations.add_evaluation(
             span=span,
             evaluation_id=evaluation_id,
             name=name,
@@ -330,7 +328,7 @@ class LangWatchTrace:
         expected_output: Optional[str] = None,
         contexts: Union[List[RAGChunk], List[str]] = [],
         conversation: Conversation = [],
-        settings: Optional[dict] = None,
+        settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
     ):
         from langwatch import evaluations
@@ -356,7 +354,7 @@ class LangWatchTrace:
         expected_output: Optional[str] = None,
         contexts: Union[List[RAGChunk], List[str]] = [],
         conversation: Conversation = [],
-        settings: Optional[dict] = None,
+        settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
     ):
         from langwatch import evaluations

@@ -22,8 +22,8 @@ def get_endpoint() -> str:
         return os.getenv("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
     return __instance.endpoint_url
 
-def get_api_key() -> Optional[str]:
+def get_api_key() -> str:
     """Get the current API key of the LangWatch client."""
     if __instance is None:
-        return os.getenv("LANGWATCH_API_KEY")
+        return os.getenv("LANGWATCH_API_KEY", "")
     return __instance.api_key
