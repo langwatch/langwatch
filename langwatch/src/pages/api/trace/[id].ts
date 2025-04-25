@@ -137,6 +137,7 @@ export default async function handler(
     spans,
     evaluations: evaluations_,
     ascii_tree: asciiTree,
+    metadata: traceDetails?.metadata,
   });
 }
 
