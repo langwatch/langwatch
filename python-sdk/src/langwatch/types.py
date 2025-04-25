@@ -55,6 +55,16 @@ class LangWatchClientProtocol(Protocol):
         """Set the debug flag for the client."""
         ...
 
+    @property
+    def disable_sending(self) -> bool:
+        """Get the disable_sending flag for the client."""
+        ...
+
+    @disable_sending.setter
+    def disable_sending(self, value: bool) -> None:
+        """Set the disable_sending flag for the client."""
+        ...
+
 
 __all__ = [
     "Conversation",

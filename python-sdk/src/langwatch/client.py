@@ -63,7 +63,7 @@ class Client(LangWatchClientProtocol):
 
 		self.base_attributes = base_attributes or {}
 		self.base_attributes[AttributeName.LangWatchSDKName] = "langwatch-observability-sdk"
-		self.base_attributes[AttributeName.LangWatchSDKVersion] = __version__
+		self.base_attributes[AttributeName.LangWatchSDKVersion] = str(__version__)
 		self.base_attributes[AttributeName.LangWatchSDKLanguage] = "python"
 
 		self.tracer_provider = self.__ensure_otel_setup(tracer_provider)
@@ -146,7 +146,7 @@ class Client(LangWatchClientProtocol):
 
 			headers = {
 				"Authorization": f"Bearer {self.api_key}",
-				"X-LangWatch-SDK-Version": __version__,
+				"X-LangWatch-SDK-Version": str(__version__),
 			}
 
 			if self.debug:
