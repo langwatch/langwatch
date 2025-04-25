@@ -3,7 +3,12 @@ import type { Node } from "@xyflow/react";
 import { parseLlmConfigVersion } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 
-import type { Component, LlmPromptConfigComponent } from "../types/dsl";
+import type {
+  Component,
+  LlmConfigParameter,
+  LlmPromptConfigComponent,
+  Signature,
+} from "../types/dsl";
 
 import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
 import { kebabCase } from "~/utils/stringCasing";
@@ -24,7 +29,9 @@ export function llmConfigToNodeData(
       {
         identifier: "llm",
         type: "llm",
-        value: version.configData.model,
+        value: {
+          model: version.configData.model,
+        },
       },
       {
         identifier: "instructions",
@@ -70,16 +77,19 @@ export function promptConfigFormValuesToNodeData(
 }
 
 export function nodeDataToPromptConfigFormInitialValues(
-  nodeData: Node<LlmPromptConfigComponent>["data"]
+  nodeData: Omit<Node<Signature | LlmPromptConfigComponent>["data"], "configId">
 ): PromptConfigFormValues {
+  const parametersMap = nodeData.parameters
+    ? Object.fromEntries(nodeData.parameters.map((p) => [p.identifier, p]))
+    : {};
+  const llmParameter = parametersMap.llm as LlmConfigParameter;
   return {
     name: nodeData.name ?? "",
     version: {
       configData: {
         inputs: nodeData.inputs ?? [],
         outputs: nodeData.outputs ?? [],
-        model: nodeData.parameters?.find((p) => p.identifier === "llm")
-          ?.value as string,
+        model: llmParameter.value,
         prompt: nodeData.parameters?.find(
           (p) => p.identifier === "instructions"
         )?.value as string,

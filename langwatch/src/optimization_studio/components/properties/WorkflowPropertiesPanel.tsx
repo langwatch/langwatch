@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import { BasePropertiesPanel, PropertyField } from "./BasePropertiesPanel";
-import { LLMConfigField } from "./modals/llm-config/LLMConfigField";
+import { OptimizationStudioLLMConfigField } from "./llm-configs/OptimizationStudioLLMConfigField";
 import { WorkflowIcon } from "../ColorfulBlockIcons";
 import { EmojiPickerModal } from "./modals/EmojiPickerModal";
 import { useState } from "react";
@@ -206,7 +206,7 @@ export const WorkflowPropertiesPanel = () => {
         </NativeSelect.Root>
       </PropertyField>
       <PropertyField title="Default LLM">
-        <LLMConfigField
+        <OptimizationStudioLLMConfigField
           llmConfig={workflow.default_llm}
           onChange={(llmConfig) => {
             setWorkflow({ default_llm: llmConfig });

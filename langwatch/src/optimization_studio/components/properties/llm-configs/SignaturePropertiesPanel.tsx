@@ -6,10 +6,15 @@ import { FormProvider } from "react-hook-form";
 import type { LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 import { useWorkflowStore } from "../../../hooks/useWorkflowStore";
-import type { LlmPromptConfigComponent, Signature } from "../../../types/dsl";
+import type {
+  LLMConfig,
+  LlmPromptConfigComponent,
+  Signature,
+} from "../../../types/dsl";
 import { BasePropertiesPanel } from "../BasePropertiesPanel";
 
-import { PromptSourceHeader } from "./prompt-source-select/PromptSourceHeader";
+import { PromptSourceHeader } from "./promptSourceSelect/PromptSourceHeader";
+import { WrappedOptimizationStudioLLMConfigField } from "./WrappedOptimizationStudioLLMConfigField";
 
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -142,6 +147,7 @@ function SignaturePropertiesPanelInner({
       <FormProvider {...formProps.methods}>
         <form style={{ width: "100%" }}>
           <PromptNameField />
+          <WrappedOptimizationStudioLLMConfigField />
           <PromptConfigVersionFieldGroup />
           <DemonstrationsField />
         </form>
@@ -157,19 +163,26 @@ function SignaturePropertiesPanelInner({
 export function SignaturePropertiesPanel({
   node,
 }: {
-  node: Node<Signature | Node<LlmPromptConfigComponent>>;
+  node: Node<Signature | LlmPromptConfigComponent>;
 }) {
   const { project } = useOrganizationTeamProject();
   const createMutation =
     api.llmConfigs.createConfigWithInitialVersion.useMutation();
   const setNode = useSmartSetNode();
-  const { name: workflowName, nodes } = useWorkflowStore((state) => ({
+  const {
+    name: workflowName,
+    nodes,
+    defaultLLMConfig,
+  } = useWorkflowStore((state) => ({
     name: state.getWorkflow().name,
     nodes: state.getWorkflow().nodes,
+    defaultLLMConfig: state.getWorkflow().default_llm,
   }));
   const nodeHasConfigId = "configId" in node.data;
   const idRef = useRef<string | null>(null);
   const { createNewVersion } = usePromptConfig();
+
+  console.log("defaultLLMConfig", defaultLLMConfig);
 
   // For backwards compatibility, we need to check if there's a configId on the node data.
   // If not, we need to create a new config and update the node data.
@@ -190,9 +203,14 @@ export function SignaturePropertiesPanel({
           });
 
           // Convert the node data to form initial values
-          const initialValues = nodeDataToPromptConfigFormInitialValues(
-            node.data as LlmPromptConfigComponent
-          );
+          const initialValues = nodeDataToPromptConfigFormInitialValues({
+            ...node.data,
+            parameters: setDefaultLlmConfigToParameters(
+              (node.data.parameters ??
+                []) as LlmPromptConfigComponent["parameters"],
+              defaultLLMConfig
+            ),
+          });
 
           // Use the initial values to create a new version
           const currentConfigData = newConfig.latestVersion.configData; // Use the defaults
@@ -243,6 +261,7 @@ export function SignaturePropertiesPanel({
     setNode,
     nodeHasConfigId,
     createNewVersion,
+    defaultLLMConfig,
   ]);
 
   if (!nodeHasConfigId) {
@@ -268,4 +287,23 @@ export function SignaturePropertiesPanel({
  */
 function isEqual(a: any, b: any) {
   return JSON.stringify(a, null, 2) === JSON.stringify(b, null, 2);
+}
+
+function setDefaultLlmConfigToParameters(
+  parameters: LlmPromptConfigComponent["parameters"],
+  defaultLLMConfig: LLMConfig
+) {
+  return parameters.map((item) => {
+    if (item.identifier === "llm") {
+      const value =
+        typeof item.value === "object" ? item.value : defaultLLMConfig;
+
+      return {
+        ...item,
+        value,
+      };
+    }
+
+    return item;
+  }) as LlmPromptConfigComponent["parameters"];
 }

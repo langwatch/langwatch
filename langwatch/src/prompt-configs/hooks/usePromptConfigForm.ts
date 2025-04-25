@@ -14,10 +14,17 @@ const latestConfigVersionSchema = getLatestConfigVersionSchema();
 const formSchema = promptConfigSchema.extend({
   version: z.object({
     configData: z.object({
-      model: latestConfigVersionSchema.shape.configData.shape.model,
       prompt: latestConfigVersionSchema.shape.configData.shape.prompt,
       inputs: latestConfigVersionSchema.shape.configData.shape.inputs,
       outputs: latestConfigVersionSchema.shape.configData.shape.outputs,
+      model: z.object({
+        model: latestConfigVersionSchema.shape.configData.shape.model,
+        temperature:
+          latestConfigVersionSchema.shape.configData.shape.temperature,
+        max_tokens: latestConfigVersionSchema.shape.configData.shape.max_tokens,
+        litellm_params:
+          latestConfigVersionSchema.shape.configData.shape.litellm_params,
+      }),
       demonstrations:
         latestConfigVersionSchema.shape.configData.shape.demonstrations,
     }),

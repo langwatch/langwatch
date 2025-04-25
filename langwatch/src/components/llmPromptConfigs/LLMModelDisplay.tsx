@@ -1,9 +1,7 @@
 import { Box } from "@chakra-ui/react";
-import {
-  allModelOptions,
-  useModelSelectionOptions,
-} from "../../../../../components/ModelSelector";
-import { OverflownTextWithTooltip } from "../../../../../components/OverflownText";
+
+import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
+import { OverflownTextWithTooltip } from "../OverflownText";
 
 export function LLMModelDisplay({
   model,

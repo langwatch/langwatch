@@ -64,11 +64,14 @@ const configSchemaV1_0 = z.object({
   configData: z.object({
     version: z.number().min(1, "Version must be greater than 0").optional(),
     prompt: z.string().min(1, "Prompt cannot be empty"),
-    model: z.string().min(1, "Model identifier cannot be empty"),
     inputs: z.array(inputOutputSchema).min(1, "At least one input is required"),
     outputs: z
       .array(inputOutputSchema)
       .min(1, "At least one output is required"),
+    model: z.string().min(1, "Model identifier cannot be empty"),
+    temperature: z.number().optional(),
+    max_tokens: z.number().optional(),
+    litellm_params: z.record(z.string()).optional(),
     demonstrations: demonstrationsSchema,
   }),
 });
