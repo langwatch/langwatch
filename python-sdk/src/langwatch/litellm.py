@@ -67,10 +67,7 @@ class LiteLLMPatch:
         if not trace or trace not in self.tracked_traces:
             return cast(Any, self.client)._original_completion(*args, **kwargs)
 
-        span = trace.span(
-            type="llm",
-            span_id=f"span_{nanoid.generate()}",
-        )
+        span = trace.span(type="llm")
 
         started_at = milliseconds_timestamp()
         try:
@@ -123,7 +120,6 @@ class LiteLLMPatch:
 
         span = trace.span(
             type="llm",
-            span_id=f"span_{nanoid.generate()}",
             parent=trace.get_current_span(),
         )
 
