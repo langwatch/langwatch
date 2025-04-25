@@ -11,7 +11,10 @@ import { Tooltip } from "../../../ui/tooltip";
  * This is a stateful component is used to run a trial evaluation.
  * @returns A button to run a trial evaluation.
  */
-export function RunEvaluationButton({ children, ...props }: ButtonProps) {
+export function RunEvaluationButton({
+  children,
+  ...props
+}: Omit<ButtonProps, "onClick">) {
   const { getDSL } = useEvaluationWizardStore(
     useShallow((state) => ({
       getDSL: state.getDSL,
@@ -37,14 +40,16 @@ export function RunEvaluationButton({ children, ...props }: ButtonProps) {
       }}
     >
       <Button
-        _icon={{
-          minWidth: "18px",
-          minHeight: "18px",
-        }}
-        onClick={runEvaluation}
-        loading={isLoading}
-        disabled={!!trialDisabled}
         {...props}
+        _icon={{
+          minWidth: props._icon?.minWidth ?? "18px",
+          minHeight: props._icon?.minHeight ?? "18px",
+        }}
+        loading={props.loading ?? isLoading}
+        disabled={props.disabled ?? !!trialDisabled}
+        onClick={() => {
+          runEvaluation();
+        }}
       >
         <LuCirclePlay />
         {children}
