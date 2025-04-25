@@ -3,6 +3,8 @@ import {
   Button,
   Grid,
   Heading,
+  HStack,
+  Input,
   RadioCard,
   Spinner,
   Text,
@@ -31,6 +33,8 @@ import { useAnimatedFocusElementById } from "../../../../hooks/useAnimatedFocusE
 import { InlineUploadCSVForm } from "~/components/datasets/UploadCSVModal";
 import { toaster } from "../../../ui/toaster";
 import { useShallow } from "zustand/react/shallow";
+import { LuBot, LuSparkles } from "react-icons/lu";
+import { DatasetGeneration } from "./datasets/DatasetGeneration";
 
 export function DatasetStep() {
   const {
@@ -149,16 +153,7 @@ export function DatasetStep() {
         projectId: project?.id ?? "",
         columnTypes,
         experimentId,
-        datasetRecords: [
-          {
-            id: `${Date.now()}-0`,
-            input: "Change this example input",
-          },
-          {
-            id: `${Date.now()}-1`,
-            input: "",
-          },
-        ],
+        datasetRecords: [],
       },
       {
         onSuccess: (dataset) => {
@@ -293,8 +288,7 @@ export function DatasetStep() {
                   {wizardState.dataSource === "choose" && "Select Dataset"}
                   {wizardState.dataSource === "from_production" &&
                     "Import from Production"}
-                  {wizardState.dataSource === "manual" &&
-                    "Create Dataset Manually"}
+                  {wizardState.dataSource === "manual" && "Create Dataset"}
                   {wizardState.dataSource === "upload" && "Upload CSV"}
                 </Text>
               }
@@ -372,15 +366,7 @@ export function DatasetStep() {
                 </VStack>
               )}
 
-              {wizardState.dataSource === "manual" && (
-                <VStack width="full" align="start" gap={3}>
-                  <Text>
-                    Double click the dataset cells and press the &quot;+ Add new
-                    record&quot; button on the right side to add some sample
-                    entries, then press next to continue
-                  </Text>
-                </VStack>
-              )}
+              {wizardState.dataSource === "manual" && <DatasetGeneration />}
 
               {wizardState.dataSource === "upload" && (
                 <InlineUploadCSVForm

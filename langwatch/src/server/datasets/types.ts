@@ -9,6 +9,22 @@ import {
 
 export type DatasetRecordEntry = { id: string } & Record<string, any>;
 
+export const datasetColumnTypeSchema = z.union([
+  z.literal("string"),
+  z.literal("boolean"),
+  z.literal("number"),
+  z.literal("date"),
+  z.literal("list"),
+  z.literal("json"),
+  z.literal("spans"),
+  z.literal("rag_contexts"),
+  z.literal("chat_messages"),
+  z.literal("annotations"),
+  z.literal("evaluations"),
+]);
+
+export type DatasetColumnType = z.infer<typeof datasetColumnTypeSchema>;
+
 export const DATASET_COLUMN_TYPES = [
   "string",
   "boolean",
@@ -21,9 +37,7 @@ export const DATASET_COLUMN_TYPES = [
   "chat_messages",
   "annotations",
   "evaluations",
-] as const;
-
-export type DatasetColumnType = (typeof DATASET_COLUMN_TYPES)[number];
+] as const satisfies DatasetColumnType[];
 
 export type DatasetColumns = { name: string; type: DatasetColumnType }[];
 

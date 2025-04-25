@@ -16,6 +16,8 @@ import {
   createEvaluationWizardSlicesStore,
   type EvaluationWizardSlicesUnion,
 } from "./slices";
+import type { AgGridReact } from "@ag-grid-community/react";
+import type { RefObject } from "react";
 
 export const EVALUATOR_CATEGORIES = [
   "expected_answer",
@@ -54,7 +56,7 @@ export type TaskType = keyof typeof TASK_TYPES;
 export const DATA_SOURCE_TYPES = {
   choose: "Choose existing dataset",
   from_production: "Import from Production",
-  manual: "Create manually",
+  manual: "Create with AI ✨",
   upload: "Upload CSV",
 } as const;
 
@@ -109,6 +111,7 @@ export type State = {
   isAutosaving: boolean;
   autosaveDisabled: boolean;
   workflowStore: WorkflowStoreState;
+  datasetGridRef?: RefObject<AgGridReact<any> | null>;
 };
 
 export type EvaluationWizardStore = State & {
@@ -135,6 +138,7 @@ export type EvaluationWizardStore = State & {
   previousStep: () => void;
   setDatasetId: (datasetId: string, columnTypes: DatasetColumns) => void;
   getDatasetId: () => string | undefined;
+  setDatasetGridRef: (gridRef: RefObject<AgGridReact<any> | null>) => void;
 
   workflowStore: WorkflowStore;
 };
@@ -296,6 +300,9 @@ const store = (
         return entryNodeData.dataset?.id;
       }
       return undefined;
+    },
+    setDatasetGridRef(gridRef) {
+      set((current) => ({ ...current, datasetGridRef: gridRef }));
     },
     workflowStore: createWorkflowStore(set, get),
   };

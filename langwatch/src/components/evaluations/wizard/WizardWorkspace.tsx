@@ -8,11 +8,12 @@ import { OptimizationStudioCanvas } from "../../../optimization_studio/component
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { Controls, useUpdateNodeInternals } from "@xyflow/react";
-import { memo, useEffect } from "react";
+import { memo, useEffect, useRef } from "react";
 import { EvaluationResults } from "../../../optimization_studio/components/ResultsPanel";
 import { useShallow } from "zustand/react/shallow";
 import { EvaluationManualIntegration } from "../../checks/EvaluationManualIntegration";
 import { useAvailableEvaluators } from "../../../hooks/useAvailableEvaluators";
+import type { AgGridReact } from "@ag-grid-community/react";
 
 export const WizardWorkspace = memo(function WizardWorkspace() {
   const {
@@ -25,6 +26,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
     task,
     hasWorkflow,
     hasCodeImplementation,
+    setDatasetGridRef,
   } = useEvaluationWizardStore(
     useShallow((state) => ({
       getDatasetId: state.getDatasetId,
@@ -40,11 +42,18 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
         !!state.getFirstEvaluatorNode() &&
         (state.wizardState.executionMethod === "realtime_guardrail" ||
           state.wizardState.executionMethod === "realtime_manually"),
+      setDatasetGridRef: state.setDatasetGridRef,
     }))
   );
 
+  const datasetGridRef = useRef<AgGridReact<any>>(null);
+
   const hasDataset = !!getDatasetId();
   const hasResults = hasDataset && hasWorkflow;
+
+  useEffect(() => {
+    setDatasetGridRef(datasetGridRef);
+  }, [datasetGridRef, setDatasetGridRef]);
 
   return (
     <VStack
@@ -103,7 +112,11 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
               <Card.Root width="full" position="sticky" top={6}>
                 <Card.Body width="full" paddingBottom={6}>
                   <Box width="full" position="relative">
-                    <DatasetTable datasetId={getDatasetId()} insideWizard />
+                    <DatasetTable
+                      datasetId={getDatasetId()}
+                      insideWizard
+                      gridRef={datasetGridRef}
+                    />
                   </Box>
                 </Card.Body>
               </Card.Root>

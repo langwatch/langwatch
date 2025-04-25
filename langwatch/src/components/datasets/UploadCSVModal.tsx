@@ -262,7 +262,6 @@ export function CSVReaderComponent({
             }
             readString(jsonToCSV(jsonContents), {
               complete: (results) => {
-                console.log("results", results);
                 setResults({ data: results.data as string[][] });
               },
             });

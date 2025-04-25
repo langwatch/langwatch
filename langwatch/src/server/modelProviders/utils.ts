@@ -42,5 +42,7 @@ export const getVercelAIModel = async (projectId: string, model?: string) => {
     headers,
   });
 
-  return vercelProvider(model_);
+  return vercelProvider(model_, {
+    parallelToolCalls: false,
+  });
 };

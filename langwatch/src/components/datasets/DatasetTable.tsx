@@ -11,7 +11,14 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import Parse from "papaparse";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import {
   ChevronDown,
   Download,
@@ -63,6 +70,7 @@ export function DatasetTable({
   hideButtons = false,
   bottomSpace = "300px",
   loadingOverlayComponent,
+  gridRef: parentGridRef,
 }: {
   datasetId?: string;
   inMemoryDataset?: InMemoryDataset;
@@ -73,6 +81,7 @@ export function DatasetTable({
   hideButtons?: boolean;
   bottomSpace?: string;
   loadingOverlayComponent?: (() => React.ReactNode) | null;
+  gridRef?: RefObject<AgGridReact<any> | null>;
 }) {
   const { project } = useOrganizationTeamProject();
 
@@ -363,8 +372,10 @@ export function DatasetTable({
         (rows) => rows?.filter((row) => !recordIds.includes(row.id))
       );
 
-      if (gridRef.current?.api) {
-        gridRef.current.api.applyTransaction({
+      const grid = parentGridRef ?? gridRef;
+
+      if (grid.current?.api) {
+        grid.current.api.applyTransaction({
           remove: recordIds.map((id) => ({ id })),
         });
       }
@@ -389,7 +400,7 @@ export function DatasetTable({
             databaseDataset
               .refetch()
               .then(() => {
-                gridRef.current?.api.refreshCells();
+                grid.current?.api.refreshCells();
               })
               .catch(() => {
                 // ignore
@@ -411,6 +422,7 @@ export function DatasetTable({
   }, [
     selectedEntryIds,
     setParentRowData,
+    parentGridRef,
     datasetId,
     deleteDatasetRecord,
     project?.id,
@@ -418,7 +430,8 @@ export function DatasetTable({
   ]);
 
   const onAddNewRow = useCallback(() => {
-    if (!gridRef.current?.api) return;
+    const grid = parentGridRef ?? gridRef;
+    if (!grid.current?.api) return;
 
     // Create a new empty row
     const newRow: Record<string, any> = { id: nanoid() };
@@ -432,7 +445,7 @@ export function DatasetTable({
       (col) => col.editable !== false && col.field !== "selected"
     );
 
-    const result = gridRef.current.api.applyTransaction({ add: [newRow] });
+    const result = grid.current.api.applyTransaction({ add: [newRow] });
 
     // Get the index of the newly added row
     const newRowIndex = result?.add[0]?.rowIndex ?? 0; // editableRowData.length;
@@ -443,7 +456,7 @@ export function DatasetTable({
 
       const focus = () => {
         // Start editing the first editable cell in the new row
-        gridRef.current?.api.startEditingCell({
+        grid.current?.api.startEditingCell({
           rowIndex: newRowIndex,
           colKey: firstEditableColumn.field!,
         });
@@ -460,7 +473,7 @@ export function DatasetTable({
         }, 1500);
       }
     }, 100);
-  }, [columnDefs, dataset]);
+  }, [columnDefs, dataset, parentGridRef]);
 
   return (
     <>
@@ -595,7 +608,7 @@ export function DatasetTable({
                 columnDefs={columnDefs}
                 rowData={localRowData}
                 onCellValueChanged={onCellValueChanged}
-                ref={gridRef}
+                ref={parentGridRef ?? gridRef}
                 domLayout="normal"
                 {...(loadingOverlayComponent !== undefined
                   ? { loadingOverlayComponent }
