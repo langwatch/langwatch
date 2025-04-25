@@ -155,7 +155,7 @@ class LangWatchTrace:
                 trace=self,
                 **root_span_params
             )
-            self.root_span.__enter__()
+            await self.root_span.__aenter__()
             return self.root_span
 
     def _cleanup(self, exc_type: Optional[type], exc_value: Optional[BaseException], traceback: Any) -> None:
