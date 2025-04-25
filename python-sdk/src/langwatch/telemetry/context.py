@@ -15,7 +15,7 @@ stored_langwatch_trace = contextvars.ContextVar["LangWatchTrace"](
 stored_langwatch_span = contextvars.ContextVar["LangWatchSpan"]("stored_langwatch_span")
 
 
-def get_current_trace() -> "LangWatchTrace":
+def get_current_trace(suppress_warning: bool = False) -> "LangWatchTrace":
     """Get the current trace from the LangWatch context.
 
     Returns:
@@ -28,11 +28,12 @@ def get_current_trace() -> "LangWatchTrace":
 
     from langwatch.telemetry.tracing import LangWatchTrace
 
-    warnings.warn(
-        "No trace in context when calling langwatch.get_current_trace(), perhaps you forgot to use @langwatch.trace()?",
-    )
+    if not suppress_warning:
+        warnings.warn(
+            "No trace in context when calling langwatch.get_current_trace(), perhaps you forgot to use @langwatch.trace()?",
+        )
 
-    return LangWatchTrace()
+    return LangWatchTrace().__enter__()
 
 
 def get_current_span() -> "LangWatchSpan":

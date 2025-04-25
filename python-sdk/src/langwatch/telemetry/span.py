@@ -161,7 +161,7 @@ class LangWatchSpan:
             if self.trace:
                 tracer = self.trace.tracer
             else:
-                if not self.ignore_missing_trace_warning:
+                if not self.ignore_missing_trace_warning and not self.parent:
                     warn(
                         "No current trace found, some spans may not be sent to LangWatch"
                     )
@@ -327,7 +327,7 @@ class LangWatchSpan:
                 truncate_object_recursively(
                     convert_typed_values(deepcopy(input)),
                     max_string_length=(
-                        self.trace or get_current_trace()
+                        self.trace or get_current_trace(suppress_warning=True)
                     ).max_string_length,
                 ),
                 cls=SerializableWithStringFallback,
@@ -338,7 +338,7 @@ class LangWatchSpan:
                 truncate_object_recursively(
                     convert_typed_values(deepcopy(output)),
                     max_string_length=(
-                        self.trace or get_current_trace()
+                        self.trace or get_current_trace(suppress_warning=True)
                     ).max_string_length,
                 ),
                 cls=SerializableWithStringFallback,
@@ -357,7 +357,7 @@ class LangWatchSpan:
                 truncate_object_recursively(
                     rag_contexts(contexts),
                     max_string_length=(
-                        self.trace or get_current_trace()
+                        self.trace or get_current_trace(suppress_warning=True)
                     ).max_string_length,
                 ),
                 cls=SerializableWithStringFallback,
@@ -604,7 +604,7 @@ class LangWatchSpan:
     def __enter__(self) -> "LangWatchSpan":
         """Makes the span usable as a context manager."""
         self.trace = self.trace or stored_langwatch_trace.get(None)
-        if not self.ignore_missing_trace_warning and not self.trace:
+        if not self.ignore_missing_trace_warning and not self.trace and not self.parent:
             warn("No current trace found, some spans will may not be sent to LangWatch")
 
         self._create_span()
@@ -637,7 +637,7 @@ class LangWatchSpan:
     async def __aenter__(self) -> "LangWatchSpan":
         """Makes the span usable as an async context manager."""
         self.trace = self.trace or stored_langwatch_trace.get(None)
-        if not self.ignore_missing_trace_warning and not self.trace:
+        if not self.ignore_missing_trace_warning and not self.trace and not self.parent:
             warn("No current trace found, some spans may not be sent to LangWatch")
 
         self._create_span()
