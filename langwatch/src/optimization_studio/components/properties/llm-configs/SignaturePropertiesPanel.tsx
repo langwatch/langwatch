@@ -1,6 +1,7 @@
 import { Separator, Spinner, VStack } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { useCallback, useEffect, useRef } from "react";
+import debounce from "lodash.debounce";
+import { useEffect, useMemo, useRef } from "react";
 import { FormProvider } from "react-hook-form";
 
 import type { LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
@@ -72,17 +73,19 @@ function SignaturePropertiesPanelInner({
    *
    * @param formValues - The current form values to sync with node data
    */
-  const syncNodeDataWithFormValues = useCallback(
-    (formValues: PromptConfigFormValues) => {
-      const newNodeData = promptConfigFormValuesToOptimizationStudioNodeData(
-        configId,
-        formValues
-      );
-      setNode({
-        ...node,
-        data: newNodeData,
-      });
-    },
+  const syncNodeDataWithFormValues = useMemo(
+    () =>
+      // Debounce the sync to prevent excessive re-renders when the user is typing
+      debounce((formValues: PromptConfigFormValues) => {
+        const newNodeData = promptConfigFormValuesToOptimizationStudioNodeData(
+          configId,
+          formValues
+        );
+        setNode({
+          ...node,
+          data: newNodeData,
+        });
+      }, 1000),
     [configId, node, setNode]
   );
 
