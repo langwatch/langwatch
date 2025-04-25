@@ -232,8 +232,9 @@ export function SignaturePropertiesPanel({
           const newVersion = await createNewVersion(
             newConfig.id,
             {
-              ...currentConfigData,
-              ...rest,
+              prompt: rest?.prompt ?? currentConfigData.prompt,
+              inputs: rest?.inputs ?? currentConfigData.inputs,
+              outputs: rest?.outputs ?? currentConfigData.outputs,
               model: llm?.model ?? currentConfigData.model,
               temperature: llm?.temperature ?? currentConfigData.temperature,
               max_tokens: llm?.max_tokens ?? currentConfigData.max_tokens,

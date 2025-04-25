@@ -37,7 +37,7 @@ export function PromptSourceHeader({
   const setNode = useSmartSetNode();
 
   // Fetch the saved configuration to compare with current node data
-  const { data: savedConfig } =
+  const { data: savedConfig, isLoading: isLoadingSavedConfig } =
     useGetPromptConfigByIdWithLatestVersionQuery(configId);
 
   const { mutateAsync: createConfig } =
@@ -90,7 +90,8 @@ export function PromptSourceHeader({
       label="Source Prompt"
       width="full"
       helper={
-        !savedConfig && (
+        !savedConfig &&
+        !isLoadingSavedConfig && (
           <Text fontSize="sm" color="red.500">
             This node&apos;s source prompt was deleted. Please save a new prompt
             version to continue using this configuration.
