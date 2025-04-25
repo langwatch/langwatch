@@ -12,12 +12,12 @@ export function ModelSelectField() {
   return (
     <VerticalFormControl
       label="Model"
-      invalid={!!errors.version?.configData?.model}
-      helper={errors.version?.configData?.model?.message?.toString()}
-      error={errors.version?.configData?.model}
+      invalid={!!errors.version?.configData?.llm?.model}
+      helper={errors.version?.configData?.llm?.model?.message?.toString()}
+      error={errors.version?.configData?.llm?.model}
     >
       <Controller
-        name="version.configData.model"
+        name="version.configData.llm.model"
         control={control}
         render={({ field }) => {
           return (

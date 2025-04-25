@@ -17,12 +17,12 @@ export function WrappedOptimizationStudioLLMConfigField() {
   return (
     <VerticalFormControl
       label="Model"
-      invalid={!!errors.version?.configData?.model}
-      helper={errors.version?.configData?.model?.message?.toString()}
-      error={errors.version?.configData?.model}
+      invalid={!!errors.version?.configData?.llm}
+      helper={errors.version?.configData?.llm?.message?.toString()}
+      error={errors.version?.configData?.llm}
     >
       <Controller
-        name="version.configData.model"
+        name="version.configData.llm"
         control={control}
         render={({ field }) => {
           return (

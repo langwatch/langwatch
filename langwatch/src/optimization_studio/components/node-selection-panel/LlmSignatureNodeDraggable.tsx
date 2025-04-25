@@ -9,9 +9,9 @@ import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import { MODULES } from "~/optimization_studio/registry";
 import type { Component } from "~/optimization_studio/types/dsl";
 import {
-  createNewPromptName,
-  llmConfigToNodeData,
-} from "~/optimization_studio/utils/llmPromptConfigUtils";
+  createNewOptimizationStudioPromptName,
+  llmConfigToOptimizationStudioNodeData,
+} from "~/prompt-configs/llmPromptConfigUtils";
 import type { NodeWithOptionalPosition } from "~/types";
 import { api } from "~/utils/api";
 
@@ -37,7 +37,10 @@ export function LlmSignatureNodeDraggable() {
         }
 
         const { name: workflowName, nodes } = getWorkflow();
-        const promptName = createNewPromptName(workflowName, nodes);
+        const promptName = createNewOptimizationStudioPromptName(
+          workflowName,
+          nodes
+        );
         // Do this right away so that it appears snappy
         setNode({
           id: item.node.id,
@@ -54,7 +57,7 @@ export function LlmSignatureNodeDraggable() {
 
           setNode({
             id: item.node.id,
-            data: llmConfigToNodeData(config),
+            data: llmConfigToOptimizationStudioNodeData(config),
           });
         } catch (error) {
           console.error("Error creating new prompt", error);

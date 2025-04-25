@@ -1,6 +1,9 @@
 import type { Node } from "@xyflow/react";
 
-import { parseLlmConfigVersion } from "~/server/prompt-config/repositories/llm-config-version-schema";
+import {
+  parseLlmConfigVersion,
+  type LatestConfigVersionSchema,
+} from "~/server/prompt-config/repositories/llm-config-version-schema";
 import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 
 import type {
@@ -8,12 +11,12 @@ import type {
   LlmConfigParameter,
   LlmPromptConfigComponent,
   Signature,
-} from "../types/dsl";
+} from "../optimization_studio/types/dsl";
 
 import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
 import { kebabCase } from "~/utils/stringCasing";
 
-export function llmConfigToNodeData(
+export function llmConfigToOptimizationStudioNodeData(
   config: LlmConfigWithLatestVersion
 ): Node<LlmPromptConfigComponent>["data"] {
   const { latestVersion } = config;
@@ -47,7 +50,7 @@ export function llmConfigToNodeData(
   };
 }
 
-export function promptConfigFormValuesToNodeData(
+export function promptConfigFormValuesToOptimizationStudioNodeData(
   configId: string,
   formValues: PromptConfigFormValues
 ): Node<LlmPromptConfigComponent>["data"] {
@@ -60,7 +63,7 @@ export function promptConfigFormValuesToNodeData(
       {
         identifier: "llm",
         type: "llm",
-        value: formValues.version?.configData?.model,
+        value: formValues.version?.configData?.llm,
       },
       {
         identifier: "instructions",
@@ -76,7 +79,7 @@ export function promptConfigFormValuesToNodeData(
   };
 }
 
-export function nodeDataToPromptConfigFormInitialValues(
+export function optimizationStudioNodeDataToPromptConfigFormInitialValues(
   nodeData: Omit<Node<Signature | LlmPromptConfigComponent>["data"], "configId">
 ): PromptConfigFormValues {
   const parametersMap = nodeData.parameters
@@ -89,7 +92,7 @@ export function nodeDataToPromptConfigFormInitialValues(
       configData: {
         inputs: nodeData.inputs ?? [],
         outputs: nodeData.outputs ?? [],
-        model: llmParameter.value,
+        llm: llmParameter.value,
         prompt: nodeData.parameters?.find(
           (p) => p.identifier === "instructions"
         )?.value as string,
@@ -102,7 +105,38 @@ export function nodeDataToPromptConfigFormInitialValues(
   };
 }
 
-export function createNewPromptName(
+export function llmConfigToPromptConfigFormValues(
+  llmConfig: LlmConfigWithLatestVersion
+): PromptConfigFormValues {
+  return {
+    name: llmConfig.name ?? "",
+    version: {
+      configData: {
+        ...llmConfig.latestVersion.configData,
+        llm: {
+          model: llmConfig.latestVersion.configData.model,
+          temperature: llmConfig.latestVersion.configData.temperature,
+          max_tokens: llmConfig.latestVersion.configData.max_tokens,
+          litellm_params: llmConfig.latestVersion.configData.litellm_params,
+        },
+      },
+    },
+  };
+}
+
+export function promptConfigFormValuesVersionToLlmConfigVersionConfigData(
+  versionValues: PromptConfigFormValues["version"]
+): LatestConfigVersionSchema["configData"] {
+  return {
+    ...versionValues.configData,
+    model: versionValues.configData.llm.model,
+    temperature: versionValues.configData.llm.temperature,
+    max_tokens: versionValues.configData.llm.max_tokens,
+    litellm_params: versionValues.configData.llm.litellm_params,
+  };
+}
+
+export function createNewOptimizationStudioPromptName(
   workflowName: string,
   nodes: Node<Component>[]
 ) {

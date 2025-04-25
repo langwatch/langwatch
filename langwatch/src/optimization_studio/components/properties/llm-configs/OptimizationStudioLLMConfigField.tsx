@@ -1,3 +1,4 @@
+import { LLMConfigField } from "~/components/llmPromptConfigs/LlmConfigField";
 import {
   allModelOptions,
   useModelSelectionOptions,
@@ -5,8 +6,6 @@ import {
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useWorkflowStore } from "../../../hooks/useWorkflowStore";
 import type { LLMConfig } from "../../../types/dsl";
-
-import { LLMConfigField } from "~/components/llmPromptConfigs/LlmConfigField";
 
 /**
  * LLM Config field for the Optimization Studio

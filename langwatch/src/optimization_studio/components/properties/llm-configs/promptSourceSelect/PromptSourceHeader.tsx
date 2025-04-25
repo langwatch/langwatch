@@ -10,7 +10,7 @@ import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
-import { llmConfigToNodeData } from "~/optimization_studio/utils/llmPromptConfigUtils";
+import { llmConfigToOptimizationStudioNodeData } from "~/prompt-configs/llmPromptConfigUtils";
 import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionHistoryButton";
 import { VersionSaveButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionSaveButton";
 import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
@@ -49,7 +49,7 @@ export function PromptSourceHeader({
    */
   const hasDrifted = useMemo(() => {
     if (!savedConfig) return false;
-    const savedConfigData = llmConfigToNodeData(savedConfig);
+    const savedConfigData = llmConfigToOptimizationStudioNodeData(savedConfig);
     return !isEqual(node.data, savedConfigData);
   }, [node.data, savedConfig]);
 

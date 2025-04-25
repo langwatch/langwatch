@@ -19,12 +19,6 @@ import { WrappedOptimizationStudioLLMConfigField } from "./WrappedOptimizationSt
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
-import {
-  createNewPromptName,
-  llmConfigToNodeData,
-  nodeDataToPromptConfigFormInitialValues,
-  promptConfigFormValuesToNodeData,
-} from "~/optimization_studio/utils/llmPromptConfigUtils";
 import { DemonstrationsField } from "~/prompt-configs/forms/fields/DemonstrationsField";
 import { PromptConfigVersionFieldGroup } from "~/prompt-configs/forms/fields/PromptConfigVersionFieldGroup";
 import { PromptNameField } from "~/prompt-configs/forms/fields/PromptNameField";
@@ -33,6 +27,12 @@ import {
   usePromptConfigForm,
   type PromptConfigFormValues,
 } from "~/prompt-configs/hooks/usePromptConfigForm";
+import {
+  createNewOptimizationStudioPromptName,
+  llmConfigToOptimizationStudioNodeData,
+  optimizationStudioNodeDataToPromptConfigFormInitialValues,
+  promptConfigFormValuesToOptimizationStudioNodeData,
+} from "~/prompt-configs/llmPromptConfigUtils";
 import { PromptConfigProvider } from "~/prompt-configs/providers/PromptConfigProvider";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import { api } from "~/utils/api";
@@ -70,7 +70,7 @@ function SignaturePropertiesPanelInner({
    */
   const syncNodeDataWithFormValues = useCallback(
     (formValues: PromptConfigFormValues) => {
-      const newNodeData = promptConfigFormValuesToNodeData(
+      const newNodeData = promptConfigFormValuesToOptimizationStudioNodeData(
         configId,
         formValues
       );
@@ -83,9 +83,8 @@ function SignaturePropertiesPanelInner({
   );
 
   // Initialize form with values from node data
-  const initialConfigValues = nodeDataToPromptConfigFormInitialValues(
-    node.data
-  );
+  const initialConfigValues =
+    optimizationStudioNodeDataToPromptConfigFormInitialValues(node.data);
   const formProps = usePromptConfigForm({
     configId,
     initialConfigValues,
@@ -112,7 +111,7 @@ function SignaturePropertiesPanelInner({
         projectId: project?.id ?? "",
       });
 
-      const newNodeData = llmConfigToNodeData(config);
+      const newNodeData = llmConfigToOptimizationStudioNodeData(config);
 
       // Update the node data with the new config
       setNode({
@@ -122,7 +121,7 @@ function SignaturePropertiesPanelInner({
 
       // Reset the form with the updated node data
       formProps.methods.reset(
-        nodeDataToPromptConfigFormInitialValues(newNodeData)
+        optimizationStudioNodeDataToPromptConfigFormInitialValues(newNodeData)
       );
     } catch (error) {
       console.error(error);
@@ -182,8 +181,6 @@ export function SignaturePropertiesPanel({
   const idRef = useRef<string | null>(null);
   const { createNewVersion } = usePromptConfig();
 
-  console.log("defaultLLMConfig", defaultLLMConfig);
-
   // For backwards compatibility, we need to check if there's a configId on the node data.
   // If not, we need to create a new config and update the node data.
   useEffect(() => {
@@ -198,39 +195,40 @@ export function SignaturePropertiesPanel({
           const newConfig = await createMutation.mutateAsync({
             name:
               (node.data as LlmPromptConfigComponent).name ??
-              createNewPromptName(workflowName, nodes),
+              createNewOptimizationStudioPromptName(workflowName, nodes),
             projectId: project?.id ?? "",
           });
 
           // Convert the node data to form initial values
-          const initialValues = nodeDataToPromptConfigFormInitialValues({
-            ...node.data,
-            parameters: setDefaultLlmConfigToParameters(
-              (node.data.parameters ??
-                []) as LlmPromptConfigComponent["parameters"],
-              defaultLLMConfig
-            ),
-          });
+          const initialValues =
+            optimizationStudioNodeDataToPromptConfigFormInitialValues({
+              ...node.data,
+              parameters: setDefaultLlmConfigToParameters(
+                (node.data.parameters ??
+                  []) as LlmPromptConfigComponent["parameters"],
+                defaultLLMConfig
+              ),
+            });
 
           // Use the initial values to create a new version
           const currentConfigData = newConfig.latestVersion.configData; // Use the defaults
           const nodeConfigData = initialValues.version.configData; // Use the node's config data
+          const { llm, ...rest } = nodeConfigData;
           const newVersion = await createNewVersion(
             newConfig.id,
             {
-              inputs: nodeConfigData.inputs ?? currentConfigData.inputs,
-              outputs: nodeConfigData.outputs ?? currentConfigData.outputs,
-              model: nodeConfigData.model ?? currentConfigData.model,
-              prompt: nodeConfigData.prompt ?? currentConfigData.prompt,
-              demonstrations:
-                nodeConfigData.demonstrations ??
-                currentConfigData.demonstrations,
+              // Base
+              ...currentConfigData,
+              // LLM from node
+              ...llm,
+              // Rest of the values from the node
+              ...rest,
             },
             "Save from legacy node"
           );
 
           // Convert the new config and version to node data
-          const newNodeData = llmConfigToNodeData({
+          const newNodeData = llmConfigToOptimizationStudioNodeData({
             ...newConfig,
             latestVersion: newVersion as unknown as LatestConfigVersionSchema,
           });

@@ -105,7 +105,7 @@ export type LlmConfigParameter = StronglyTypedFieldBase & {
 type PromptingTechniqueParameter = StronglyTypedFieldBase & {
   type: "prompting_technique";
   identifier: "prompting_technique";
-  value: PromptingTechnique;
+  value: unknown;
 };
 
 /**
