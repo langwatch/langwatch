@@ -5,7 +5,6 @@ import {
   Input,
   Spacer,
   Text,
-  Textarea,
   VStack,
 } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
@@ -14,41 +13,6 @@ import { useFieldArray, useFormContext } from "react-hook-form";
 
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
 import { TypeSelector } from "../../ui/TypeSelector";
-
-import { ModelSelectField } from "./ModelSelectField";
-
-/**
- * Dumb Form Component for editing the config content
- */
-export function PromptConfigVersionFieldGroup() {
-  const form = useFormContext<PromptConfigFormValues>();
-  const { register, formState } = form;
-  const { errors } = formState;
-
-  return (
-    <VStack align="stretch" gap={6}>
-      <ModelSelectField />
-
-      <Field.Root invalid={!!errors.version?.configData?.prompt}>
-        <Field.Label>Prompt</Field.Label>
-        <Textarea
-          {...register("version.configData.prompt")}
-          placeholder="You are a helpful assistant"
-          rows={4}
-        />
-        {errors.version?.configData?.prompt && (
-          <Field.ErrorText>
-            {errors.version?.configData?.prompt.message}
-          </Field.ErrorText>
-        )}
-      </Field.Root>
-
-      <ConfigFieldGroup title="Inputs" name="inputs" />
-
-      <ConfigFieldGroup title="Outputs" name="outputs" />
-    </VStack>
-  );
-}
 
 /**
  * Reusable component for a group of fields (inputs, outputs)
@@ -240,4 +204,12 @@ function FieldRow({
       {error?.message && <Field.ErrorText>{error.message}</Field.ErrorText>}
     </Field.Root>
   );
+}
+
+export function InputsFieldGroup() {
+  return <ConfigFieldGroup title="Inputs" name="inputs" />;
+}
+
+export function OutputsFieldGroup() {
+  return <ConfigFieldGroup title="Outputs" name="outputs" />;
 }

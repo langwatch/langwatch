@@ -10,11 +10,11 @@ import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
-import { llmConfigToOptimizationStudioNodeData } from "~/prompt-configs/llmPromptConfigUtils";
 import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionHistoryButton";
 import { VersionSaveButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionSaveButton";
 import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
 import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
+import { llmConfigToOptimizationStudioNodeData } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 
 export function PromptSourceHeader({

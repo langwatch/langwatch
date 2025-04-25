@@ -114,7 +114,10 @@ type PromptingTechniqueParameter = StronglyTypedFieldBase & {
 type DemonstrationsParameter = StronglyTypedFieldBase & {
   type: "dataset";
   identifier: "demonstrations";
-  value: unknown;
+  value: {
+    columns: DatasetColumns;
+    rows: Record<string, string>[];
+  };
 };
 
 /**

@@ -1,4 +1,4 @@
-import { Separator, Spinner } from "@chakra-ui/react";
+import { Separator, Spinner, VStack } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useRef } from "react";
 import { FormProvider } from "react-hook-form";
@@ -20,7 +20,11 @@ import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
 import { DemonstrationsField } from "~/prompt-configs/forms/fields/DemonstrationsField";
-import { PromptConfigVersionFieldGroup } from "~/prompt-configs/forms/fields/PromptConfigVersionFieldGroup";
+import {
+  InputsFieldGroup,
+  OutputsFieldGroup,
+} from "~/prompt-configs/forms/fields/PromptConfigVersionFieldGroup";
+import { PromptField } from "~/prompt-configs/forms/fields/PromptField";
 import { PromptNameField } from "~/prompt-configs/forms/fields/PromptNameField";
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import {
@@ -135,22 +139,31 @@ function SignaturePropertiesPanelInner({
   // TODO: Consider refactoring the BasePropertiesPanel so that we don't need to hide everything like this
   return (
     <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs>
-      <Separator />
-      <PromptSourceHeader
-        node={node}
-        onPromptSourceSelect={(config) => void handlePromptSourceSelect(config)}
-        triggerSaveVersion={triggerSaveVersion}
-        values={formProps.methods.getValues()}
-      />
-      {/* Prompt Configuration Form */}
-      <FormProvider {...formProps.methods}>
-        <form style={{ width: "100%" }}>
-          <PromptNameField />
-          <WrappedOptimizationStudioLLMConfigField />
-          <PromptConfigVersionFieldGroup />
-          <DemonstrationsField />
-        </form>
-      </FormProvider>
+      <VStack width="full">
+        <Separator marginY={0} />
+        <PromptSourceHeader
+          node={node}
+          onPromptSourceSelect={(config) =>
+            void handlePromptSourceSelect(config)
+          }
+          triggerSaveVersion={triggerSaveVersion}
+          values={formProps.methods.getValues()}
+        />
+        <Separator marginY={0} />
+        {/* Prompt Configuration Form */}
+        <FormProvider {...formProps.methods}>
+          <form style={{ width: "100%" }}>
+            <VStack width="full" gap={6}>
+              <PromptNameField />
+              <WrappedOptimizationStudioLLMConfigField />
+              <PromptField />
+              <InputsFieldGroup />
+              <OutputsFieldGroup />
+              <DemonstrationsField />
+            </VStack>
+          </form>
+        </FormProvider>
+      </VStack>
     </BasePropertiesPanel>
   );
 }
@@ -212,18 +225,21 @@ export function SignaturePropertiesPanel({
 
           // Use the initial values to create a new version
           const currentConfigData = newConfig.latestVersion.configData; // Use the defaults
-          const nodeConfigData = initialValues.version.configData; // Use the node's config data
-          const { llm, ...rest } = nodeConfigData;
+          const nodeConfigData = initialValues.version?.configData; // Use the node's config data
+          const { llm, ...rest } =
+            nodeConfigData ??
+            ({} as PromptConfigFormValues["version"]["configData"]);
           const newVersion = await createNewVersion(
             newConfig.id,
             {
-              // Base
               ...currentConfigData,
-              // LLM from node
-              ...llm,
-              // Rest of the values from the node
               ...rest,
-            },
+              model: llm?.model ?? currentConfigData.model,
+              temperature: llm?.temperature ?? currentConfigData.temperature,
+              max_tokens: llm?.max_tokens ?? currentConfigData.max_tokens,
+              demonstrations:
+                rest?.demonstrations ?? currentConfigData.demonstrations,
+            } as LatestConfigVersionSchema["configData"],
             "Save from legacy node"
           );
 

@@ -1,5 +1,7 @@
 import type { Node } from "@xyflow/react";
+import type { DeepPartial } from "react-hook-form";
 
+import type { DatasetColumns } from "~/server/datasets/types";
 import {
   parseLlmConfigVersion,
   type LatestConfigVersionSchema,
@@ -81,7 +83,7 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
 
 export function optimizationStudioNodeDataToPromptConfigFormInitialValues(
   nodeData: Omit<Node<Signature | LlmPromptConfigComponent>["data"], "configId">
-): PromptConfigFormValues {
+): DeepPartial<PromptConfigFormValues> {
   const parametersMap = nodeData.parameters
     ? Object.fromEntries(nodeData.parameters.map((p) => [p.identifier, p]))
     : {};
@@ -93,13 +95,18 @@ export function optimizationStudioNodeDataToPromptConfigFormInitialValues(
         inputs: nodeData.inputs ?? [],
         outputs: nodeData.outputs ?? [],
         llm: llmParameter.value,
-        prompt: nodeData.parameters?.find(
-          (p) => p.identifier === "instructions"
-        )?.value as string,
-        demonstrations: nodeData.parameters?.find(
-          (p) => p.identifier === "demonstrations"
-        )
-          ?.value as PromptConfigFormValues["version"]["configData"]["demonstrations"],
+        prompt:
+          typeof parametersMap.instructions?.value === "string"
+            ? parametersMap.instructions.value
+            : undefined,
+        demonstrations:
+          typeof parametersMap.demonstrations?.value === "object" &&
+          parametersMap.demonstrations?.value !== null
+            ? (parametersMap.demonstrations.value as {
+                columns: DatasetColumns;
+                rows: Record<string, string>[];
+              })
+            : undefined,
       },
     },
   };
@@ -117,7 +124,6 @@ export function llmConfigToPromptConfigFormValues(
           model: llmConfig.latestVersion.configData.model,
           temperature: llmConfig.latestVersion.configData.temperature,
           max_tokens: llmConfig.latestVersion.configData.max_tokens,
-          litellm_params: llmConfig.latestVersion.configData.litellm_params,
         },
       },
     },
@@ -132,7 +138,6 @@ export function promptConfigFormValuesVersionToLlmConfigVersionConfigData(
     model: versionValues.configData.llm.model,
     temperature: versionValues.configData.llm.temperature,
     max_tokens: versionValues.configData.llm.max_tokens,
-    litellm_params: versionValues.configData.llm.litellm_params,
   };
 }
 

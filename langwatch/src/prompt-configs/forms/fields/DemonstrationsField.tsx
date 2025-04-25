@@ -1,11 +1,13 @@
 import { Button, HStack, Spacer, Text, useDisclosure } from "@chakra-ui/react";
 import { Edit2, Info } from "react-feather";
 import { useFormContext, Controller } from "react-hook-form";
+
+import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
+import { DemonstrationsModal } from "../../modals/DemonstrationsModal";
+
 import { DatasetPreview } from "~/components/datasets/DatasetPreview";
 import { Tooltip } from "~/components/ui/tooltip";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
-import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
-import { DemonstrationsModal } from "../../modals/DemonstrationsModal";
 
 /**
  * Field for managing demonstrations (few-shot examples) in prompt configurations

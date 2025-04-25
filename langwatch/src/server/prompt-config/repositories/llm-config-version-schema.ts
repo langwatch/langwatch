@@ -71,7 +71,6 @@ const configSchemaV1_0 = z.object({
     model: z.string().min(1, "Model identifier cannot be empty"),
     temperature: z.number().optional(),
     max_tokens: z.number().optional(),
-    litellm_params: z.record(z.string()).optional(),
     demonstrations: demonstrationsSchema,
   }),
 });

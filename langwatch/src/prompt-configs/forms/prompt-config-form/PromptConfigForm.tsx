@@ -1,8 +1,13 @@
+import { VStack } from "@chakra-ui/react";
 import { FormProvider, type UseFormReturn } from "react-hook-form";
 
 import { PromptConfigProvider } from "../../providers/PromptConfigProvider";
 import { DemonstrationsField } from "../fields/DemonstrationsField";
-import { PromptConfigVersionFieldGroup } from "../fields/PromptConfigVersionFieldGroup";
+import {
+  InputsFieldGroup,
+  OutputsFieldGroup,
+} from "../fields/PromptConfigVersionFieldGroup";
+import { PromptField } from "../fields/PromptField";
 import { PromptNameField } from "../fields/PromptNameField";
 
 import { PromptConfigInfoBox } from "./components/PromptConfigInfoBox";
@@ -35,19 +40,23 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
   return (
     <FormProvider {...methods}>
       <form style={{ width: "100%" }}>
-        <VerticalFormControl label="Current Version">
-          <PromptConfigInfoBox
-            isSaving={isLoading}
-            config={savedConfig}
-            saveEnabled={saveEnabled}
-            onSaveClick={() =>
-              triggerSaveVersion(configId, methods.getValues())
-            }
-          />
-        </VerticalFormControl>
-        <PromptNameField />
-        <PromptConfigVersionFieldGroup />
-        <DemonstrationsField />
+        <VStack width="full" gap={6}>
+          <VerticalFormControl label="Current Version">
+            <PromptConfigInfoBox
+              isSaving={isLoading}
+              config={savedConfig}
+              saveEnabled={saveEnabled}
+              onSaveClick={() =>
+                triggerSaveVersion(configId, methods.getValues())
+              }
+            />
+          </VerticalFormControl>
+          <PromptNameField />
+          <PromptField />
+          <InputsFieldGroup />
+          <OutputsFieldGroup />
+          <DemonstrationsField />
+        </VStack>
       </form>
     </FormProvider>
   );
