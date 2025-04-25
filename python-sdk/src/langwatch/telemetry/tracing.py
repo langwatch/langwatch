@@ -252,14 +252,16 @@ class LangWatchTrace:
     ) -> None:
         ensure_setup()
 
+        client = get_instance()
+
         if metadata is None:
             metadata = {}
         if trace_id is not None:
-            metadata[AttributeName.DeprecatedTraceId] = trace_id
+            metadata[AttributeName.DeprecatedTraceId] = str(trace_id)
         if expected_output is not None:
             self._expected_output = expected_output
-        if disable_sending is not None:
-            get_instance().disable_sending = disable_sending
+        if disable_sending is not None and client is not None:
+            client.disable_sending = disable_sending
 
         # Serialize metadata before setting as attribute
         self.root_span.set_attributes({
