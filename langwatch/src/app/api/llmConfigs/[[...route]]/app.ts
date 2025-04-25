@@ -1,12 +1,14 @@
+import type { Project } from "@prisma/client";
 import { Hono } from "hono";
+import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
-import { describeRoute } from "hono-openapi";
-import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
+
+import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+
 import { prisma } from "../../../../server/db";
-import type { Project } from "@prisma/client";
-import { LlmConfigRepository } from "../../../../server/repositories/llm-config.repository";
-import { getLatestConfigVersionSchema } from "~/server/repositories/llm-config-version-schema";
+import { LlmConfigRepository } from "../../../../server/prompt-config/repositories/llm-config.repository";
+import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 
 patchZodOpenapi();
 
@@ -56,7 +58,7 @@ app.get(
     const repository = c.get("llmConfigRepository");
     const project = c.get("project");
 
-    const configs = await repository.getAllConfigs(project.id);
+    const configs = await repository.getAllWithLatestVersion(project.id);
     return c.json(configs);
   }
 );
@@ -73,7 +75,10 @@ app.get(
     const { id } = c.req.param();
 
     try {
-      const config = await repository.getConfigById(id, project.id);
+      const config = await repository.getConfigByIdWithLatestVersions(
+        id,
+        project.id
+      );
       return c.json(config);
     } catch (error: any) {
       return c.json({ error: error.message }, 404);
@@ -81,11 +86,12 @@ app.get(
   }
 );
 
-// Create prompt
+// Create prompt with initial version
+// TODO: Consider allowing for the initial version to be customized via params
 app.post(
   "/",
   describeRoute({
-    description: "Create a new prompt",
+    description: "Create a new prompt with default initial version",
   }),
   zValidator("json", baseConfigSchema),
   async (c) => {
@@ -94,7 +100,7 @@ app.post(
     const data = c.req.valid("json");
     const { name } = data;
 
-    const newConfig = await repository.createConfig({
+    const newConfig = await repository.createConfigWithInitialVersion({
       name,
       projectId: project.id,
     });
@@ -115,7 +121,7 @@ app.get(
     const { id } = c.req.param();
 
     try {
-      const versions = await repository.versions.getVersions({
+      const versions = await repository.versions.getVersionsForConfigById({
         configId: id,
         projectId: project.id,
       });

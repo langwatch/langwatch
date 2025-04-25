@@ -12,6 +12,7 @@ import isDeepEqual from "fast-deep-equal";
 import debounce from "lodash.debounce";
 import { temporal } from "zundo";
 import { create } from "zustand";
+
 import { snakeCaseToPascalCase } from "../../utils/stringCasing";
 import type {
   BaseComponent,
@@ -20,8 +21,8 @@ import type {
   LLMConfig,
   Workflow,
 } from "../types/dsl";
-import { findLowestAvailableName } from "../utils/nodeUtils";
 import { hasDSLChanged } from "../utils/dslUtils";
+import { findLowestAvailableName } from "../utils/nodeUtils";
 
 export type SocketStatus =
   | "disconnected"
@@ -65,6 +66,13 @@ export type WorkflowStore = State & {
   onConnect: (connection: Connection) => void;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
+  /**
+   * Update a node in the workflow.
+   * This will find the node by id and update it.
+   * If the id is not found, nothing will be updated.
+   * @param node - The new node data
+   * @param newId - Optional new id for the node once it updated
+   */
   setNode: (node: Partial<Node> & { id: string }, newId?: string) => void;
   setNodeParameter: (
     nodeId: string,
@@ -325,7 +333,7 @@ export const store = (
     }
 
     const { name: newName, id: newId } = findLowestAvailableName(
-      get().nodes,
+      get().nodes.map((node) => node.id),
       currentNode.data.name?.replace(/ \(.*?\)$/, "") ?? "Component"
     );
 

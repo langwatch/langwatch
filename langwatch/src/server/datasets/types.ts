@@ -9,18 +9,21 @@ import {
 
 export type DatasetRecordEntry = { id: string } & Record<string, any>;
 
-export type DatasetColumnType =
-  | "string"
-  | "boolean"
-  | "number"
-  | "date"
-  | "list"
-  | "json"
-  | "spans"
-  | "rag_contexts"
-  | "chat_messages"
-  | "annotations"
-  | "evaluations";
+export const DATASET_COLUMN_TYPES = [
+  "string",
+  "boolean",
+  "number",
+  "date",
+  "list",
+  "json",
+  "spans",
+  "rag_contexts",
+  "chat_messages",
+  "annotations",
+  "evaluations",
+] as const;
+
+export type DatasetColumnType = (typeof DATASET_COLUMN_TYPES)[number];
 
 export type DatasetColumns = { name: string; type: DatasetColumnType }[];
 
