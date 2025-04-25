@@ -7,9 +7,9 @@ import { nanoid } from "nanoid";
 import {
   LATEST_SCHEMA_VERSION,
   type SchemaVersion,
-  parseLlmConfigVersion,
+  validateConfig,
   type schemaValidators,
-} from "~/server/prompt-config/repositories/llm-config-version-schema";
+} from "~/server/repositories/llm-config-version-schema";
 import type { z } from "zod";
 
 /**
@@ -41,10 +41,10 @@ export const llmPromptConfigVersionFactory = Factory.define<
   const schemaVersion = params?.schemaVersion ?? LATEST_SCHEMA_VERSION;
 
   const configData = params?.configData
-    ? parseLlmConfigVersion(params?.configData as any)
+    ? validateConfig(params?.configData as any)
     : {
         prompt: "You are a helpful assistant",
-        model: "gpt-4o-mini",
+        model: "gpt-3.5-turbo",
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         demonstrations: {

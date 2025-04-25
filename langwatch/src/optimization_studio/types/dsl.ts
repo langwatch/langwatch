@@ -1,32 +1,27 @@
 import type { Edge, Node } from "@xyflow/react";
-import { z } from "zod";
-
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
-
 import type { DatasetColumns } from "../../server/datasets/types";
-
-export const FIELD_TYPES = [
-  "str",
-  "image",
-  "float",
-  "int",
-  "bool",
-  "list",
-  "list[str]",
-  "list[float]",
-  "list[int]",
-  "list[bool]",
-  "dict",
-  "signature",
-  "llm",
-  "prompting_technique",
-  "dataset",
-  "code",
-] as const;
+import { z } from "zod";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 
 export type Field = {
   identifier: string;
-  type: (typeof FIELD_TYPES)[number];
+  type:
+    | "str"
+    | "image"
+    | "float"
+    | "int"
+    | "bool"
+    | "list"
+    | "list[str]"
+    | "list[float]"
+    | "list[int]"
+    | "list[bool]"
+    | "dict"
+    | "signature"
+    | "llm"
+    | "prompting_technique"
+    | "dataset"
+    | "code";
   optional?: boolean;
   value?: unknown;
   desc?: string;
@@ -89,14 +84,6 @@ export const llmConfigSchema = z.object({
 export type LLMConfig = z.infer<typeof llmConfigSchema>;
 
 export type Signature = BaseComponent;
-
-export type LlmPromptConfigComponent = Signature & {
-  configId: string;
-  name: string;
-  inputs: Field[];
-  outputs: Field[];
-  parameters: Field[];
-};
 
 export type Code = BaseComponent;
 

@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { useWindowSize } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Component, ComponentType, Signature } from "../../types/dsl";
+import type { Component, ComponentType } from "../../types/dsl";
 import { InputPanel } from "../component_execution/InputPanel";
 import { OutputPanel } from "../component_execution/OutputPanel";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
@@ -15,7 +15,7 @@ import { EntryPointPropertiesPanel } from "./EntryPointPropertiesPanel";
 import { EvaluatorPropertiesPanel } from "./EvaluatorPropertiesPanel";
 import { PromptingTechniquePropertiesPanel } from "./PromptingTechniquePropertiesPanel";
 import { RetrievePropertiesPanel } from "./RetrievePropertiesPanel";
-import { SignaturePropertiesPanel } from "./llm-configs/SignaturePropertiesPanel";
+import { SignaturePropertiesPanel } from "./SignaturePropertiesPanel";
 import { WorkflowPropertiesPanel } from "./WorkflowPropertiesPanel";
 
 export function PropertiesPanel() {
@@ -39,7 +39,7 @@ export function PropertiesPanel() {
   > = {
     entry: EntryPointPropertiesPanel as React.FC<{ node: Node<Component> }>,
     end: EndPropertiesPanel as React.FC<{ node: Node<Component> }>,
-    signature: SignaturePropertiesPanel as React.FC<{ node: Node<Component> }>,
+    signature: SignaturePropertiesPanel,
     code: BasePropertiesPanel,
     custom: CustomPropertiesPanel,
     retriever: RetrievePropertiesPanel,

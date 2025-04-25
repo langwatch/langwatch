@@ -1,21 +1,23 @@
-import type { Prisma, PrismaClient, WorkflowVersion } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { generateText } from "ai";
-import { createPatch } from "diff";
-import { nanoid } from "nanoid";
-import { type Session } from "next-auth";
 import { z } from "zod";
-
+import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { nanoid } from "nanoid";
+import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import type { Prisma, PrismaClient, WorkflowVersion } from "@prisma/client";
+import { type Session } from "next-auth";
 import {
   workflowJsonSchema,
   type Workflow,
 } from "../../../optimization_studio/types/dsl";
-import { migrateDSLVersion } from "../../../optimization_studio/types/migrate";
-import { clearDsl } from "../../../optimization_studio/utils/dslUtils";
 import type { Unpacked } from "../../../utils/types";
+import { migrateDSLVersion } from "../../../optimization_studio/types/migrate";
+import { createPatch } from "diff";
+import { generateText } from "ai";
 import { getVercelAIModel } from "../../modelProviders/utils";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import {
+  clearDsl,
+  hasDSLChanged,
+} from "../../../optimization_studio/utils/dslUtils";
 
 export const workflowRouter = createTRPCRouter({
   create: protectedProcedure

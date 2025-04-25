@@ -58,15 +58,3 @@ export const camelCaseToPascalCase = (input: string): string => {
 export const snakeCaseToPascalCase = (input: string): string => {
   return camelCaseToPascalCase(snakeCaseToCamelCase(input));
 };
-
-export const kebabCase = (input: string): string => {
-  return input
-    .replace(
-      /!|@|#|\$|%|\^|&|\*|\(|\)|_|\+|`|~|:|;|,|\.|\?|\/|\\|\{|\}|\[|\]|\"|\'|\<|\>/g,
-      ""
-    )
-    .replace(/([A-Z])/g, " $1")
-    .trim()
-    .replace(/ /g, "-")
-    .toLowerCase();
-};

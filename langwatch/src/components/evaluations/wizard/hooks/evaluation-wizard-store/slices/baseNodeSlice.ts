@@ -6,7 +6,7 @@ import type {
 } from "../../../../../../optimization_studio/types/dsl";
 import { calculateNextPosition, updateNodeParameter } from "./utils/node.util";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
-import type { NodeWithOptionalPosition } from "../../../../../../types";
+import type { NodeWithOptionalPosition } from "./types";
 
 type NodeTypes = "signature" | "code" | "evaluator" | "entry";
 

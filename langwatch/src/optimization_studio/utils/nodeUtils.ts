@@ -7,9 +7,9 @@ export const nameToId = (name: string) => {
     .replace(/[^a-zA-Z0-9_]/g, "_");
 };
 
-export const findLowestAvailableName = (nodesIds: string[], prefix: string) => {
+export const findLowestAvailableName = (nodes: Node[], prefix: string) => {
   const findNode = (id: string) => {
-    return nodesIds.find((nodeId) => nodeId === id);
+    return nodes.find((node) => node.id === id);
   };
 
   let i = 1;

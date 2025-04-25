@@ -8,12 +8,10 @@ import {
 } from "@chakra-ui/react";
 import React, { useEffect, useState } from "react";
 import { Search } from "react-feather";
-
 import models from "../../models.json";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
 import { api } from "../utils/api";
-
 import { InputGroup } from "./ui/input-group";
 import { Select } from "./ui/select";
 

@@ -30,7 +30,7 @@ import { workflowRouter } from "./routers/workflows";
 import { optimizationRouter } from "./routers/optimization";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
 import { onboardingRouter } from "./routers/onboarding";
-import { llmConfigsRouter } from "./routers/llm-prompt-configs/llmConfigs";
+import { llmConfigsRouter } from "./routers/llmConfigs";
 /**
  * This is the primary router for your server.
  *
