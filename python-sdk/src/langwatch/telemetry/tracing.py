@@ -118,6 +118,10 @@ class LangWatchTrace:
             "evaluations": evaluations,
         } if not skip_root_span else None
 
+        # TODO
+        # if skip_root_span is False:
+        #     self._create_root_span()
+
     def _create_root_span(self):
         """Create the root span if parameters were provided."""
         if self._root_span_params is not None:

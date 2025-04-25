@@ -55,7 +55,7 @@ class Client(LangWatchClientProtocol):
 			disable_sending: Optional. If True, no traces will be sent to the server.
 		"""
 
-		self._api_key = api_key or os.getenv("LANGWATCH_API_KEY") or "no api key provided"
+		self._api_key = api_key or os.getenv("LANGWATCH_API_KEY", "")
 		self._endpoint_url = endpoint_url or os.getenv("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
 		self._debug = debug or os.getenv("LANGWATCH_DEBUG") == "true"
 		self._disable_sending = disable_sending

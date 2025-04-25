@@ -25,5 +25,5 @@ def get_endpoint() -> str:
 def get_api_key() -> str:
     """Get the current API key of the LangWatch client."""
     if __instance is None:
-        return os.getenv("LANGWATCH_API_KEY") or "no api key set"
+        return os.getenv("LANGWATCH_API_KEY", "")
     return __instance.api_key
