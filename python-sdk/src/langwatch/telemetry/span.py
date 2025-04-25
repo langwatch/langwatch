@@ -29,7 +29,7 @@ from langwatch.utils.transformation import (
 from opentelemetry import trace as trace_api, context as context_api
 from opentelemetry.trace import (
     SpanKind,
-    _Links,
+    Link,
     Span as OtelSpan,
     Status,
     StatusCode,
@@ -98,7 +98,7 @@ class LangWatchSpan:
         kind: SpanKind = SpanKind.INTERNAL,
         span_context: Optional[context_api.Context] = None,
         attributes: Optional[Dict[str, Any]] = None,
-        links: Optional[_Links] = None,
+        links: Optional[List[Link]] = None,
         start_time: Optional[int] = None,
         record_exception: bool = True,
         set_status_on_exception: bool = True,
@@ -120,7 +120,7 @@ class LangWatchSpan:
 
         # Initialize other attributes
         self.trace = trace
-        self.type = type
+        self.type: SpanTypes = type
         self.ignore_missing_trace_warning = ignore_missing_trace_warning
         self.capture_input = capture_input
         self.capture_output = capture_output
@@ -135,11 +135,10 @@ class LangWatchSpan:
         self.params = params
         self.metrics = metrics
         self.evaluations = evaluations
-        self._span_id = (
-            span_id or f"{type}_{id(self)}"
-        )  # Add a unique identifier for logging
 
         # Store OpenTelemetry-specific parameters
+        self._span = None
+        self._span_context_manager = None
         self.kind = kind
         self.span_context = span_context
         self.attributes = attributes or {}
@@ -160,20 +159,15 @@ class LangWatchSpan:
 
     def _create_span(self):
         """Internal method to create and start the OpenTelemetry span."""
-        # print stack trace
         try:
             if self.trace:
                 tracer = self.trace.tracer
             else:
                 if not self.ignore_missing_trace_warning:
                     warn(
-                        "No current trace found, some spans will not be sent to LangWatch"
+                        "No current trace found, some spans may not be sent to LangWatch"
                     )
                 tracer = trace_api.get_tracer("langwatch", __version__)
-
-            if not tracer:
-                warn("No tracer available - span operations will be no-ops")
-                return
 
             # Handle parent span
             parent = self.parent
@@ -186,13 +180,12 @@ class LangWatchSpan:
                     # If still no parent, use the current span from OpenTelemetry context
                     parent = get_current_span()
             parent_span_context: Optional[Context] = None
-            if parent is not None:
-                if isinstance(parent, LangWatchSpan) and parent._span is not None:
-                    parent_span_context = set_span_in_context(parent._span)
+            if isinstance(parent, LangWatchSpan) and parent._span is not None:
+                parent_span_context = set_span_in_context(parent._span)
 
             # Create the underlying OpenTelemetry span
             try:
-                self._span_context = tracer.start_as_current_span(
+                self._span_context_manager = tracer.start_as_current_span(
                     name=self.name or self.type,
                     context=self.span_context or parent_span_context,
                     kind=self.kind,
@@ -200,8 +193,10 @@ class LangWatchSpan:
                     start_time=self.start_time,
                     record_exception=self.record_exception,
                     set_status_on_exception=self.set_status_on_exception,
+                    attributes=self.attributes,
+                    end_on_exit=True,
                 )
-                self._span = self._span_context.__enter__()
+                self._span = self._span_context_manager.__enter__()
 
                 if not self._span:
                     warn("Failed to create span - got None from tracer")
@@ -431,7 +426,7 @@ class LangWatchSpan:
         expected_output: Optional[str] = None,
         contexts: Union[List[RAGChunk], List[str]] = [],
         conversation: Conversation = [],
-        settings: Optional[dict] = None,
+        settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
     ):
         contexts = contexts or []
@@ -461,7 +456,7 @@ class LangWatchSpan:
         expected_output: Optional[str] = None,
         contexts: Union[List[RAGChunk], List[str]] = [],
         conversation: Conversation = [],
-        settings: Optional[dict] = None,
+        settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
     ):
         contexts = contexts or []
@@ -512,8 +507,10 @@ class LangWatchSpan:
             metrics=metrics,
             **kwargs,
         )
-        if self._span:
-            self._span_context.__exit__(None, error, None)
+        if hasattr(self, "_span_context_manager") and self._span_context_manager is not None:
+            self._span_context_manager.__exit__(None, error, None)
+        elif hasattr(self, "_span") and self._span is not None:
+            self._span.end(end_time)
 
     def _get_span_params(self, func_name: Optional[str] = None) -> Dict[str, Any]:
         """Helper method to get common span parameters."""
@@ -523,8 +520,8 @@ class LangWatchSpan:
         return {
             "name": self.name or func_name,
             "type": self.type,
-            "trace": current_trace,  # Use the current trace
-            "parent": current_span,  # Use the current span as parent
+            "trace": current_trace,
+            "parent": current_span,
             "capture_input": self.capture_input,
             "capture_output": self.capture_output,
             "input": self.input,
@@ -556,7 +553,7 @@ class LangWatchSpan:
             async def async_gen_wrapper(*args: Any, **kwargs: Any) -> Any:
                 async with self:
                     self._set_callee_input_information(func, *args, **kwargs)
-                    items = []
+                    items: List[Any] = []
                     async for item in func(*args, **kwargs):
                         items.append(item)
                         yield item
@@ -575,7 +572,7 @@ class LangWatchSpan:
             def sync_gen_wrapper(*args: Any, **kwargs: Any):
                 with self:
                     self._set_callee_input_information(func, *args, **kwargs)
-                    items = []
+                    items: List[Any] = []
                     for item in func(*args, **kwargs):
                         items.append(item)
                         yield item
@@ -622,13 +619,16 @@ class LangWatchSpan:
             if self._cleaned_up:
                 return
 
-            if self._span is not None:
+            if hasattr(self, "_span_context_manager") and self._span_context_manager is not None:  # type: ignore
                 try:
-                    self._span_context.__exit__(exc_type, exc_value, traceback)
+                    self._span_context_manager.__exit__(exc_type, exc_value, traceback)
                 except Exception as e:
                     warn(f"Failed to end span: {e}")
                 finally:
-                    self._span = None
+                    self._span_context_manager = None
+            
+            if hasattr(self, "_span") and self._span is not None:
+                self._span = None
 
             self._cleaned_up = True
 
@@ -697,19 +697,6 @@ class LangWatchSpan:
     def __del__(self):
         """Ensure span context is cleaned up if object is garbage collected."""
         self._cleanup(None, None, None)
-
-    def __getattr__(self, name: str) -> Any:
-        """Forward all other methods to the underlying span."""
-        try:
-            span = object.__getattribute__(self, "_span")
-        except AttributeError:
-            span = None
-
-        if span is None:
-            raise AttributeError(
-                f"'LangWatchSpan' object has no attribute '{name}' and no underlying span"
-            )
-        return getattr(span, name)
 
     def _set_callee_input_information(
         self, func: Callable[..., Any], *args: Any, **kwargs: Any
@@ -816,7 +803,7 @@ def span(
     kind: SpanKind = SpanKind.INTERNAL,
     span_context: Optional[Context] = None,
     attributes: Optional[Dict[str, Any]] = None,
-    links: Optional[_Links] = None,
+    links: Optional[List[Link]] = None,
     start_time: Optional[int] = None,
     record_exception: bool = True,
     set_status_on_exception: bool = True,
