@@ -48,7 +48,7 @@ export function RunEvaluationButton({
         loading={props.loading ?? isLoading}
         disabled={props.disabled ?? !!trialDisabled}
         onClick={() => {
-          runEvaluation();
+          void runEvaluation();
         }}
       >
         <LuCirclePlay />

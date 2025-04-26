@@ -22,6 +22,10 @@ import type {
 } from "../types/dsl";
 import { findLowestAvailableName } from "../utils/nodeUtils";
 import { hasDSLChanged } from "../utils/dslUtils";
+import React from "react";
+import { WorkflowStoreContext } from "../../components/evaluations/wizard/hooks/useWorkflowStoreProvider";
+import { useEvaluationWizardStore } from "../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import { useShallow } from "zustand/react/shallow";
 
 export type SocketStatus =
   | "disconnected"
@@ -525,7 +529,7 @@ export const store = (
   },
 });
 
-export const useWorkflowStore = create<WorkflowStore>()(
+const _useWorkflowStore = create<WorkflowStore>()(
   temporal(store, {
     handleSet: (handleSet) => {
       return debounce<typeof handleSet>(
@@ -570,6 +574,27 @@ export const useWorkflowStore = create<WorkflowStore>()(
     },
   })
 );
+
+type UseWorkflowStoreType = typeof _useWorkflowStore;
+
+export const useWorkflowStore = ((
+  ...args: Parameters<UseWorkflowStoreType>
+) => {
+  const { useWorkflowStoreFromWizard } = React.useContext(WorkflowStoreContext);
+
+  const selector = args[0] ?? ((state) => state);
+  const equalityFn = args[1];
+
+  if (useWorkflowStoreFromWizard) {
+    return useEvaluationWizardStore(
+      useShallow(({ workflowStore }) => {
+        return selector(workflowStore);
+      })
+    );
+  }
+
+  return _useWorkflowStore(selector, equalityFn);
+}) as UseWorkflowStoreType;
 
 export const removeInvalidEdges = ({
   nodes,
