@@ -10,7 +10,6 @@ import {
   Spinner,
   Text,
   VStack,
-  type BoxProps,
   type StackProps,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
@@ -171,7 +170,7 @@ export const useBatchEvaluationState = ({
     api.experiments.getExperimentBatchEvaluationRuns.useQuery(
       {
         projectId: project?.id ?? "",
-        experimentSlug: experiment?.slug ?? "",
+        experimentId: experiment?.id ?? "",
       },
       {
         refetchInterval: keepFetching ? 1 : isSomeRunning ? 3000 : 10_000,

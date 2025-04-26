@@ -1,4 +1,4 @@
-import { Box, Card, Tabs, VStack, Text } from "@chakra-ui/react";
+import { Box, Card, Tabs, VStack } from "@chakra-ui/react";
 import { DatasetTable } from "../../datasets/DatasetTable";
 import {
   useEvaluationWizardStore,
@@ -65,6 +65,8 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
       minHeight="calc(100vh - 50px)"
       borderLeft="1px solid"
       borderLeftColor="gray.200"
+      minWidth="0"
+      gap={0}
     >
       {(hasDataset || hasWorkflow || hasResults) && (
         <Tabs.Root
@@ -86,7 +88,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
             colorPalette="blue"
             alignSelf="center"
             position="sticky"
-            top="16px"
+            top="0px"
             flexShrink={0}
           >
             {hasDataset && <Tabs.Trigger value="dataset">Dataset</Tabs.Trigger>}

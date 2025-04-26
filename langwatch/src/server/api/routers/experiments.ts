@@ -586,12 +586,12 @@ export const experimentsRouter = createTRPCRouter({
     }),
 
   getExperimentBatchEvaluationRuns: protectedProcedure
-    .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
+    .input(z.object({ projectId: z.string(), experimentId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
     .query(async ({ input }) => {
-      const experiment = await getExperimentBySlug(
+      const experiment = await getExperimentById(
         input.projectId,
-        input.experimentSlug
+        input.experimentId
       );
 
       const runsByExperimentId = await getExperimentBatchEvaluationRuns(
@@ -606,15 +606,15 @@ export const experimentsRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        experimentSlug: z.string(),
+        experimentId: z.string(),
         runId: z.string(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
     .query(async ({ input }) => {
-      const experiment = await getExperimentBySlug(
+      const experiment = await getExperimentById(
         input.projectId,
-        input.experimentSlug
+        input.experimentId
       );
 
       const id = batchEvaluationId({
@@ -771,6 +771,24 @@ const getExperimentBySlug = async (
     where: {
       projectId: projectId,
       slug: experimentSlug,
+    },
+  });
+
+  if (!experiment) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Experiment not found",
+    });
+  }
+
+  return experiment;
+};
+
+const getExperimentById = async (projectId: string, experimentId: string) => {
+  const experiment = await prisma.experiment.findFirst({
+    where: {
+      projectId: projectId,
+      id: experimentId,
     },
   });
 
