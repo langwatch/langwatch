@@ -26,6 +26,7 @@ from langwatch_nlp.studio.utils import (
     normalize_name_to_class_name,
     normalize_to_variable_name,
     transpose_inline_dataset_to_object_list,
+    reserved_keywords,
 )
 import isort
 import black
@@ -87,7 +88,11 @@ def parse_workflow(
     }
 
     inputs = workflow_inputs(workflow)
-    use_kwargs = any(re.search(r"[^a-zA-Z0-9]", field.identifier) for field in inputs)
+    use_kwargs = any(
+        re.search(r"[^a-zA-Z0-9]", field.identifier)
+        or field.identifier in reserved_keywords
+        for field in inputs
+    )
 
     module = render_template(
         "workflow.py.jinja",
@@ -208,9 +213,7 @@ def parse_component(
             try:
                 code = black.format_str(code, mode=black.Mode())
             except Exception as e:
-                raise ValueError(
-                    f"{node.data.name} has invalid code: {e}"
-                )
+                raise ValueError(f"{node.data.name} has invalid code: {e}")
 
             return code, class_name, {}
         case "retriever":
@@ -461,10 +464,16 @@ def normalized_workflow(workflow: Workflow) -> Workflow:
     for edge in workflow.edges:
         edge.source = normalize_to_variable_name(edge.source)
         [handle, field] = edge.sourceHandle.split(".")
-        edge.sourceHandle = f"{handle}.{field}"
+        if edge.source == "entry":
+            edge.sourceHandle = f"{handle}.{field}"
+        else:
+            edge.sourceHandle = f"{handle}.{normalize_to_variable_name(field)}"
         edge.target = normalize_to_variable_name(edge.target)
         [handle, field] = edge.targetHandle.split(".")
-        edge.targetHandle = f"{handle}.{normalize_to_variable_name(field)}"
+        if edge.target == "end":
+            edge.targetHandle = field
+        else:
+            edge.targetHandle = f"{handle}.{normalize_to_variable_name(field)}"
 
     return workflow
 

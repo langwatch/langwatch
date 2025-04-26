@@ -60,6 +60,7 @@ import { Publish } from "./Publish";
 import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
 import type { Workflow } from "../types/dsl";
+import { toaster } from "../../components/ui/toaster";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {
   const [_, drop] = useDrop(() => ({
@@ -301,7 +302,20 @@ export default function OptimizationStudio() {
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
                         onNodesDelete={() => setTimeout(onNodesDelete, 0)}
-                        onConnect={onConnect}
+                        onConnect={(connection) => {
+                          const result = onConnect(connection);
+                          if (result?.error) {
+                            toaster.create({
+                              title: "Error",
+                              description: result.error,
+                              type: "error",
+                              duration: 5000,
+                              meta: {
+                                closable: true,
+                              },
+                            });
+                          }
+                        }}
                         onPaneClick={() => {
                           setWorkflowSelected(true);
                         }}

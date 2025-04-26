@@ -14,6 +14,7 @@ import { useShallow } from "zustand/react/shallow";
 import { EvaluationManualIntegration } from "../../checks/EvaluationManualIntegration";
 import { useAvailableEvaluators } from "../../../hooks/useAvailableEvaluators";
 import type { AgGridReact } from "@ag-grid-community/react";
+import { toaster } from "../../ui/toaster";
 
 export const WizardWorkspace = memo(function WizardWorkspace() {
   const {
@@ -209,7 +210,20 @@ const WizardOptimizationStudioCanvas = memo(
         }}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
+        onConnect={(connection) => {
+          const result = onConnect(connection);
+          if (result?.error) {
+            toaster.create({
+              title: "Error",
+              description: result.error,
+              type: "error",
+              duration: 5000,
+              meta: {
+                closable: true,
+              },
+            });
+          }
+        }}
         fitView
         fitViewOptions={{
           maxZoom: 1.5,

@@ -224,6 +224,42 @@ def normalize_name_to_class_name(node_name: str) -> str:
     return class_name
 
 
+reserved_keywords = [
+    "and",
+    "as",
+    "assert",
+    "async",
+    "await",
+    "break",
+    "class",
+    "continue",
+    "def",
+    "del",
+    "elif",
+    "else",
+    "except",
+    "finally",
+    "for",
+    "from",
+    "global",
+    "if",
+    "import",
+    "in",
+    "is",
+    "lambda",
+    "nonlocal",
+    "not",
+    "or",
+    "pass",
+    "raise",
+    "return",
+    "try",
+    "while",
+    "with",
+    "yield",
+]
+
+
 def normalize_to_variable_name(name: str) -> str:
     """
     Converts a name like "LLM Signature (2)" to a valid Python variable name like "llm_signature_2".
@@ -231,41 +267,6 @@ def normalize_to_variable_name(name: str) -> str:
     Args:
         name: A string representing the name
     """
-
-    reserved_keywords = [
-        "and",
-        "as",
-        "assert",
-        "async",
-        "await",
-        "break",
-        "class",
-        "continue",
-        "def",
-        "del",
-        "elif",
-        "else",
-        "except",
-        "finally",
-        "for",
-        "from",
-        "global",
-        "if",
-        "import",
-        "in",
-        "is",
-        "lambda",
-        "nonlocal",
-        "not",
-        "or",
-        "pass",
-        "raise",
-        "return",
-        "try",
-        "while",
-        "with",
-        "yield",
-    ]
 
     name = re.sub(r"[^a-zA-Z0-9_]", "", name.strip().replace(" ", "_")).lower()
 

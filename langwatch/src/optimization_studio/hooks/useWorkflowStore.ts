@@ -62,7 +62,7 @@ export type WorkflowStore = State & {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onNodesDelete: () => void;
-  onConnect: (connection: Connection) => void;
+  onConnect: (connection: Connection) => { error?: string } | undefined;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   setNode: (node: Partial<Node> & { id: string }, newId?: string) => void;
@@ -215,8 +215,19 @@ export const store = (
     });
   },
   onConnect: (connection: Connection) => {
+    const currentEdges = get().edges;
+    const existingConnection = currentEdges.find(
+      (edge) =>
+        edge.target === connection.target &&
+        edge.targetHandle === connection.targetHandle
+    );
+    if (existingConnection) {
+      return {
+        error: "Cannot connect two values to the same input",
+      };
+    }
     set({
-      edges: addEdge(connection, get().edges).map((edge) => ({
+      edges: addEdge(connection, currentEdges).map((edge) => ({
         ...edge,
         type: edge.type ?? "default",
       })),
