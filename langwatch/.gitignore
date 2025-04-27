@@ -41,7 +41,7 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-
+.
 # Sentry Config File
 .sentryclirc
 
@@ -56,3 +56,11 @@ saas-src
 
 # local config
 .eslintrc.local.cjs
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/e2e/auth.json
