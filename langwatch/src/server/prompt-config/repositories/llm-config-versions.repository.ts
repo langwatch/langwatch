@@ -188,8 +188,6 @@ export class LlmConfigVersionsRepository {
       where: { id, projectId },
     });
 
-    console.error("Response", version);
-
     if (!version) {
       throw new Error(`Version ${id} not found.`);
     }

@@ -42,6 +42,7 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
     <FormProvider {...methods}>
       <form style={{ width: "100%" }}>
         <VStack width="full" gap={6}>
+          <PromptNameField />
           <VerticalFormControl label="Current Version">
             <PromptConfigInfoBox
               isSaving={isLoading}
@@ -52,7 +53,6 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
               }
             />
           </VerticalFormControl>
-          <PromptNameField />
           <ModelSelectField />
           <PromptField />
           <InputsFieldGroup />
