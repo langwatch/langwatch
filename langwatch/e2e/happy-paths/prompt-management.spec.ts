@@ -30,7 +30,7 @@ test("Test happy paths for prompt management", async ({ page }) => {
     .getByRole("textbox", { name: "Description" })
     .fill("save new name");
   await page.getByRole("textbox", { name: "Description" }).press("Enter");
-  await page.getByRole("textbox", { name: "Prompt Name" }).click();
+  // await page.getByRole("textbox", { name: "Prompt Name" }).click();
   await page
     .getByRole("textbox", { name: "Prompt Name" })
     .fill("Excellent Prompt For Testing - New Name");
@@ -40,12 +40,7 @@ test("Test happy paths for prompt management", async ({ page }) => {
     .getByRole("button")
     .click();
   await page.getByRole("combobox", { name: "Model" }).click();
-  await page
-    .locator(
-      '[id="select\\:\\:rv\\:\\:option\\:openai\\/gpt-4-turbo-2024-04-09"]'
-    )
-    .getByText("gpt-4-turbo-2024-04-")
-    .click();
+  await page.getByRole("option", { name: "gpt-4-turbo", exact: true }).click();
   await page.getByRole("spinbutton", { name: "Temperature" }).click();
   await page.getByRole("spinbutton", { name: "Temperature" }).fill("1");
   await page.getByRole("spinbutton", { name: "Max Tokens" }).click();
@@ -154,5 +149,5 @@ test("Test happy paths for prompt management", async ({ page }) => {
   await page
     .getByRole("textbox", { name: "Type 'delete' to confirm" })
     .press("Enter");
-  await page.getByText("No prompt configurations").click();
+  await page.getByText("No prompt configurations", { exact: false }).click();
 });

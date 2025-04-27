@@ -110,7 +110,12 @@ function VersionHistoryItem({
             content="Restore this version"
             positioning={{ placement: "top" }}
           >
-            <Button variant="ghost" onClick={onRestore} loading={isLoading}>
+            <Button
+              data-testid={`restore-version-button-${version.version}`}
+              variant="ghost"
+              onClick={onRestore}
+              loading={isLoading}
+            >
               <HistoryIcon size={24} />
             </Button>
           </Tooltip>
