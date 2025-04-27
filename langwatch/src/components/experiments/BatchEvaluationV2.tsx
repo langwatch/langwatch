@@ -37,6 +37,7 @@ import {
   useBatchEvaluationDownloadCSV,
 } from "./BatchEvaluationV2/BatchEvaluationV2EvaluationResults";
 import React from "react";
+import { OverflownTextWithTooltip } from "../OverflownText";
 
 export function BatchEvaluationV2({
   project,
@@ -380,7 +381,7 @@ export function BatchEvaluationV2RunList({
                   />
                 )}
                 <VStack align="start" gap={0}>
-                  <Text
+                  <OverflownTextWithTooltip
                     fontSize={size === "sm" ? "13px" : "14px"}
                     lineClamp={1}
                     wordBreak="break-all"
@@ -395,7 +396,7 @@ export function BatchEvaluationV2RunList({
                         marginBottom="-2px"
                       />
                     )}
-                  </Text>
+                  </OverflownTextWithTooltip>
                   <HStack
                     color="gray.400"
                     fontSize={size === "sm" ? "12px" : "13px"}

@@ -10,12 +10,19 @@ import { api } from "../../../../utils/api";
 import { useForm } from "react-hook-form";
 import { useVersionState } from "../../../../optimization_studio/components/History";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
+import {
+  clearDsl,
+  hasDSLChanged,
+  recursiveAlphabeticallySortedKeys,
+} from "../../../../optimization_studio/utils/dslUtils";
+import { createPatch } from "diff";
 
 export const useRunEvalution = () => {
   const completedStepValue = useStepCompletedValue();
   const {
     workflowStore: { setEvaluationState, getWorkflow },
     setWizardState,
+    setDSL,
   } = useEvaluationWizardStore(
     useShallow((state) => ({
       workflowStore: {
@@ -23,6 +30,7 @@ export const useRunEvalution = () => {
         getWorkflow: state.workflowStore.getWorkflow,
       },
       setWizardState: state.setWizardState,
+      setDSL: state.setDSL,
     }))
   );
 
@@ -39,7 +47,7 @@ export const useRunEvalution = () => {
     },
   });
 
-  const { previousVersion, nextVersion } = useVersionState({
+  const { previousVersion, nextVersion, latestVersion } = useVersionState({
     project,
     form: form,
     allowSaveIfAutoSaveIsCurrentButNotLatest: true,
@@ -47,6 +55,8 @@ export const useRunEvalution = () => {
 
   const generateCommitMessage =
     api.workflow.generateCommitMessage.useMutation();
+
+  const trpc = api.useContext();
 
   const runEvaluation = useCallback(async () => {
     if (!project) return;
@@ -66,47 +76,85 @@ export const useRunEvalution = () => {
 
     const run_id = `run_${nanoid()}`;
     const workflow = getWorkflow();
+    const hasChanges =
+      latestVersion?.autoSaved &&
+      (previousVersion?.dsl
+        ? hasDSLChanged(workflow, previousVersion.dsl, false)
+        : true);
 
-    let commitMessage = previousVersion ? "autosaved" : "first version";
-    if (previousVersion?.dsl) {
+    if (hasChanges && previousVersion?.dsl) {
+      const prevDsl_ = JSON.stringify(
+        recursiveAlphabeticallySortedKeys(clearDsl(previousVersion.dsl)),
+        null,
+        2
+      );
+      const newDsl_ = JSON.stringify(
+        recursiveAlphabeticallySortedKeys(clearDsl(workflow)),
+        null,
+        2
+      );
+
+      const diff = createPatch(
+        "workflow.json",
+        prevDsl_,
+        newDsl_,
+        "Previous Version",
+        "New Version"
+      );
+      console.log("diff", diff);
+    }
+
+    let versionId = latestVersion?.autoSaved ? previousVersion?.id : latestVersion?.id;
+    if (hasChanges) {
+      let commitMessage = previousVersion ? "autosaved" : "first version";
+      if (previousVersion?.dsl) {
+        try {
+          const commitMessageResponse = await generateCommitMessage.mutateAsync(
+            {
+              projectId: project?.id ?? "",
+              prevDsl: previousVersion?.dsl,
+              newDsl: getWorkflow(),
+            }
+          );
+          commitMessage = commitMessageResponse ?? "autosaved";
+        } catch (error) {
+          toaster.create({
+            title: "Error auto-generating version description",
+            type: "error",
+            duration: 5000,
+            meta: { closable: true },
+          });
+        }
+      }
+
       try {
-        const commitMessageResponse = await generateCommitMessage.mutateAsync({
-          projectId: project?.id ?? "",
-          prevDsl: previousVersion?.dsl,
-          newDsl: getWorkflow(),
+        const versionResponse = await commitVersion.mutateAsync({
+          projectId: project.id,
+          workflowId,
+          commitMessage,
+          dsl: {
+            ...workflow,
+            version: nextVersion,
+          },
         });
-        commitMessage = commitMessageResponse ?? "autosaved";
+        versionId = versionResponse.id;
+
+        setDSL({
+          ...workflow,
+          version: nextVersion,
+        });
+
+        void trpc.workflow.getVersions.invalidate();
       } catch (error) {
         toaster.create({
-          title: "Error auto-generating version description",
+          title: "Error saving version",
           type: "error",
           duration: 5000,
           meta: { closable: true },
+          placement: "top-end",
         });
+        return;
       }
-    }
-
-    let versionId: string;
-    try {
-      const versionResponse = await commitVersion.mutateAsync({
-        projectId: project.id,
-        workflowId,
-        commitMessage,
-        dsl: {
-          ...getWorkflow(),
-          version: nextVersion,
-        },
-      });
-      versionId = versionResponse.id;
-    } catch (error) {
-      toaster.create({
-        title: "Error saving version",
-        type: "error",
-        duration: 5000,
-        meta: { closable: true },
-        placement: "top-end",
-      });
-      throw error;
     }
 
     setWizardState({
@@ -125,7 +173,7 @@ export const useRunEvalution = () => {
         run_id,
         workflow,
         // TODO: autosave and generate a new commit message and version id automatically
-        workflow_version_id: versionId,
+        workflow_version_id: versionId ?? "",
         evaluate_on: "full",
       },
     };
@@ -134,6 +182,7 @@ export const useRunEvalution = () => {
     project,
     getWorkflow,
     completedStepValue,
+    latestVersion,
     previousVersion,
     setWizardState,
     setEvaluationState,
@@ -141,6 +190,8 @@ export const useRunEvalution = () => {
     generateCommitMessage,
     commitVersion,
     nextVersion,
+    setDSL,
+    trpc.workflow.getVersions,
   ]);
 
   return {

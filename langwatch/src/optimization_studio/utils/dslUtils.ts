@@ -25,6 +25,7 @@ export const clearDsl = (
         },
       };
       delete node_.selected;
+      delete node_.measured;
       if (!includeExecutionStates) {
         delete node_.data.execution_state;
       }
@@ -40,7 +41,29 @@ export const hasDSLChanged = (
   includeExecutionStates: boolean
 ) => {
   return (
-    JSON.stringify(clearDsl(dslCurrent, includeExecutionStates)) !==
-    JSON.stringify(clearDsl(dslPrevious, includeExecutionStates))
+    JSON.stringify(
+      recursiveAlphabeticallySortedKeys(
+        clearDsl(dslCurrent, includeExecutionStates)
+      )
+    ) !==
+    JSON.stringify(
+      recursiveAlphabeticallySortedKeys(
+        clearDsl(dslPrevious, includeExecutionStates)
+      )
+    )
   );
+};
+
+export const recursiveAlphabeticallySortedKeys = <T>(obj: T): T => {
+  if (typeof obj !== "object" || obj === null) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(recursiveAlphabeticallySortedKeys) as T;
+  }
+  return Object.fromEntries(
+    Object.entries(obj)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => [key, recursiveAlphabeticallySortedKeys(value)])
+  ) as T;
 };

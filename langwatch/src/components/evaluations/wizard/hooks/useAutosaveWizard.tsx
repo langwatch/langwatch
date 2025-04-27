@@ -125,10 +125,10 @@ const useAutosaveWizard = () => {
             experiment_id: updatedExperiment.id,
           });
         } catch (error) {
-          console.error("Failed to autosave experiment:", error);
+          console.log("Failed to autosave evaluation:", error);
           Sentry.captureException(error, {
             extra: {
-              context: "Failed to autosave experiment",
+              context: "Failed to autosave evaluation",
               projectId: project.id,
               wizardState,
               dsl,
