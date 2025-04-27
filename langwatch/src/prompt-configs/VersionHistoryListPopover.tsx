@@ -14,6 +14,7 @@ import type { LlmPromptConfigVersion } from "@prisma/client";
 
 import { HistoryIcon } from "~/components/icons/History";
 import { Popover } from "~/components/ui/popover";
+import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -252,7 +253,7 @@ export function VersionHistoryListPopover({ configId }: { configId: string }) {
       },
       { enabled: !!project?.id }
     );
-  const { mutate: restoreVersion } =
+  const { mutateAsync: restoreVersion } =
     api.llmConfigs.versions.restore.useMutation({
       onSuccess: () => {
         void refetch();
@@ -260,11 +261,21 @@ export function VersionHistoryListPopover({ configId }: { configId: string }) {
       },
     });
 
-  const handleRestore = (versionId: string) => {
-    restoreVersion({
-      id: versionId,
-      projectId: project?.id ?? "",
-    });
+  const handleRestore = async (versionId: string) => {
+    try {
+      await restoreVersion({
+        id: versionId,
+        projectId: project?.id ?? "",
+      });
+      toaster.success({
+        title: "Version restored successfully",
+      });
+    } catch (error) {
+      console.error("Error restoring version", error);
+      toaster.error({
+        title: "Failed to restore version",
+      });
+    }
   };
 
   return (
