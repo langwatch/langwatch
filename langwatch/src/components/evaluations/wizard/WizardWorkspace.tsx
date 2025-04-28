@@ -264,7 +264,7 @@ function CodeImplementation() {
       <Card.Body width="full" height="full" paddingTop={0}>
         {availableEvaluators[checkType] && (
           <EvaluationManualIntegration
-            evaluatorDefinition={availableEvaluators[checkType]}
+            evaluatorDefinition={availableEvaluators[checkType]!}
             checkType={checkType}
             name={name ?? "Untitled"}
             executionMode={
