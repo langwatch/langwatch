@@ -19,7 +19,10 @@ import {
   llmConfigToPromptConfigFormValues,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-import type { LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+import {
+  parseLlmConfigVersion,
+  type LatestConfigVersionSchema,
+} from "~/server/prompt-config/repositories/llm-config-version-schema";
 import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 import { useFormContext } from "react-hook-form";
 
@@ -106,7 +109,7 @@ export function PromptSourceHeader({
       // Convert the saved version to a form values object
       const newFormValues = llmConfigToPromptConfigFormValues({
         ...savedConfig,
-        latestVersion: savedVersion as unknown as LatestConfigVersionSchema,
+        latestVersion: parseLlmConfigVersion(savedVersion),
       } as LlmConfigWithLatestVersion);
 
       // Update the form values
