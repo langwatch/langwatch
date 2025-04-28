@@ -1,18 +1,12 @@
 ![logo.webp](assets/logo-header.webp)
 
 <p align="center">
-<a href="https://discord.gg/kT4PhDS2gH">
-  <img src="https://img.shields.io/badge/LangWatch-Discord-%235865F2.svg" alt="Discord">
-</a>
-<a href="https://pypi.org/project/langwatch/">
-  <img src="https://img.shields.io/pypi/v/langwatch?color=007EC6" alt="LangWatch Python SDK version">
-</a>
-<a href="https://www.npmjs.com/package/langwatch">
-  <img src="https://img.shields.io/npm/v/langwatch?color=007EC6" alt="LangWatch TypeScript SDK version">
-</a>
+<a href="https://discord.gg/kT4PhDS2gH"><img src="https://img.shields.io/badge/LangWatch-Discord-%235865F2.svg" alt="Discord"></a>
+<a href="https://pypi.org/project/langwatch/"><img src="https://img.shields.io/pypi/v/langwatch?color=007EC6" alt="LangWatch Python SDK version"></a>
+<a href="https://www.npmjs.com/package/langwatch"><img src="https://img.shields.io/npm/v/langwatch?color=007EC6" alt="LangWatch TypeScript SDK version"></a>
 </p>
 
-LangWatch is an Open-Platform for **Observing**, **Evaluating** and **Optimizing** your LLM and Agentic applications. We offer:
+LangWatch is an open platform for **Observing**, **Evaluating** and **Optimizing** your LLM and Agentic applications. We offer:
 
 - [**Observability**](https://docs.langwatch.ai/integration/overview) - Add tracing to your LLM, based on the OpenTelemetry standard, allowing LangWatch to provide real-time powers.
 - [**Evaluation**](https://docs.langwatch.ai/llm-evaluation/offline-evaluation) - Run real-time and offline evaluations against production or synthetic datasets. Compare performance across various matrixes (prompts, modules, hosting providers, and complete LLM pipelines).
