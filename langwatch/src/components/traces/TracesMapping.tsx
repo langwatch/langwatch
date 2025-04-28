@@ -277,7 +277,7 @@ export const TracesMapping = ({
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetFields, dsl?.sourceOptions]);
+  }, [JSON.stringify(targetFields), dsl?.sourceOptions]);
 
   useEffect(() => {
     let index = 0;

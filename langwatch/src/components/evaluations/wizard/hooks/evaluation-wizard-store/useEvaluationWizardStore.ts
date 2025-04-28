@@ -25,6 +25,7 @@ export const EVALUATOR_CATEGORIES = [
   "quality",
   "rag",
   "safety",
+  "custom_evaluators",
 ] as const;
 
 export type EvaluatorCategory = (typeof EVALUATOR_CATEGORIES)[number];
