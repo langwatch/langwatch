@@ -12,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { Field } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ChevronDown,
   Columns,
@@ -24,10 +24,12 @@ import {
 } from "react-feather";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 
+import { RenderCode } from "../../../components/code/RenderCode";
 import { HoverableBigText } from "../../../components/HoverableBigText";
+import { Tooltip } from "../../../components/ui/tooltip";
 import { camelCaseToTitleCase } from "../../../utils/stringCasing";
+import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type {
   Component,
   ComponentType,
@@ -36,6 +38,7 @@ import type {
   Workflow,
 } from "../../types/dsl";
 import { nameToId } from "../../utils/nodeUtils";
+import { CodeEditorModal } from "../code/CodeEditorModal";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import {
   ComponentExecutionButton,
@@ -45,10 +48,7 @@ import {
   TypeLabel,
 } from "../nodes/Nodes";
 
-import { LLMConfigField } from "./modals/llm-config/LLMConfigField";
-import { RenderCode } from "../../../components/code/RenderCode";
-import { CodeEditorModal } from "../code/CodeEditorModal";
-import { Tooltip } from "../../../components/ui/tooltip";
+import { OptimizationStudioLLMConfigField } from "./llm-configs/OptimizationStudioLLMConfigField";
 
 export function PropertyField({
   title,
@@ -336,7 +336,7 @@ export function FieldsForm({
       {fields.map((field, index) => {
         if (field.type === "llm") {
           return (
-            <LLMConfigField
+            <OptimizationStudioLLMConfigField
               key={field.id}
               allowDefault={true}
               defaultLLMConfig={default_llm}
