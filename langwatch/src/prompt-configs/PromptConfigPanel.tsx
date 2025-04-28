@@ -6,6 +6,7 @@ import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
 import { PanelHeader } from "./ui/PanelHeader";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { llmConfigToPromptConfigFormValues } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 
 interface PromptConfigPanelProps {
@@ -29,18 +30,7 @@ export function PromptConfigPanel({
     { enabled: !!projectId && !!configId }
   );
   const initialConfigValues = useMemo(() => {
-    return llmConfig
-      ? {
-          name: llmConfig.name,
-          version: {
-            ...llmConfig.latestVersion,
-            commitMessage: "",
-            configData: {
-              ...llmConfig.latestVersion.configData,
-            },
-          },
-        }
-      : undefined;
+    return llmConfig ? llmConfigToPromptConfigFormValues(llmConfig) : undefined;
   }, [llmConfig]);
 
   const formProps = usePromptConfigForm({

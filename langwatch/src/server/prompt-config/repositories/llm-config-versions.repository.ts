@@ -189,34 +189,17 @@ export class LlmConfigVersionsRepository {
     });
 
     if (!version) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Version not found.",
-      });
+      throw new Error(`Version ${id} not found.`);
     }
 
-    const latestVersionNumber = await this.prisma.llmPromptConfigVersion.count({
-      where: { configId: version.configId, projectId },
-    });
-
-    // Create a new version with the same config data
-    const newVersion = await this.prisma.llmPromptConfigVersion.create({
-      data: {
-        commitMessage: `Restore from version ${version.version}`,
-        version: latestVersionNumber + 1,
-        authorId,
-        configId: version.configId,
-        schemaVersion: version.schemaVersion,
-        projectId: version.projectId,
-        configData: version.configData as Record<string, any>,
-      },
-    });
-
-    // Update the parent config's updatedAt timestamp
-    await this.prisma.llmPromptConfig.update({
-      where: { id: version.configId, projectId },
-      data: { updatedAt: new Date() },
-    });
+    const newVersion = await this.createVersion({
+      authorId,
+      projectId: version.projectId,
+      configId: version.configId,
+      commitMessage: `Restore from version ${version.version}`,
+      schemaVersion: version.schemaVersion as SchemaVersion,
+      configData: version.configData as LlmConfigVersionDTO["configData"],
+    } as LlmConfigVersionDTO);
 
     return newVersion;
   }

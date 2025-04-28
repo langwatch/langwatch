@@ -1,14 +1,12 @@
 import { Button, HStack, Input } from "@chakra-ui/react";
 import { Settings } from "react-feather";
-import { HorizontalFormControl } from "../../../../../components/HorizontalFormControl";
-import {
-  allModelOptions,
-  ModelSelector,
-} from "../../../../../components/ModelSelector";
-import type { LLMConfig } from "../../../../types/dsl";
-import { ConfigModal } from "../ConfigModal";
-import { Link } from "../../../../../components/ui/link";
-import { Tooltip } from "../../../../../components/ui/tooltip";
+
+import { ConfigModal } from "../../optimization_studio/components/properties/modals/ConfigModal";
+import type { LLMConfig } from "../../optimization_studio/types/dsl";
+import { HorizontalFormControl } from "../HorizontalFormControl";
+import { allModelOptions, ModelSelector } from "../ModelSelector";
+import { Link } from "../ui/link";
+import { Tooltip } from "../ui/tooltip";
 
 export function LLMConfigModal({
   open,

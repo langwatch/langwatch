@@ -1,4 +1,4 @@
-import { Button, Spinner } from "@chakra-ui/react";
+import { Button, Spinner, Text } from "@chakra-ui/react";
 import { Save } from "lucide-react";
 
 export function VersionSaveButton({
@@ -13,6 +13,7 @@ export function VersionSaveButton({
   return (
     <Button
       type="submit"
+      data-testid="save-version-button"
       disabled={!!isSaving || !!disabled}
       colorPalette="green"
       loading={isSaving}
@@ -22,7 +23,7 @@ export function VersionSaveButton({
       }}
     >
       {isSaving ? <Spinner /> : <Save />}
-      Save Version
+      <Text display={{ base: "none", "2xl": "block" }}>Save Version</Text>
     </Button>
   );
 }

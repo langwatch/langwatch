@@ -3,7 +3,12 @@ import { DEFAULT_MODEL } from "../../../../../../../utils/constants";
 
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 
-type LlmSignatureNode = NodeWithOptionalPosition<LlmPromptConfigComponent>;
+type LlmSignatureNode = Omit<
+  NodeWithOptionalPosition<LlmPromptConfigComponent>,
+  "data"
+> & {
+  data: Omit<LlmPromptConfigComponent, "configId">;
+};
 
 const DEFAULT_SIGNATURE_NODE_PROPERTIES = (
   model: string
@@ -12,7 +17,6 @@ const DEFAULT_SIGNATURE_NODE_PROPERTIES = (
   id: "signature_node",
   deletable: false,
   data: {
-    configId: "",
     name: "LLM Signature",
     description: "LLM calling node",
     parameters: [
@@ -36,7 +40,19 @@ const DEFAULT_SIGNATURE_NODE_PROPERTIES = (
       {
         identifier: "demonstrations",
         type: "dataset" as const,
-        value: undefined,
+        value: {
+          columns: [
+            {
+              name: "Input",
+              type: "string",
+            },
+            {
+              name: "Output",
+              type: "string",
+            },
+          ],
+          rows: [],
+        },
       },
     ],
     inputs: [
