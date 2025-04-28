@@ -15,7 +15,7 @@ import { getTestProject, waitForResult } from "../../../../../utils/testUtils";
 import type { Worker } from "bullmq";
 import * as crypto from "crypto";
 import type { ElasticSearchTrace } from "../../../../../server/tracer/types";
-import { DEFAULT_EMBEDDINGS_MODEL } from "../../../../../server/embeddings";
+import { DEFAULT_EMBEDDINGS_MODEL } from "~/utils/constants";
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
