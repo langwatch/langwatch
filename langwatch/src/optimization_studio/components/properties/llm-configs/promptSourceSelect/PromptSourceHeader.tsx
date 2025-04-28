@@ -13,9 +13,15 @@ import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionHistoryButton";
 import { VersionSaveButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionSaveButton";
 import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
-import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
-import { llmConfigToOptimizationStudioNodeData } from "~/prompt-configs/llmPromptConfigUtils";
+import { type PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
+import {
+  llmConfigToOptimizationStudioNodeData,
+  llmConfigToPromptConfigFormValues,
+} from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
+import type { LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
+import { useFormContext } from "react-hook-form";
 
 export function PromptSourceHeader({
   node,
@@ -31,10 +37,12 @@ export function PromptSourceHeader({
   ) => void;
   values: PromptConfigFormValues;
 }) {
+  const trpc = api.useContext();
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const configId = node.data.configId;
   const setNode = useSmartSetNode();
+  const formProps = useFormContext<PromptConfigFormValues>();
 
   // Fetch the saved configuration to compare with current node data
   const { data: savedConfig, isLoading: isLoadingSavedConfig } =
@@ -53,6 +61,7 @@ export function PromptSourceHeader({
     return !isEqual(node.data, savedConfigData);
   }, [node.data, savedConfig]);
 
+  // TODO: Move this outside of the component
   const handleSaveVersion = async () => {
     // If no saved config, we will need to create a new one
     if (!savedConfig) {
@@ -85,6 +94,24 @@ export function PromptSourceHeader({
     }
   };
 
+  // TODO: Move this outside of the component
+  const handleRestore = async (versionId: string) => {
+    // Get the saved version
+    const savedVersion = await trpc.llmConfigs.versions.getById.fetch({
+      versionId,
+      projectId,
+    });
+
+    // Convert the saved version to a form values object
+    const newFormValues = llmConfigToPromptConfigFormValues({
+      ...savedConfig,
+      latestVersion: savedVersion as unknown as LatestConfigVersionSchema,
+    } as LlmConfigWithLatestVersion);
+
+    // Update the form values
+    formProps.setValue("version.configData", newFormValues.version.configData);
+  };
+
   return (
     <VerticalFormControl
       label="Source Prompt"
@@ -104,7 +131,10 @@ export function PromptSourceHeader({
           <PromptSource configId={configId} onSelect={onPromptSourceSelect} />
         </HStack>
         {node.data.configId && (
-          <VersionHistoryButton configId={node.data.configId} />
+          <VersionHistoryButton
+            configId={node.data.configId}
+            onRestore={handleRestore}
+          />
         )}
         <VersionSaveButton
           disabled={savedConfig && !hasDrifted}

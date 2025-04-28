@@ -234,8 +234,14 @@ function VersionHistoryPopover({
 /**
  * Fully composed version history popover with API integration
  */
-export function VersionHistoryListPopover({ configId }: { configId: string }) {
-  const { open, setOpen } = useDisclosure();
+export function VersionHistoryListPopover({
+  configId,
+  onRestore,
+}: {
+  configId: string;
+  onRestore?: (versionId: string) => void;
+}) {
+  const { open, setOpen, onClose } = useDisclosure();
   const { project } = useOrganizationTeamProject();
   const {
     data: versions,
@@ -259,12 +265,7 @@ export function VersionHistoryListPopover({ configId }: { configId: string }) {
       { enabled: !!project?.id }
     );
   const { mutateAsync: restoreVersion } =
-    api.llmConfigs.versions.restore.useMutation({
-      onSuccess: () => {
-        void refetch();
-        void refetchPromptConfig();
-      },
-    });
+    api.llmConfigs.versions.restore.useMutation();
 
   const handleRestore = async (versionId: string) => {
     try {
@@ -272,6 +273,10 @@ export function VersionHistoryListPopover({ configId }: { configId: string }) {
         id: versionId,
         projectId: project?.id ?? "",
       });
+      await refetch();
+      await refetchPromptConfig();
+      onClose();
+      onRestore?.(versionId);
       toaster.success({
         title: "Version restored successfully",
       });
