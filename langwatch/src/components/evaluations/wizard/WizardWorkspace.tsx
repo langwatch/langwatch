@@ -262,18 +262,20 @@ function CodeImplementation() {
   return (
     <Card.Root width="full" height="full" position="sticky" top={6}>
       <Card.Body width="full" height="full" paddingTop={0}>
-        <EvaluationManualIntegration
-          evaluatorDefinition={availableEvaluators[checkType]}
-          checkType={checkType}
-          name={name ?? "Untitled"}
-          executionMode={
-            executionMethod === "realtime_guardrail"
-              ? "AS_GUARDRAIL"
-              : "MANUALLY"
-          }
-          settings={settings}
-          storeSettingsOnCode={true}
-        />
+        {availableEvaluators[checkType] && (
+          <EvaluationManualIntegration
+            evaluatorDefinition={availableEvaluators[checkType]}
+            checkType={checkType}
+            name={name ?? "Untitled"}
+            executionMode={
+              executionMethod === "realtime_guardrail"
+                ? "AS_GUARDRAIL"
+                : "MANUALLY"
+            }
+            settings={settings}
+            storeSettingsOnCode={true}
+          />
+        )}
       </Card.Body>
     </Card.Root>
   );

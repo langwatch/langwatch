@@ -529,7 +529,7 @@ export const store = (
   },
 });
 
-const _useWorkflowStore = create<WorkflowStore>()(
+export const _useWorkflowStore = create<WorkflowStore>()(
   temporal(store, {
     handleSet: (handleSet) => {
       return debounce<typeof handleSet>(
@@ -589,7 +589,8 @@ export const useWorkflowStore = ((
     return useEvaluationWizardStore(
       useShallow(({ workflowStore }) => {
         return selector(workflowStore);
-      })
+      }),
+      equalityFn
     );
   }
 

@@ -15,6 +15,7 @@ import {
   buildExecutorToEvaluatorEdge,
 } from "./utils/edge.util";
 import type { ExecutorSlice } from "./executorSlice";
+import type { useAvailableEvaluators } from "../../../../../../hooks/useAvailableEvaluators";
 
 const createEvaluatorData = (): Omit<Node<Evaluator>, "position"> => ({
   id: "evaluator_node",
@@ -32,7 +33,10 @@ export interface EvaluatorNodeSlice {
   createNewEvaluatorNode: () => Node<Evaluator>;
   addNewEvaluatorNodeToWorkflow: () => string;
   setFirstEvaluator: (
-    evaluator: Partial<Evaluator> & { evaluator: EvaluatorTypes }
+    evaluator: Partial<Evaluator> & {
+      evaluator: EvaluatorTypes | `custom/${string}`;
+    },
+    availableEvaluators: ReturnType<typeof useAvailableEvaluators>
   ) => void;
   getFirstEvaluatorNode: () => Node<Evaluator> | undefined;
   setFirstEvaluatorEdges: (edges: Workflow["edges"]) => void;
@@ -73,14 +77,12 @@ export const createEvaluatorNodeSlice: StateCreator<
      * rather than trying to handle a complex merge.
      */
     setFirstEvaluator(
-      evaluator: Partial<Evaluator> & { evaluator: EvaluatorTypes }
+      evaluator: Partial<Evaluator> & {
+        evaluator: EvaluatorTypes | `custom/${string}`;
+      },
+      availableEvaluators: ReturnType<typeof useAvailableEvaluators>
     ) {
       get().workflowStore.setWorkflow((current) => {
-        // Validate evaluator type
-        if (evaluator.evaluator.startsWith("custom/")) {
-          throw new Error("Custom evaluators are not supported yet");
-        }
-
         // Find existing evaluator node if any
         const firstEvaluatorIndex = current.nodes.findIndex(
           (node) => node.type === "evaluator"
@@ -91,7 +93,10 @@ export const createEvaluatorNodeSlice: StateCreator<
             : undefined;
 
         // Get base evaluator properties from the evaluator type
-        const initialEvaluator = buildEvaluatorFromType(evaluator.evaluator);
+        const initialEvaluator = buildEvaluatorFromType(
+          evaluator.evaluator,
+          availableEvaluators
+        );
         const id = nameToId(initialEvaluator.name ?? initialEvaluator.cls);
 
         // Check if evaluator type has changed
