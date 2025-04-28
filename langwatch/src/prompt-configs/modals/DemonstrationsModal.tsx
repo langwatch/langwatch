@@ -51,6 +51,7 @@ export function DemonstrationsModal({
                   rows: dataset.datasetRecords,
                 })
               }
+              canEditDatasetRecord={false}
             />
             {/** This is a hacky way to get a button on here, but we're pressed for time */}
             <Button

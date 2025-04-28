@@ -141,6 +141,17 @@ function SignaturePropertiesPanelInner({
     }
   };
 
+  const handleTriggerSaveVersion = async (
+    configId: string,
+    saveFormValues: PromptConfigFormValues
+  ) => {
+    // Check form value validity
+    const isValid = await formProps.methods.trigger();
+    if (!isValid) return;
+
+    triggerSaveVersion(configId, saveFormValues);
+  };
+
   // TODO: Consider refactoring the BasePropertiesPanel so that we don't need to hide everything like this
   return (
     <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs>
@@ -151,7 +162,7 @@ function SignaturePropertiesPanelInner({
           onPromptSourceSelect={(config) =>
             void handlePromptSourceSelect(config)
           }
-          triggerSaveVersion={triggerSaveVersion}
+          triggerSaveVersion={handleTriggerSaveVersion}
           values={formProps.methods.getValues()}
         />
         <Separator marginY={0} />
