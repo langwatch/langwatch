@@ -3,7 +3,7 @@ import { Book, ChevronDown } from "react-feather";
 
 // Prompt Selection Button Component
 interface PromptSelectionButtonProps {
-  selectedConfig: any;
+  selectedConfig?: { name: string };
   onClick: () => void;
 }
 
