@@ -90,7 +90,6 @@ export const llmConfigVersionsRouter = createTRPCRouter({
       const authorId = ctx.session?.user?.id;
 
       try {
-        // TODO: Validate the config data against the schema before saving
         const version = await repository.versions.createVersion({
           ...input,
           authorId,
