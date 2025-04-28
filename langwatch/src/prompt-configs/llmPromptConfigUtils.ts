@@ -162,10 +162,10 @@ function safeOutputs(
   );
 }
 
-function inputsAndOutputsToDemostrationColumns(
+export function inputsAndOutputsToDemostrationColumns(
   inputs: PromptConfigFormValues["version"]["configData"]["inputs"],
   outputs: PromptConfigFormValues["version"]["configData"]["outputs"]
-): DatasetColumns {
+): { name: string; type: DatasetColumnType; id: string }[] {
   return [
     ...inputs
       .filter(({ type }) => type !== "image")

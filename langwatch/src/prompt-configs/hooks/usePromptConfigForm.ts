@@ -4,6 +4,8 @@ import { useForm, type DeepPartial } from "react-hook-form";
 import { z } from "zod";
 
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+import { inputsAndOutputsToDemostrationColumns } from "../llmPromptConfigUtils";
+import isEqual from "lodash.isequal";
 
 const promptConfigSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -50,6 +52,19 @@ export const usePromptConfigForm = ({
   });
 
   const formData = methods.watch();
+
+  // Handle syncing the inputs/outputs with the demonstrations columns
+  useEffect(() => {
+    const inputs = formData.version?.configData.inputs ?? [];
+    const outputs = formData.version?.configData.outputs ?? [];
+    const newColumns = inputsAndOutputsToDemostrationColumns(inputs, outputs);
+    const currentColumns =
+      formData.version?.configData.demonstrations.columns ?? [];
+
+    if (!isEqual(newColumns, currentColumns)) {
+      methods.setValue("version.configData.demonstrations.columns", newColumns);
+    }
+  }, [formData]);
 
   // Provides on change callback to the parent component
   useEffect(() => {
