@@ -525,17 +525,6 @@ const customEvaluation = async (
     throw new Error("Project not found");
   }
 
-  const check = await prisma.monitor.findFirst({
-    where: {
-      checkType: evaluatorType,
-      projectId: projectId,
-    },
-  });
-
-  if (!check) {
-    throw new Error("Check not found");
-  }
-
   const requestBody: Record<string, any> = {
     trace_id: trace?.trace_id,
     do_not_trace: true,

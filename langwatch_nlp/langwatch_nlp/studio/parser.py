@@ -71,7 +71,7 @@ def parse_workflow(
     until_node_id=None,
     handle_errors=False,
     do_not_trace=False,
-) -> Tuple[str, str]:
+) -> Tuple[str, str, List[Field]]:
     workflow = normalized_workflow(workflow)
 
     # Find all reachable nodes from entry
@@ -107,7 +107,7 @@ def parse_workflow(
         do_not_trace=do_not_trace,
     )
 
-    return "WorkflowModule", module
+    return "WorkflowModule", module, inputs
 
 
 @contextmanager
@@ -118,14 +118,14 @@ def parsed_and_materialized_workflow_class(
     until_node_id=None,
     handle_errors=False,
     do_not_trace=False,
-) -> Generator[Type[LangWatchWorkflowModule], None, None]:
-    class_name, code = parse_workflow(
+) -> Generator[Tuple[Type[LangWatchWorkflowModule], List[Field]], None, None]:
+    class_name, code, inputs = parse_workflow(
         workflow, format, debug_level, until_node_id, handle_errors, do_not_trace
     )
     with materialized_component_class(
         component_code=code, class_name=class_name
     ) as Module:
-        yield cast(Type[LangWatchWorkflowModule], Module)
+        yield cast(Type[LangWatchWorkflowModule], Module), inputs
 
 
 def parse_component(

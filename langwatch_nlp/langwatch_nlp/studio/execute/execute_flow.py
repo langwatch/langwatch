@@ -1,6 +1,6 @@
 import json
 import time
-from typing import Dict, Set, cast
+from typing import Any, Dict, Set, cast
 
 import dspy
 import asyncer
@@ -77,7 +77,7 @@ async def execute_flow(
                 debug_level=0,
                 until_node_id=until_node_id,
                 do_not_trace=do_not_trace,
-            ) as Module:
+            ) as (Module, module_inputs):
                 module = Module(run_evaluations=True)
                 module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
 
@@ -106,7 +106,13 @@ async def execute_flow(
                     )
 
                 try:
-                    result = await dspy.asyncify(module.forward)(**entries[0])  # type: ignore
+                    input_keys = [input.identifier for input in module_inputs]
+                    inputs_ = {
+                        k: v
+                        for k, v in entries[0].items()
+                        if k in input_keys
+                    }
+                    result = await dspy.asyncify(module.forward)(**inputs_)  # type: ignore
 
                 except Exception as e:
                     import traceback
@@ -150,7 +156,9 @@ def end_workflow_event(workflow: Workflow, trace_id: str, result):
                 trace_id=trace_id,
                 timestamps=Timestamps(finished_at=int(time.time() * 1000)),
                 result=json.loads(
-                    json.dumps(result.toDict(), cls=SerializableWithPydanticAndPredictEncoder)
+                    json.dumps(
+                        result.toDict(), cls=SerializableWithPydanticAndPredictEncoder
+                    )
                 ),
             )
         )
