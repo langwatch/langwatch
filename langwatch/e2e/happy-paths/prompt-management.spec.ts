@@ -81,13 +81,13 @@ test("Test happy paths for prompt management", async ({ page }) => {
     .fill("new_output");
   await page
     .locator('select[name="version\\.configData\\.inputs\\.1\\.type"]')
-    .selectOption("int");
+    .selectOption("float");
 
   // Dismissing Next error issue, doesn't happen on test
   // await page.getByRole("button", { name: "Collapse issues badge" }).click();
   await page
     .locator('select[name="version\\.configData\\.outputs\\.1\\.type"]')
-    .selectOption("code");
+    .selectOption("float");
   await page.getByTestId("save-version-button").click();
   await page
     .getByRole("textbox", { name: "Description" })
@@ -100,20 +100,8 @@ test("Test happy paths for prompt management", async ({ page }) => {
     .filter({ hasText: "Current Versionchanged" })
     .click();
   await page
-    .getByRole("group")
-    .filter({
-      hasText:
-        "intstrimagefloatintboolllmprompting_techniquedatasetcodelist[str]",
-    })
-    .getByRole("button")
-    .click();
-  await page
-    .getByRole("group")
-    .filter({
-      hasText: "codestrfloatintboolllmprompting_techniquedatasetcodelist[str]",
-    })
-    .getByRole("button")
-    .click();
+    .getByRole("textbox", { name: "Prompt", exact: true })
+    .fill("new prompt text");
   await page.getByTestId("save-version-button").click();
   await page
     .getByRole("textbox", { name: "Description" })
