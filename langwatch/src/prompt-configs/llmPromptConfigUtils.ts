@@ -96,7 +96,7 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   const parametersMap = nodeData.parameters
     ? Object.fromEntries(nodeData.parameters.map((p) => [p.identifier, p]))
     : {};
-  const llmParameter = parametersMap.llm as LlmConfigParameter;
+  const llmParameter = parametersMap.llm as LlmConfigParameter | undefined;
   const inputs = safeInputs(nodeData.inputs);
   const outputs = safeOutputs(nodeData.outputs);
   return {
@@ -105,7 +105,7 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
       configData: {
         inputs,
         outputs,
-        llm: llmParameter.value,
+        llm: llmParameter?.value,
         prompt:
           typeof parametersMap.instructions?.value === "string"
             ? parametersMap.instructions.value
