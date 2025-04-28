@@ -1,23 +1,25 @@
-import { Button, Container, HStack, Heading, VStack } from "@chakra-ui/react";
-import { Plus } from "react-feather";
-import { DashboardLayout } from "~/components/DashboardLayout";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import {
+  Button,
+  Container,
+  HStack,
+  Heading,
+  VStack,
+  Flex,
+} from "@chakra-ui/react";
+import { type LlmPromptConfig } from "@prisma/client";
 import { useState, useMemo } from "react";
+import { Plus } from "react-feather";
+
+import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
+import { DashboardLayout } from "~/components/DashboardLayout";
+import { toaster } from "~/components/ui/toaster";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { PromptConfigPanel } from "~/prompt-configs/PromptConfigPanel";
 import {
   createDefaultColumns,
   PromptConfigTable,
-} from "~/components/prompt-configs/PromptConfigTable";
-import { PromptConfigPanel } from "~/components/prompt-configs/PromptConfigPanel";
-import { toaster } from "~/components/ui/toaster";
-import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
-import { type LlmPromptConfig } from "@prisma/client";
-import { llmPromptConfigVersionFactory } from "~/factories/llm-config.factory";
-import {
-  getSchemaValidator,
-  LATEST_SCHEMA_VERSION,
-  type LatestConfigVersionSchema,
-} from "~/server/repositories/llm-config-version-schema";
+} from "~/prompt-configs/PromptConfigTable";
+import { api } from "~/utils/api";
 
 export default function PromptConfigsPage() {
   const utils = api.useContext();
@@ -27,6 +29,9 @@ export default function PromptConfigsPage() {
   const [configToDelete, setConfigToDelete] = useState<LlmPromptConfig | null>(
     null
   );
+  const closePanel = () => {
+    setSelectedConfigId(null);
+  };
 
   // Fetch prompt configs
   const { data: promptConfigs, refetch: refetchPromptConfigs } =
@@ -38,7 +43,7 @@ export default function PromptConfigsPage() {
         enabled: !!project?.id,
         onError: (error) => {
           toaster.create({
-            title: "Error loading prompt configs",
+            title: "Error loading prompt configs from here",
             description: error.message,
             type: "error",
           });
@@ -46,20 +51,8 @@ export default function PromptConfigsPage() {
       }
     );
 
-  const createConfigMutation = api.llmConfigs.createPromptConfig.useMutation({
-    onSuccess: ({ id }) => {
-      void utils.llmConfigs.getPromptConfigs.invalidate();
-      setSelectedConfigId(id);
-      void refetchPromptConfigs();
-    },
-    onError: (error) => {
-      toaster.create({
-        title: "Error creating prompt config",
-        description: error.message,
-        type: "error",
-      });
-    },
-  });
+  const createConfigWithInitialVersionMutation =
+    api.llmConfigs.createConfigWithInitialVersion.useMutation();
 
   const deleteConfigMutation = api.llmConfigs.deletePromptConfig.useMutation({
     onSuccess: () => {
@@ -84,42 +77,37 @@ export default function PromptConfigsPage() {
     },
   });
 
-  const createConfigVersionMutation =
-    api.llmConfigs.versions.create.useMutation({
-      onSuccess: () => {
-        void utils.llmConfigs.getPromptConfigs.invalidate();
-        void refetchPromptConfigs();
-      },
-    });
-
   const handleCreateButtonClick = async () => {
-    if (!project?.id) {
+    try {
+      if (!project?.id) {
+        toaster.create({
+          title: "Error",
+          description: "Project ID is required",
+          type: "error",
+        });
+        return;
+      }
+
+      // Create with defaults
+      await createConfigWithInitialVersionMutation.mutateAsync({
+        name: "New Prompt Config",
+        projectId: project.id,
+      });
+    } catch (error) {
       toaster.create({
-        title: "Error",
-        description: "Project ID is required",
+        title: "Error creating prompt config",
+        description: error instanceof Error ? error.message : "Unknown error",
         type: "error",
       });
-      return;
     }
 
-    // Default config version data
-    const defaultPromptVersionConfig = llmPromptConfigVersionFactory.build({
-      schemaVersion: LATEST_SCHEMA_VERSION,
-    });
-
-    // Create with defaults
-    const newConfig = await createConfigMutation.mutateAsync({
-      name: "New Prompt Config",
-      projectId: project.id,
-    });
-
-    // Create with defaults
-    await createConfigVersionMutation.mutateAsync({
-      configId: newConfig.id,
-      projectId: project.id,
-      configData: defaultPromptVersionConfig.configData as any,
-      schemaVersion: LATEST_SCHEMA_VERSION,
-      commitMessage: "Initial version",
+    void refetchPromptConfigs();
+    toaster.create({
+      title: "Prompt config created",
+      type: "success",
+      meta: {
+        closable: true,
+      },
     });
   };
 
@@ -157,58 +145,52 @@ export default function PromptConfigsPage() {
   }, []);
 
   return (
-    <DashboardLayout>
-      <Container
-        maxW={"calc(100vw - 200px)"}
-        padding={6}
-        // marginTop={8}
+    <DashboardLayout position="relative">
+      <Flex
+        flexDirection="column"
+        height="100%"
+        width="100%"
         position="relative"
-        height="full"
       >
-        <VStack align="start" width="full">
-          {/* Header with title and "Create New" button */}
-          <HStack width="full" justifyContent="space-between">
-            <Heading as="h1" size="lg">
-              Prompts
-            </Heading>
-            <Button
-              colorPalette="blue"
-              minWidth="fit-content"
-              onClick={() => void handleCreateButtonClick()}
-            >
-              <Plus height={16} /> Create New
-            </Button>
-          </HStack>
-          <PromptConfigTable
-            configs={promptConfigs ?? []}
-            isLoading={false}
-            onRowClick={(config) => setSelectedConfigId(config.id)}
-            columns={defaultColumns}
+        <Container padding={6} height="full" width="full">
+          <VStack align="start" width="full">
+            {/* Header with title and "Create New" button */}
+            <HStack width="full" justifyContent="space-between">
+              <Heading as="h1" size="lg">
+                Prompts
+              </Heading>
+              <Button
+                colorPalette="blue"
+                minWidth="fit-content"
+                onClick={() => void handleCreateButtonClick()}
+              >
+                <Plus height={16} /> Create New
+              </Button>
+            </HStack>
+            <PromptConfigTable
+              configs={promptConfigs ?? []}
+              isLoading={false}
+              onRowClick={(config) => setSelectedConfigId(config.id)}
+              columns={defaultColumns}
+            />
+          </VStack>
+
+          <DeleteConfirmationDialog
+            title="Are you really sure?"
+            description="There is no going back, and you will lose all versions of this prompt. If you're sure you want to delete this prompt, type 'delete' below:"
+            open={isDeleteDialogOpen}
+            onClose={() => setIsDeleteDialogOpen(false)}
+            onConfirm={() => {
+              void confirmDeleteConfig();
+            }}
           />
-        </VStack>
+        </Container>
         <PromptConfigPanel
           isOpen={!!selectedConfigId}
-          onClose={() => setSelectedConfigId(null)}
+          onClose={closePanel}
           configId={selectedConfigId ?? ""}
         />
-
-        <DeleteConfirmationDialog
-          title="Are you really sure?"
-          description="There is no going back, and you will lose all versions of this prompt. If you're sure you want to delete this prompt, type 'delete' below:"
-          open={isDeleteDialogOpen}
-          onClose={() => setIsDeleteDialogOpen(false)}
-          onConfirm={() => {
-            void confirmDeleteConfig();
-          }}
-        />
-
-        {/* You'll need to implement drawer/modal components for:
-          - Creating a new config
-          - Editing a config name
-          - Viewing/managing versions
-          - Creating a new version
-      */}
-      </Container>
+      </Flex>
     </DashboardLayout>
   );
 }
