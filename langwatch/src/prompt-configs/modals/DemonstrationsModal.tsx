@@ -28,6 +28,7 @@ export function DemonstrationsModal({
         height="calc(100vh - 64px)"
         borderRadius="8px"
         overflowY="auto"
+        data-testid="prompt-config-demonstrations-modal"
       >
         <Dialog.CloseTrigger zIndex={10} />
         <Dialog.Header>
@@ -38,8 +39,8 @@ export function DemonstrationsModal({
             <DatasetTable
               inMemoryDataset={{
                 name: "Demonstrations",
-                datasetRecords: demonstrations.rows ?? [],
-                columnTypes: demonstrations.columns ?? [],
+                datasetRecords: demonstrations?.rows ?? [],
+                columnTypes: demonstrations?.columns ?? [],
               }}
               onUpdateDataset={(dataset) =>
                 onChange({
