@@ -29,9 +29,11 @@ function ConfigFieldGroup({
   const { control, setValue, getValues } =
     useFormContext<PromptConfigFormValues>();
 
+  const fieldArrayName = `version.configData.${name}` as const;
+
   const { fields, append, remove } = useFieldArray({
     control,
-    name: `version.configData.${name}`,
+    name: fieldArrayName,
   });
 
   const handleAddField = () => {
@@ -39,11 +41,13 @@ function ConfigFieldGroup({
   };
 
   const handleSetValue = (path: string, value: any) => {
-    setValue(path as any, value, { shouldValidate: true });
+    setValue(path as any, value, { shouldValidate: false });
   };
 
   const validateIdentifier = (index: number, value: string) => {
-    const currentFields = getValues(`version.configData.${name}`);
+    const currentFields = getValues(fieldArrayName);
+    const fieldArrayIdentifierPath =
+      `${fieldArrayName}.${index}.identifier` as const;
 
     if (Array.isArray(currentFields)) {
       const identifierCount = currentFields.filter(
@@ -51,13 +55,9 @@ function ConfigFieldGroup({
       ).length;
 
       if (identifierCount > 0) {
-        setValue(
-          `version.configData.${name}.${index}.identifier` as any,
-          value,
-          {
-            shouldValidate: true,
-          }
-        );
+        setValue(fieldArrayIdentifierPath, value, {
+          shouldValidate: true,
+        });
         return "Duplicate identifier";
       }
     }
@@ -139,6 +139,15 @@ function FieldRow({
   error?: { message?: string };
   validateIdentifier: (value: string) => true | string;
 }) {
+  const { getValues } = useFormContext();
+  const fieldIdBase = `version.configData.${name}.${index}`;
+  const identifierFieldId = `${fieldIdBase}.identifier`;
+  const typeFieldId = `${fieldIdBase}.type`;
+
+  const currentIdentifier =
+    getValues(identifierFieldId) ?? field.identifier ?? "";
+  const currentType = getValues(typeFieldId) ?? field.type ?? "str";
+
   return (
     <Field.Root key={field.id} invalid={!!error}>
       <HStack width="full">
@@ -150,21 +159,18 @@ function FieldRow({
         >
           {!readOnly ? (
             <Input
-              name={`${name}.${index}.identifier`}
+              name={identifierFieldId}
               onChange={(e) => {
                 const normalized = e.target.value
                   .replace(/ /g, "_")
                   .toLowerCase();
 
-                onChange(
-                  `version.configData.${name}.${index}.identifier`,
-                  normalized
-                );
+                onChange(identifierFieldId, normalized);
               }}
               onBlur={(e) => {
                 validateIdentifier(e.target.value);
               }}
-              defaultValue={field.identifier || ""}
+              value={currentIdentifier}
               width="full"
               fontFamily="monospace"
               fontSize="13px"
@@ -179,13 +185,15 @@ function FieldRow({
               width="full"
               padding="8px 0px 8px 12px"
             >
-              {field.identifier}
+              {currentIdentifier}
             </Text>
           )}
           <TypeSelector
-            name={`${name}.${index}.type`}
-            value={field.type || "str"}
-            onChange={(value) => onChange(`${name}.${index}.type`, value)}
+            name={typeFieldId}
+            value={currentType}
+            onChange={(value) => {
+              onChange(typeFieldId, value);
+            }}
             isInput={name === "inputs"}
             readOnly={readOnly}
           />

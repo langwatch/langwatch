@@ -44,7 +44,6 @@ export function DemonstrationsField() {
             onClose={onClose}
             demonstrations={demonstrations}
             onChange={(demonstrations) => {
-              console.log("in change demonstrations", demonstrations);
               field.onChange(demonstrations);
             }}
           />

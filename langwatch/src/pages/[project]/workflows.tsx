@@ -93,7 +93,13 @@ export default function Workflows() {
                 </Tooltip>
               </WorkflowCardBase>
             ) : (
-              <WorkflowCardBase onClick={onOpen}>
+              <WorkflowCardBase
+                // This lets us test the happy path for prompt management from workflow
+                // since otherwise both versions look the same, but we need to wait
+                // for this one to be clickable
+                data-testid="active-create-new-workflow-button"
+                onClick={onOpen}
+              >
                 <Center width="full" height="full">
                   <HStack gap={3}>
                     <Box

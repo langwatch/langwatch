@@ -13,6 +13,7 @@ export function VersionSaveButton({
   return (
     <Button
       type="submit"
+      data-testid="save-version-button"
       disabled={!!isSaving || !!disabled}
       colorPalette="green"
       loading={isSaving}
