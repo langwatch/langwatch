@@ -7,7 +7,7 @@ import { VersionSaveButton } from "./VersionSaveButton";
 
 interface ConfigHeaderProps {
   config: LlmConfigWithLatestVersion;
-  saveEnabled?: boolean;
+  saveEnabled: boolean;
   onSaveClick: () => void;
   isSaving?: boolean;
 }
