@@ -1,14 +1,25 @@
 ![logo.webp](assets/logo-header.webp)
 
+<p align="center">
+<a href="https://discord.gg/kT4PhDS2gH">
+  <img src="https://img.shields.io/badge/LangWatch-Discord-%235865F2.svg" alt="Discord">
+</a>
+<a href="https://pypi.org/project/langwatch/">
+  <img src="https://img.shields.io/pypi/v/langwatch?color=007EC6" alt="LangWatch Python SDK version">
+</a>
+<a href="https://www.npmjs.com/package/langwatch">
+  <img src="https://img.shields.io/npm/v/langwatch?color=007EC6" alt="LangWatch TypeScript SDK version">
+</a>
+</p>
 
 LangWatch is an Open-Platform for **Observing**, **Evaluating** and **Optimizing** your LLM and Agentic applications. We offer:
 
 - [**Observability**](https://docs.langwatch.ai/integration/overview) - Add tracing to your LLM, based on the OpenTelemetry standard, allowing LangWatch to provide real-time powers.
 - [**Evaluation**](https://docs.langwatch.ai/llm-evaluation/offline-evaluation) - Run real-time and offline evaluations against production or synthetic datasets. Compare performance across various matrixes (prompts, modules, hosting providers, and complete LLM pipelines).
 - [**Datasets**](https://docs.langwatch.ai/features/datasets) - Automatically created from traced messages, or upload, datasets which can be used across the platform for evals.
-- [**Optimization Studio**](https://docs.langwatch.ai/optimization-studio/overview) – Build and run evaluations faster with our no+lo 🧘 code studio.
-- **Prompt Management & Optimization** – Version prompts, test changes on datasets, and improve real-world performance. Auto-optimize with DSPy’s MIPROv2 to generate better prompts and few-shot examples.
-- [**Annotations**](https://docs.langwatch.ai/features/annotations) - Human in the Loop, done right. Accelerate better data creation by combining domain expert input with smart workflows. Use LangWatch’s intuitive annotation interface to collaborate directly with experts while keeping full control over your code. Quickly generate high-quality labels, catch edge cases, and fine-tune datasets to build more accurate, robust AI models.
+- [**Optimization Studio**](https://docs.langwatch.ai/optimization-studio/overview) – Build and run evaluations faster with our no+lo 🧘 code studio. If you need more flexibility, you have access to the DSL that powers it too.
+- **Prompt Management & Optimization** – Version prompts, test changes on datasets, and improve real-world performance. Auto-optimize with DSPy's MIPROv2 to generate better prompts and few-shot examples.
+- [**Annotations**](https://docs.langwatch.ai/features/annotations) - Human in the Loop, done right. Accelerate better data creation by combining domain expert input with smart workflows. Use LangWatch's intuitive annotation interface to collaborate directly with experts while keeping full control over your code. Quickly generate high-quality labels, catch edge cases, and fine-tune datasets to build more accurate, robust AI models.
 
 LangWatch is framework- and LLM-agnostic, with support for (LangGraph, DSPy, Langflow, Flowise, and others) and LLM providers (OpenAI, Azure, Bedrock, Gemini, Deepseek, Groq, MistralAI, VertexAI, LiteLLM, and others) via [OpenTelemetry](https://opentelemetry.io/).
 
@@ -27,7 +38,7 @@ docker compose up -d --wait --build
 open http://localhost:5560
 ```
 
-You’ll be launched right into our onboarding flow. Welcome aboard 🫡.
+You'll be launched right into our onboarding flow. Welcome aboard 🫡.
 
 ### Cloud ☁️
 
@@ -70,7 +81,7 @@ make start
 Get observing in minutes. Now you have an account and have created a project inside LangWatch, lets get your messages flowing through LangWatch.
 
 > [!NOTE]  
-> Not using Python or OpenAI? Don’t worry, we have your back . [Visit our docs](https://docs.langwatch.ai/integration/overview) for full guides for other popular languages, LLM providers, and frameworks.
+> Not using Python or OpenAI? Don't worry, we have your back . [Visit our docs](https://docs.langwatch.ai/integration/overview) for full guides for other popular languages, LLM providers, and frameworks.
 
 ### Install and configure SDK
 
@@ -148,14 +159,14 @@ Our JavaScript SDK supports the following instrumentors:
 - [LangFlow](https://docs.langwatch.ai/integration/langflow)
 - [Flowise](https://docs.langwatch.ai/integration/flowise)
 
-Are you using a platform that could benefit from a direct LangWatch integration? We’d love to hear from you, please [**fill out this very quick form.**](https://www.notion.so/1e35e165d48280468247fcbdc3349077?pvs=21)
+Are you using a platform that could benefit from a direct LangWatch integration? We'd love to hear from you, please [**fill out this very quick form.**](https://www.notion.so/1e35e165d48280468247fcbdc3349077?pvs=21)
 
-## 🥰 Community
+## 🥰 Community
 
 - Join our [Discord](https://discord.gg/kT4PhDS2gH) community
 - Follow our [Twitter](https://x.com/LangWatchAI)
 
-## 💬 Support
+## 💬 Support
 
 Have questions or need help? We're here to support you in multiple ways:
 
@@ -164,13 +175,13 @@ Have questions or need help? We're here to support you in multiple ways:
 - **GitHub Issues:** Report bugs or request features through our [GitHub repository](https://github.com/langwatch/langwatch).
 - **Enterprise Support:** Enterprise customers receive priority support with dedicated response times. Our [pricing page](https://langwatch.ai/pricing) contains more information.
 
-## 🤝 Collaborating
+## 🤝 Collaborating
 
-Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
-Please read our [Contribution Guidelines](https://github.com/langwatch/langwatch/blob/main/CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests.
+Please read our [Contribution Guidelines](https://github.com/langwatch/langwatch/blob/main/CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests.
 
-## ✍️ License
+## ✍️ License
 
 Please read our [LICENSE.md](http://LICENSE.md) file.
 
