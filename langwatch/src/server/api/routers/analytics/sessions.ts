@@ -19,116 +19,65 @@ export const sessionsVsPreviousPeriod = protectedProcedure
         index: TRACE_INDEX.alias,
         body: {
           aggs: {
-            user_sessions: {
-              terms: {
-                field: "metadata.user_id",
-                size: 10000, // Adjust based on expected number of unique users
-              },
-              aggs: {
-                session_windows: {
-                  date_histogram: {
-                    field: "timestamps.started_at",
-                    calendar_interval: "hour", // Group by hour
-                  },
-                  aggs: {
-                    distinct_threads: {
-                      cardinality: {
-                        field: "metadata.thread_id",
-                      },
-                    },
-                    session_duration: {
-                      scripted_metric: {
-                        init_script: "state.duration = 0",
-                        map_script: `
-                          if (doc.containsKey('trace.timestamps.started_at') && doc['trace.timestamps.started_at'].size() > 0) {
-                            long startedAt = doc['trace.timestamps.started_at'].value.toInstant().toEpochMilli();
-                            if (state.min_started_at == null || startedAt < state.min_started_at) {
-                              state.min_started_at = startedAt;
-                            }
-                            if (state.max_started_at == null || startedAt > state.max_started_at) {
-                              state.max_started_at = startedAt;
-                              state.total_time_ms = doc.containsKey('trace.metrics.total_time_ms') && doc['trace.metrics.total_time_ms'].size() > 0 ? doc['trace.metrics.total_time_ms'].value : 0;
-                            }
-                          }
-                        `,
-                        combine_script: "return state",
-                        reduce_script: `
-                          long minStartedAt = Long.MAX_VALUE;
-                          long maxStartedAt = Long.MIN_VALUE;
-                          long totalTimeMs = 0;
-                          for (state in states) {
-                            if (state != null) {
-                              if (state.min_started_at != null && state.min_started_at < minStartedAt) {
-                                minStartedAt = state.min_started_at;
-                              }
-                              if (state.max_started_at != null && state.max_started_at > maxStartedAt) {
-                                maxStartedAt = state.max_started_at;
-                                totalTimeMs = state.total_time_ms;
-                              }
-                            }
-                          }
-                          return (maxStartedAt + totalTimeMs) - minStartedAt;
-                        `,
-                      },
-                    },
-                  },
-                },
-                average_threads_per_session: {
-                  avg_bucket: {
-                    buckets_path: "session_windows>distinct_threads",
-                  },
-                },
-                average_session_duration: {
-                  avg_bucket: {
-                    buckets_path: "session_windows>session_duration.value",
-                  },
-                },
-                returning_user_flag: {
-                  bucket_script: {
-                    buckets_path: {
-                      numSessions: "session_windows._bucket_count",
-                    },
-                    script: "params.numSessions > 1 ? 1 : 0",
-                  },
-                },
-                bouncing_user_flag: {
-                  bucket_script: {
-                    buckets_path: {
-                      numTraces: "_count",
-                    },
-                    script: "params.numTraces == 1 ? 1 : 0",
-                  },
-                },
-              },
-            },
             total_users: {
               cardinality: {
                 field: "metadata.user_id",
               },
             },
             total_sessions: {
-              sum_bucket: {
-                buckets_path: "user_sessions>session_windows._bucket_count",
+              cardinality: {
+                field: "metadata.thread_id",
               },
             },
-            average_threads_per_user_session: {
+            // Direct aggregations for metrics instead of nested user buckets
+            thread_sessions: {
+              terms: {
+                field: "metadata.thread_id",
+                size: 10000,
+              },
+              aggs: {
+                interactions: {
+                  value_count: {
+                    field: "timestamps.started_at",
+                  },
+                },
+                session_duration: {
+                  scripted_metric: {
+                    init_script:
+                      "state.min = Long.MAX_VALUE; state.max = Long.MIN_VALUE;",
+                    map_script: `
+                      if (doc.containsKey('timestamps.started_at') && !doc['timestamps.started_at'].empty) {
+                        long timestamp = doc['timestamps.started_at'].value.toInstant().toEpochMilli();
+                        if (timestamp < state.min) state.min = timestamp;
+                        if (timestamp > state.max) state.max = timestamp;
+                      }
+                    `,
+                    combine_script:
+                      "return ['min': state.min, 'max': state.max];",
+                    reduce_script: `
+                      long min = Long.MAX_VALUE;
+                      long max = Long.MIN_VALUE;
+                      for (state in states) {
+                        if (state.min < min && state.min != Long.MAX_VALUE) min = state.min;
+                        if (state.max > max && state.max != Long.MIN_VALUE) max = state.max;
+                      }
+                      if (min == Long.MAX_VALUE || max == Long.MIN_VALUE) return 0;
+                      // Cap at 2 hours (7,200,000 ms) to avoid unreasonable values
+                      long duration = max - min;
+                      return duration > 7200000 ? 7200000 : duration;
+                    `,
+                  },
+                },
+              },
+            },
+            avg_interactions_per_session: {
               avg_bucket: {
-                buckets_path: "user_sessions>average_threads_per_session",
+                buckets_path: "thread_sessions>interactions.value",
               },
             },
-            average_duration_per_user_session: {
+            avg_duration_per_session: {
               avg_bucket: {
-                buckets_path: "user_sessions>average_session_duration",
-              },
-            },
-            returning_users_count: {
-              sum_bucket: {
-                buckets_path: "user_sessions>returning_user_flag",
-              },
-            },
-            bouncing_users_count: {
-              sum_bucket: {
-                buckets_path: "user_sessions>bouncing_user_flag",
+                buckets_path: "thread_sessions>session_duration.value",
               },
             },
           },
@@ -142,10 +91,8 @@ export const sessionsVsPreviousPeriod = protectedProcedure
         filter_path: [
           "aggregations.total_users",
           "aggregations.total_sessions",
-          "aggregations.average_threads_per_user_session",
-          "aggregations.average_duration_per_user_session",
-          "aggregations.returning_users_count",
-          "aggregations.bouncing_users_count",
+          "aggregations.avg_interactions_per_session",
+          "aggregations.avg_duration_per_session",
         ],
       });
 
@@ -156,18 +103,18 @@ export const sessionsVsPreviousPeriod = protectedProcedure
 
     const mapAggregations = ({ aggregations }: { aggregations: any }) => {
       return {
-        total_users: aggregations.total_users.value,
-        total_sessions: aggregations.total_sessions.value,
-        returning_users_count: aggregations.returning_users_count.value,
-        bouncing_users_count: aggregations.bouncing_users_count.value,
+        total_users: aggregations.total_users.value || 0,
+        total_sessions: aggregations.total_sessions.value || 0,
+
         average_sessions_per_user:
           (aggregations.total_sessions.value || 0) /
           (aggregations.total_users.value || 1),
-        average_threads_per_user_session:
-          aggregations.average_threads_per_user_session.value || 0,
-        average_duration_per_user_session: Math.round(
-          aggregations.average_duration_per_user_session.value || 0
+        average_interactions_per_session: Math.round(
+          aggregations.avg_interactions_per_session?.value || 0
         ),
+        average_duration_per_session: Math.round(
+          (aggregations.avg_duration_per_session?.value || 0) / 1000
+        ), // Convert to seconds
       };
     };
 

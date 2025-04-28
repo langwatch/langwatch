@@ -1,8 +1,4 @@
-import {
-  Card,
-  HStack,
-  Heading,
-} from "@chakra-ui/react";
+import { Card, HStack, Heading } from "@chakra-ui/react";
 import { HelpCircle } from "react-feather";
 import { api } from "../../utils/api";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
@@ -37,63 +33,28 @@ export const SessionsSummary = () => {
         {isNotQuickwit ? (
           <HStack gap={0} align="stretch">
             <SummaryMetric
-              label="Bouncing Rate"
+              label="Average Duration"
               current={
                 data
-                  ? data.currentPeriod.bouncing_users_count /
-                    (data.currentPeriod.total_users || 1)
+                  ? data.currentPeriod.average_duration_per_session
                   : undefined
               }
               previous={
                 data
-                  ? data.previousPeriod.bouncing_users_count /
-                    (data.previousPeriod.total_users || 1)
-                  : undefined
-              }
-              format="0%"
-              tooltip="Percentage of users who only sent a single message and never used it again"
-              increaseIs="bad"
-            />
-            <SummaryMetric
-              label="Returning Users"
-              current={
-                data
-                  ? data.currentPeriod.returning_users_count /
-                    (data.currentPeriod.total_users || 1)
-                  : undefined
-              }
-              previous={
-                data
-                  ? data.previousPeriod.returning_users_count /
-                    (data.previousPeriod.total_users || 1)
-                  : undefined
-              }
-              format="0%"
-              tooltip="Percentage of users who came back and initiated more than one session, hours appart"
-            />
-            <SummaryMetric
-              label="Average Session Duration"
-              current={
-                data
-                  ? data.currentPeriod.average_duration_per_user_session / 1000
-                  : undefined
-              }
-              previous={
-                data
-                  ? data.previousPeriod.average_duration_per_user_session / 1000
+                  ? data.previousPeriod.average_duration_per_session
                   : undefined
               }
               format="00:00:00"
             />
             <SummaryMetric
-              label="Average Sessions per User"
+              label="Average per User"
               current={data?.currentPeriod.average_sessions_per_user}
               previous={data?.previousPeriod.average_sessions_per_user}
             />
             <SummaryMetric
               label="Average Threads per Session"
-              current={data?.currentPeriod.average_threads_per_user_session}
-              previous={data?.previousPeriod.average_threads_per_user_session}
+              current={data?.currentPeriod.average_interactions_per_session}
+              previous={data?.previousPeriod.average_interactions_per_session}
             />
           </HStack>
         ) : isQuickwit ? (
