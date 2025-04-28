@@ -168,10 +168,11 @@ class WorkflowModule(LangWatchWorkflowModule):
                     {% if edge.target == ns.end_node.id %}
                         {% set source_parts = edge.sourceHandle.split(".") %}
                         {% set target_parts = edge.targetHandle.split(".") %}
+                        {% set target_handle = target_parts[1] if target_parts[1] else target_parts[0] %}
                         {% if edge.source == "entry" %}
-                "{{ target_parts[1] }}": {% if use_kwargs %}kwargs.get("{{ source_parts[1] }}"){% else %}{{ source_parts[1] }}{% endif %},
+                "{{ target_handle }}": {% if use_kwargs %}kwargs.get("{{ source_parts[1] }}"){% else %}{{ source_parts[1] }}{% endif %},
                         {% else %}
-                "{{ target_parts[1] }}": {{ edge.source }}.{{ source_parts[1] }},
+                "{{ target_handle }}": {{ edge.source }}.{{ source_parts[1] }},
                         {% endif %}
                     {% endif %}
                 {% endfor %}
