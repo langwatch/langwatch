@@ -1,47 +1,10 @@
 import { Dialog } from "~/components/ui/dialog";
-import { Box, Heading } from "@chakra-ui/react";
-import {
-  DatasetTable,
-  type InMemoryDataset,
-} from "~/components/datasets/DatasetTable";
+import { Box, Button, Heading } from "@chakra-ui/react";
+import { DatasetTable } from "~/components/datasets/DatasetTable";
 import type { PromptConfigFormValues } from "../hooks/usePromptConfigForm";
 
 type Demonstrations =
   PromptConfigFormValues["version"]["configData"]["demonstrations"];
-
-/**
- * Component to render the dataset table with demonstrations
- */
-function DemonstrationsDatasetTable({
-  demonstrations,
-  onUpdate,
-}: {
-  demonstrations: Demonstrations;
-  onUpdate: (dataset: InMemoryDataset) => void;
-}) {
-  return (
-    <Box position="relative">
-      <DatasetTable
-        inMemoryDataset={{
-          name: "Demonstrations",
-          datasetRecords: demonstrations.rows ?? [],
-          columnTypes: demonstrations.columns ?? [
-            { name: "input", type: "string" },
-            { name: "output", type: "string" },
-          ],
-        }}
-        onUpdateDataset={onUpdate}
-        isEmbedded={false}
-        insideWizard={false}
-        title="Demonstrations"
-        hideButtons={false}
-        bottomSpace="268px"
-        loadingOverlayComponent={null}
-        canEditDatasetRecord={false}
-      />
-    </Box>
-  );
-}
 
 export function DemonstrationsModal({
   open,
@@ -71,18 +34,36 @@ export function DemonstrationsModal({
           <Heading size="md">Edit Demonstrations</Heading>
         </Dialog.Header>
         <Dialog.Body paddingBottom="32px">
-          <DemonstrationsDatasetTable
-            demonstrations={demonstrations}
-            onUpdate={(dataset) =>
-              onChange({
-                columns: dataset.columnTypes.map((column) => ({
-                  ...column,
-                  id: column.name,
-                })),
-                rows: dataset.datasetRecords,
-              })
-            }
-          />
+          <Box position="relative">
+            <DatasetTable
+              inMemoryDataset={{
+                name: "Demonstrations",
+                datasetRecords: demonstrations.rows ?? [],
+                columnTypes: demonstrations.columns ?? [],
+              }}
+              onUpdateDataset={(dataset) =>
+                onChange({
+                  columns: dataset.columnTypes.map((column) => ({
+                    ...column,
+                    id: column.name,
+                  })),
+                  rows: dataset.datasetRecords,
+                })
+              }
+            />
+            {/** This is a hacky way to get a button on here, but we're pressed for time */}
+            <Button
+              colorPalette="blue"
+              position="absolute"
+              bottom="0"
+              right="24px"
+              onClick={() => {
+                onClose();
+              }}
+            >
+              Close
+            </Button>
+          </Box>
         </Dialog.Body>
       </Dialog.Content>
     </Dialog.Root>
