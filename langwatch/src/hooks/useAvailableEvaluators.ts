@@ -1,13 +1,20 @@
 import { useMemo } from "react";
 
 import { api } from "../utils/api";
-import { AVAILABLE_EVALUATORS } from "../server/evaluations/evaluators.generated";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorDefinition,
+  type EvaluatorTypes,
+} from "../server/evaluations/evaluators.generated";
 import { getInputsOutputs } from "../optimization_studio/utils/nodeUtils";
 import type { Node, Edge } from "@xyflow/react";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 import type { JsonArray } from "@prisma/client/runtime/library";
 
-export const useAvailableEvaluators = () => {
+export const useAvailableEvaluators = (): Record<
+  EvaluatorTypes | `custom/${string}`,
+  EvaluatorDefinition<EvaluatorTypes>
+> => {
   const { project } = useOrganizationTeamProject();
 
   const availableCustomEvaluators =

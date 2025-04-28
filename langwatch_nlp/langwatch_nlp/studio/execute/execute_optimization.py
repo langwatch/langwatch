@@ -79,7 +79,7 @@ async def execute_optimization(
             format=False,
             debug_level=0,
             do_not_trace=True,
-        ) as Module:
+        ) as (Module, _):
             module = Module(run_evaluations=True)
 
             entry_node = cast(

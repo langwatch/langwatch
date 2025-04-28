@@ -69,7 +69,11 @@ export function EvaluationStep() {
         <VStack width="full" gap={3}>
           <CategorySelectionAccordion setAccordeonValue={setAccordeonValue} />
           <EvaluatorSelectionAccordion setAccordeonValue={setAccordeonValue} />
-          {firstEvaluator && <EvaluatorMappingAccordion />}
+          {firstEvaluator && (
+            <EvaluatorMappingAccordion
+              selected={accordeonValue[0] === "mappings"}
+            />
+          )}
           {firstEvaluator && <EvaluatorSettingsAccordion />}
         </VStack>
       </Accordion.Root>

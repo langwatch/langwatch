@@ -312,7 +312,7 @@ simple_workflow = Workflow(
 def test_parse_workflow():
     disable_dsp_caching()
 
-    class_name, code = parse_workflow(simple_workflow, format=True, debug_level=1)
+    class_name, code, _ = parse_workflow(simple_workflow, format=True, debug_level=1)
     with materialized_component_class(
         component_code=code, class_name=class_name
     ) as Module:
@@ -596,7 +596,7 @@ def test_parse_parallel_execution_workflow():
         state=WorkflowState(execution=None, evaluation=None),
     )
 
-    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+    class_name, code, _ = parse_workflow(workflow, format=True, debug_level=1)
     with materialized_component_class(
         component_code=code, class_name=class_name
     ) as Module:
@@ -628,7 +628,7 @@ def test_parse_workflow_with_orphan_nodes():
             type="signature",
         )
     )
-    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+    class_name, code, _ = parse_workflow(workflow, format=True, debug_level=1)
     with materialized_component_class(
         component_code=code, class_name=class_name
     ) as Module:
@@ -788,7 +788,7 @@ def test_langwatch_evaluator_with_settings():
         )
     )
 
-    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+    class_name, code, _ = parse_workflow(workflow, format=True, debug_level=1)
     with materialized_component_class(
         component_code=code, class_name=class_name
     ) as Module:
@@ -806,7 +806,7 @@ def test_langwatch_evaluator_with_settings():
 def test_parse_workflow_with_until_node():
     disable_dsp_caching()
 
-    class_name, code = parse_workflow(
+    class_name, code, _ = parse_workflow(
         simple_workflow, format=True, debug_level=1, until_node_id="generate_query"
     )
     with materialized_component_class(
@@ -841,7 +841,7 @@ def test_parse_workflow_with_default_llm():
     )
     generate_answer_node.data.parameters = []
 
-    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+    class_name, code, _ = parse_workflow(workflow, format=True, debug_level=1)
 
     with materialized_component_class(
         component_code=code, class_name=class_name
@@ -901,7 +901,7 @@ class BlowsUp(dspy.Module):
         )
     )
 
-    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+    class_name, code, _ = parse_workflow(workflow, format=True, debug_level=1)
     with materialized_component_class(
         component_code=code, class_name=class_name
     ) as Module:
@@ -960,7 +960,7 @@ class BlowsUp(dspy.Module):
         )
     )
 
-    class_name, code = parse_workflow(
+    class_name, code, _ = parse_workflow(
         workflow, format=True, debug_level=1, handle_errors=True
     )
     with materialized_component_class(
@@ -1048,7 +1048,7 @@ class CheckInputTypes(dspy.Module):
         )
     )
 
-    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+    class_name, code, _ = parse_workflow(workflow, format=True, debug_level=1)
     with materialized_component_class(
         component_code=code, class_name=class_name
     ) as Module:
@@ -1079,7 +1079,7 @@ def test_parse_workflow_when_entry_has_special_characters():
         )
     )
 
-    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+    class_name, code, _ = parse_workflow(workflow, format=True, debug_level=1)
     with materialized_component_class(
         component_code=code, class_name=class_name
     ) as Module:
@@ -1136,7 +1136,7 @@ def test_proposes_instructions_with_grounded_proposer():
         ),
     ]
 
-    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+    class_name, code, _ = parse_workflow(workflow, format=True, debug_level=1)
     with materialized_component_class(
         component_code=code, class_name=class_name
     ) as Module:
@@ -1201,7 +1201,7 @@ def test_parse_workflow_with_retriever():
         )
     )
 
-    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+    class_name, code, _ = parse_workflow(workflow, format=True, debug_level=1)
     with materialized_component_class(
         component_code=code, class_name=class_name
     ) as Module:
@@ -1263,7 +1263,7 @@ def test_parse_node_with_reserved_keywords():
         )
     )
 
-    class_name, code = parse_workflow(workflow, format=True, debug_level=1)
+    class_name, code, _ = parse_workflow(workflow, format=True, debug_level=1)
     with materialized_component_class(
         component_code=code, class_name=class_name
     ) as Module:

@@ -1,15 +1,16 @@
-import { VStack } from "@chakra-ui/react";
+import { VStack, Text } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { z } from "zod";
 import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 import { evaluatorsSchema } from "../../../../../server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "../../../../../server/evaluations/getEvaluator";
 import DynamicZodForm from "../../../../checks/DynamicZodForm";
 import type { Field } from "../../../../../optimization_studio/types/dsl";
 import { StepAccordion } from "../../components/StepAccordion";
 import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
+import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
+import type { EvaluatorTypes } from "../../../../../server/evaluations/evaluators.generated";
 
 export const EvaluatorSettingsAccordion = () => {
   const { project } = useOrganizationTeamProject();
@@ -18,10 +19,11 @@ export const EvaluatorSettingsAccordion = () => {
 
   const evaluator = getFirstEvaluatorNode();
   const evaluatorType = evaluator?.data.evaluator;
+  const availableEvaluators = useAvailableEvaluators();
 
   const schema =
-    evaluatorType && evaluatorType in AVAILABLE_EVALUATORS
-      ? evaluatorsSchema.shape[evaluatorType].shape.settings
+    evaluatorType && evaluatorType in availableEvaluators
+      ? evaluatorsSchema.shape[evaluatorType as EvaluatorTypes]?.shape.settings
       : undefined;
 
   const hasEvaluatorFields =
@@ -44,7 +46,7 @@ export const EvaluatorSettingsAccordion = () => {
       ? (settingsFromParameters as any)
       : evaluatorType
       ? getEvaluatorDefaultSettings(
-          AVAILABLE_EVALUATORS[evaluatorType],
+          availableEvaluators[evaluatorType as EvaluatorTypes],
           project
         )
       : undefined;
@@ -73,19 +75,22 @@ export const EvaluatorSettingsAccordion = () => {
       if (!evaluatorType) return;
 
       // This updates the evaluator node with the settings
-      setFirstEvaluator({
-        evaluator: evaluatorType,
-        parameters: Object.entries(data.settings ?? {}).map(
-          ([identifier, value]) =>
-            ({
-              identifier,
-              type: "str",
-              value: value,
-            }) as Field
-        ),
-      });
+      setFirstEvaluator(
+        {
+          evaluator: evaluatorType,
+          parameters: Object.entries(data.settings ?? {}).map(
+            ([identifier, value]) =>
+              ({
+                identifier,
+                type: "str",
+                value: value,
+              }) as Field
+          ),
+        },
+        availableEvaluators
+      );
     },
-    [evaluatorType, setFirstEvaluator]
+    [availableEvaluators, evaluatorType, setFirstEvaluator]
   );
 
   const formRenderedFor = useRef<string>(evaluatorType);
@@ -122,14 +127,17 @@ export const EvaluatorSettingsAccordion = () => {
     >
       <FormProvider {...form}>
         <VStack width="full" gap={3}>
-          {hasEvaluatorFields && (
+          {hasEvaluatorFields && schema && (
             <DynamicZodForm
               schema={schema}
-              evaluatorType={evaluatorType}
+              evaluatorType={evaluatorType as EvaluatorTypes}
               prefix="settings"
               errors={form.formState.errors.settings}
               variant="default"
             />
+          )}
+          {!schema && (
+            <Text>This evaluator does not have any settings to configure.</Text>
           )}
         </VStack>
       </FormProvider>

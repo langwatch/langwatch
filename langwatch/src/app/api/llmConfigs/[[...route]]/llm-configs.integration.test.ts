@@ -4,6 +4,9 @@ import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "../../../../server/db";
 import { nanoid } from "nanoid";
 import { llmPromptConfigFactory } from "~/factories/llm-config.factory";
+import { SchemaVersion } from "~/server/prompt-config/repositories/llm-config-version-schema";
+import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
+import type { LlmPromptConfig } from "@prisma/client";
 
 describe("Prompts API", () => {
   // Test data setup
@@ -75,12 +78,12 @@ describe("Prompts API", () => {
     });
 
     describe("when there are prompts", () => {
+      let config: LlmPromptConfig;
       beforeEach(async () => {
-        // Create a config in the database
-        await prisma.llmPromptConfig.create({
-          data: {
-            ...mockConfig,
-          },
+        const repository = new LlmConfigRepository(prisma);
+        config = await repository.createConfigWithInitialVersion({
+          name: mockConfig.name,
+          projectId: testProjectId,
         });
       });
 
@@ -100,35 +103,22 @@ describe("Prompts API", () => {
         const body = await res.json();
         expect(Array.isArray(body)).toBe(true);
         expect(body.length).toBe(1);
-        expect(body[0].id).toBe(mockConfig.id);
+        expect(body[0].id).toBe(config.id);
         expect(body[0].projectId).toBe(testProjectId);
       });
 
       describe("Prompt Versions - Schema Version 1.0", () => {
         describe("when there are versions for a prompt", () => {
-          beforeEach(async () => {
-            // Create a version for the config
-            await prisma.llmPromptConfigVersion.create({
-              data: {
-                configId: mockConfig.id,
-                projectId: testProjectId,
-                schemaVersion: "1.0",
-                configData: { model: "gpt-4", temperature: 0.7 },
-                commitMessage: "Initial version",
-              },
-            });
-          });
-
           afterEach(async () => {
             // Clean up versions
             await prisma.llmPromptConfigVersion.deleteMany({
-              where: { configId: mockConfig.id, projectId: testProjectId },
+              where: { configId: config.id, projectId: testProjectId },
             });
           });
 
           it("should get all versions for a prompt", async () => {
             const res = await app.request(
-              `/api/prompts/${mockConfig.id}/versions`,
+              `/api/prompts/${config.id}/versions`,
               {
                 headers: { "X-Auth-Token": testApiKey },
               }
@@ -138,16 +128,26 @@ describe("Prompts API", () => {
             const body = await res.json();
             expect(Array.isArray(body)).toBe(true);
             expect(body.length).toBe(1);
-            expect(body[0].configId).toBe(mockConfig.id);
+            expect(body[0].configId).toBe(config.id);
             expect(body[0].projectId).toBe(testProjectId);
-            expect(body[0].configData).toHaveProperty("model", "gpt-4");
+            expect(body[0].configData).toHaveProperty(
+              "model",
+              "openai/gpt-4o-mini"
+            );
           });
         });
 
         describe("when there are no versions for a prompt", () => {
+          beforeEach(async () => {
+            // Delete all versions for the config
+            await prisma.llmPromptConfigVersion.deleteMany({
+              where: { configId: config.id, projectId: testProjectId },
+            });
+          });
+
           it("should get empty array for a prompt with no versions", async () => {
             const res = await app.request(
-              `/api/prompts/${mockConfig.id}/versions`,
+              `/api/prompts/${config.id}/versions`,
               {
                 headers: { "X-Auth-Token": testApiKey },
               }

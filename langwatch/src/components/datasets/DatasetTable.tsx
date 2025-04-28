@@ -71,6 +71,7 @@ export function DatasetTable({
   bottomSpace = "300px",
   loadingOverlayComponent,
   gridRef: parentGridRef,
+  canEditDatasetRecord = true,
 }: {
   datasetId?: string;
   inMemoryDataset?: InMemoryDataset;
@@ -82,6 +83,12 @@ export function DatasetTable({
   bottomSpace?: string;
   loadingOverlayComponent?: (() => React.ReactNode) | null;
   gridRef?: RefObject<AgGridReact<any> | null>;
+  /**
+   * Whether the user can edit the dataset records in the database.
+   * Generally disabled when you want to force InMemoryDataset only mode.
+   * This disables the "Edit Columns" button and the edit dataset drawer.
+   */
+  canEditDatasetRecord?: boolean;
 }) {
   const { project } = useOrganizationTeamProject();
 
@@ -501,14 +508,16 @@ export function DatasetTable({
               )}
             </Heading>
           )}
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => editDataset.onOpen()}
-            minWidth="fit-content"
-          >
-            <Edit2 />
-          </Button>
+          {canEditDatasetRecord && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => editDataset.onOpen()}
+              minWidth="fit-content"
+            >
+              <Edit2 />
+            </Button>
+          )}
         </HStack>
         <Text fontSize={"14px"} color="gray.400">
           {databaseDataset.data?.count ?? parentRowData?.length} records
@@ -560,14 +569,16 @@ export function DatasetTable({
                 Export
               </Button>
             )}
-            <Button
-              colorPalette="gray"
-              onClick={() => editDataset.onOpen()}
-              minWidth="fit-content"
-            >
-              <Edit2 />
-              Edit Columns
-            </Button>
+            {canEditDatasetRecord && (
+              <Button
+                colorPalette="gray"
+                onClick={() => editDataset.onOpen()}
+                minWidth="fit-content"
+              >
+                <Edit2 />
+                Edit Columns
+              </Button>
+            )}
             {datasetId && !isEmbedded && !insideWizard && (
               <Button
                 colorPalette="blue"

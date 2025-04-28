@@ -3,11 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import { Worker, type Job } from "bullmq";
 import { nanoid } from "nanoid";
 import type { EvaluationJob } from "~/server/background/types";
-import type {
-  ElasticSearchSpan,
-  Trace,
-  TraceWithSpans,
-} from "~/server/tracer/types";
+import type { Trace, TraceWithSpans } from "~/server/tracer/types";
 import { env } from "../../../env.mjs";
 import {
   AVAILABLE_EVALUATORS,
@@ -523,17 +519,6 @@ const customEvaluation = async (
 
   if (!project) {
     throw new Error("Project not found");
-  }
-
-  const check = await prisma.monitor.findFirst({
-    where: {
-      checkType: evaluatorType,
-      projectId: projectId,
-    },
-  });
-
-  if (!check) {
-    throw new Error("Check not found");
   }
 
   const requestBody: Record<string, any> = {

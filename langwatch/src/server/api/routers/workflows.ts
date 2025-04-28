@@ -1,23 +1,24 @@
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { nanoid } from "nanoid";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import type { Prisma, PrismaClient, WorkflowVersion } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import { generateText } from "ai";
+import { createPatch } from "diff";
+import { nanoid } from "nanoid";
 import { type Session } from "next-auth";
+import { z } from "zod";
+
 import {
   workflowJsonSchema,
   type Workflow,
 } from "../../../optimization_studio/types/dsl";
-import type { Unpacked } from "../../../utils/types";
 import { migrateDSLVersion } from "../../../optimization_studio/types/migrate";
-import { createPatch } from "diff";
-import { generateText } from "ai";
+import type { Unpacked } from "../../../utils/types";
 import { getVercelAIModel } from "../../modelProviders/utils";
 import {
   clearDsl,
-  hasDSLChanged,
+  recursiveAlphabeticallySortedKeys,
 } from "../../../optimization_studio/utils/dslUtils";
+import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const workflowRouter = createTRPCRouter({
   create: protectedProcedure
@@ -360,23 +361,6 @@ export const workflowRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
     .mutation(async ({ input }) => {
-      const recursiveAlphabeticallySortedKeys = <T>(obj: T): T => {
-        if (typeof obj !== "object" || obj === null) {
-          return obj;
-        }
-        if (Array.isArray(obj)) {
-          return obj.map(recursiveAlphabeticallySortedKeys) as T;
-        }
-        return Object.fromEntries(
-          Object.entries(obj)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([key, value]) => [
-              key,
-              recursiveAlphabeticallySortedKeys(value),
-            ])
-        ) as T;
-      };
-
       const prevDsl_ = JSON.stringify(
         recursiveAlphabeticallySortedKeys(clearDsl(input.prevDsl)),
         null,
@@ -407,10 +391,13 @@ export const workflowRouter = createTRPCRouter({
             content: `
 You are a diff generator for the LLM Workflow builder from LangWatch Optimization Studio.
 Generate very short, concise commit messages for the changes in the diff. From 1 to 5 words max, all lowercase.
-Ignore position changes unless it's the only thing that changed.
-Explain not only the keys that changed, but the content inside them, for example do not say just "updated prompt", \
+If changing the model, just say the short new model name, like "gpt-4o", nothing else.
+For other changes:
+- Ignore renames and position changes unless it's the only thing that changed.
+- Explain not only the keys that changed, but the content inside them, for example do not say just "updated prompt", \
 but the actual change that was made inside the fields with as few words as possible, like "avoid word <example>".
-By the way, always refer to the prompt as "prompt", not "instructions".
+- By the way, always refer to the prompt as "prompt", not "instructions".
+- When changing the evaluator, it's not just the name the changes, it means the workflow is actually now using a different evaluator.
             `,
           },
           {
@@ -493,7 +480,7 @@ export const saveOrCommitWorkflowVersion = async ({
 
   const latestVersion = workflow.latestVersion;
 
-  const [versionMajor] = (latestVersion?.version ?? "1.0").split(".");
+  const [versionMajor] = (latestVersion?.version ?? "0.0").split(".");
   const nextVersion = `${parseInt(versionMajor ?? "0") + 1}`;
 
   const dslWithoutStates = JSON.parse(

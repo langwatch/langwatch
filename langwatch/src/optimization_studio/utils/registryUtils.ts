@@ -1,12 +1,10 @@
 import { evaluatorTempNameMap } from "../../components/checks/EvaluatorSelection";
-import {
-  AVAILABLE_EVALUATORS,
-  type EvaluatorTypes,
-} from "../../server/evaluations/evaluators.generated";
+import type { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
+import { type EvaluatorTypes } from "../../server/evaluations/evaluators.generated";
 import type { Evaluator, Field } from "../types/dsl";
 
 export const convertEvaluators = (
-  evaluators: typeof AVAILABLE_EVALUATORS
+  evaluators: ReturnType<typeof useAvailableEvaluators>
 ): Evaluator[] => {
   return Object.entries(evaluators)
     .filter(([evaluator, definition]) => {
@@ -20,7 +18,10 @@ export const convertEvaluators = (
       return true;
     })
     .map(([evaluator]) =>
-      buildEvaluatorFromType(evaluator as keyof typeof AVAILABLE_EVALUATORS)
+      buildEvaluatorFromType(
+        evaluator as EvaluatorTypes | `custom/${string}`,
+        evaluators
+      )
     );
 };
 
@@ -30,9 +31,14 @@ export const convertEvaluators = (
  * @returns The evaluator object
  */
 export const buildEvaluatorFromType = (
-  evaluatorType: EvaluatorTypes
+  evaluatorType: EvaluatorTypes | `custom/${string}`,
+  availableEvaluators: ReturnType<typeof useAvailableEvaluators>
 ): Evaluator => {
-  const definition = AVAILABLE_EVALUATORS[evaluatorType];
+  const definition = availableEvaluators[evaluatorType];
+
+  if (!definition) {
+    throw new Error(`Evaluator type ${evaluatorType} not found`);
+  }
 
   let inputs: Field[] = [];
   const outputs: Field[] = [];

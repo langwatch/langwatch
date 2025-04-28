@@ -37,6 +37,7 @@ import { EvaluationStep } from "./steps/EvaluationStep";
 import { ExecutionStep } from "./steps/ExecutionStep";
 import { ResultsStep } from "./steps/ResultsStep";
 import { TaskStep } from "./steps/TaskStep";
+import { WorkflowStoreProvider } from "./hooks/useWorkflowStoreProvider";
 
 export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
   const router = useRouter();
@@ -98,8 +99,10 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
         padding={0}
       >
         <ReactFlowProvider>
-          <WizardSidebar isLoading={isLoading} />
-          <WizardWorkspace />
+          <WorkflowStoreProvider useWorkflowStoreFromWizard={true}>
+            <WizardSidebar isLoading={isLoading} />
+            <WizardWorkspace />
+          </WorkflowStoreProvider>
         </ReactFlowProvider>
       </Dialog.Body>
     </Dialog.Content>

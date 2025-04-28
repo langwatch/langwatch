@@ -26,7 +26,10 @@
     "copy:langevals-types": "cd src/server/evaluations && curl -L \"https://raw.githubusercontent.com/langwatch/langevals/main/ts-integration/evaluators.generated.ts?$(date +%s)\" -o evaluators.generated.ts",
     "copy:llm-model-costs": "cd src/server/modelProviders && curl -L \"https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json\" -o llmModelCosts.json",
     "setup:quickwit": "./scripts/install-quickwit.sh",
-    "tsc-watch": "tsc --noEmit --watch"
+    "tsc-watch": "tsc --noEmit --watch",
+    "test:e2e": "playwright test --config=e2e/playwright.config.ts",
+    "test:e2e:save-auth-state": "tsx e2e/save-auth-state.ts",
+    "test:e2e:codegen": "playwright codegen --load-storage=./e2e/auth.json http://localhost:5560/"
   },
   "dependencies": {
     "@ag-grid-community/client-side-row-model": "^32.3.3",
@@ -165,6 +168,7 @@
     "zustand": "^4.5.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "@types/bcrypt": "^5.0.2",
     "@types/cookie": "^0.6.0",
     "@types/debug": "^4.1.10",

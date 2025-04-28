@@ -1,13 +1,13 @@
 import { Button } from "@chakra-ui/react";
 
 import { RotateCcw, RotateCw } from "react-feather";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { _useWorkflowStore } from "../hooks/useWorkflowStore";
 import { useEffect } from "react";
 import { useLoadWorkflow } from "../hooks/useLoadWorkflow";
 
 export function UndoRedo() {
   const { undo, redo, pastStates, futureStates, clear, pause, resume } =
-    useWorkflowStore.temporal.getState();
+    _useWorkflowStore.temporal.getState();
 
   const { workflow } = useLoadWorkflow();
 
@@ -44,6 +44,7 @@ export function UndoRedo() {
     } else {
       pause();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workflow.isFetched]);
 
   return (

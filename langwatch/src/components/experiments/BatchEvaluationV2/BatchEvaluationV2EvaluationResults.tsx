@@ -37,7 +37,7 @@ export const useBatchEvaluationResults = ({
   const run = api.experiments.getExperimentBatchEvaluationRun.useQuery(
     {
       projectId: project.id,
-      experimentSlug: experiment.slug,
+      experimentId: experiment.id,
       runId: runId ?? "",
     },
     {
@@ -382,24 +382,22 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
           borderColor="gray.200"
         >
           <Tabs.List minWidth={0}>
-            {Object.entries(resultsByEvaluator).map(
-              ([evaluator, results], idx) => (
-                <Tabs.Trigger
-                  key={evaluator}
-                  value={evaluator}
-                  css={{
-                    "& span": {
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      minWidth: 0,
-                    },
-                  }}
-                >
-                  {results.find((r) => r.name)?.name ?? evaluator}
-                </Tabs.Trigger>
-              )
-            )}
+            {Object.entries(resultsByEvaluator).map(([evaluator, results]) => (
+              <Tabs.Trigger
+                key={evaluator}
+                value={evaluator}
+                css={{
+                  "& span": {
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    minWidth: 0,
+                  },
+                }}
+              >
+                {results.find((r) => r.name)?.name ?? evaluator}
+              </Tabs.Trigger>
+            ))}
           </Tabs.List>
           <Spacer />
           <Text color="gray.400" fontSize="12px" flexShrink={0}>

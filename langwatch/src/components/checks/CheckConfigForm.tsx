@@ -376,7 +376,7 @@ export default function CheckConfigForm({
                   {executionMode !== EvaluationExecutionMode.ON_MESSAGE && (
                     <EvaluationManualIntegration
                       slug={slug}
-                      evaluatorDefinition={availableEvaluators[checkType]}
+                      evaluatorDefinition={availableEvaluators[checkType]!}
                       form={form}
                       checkType={checkType}
                       name={nameValue}

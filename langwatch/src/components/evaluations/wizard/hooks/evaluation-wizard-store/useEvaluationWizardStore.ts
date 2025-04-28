@@ -1,5 +1,8 @@
+import type { AgGridReact } from "@ag-grid-community/react";
+import type { RefObject } from "react";
 import { z } from "zod";
 import { create } from "zustand";
+
 import {
   initialState as initialWorkflowStore,
   type WorkflowStore,
@@ -10,14 +13,13 @@ import { entryNode } from "../../../../../optimization_studio/templates/blank";
 import type { Workflow } from "../../../../../optimization_studio/types/dsl";
 import { datasetColumnsToFields } from "../../../../../optimization_studio/utils/datasetUtils";
 import type { DatasetColumns } from "../../../../../server/datasets/types";
-import { mappingStateSchema } from "../../../../../server/tracer/tracesMapping";
 import { checkPreconditionsSchema } from "../../../../../server/evaluations/types.generated";
+import { mappingStateSchema } from "../../../../../server/tracer/tracesMapping";
+
 import {
   createEvaluationWizardSlicesStore,
   type EvaluationWizardSlicesUnion,
 } from "./slices";
-import type { AgGridReact } from "@ag-grid-community/react";
-import type { RefObject } from "react";
 
 export const EVALUATOR_CATEGORIES = [
   "expected_answer",
@@ -25,6 +27,7 @@ export const EVALUATOR_CATEGORIES = [
   "quality",
   "rag",
   "safety",
+  "custom_evaluators",
 ] as const;
 
 export type EvaluatorCategory = (typeof EVALUATOR_CATEGORIES)[number];

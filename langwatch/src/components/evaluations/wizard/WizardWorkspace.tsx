@@ -1,4 +1,4 @@
-import { Box, Card, Tabs, VStack, Text } from "@chakra-ui/react";
+import { Box, Card, Tabs, VStack } from "@chakra-ui/react";
 import { DatasetTable } from "../../datasets/DatasetTable";
 import {
   useEvaluationWizardStore,
@@ -14,6 +14,7 @@ import { useShallow } from "zustand/react/shallow";
 import { EvaluationManualIntegration } from "../../checks/EvaluationManualIntegration";
 import { useAvailableEvaluators } from "../../../hooks/useAvailableEvaluators";
 import type { AgGridReact } from "@ag-grid-community/react";
+import { toaster } from "../../ui/toaster";
 
 export const WizardWorkspace = memo(function WizardWorkspace() {
   const {
@@ -64,6 +65,8 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
       minHeight="calc(100vh - 50px)"
       borderLeft="1px solid"
       borderLeftColor="gray.200"
+      minWidth="0"
+      gap={0}
     >
       {(hasDataset || hasWorkflow || hasResults) && (
         <Tabs.Root
@@ -85,7 +88,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
             colorPalette="blue"
             alignSelf="center"
             position="sticky"
-            top="16px"
+            top="0px"
             flexShrink={0}
           >
             {hasDataset && <Tabs.Trigger value="dataset">Dataset</Tabs.Trigger>}
@@ -209,7 +212,20 @@ const WizardOptimizationStudioCanvas = memo(
         }}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
+        onConnect={(connection) => {
+          const result = onConnect(connection);
+          if (result?.error) {
+            toaster.create({
+              title: "Error",
+              description: result.error,
+              type: "error",
+              duration: 5000,
+              meta: {
+                closable: true,
+              },
+            });
+          }
+        }}
         fitView
         fitViewOptions={{
           maxZoom: 1.5,
@@ -246,18 +262,20 @@ function CodeImplementation() {
   return (
     <Card.Root width="full" height="full" position="sticky" top={6}>
       <Card.Body width="full" height="full" paddingTop={0}>
-        <EvaluationManualIntegration
-          evaluatorDefinition={availableEvaluators[checkType]}
-          checkType={checkType}
-          name={name ?? "Untitled"}
-          executionMode={
-            executionMethod === "realtime_guardrail"
-              ? "AS_GUARDRAIL"
-              : "MANUALLY"
-          }
-          settings={settings}
-          storeSettingsOnCode={true}
-        />
+        {availableEvaluators[checkType] && (
+          <EvaluationManualIntegration
+            evaluatorDefinition={availableEvaluators[checkType]!}
+            checkType={checkType}
+            name={name ?? "Untitled"}
+            executionMode={
+              executionMethod === "realtime_guardrail"
+                ? "AS_GUARDRAIL"
+                : "MANUALLY"
+            }
+            settings={settings}
+            storeSettingsOnCode={true}
+          />
+        )}
       </Card.Body>
     </Card.Root>
   );
