@@ -19,7 +19,7 @@ export function OptimizationStudioLLMConfigField({
 }:
   | {
       allowDefault: true;
-      llmConfig: LLMConfig | undefined;
+      llmConfig?: LLMConfig | undefined;
       defaultLLMConfig: LLMConfig;
       onChange: (llmConfig: LLMConfig | undefined) => void;
     }
@@ -29,7 +29,7 @@ export function OptimizationStudioLLMConfigField({
       defaultLLMConfig?: undefined;
       onChange: (llmConfig: LLMConfig) => void;
     }) {
-  const model = llmConfig?.model ?? defaultLLMConfig!.model;
+  const model = llmConfig?.model ?? defaultLLMConfig?.model ?? "";
   const { modelOption } = useModelSelectionOptions(
     allModelOptions,
     model,

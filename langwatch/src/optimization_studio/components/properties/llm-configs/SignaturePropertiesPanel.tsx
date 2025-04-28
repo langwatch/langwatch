@@ -35,7 +35,7 @@ import {
 import {
   createNewOptimizationStudioPromptName,
   llmConfigToOptimizationStudioNodeData,
-  optimizationStudioNodeDataToPromptConfigFormInitialValues,
+  safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
   promptConfigFormValuesToOptimizationStudioNodeData,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { PromptConfigProvider } from "~/prompt-configs/providers/PromptConfigProvider";
@@ -91,7 +91,7 @@ function SignaturePropertiesPanelInner({
 
   // Initialize form with values from node data
   const initialConfigValues =
-    optimizationStudioNodeDataToPromptConfigFormInitialValues(node.data);
+    safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(node.data);
   const formProps = usePromptConfigForm({
     configId,
     initialConfigValues,
@@ -128,7 +128,9 @@ function SignaturePropertiesPanelInner({
 
       // Reset the form with the updated node data
       formProps.methods.reset(
-        optimizationStudioNodeDataToPromptConfigFormInitialValues(newNodeData)
+        safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
+          newNodeData
+        )
       );
     } catch (error) {
       console.error(error);
@@ -217,7 +219,7 @@ export function SignaturePropertiesPanel({
 
           // Convert the node data to form initial values
           const initialValues =
-            optimizationStudioNodeDataToPromptConfigFormInitialValues({
+            safeOptimizationStudioNodeDataToPromptConfigFormInitialValues({
               ...node.data,
               parameters: setDefaultLlmConfigToParameters(
                 (node.data.parameters ??

@@ -1,6 +1,7 @@
 import { Box, HStack, NativeSelect } from "@chakra-ui/react";
 import { ChevronDown } from "react-feather";
 import { TypeLabel } from "~/optimization_studio/components/nodes/Nodes";
+import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 /**
  * Type selector with dropdown for field types
@@ -52,20 +53,40 @@ export function TypeSelector({
               value={value}
               onChange={(e) => onChange(e.target.value)}
             >
-              <option value="str">str</option>
-              {isInput && <option value="image">image</option>}
-              <option value="float">float</option>
-              <option value="int">int</option>
-              <option value="bool">bool</option>
-              <option value="llm">llm</option>
-              <option value="prompting_technique">prompting_technique</option>
-              <option value="dataset">dataset</option>
-              <option value="code">code</option>
-              <option value="list[str]">list[str]</option>
+              {isInput ? <InputOptions /> : <OutputOptions />}
             </NativeSelect.Field>
           </NativeSelect.Root>
         </>
       )}
     </HStack>
   );
+}
+
+function InputOptions() {
+  return (
+    <>
+      <InputOption type="str" />
+      <InputOption type="image" />
+      <InputOption type="float" />
+      <InputOption type="bool" />
+    </>
+  );
+}
+
+function OutputOptions() {
+  return (
+    <>
+      <OutputOption type="str" />
+      <OutputOption type="float" />
+      <OutputOption type="bool" />
+    </>
+  );
+}
+
+function InputOption({ type }: { type: LlmConfigInputType }) {
+  return <option value={type}>{type}</option>;
+}
+
+function OutputOption({ type }: { type: LlmConfigOutputType }) {
+  return <option value={type}>{type}</option>;
 }

@@ -7,7 +7,7 @@ import { DATASET_COLUMN_TYPES } from "../../datasets/types";
 
 import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
 
-import { FIELD_TYPES } from "~/optimization_studio/types/dsl";
+import { LlmConfigInputTypes, LlmConfigOutputTypes } from "~/types";
 
 /**
  * Schema version enum for LLM configuration
@@ -23,9 +23,14 @@ export const LATEST_SCHEMA_VERSION = SchemaVersion.V1_0 as const;
 /**
  * Base schema for input and output parameters
  */
-const inputOutputSchema = z.object({
+const inputsSchema = z.object({
   identifier: z.string().min(1, "Identifier cannot be empty"),
-  type: z.enum(FIELD_TYPES),
+  type: z.enum(LlmConfigInputTypes),
+});
+
+const outputsSchema = z.object({
+  identifier: z.string().min(1, "Identifier cannot be empty"),
+  type: z.enum(LlmConfigOutputTypes),
 });
 
 /**
@@ -64,10 +69,8 @@ const configSchemaV1_0 = z.object({
   configData: z.object({
     version: z.number().min(1, "Version must be greater than 0").optional(),
     prompt: z.string().min(1, "Prompt cannot be empty"),
-    inputs: z.array(inputOutputSchema).min(1, "At least one input is required"),
-    outputs: z
-      .array(inputOutputSchema)
-      .min(1, "At least one output is required"),
+    inputs: z.array(inputsSchema).min(1, "At least one input is required"),
+    outputs: z.array(outputsSchema).min(1, "At least one output is required"),
     model: z.string().min(1, "Model identifier cannot be empty"),
     temperature: z.number().optional(),
     max_tokens: z.number().optional(),

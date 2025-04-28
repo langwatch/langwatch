@@ -7,3 +7,15 @@ export type NodeWithOptionalPosition<T extends Component> = Omit<
 > & {
   position?: XYPosition;
 };
+
+export const LlmConfigInputTypes = [
+  "str",
+  "float",
+  "bool",
+  "image",
+  "list[str]",
+] as const;
+export type LlmConfigInputType = (typeof LlmConfigInputTypes)[number];
+
+export const LlmConfigOutputTypes = ["str", "float", "bool"] as const;
+export type LlmConfigOutputType = (typeof LlmConfigOutputTypes)[number];

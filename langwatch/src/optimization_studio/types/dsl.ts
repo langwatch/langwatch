@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 
 import type { DatasetColumns } from "../../server/datasets/types";
+import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 export const FIELD_TYPES = [
   "str",
@@ -132,8 +133,8 @@ type InstructionsParameter = StronglyTypedFieldBase & {
 export type LlmPromptConfigComponent = Signature & {
   configId: string;
   name: string;
-  inputs: Field[];
-  outputs: Field[];
+  inputs: (Omit<Field, "type"> & { type: LlmConfigInputType })[];
+  outputs: (Omit<Field, "type"> & { type: LlmConfigOutputType })[];
   parameters: (
     | LlmConfigParameter
     | PromptingTechniqueParameter
