@@ -96,20 +96,31 @@ export function PromptSourceHeader({
 
   // TODO: Move this outside of the component
   const handleRestore = async (versionId: string) => {
-    // Get the saved version
-    const savedVersion = await trpc.llmConfigs.versions.getById.fetch({
-      versionId,
-      projectId,
-    });
+    try {
+      // Get the saved version
+      const savedVersion = await trpc.llmConfigs.versions.getById.fetch({
+        versionId,
+        projectId,
+      });
 
-    // Convert the saved version to a form values object
-    const newFormValues = llmConfigToPromptConfigFormValues({
-      ...savedConfig,
-      latestVersion: savedVersion as unknown as LatestConfigVersionSchema,
-    } as LlmConfigWithLatestVersion);
+      // Convert the saved version to a form values object
+      const newFormValues = llmConfigToPromptConfigFormValues({
+        ...savedConfig,
+        latestVersion: savedVersion as unknown as LatestConfigVersionSchema,
+      } as LlmConfigWithLatestVersion);
 
-    // Update the form values
-    formProps.setValue("version.configData", newFormValues.version.configData);
+      // Update the form values
+      formProps.setValue(
+        "version.configData",
+        newFormValues.version.configData
+      );
+    } catch (error) {
+      console.error(error);
+      toaster.error({
+        title: "Failed to restore prompt version",
+        description: "Please try again.",
+      });
+    }
   };
 
   return (
