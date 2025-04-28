@@ -99,10 +99,8 @@ test("Prompt Management from Workflow", async ({ page }) => {
     .getByRole("button", { name: "GenerateAnswer - Save from" })
     .click();
   await page
-    .getByRole("button", {
-      name: "We will use this prompt in the other node - Saving a new version Updated: 4/27/",
-    })
-    .first()
+    .getByTestId("prompt-source-dialog")
+    .getByText(/We will use this prompt in the other node/)
     .click();
   await page.locator("div:nth-child(2) > button:nth-child(3)").click();
   await page.getByTestId("rf__node-generate_query").click();
