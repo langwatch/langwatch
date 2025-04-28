@@ -16,7 +16,6 @@ import { generateText } from "ai";
 import { getVercelAIModel } from "../../modelProviders/utils";
 import {
   clearDsl,
-  hasDSLChanged,
   recursiveAlphabeticallySortedKeys,
 } from "../../../optimization_studio/utils/dslUtils";
 

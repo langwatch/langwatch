@@ -14,9 +14,10 @@ export const getEvaluatorDefinitions = (evaluator: string) => {
 };
 
 export const getEvaluatorDefaultSettings = <T extends EvaluatorTypes>(
-  evaluator: EvaluatorDefinition<T>,
+  evaluator: EvaluatorDefinition<T> | undefined,
   project?: { defaultModel?: string | null; embeddingsModel?: string | null }
 ) => {
+  if (!evaluator) return {};
   return Object.fromEntries(
     Object.entries(evaluator.settings).map(([key, setting]) => {
       if (key === "model") {

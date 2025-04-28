@@ -1,6 +1,7 @@
 import { Grid, RadioCard } from "@chakra-ui/react";
 import {
   LuBrain,
+  LuCode,
   LuDatabase,
   LuShield,
   LuSquareCheckBig,
@@ -14,6 +15,9 @@ import { AVAILABLE_EVALUATORS } from "../../../../../server/evaluations/evaluato
 import { Tooltip } from "../../../../ui/tooltip";
 import { StepAccordion } from "../../components/StepAccordion";
 import { StepRadio } from "../../components/StepButton";
+import { api } from "../../../../../utils/api";
+import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
+import { useMemo } from "react";
 
 type EvaluationCategoryConfig = {
   id: string;
@@ -25,124 +29,152 @@ type EvaluationCategoryConfig = {
 };
 
 type EvaluationType = {
-  id: keyof typeof AVAILABLE_EVALUATORS;
+  id: keyof typeof AVAILABLE_EVALUATORS | `custom/${string}`;
   name: string;
   description: string;
   disabled?: boolean;
   future?: boolean;
 };
 
-export const evaluatorCategories: EvaluationCategoryConfig[] = [
-  {
-    id: "expected_answer",
-    name: "Expected Answer Evaluation",
-    description:
-      "For when you have the golden answer and want to measure how correct can the LLM get it",
-    icon: <LuSquareCheckBig />,
-    evaluators: (
-      [
-        "langevals/exact_match",
-        "langevals/llm_answer_match",
-        "ragas/factual_correctness",
-        "ragas/sql_query_equivalence",
-        "ragas/rouge_score",
-        "ragas/bleu_score",
-      ] as const
-    ).map((evaluator) => ({
-      id: evaluator,
-      name: AVAILABLE_EVALUATORS[evaluator].name,
-      description: AVAILABLE_EVALUATORS[evaluator].description,
-    })),
-    realtime: false,
-  },
-  {
-    id: "llm_judge",
-    name: "LLM-as-a-Judge",
-    description:
-      "For when you don't have a golden answer, but have a set of rules for another LLM to evaluate quality",
-    icon: <LuBrain />,
-    evaluators: (
-      [
-        "langevals/llm_boolean",
-        "langevals/llm_score",
-        "langevals/llm_category",
-        "ragas/rubrics_based_scoring",
-      ] as const
-    ).map((evaluator) => ({
-      id: evaluator,
-      name: AVAILABLE_EVALUATORS[evaluator].name,
-      description: AVAILABLE_EVALUATORS[evaluator].description,
-    })),
-    realtime: true,
-  },
-  {
-    id: "rag",
-    name: "RAG Quality",
-    description:
-      "For measuring the quality of your RAG, check for hallucinations with faithfulness and precision/recall",
-    icon: <LuDatabase />,
-    evaluators: (
-      [
-        "ragas/faithfulness",
-        "ragas/response_relevancy",
-        "ragas/response_context_recall",
-        "ragas/response_context_precision",
-        "ragas/context_f1",
-        "ragas/context_precision",
-        "ragas/context_recall",
-      ] as const
-    ).map((evaluator) => ({
-      id: evaluator,
-      name: AVAILABLE_EVALUATORS[evaluator].name,
-      description: AVAILABLE_EVALUATORS[evaluator].description,
-    })),
-    realtime: true,
-  },
-  {
-    id: "quality",
-    name: "Quality Aspects Evaluation",
-    description:
-      "For when you want to check the language, structure, style and other general quality metrics",
-    icon: <LuStar />,
-    evaluators: (
-      [
-        "lingua/language_detection",
-        "ragas/summarization_score",
-        "langevals/valid_format",
-      ] as const
-    ).map((evaluator) => ({
-      id: evaluator,
-      name: AVAILABLE_EVALUATORS[evaluator].name,
-      description: AVAILABLE_EVALUATORS[evaluator].description,
-    })),
-    realtime: true,
-  },
-  {
-    id: "safety",
-    name: "Safety",
-    description: "Check for PII, prompt injection attempts and toxic content",
-    icon: <LuShield />,
-    evaluators: [
+export const useEvaluatorCategories = (): EvaluationCategoryConfig[] => {
+  const { project } = useOrganizationTeamProject();
+
+  const availableCustomEvaluators =
+    api.evaluations.availableCustomEvaluators.useQuery(
+      { projectId: project?.id ?? "" },
+      { enabled: !!project }
+    );
+
+  return useMemo(
+    () => [
       {
-        id: "presidio/pii_detection",
-        name: "PII Detection",
-        description: AVAILABLE_EVALUATORS["presidio/pii_detection"].description,
-      },
-      {
-        id: "azure/prompt_injection",
-        name: "Prompt Injection / Jailbreak Detection",
+        id: "expected_answer",
+        name: "Expected Answer Evaluation",
         description:
-          "Detect prompt injection attempts and jailbreak attempts in the input",
+          "For when you have the golden answer and want to measure how correct can the LLM get it",
+        icon: <LuSquareCheckBig />,
+        evaluators: (
+          [
+            "langevals/exact_match",
+            "langevals/llm_answer_match",
+            "ragas/factual_correctness",
+            "ragas/sql_query_equivalence",
+            "ragas/rouge_score",
+            "ragas/bleu_score",
+          ] as const
+        ).map((evaluator) => ({
+          id: evaluator,
+          name: AVAILABLE_EVALUATORS[evaluator].name,
+          description: AVAILABLE_EVALUATORS[evaluator].description,
+        })),
+        realtime: false,
       },
       {
-        id: "azure/content_safety",
-        name: "Content Safety",
-        description: AVAILABLE_EVALUATORS["azure/content_safety"].description,
+        id: "llm_judge",
+        name: "LLM-as-a-Judge",
+        description:
+          "For when you don't have a golden answer, but have a set of rules for another LLM to evaluate quality",
+        icon: <LuBrain />,
+        evaluators: (
+          [
+            "langevals/llm_boolean",
+            "langevals/llm_score",
+            "langevals/llm_category",
+            "ragas/rubrics_based_scoring",
+          ] as const
+        ).map((evaluator) => ({
+          id: evaluator,
+          name: AVAILABLE_EVALUATORS[evaluator].name,
+          description: AVAILABLE_EVALUATORS[evaluator].description,
+        })),
+        realtime: true,
       },
+      {
+        id: "rag",
+        name: "RAG Quality",
+        description:
+          "For measuring the quality of your RAG, check for hallucinations with faithfulness and precision/recall",
+        icon: <LuDatabase />,
+        evaluators: (
+          [
+            "ragas/faithfulness",
+            "ragas/response_relevancy",
+            "ragas/response_context_recall",
+            "ragas/response_context_precision",
+            "ragas/context_f1",
+            "ragas/context_precision",
+            "ragas/context_recall",
+          ] as const
+        ).map((evaluator) => ({
+          id: evaluator,
+          name: AVAILABLE_EVALUATORS[evaluator].name,
+          description: AVAILABLE_EVALUATORS[evaluator].description,
+        })),
+        realtime: true,
+      },
+      {
+        id: "quality",
+        name: "Quality Aspects Evaluation",
+        description:
+          "For when you want to check the language, structure, style and other general quality metrics",
+        icon: <LuStar />,
+        evaluators: (
+          [
+            "lingua/language_detection",
+            "ragas/summarization_score",
+            "langevals/valid_format",
+          ] as const
+        ).map((evaluator) => ({
+          id: evaluator,
+          name: AVAILABLE_EVALUATORS[evaluator].name,
+          description: AVAILABLE_EVALUATORS[evaluator].description,
+        })),
+        realtime: true,
+      },
+      {
+        id: "safety",
+        name: "Safety",
+        description:
+          "Check for PII, prompt injection attempts and toxic content",
+        icon: <LuShield />,
+        evaluators: [
+          {
+            id: "presidio/pii_detection",
+            name: "PII Detection",
+            description:
+              AVAILABLE_EVALUATORS["presidio/pii_detection"].description,
+          },
+          {
+            id: "azure/prompt_injection",
+            name: "Prompt Injection / Jailbreak Detection",
+            description:
+              "Detect prompt injection attempts and jailbreak attempts in the input",
+          },
+          {
+            id: "azure/content_safety",
+            name: "Content Safety",
+            description:
+              AVAILABLE_EVALUATORS["azure/content_safety"].description,
+          },
+        ],
+        realtime: true,
+      },
+      // {
+      //   id: "custom_evaluators",
+      //   name: "Custom Evaluators",
+      //   description: "Evaluate with your own custom evaluators",
+      //   icon: <LuCode />,
+      //   evaluators: (availableCustomEvaluators.data ?? []).map((evaluator) => ({
+      //     id: `custom/${evaluator.id}`,
+      //     name: evaluator.name,
+      //     description: evaluator.description,
+      //   })),
+      //   realtime: true,
+      // },
     ],
-    realtime: true,
-  },
-];
+    [availableCustomEvaluators.data]
+  );
+};
 
 export const CategorySelectionAccordion = ({
   setAccordeonValue,
@@ -159,6 +191,8 @@ export const CategorySelectionAccordion = ({
       setAccordeonValue(["selection"]);
     }, 300);
   };
+
+  const evaluatorCategories = useEvaluatorCategories();
 
   return (
     <StepAccordion

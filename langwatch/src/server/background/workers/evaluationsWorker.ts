@@ -3,11 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import { Worker, type Job } from "bullmq";
 import { nanoid } from "nanoid";
 import type { EvaluationJob } from "~/server/background/types";
-import type {
-  ElasticSearchSpan,
-  Trace,
-  TraceWithSpans,
-} from "~/server/tracer/types";
+import type { Trace, TraceWithSpans } from "~/server/tracer/types";
 import { env } from "../../../env.mjs";
 import {
   AVAILABLE_EVALUATORS,

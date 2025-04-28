@@ -119,7 +119,7 @@ export type Entry = BaseComponent & {
 
 export type Evaluator = Omit<BaseComponent, "cls"> & {
   cls: string;
-  evaluator?: EvaluatorTypes;
+  evaluator?: EvaluatorTypes | `custom/${string}`;
   workflowId?: string;
   data?: any;
 };

@@ -3,8 +3,9 @@ import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/
 import { useAnimatedFocusElementById } from "../../../../../hooks/useAnimatedFocusElementById";
 import { StepAccordion } from "../../components/StepAccordion";
 import { StepRadio } from "../../components/StepButton";
-import { evaluatorCategories } from "./CategorySelectionAccordion";
+import { useEvaluatorCategories } from "./CategorySelectionAccordion";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
 
 export const EvaluatorSelectionAccordion = ({
   setAccordeonValue,
@@ -16,11 +17,18 @@ export const EvaluatorSelectionAccordion = ({
 
   const focusElementById = useAnimatedFocusElementById();
 
-  const handleEvaluatorSelect = (evaluatorType: EvaluatorTypes) => {
+  const availableEvaluators = useAvailableEvaluators();
+
+  const handleEvaluatorSelect = (
+    evaluatorType: EvaluatorTypes | `custom/${string}`
+  ) => {
     // This initializes the evaluator node without any properties
-    setFirstEvaluator({
-      evaluator: evaluatorType,
-    });
+    setFirstEvaluator(
+      {
+        evaluator: evaluatorType,
+      },
+      availableEvaluators
+    );
     const nextStep =
       wizardState.task == "real_time" &&
       wizardState.dataSource == "from_production"
@@ -36,6 +44,8 @@ export const EvaluatorSelectionAccordion = ({
     }, 300);
   };
 
+  const evaluatorCategories = useEvaluatorCategories();
+
   return (
     <StepAccordion
       value="selection"
@@ -48,7 +58,7 @@ export const EvaluatorSelectionAccordion = ({
         variant="outline"
         colorPalette="green"
         value={getFirstEvaluatorNode()?.data.evaluator}
-        onValueChange={(e: { value: EvaluatorTypes }) => {
+        onValueChange={(e: { value: EvaluatorTypes | `custom/${string}` }) => {
           handleEvaluatorSelect(e.value);
         }}
         paddingTop={2}

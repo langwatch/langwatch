@@ -2,10 +2,10 @@ import { Field, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 import type { Entry } from "../../../../../optimization_studio/types/dsl";
 import { EvaluatorTracesMapping } from "../../../EvaluatorTracesMapping";
 import { StepAccordion } from "../../components/StepAccordion";
+import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
 
 export const EvaluatorMappingAccordion = () => {
   const {
@@ -47,11 +47,12 @@ export const EvaluatorMappingAccordion = () => {
   const evaluator = getFirstEvaluatorNode();
   const evaluatorEdges = getFirstEvaluatorEdges();
   const evaluatorType = evaluator?.data.evaluator;
+  const availableEvaluators = useAvailableEvaluators();
   const evaluatorDefinition = useMemo(() => {
-    return evaluatorType && evaluatorType in AVAILABLE_EVALUATORS
-      ? AVAILABLE_EVALUATORS[evaluatorType]
+    return evaluatorType && evaluatorType in availableEvaluators
+      ? availableEvaluators[evaluatorType]
       : undefined;
-  }, [evaluatorType]);
+  }, [availableEvaluators, evaluatorType]);
 
   const traceMappings = realTimeTraceMappings ?? {
     mapping: {},
