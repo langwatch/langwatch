@@ -61,6 +61,7 @@ export const NewWorkflowModal = ({
             >
               {Object.entries(TEMPLATES).map(([name, template]) => (
                 <WorkflowCard
+                  data-testid={`new-workflow-card-${name}`}
                   key={name}
                   name={template.name}
                   icon={

@@ -1,11 +1,16 @@
-import { useFormContext, Controller } from "react-hook-form";
+import { Controller, useFormContext } from "react-hook-form";
 
-import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
+import { OptimizationStudioLLMConfigField } from "./OptimizationStudioLLMConfigField";
 
-import { LLMConfigField } from "~/components/llmPromptConfigs/LlmConfigField";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
+import type { LLMConfig } from "~/optimization_studio/types/dsl";
+import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
 
-export function ModelSelectField() {
+/**
+ * Wrapped OptimizationStudioLLMConfigField that works with
+ * the Form field
+ */
+export function WrappedOptimizationStudioLLMConfigField() {
   const { control, formState } = useFormContext<PromptConfigFormValues>();
   const { errors } = formState;
 
@@ -21,10 +26,9 @@ export function ModelSelectField() {
         control={control}
         render={({ field }) => {
           return (
-            <LLMConfigField
-              llmConfig={field.value ?? {}} // Prevent a runtime error if the value is undefined
+            <OptimizationStudioLLMConfigField
+              llmConfig={field.value as LLMConfig}
               onChange={field.onChange}
-              requiresCustomKey={false}
             />
           );
         }}

@@ -90,12 +90,56 @@ export type LLMConfig = z.infer<typeof llmConfigSchema>;
 
 export type Signature = BaseComponent;
 
+type StronglyTypedFieldBase = Omit<Field, "value" | "type" | "identifier">;
+/**
+ * Parameter specific to LLM Configs
+ */
+export type LlmConfigParameter = StronglyTypedFieldBase & {
+  type: "llm";
+  identifier: "llm";
+  value: LLMConfig;
+};
+/**
+ * Parameter specific to Prompting Techniques
+ */
+type PromptingTechniqueParameter = StronglyTypedFieldBase & {
+  type: "prompting_technique";
+  identifier: "prompting_technique";
+  value: unknown;
+};
+
+/**
+ * Parameter specific to Demonstrations
+ */
+type DemonstrationsParameter = StronglyTypedFieldBase & {
+  type: "dataset";
+  identifier: "demonstrations";
+  value: {
+    columns: DatasetColumns;
+    rows: Record<string, string>[];
+  };
+};
+
+/**
+ * Parameter specific to Instructions
+ */
+type InstructionsParameter = StronglyTypedFieldBase & {
+  type: "str";
+  identifier: "instructions";
+  value: string;
+};
+
 export type LlmPromptConfigComponent = Signature & {
   configId: string;
   name: string;
   inputs: Field[];
   outputs: Field[];
-  parameters: Field[];
+  parameters: (
+    | LlmConfigParameter
+    | PromptingTechniqueParameter
+    | DemonstrationsParameter
+    | InstructionsParameter
+  )[];
 };
 
 export type Code = BaseComponent;

@@ -1,7 +1,7 @@
 import { Textarea } from "@chakra-ui/react";
 import { useShallow } from "zustand/react/shallow";
 import { useEvaluationWizardStore } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { LLMConfigField } from "~/optimization_studio/components/properties/modals/llm-config/LLMConfigField";
+import { OptimizationStudioLLMConfigField } from "~/optimization_studio/components/properties/llm-configs/OptimizationStudioLLMConfigField";
 import { useCallback, useMemo } from "react";
 import type { Field, LLMConfig } from "~/optimization_studio/types/dsl";
 import { PropertyField } from "~/optimization_studio/components/properties/BasePropertiesPanel";
@@ -93,7 +93,7 @@ export function LlmPromptPropertiesStepAccordion() {
         <>
           <PropertyField title="LLM">
             {llmConfig && (
-              <LLMConfigField
+              <OptimizationStudioLLMConfigField
                 llmConfig={llmConfig}
                 onChange={handleOnLLMConfigChange}
               />

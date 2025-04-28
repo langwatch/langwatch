@@ -1,33 +1,43 @@
-import { Separator, Spinner } from "@chakra-ui/react";
+import { Separator, Spinner, VStack } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { useCallback, useEffect, useRef } from "react";
+import debounce from "lodash.debounce";
+import { useEffect, useMemo, useRef } from "react";
 import { FormProvider } from "react-hook-form";
 
 import type { LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 import { useWorkflowStore } from "../../../hooks/useWorkflowStore";
-import type { LlmPromptConfigComponent, Signature } from "../../../types/dsl";
+import type {
+  LLMConfig,
+  LlmPromptConfigComponent,
+  Signature,
+} from "../../../types/dsl";
 import { BasePropertiesPanel } from "../BasePropertiesPanel";
 
-import { PromptSourceHeader } from "./prompt-source-select/PromptSourceHeader";
+import { PromptSourceHeader } from "./promptSourceSelect/PromptSourceHeader";
+import { WrappedOptimizationStudioLLMConfigField } from "./WrappedOptimizationStudioLLMConfigField";
 
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
-import {
-  createNewPromptName,
-  llmConfigToNodeData,
-  nodeDataToPromptConfigFormInitialValues,
-  promptConfigFormValuesToNodeData,
-} from "~/optimization_studio/utils/llmPromptConfigUtils";
 import { DemonstrationsField } from "~/prompt-configs/forms/fields/DemonstrationsField";
-import { PromptConfigVersionFieldGroup } from "~/prompt-configs/forms/fields/PromptConfigVersionFieldGroup";
+import {
+  InputsFieldGroup,
+  OutputsFieldGroup,
+} from "~/prompt-configs/forms/fields/PromptConfigVersionFieldGroup";
+import { PromptField } from "~/prompt-configs/forms/fields/PromptField";
 import { PromptNameField } from "~/prompt-configs/forms/fields/PromptNameField";
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import {
   usePromptConfigForm,
   type PromptConfigFormValues,
 } from "~/prompt-configs/hooks/usePromptConfigForm";
+import {
+  createNewOptimizationStudioPromptName,
+  llmConfigToOptimizationStudioNodeData,
+  optimizationStudioNodeDataToPromptConfigFormInitialValues,
+  promptConfigFormValuesToOptimizationStudioNodeData,
+} from "~/prompt-configs/llmPromptConfigUtils";
 import { PromptConfigProvider } from "~/prompt-configs/providers/PromptConfigProvider";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import { api } from "~/utils/api";
@@ -63,24 +73,25 @@ function SignaturePropertiesPanelInner({
    *
    * @param formValues - The current form values to sync with node data
    */
-  const syncNodeDataWithFormValues = useCallback(
-    (formValues: PromptConfigFormValues) => {
-      const newNodeData = promptConfigFormValuesToNodeData(
-        configId,
-        formValues
-      );
-      setNode({
-        ...node,
-        data: newNodeData,
-      });
-    },
+  const syncNodeDataWithFormValues = useMemo(
+    () =>
+      // Debounce the sync to prevent excessive re-renders when the user is typing
+      debounce((formValues: PromptConfigFormValues) => {
+        const newNodeData = promptConfigFormValuesToOptimizationStudioNodeData(
+          configId,
+          formValues
+        );
+        setNode({
+          ...node,
+          data: newNodeData,
+        });
+      }, 1000),
     [configId, node, setNode]
   );
 
   // Initialize form with values from node data
-  const initialConfigValues = nodeDataToPromptConfigFormInitialValues(
-    node.data
-  );
+  const initialConfigValues =
+    optimizationStudioNodeDataToPromptConfigFormInitialValues(node.data);
   const formProps = usePromptConfigForm({
     configId,
     initialConfigValues,
@@ -107,7 +118,7 @@ function SignaturePropertiesPanelInner({
         projectId: project?.id ?? "",
       });
 
-      const newNodeData = llmConfigToNodeData(config);
+      const newNodeData = llmConfigToOptimizationStudioNodeData(config);
 
       // Update the node data with the new config
       setNode({
@@ -117,7 +128,7 @@ function SignaturePropertiesPanelInner({
 
       // Reset the form with the updated node data
       formProps.methods.reset(
-        nodeDataToPromptConfigFormInitialValues(newNodeData)
+        optimizationStudioNodeDataToPromptConfigFormInitialValues(newNodeData)
       );
     } catch (error) {
       console.error(error);
@@ -131,21 +142,31 @@ function SignaturePropertiesPanelInner({
   // TODO: Consider refactoring the BasePropertiesPanel so that we don't need to hide everything like this
   return (
     <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs>
-      <Separator />
-      <PromptSourceHeader
-        node={node}
-        onPromptSourceSelect={(config) => void handlePromptSourceSelect(config)}
-        triggerSaveVersion={triggerSaveVersion}
-        values={formProps.methods.getValues()}
-      />
-      {/* Prompt Configuration Form */}
-      <FormProvider {...formProps.methods}>
-        <form style={{ width: "100%" }}>
-          <PromptNameField />
-          <PromptConfigVersionFieldGroup />
-          <DemonstrationsField />
-        </form>
-      </FormProvider>
+      <VStack width="full">
+        <Separator marginY={0} />
+        <PromptSourceHeader
+          node={node}
+          onPromptSourceSelect={(config) =>
+            void handlePromptSourceSelect(config)
+          }
+          triggerSaveVersion={triggerSaveVersion}
+          values={formProps.methods.getValues()}
+        />
+        <Separator marginY={0} />
+        {/* Prompt Configuration Form */}
+        <FormProvider {...formProps.methods}>
+          <form style={{ width: "100%" }}>
+            <VStack width="full" gap={6}>
+              <PromptNameField />
+              <WrappedOptimizationStudioLLMConfigField />
+              <PromptField />
+              <InputsFieldGroup />
+              <OutputsFieldGroup />
+              <DemonstrationsField />
+            </VStack>
+          </form>
+        </FormProvider>
+      </VStack>
     </BasePropertiesPanel>
   );
 }
@@ -157,15 +178,20 @@ function SignaturePropertiesPanelInner({
 export function SignaturePropertiesPanel({
   node,
 }: {
-  node: Node<Signature | Node<LlmPromptConfigComponent>>;
+  node: Node<Signature | LlmPromptConfigComponent>;
 }) {
   const { project } = useOrganizationTeamProject();
   const createMutation =
     api.llmConfigs.createConfigWithInitialVersion.useMutation();
   const setNode = useSmartSetNode();
-  const { name: workflowName, nodes } = useWorkflowStore((state) => ({
+  const {
+    name: workflowName,
+    nodes,
+    defaultLLMConfig,
+  } = useWorkflowStore((state) => ({
     name: state.getWorkflow().name,
     nodes: state.getWorkflow().nodes,
+    defaultLLMConfig: state.getWorkflow().default_llm,
   }));
   const nodeHasConfigId = "configId" in node.data;
   const idRef = useRef<string | null>(null);
@@ -185,34 +211,44 @@ export function SignaturePropertiesPanel({
           const newConfig = await createMutation.mutateAsync({
             name:
               (node.data as LlmPromptConfigComponent).name ??
-              createNewPromptName(workflowName, nodes),
+              createNewOptimizationStudioPromptName(workflowName, nodes),
             projectId: project?.id ?? "",
           });
 
           // Convert the node data to form initial values
-          const initialValues = nodeDataToPromptConfigFormInitialValues(
-            node.data as LlmPromptConfigComponent
-          );
+          const initialValues =
+            optimizationStudioNodeDataToPromptConfigFormInitialValues({
+              ...node.data,
+              parameters: setDefaultLlmConfigToParameters(
+                (node.data.parameters ??
+                  []) as LlmPromptConfigComponent["parameters"],
+                defaultLLMConfig
+              ),
+            });
 
           // Use the initial values to create a new version
           const currentConfigData = newConfig.latestVersion.configData; // Use the defaults
-          const nodeConfigData = initialValues.version.configData; // Use the node's config data
+          const nodeConfigData = initialValues.version?.configData; // Use the node's config data
+          const { llm, ...rest } =
+            nodeConfigData ??
+            ({} as PromptConfigFormValues["version"]["configData"]);
           const newVersion = await createNewVersion(
             newConfig.id,
             {
-              inputs: nodeConfigData.inputs ?? currentConfigData.inputs,
-              outputs: nodeConfigData.outputs ?? currentConfigData.outputs,
-              model: nodeConfigData.model ?? currentConfigData.model,
-              prompt: nodeConfigData.prompt ?? currentConfigData.prompt,
+              prompt: rest?.prompt ?? currentConfigData.prompt,
+              inputs: rest?.inputs ?? currentConfigData.inputs,
+              outputs: rest?.outputs ?? currentConfigData.outputs,
+              model: llm?.model ?? currentConfigData.model,
+              temperature: llm?.temperature ?? currentConfigData.temperature,
+              max_tokens: llm?.max_tokens ?? currentConfigData.max_tokens,
               demonstrations:
-                nodeConfigData.demonstrations ??
-                currentConfigData.demonstrations,
-            },
+                rest?.demonstrations ?? currentConfigData.demonstrations,
+            } as LatestConfigVersionSchema["configData"],
             "Save from legacy node"
           );
 
           // Convert the new config and version to node data
-          const newNodeData = llmConfigToNodeData({
+          const newNodeData = llmConfigToOptimizationStudioNodeData({
             ...newConfig,
             latestVersion: newVersion as unknown as LatestConfigVersionSchema,
           });
@@ -243,6 +279,7 @@ export function SignaturePropertiesPanel({
     setNode,
     nodeHasConfigId,
     createNewVersion,
+    defaultLLMConfig,
   ]);
 
   if (!nodeHasConfigId) {
@@ -268,4 +305,23 @@ export function SignaturePropertiesPanel({
  */
 function isEqual(a: any, b: any) {
   return JSON.stringify(a, null, 2) === JSON.stringify(b, null, 2);
+}
+
+function setDefaultLlmConfigToParameters(
+  parameters: LlmPromptConfigComponent["parameters"],
+  defaultLLMConfig: LLMConfig
+) {
+  return parameters.map((item) => {
+    if (item.identifier === "llm") {
+      const value =
+        typeof item.value === "object" ? item.value : defaultLLMConfig;
+
+      return {
+        ...item,
+        value,
+      };
+    }
+
+    return item;
+  }) as LlmPromptConfigComponent["parameters"];
 }

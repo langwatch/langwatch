@@ -9,6 +9,7 @@ import { usePromptConfig } from "../hooks/usePromptConfig";
 import type { PromptConfigFormValues } from "../hooks/usePromptConfigForm";
 
 import { toaster } from "~/components/ui/toaster";
+import { promptConfigFormValuesVersionToLlmConfigVersionConfigData } from "~/prompt-configs/llmPromptConfigUtils";
 
 interface PromptConfigContextType {
   triggerSaveVersion: (
@@ -65,7 +66,9 @@ export function PromptConfigProvider({
 
           const version = await createNewVersion(
             configId,
-            updateConfigValues.version.configData,
+            promptConfigFormValuesVersionToLlmConfigVersionConfigData(
+              updateConfigValues.version
+            ),
             saveFormValues.commitMessage
           );
 

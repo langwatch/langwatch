@@ -10,11 +10,11 @@ import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
-import { llmConfigToNodeData } from "~/optimization_studio/utils/llmPromptConfigUtils";
 import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionHistoryButton";
 import { VersionSaveButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionSaveButton";
 import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
 import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
+import { llmConfigToOptimizationStudioNodeData } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 
 export function PromptSourceHeader({
@@ -37,7 +37,7 @@ export function PromptSourceHeader({
   const setNode = useSmartSetNode();
 
   // Fetch the saved configuration to compare with current node data
-  const { data: savedConfig } =
+  const { data: savedConfig, isLoading: isLoadingSavedConfig } =
     useGetPromptConfigByIdWithLatestVersionQuery(configId);
 
   const { mutateAsync: createConfig } =
@@ -49,7 +49,7 @@ export function PromptSourceHeader({
    */
   const hasDrifted = useMemo(() => {
     if (!savedConfig) return false;
-    const savedConfigData = llmConfigToNodeData(savedConfig);
+    const savedConfigData = llmConfigToOptimizationStudioNodeData(savedConfig);
     return !isEqual(node.data, savedConfigData);
   }, [node.data, savedConfig]);
 
@@ -90,7 +90,8 @@ export function PromptSourceHeader({
       label="Source Prompt"
       width="full"
       helper={
-        !savedConfig && (
+        !savedConfig &&
+        !isLoadingSavedConfig && (
           <Text fontSize="sm" color="red.500">
             This node&apos;s source prompt was deleted. Please save a new prompt
             version to continue using this configuration.

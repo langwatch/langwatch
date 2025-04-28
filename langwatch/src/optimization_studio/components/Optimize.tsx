@@ -40,7 +40,7 @@ import { checkIsEvaluator } from "../utils/nodeUtils";
 
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
-import { LLMConfigField } from "./properties/modals/llm-config/LLMConfigField";
+import { OptimizationStudioLLMConfigField } from "./properties/llm-configs/OptimizationStudioLLMConfigField";
 
 const optimizerOptions: {
   label: string;
@@ -390,7 +390,7 @@ export function OptimizeModalContent({
                     paddingX={1}
                     paddingY="3px"
                   >
-                    <LLMConfigField
+                    <OptimizationStudioLLMConfigField
                       allowDefault={true}
                       defaultLLMConfig={default_llm}
                       llmConfig={llmConfig ?? undefined}

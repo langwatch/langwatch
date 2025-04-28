@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type DeepPartial } from "react-hook-form";
 import { z } from "zod";
 
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
@@ -14,10 +14,17 @@ const latestConfigVersionSchema = getLatestConfigVersionSchema();
 const formSchema = promptConfigSchema.extend({
   version: z.object({
     configData: z.object({
-      model: latestConfigVersionSchema.shape.configData.shape.model,
       prompt: latestConfigVersionSchema.shape.configData.shape.prompt,
       inputs: latestConfigVersionSchema.shape.configData.shape.inputs,
       outputs: latestConfigVersionSchema.shape.configData.shape.outputs,
+      llm: z.object({
+        model: latestConfigVersionSchema.shape.configData.shape.model,
+        temperature:
+          latestConfigVersionSchema.shape.configData.shape.temperature,
+        max_tokens: latestConfigVersionSchema.shape.configData.shape.max_tokens,
+        // Additional params attached to the LLM config
+        litellm_params: z.record(z.string()).optional(),
+      }),
       demonstrations:
         latestConfigVersionSchema.shape.configData.shape.demonstrations,
     }),
@@ -28,7 +35,7 @@ export type PromptConfigFormValues = z.infer<typeof formSchema>;
 
 interface UsePromptConfigFormProps {
   configId: string;
-  initialConfigValues?: Partial<PromptConfigFormValues>;
+  initialConfigValues?: DeepPartial<PromptConfigFormValues>;
   onChange?: (formValues: PromptConfigFormValues) => void;
 }
 

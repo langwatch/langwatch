@@ -20,7 +20,7 @@ export function PromptSourceDialog({
       open={open}
       onOpenChange={({ open }) => (open ? onOpen() : onClose())}
     >
-      <Dialog.Content>
+      <Dialog.Content data-testid="prompt-source-dialog">
         <Dialog.Header>
           <Dialog.Title>Select a Prompt</Dialog.Title>
           <Dialog.CloseTrigger />
