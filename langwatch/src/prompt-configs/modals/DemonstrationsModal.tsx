@@ -37,6 +37,7 @@ function DemonstrationsDatasetTable({
         hideButtons={false}
         bottomSpace="268px"
         loadingOverlayComponent={null}
+        canEditDatasetRecord={false}
       />
     </Box>
   );
