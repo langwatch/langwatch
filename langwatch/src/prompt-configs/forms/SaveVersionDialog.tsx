@@ -8,7 +8,10 @@ import { z } from "zod";
 import { Dialog } from "~/components/ui/dialog";
 
 const saveVersionFormSchema = z.object({
-  commitMessage: z.string().min(1, "Commit message is required"),
+  commitMessage: z
+    .string()
+    .trim()
+    .min(1, "Commit message is required"),
 });
 
 export type SaveDialogFormValues = {
