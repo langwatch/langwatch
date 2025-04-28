@@ -130,7 +130,7 @@ export const createEvaluatorNodeSlice: StateCreator<
             // 2. Reset parameters if evaluator type changed
             // 3. Otherwise keep existing parameters
             parameters:
-              evaluator.data?.parameters ??
+              evaluator.parameters ??
               (hasEvaluatorChanged
                 ? []
                 : baseEvaluatorNode.data.parameters ?? []),
