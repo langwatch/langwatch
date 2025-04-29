@@ -26,6 +26,7 @@ import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
 import { RenderInputOutput } from "./RenderInputOutput";
 import { OverflownTextWithTooltip } from "../OverflownText";
+import { RedactedField } from "../ui/RedactedField";
 
 export function SpanDetails({
   project,
@@ -174,7 +175,9 @@ export function SpanDetails({
             width="full"
             whiteSpace="pre-wrap"
           >
-            <RenderInputOutput value={span.input?.value} showTools />
+            <RedactedField field="input">
+              <RenderInputOutput value={span.input?.value} showTools />
+            </RedactedField>
           </Box>
         </VStack>
       )}
@@ -264,7 +267,9 @@ export function SpanDetails({
                 width="full"
                 whiteSpace="pre-wrap"
               >
-                <RenderInputOutput value={span.output.value} showTools />
+                <RedactedField field="output">
+                  <RenderInputOutput value={span.output.value} showTools />
+                </RedactedField>
               </Box>
             )}
           </VStack>
@@ -283,6 +288,10 @@ export const getEvaluationResult = (
 
   if (span.output.type === "evaluation_result") {
     try {
+      if (typeof span.output.value === "string") {
+        return JSON.parse(span.output.value);
+      }
+
       return span.output.value;
     } catch (_) {
       return undefined;

@@ -43,6 +43,7 @@ import type { CheckConfigFormData } from "./CheckConfigForm";
 import { evaluationStatusColor } from "./EvaluationStatus";
 import { toaster } from "../../components/ui/toaster";
 import { InputGroup } from "../ui/input-group";
+import { RedactedField } from "../ui/RedactedField";
 
 export function TryItOut({
   form,
@@ -468,13 +469,15 @@ export function TryItOut({
                                   : undefined
                               }
                             >
-                              <Text
-                                lineClamp={1}
-                                wordBreak="break-all"
-                                display="block"
-                              >
-                                {trace.input?.value ?? "<empty>"}
-                              </Text>
+                              <RedactedField field="input">
+                                <Text
+                                  lineClamp={1}
+                                  wordBreak="break-all"
+                                  display="block"
+                                >
+                                  {trace.input?.value ?? "<empty>"}
+                                </Text>
+                              </RedactedField>
                             </Tooltip>
                           </Table.Cell>
                           {trace.error ? (
@@ -513,15 +516,17 @@ export function TryItOut({
                                     : undefined
                                 }
                               >
-                                <Text
-                                  lineClamp={1}
-                                  display="block"
-                                  maxWidth="250px"
-                                >
-                                  {(trace.output?.value ?? "").trim() !== ""
-                                    ? trace.output?.value
-                                    : "<empty>"}
-                                </Text>
+                                <RedactedField field="output">
+                                  <Text
+                                    lineClamp={1}
+                                    display="block"
+                                    maxWidth="250px"
+                                  >
+                                    {(trace.output?.value ?? "").trim() !== ""
+                                      ? trace.output?.value
+                                      : "<empty>"}
+                                  </Text>
+                                </RedactedField>
                               </Tooltip>
                             </Table.Cell>
                           )}
