@@ -38,6 +38,7 @@ import { generateTracesPivotQueryConditions } from "./analytics/common";
 import { aggregateTraces, getTraceById, getTracesGroupedByThreadId, searchTraces } from "~/server/elasticsearch/traces";
 import { getUserProtectionsForProject } from "../utils";
 import { transformElasticSearchTraceToTrace } from "~/server/elasticsearch/transformers";
+import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
@@ -596,8 +597,8 @@ export const getAllTracesForProject = async ({
 
     traces.unshift(...filteredTracesByThreadId);
   }
- 
-  traces.map((trace) => {
+
+  const tracesWithGuardrails = traces.map<TraceWithGuardrail>((trace) => {
     const spans = trace.spans;
     const lastSpans = spans.reverse();
     const lastNonGuardrailSpanIndex =
@@ -641,14 +642,14 @@ export const getAllTracesForProject = async ({
     };
   });
 
-  const groups = groupTraces(input.groupBy, traces);
-
   totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
 
   const evaluations = Object.fromEntries(
     traces
       .map((trace) => [trace.trace_id, trace.evaluations ?? []])
   );
+
+  const groups = groupTraces(input.groupBy, tracesWithGuardrails)
 
   return {
     groups,
