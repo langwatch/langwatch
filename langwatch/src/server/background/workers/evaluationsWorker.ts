@@ -46,6 +46,7 @@ import {
 import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
 import type { Protections } from "~/server/elasticsearch/protections";
 import { getTraceById } from "~/server/elasticsearch/traces";
+import { getProtectionsForProject } from "~/server/api/utils";
 
 const debug = getDebugger("langwatch:workers:evaluationsWorker");
 
@@ -62,17 +63,15 @@ export async function runEvaluationJob(
     throw `check config ${job.data.check.evaluator_id} not found`;
   }
 
+  const protections = await getProtectionsForProject(prisma, { projectId: job.data.trace.project_id });
+
   return await runEvaluationForTrace({
     projectId: job.data.trace.project_id,
     traceId: job.data.trace.trace_id,
     evaluatorType: job.data.check.type,
     settings: check.parameters,
     mappings: check.mappings as MappingState,
-    protections: {
-      canSeeCapturedInput: true,
-      canSeeCapturedOutput: true,
-      canSeeCosts: true,
-    },
+    protections,
   });
 }
 

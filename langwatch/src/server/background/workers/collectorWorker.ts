@@ -9,7 +9,7 @@ import type {
 import { env } from "../../../env.mjs";
 import { getDebugger } from "../../../utils/logger";
 import { safeTruncate } from "../../../utils/truncate";
-import { flattenObjectKeys } from "../../api/utils";
+import { flattenObjectKeys, getProtectionsForProject } from "../../api/utils";
 import { prisma } from "../../db";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import {
@@ -252,14 +252,11 @@ const processCollectorJob_ = async (
 
   if (existingTrace?.inserted_at) {
     // TODO: check for quickwit
+    const protections = await getProtectionsForProject(prisma, { projectId: project.id });
     const existingTraceResponse = await getTraceById({
       connConfig: { projectId: project.id },
       traceId: traceId,
-      protections: {
-        canSeeCapturedInput: true,
-        canSeeCapturedOutput: true,
-        canSeeCosts: true,
-      },
+      protections,
       includeEvaluations: true,
       includeSpans: true,
     });
