@@ -11,6 +11,7 @@ import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
 import React, { useMemo } from "react";
 import {
+  Book,
   BookOpen,
   CheckSquare,
   Edit,
@@ -103,12 +104,12 @@ export const MainMenu = React.memo(function MainMenu() {
             project={project}
           />
 
-          {/* <PageMenuLink
-              path={projectRoutes.promptConfigs.path}
-              icon={Layers} // Use an appropriate icon
-              label={projectRoutes.promptConfigs.title}
-              project={project}
-            /> */}
+          <PageMenuLink
+            path={projectRoutes.promptConfigs.path}
+            icon={Book}
+            label={projectRoutes.promptConfigs.title}
+            project={project}
+          />
 
           <PageMenuLink
             path={projectRoutes.datasets.path}
