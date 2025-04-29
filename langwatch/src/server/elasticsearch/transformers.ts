@@ -1,4 +1,8 @@
-import { elasticSearchToTypedValue, elasticSearchEventsToEvents, elasticSearchEvaluationsToEvaluations } from "../tracer/utils";
+import {
+  elasticSearchToTypedValue,
+  elasticSearchEventsToEvents,
+  elasticSearchEvaluationsToEvaluations,
+} from "../tracer/utils";
 import {
   type ElasticSearchSpan,
   type ElasticSearchTrace,
@@ -11,9 +15,20 @@ import {
   type SpanMetrics,
   type TraceInput,
   type TraceOutput,
+  type DatasetSpan,
 } from "../tracer/types";
+import { datasetSpanSchema } from "../datasets/types";
+import { z } from "zod";
 import { reservedTraceMetadataSchema } from "../tracer/types.generated";
 import type { Protections } from "./protections";
+
+export const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
+  try {
+    return z.array(datasetSpanSchema).parse(spans);
+  } catch (e) {
+    return spans as unknown as DatasetSpan[];
+  }
+};
 
 export const transformElasticSearchTraceToTrace = (
   elasticSearchTrace: ElasticSearchTrace,
