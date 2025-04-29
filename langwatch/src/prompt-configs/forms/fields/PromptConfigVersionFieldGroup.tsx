@@ -11,6 +11,7 @@ import { Plus } from "lucide-react";
 import { Trash2 } from "react-feather";
 import { useFieldArray, useFormContext } from "react-hook-form";
 
+import { PropertySectionTitle } from "../../../optimization_studio/components/properties/BasePropertiesPanel";
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
 import { TypeSelector } from "../../ui/TypeSelector";
 
@@ -104,9 +105,7 @@ function FieldGroupHeader({
 }) {
   return (
     <HStack width="full">
-      <Text fontSize="sm" fontWeight="semibold">
-        {title}
-      </Text>
+      <PropertySectionTitle>{title}</PropertySectionTitle>
       <Spacer />
       {!readOnly && (
         <Button size="xs" variant="ghost" onClick={onAdd}>

@@ -1,6 +1,5 @@
-import { Button, Field, Input, Spinner } from "@chakra-ui/react";
+import { Button, Field, Input } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { SaveIcon } from "lucide-react";
 import { useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -8,10 +7,7 @@ import { z } from "zod";
 import { Dialog } from "~/components/ui/dialog";
 
 const saveVersionFormSchema = z.object({
-  commitMessage: z
-    .string()
-    .trim()
-    .min(1, "Commit message is required"),
+  commitMessage: z.string().trim().min(1, "Commit message is required"),
 });
 
 export type SaveDialogFormValues = {
@@ -61,7 +57,9 @@ export function SaveVersionDialog({
     >
       <Dialog.Backdrop />
       <Dialog.Content>
-        <Dialog.Header>Save Version</Dialog.Header>
+        <Dialog.Header>
+          <Dialog.Title>Save Version</Dialog.Title>
+        </Dialog.Header>
         <Dialog.CloseTrigger />
         <Dialog.Body>
           <form
@@ -97,7 +95,6 @@ export function SaveVersionDialog({
             loading={isSubmitting}
             disabled={!isDirty}
           >
-            {isSubmitting ? <Spinner /> : <SaveIcon />}
             Save
           </Button>
         </Dialog.Footer>

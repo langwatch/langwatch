@@ -20,6 +20,7 @@ export function WrappedOptimizationStudioLLMConfigField() {
       invalid={!!errors.version?.configData?.llm}
       helper={errors.version?.configData?.llm?.message?.toString()}
       error={errors.version?.configData?.llm}
+      size="sm"
     >
       <Controller
         name="version.configData.llm"

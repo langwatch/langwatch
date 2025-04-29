@@ -506,6 +506,7 @@ export function BasePropertiesPanel({
   inputsReadOnly,
   outputsTitle,
   outputsReadOnly,
+  hideDescription,
 }: {
   node: Node<Component> | Workflow;
   header?: React.ReactNode;
@@ -518,6 +519,7 @@ export function BasePropertiesPanel({
   inputsReadOnly?: boolean;
   outputsTitle?: string;
   outputsReadOnly?: boolean;
+  hideDescription?: boolean;
 }) {
   const {
     deselectAllNodes,
@@ -621,6 +623,7 @@ export function BasePropertiesPanel({
                     }
                     overflow="hidden"
                     textOverflow="ellipsis"
+                    expandable={false}
                   >
                     {getNodeDisplayName(node)}
                   </HoverableBigText>
@@ -674,7 +677,7 @@ export function BasePropertiesPanel({
             </Button>
           </HStack>
         </HStack>
-        {node.data?.description && (
+        {!hideDescription && node.data?.description && (
           <Text fontSize="12px" color="gray.500" paddingX={2}>
             {node.data?.description}
           </Text>

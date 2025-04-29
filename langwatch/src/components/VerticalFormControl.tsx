@@ -1,6 +1,7 @@
 import { Box, Field, VStack, type SystemStyleObject } from "@chakra-ui/react";
 import { type PropsWithChildren, type ReactNode } from "react";
 import type { FieldErrors } from "react-hook-form";
+import { HorizontalFormControl } from "./HorizontalFormControl";
 
 export function VerticalFormControl({
   label,
@@ -8,43 +9,30 @@ export function VerticalFormControl({
   invalid,
   children,
   inputWidth,
-  onClick,
   error,
+  size = "md",
   ...props
 }: PropsWithChildren<{
   label: string | ReactNode;
   helper?: string | ReactNode;
   invalid?: boolean;
   inputWidth?: string;
-  onClick?: () => void;
-  error?: FieldErrors<any>[0];
+  error?: FieldErrors<any>[0] | ReactNode;
+  size?: "sm" | "md";
 }> &
   SystemStyleObject) {
   return (
-    <Field.Root
-      borderBottomWidth="1px"
-      paddingY={5}
+    <HorizontalFormControl
+      label={label}
+      helper={helper}
       invalid={invalid}
-      _last={{ border: "none" }}
-      onClick={onClick}
+      inputWidth={inputWidth}
+      size={size}
+      error={error}
       {...props}
+      direction="vertical"
     >
-      <VStack width="full" align="start" gap={3}>
-        <VStack align="start" gap={1} width="full">
-          <Field.Label margin={0} width="full">
-            {label}
-          </Field.Label>
-          <Field.HelperText margin={0} fontSize="13px">
-            {helper}
-          </Field.HelperText>
-        </VStack>
-        <Box width="full" minWidth={inputWidth ?? "full"}>
-          {children}
-          {error && (
-            <Field.ErrorText>{error.message?.toString()}</Field.ErrorText>
-          )}
-        </Box>
-      </VStack>
-    </Field.Root>
+      {children}
+    </HorizontalFormControl>
   );
 }

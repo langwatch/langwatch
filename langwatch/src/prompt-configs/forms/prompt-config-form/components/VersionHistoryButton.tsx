@@ -1,6 +1,7 @@
 import { Button } from "@chakra-ui/react";
 
 import { VersionHistoryListPopover } from "../../../VersionHistoryListPopover";
+import { Tooltip } from "../../../../components/ui/tooltip";
 
 export function VersionHistoryButton({
   configId,
@@ -10,8 +11,15 @@ export function VersionHistoryButton({
   onRestore?: (versionId: string) => void;
 }) {
   return (
-    <Button variant="outline" marginLeft={2}>
-      <VersionHistoryListPopover configId={configId} onRestore={onRestore} />
-    </Button>
+    <Tooltip
+      content="View previous versions"
+      positioning={{ placement: "top" }}
+      openDelay={0}
+      showArrow
+    >
+      <Button variant="outline">
+        <VersionHistoryListPopover configId={configId} onRestore={onRestore} />
+      </Button>
+    </Tooltip>
   );
 }

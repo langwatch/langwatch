@@ -271,7 +271,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
       align="start"
       color="gray.600"
       fontSize="11px"
-      minWidth="180px"
+      minWidth={80 + 3 * getNodeDisplayName(props).length + "px"}
       boxShadow={`0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.2" : "0.1"})`}
       border="none"
       outline={!!props.selected || isHovered ? "1.5px solid" : "none"}
@@ -287,43 +287,45 @@ export const ComponentNode = forwardRef(function ComponentNode(
         }
       }}
     >
-      {props.selected && !["entry", "end"].includes(props.type) && !isInsideWizard && (
-        <Menu.Root positioning={{ placement: "top-start" }}>
-          <Menu.Trigger asChild>
-            <Button
-              background="white"
-              position="absolute"
-              top="-28px"
-              right={1}
-              paddingX={1}
-              paddingY={1}
-              borderRadius={6}
-              minWidth="auto"
-              minHeight="auto"
-              boxShadow="sm"
-              width="auto"
-              height="auto"
-            >
-              <MoreHorizontal size={11} />
-            </Button>
-          </Menu.Trigger>
-          <NodeToolbar>
-            <Menu.Content>
-              <Menu.Item
-                value="duplicate"
-                onClick={() => duplicateNode(props.id)}
+      {props.selected &&
+        !["entry", "end"].includes(props.type) &&
+        !isInsideWizard && (
+          <Menu.Root positioning={{ placement: "top-start" }}>
+            <Menu.Trigger asChild>
+              <Button
+                background="white"
+                position="absolute"
+                top="-28px"
+                right={1}
+                paddingX={1}
+                paddingY={1}
+                borderRadius={6}
+                minWidth="auto"
+                minHeight="auto"
+                boxShadow="sm"
+                width="auto"
+                height="auto"
               >
-                <Copy size={14} />
-                Duplicate
-              </Menu.Item>
-              <Menu.Item value="delete" onClick={() => deleteNode(props.id)}>
-                <Trash2 size={14} />
-                Delete
-              </Menu.Item>
-            </Menu.Content>
-          </NodeToolbar>
-        </Menu.Root>
-      )}
+                <MoreHorizontal size={11} />
+              </Button>
+            </Menu.Trigger>
+            <NodeToolbar>
+              <Menu.Content>
+                <Menu.Item
+                  value="duplicate"
+                  onClick={() => duplicateNode(props.id)}
+                >
+                  <Copy size={14} />
+                  Duplicate
+                </Menu.Item>
+                <Menu.Item value="delete" onClick={() => deleteNode(props.id)}>
+                  <Trash2 size={14} />
+                  Delete
+                </Menu.Item>
+              </Menu.Content>
+            </NodeToolbar>
+          </Menu.Root>
+        )}
       <HStack gap={2} width="full">
         <ComponentIcon
           type={props.type as ComponentType}
@@ -331,7 +333,14 @@ export const ComponentNode = forwardRef(function ComponentNode(
           behave_as={props.data.behave_as}
           size="md"
         />
-        <Text fontSize="12px" fontWeight={500}>
+        <Text
+          fontSize="12px"
+          fontWeight={500}
+          minWidth="0"
+          flexShrink={1}
+          lineClamp={2}
+          wordBreak="break-all"
+        >
           {getNodeDisplayName(props)}
         </Text>
         <Spacer />

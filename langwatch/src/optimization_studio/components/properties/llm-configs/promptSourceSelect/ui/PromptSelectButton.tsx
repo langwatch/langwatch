@@ -1,5 +1,6 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
 import { Book, ChevronDown } from "react-feather";
+import { Tooltip } from "../../../../../../components/ui/tooltip";
 
 // Prompt Selection Button Component
 interface PromptSelectionButtonProps {
@@ -12,21 +13,19 @@ export function PromptSelectionButton({
   onClick,
 }: PromptSelectionButtonProps) {
   return (
-    <Button
-      onClick={onClick}
-      justifyContent="space-between"
-      variant="outline"
-      width="full"
+    <Tooltip
+      content="Select another prompt"
+      positioning={{ placement: "top" }}
+      openDelay={0}
+      showArrow
     >
-      <HStack justifyContent="space-between" width="full">
-        <HStack width="full">
-          <Book size={16} />
-          <Text width="90%" overflow="hidden" textOverflow="ellipsis">
-            {selectedConfig ? selectedConfig.name : "Select a prompt"}
-          </Text>
-        </HStack>
-        <ChevronDown size={16} />
-      </HStack>
-    </Button>
+      <Button
+        onClick={onClick}
+        justifyContent="space-between"
+        variant="outline"
+      >
+        <Book size={16} />
+      </Button>
+    </Tooltip>
   );
 }

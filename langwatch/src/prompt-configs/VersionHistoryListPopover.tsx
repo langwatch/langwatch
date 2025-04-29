@@ -164,7 +164,7 @@ function VersionHistoryList({
 function VersionHistoryTrigger({ onClick }: { onClick?: () => void }) {
   return (
     <Popover.Trigger asChild onClick={onClick}>
-      <Button variant="ghost" color="gray.500" size="xs">
+      <Button variant="ghost" color="gray.500" size="xs" padding={0} minWidth={0}>
         <HistoryIcon size={16} />
       </Button>
     </Popover.Trigger>

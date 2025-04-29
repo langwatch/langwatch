@@ -3,24 +3,26 @@ import { useFormContext } from "react-hook-form";
 
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
 
+import { VerticalFormControl } from "~/components/VerticalFormControl";
+
 export function PromptField() {
   const form = useFormContext<PromptConfigFormValues>();
   const { register, formState } = form;
   const { errors } = formState;
 
   return (
-    <Field.Root invalid={!!errors.version?.configData?.prompt}>
-      <Field.Label>Prompt</Field.Label>
+    <VerticalFormControl
+      label="Prompt"
+      invalid={!!errors.version?.configData?.prompt}
+      helper={errors.version?.configData?.prompt?.message?.toString()}
+      error={errors.version?.configData?.prompt}
+      size="sm"
+    >
       <Textarea
         {...register("version.configData.prompt")}
         placeholder="You are a helpful assistant"
         rows={4}
       />
-      {errors.version?.configData?.prompt && (
-        <Field.ErrorText>
-          {errors.version?.configData?.prompt.message}
-        </Field.ErrorText>
-      )}
-    </Field.Root>
+    </VerticalFormControl>
   );
 }

@@ -21,8 +21,14 @@ export function PromptNameField({ label }: PromptNameFieldProps) {
       invalid={!!errors.name}
       helper={errors.name?.message?.toString()}
       error={errors.name}
+      size="sm"
+      paddingBottom={4}
     >
-      <Input placeholder="Enter a name for this prompt" {...register("name")} />
+      <Input
+        size="sm"
+        placeholder="Enter a name for this prompt"
+        {...register("name")}
+      />
     </VerticalFormControl>
   );
 }

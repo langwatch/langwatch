@@ -33,6 +33,7 @@ export function DemonstrationsField() {
           invalid={!!errors.version?.configData?.demonstrations}
           helper={errors.version?.configData?.demonstrations?.message?.toString()}
           error={errors.version?.configData?.demonstrations}
+          size="sm"
         >
           <DatasetPreview
             rows={demonstrations?.rows ?? []}
@@ -63,7 +64,7 @@ function DemonstrationsLabel({
   return (
     <HStack width="full" align="center">
       <HStack gap={2} align="center">
-        <Text fontSize="sm" fontWeight="medium">
+        <Text>
           Demonstrations{" "}
           {total !== undefined && total > 0 && (
             <Text as="span" color="gray.400">

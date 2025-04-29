@@ -1,10 +1,10 @@
-import { Text } from "@chakra-ui/react";
-import { HStack } from "@chakra-ui/react";
+import { HStack, Input, Text } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useMemo } from "react";
 
 import { PromptSource } from "./PromptSource";
 
+import { useFormContext } from "react-hook-form";
 import { toaster } from "~/components/ui/toaster";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -18,13 +18,10 @@ import {
   llmConfigToOptimizationStudioNodeData,
   llmConfigToPromptConfigFormValues,
 } from "~/prompt-configs/llmPromptConfigUtils";
-import { api } from "~/utils/api";
-import {
-  parseLlmConfigVersion,
-  type LatestConfigVersionSchema,
-} from "~/server/prompt-config/repositories/llm-config-version-schema";
+import { parseLlmConfigVersion } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
-import { useFormContext } from "react-hook-form";
+import { api } from "~/utils/api";
+import { InputGroup } from "../../../../../components/ui/input-group";
 
 export function PromptSourceHeader({
   node,
@@ -126,21 +123,38 @@ export function PromptSourceHeader({
     }
   };
 
+  const { register, formState } = useFormContext<PromptConfigFormValues>();
+  const { errors } = formState;
+
   return (
     <VerticalFormControl
-      label="Source Prompt"
+      label="Versioned Prompt"
       width="full"
-      helper={
-        !savedConfig &&
-        !isLoadingSavedConfig && (
+      size="sm"
+      invalid={!!errors.name}
+      error={
+        errors.name ??
+        (!savedConfig && !isLoadingSavedConfig && (
           <Text fontSize="sm" color="red.500">
             This node&apos;s source prompt was deleted. Please save a new prompt
             version to continue using this configuration.
           </Text>
-        )
+        ))
       }
+      paddingBottom={4}
     >
       <HStack justifyContent="space-between">
+        <InputGroup
+          startElement={<Text fontSize="12px">Name:</Text>}
+          startOffset="-24px"
+          // startOffset="50px"
+        >
+          <Input
+            size="sm"
+            placeholder="Enter a name for this prompt"
+            {...register("name")}
+          />
+        </InputGroup>
         <HStack flex={1} width="50%">
           <PromptSource configId={configId} onSelect={onPromptSourceSelect} />
         </HStack>

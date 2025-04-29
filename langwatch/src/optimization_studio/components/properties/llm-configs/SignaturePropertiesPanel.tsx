@@ -154,23 +154,26 @@ function SignaturePropertiesPanelInner({
 
   // TODO: Consider refactoring the BasePropertiesPanel so that we don't need to hide everything like this
   return (
-    <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs>
-      <VStack width="full">
-        <Separator marginY={0} />
+    <BasePropertiesPanel
+      node={node}
+      hideParameters
+      hideInputs
+      hideOutputs
+      hideDescription
+    >
+      <VStack width="full" gap={4}>
         {/* Prompt Configuration Form */}
         <FormProvider {...formProps.methods}>
-          <PromptSourceHeader
-            node={node}
-            onPromptSourceSelect={(config) =>
-              void handlePromptSourceSelect(config)
-            }
-            triggerSaveVersion={handleTriggerSaveVersion}
-            values={formProps.methods.getValues()}
-          />
-          <Separator marginY={0} />
           <form style={{ width: "100%" }}>
-            <VStack width="full" gap={6}>
-              <PromptNameField />
+            <VStack width="full" gap={4}>
+              <PromptSourceHeader
+                node={node}
+                onPromptSourceSelect={(config) =>
+                  void handlePromptSourceSelect(config)
+                }
+                triggerSaveVersion={handleTriggerSaveVersion}
+                values={formProps.methods.getValues()}
+              />
               <WrappedOptimizationStudioLLMConfigField />
               <PromptField />
               <InputsFieldGroup />
