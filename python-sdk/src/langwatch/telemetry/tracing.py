@@ -396,6 +396,7 @@ class LangWatchTrace:
         conversation: Conversation = [],
         settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
+        data: Optional[Dict[str, Any]] = None,
     ):
         from langwatch import evaluations
 
@@ -410,6 +411,7 @@ class LangWatchTrace:
             conversation=conversation,
             settings=settings,
             as_guardrail=as_guardrail,
+            data=data,
         )
 
     async def async_evaluate(
@@ -423,6 +425,7 @@ class LangWatchTrace:
         conversation: Conversation = [],
         settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
+        data: Optional[Dict[str, Any]] = None,
     ):
         from langwatch import evaluations
 
@@ -437,6 +440,7 @@ class LangWatchTrace:
             conversation=conversation,
             settings=settings,
             as_guardrail=as_guardrail,
+            data=data,
         )
 
     def __call__(self, func: T) -> T:

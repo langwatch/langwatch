@@ -426,6 +426,7 @@ class LangWatchSpan:
         conversation: Conversation = [],
         settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
+        data: Optional[Dict[str, Any]] = None,
     ):
         contexts = contexts or []
         conversation = conversation or []
@@ -443,6 +444,7 @@ class LangWatchSpan:
             conversation=conversation,
             settings=settings,
             as_guardrail=as_guardrail,
+            data=data,
         )
 
     async def async_evaluate(
@@ -456,6 +458,7 @@ class LangWatchSpan:
         conversation: Conversation = [],
         settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
+        data: Optional[Dict[str, Any]] = None,
     ):
         contexts = contexts or []
         conversation = conversation or []
@@ -473,6 +476,7 @@ class LangWatchSpan:
             conversation=conversation,
             settings=settings,
             as_guardrail=as_guardrail,
+            data=data,
         )
 
     def end(

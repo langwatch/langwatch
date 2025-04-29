@@ -53,6 +53,7 @@ def evaluate(
     trace: Optional["LangWatchTrace"] = None,
     span: Optional["LangWatchSpan"] = None,
     api_key: Optional[str] = None,
+    data: Optional[Dict[str, Any]] = None,
 ) -> EvaluationResultModel:  # type: ignore
     with langwatch.span(
         name=name or slug, type="guardrail" if as_guardrail else "evaluation"
@@ -70,6 +71,7 @@ def evaluate(
             span=span,
             as_guardrail=as_guardrail,
             api_key=api_key,
+            data=data,
         )
         try:
             with httpx.Client(timeout=900) as client:
@@ -97,6 +99,7 @@ async def async_evaluate(
     trace: Optional["LangWatchTrace"] = None,
     span: Optional["LangWatchSpan"] = None,
     api_key: Optional[str] = None,
+    data: Optional[Dict[str, Any]] = None,
 ) -> EvaluationResultModel:  # type: ignore
     with langwatch.span(
         name=name or slug, type="guardrail" if as_guardrail else "evaluation"
@@ -114,6 +117,7 @@ async def async_evaluate(
             span=span,
             as_guardrail=as_guardrail,
             api_key=api_key,
+            data=data,
         )
         try:
             async with httpx.AsyncClient(timeout=900) as client:
@@ -142,35 +146,39 @@ def prepare_data(
     span: Optional["LangWatchSpan"] = None,
     as_guardrail: bool = False,
     api_key: Optional[str] = None,
+    data: Optional[Dict[str, Any]] = None,
 ):
     span_ctx = get_current_span().get_span_context()
 
-    data = {
+    dataDict = {
         "trace_id": format(span_ctx.trace_id, "x"),
         "span_id": format(span_ctx.span_id, "x"),
+        **(data or {}),
     }
     if input is not None:
-        data["input"] = input
+        dataDict["input"] = input
     if output is not None:
-        data["output"] = output
+        dataDict["output"] = output
     if expected_output is not None:
-        data["expected_output"] = expected_output
+        dataDict["expected_output"] = expected_output
     if contexts is not None:
-        data["contexts"] = contexts
+        dataDict["contexts"] = contexts
     if expected_contexts is not None:
-        data["expected_contexts"] = expected_contexts
+        dataDict["expected_contexts"] = expected_contexts
     if conversation is not None:
-        data["conversation"] = conversation
+        dataDict["conversation"] = conversation
+
     if trace_id is not None:
         warn(
             "trace_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `trace_id` will be mapped to `deprecated.trace_id` in the data."
         )
-        data["deprecated.trace_id"] = str(trace_id)
+        dataDict["deprecated.trace_id"] = str(trace_id)
     if span_id is not None:
         warn(
             "span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the data."
         )
-        data["deprecated.span_id"] = str(span_id)
+        dataDict["deprecated.span_id"] = str(span_id)
+
     if span:
         span.update(
             input=TypedValueJson(type="json", value=data),
@@ -183,7 +191,7 @@ def prepare_data(
             "trace_id": format(span_ctx.trace_id, "x"),
             "span_id": format(span_ctx.span_id, "x"),
             "name": name,
-            "data": data,
+            "data": dataDict,
             "settings": settings,
             "as_guardrail": as_guardrail,
         },
