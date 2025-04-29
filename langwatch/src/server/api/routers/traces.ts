@@ -35,7 +35,7 @@ import {
   checkUserPermissionForProject,
 } from "../permission";
 import { generateTracesPivotQueryConditions } from "./analytics/common";
-import { aggregateTraces, getTraceById, getTracesGroupedByThreadId, searchTraces } from "~/server/elasticsearch/traces";
+import { aggregateTraces, getTraceById, getTracesGroupedByThreadId, searchTraces,  } from "~/server/elasticsearch/traces";
 import { getUserProtectionsForProject } from "../utils";
 import { transformElasticSearchTraceToTrace } from "~/server/elasticsearch/transformers";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
@@ -441,18 +441,12 @@ export const getAllTracesForProject = async ({
     pageSize = 10_000;
   }
 
-  let protections: Protections = {
-    canSeeCapturedInput: true,
-    canSeeCapturedOutput: true,
-    canSeeCosts: true,
-  };
-  if (ctx?.prisma) {
-    protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
-  }
-  if (downloadMode) {
-    protections.canSeeCapturedInput = false;
-    protections.canSeeCapturedOutput = false;
-  }
+  const baseProtections: Protections = ctx?.prisma
+    ? await getUserProtectionsForProject(ctx, { projectId: input.projectId })
+    : { canSeeCapturedInput: true, canSeeCapturedOutput: true, canSeeCosts: true };
+  const protections: Protections = downloadMode
+    ? { ...baseProtections, canSeeCapturedInput: false, canSeeCapturedOutput: false }
+    : baseProtections;
 
   let tracesResult: SearchResponse<ElasticSearchTrace>;
   if (scrollId) {
@@ -602,13 +596,13 @@ export const getAllTracesForProject = async ({
   }
 
   const tracesWithGuardrails = traces.map<TraceWithGuardrail>((trace) => {
-    const spans = trace.spans;
-    const lastSpans = spans.reverse();
+    const spans = trace.spans ?? [];
+    const lastSpans = [...spans].reverse();
     const lastNonGuardrailSpanIndex =
-      lastSpans?.findIndex((span) => span.type !== "guardrail") ?? -1;
+      lastSpans.findIndex((span) => span.type !== "guardrail") ?? -1;
     const lastGuardrailSpans =
       lastNonGuardrailSpanIndex > -1
-        ? lastSpans?.slice(0, lastNonGuardrailSpanIndex)
+        ? lastSpans.slice(0, lastNonGuardrailSpanIndex)
         : lastSpans;
 
     const lastFailedGuardrailResult:

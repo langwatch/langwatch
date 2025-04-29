@@ -639,7 +639,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                       <Select.ValueText placeholder="Select captured output visibility" />
                     </Select.Trigger>
                     <Select.Content width="300px">
-                      {capturedInputVisibilityCollection.items.map((option) => (
+                      {capturedOutputVisibilityCollection.items.map((option) => (
                         <Select.Item key={option.value} item={option}>
                           <VStack align="start" gap={0}>
                             <Text>{option.label}</Text>

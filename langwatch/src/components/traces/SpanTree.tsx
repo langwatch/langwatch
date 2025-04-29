@@ -4,7 +4,7 @@ import numeral from "numeral";
 import { useEffect, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
-import type { ElasticSearchSpan, Span } from "../../server/tracer/types";
+import type { Span } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import {
   CheckStatusIcon,
@@ -149,7 +149,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
         <VStack align="start">
           <HStack>
             <HoverableBigText
-              color={!span.name && !span.name ? "gray.400" : undefined}
+              color={!span.name && !("model" in span) ? "gray.400" : undefined}
               maxWidth="180px"
               lineClamp={1}
               expandable={false}

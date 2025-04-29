@@ -438,7 +438,7 @@ export const projectRouter = createTRPCRouter({
         },
       });
 
-      const isUserAdminOrOwnerInAnyTeam = teamsWithAccess.some(
+      const isUserPrivileged = teamsWithAccess.some(
         (teamUser: { role: TeamUserRole }) => teamUser.role === TeamUserRole.ADMIN
       );
 
@@ -448,7 +448,7 @@ export const projectRouter = createTRPCRouter({
 
       const canUserSeeData = canAccessSensitiveData(
         visibilitySetting,
-        isUserAdminOrOwnerInAnyTeam
+        isUserPrivileged,
       );
 
       return !canUserSeeData;
@@ -485,7 +485,7 @@ async function checkCapturedDataVisibilityPermission({
 
 const canAccessSensitiveData = (
   visibility: ProjectSensitiveDataVisibilityLevel,
-  userIsAdminOrOwner: boolean
+  userIsPrivileged: boolean
 ): boolean => {
   switch (visibility) {
     case ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL:
@@ -493,7 +493,7 @@ const canAccessSensitiveData = (
     case ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL:
       return true;
     case ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN:
-      return userIsAdminOrOwner;
+      return userIsPrivileged;
     default:
       console.error("Unexpected visibility level:", visibility);
       return false; // Default to not showing

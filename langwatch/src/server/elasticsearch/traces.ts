@@ -86,17 +86,17 @@ export async function searchTraces({
   return tracesWithInternals.map(({ trace }) => trace);
 }
 
-interface AggregateTracesOptions<T extends Record<string, T.AggregationsAggregationContainer>> {
+interface AggregateTracesOptions<Aggs extends Record<string, T.AggregationsAggregationContainer>> {
   connConfig: ConnectionConfig;
   search: Parameters<ElasticClient['search']>[0] & {
     index?: typeof TRACE_INDEX[keyof typeof TRACE_INDEX];
     size?: 0;
-    aggs: T;
+    aggs: Aggs;
   };
   protections?: Protections;
 }
 
-export async function aggregateTraces<T extends Record<string, T.AggregationsAggregationContainer>>({
+export async function aggregateTraces<Aggs extends Record<string, T.AggregationsAggregationContainer>>({
   connConfig,
   search: {
     index = TRACE_INDEX.alias,
@@ -105,9 +105,15 @@ export async function aggregateTraces<T extends Record<string, T.AggregationsAgg
     ...searchParams
   },
   protections = {}, // I don't think we need protections here, but good to have for future?
-}: AggregateTracesOptions<T>): Promise<Record<keyof T, (T.AggregationsMultiBucketBase & { key: string })[]>> {
+}: AggregateTracesOptions<Aggs>): Promise<Record<keyof Aggs, (T.AggregationsMultiBucketBase & { key: string })[]>> {
   const client = await esClient(connConfig);
-  const result = await client.search<unknown, Record<keyof T, T.AggregationsMultiBucketAggregateBase<T.AggregationsMultiBucketBase & { key: string }>>>({
+  const result = await client.search<
+    unknown,
+    Record<
+      keyof Aggs,
+      T.AggregationsMultiBucketAggregateBase<T.AggregationsMultiBucketBase & { key: string }>
+    >
+  >({
     index,
     size,
     aggs,
@@ -131,7 +137,7 @@ export async function aggregateTraces<T extends Record<string, T.AggregationsAgg
   // Initialize output with empty arrays for all keys in the input aggs, to avoid missing key errors
   const out = Object.fromEntries(
     Object.keys(aggs).map(key => [key, [] as (T.AggregationsMultiBucketBase & { key: string })[]])
-  ) as Record<keyof T, (T.AggregationsMultiBucketBase & { key: string })[]>;
+  ) as Record<keyof Aggs, (T.AggregationsMultiBucketBase & { key: string })[]>;
 
   if (result.aggregations) {
     for (const key in result.aggregations) {

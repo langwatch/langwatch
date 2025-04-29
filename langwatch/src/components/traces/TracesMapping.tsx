@@ -19,11 +19,11 @@ import {
   TRACE_MAPPINGS,
   mapTraceToDatasetEntry,
 } from "../../server/tracer/tracesMapping";
-import type { TraceWithSpans } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { Switch } from "../ui/switch";
 import type { Workflow } from "../../optimization_studio/types/dsl";
 import { useEvaluationWizardStore } from "../evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import type { Trace } from "~/server/tracer/types";
 
 export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   string,
@@ -69,7 +69,7 @@ export const TracesMapping = ({
   skipSettingDefaultEdges,
 }: {
   titles?: string[];
-  traces: TraceWithSpans[];
+  traces: Trace[];
   traceMapping?: MappingState;
   dsl?: {
     sourceOptions: Record<string, { label: string; fields: string[] }>;

@@ -30,7 +30,7 @@ export const spansRouter = createTRPCRouter({
         protections,
         includeSpans: true,
       });
-      if (!trace) {
+      if (!trace?.spans) {
         return [];
       }
 

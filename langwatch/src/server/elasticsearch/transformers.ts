@@ -26,6 +26,7 @@ export const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
   try {
     return z.array(datasetSpanSchema).parse(spans);
   } catch (e) {
+    console.error('DatasetSpan validation failed', e);
     return spans as unknown as DatasetSpan[];
   }
 };
@@ -50,7 +51,11 @@ export const transformElasticSearchTraceToTrace = (
       ([key]) => key in reservedTraceMetadataSchema.shape
     )
   ) as ReservedTraceMetadata;
-  const customMetadata = metadata.custom ?? {};
+  const customMetadata = Object.fromEntries(
+    Object.entries(metadata).filter(
+      ([key]) => !(key in reservedTraceMetadataSchema.shape)
+    )
+  );
 
   let transformedEvents: Event[] = [];
   let transformedEvaluations: Evaluation[] = [];
