@@ -1,0 +1,111 @@
+import { elasticSearchToTypedValue, elasticSearchEventsToEvents, elasticSearchEvaluationsToEvaluations } from "../tracer/utils";
+import {
+  type ElasticSearchSpan,
+  type ElasticSearchTrace,
+  type Evaluation,
+  type ReservedTraceMetadata,
+  type Span,
+  type SpanInputOutput,
+  type Event,
+  type Trace,
+  type SpanMetrics,
+  type TraceInput,
+  type TraceOutput,
+} from "../tracer/types";
+import { reservedTraceMetadataSchema } from "../tracer/types.generated";
+import type { Protections } from "./protections";
+
+export const transformElasticSearchTraceToTrace = (
+  elasticSearchTrace: ElasticSearchTrace,
+  protections: Protections,
+): Trace => {
+  const { metadata = {}, events, evaluations, spans, input, output, metrics, ...traceFields } = elasticSearchTrace;
+
+  const reservedMetadata = Object.fromEntries(
+    Object.entries(metadata).filter(
+      ([key]) => key in reservedTraceMetadataSchema.shape
+    )
+  ) as ReservedTraceMetadata;
+
+  const customMetadata = metadata.custom ?? {};
+
+  const finalMetadata = {
+    ...reservedMetadata,
+    ...customMetadata,
+  };
+
+  let transformedEvents: Event[] = [];
+  let transformedEvaluations: Evaluation[] = [];
+  let transformedSpans: Span[] = [];
+
+  let transformedInput: TraceInput | undefined = void 0;
+  let transformedOutput: TraceOutput | undefined = void 0;
+  let transformedMetrics: Trace['metrics'] = void 0;
+
+  if (input && protections.canSeeCapturedInput === true) {
+    transformedInput = input;
+  }
+  if (output && protections.canSeeCapturedOutput === true) {
+    transformedOutput = output;
+  }
+  if (metrics) {
+    const { total_cost, ...otherMetrics } = metrics;
+    transformedMetrics = otherMetrics;
+
+    if (protections.canSeeCosts === true) {
+      transformedMetrics.total_cost = total_cost;
+    }
+  }
+  if (events) {
+    transformedEvents = elasticSearchEventsToEvents(events);
+  }
+  if (evaluations) {
+    transformedEvaluations = elasticSearchEvaluationsToEvaluations(evaluations);
+  }
+  if (spans) {
+    for (const span of spans) {
+      transformedSpans.push(transformElasticSearchSpanToSpan(span, protections));
+    }
+  }
+
+  return {
+    ...traceFields,
+    metadata: finalMetadata,
+    events: transformedEvents,
+    evaluations: transformedEvaluations,
+    spans: transformedSpans,
+    input: transformedInput,
+    output: transformedOutput,
+    metrics: transformedMetrics,
+  };
+};
+
+export const transformElasticSearchSpanToSpan = (esSpan: ElasticSearchSpan, protections: Protections): Span => {
+  const { input, output, metrics, ...spanFields } = esSpan;
+
+  let transformedInput: SpanInputOutput | null = null;
+  let transformedOutput: SpanInputOutput | null = null;
+  let transformedMetrics: SpanMetrics | null = null;
+
+  if (input && protections.canSeeCapturedInput === true) {
+    transformedInput = elasticSearchToTypedValue(input);
+  }
+  if (output && protections.canSeeCapturedOutput === true) {
+    transformedOutput = elasticSearchToTypedValue(output);
+  }
+  if (metrics) {
+    const { cost, ...otherMetrics } = metrics;
+    transformedMetrics = otherMetrics;
+
+    if (protections.canSeeCosts === true) {
+      transformedMetrics.cost = cost;
+    }
+  }
+
+  return {
+    ...spanFields,
+    input: transformedInput,
+    output: transformedOutput,
+    metrics: transformedMetrics,
+  };
+};
