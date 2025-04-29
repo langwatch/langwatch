@@ -44,6 +44,7 @@ import type { Field, Signature, Workflow } from "../types/dsl";
 import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
 import { OptimizationProgressBar } from "./ProgressToast";
 import { slugify } from "../../utils/slugify";
+import { useRunEvalution } from "../hooks/useRunEvalution";
 
 export function ResultsPanel({
   isCollapsed,
@@ -183,7 +184,7 @@ export function EvaluationResults({
     setSelectedRunId(evaluationState?.run_id);
   }, [evaluationState?.run_id]);
 
-  const { stopEvaluationExecution } = useEvaluationExecution();
+  const { stopEvaluation } = useRunEvalution();
 
   const {
     selectedRun,
@@ -254,41 +255,20 @@ export function EvaluationResults({
         />
         <Spacer />
         {selectedRun && (
-          <BatchEvaluationV2EvaluationSummary run={selectedRun} />
+          <BatchEvaluationV2EvaluationSummary
+            run={selectedRun}
+            showProgress={
+              (!selectedRun || selectedRun.run_id === evaluationStateRunId) &&
+              !!evaluationStateRunId &&
+              evaluationState?.status === "running"
+            }
+            onStop={() =>
+              stopEvaluation({
+                run_id: evaluationStateRunId ?? "",
+              })
+            }
+          />
         )}
-        {(!selectedRun || selectedRun.run_id === evaluationStateRunId) &&
-          evaluationStateRunId &&
-          evaluationState?.status === "running" && (
-            <HStack
-              width="full"
-              padding={3}
-              borderTop="1px solid"
-              borderColor="gray.200"
-              gap={2}
-            >
-              <Text whiteSpace="nowrap" marginTop="-1px" paddingX={2}>
-                Running
-              </Text>
-              <EvaluationProgressBar
-                evaluationState={evaluationState}
-                size="lg"
-              />
-              <Button
-                colorPalette="red"
-                onClick={() =>
-                  stopEvaluationExecution({
-                    run_id: evaluationStateRunId,
-                  })
-                }
-                minHeight="28px"
-                minWidth="0"
-                paddingY="6px"
-                marginLeft="8px"
-              >
-                <Box paddingX="6px">Stop</Box>
-              </Button>
-            </HStack>
-          )}
       </VStack>
     </HStack>
   );

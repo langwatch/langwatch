@@ -1,4 +1,4 @@
-import { Box, Separator, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, Separator, HStack, Spacer, Text, VStack, Button } from "@chakra-ui/react";
 import { Tooltip } from "../../../components/ui/tooltip";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
@@ -17,6 +17,7 @@ import React from "react";
 export function BatchEvaluationV2EvaluationSummary({
   run,
   showProgress = false,
+  onStop,
 }: {
   run: NonNullable<
     UseTRPCQueryResult<
@@ -25,6 +26,7 @@ export function BatchEvaluationV2EvaluationSummary({
     >["data"]
   >["runs"][number];
   showProgress?: boolean;
+  onStop?: () => void;
 }) {
   const [currentTimestamp, setCurrentTimestamp] = useState(0);
   const finishedAt = useMemo(() => {
@@ -62,6 +64,7 @@ export function BatchEvaluationV2EvaluationSummary({
       borderColor="gray.200"
       overflowX="auto"
       overflowY="hidden"
+      flexShrink={0}
     >
       <HStack width="100%" paddingY={4} paddingX={6} gap={5}>
         {Object.entries(run.summary.evaluations).map(([_, evaluation]) => {
@@ -246,6 +249,18 @@ export function BatchEvaluationV2EvaluationSummary({
             }}
             size="lg"
           />
+          {onStop && (
+            <Button
+              colorPalette="red"
+              onClick={onStop}
+              minHeight="28px"
+              minWidth="0"
+              paddingY="6px"
+              marginLeft="8px"
+            >
+              <Box paddingX="6px">Stop</Box>
+            </Button>
+          )}
         </HStack>
       )}
     </VStack>

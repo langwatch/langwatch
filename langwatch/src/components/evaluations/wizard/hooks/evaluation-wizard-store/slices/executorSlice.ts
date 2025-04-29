@@ -5,7 +5,8 @@ import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore
 import type { CodeExecutionSlice } from "./codeExecutionSlice";
 import type { BaseNodeSlice } from "./baseNodeSlice";
 import type { LlmSignatureNodeSlice } from "./llmSignatureNodeSlice";
-const EXECUTOR_NODE_TYPES = ["signature", "code"] as string[];
+
+export const EXECUTOR_NODE_TYPES = ["signature", "code"] as string[];
 
 type NodeId = string;
 

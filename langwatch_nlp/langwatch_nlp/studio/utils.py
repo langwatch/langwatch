@@ -283,3 +283,11 @@ class SerializableWithPydanticAndPredictEncoder(json.JSONEncoder):
         if isinstance(o, BaseModel):
             return o.model_dump()
         return super().default(o)
+
+
+class SerializableWithStringFallback(SerializableWithPydanticAndPredictEncoder):
+    def default(self, o):
+        try:
+            return super().default(o)
+        except:
+            return str(o)

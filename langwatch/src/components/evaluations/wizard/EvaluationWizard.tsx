@@ -8,7 +8,7 @@ import {
   Spinner,
   VStack,
 } from "@chakra-ui/react";
-import { ReactFlowProvider } from "@xyflow/react";
+import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import { useRouter } from "next/router";
 import { memo, useEffect, useRef, useState } from "react";
 import {
@@ -37,7 +37,7 @@ import { EvaluationStep } from "./steps/EvaluationStep";
 import { ExecutionStep } from "./steps/ExecutionStep";
 import { ResultsStep } from "./steps/ResultsStep";
 import { TaskStep } from "./steps/TaskStep";
-import { WorkflowStoreProvider } from "./hooks/useWorkflowStoreProvider";
+import { WizardProvider } from "./hooks/useWizardContext";
 
 export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
   const router = useRouter();
@@ -99,10 +99,10 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
         padding={0}
       >
         <ReactFlowProvider>
-          <WorkflowStoreProvider useWorkflowStoreFromWizard={true}>
+          <WizardProvider isInsideWizard={true}>
             <WizardSidebar isLoading={isLoading} />
             <WizardWorkspace />
-          </WorkflowStoreProvider>
+          </WizardProvider>
         </ReactFlowProvider>
       </Dialog.Body>
     </Dialog.Content>
@@ -196,15 +196,18 @@ const WizardSidebar = memo(function WizardSidebar({
     !stepCompletedValue("all") || isAutosaving || !experimentId || !project;
   const saveAsMonitor = api.experiments.saveAsMonitor.useMutation();
   const router = useRouter();
+  const reactFlow = useReactFlow();
 
   // When state changes, update the view to show the tab user
   // should be paying attention to at the moment
   useEffect(() => {
     if (step === "execution" && executionMethod) {
       setWizardState({ workspaceTab: "workflow" });
+      reactFlow.fitView();
     }
     if (step === "evaluation" && evaluatorNode) {
       setWizardState({ workspaceTab: "workflow" });
+      reactFlow.fitView();
     }
     if (step === "dataset") {
       setWizardState({ workspaceTab: "dataset" });
