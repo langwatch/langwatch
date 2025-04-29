@@ -138,11 +138,13 @@ export const tracesRouter = createTRPCRouter({
         }
       )
     )
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
+      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
       return (
         await getEvaluationsMultiple({
           projectId: input.projectId,
           traceIds: [input.traceId],
+          protections,
         })
       )[input.traceId];
     }),
@@ -154,8 +156,13 @@ export const tracesRouter = createTRPCRouter({
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
-    .query(async ({ input }) => {
-      return getEvaluationsMultiple(input);
+    .query(async ({ input, ctx }) => {
+      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+      return getEvaluationsMultiple({
+        projectId: input.projectId,
+        traceIds: input.traceIds,
+        protections,
+      });
     }),
   getTopicCounts: protectedProcedure
     .input(tracesFilterInput)
@@ -863,29 +870,29 @@ const groupTraces = <T extends Trace>(
 export const getEvaluationsMultiple = async (input: {
   projectId: string;
   traceIds: string[];
+  protections: Protections;
 }) => {
-  const { projectId, traceIds } = input;
+  const { projectId, traceIds, protections } = input;
 
-  const client = await esClient({ projectId });
-  const checksResult = await client.search<ElasticSearchTrace>({
-    index: TRACE_INDEX.alias,
-    _source: ["trace_id", "evaluations"],
-    body: {
+  const traces = await searchTraces({
+    connConfig: { projectId },
+    search: {
+      index: TRACE_INDEX.alias,
       size: Math.min(traceIds.length * 100, 10_000), // Assuming a maximum of 100 checks per trace
+      _source: ["trace_id", "evaluations"],
       query: {
         bool: {
           filter: [
             { terms: { trace_id: traceIds } },
             { term: { project_id: projectId } },
-          ] as QueryDslBoolQuery["filter"],
-        } as QueryDslBoolQuery,
+          ],
+          should: void 0,
+          must_not: void 0,
+        },
       },
     },
+    protections,
   });
-
-  const traces = checksResult.hits.hits
-    .map((hit) => hit._source!)
-    .filter((x) => x);
 
   return Object.fromEntries(
     traces.map((trace) => [trace.trace_id, trace.evaluations ?? []])
