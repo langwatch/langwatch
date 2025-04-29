@@ -666,42 +666,6 @@ export const experimentsRouter = createTRPCRouter({
 
       // Perform the deletion in a transaction to ensure consistency
       await prisma.$transaction(async (tx) => {
-        // Delete experiment-related data in Elasticsearch
-        try {
-          const client = await esClient({ projectId: input.projectId });
-          await client.deleteByQuery({
-            index: BATCH_EVALUATION_INDEX.alias,
-            body: {
-              query: {
-                bool: {
-                  must: [
-                    { term: { experiment_id: input.experimentId } },
-                    { term: { project_id: input.projectId } },
-                  ] as QueryDslBoolQuery["must"],
-                } as QueryDslBoolQuery,
-              },
-            },
-          });
-
-          // Delete DSPy steps in ES if applicable
-          await client.deleteByQuery({
-            index: DSPY_STEPS_INDEX.alias,
-            body: {
-              query: {
-                bool: {
-                  must: [
-                    { term: { experiment_id: input.experimentId } },
-                    { term: { project_id: input.projectId } },
-                  ] as QueryDslBoolQuery["must"],
-                } as QueryDslBoolQuery,
-              },
-            },
-          });
-        } catch (error) {
-          console.error("Error deleting Elasticsearch data:", error);
-          // Continue with deletion even if ES deletion fails
-        }
-
         // Delete workflow versions if a workflow exists
         if (experiment.workflowId) {
           // First, update the workflow to null out the reference fields
@@ -713,6 +677,17 @@ export const experimentsRouter = createTRPCRouter({
             data: {
               currentVersionId: null,
               latestVersionId: null,
+            },
+          });
+
+          // Then we update all workflow versions to null out the parent field
+          await tx.workflowVersion.updateMany({
+            where: {
+              workflowId: experiment.workflowId,
+              projectId: input.projectId,
+            },
+            data: {
+              parentId: null,
             },
           });
 
@@ -755,6 +730,37 @@ export const experimentsRouter = createTRPCRouter({
           where: {
             id: input.experimentId,
             projectId: input.projectId,
+          },
+        });
+
+        // At last, delete experiment-related data in Elasticsearch
+        const client = await esClient({ projectId: input.projectId });
+        await client.deleteByQuery({
+          index: BATCH_EVALUATION_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { experiment_id: input.experimentId } },
+                  { term: { project_id: input.projectId } },
+                ] as QueryDslBoolQuery["must"],
+              } as QueryDslBoolQuery,
+            },
+          },
+        });
+
+        // And delete DSPy steps in ES if applicable
+        await client.deleteByQuery({
+          index: DSPY_STEPS_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { experiment_id: input.experimentId } },
+                  { term: { project_id: input.projectId } },
+                ] as QueryDslBoolQuery["must"],
+              } as QueryDslBoolQuery,
+            },
           },
         });
       });
