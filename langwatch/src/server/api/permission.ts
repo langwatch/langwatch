@@ -40,6 +40,7 @@ export const teamRolePermissionMapping = {
   WORKFLOWS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   TEAM_MEMBERS_MANAGE: [TeamUserRole.ADMIN],
   TEAM_CREATE_NEW_PROJECTS: [TeamUserRole.ADMIN],
+  PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY: [TeamUserRole.ADMIN],
 };
 
 export const organizationRolePermissionMapping = {
