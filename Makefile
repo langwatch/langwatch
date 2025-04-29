@@ -17,9 +17,6 @@ start/postgres:
 	@echo "Starting Postgres..."
 	@docker compose up -d postgres
 
-print/openApiSpec:
-	cd langwatch && npx tsx src/tasks/generateOpenAPISpec.ts
-
 tsc-watch:
 	cd langwatch && npm run tsc-watch
 	

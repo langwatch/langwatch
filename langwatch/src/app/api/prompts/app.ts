@@ -3,12 +3,10 @@ import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
-
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
-
-import { prisma } from "../../../server/db";
-import { LlmConfigRepository } from "../../../server/prompt-config/repositories/llm-config.repository";
-import { patchZodOpenapi } from "../../../utils/extend-zod-openapi";
+import { prisma } from "~/server/db";
+import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
+import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 
 patchZodOpenapi();
 

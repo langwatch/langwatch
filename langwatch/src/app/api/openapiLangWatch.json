@@ -840,7 +840,7 @@
         "responses": {},
         "operationId": "postApiPrompts",
         "parameters": [],
-        "description": "Create a new prompt",
+        "description": "Create a new prompt with default initial version",
         "requestBody": {
           "content": {
             "application/json": {
@@ -984,8 +984,9 @@
                     "type": "object",
                     "properties": {
                       "version": {
-                        "type": "string",
-                        "const": "1.0"
+                        "type": "number",
+                        "const": "1.0",
+                        "minimum": 1
                       },
                       "prompt": {
                         "type": "string",
@@ -1006,7 +1007,14 @@
                             },
                             "type": {
                               "type": "string",
-                              "minLength": 1
+                              "minLength": 1,
+                              "enum": [
+                                "str",
+                                "float",
+                                "bool",
+                                "image",
+                                "list[str]"
+                              ]
                             }
                           },
                           "required": [
@@ -1027,7 +1035,12 @@
                             },
                             "type": {
                               "type": "string",
-                              "minLength": 1
+                              "minLength": 1,
+                              "enum": [
+                                "str",
+                                "float",
+                                "bool"
+                              ]
                             }
                           },
                           "required": [
@@ -1051,10 +1064,28 @@
                                 },
                                 "type": {
                                   "type": "string",
+                                  "minLength": 1,
+                                  "enum": [
+                                    "string",
+                                    "boolean",
+                                    "number",
+                                    "date",
+                                    "list",
+                                    "json",
+                                    "spans",
+                                    "rag_contexts",
+                                    "chat_messages",
+                                    "annotations",
+                                    "evaluations"
+                                  ]
+                                },
+                                "id": {
+                                  "type": "string",
                                   "minLength": 1
                                 }
                               },
                               "required": [
+                                "id",
                                 "name",
                                 "type"
                               ]
@@ -1064,7 +1095,25 @@
                             "type": "array",
                             "items": {
                               "type": "object",
-                              "additionalProperties": {}
+                              "additionalProperties": {},
+                              "allOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "id"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "additionalProperties": {}
+                                }
+                              ]
                             },
                             "default": []
                           }
@@ -1072,24 +1121,32 @@
                         "required": [
                           "columns"
                         ]
+                      },
+                      "temperature": {
+                        "type": "number"
+                      },
+                      "max_tokens": {
+                        "type": "number"
                       }
                     },
                     "required": [
-                      "version",
                       "prompt",
-                      "model",
                       "inputs",
                       "outputs",
+                      "model",
                       "demonstrations"
                     ]
+                  },
+                  "version": {
+                    "type": "number"
                   }
                 },
                 "required": [
-                  "authorId",
                   "projectId",
                   "configId",
                   "schemaVersion",
                   "commitMessage",
+                  "version",
                   "configData"
                 ]
               }

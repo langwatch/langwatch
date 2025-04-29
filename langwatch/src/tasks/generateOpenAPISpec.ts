@@ -26,8 +26,12 @@ const langwatchSpec = {
  * original file.
  */
 export default async function execute() {
+  console.log("Generating OpenAPI spec...");
+  console.log("Building dataset spec...");
   const datasetSpec = await generateSpecs(datasetApp);
+  console.log("Building llm configs spec...");
   const llmConfigsSpec = await generateSpecs(llmConfigsApp);
+  console.log("Merging specs...");
   const mergedSpec = deepmerge.all(
     // Merges this way ==>
     [currentSpec, datasetSpec, llmConfigsSpec, langwatchSpec],
