@@ -572,30 +572,33 @@ export const getAllTracesForProject = async ({
   );
 
   if (input.groupBy === "thread_id") {
-    const threadIds = traces.map((t) => t.metadata.thread_id);
-    const existingTraceIds = new Set(threadIds);
-    const tracesFromThreadId = await searchTraces({
-      connConfig: { projectId: input.projectId },
-      search: {
-        size: 100,
-        query: {
-          bool: {
-            filter: [
-              { terms: { "metadata.thread_id": threadIds } },
-              { term: { project_id: input.projectId } },
-            ],
-            should: void 0,
-            must_not: void 0,
+    const threadIds = traces.map((t) => t.metadata.thread_id).filter(Boolean);
+    const existingTraceIds = new Set(traces.map((t) => t.trace_id));
+
+    if (threadIds.length > 0) {
+      const tracesFromThreadId = await searchTraces({
+        connConfig: { projectId: input.projectId },
+        search: {
+          size: 100,
+          query: {
+            bool: {
+              filter: [
+                { terms: { "metadata.thread_id": threadIds } },
+                { term: { project_id: input.projectId } },
+              ],
+              should: void 0,
+              must_not: void 0,
+            },
           },
         },
-      },
-      protections,
-    });
-    const filteredTracesByThreadId = tracesFromThreadId.filter(
-      (trace) => !existingTraceIds.has(trace.trace_id)
-    );
+        protections,
+      });
+      const filteredTracesByThreadId = tracesFromThreadId.filter(
+        (trace) => !existingTraceIds.has(trace.trace_id)
+      );
 
-    traces.unshift(...filteredTracesByThreadId);
+      traces.unshift(...filteredTracesByThreadId);
+    }
   }
 
   const tracesWithGuardrails = traces.map<TraceWithGuardrail>((trace) => {
