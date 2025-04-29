@@ -64,6 +64,7 @@ export function BatchEvaluationV2EvaluationSummary({
       borderColor="gray.200"
       overflowX="auto"
       overflowY="hidden"
+      flexShrink={0}
     >
       <HStack width="100%" paddingY={4} paddingX={6} gap={5}>
         {Object.entries(run.summary.evaluations).map(([_, evaluation]) => {
