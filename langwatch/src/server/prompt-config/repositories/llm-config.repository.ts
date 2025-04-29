@@ -60,7 +60,7 @@ export class LlmConfigRepository {
     return configs
       .map((config) => {
         try {
-          if (!config.versions[0]) {
+          if (!config.versions?.[0]) {
             throw new TRPCError({
               code: "NOT_FOUND",
               message: `Prompt config ${config.id} has no versions.`,
@@ -76,7 +76,7 @@ export class LlmConfigRepository {
           return null;
         }
       })
-      .filter((config) => config !== null);
+      .filter((config) => config !== null) as LlmConfigWithLatestVersion[];
   }
 
   /**
