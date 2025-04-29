@@ -63,6 +63,7 @@ export const workflowRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       return ctx.prisma.workflow.findMany({
         where: { projectId: input.projectId, archivedAt: null },
+        orderBy: { updatedAt: "desc" },
       });
     }),
 
