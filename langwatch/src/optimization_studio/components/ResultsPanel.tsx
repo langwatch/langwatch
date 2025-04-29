@@ -44,6 +44,7 @@ import type { Field, Signature, Workflow } from "../types/dsl";
 import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
 import { OptimizationProgressBar } from "./ProgressToast";
 import { slugify } from "../../utils/slugify";
+import { useRunEvalution } from "../hooks/useRunEvalution";
 
 export function ResultsPanel({
   isCollapsed,
@@ -183,7 +184,7 @@ export function EvaluationResults({
     setSelectedRunId(evaluationState?.run_id);
   }, [evaluationState?.run_id]);
 
-  const { stopEvaluationExecution } = useEvaluationExecution();
+  const { stopEvaluation } = useRunEvalution();
 
   const {
     selectedRun,
@@ -262,7 +263,7 @@ export function EvaluationResults({
               evaluationState?.status === "running"
             }
             onStop={() =>
-              stopEvaluationExecution({
+              stopEvaluation({
                 run_id: evaluationStateRunId ?? "",
               })
             }

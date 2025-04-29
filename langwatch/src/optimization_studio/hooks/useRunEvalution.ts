@@ -1,6 +1,6 @@
 import { toaster } from "../../components/ui/toaster";
 import type { StudioClientEvent } from "../types/events";
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { nanoid } from "nanoid";
 import { usePostEvent } from "./usePostEvent";
 import { useShallow } from "zustand/react/shallow";
@@ -47,6 +47,38 @@ export const useRunEvalution = () => {
     api.workflow.generateCommitMessage.useMutation();
 
   const trpc = api.useContext();
+
+  const [triggerTimeout, setTriggerTimeout] = useState<{
+    run_id: string;
+    timeout_on_status: "waiting" | "running";
+  } | null>(null);
+
+  useEffect(() => {
+    const workflow = getWorkflow();
+    if (
+      triggerTimeout &&
+      workflow.state.evaluation?.run_id === triggerTimeout.run_id &&
+      workflow.state.evaluation?.status === triggerTimeout.timeout_on_status
+    ) {
+      setEvaluationState({
+        status: "error",
+        error: "Timeout",
+        timestamps: { finished_at: Date.now() },
+      });
+      toaster.create({
+        title: `Timeout ${
+          triggerTimeout.timeout_on_status === "waiting"
+            ? "starting"
+            : "stopping"
+        } evaluation execution`,
+        type: "error",
+        duration: 5000,
+        meta: {
+          closable: true,
+        },
+      });
+    }
+  }, [triggerTimeout, setEvaluationState, getWorkflow]);
 
   const runEvaluation = useCallback(
     async ({
@@ -169,8 +201,37 @@ export const useRunEvalution = () => {
     ]
   );
 
+  const stopEvaluation = useCallback(
+    ({ run_id }: { run_id: string }) => {
+      const workflow = getWorkflow();
+      const current_state = workflow.state.evaluation?.status;
+      if (current_state === "waiting") {
+        setEvaluationState({
+          status: "idle",
+          run_id: undefined,
+        });
+        return;
+      }
+
+      const payload: StudioClientEvent = {
+        type: "stop_evaluation_execution",
+        payload: { workflow: workflow, run_id },
+      };
+      postEvent(payload);
+
+      setTimeout(() => {
+        setTriggerTimeout({
+          run_id,
+          timeout_on_status: "running",
+        });
+      }, 10_000);
+    },
+    [setEvaluationState]
+  );
+
   return {
     runEvaluation,
+    stopEvaluation,
     isLoading:
       isLoading || generateCommitMessage.isLoading || commitVersion.isLoading,
   };
