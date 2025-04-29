@@ -14,10 +14,10 @@ const DEFAULT_SIGNATURE_NODE_PROPERTIES = (
   model: string
 ): LlmSignatureNode => ({
   type: "signature",
-  id: "signature_node",
+  id: "llm_node",
   deletable: false,
   data: {
-    name: "LLM Signature",
+    name: "LLM Node",
     description: "LLM calling node",
     parameters: [
       {

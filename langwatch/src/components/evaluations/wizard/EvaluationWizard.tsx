@@ -79,7 +79,7 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
           <Dialog.Header
             background="white"
             paddingLeft={2}
-            paddingY={3}
+            paddingY={0}
             display="flex"
           >
             <HStack
@@ -97,6 +97,7 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
                   void router.push(`/${project?.slug}/evaluations`)
                 }
                 cursor="pointer"
+                paddingY={3}
               >
                 <LogoIcon width={24} height={24} />
               </Box>
@@ -243,11 +244,12 @@ const WizardSidebar = memo(function WizardSidebar({
   useEffect(() => {
     if (step === "execution" && executionMethod) {
       setWizardState({ workspaceTab: "workflow" });
-      reactFlow.fitView();
     }
     if (step === "evaluation" && evaluatorNode) {
       setWizardState({ workspaceTab: "workflow" });
-      reactFlow.fitView();
+      setTimeout(() => {
+        reactFlow.fitView();
+      }, 100);
     }
     if (step === "dataset") {
       setWizardState({ workspaceTab: "dataset" });

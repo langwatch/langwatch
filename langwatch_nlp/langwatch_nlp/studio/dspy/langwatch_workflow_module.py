@@ -110,9 +110,6 @@ class LangWatchWorkflowModule(ReportingModule):
                 return self.__forward_before_prevent_crashes__(*args, **kwargs)
             except Exception as e:
                 return PredictionWithEvaluationAndMetadata(
-                    status="error",
-                    details=str(e),
-                    inputs=kwargs,
                     duration=self.duration,
                     cost=self.cost,
                     error=e,

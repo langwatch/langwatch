@@ -194,8 +194,9 @@ class EvaluationReporting:
         }
         if error:
             predicted["error"] = str(error)
-        if "end" in node_results:
-            predicted["predicted"] = node_results["end"]
+        if "evaluations" in node_results:
+            del node_results["evaluations"]
+        predicted["predicted"] = node_results
 
         self.batch["dataset"].append(predicted)
 
@@ -210,7 +211,6 @@ class EvaluationReporting:
                 "status": result.status,
                 "index": example._index,
                 "duration": result.duration,
-                "inputs": result.inputs,
             }
 
             if result.status == "processed":

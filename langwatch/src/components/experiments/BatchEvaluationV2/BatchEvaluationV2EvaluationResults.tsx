@@ -72,11 +72,39 @@ export const useBatchEvaluationResults = ({
     )
   );
 
-  const predictedColumns = new Set(
-    Object.values(datasetByIndex ?? {}).flatMap((item) =>
-      Object.keys(item.predicted ?? {})
-    )
+  // Retrocompatibility with old evaluations
+  const isItJustEndNode = !Object.values(datasetByIndex ?? {}).every(
+    (value) => typeof value === "object" && !Array.isArray(value)
   );
+  let entriesPredictions = Object.values(datasetByIndex ?? {})
+    .map((value) => value.predicted!)
+    .filter(Boolean);
+  if (isItJustEndNode) {
+    entriesPredictions = entriesPredictions.map((value) => ({
+      end: value,
+    }));
+  }
+
+  let predictedColumns: Record<string, Set<string>> = {};
+  for (const entry of entriesPredictions) {
+    for (const [node, value] of Object.entries(entry)) {
+      for (const key of Object.keys(value)) {
+        if (!predictedColumns[node]) {
+          predictedColumns[node] = new Set();
+        }
+        predictedColumns[node].add(key);
+      }
+    }
+  }
+
+  const hasErrors = Object.values(datasetByIndex ?? {}).some(
+    (value) => value.error
+  );
+  if (Object.keys(predictedColumns).length === 0 && hasErrors) {
+    predictedColumns = {
+      "": new Set(["error"]),
+    };
+  }
 
   let resultsByEvaluator = run.data?.evaluations.reduce(
     (acc, evaluation) => {
@@ -170,8 +198,13 @@ export const useBatchEvaluationDownloadCSV = ({
 
     const csvHeaders = [
       ...Array.from(tableData.headers.datasetColumns),
-      ...Array.from(tableData.headers.predictedColumns).map((c) =>
-        tableData.headers.datasetColumns.has(c) ? `predicted_${c}` : c
+      ...Object.entries(tableData.headers.predictedColumns).flatMap(
+        ([node, columns]) =>
+          Array.from(columns).map((c) =>
+            tableData.headers.datasetColumns.has(c)
+              ? `${node}.${c}`
+              : `${node}.${c}`
+          )
       ),
       tableData.headers.cost,
       tableData.headers.duration,
