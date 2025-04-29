@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { app } from "./app";
+import { app } from "./[[...route]]/app";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 import { nanoid } from "nanoid";
