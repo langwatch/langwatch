@@ -2,8 +2,8 @@ import { Client as ElasticClient } from "@elastic/elasticsearch";
 import { Client as OpenSearchClient } from "@opensearch-project/opensearch";
 
 import { env } from "../env.mjs";
-import { patchForOpensearchCompatibility } from "./elasticsearch/opensearchCompatibility";
-import { patchForQuickwitCompatibility } from "./elasticsearch/quickwitCompatibility";
+import { patchForOpensearchCompatibility } from "./elasticsearch/patchOpensearchCompatibility";
+import { patchForQuickwitCompatibility } from "./elasticsearch/patchQuickwitCompatibility";
 
 import { prisma } from "./db";
 import { decrypt } from "../utils/encryption";
