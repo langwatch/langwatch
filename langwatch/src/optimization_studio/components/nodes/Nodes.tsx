@@ -45,6 +45,7 @@ import {
 import { checkIsEvaluator } from "../../utils/nodeUtils";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import { LLMModelDisplay } from "../../../components/llmPromptConfigs/LLMModelDisplay";
+import { useWizardContext } from "../../../components/evaluations/wizard/hooks/useWizardContext";
 
 export function getNodeDisplayName(node: { id: string; data: Component }) {
   return node.data.name ?? node.data.cls ?? node.id;
@@ -255,6 +256,8 @@ export const ComponentNode = forwardRef(function ComponentNode(
   const llmParams =
     props.data.parameters?.filter((p) => p.type === "llm") ?? [];
 
+  const { isInsideWizard } = useWizardContext();
+
   return (
     <VStack
       className="js-component-node"
@@ -284,7 +287,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
         }
       }}
     >
-      {props.selected && !["entry", "end"].includes(props.type) && (
+      {props.selected && !["entry", "end"].includes(props.type) && !isInsideWizard && (
         <Menu.Root positioning={{ placement: "top-start" }}>
           <Menu.Trigger asChild>
             <Button
@@ -332,7 +335,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
           {getNodeDisplayName(props)}
         </Text>
         <Spacer />
-        {node && isExecutableComponent(node) ? (
+        {node && isExecutableComponent(node) && !isInsideWizard ? (
           <ComponentExecutionButton
             node={node}
             marginRight="-6px"

@@ -23,7 +23,7 @@ import type {
 } from "../types/dsl";
 import { hasDSLChanged } from "../utils/dslUtils";
 import React from "react";
-import { WorkflowStoreContext } from "../../components/evaluations/wizard/hooks/useWorkflowStoreProvider";
+import { WizardContext } from "../../components/evaluations/wizard/hooks/useWizardContext";
 import { useEvaluationWizardStore } from "../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useShallow } from "zustand/react/shallow";
 import { findLowestAvailableName } from "../utils/nodeUtils";
@@ -588,12 +588,12 @@ type UseWorkflowStoreType = typeof _useWorkflowStore;
 export const useWorkflowStore = ((
   ...args: Parameters<UseWorkflowStoreType>
 ) => {
-  const { useWorkflowStoreFromWizard } = React.useContext(WorkflowStoreContext);
+  const { isInsideWizard } = React.useContext(WizardContext);
 
   const selector = args[0] ?? ((state) => state);
   const equalityFn = args[1];
 
-  if (useWorkflowStoreFromWizard) {
+  if (isInsideWizard) {
     return useEvaluationWizardStore(
       useShallow(({ workflowStore }) => {
         return selector(workflowStore);
