@@ -2,13 +2,12 @@ import { z } from "zod";
 
 import {
   type AggregationsAggregate,
-  type AggregationsBucketAggregationBase,
   type QueryDslBoolQuery,
   type SearchResponse,
   type SearchTotalHits,
   type Sort,
 } from "@elastic/elasticsearch/lib/api/types";
-import { ProjectSensitiveDataVisibilityLevel, PublicShareResourceTypes, TeamUserRole, type PrismaClient } from "@prisma/client";
+import { PublicShareResourceTypes, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import shuffle from "lodash/shuffle";
 import type { Session } from "next-auth";
@@ -25,7 +24,7 @@ import type { Protections } from "../../elasticsearch/protections";
 
 import { getAnnotatedTraceIds } from "~/server/filters/annotations";
 import { sharedFiltersInputSchema } from "../../analytics/types";
-import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
+import { TRACE_INDEX, esClient } from "../../elasticsearch";
 import {
   type ElasticSearchSpan,
   type ElasticSearchTrace,
@@ -35,13 +34,13 @@ import {
 } from "../../tracer/types";
 import {
   TeamRoleGroup,
-  backendHasTeamProjectPermission,
   checkPermissionOrPubliclyShared,
   checkUserPermissionForProject,
 } from "../permission";
 import { generateTracesPivotQueryConditions } from "./analytics/common";
 import { aggregateTraces, getTraceById, getTracesGroupedByThreadId, searchTraces } from "~/server/elasticsearch/traces";
 import { getUserProtectionsForProject } from "../utils";
+import { transformElasticSearchTraceToTrace } from "~/server/elasticsearch/transformers";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
@@ -258,10 +257,11 @@ export const tracesRouter = createTRPCRouter({
   getTracesWithSpans: protectedProcedure
     .input(z.object({ projectId: z.string(), traceIds: z.array(z.string()) }))
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const { projectId, traceIds } = input;
+      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
 
-      return getTracesWithSpans(projectId, traceIds);
+      return getTracesWithSpans(projectId, traceIds, protections);
     }),
 
   getSampleTracesDataset: protectedProcedure
@@ -291,7 +291,8 @@ export const tracesRouter = createTRPCRouter({
       }
 
       const { projectId } = input;
-      const traceWithSpans = await getTracesWithSpans(projectId, traceIds);
+      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+      const traceWithSpans = await getTracesWithSpans(projectId, traceIds, protections);
 
       return traceWithSpans;
     }),
@@ -329,7 +330,8 @@ export const tracesRouter = createTRPCRouter({
       const { projectId, evaluatorType, preconditions, expectedResults } =
         input;
 
-      const traceWithSpans = await getTracesWithSpans(projectId, traceIds);
+      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+      const traceWithSpans = await getTracesWithSpans(projectId, traceIds, protections);
 
       const passedPreconditions = traceWithSpans.filter(
         (trace) =>
@@ -394,7 +396,7 @@ export const getAllTracesForProject = async ({
   scrollId = undefined,
 }: {
   input: z.infer<typeof getAllForProjectInput>;
-  ctx?: { prisma: PrismaClient; session: Session };
+  ctx?: { prisma: PrismaClient; session: Session, publiclyShared?: boolean };
   downloadMode?: boolean;
   includeContexts?: boolean;
   scrollId?: string;
@@ -437,19 +439,21 @@ export const getAllTracesForProject = async ({
   const pageOffset = input.pageOffset ? input.pageOffset : 0;
 
   let totalHits = 0;
-
   if (input.updatedAt !== undefined && input.updatedAt >= 0) {
     pageSize = 10_000;
   }
 
-  let canSeeCosts = true;
+  let protections: Protections = {
+    canSeeCapturedInput: true,
+    canSeeCapturedOutput: true,
+    canSeeCosts: true,
+  };
   if (ctx?.prisma) {
-    canSeeCosts =
-      (await backendHasTeamProjectPermission(
-        ctx,
-        input,
-        TeamRoleGroup.COST_VIEW
-      )) ?? false;
+    protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+  }
+  if (downloadMode) {
+    protections.canSeeCapturedInput = false;
+    protections.canSeeCapturedOutput = false;
   }
 
   let tracesResult: SearchResponse<ElasticSearchTrace>;
@@ -473,8 +477,7 @@ export const getAllTracesForProject = async ({
           "input.embeddings.embeddings",
           "output.embeddings",
           "output.embeddings.embeddings",
-          ...(canSeeCosts ? [] : ["metrics.total_cost"]),
-          ...(downloadMode ? ["spans"] : ["spans.input.value", "spans.error"]),
+          ...(downloadMode ? ["spans"] : []),
         ],
       },
       ...(downloadMode && includeContexts
@@ -552,6 +555,10 @@ export const getAllTracesForProject = async ({
     });
   }
 
+  const traces = tracesResult.hits.hits.map((hit) => hit._source!).map(
+    t => transformElasticSearchTraceToTrace(t, protections)
+  );
+
   const guardrailsSlugToName = Object.fromEntries(
     (
       await prisma.monitor.findMany({
@@ -566,100 +573,83 @@ export const getAllTracesForProject = async ({
     ).map((guardrail) => [guardrail.slug, guardrail.name])
   );
 
-  let messagesFromThreadIds:
-    | SearchResponse<ElasticSearchTrace, Record<string, AggregationsAggregate>>
-    | undefined = undefined;
   if (input.groupBy === "thread_id") {
-    const threadIds = tracesResult.hits.hits
-      .map((hit) => hit._source?.metadata?.thread_id)
-      .filter((x) => x);
-    const existingTraceIds = new Set(
-      tracesResult.hits.hits
-        .map((hit) => hit._source?.trace_id)
-        .filter((x) => x)
-    );
-
-    const client = await esClient({ projectId: input.projectId });
-    messagesFromThreadIds = await client.search<ElasticSearchTrace>({
-      index: TRACE_INDEX.alias,
-      body: {
+    const threadIds = traces.map((t) => t.metadata.thread_id);
+    const existingTraceIds = new Set(threadIds);
+    const tracesFromThreadId = await searchTraces({
+      connConfig: { projectId: input.projectId },
+      search: {
+        size: 100,
         query: {
           bool: {
             filter: [
               { terms: { "metadata.thread_id": threadIds } },
               { term: { project_id: input.projectId } },
-            ] as QueryDslBoolQuery["filter"],
-          } as QueryDslBoolQuery,
+            ],
+            should: void 0,
+            must_not: void 0,
+          },
         },
       },
-      size: 100,
+      protections,
     });
-    messagesFromThreadIds.hits.hits = messagesFromThreadIds.hits.hits.filter(
-      (hit) => !existingTraceIds.has(hit._source?.trace_id ?? "")
+    const filteredTracesByThreadId = tracesFromThreadId.filter(
+      (trace) => !existingTraceIds.has(trace.trace_id)
     );
+
+    traces.unshift(...filteredTracesByThreadId);
   }
+ 
+  traces.map((trace) => {
+    const spans = trace.spans;
+    const lastSpans = spans.reverse();
+    const lastNonGuardrailSpanIndex =
+      lastSpans?.findIndex((span) => span.type !== "guardrail") ?? -1;
+    const lastGuardrailSpans =
+      lastNonGuardrailSpanIndex > -1
+        ? lastSpans?.slice(0, lastNonGuardrailSpanIndex)
+        : lastSpans;
 
-  const traces = [
-    ...(messagesFromThreadIds?.hits.hits ?? []),
-    ...tracesResult.hits.hits,
-  ]
-    .filter((x) => x._source)
-    .map((hit) => {
-      const trace = hit._source!;
-      const spans =
-        (hit.fields?.context_spans as ElasticSearchSpan[] | undefined) ??
-        trace.spans;
+    const lastFailedGuardrailResult:
+      | (EvaluationResult & { name?: string })
+      | undefined = lastGuardrailSpans?.flatMap((span) =>
+      (span?.output ? [span.output] : [])
+        .filter((output) => output.type === "guardrail_result")
+        .map((output) => {
+          let value = (output.value as unknown as EvaluationResult) || {};
+          if (typeof value === "string") {
+            try {
+              value = JSON.parse(value);
+            } catch {}
+          }
+          return {
+            ...value,
+            name: guardrailsSlugToName[span.name ?? ""],
+          };
+        })
+        .filter((output) => !(output as EvaluationResult)?.passed)
+    )[0];
 
-      const lastSpans = spans?.reverse();
-      const lastNonGuardrailSpanIndex =
-        lastSpans?.findIndex((span) => span.type !== "guardrail") ?? -1;
-      const lastGuardrailSpans =
-        lastNonGuardrailSpanIndex > -1
-          ? lastSpans?.slice(0, lastNonGuardrailSpanIndex)
-          : lastSpans;
-
-      const lastFailedGuardrailResult:
-        | (EvaluationResult & { name?: string })
-        | undefined = lastGuardrailSpans?.flatMap((span) =>
-        (span?.output ? [span.output] : [])
-          .filter((output) => output.type === "guardrail_result")
-          .map((output) => {
-            let value = (output.value as unknown as EvaluationResult) || {};
-            if (typeof value === "string") {
-              try {
-                value = JSON.parse(value);
-              } catch {}
-            }
-            return {
-              ...value,
-              name: guardrailsSlugToName[span.name ?? ""],
-            };
-          })
-          .filter((output) => !(output as EvaluationResult)?.passed)
-      )[0];
-
-      let contexts: RAGChunk[] = [];
-      for (const span of spans ?? []) {
-        if ("contexts" in span && Array.isArray(span.contexts)) {
-          contexts = [...contexts, ...span.contexts];
-        }
+    let contexts: RAGChunk[] = [];
+    for (const span of spans ?? []) {
+      if ("contexts" in span && Array.isArray(span.contexts)) {
+        contexts = [...contexts, ...span.contexts];
       }
+    }
 
-      return {
-        ...elasticSearchTraceToTrace(trace),
-        lastGuardrail: lastFailedGuardrailResult,
-        contexts,
-      };
-    });
+    return {
+      ...trace,
+      lastGuardrail: lastFailedGuardrailResult,
+      contexts,
+    };
+  });
 
   const groups = groupTraces(input.groupBy, traces);
 
   totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
 
   const evaluations = Object.fromEntries(
-    tracesResult.hits.hits
-      .map((hit) => hit._source!)
-      .filter((x) => x)
+    traces
       .map((trace) => [trace.trace_id, trace.evaluations ?? []])
   );
 
@@ -673,19 +663,23 @@ export const getAllTracesForProject = async ({
 
 export const getTracesWithSpans = async (
   projectId: string,
-  traceIds: string[]
+  traceIds: string[],
+  protections: Protections
 ) => {
-  const client = await esClient({ projectId });
-  const tracesResult = await client.search<ElasticSearchTrace>({
-    index: TRACE_INDEX.alias,
-    body: {
+  const traces = await searchTraces({
+    connConfig: { projectId },
+    protections,
+    search: {
+      index: TRACE_INDEX.alias,
+      size: 1000,
       query: {
-        //@ts-ignore
         bool: {
           filter: [
             { term: { project_id: projectId } },
             { terms: { trace_id: traceIds } },
           ],
+          should: void 0,
+          must_not: void 0,
         },
       },
       sort: [
@@ -695,7 +689,6 @@ export const getTracesWithSpans = async (
           },
         },
       ],
-      size: 1000,
       // Remove embeddings to reduce payload size
       _source: {
         excludes: [
@@ -707,17 +700,6 @@ export const getTracesWithSpans = async (
       },
     },
   });
-
-  const traces = tracesResult.hits.hits
-    .map((hit) => hit._source!)
-    .filter((x) => x)
-    .map((trace) => {
-      const spans = trace.spans ?? [];
-      return {
-        ...elasticSearchTraceToTrace(trace),
-        spans: spans.map(elasticSearchSpanToSpan),
-      };
-    });
 
   return traces;
 };
@@ -807,94 +789,4 @@ export const getEvaluationsMultiple = async (input: {
   return Object.fromEntries(
     traces.map((trace) => [trace.trace_id, trace.evaluations ?? []])
   );
-};
-
-export const getTraceById = async ({
-  projectId,
-  traceId,
-  canSeeCosts,
-}: {
-  projectId: string;
-  traceId: string;
-  canSeeCosts?: boolean | undefined | null;
-}) => {
-  const client = await esClient({ projectId });
-  const result = await client.search<ElasticSearchTrace>({
-    index: TRACE_INDEX.alias,
-    size: 1,
-    _source: {
-      // TODO: do we really need to exclude both keys and nested keys for embeddings?
-      excludes: [
-        "input.embeddings",
-        "input.embeddings.embeddings",
-        "output.embeddings",
-        "output.embeddings.embeddings",
-        ...(canSeeCosts ? [] : ["metrics.total_cost"]),
-        "spans",
-        "evaluations",
-      ],
-    },
-    body: {
-      query: {
-        //@ts-ignore
-        bool: {
-          filter: [
-            { term: { trace_id: traceId } },
-            { term: { project_id: projectId } },
-          ],
-        } as QueryDslBoolQuery,
-      },
-    },
-  });
-
-  const trace = result.hits.hits[0]?._source;
-  return trace ? elasticSearchTraceToTrace(trace) : undefined;
-};
-
-export const getTracesByThreadId = async ({
-  projectId,
-  threadId,
-}: {
-  projectId: string;
-  threadId: string;
-}) => {
-  const client = await esClient({ projectId });
-  const tracesResult = await client.search<ElasticSearchTrace>({
-    index: TRACE_INDEX.alias,
-    body: {
-      query: {
-        //@ts-ignore
-        bool: {
-          filter: [
-            { term: { project_id: projectId } },
-            { term: { "metadata.thread_id": threadId } },
-          ],
-        },
-      },
-      sort: [
-        {
-          "timestamps.started_at": {
-            order: "asc",
-          },
-        },
-      ],
-      // Remove embeddings to reduce payload size
-      _source: {
-        excludes: [
-          "input.embeddings",
-          "input.embeddings.embeddings",
-          "output.embeddings",
-          "output.embeddings.embeddings",
-        ],
-      },
-      size: 1000,
-    },
-  });
-
-  const traces = tracesResult.hits.hits
-    .map((hit) => hit._source!)
-    .filter((x) => x)
-    .map(elasticSearchTraceToTrace);
-
-  return traces;
 };
