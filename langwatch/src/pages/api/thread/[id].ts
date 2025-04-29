@@ -1,7 +1,8 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "~/server/db";
 
-import { getTracesByThreadId } from "~/server/api/routers/traces";
+import { getProtectionsForProject } from "~/server/api/utils";
+import { getTracesGroupedByThreadId } from "~/server/elasticsearch/traces";
 
 export default async function handler(
   req: NextApiRequest,
@@ -27,10 +28,11 @@ export default async function handler(
   }
 
   const threadId = req.query.id as string;
-
-  const traces = await getTracesByThreadId({
-    projectId: project?.id,
+  const protections = await getProtectionsForProject(prisma, { projectId: project?.id });
+  const traces = await getTracesGroupedByThreadId({
+    connConfig: { projectId: project?.id },
     threadId,
+    protections,
   });
 
   return res.status(200).json({ traces });
