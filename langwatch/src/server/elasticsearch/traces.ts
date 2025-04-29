@@ -158,3 +158,58 @@ export const getTraceById = async ({
 
   return traces[0];
 };
+
+interface GetTracesGroupedByThreadIdOptions {
+  connConfig: ProjectConnectionConfig;
+  threadId: string;
+  protections: Protections;
+
+  includeEvaluations?: boolean;
+  includeSpans?: boolean;
+}
+
+export const getTracesGroupedByThreadId = async ({
+  connConfig,
+  threadId,
+  protections,
+  includeEvaluations = false,
+  includeSpans = false,
+}: GetTracesGroupedByThreadIdOptions): Promise<Trace[]> => {
+  const traces = await searchTraces({
+    connConfig,
+    search: {
+      size: 1000,
+      _source: {
+        // TODO: do we really need to exclude both keys and nested keys for embeddings?
+        excludes: [
+          "input.embeddings",
+          "input.embeddings.embeddings",
+          "output.embeddings",
+          "output.embeddings.embeddings",
+          ...(includeEvaluations ? [] : ["evaluations"]),
+          ...(includeSpans ? [] : ["spans"]),
+        ],
+      },
+      query: {
+        bool: {
+          filter: [
+            { term: { project_id: connConfig.projectId } },
+            { term: { "metadata.thread_id": threadId } },
+          ],
+          should: void 0,
+          must_not: void 0,
+        },
+      },
+      sort: [
+        {
+          "timestamps.started_at": {
+            order: "asc",
+          },
+        },
+      ],
+    },
+    protections,
+  });
+
+  return traces;
+};
