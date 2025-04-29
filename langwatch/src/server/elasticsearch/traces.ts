@@ -7,6 +7,8 @@ import {
 import { TRACE_INDEX, esClient } from "../elasticsearch";
 import type { Protections } from "./protections";
 import { transformElasticSearchTraceToTrace } from "./transformers";
+import type { AggregationsAggregate, AggregationsAggregationContainer, QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
+
 interface ProjectConnectionConfig {
   projectId: string;
 }
@@ -108,3 +110,51 @@ export async function aggregateTraces<T extends Record<string, T.AggregationsAgg
   return out;
 }
 
+interface GetTraceByIdOptions {
+  connConfig: ProjectConnectionConfig;
+  traceId: string;
+  protections: Protections;
+
+  includeEvaluations?: boolean;
+  includeSpans?: boolean;
+}
+
+export const getTraceById = async ({
+  connConfig,
+  traceId,
+  protections,
+  includeEvaluations = false,
+  includeSpans = false,
+}: GetTraceByIdOptions): Promise<Trace | undefined> => {
+  const traces = await searchTraces({
+    connConfig,
+    search: {
+      index: TRACE_INDEX.alias,
+      size: 1,
+      _source: {
+        // TODO: do we really need to exclude both keys and nested keys for embeddings?
+        excludes: [
+          "input.embeddings",
+          "input.embeddings.embeddings",
+          "output.embeddings",
+          "output.embeddings.embeddings",
+          ...(includeEvaluations ? [] : ["evaluations"]),
+          ...(includeSpans ? [] : ["spans"]),
+        ],
+      },
+      query: {
+        bool: {
+          filter: [
+            { term: { trace_id: traceId } },
+            { term: { project_id: connConfig.projectId } },
+          ],
+          should: void 0,
+          must_not: void 0,
+        },
+      },
+    },
+    protections,
+  });
+
+  return traces[0];
+};
