@@ -80,17 +80,32 @@ const evaluationResultsTableRow = (
       value: () => stringify(datasetEntry?.entry[column]),
     })),
     predictedColumns: Array.from(predictedColumns).map((column) => ({
-      render: () => (
-        <Table.Cell key={`predicted-${column}`} maxWidth="250px">
-          {datasetEntry ? (
-            <HoverableBigText>
-              {stringify(datasetEntry.predicted?.[column])}
-            </HoverableBigText>
-          ) : (
-            "-"
-          )}
-        </Table.Cell>
-      ),
+      render: () => {
+        if (datasetEntry?.error) {
+          return (
+            <Table.Cell key={`predicted-${column}`} background="red.200">
+              <Tooltip
+                content={datasetEntry.error}
+                positioning={{ placement: "top" }}
+              >
+                <Box lineClamp={1}>Error</Box>
+              </Tooltip>
+            </Table.Cell>
+          );
+        }
+
+        return (
+          <Table.Cell key={`predicted-${column}`} maxWidth="250px">
+            {datasetEntry ? (
+              <HoverableBigText>
+                {stringify(datasetEntry.predicted?.[column])}
+              </HoverableBigText>
+            ) : (
+              "-"
+            )}
+          </Table.Cell>
+        );
+      },
       value: () => stringify(datasetEntry?.predicted?.[column]),
     })),
     cost: {

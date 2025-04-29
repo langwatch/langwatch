@@ -11,7 +11,6 @@ from langwatch_nlp.studio.dspy.reporting_module import ReportingModule
 
 from langwatch_nlp.studio.field_parser import with_autoparsing
 from langwatch_nlp.studio.dspy.patched_optional_image import patch_optional_image
-from pydantic import BaseModel
 
 
 patch_optional_image()
@@ -98,3 +97,25 @@ class LangWatchWorkflowModule(ReportingModule):
                 results[idx] = result
 
         return results
+
+    def prevent_crashes(self):
+        if hasattr(self, "__forward_before_prevent_crashes__"):
+            self.forward = self.__forward_before_prevent_crashes__
+            delattr(self, "__forward_before_prevent_crashes__")
+
+        self.__forward_before_prevent_crashes__ = self.forward
+
+        def prevent_crashes_forward(*args, **kwargs):
+            try:
+                return self.__forward_before_prevent_crashes__(*args, **kwargs)
+            except Exception as e:
+                return PredictionWithEvaluationAndMetadata(
+                    status="error",
+                    details=str(e),
+                    inputs=kwargs,
+                    duration=self.duration,
+                    cost=self.cost,
+                    error=e,
+                )
+
+        self.forward = prevent_crashes_forward

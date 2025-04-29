@@ -3,7 +3,7 @@ from typing import List, Literal, Optional, Union, cast
 from uuid import UUID
 
 import httpx
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 
 import langwatch
 import langwatch.tracer
