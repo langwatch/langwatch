@@ -89,49 +89,6 @@ export const getRAGInfo = (
   return { input, output, contexts };
 };
 
-export const elasticSearchTraceToTrace = (
-  elasticSearchTrace: ElasticSearchTrace
-): Trace => {
-  const metadata = elasticSearchTrace.metadata ?? {};
-
-  const reservedMetadata = Object.fromEntries(
-    Object.entries(metadata).filter(
-      ([key]) => key in reservedTraceMetadataSchema.shape
-    )
-  ) as ReservedTraceMetadata;
-  const customMetadata = metadata.custom ?? {};
-
-  return {
-    ...omit(elasticSearchTrace, ["events", "evaluations"]),
-    metadata: {
-      ...reservedMetadata,
-      ...customMetadata,
-    },
-    ...(elasticSearchTrace.events
-      ? { events: elasticSearchEventsToEvents(elasticSearchTrace.events) }
-      : {}),
-    ...(elasticSearchTrace.evaluations
-      ? {
-          evaluations: elasticSearchEvaluationsToEvaluations(
-            elasticSearchTrace.evaluations
-          ),
-        }
-      : {}),
-  };
-};
-
-export const elasticSearchSpanToSpan = (esSpan: ElasticSearchSpan): Span => {
-  const { input, output, ...rest } = esSpan;
-  const spanInput: SpanInputOutput | null = input
-    ? elasticSearchToTypedValue(input)
-    : null;
-  const spanOutput: SpanInputOutput | null = output
-    ? elasticSearchToTypedValue(output)
-    : null;
-
-  return { ...rest, input: spanInput, output: spanOutput };
-};
-
 export const elasticSearchToTypedValue = (
   typed: ElasticSearchInputOutput
 ): SpanInputOutput => {
