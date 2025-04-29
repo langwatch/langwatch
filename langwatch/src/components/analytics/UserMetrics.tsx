@@ -3,9 +3,55 @@ import { analyticsMetrics } from "../../server/analytics/registry";
 import { GridItem, Card, Tabs, VStack, Grid, Heading } from "@chakra-ui/react";
 
 import { SatisfactionGraphs } from "./SatisfactionGraph";
-import { SessionsSummary } from "./SessionsSummary";
 import { TopicsSelector } from "../filters/TopicsSelector";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
+
+export const userThreads = {
+  graphId: "custom",
+  graphType: "summary",
+  series: [
+    {
+      name: "Threads count",
+      colorSet: "greenTones",
+      metric: "metadata.thread_id",
+      aggregation: "cardinality",
+    },
+
+    {
+      name: "Average threads per user",
+      colorSet: "greenTones",
+      metric: "metadata.thread_id",
+      aggregation: "cardinality",
+      pipeline: {
+        field: "user_id",
+        aggregation: "avg",
+      },
+    },
+    {
+      name: "Average thread duration",
+      colorSet: "purpleTones",
+      metric: "threads.average_duration_per_thread",
+      aggregation: "avg",
+      pipeline: {
+        field: "user_id",
+        aggregation: "avg",
+      },
+    },
+    {
+      name: "Average messages per user",
+      colorSet: "orangeTones",
+      metric: "metadata.trace_id",
+      aggregation: "cardinality",
+      pipeline: {
+        field: "user_id",
+        aggregation: "avg",
+      },
+    },
+  ],
+  includePrevious: false,
+  timeScale: "1",
+  height: 300,
+};
 
 export function UserMetrics() {
   const publicEnv = usePublicEnv();
@@ -156,7 +202,14 @@ export function UserMetrics() {
       </GridItem>
       {isNotQuickwit && (
         <GridItem>
-          <SessionsSummary />
+          <Card.Root overflow="scroll">
+            <Card.Header>
+              <Heading size="sm">User Threads</Heading>
+            </Card.Header>
+            <Card.Body>
+              <CustomGraph input={userThreads as CustomGraphInput} />
+            </Card.Body>
+          </Card.Root>
         </GridItem>
       )}
     </Grid>

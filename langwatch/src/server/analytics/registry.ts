@@ -728,7 +728,7 @@ export const analyticsMetrics = {
                   }
                   if (min == Long.MAX_VALUE || max == Long.MIN_VALUE) return 0;
                   long duration = max - min;
-                  return duration > 7200000 ? 7200000 : duration;
+                  return duration > 10800000 ? 10800000 : duration;
                 `,
               },
             },
