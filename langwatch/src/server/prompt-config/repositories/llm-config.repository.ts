@@ -55,19 +55,28 @@ export class LlmConfigRepository {
       },
     });
 
-    return configs.map((config) => {
-      if (!config.versions[0]) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: `Prompt config ${config.id} has no versions.`,
-        });
-      }
+    // This is a quick and dirty way to handle the fact that some configs
+    // may have been corrupted. They will have to be fixed manually.
+    return configs
+      .map((config) => {
+        try {
+          if (!config.versions[0]) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: `Prompt config ${config.id} has no versions.`,
+            });
+          }
 
-      return {
-        ...config,
-        latestVersion: parseLlmConfigVersion(config.versions[0]),
-      };
-    });
+          return {
+            ...config,
+            latestVersion: parseLlmConfigVersion(config.versions[0]),
+          };
+        } catch (error) {
+          console.error(error);
+          return null;
+        }
+      })
+      .filter((config) => config !== null);
   }
 
   /**
