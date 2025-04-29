@@ -131,7 +131,7 @@ export default async function handler(
 }
 
 export const toLLMModeTrace = (
-  trace: Trace & { spans: Span[] },
+  trace: Trace,
   asciiTree?: string
 ): LLMModeTrace => {
   return {
