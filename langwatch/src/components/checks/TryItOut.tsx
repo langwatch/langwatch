@@ -29,7 +29,7 @@ import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { evaluatePreconditions } from "../../server/evaluations/preconditions";
 import type { CheckPreconditions } from "../../server/evaluations/types";
 import { type ElasticSearchSpan } from "../../server/tracer/types";
-import { elasticSearchSpanToSpan } from "../../server/tracer/utils";
+import { transformElasticSearchSpanToSpan } from "../../server/elasticsearch/transformers";
 import { api } from "../../utils/api";
 import { formatMoney } from "../../utils/formatMoney";
 import type { Money } from "../../utils/types";
@@ -107,7 +107,11 @@ export function TryItOut({
           evaluatorType,
           trace,
           (trace.spans ?? []).map((span) =>
-            elasticSearchSpanToSpan(span as ElasticSearchSpan)
+            transformElasticSearchSpanToSpan(span as ElasticSearchSpan, {
+              canSeeCapturedInput: true,
+              canSeeCapturedOutput: true,
+              canSeeCosts: true,
+            })
           ),
           preconditions
         )
