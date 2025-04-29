@@ -320,6 +320,10 @@ export default function OptimizationStudio() {
                           onPaneClick={() => {
                             setWorkflowSelected(true);
                           }}
+                          fitView
+                          fitViewOptions={{
+                            maxZoom: 1.2,
+                          }}
                         >
                           <Controls
                             position="bottom-left"

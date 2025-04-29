@@ -1,4 +1,12 @@
-import { Box, Card, Tabs, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Card,
+  HStack,
+  Spacer,
+  Tabs,
+  VStack,
+} from "@chakra-ui/react";
 import { DatasetTable } from "../../datasets/DatasetTable";
 import {
   useEvaluationWizardStore,
@@ -15,6 +23,9 @@ import { EvaluationManualIntegration } from "../../checks/EvaluationManualIntegr
 import { useAvailableEvaluators } from "../../../hooks/useAvailableEvaluators";
 import type { AgGridReact } from "@ag-grid-community/react";
 import { toaster } from "../../ui/toaster";
+import { Link } from "../../ui/link";
+import { LuArrowUpRight } from "react-icons/lu";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
 export const WizardWorkspace = memo(function WizardWorkspace() {
   const {
@@ -48,6 +59,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
   );
 
   const datasetGridRef = useRef<AgGridReact<any>>(null);
+  const { project } = useOrganizationTeamProject();
 
   const hasDataset = !!getDatasetId();
   const hasResults = hasDataset && hasWorkflow;
@@ -85,28 +97,43 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
             });
           }}
         >
-          <Tabs.List
-            width="fit"
-            background="gray.200"
-            colorPalette="blue"
-            alignSelf="center"
-            position="sticky"
-            top="0px"
-            flexShrink={0}
-          >
-            {hasDataset && <Tabs.Trigger value="dataset">Dataset</Tabs.Trigger>}
-            {hasWorkflow && (
-              <Tabs.Trigger value="workflow">Workflow</Tabs.Trigger>
-            )}
-            {hasResults && (
-              <Tabs.Trigger value="results">
-                {task === "real_time" ? "Trial Results" : "Results"}
-              </Tabs.Trigger>
-            )}
-            {hasCodeImplementation && (
-              <Tabs.Trigger value="code-implementation">Code</Tabs.Trigger>
-            )}
-          </Tabs.List>
+          <HStack width="full" alignItems="center">
+            <HStack width="full" />
+            <Tabs.List
+              width="fit"
+              background="gray.200"
+              colorPalette="blue"
+              alignSelf="center"
+              position="sticky"
+              top="0px"
+              flexShrink={0}
+            >
+              {hasDataset && (
+                <Tabs.Trigger value="dataset">Dataset</Tabs.Trigger>
+              )}
+              {hasWorkflow && (
+                <Tabs.Trigger value="workflow">Workflow</Tabs.Trigger>
+              )}
+              {hasResults && (
+                <Tabs.Trigger value="results">
+                  {task === "real_time" ? "Trial Results" : "Results"}
+                </Tabs.Trigger>
+              )}
+              {hasCodeImplementation && (
+                <Tabs.Trigger value="code-implementation">Code</Tabs.Trigger>
+              )}
+            </Tabs.List>
+            <HStack width="full" justifyContent="end">
+              {workflowId && workspaceTab === "workflow" && (
+                <Link href={`/${project?.slug}/studio/${workflowId}`} asChild>
+                  <Button variant="outline" size="sm">
+                    <LuArrowUpRight />
+                    Open Full Workflow
+                  </Button>
+                </Link>
+              )}
+            </HStack>
+          </HStack>
           {hasDataset && (
             <Tabs.Content
               value="dataset"
@@ -231,7 +258,7 @@ const WizardOptimizationStudioCanvas = memo(
         }}
         fitView
         fitViewOptions={{
-          maxZoom: 1.5,
+          maxZoom: 1.2,
         }}
       >
         <Controls position="bottom-center" orientation="horizontal" />

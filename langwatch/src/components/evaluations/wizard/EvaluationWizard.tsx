@@ -14,6 +14,7 @@ import { useRouter } from "next/router";
 import { memo, useEffect, useRef, useState } from "react";
 import {
   LuActivity,
+  LuArrowUpRight,
   LuChevronLeft,
   LuChevronRight,
   LuCode,
@@ -42,6 +43,8 @@ import { ExecutionStep } from "./steps/ExecutionStep";
 import { ResultsStep } from "./steps/ResultsStep";
 import { TaskStep } from "./steps/TaskStep";
 import { WizardProvider } from "./hooks/useWizardContext";
+import { Link } from "../../ui/link";
+import { PuzzleIcon } from "../../icons/PuzzleIcon";
 
 export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
   const router = useRouter();
@@ -49,10 +52,11 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
 
   const [sidebarVisible, setSidebarVisible] = useState(true);
 
-  const { name } = useEvaluationWizardStore(
+  const { name, workflowId } = useEvaluationWizardStore(
     useShallow((state) => {
       return {
         name: state.wizardState.name,
+        workflowId: state.getDSL().workflow_id,
       };
     })
   );
@@ -127,12 +131,12 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
                 </Button>
               </Tooltip>
             </HStack>
-            <HStack width="full" justifyContent="center">
+            <HStack width="full" justifyContent="center" paddingLeft={8}>
               <Heading as="h1" size="sm" fontWeight="normal">
                 Evaluation Wizard
               </Heading>
             </HStack>
-            <HStack justifyContent="end" paddingRight={10} />
+            <HStack justifyContent="end" paddingRight={5} />
           </Dialog.Header>
           <Dialog.Body
             display="flex"
@@ -244,11 +248,18 @@ const WizardSidebar = memo(function WizardSidebar({
   useEffect(() => {
     if (step === "execution" && executionMethod) {
       setWizardState({ workspaceTab: "workflow" });
+      setTimeout(() => {
+        reactFlow.fitView({
+          maxZoom: 1.2,
+        });
+      }, 100);
     }
     if (step === "evaluation" && evaluatorNode) {
       setWizardState({ workspaceTab: "workflow" });
       setTimeout(() => {
-        reactFlow.fitView();
+        reactFlow.fitView({
+          maxZoom: 1.2,
+        });
       }, 100);
     }
     if (step === "dataset") {
