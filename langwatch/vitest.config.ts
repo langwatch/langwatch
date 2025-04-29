@@ -10,6 +10,7 @@ export default defineConfig({
       "**/*.stress.test.ts",
       ".next/**/*",
       ".next-saas/**/*",
+      "**/e2e/**/*",
     ],
   },
   resolve: {

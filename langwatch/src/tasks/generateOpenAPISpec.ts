@@ -1,6 +1,6 @@
 import { generateSpecs } from "hono-openapi";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
-import { app as llmConfigsApp } from "../app/api/llmConfigs/[[...route]]/app";
+import { app as llmConfigsApp } from "../app/api/prompts/app";
 import deepmerge from "deepmerge";
 import currentSpec from "../app/api/openapiLangWatch.json";
 import fs from "fs";
@@ -26,8 +26,12 @@ const langwatchSpec = {
  * original file.
  */
 export default async function execute() {
+  console.log("Generating OpenAPI spec...");
+  console.log("Building dataset spec...");
   const datasetSpec = await generateSpecs(datasetApp);
+  console.log("Building llm configs spec...");
   const llmConfigsSpec = await generateSpecs(llmConfigsApp);
+  console.log("Merging specs...");
   const mergedSpec = deepmerge.all(
     // Merges this way ==>
     [currentSpec, datasetSpec, llmConfigsSpec, langwatchSpec],

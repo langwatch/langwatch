@@ -1,10 +1,9 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { app } from "./app";
 import { projectFactory } from "~/factories/project.factory";
-import { prisma } from "../../../../server/db";
+import { prisma } from "~/server/db";
 import { nanoid } from "nanoid";
 import { llmPromptConfigFactory } from "~/factories/llm-config.factory";
-import { SchemaVersion } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
 import type { LlmPromptConfig } from "@prisma/client";
 
