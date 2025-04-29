@@ -1,0 +1,177 @@
+import { toaster } from "../../components/ui/toaster";
+import type { StudioClientEvent } from "../types/events";
+import { useCallback } from "react";
+import { nanoid } from "nanoid";
+import { usePostEvent } from "./usePostEvent";
+import { useShallow } from "zustand/react/shallow";
+import { api } from "../../utils/api";
+import { useForm } from "react-hook-form";
+import { useVersionState } from "../components/History";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { hasDSLChanged } from "../utils/dslUtils";
+import { useWorkflowStore } from "./useWorkflowStore";
+
+/**
+ * This is the non-socket version of the useEvaluationExecution hook.
+ * It should work both in the wizard and in the optimization studio.
+ */
+export const useRunEvalution = () => {
+  const { setEvaluationState, getWorkflow, setWorkflow } = useWorkflowStore(
+    useShallow((state) => ({
+      setEvaluationState: state.setEvaluationState,
+      getWorkflow: state.getWorkflow,
+      setWorkflow: state.setWorkflow,
+    }))
+  );
+
+  const { postEvent, isLoading } = usePostEvent();
+
+  const { project } = useOrganizationTeamProject();
+
+  const commitVersion = api.workflow.commitVersion.useMutation();
+
+  const form = useForm({
+    defaultValues: {
+      version: "",
+      commitMessage: "",
+    },
+  });
+
+  const { previousVersion, nextVersion, latestVersion } = useVersionState({
+    project,
+    form: form,
+    allowSaveIfAutoSaveIsCurrentButNotLatest: true,
+  });
+
+  const generateCommitMessage =
+    api.workflow.generateCommitMessage.useMutation();
+
+  const trpc = api.useContext();
+
+  const runEvaluation = useCallback(
+    async ({
+      onStart,
+      workflow_version_id,
+      evaluate_on,
+    }: {
+      onStart?: () => void;
+      workflow_version_id?: string;
+      evaluate_on?: "full" | "test" | "train";
+    } = {}) => {
+      if (!project) return;
+
+      const workflowId = getWorkflow().workflow_id;
+      if (!workflowId) {
+        toaster.create({
+          title: "Error running evaluation: workflow not found",
+          type: "error",
+          duration: 5000,
+          meta: { closable: true },
+        });
+        return;
+      }
+
+      const run_id = `run_${nanoid()}`;
+      const workflow = getWorkflow();
+      const hasChanges =
+        latestVersion?.autoSaved &&
+        (previousVersion?.dsl
+          ? hasDSLChanged(workflow, previousVersion.dsl, false)
+          : true);
+
+      let versionId =
+        workflow_version_id ??
+        (latestVersion?.autoSaved ? previousVersion?.id : latestVersion?.id);
+      // Automatically generate a new version if there are changes and no version id was provided (e.g. when running from the wizard)
+      if (hasChanges && !workflow_version_id) {
+        let commitMessage = previousVersion ? "autosaved" : "first version";
+        if (previousVersion?.dsl) {
+          try {
+            const commitMessageResponse =
+              await generateCommitMessage.mutateAsync({
+                projectId: project?.id ?? "",
+                prevDsl: previousVersion?.dsl,
+                newDsl: getWorkflow(),
+              });
+            commitMessage = commitMessageResponse ?? "autosaved";
+          } catch (error) {
+            toaster.create({
+              title: "Error auto-generating version description",
+              type: "error",
+              duration: 5000,
+              meta: { closable: true },
+            });
+          }
+        }
+
+        try {
+          const versionResponse = await commitVersion.mutateAsync({
+            projectId: project.id,
+            workflowId,
+            commitMessage,
+            dsl: {
+              ...workflow,
+              version: nextVersion,
+            },
+          });
+          versionId = versionResponse.id;
+
+          setWorkflow({
+            ...workflow,
+            version: nextVersion,
+          });
+
+          void trpc.workflow.getVersions.invalidate();
+        } catch (error) {
+          toaster.create({
+            title: "Error saving version",
+            type: "error",
+            duration: 5000,
+            meta: { closable: true },
+            placement: "top-end",
+          });
+          return;
+        }
+      }
+
+      onStart?.();
+      setEvaluationState({
+        status: "waiting",
+        run_id,
+        progress: 0,
+        total: 0,
+      });
+
+      const payload: StudioClientEvent = {
+        type: "execute_evaluation",
+        payload: {
+          run_id,
+          workflow,
+          // TODO: autosave and generate a new commit message and version id automatically
+          workflow_version_id: versionId ?? "",
+          evaluate_on: evaluate_on ?? "full",
+        },
+      };
+      postEvent(payload);
+    },
+    [
+      project,
+      getWorkflow,
+      latestVersion,
+      previousVersion,
+      setEvaluationState,
+      postEvent,
+      generateCommitMessage,
+      commitVersion,
+      nextVersion,
+      setWorkflow,
+      trpc.workflow.getVersions,
+    ]
+  );
+
+  return {
+    runEvaluation,
+    isLoading:
+      isLoading || generateCommitMessage.isLoading || commitVersion.isLoading,
+  };
+};

@@ -1,13 +1,14 @@
 import { useCallback, useState } from "react";
-import { toaster } from "../../../ui/toaster";
-import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
-import { useHandleServerMessage } from "../../../../optimization_studio/hooks/useSocketClient";
+import { useShallow } from "zustand/react/shallow";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useHandleServerMessage } from "./useSocketClient";
+import { useWorkflowStore } from "./useWorkflowStore";
 import type {
   StudioClientEvent,
   StudioServerEvent,
-} from "../../../../optimization_studio/types/events";
-import { useEvaluationWizardStore } from "./evaluation-wizard-store/useEvaluationWizardStore";
-import { getDebugger } from "../../../../utils/logger";
+} from "../types/events";
+import { getDebugger } from "../../utils/logger";
+import { toaster } from "../../components/ui/toaster";
 
 const DEBUGGING_ENABLED = true;
 
@@ -20,11 +21,11 @@ const debug = getDebugger("langwatch:wizard:usePostEvent");
 
 export const usePostEvent = () => {
   const { project } = useOrganizationTeamProject();
-  const { workflowStore, setEvaluationState } = useEvaluationWizardStore(
-    ({ workflowStore }) => ({
-      workflowStore,
-      setEvaluationState: workflowStore.setEvaluationState,
-    })
+  const workflowStore = useWorkflowStore();
+  const { setEvaluationState } = useWorkflowStore(
+    useShallow((state) => ({
+      setEvaluationState: state.setEvaluationState,
+    }))
   );
 
   const handleServerMessage = useHandleServerMessage({
