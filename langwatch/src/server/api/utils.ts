@@ -41,6 +41,13 @@ export const flattenObjectKeys = (
 };
 
 
+export async function getProtectionsForProject(
+  prisma: PrismaClient,
+  { projectId }: { projectId: string } & Record<string, unknown>
+): Promise<Protections> {
+  return await getUserProtectionsForProject({ prisma, session: null, publiclyShared: false }, { projectId });
+}
+
 export async function getUserProtectionsForProject(
   ctx: { prisma: PrismaClient; session: Session | null; publiclyShared?: boolean },
   { projectId }: { projectId: string } & Record<string, unknown>
