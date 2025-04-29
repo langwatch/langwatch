@@ -38,8 +38,8 @@ import {
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
   promptConfigFormValuesToOptimizationStudioNodeData,
 } from "~/prompt-configs/llmPromptConfigUtils";
-import { PromptConfigProvider } from "~/prompt-configs/providers/PromptConfigProvider";
-import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
+import { PromptConfigProvider } from "~/prompt-configs/components/providers/PromptConfigProvider";
+import { usePromptConfigContext } from "~/prompt-configs/components/providers/PromptConfigProvider";
 import { api } from "~/utils/api";
 /**
  * Properties panel for the Signature node in the optimization studio.

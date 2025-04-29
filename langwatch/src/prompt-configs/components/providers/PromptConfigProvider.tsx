@@ -5,8 +5,8 @@ import {
   SaveVersionDialog,
   type SaveDialogFormValues,
 } from "../forms/SaveVersionDialog";
-import { usePromptConfig } from "../hooks/usePromptConfig";
-import type { PromptConfigFormValues } from "../hooks/usePromptConfigForm";
+import { usePromptConfig } from "../../hooks/usePromptConfig";
+import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
 
 import { toaster } from "~/components/ui/toaster";
 import { promptConfigFormValuesVersionToLlmConfigVersionConfigData } from "~/prompt-configs/llmPromptConfigUtils";

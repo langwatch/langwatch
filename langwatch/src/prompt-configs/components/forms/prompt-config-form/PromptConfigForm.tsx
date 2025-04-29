@@ -17,7 +17,7 @@ import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
-import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
+import { usePromptConfigContext } from "~/prompt-configs/components/providers/PromptConfigProvider";
 
 interface PromptConfigFormProps {
   configId: string;

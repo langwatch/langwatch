@@ -1,6 +1,6 @@
 import { Button } from "@chakra-ui/react";
 
-import { VersionHistoryListPopover } from "../../../VersionHistoryListPopover";
+import { VersionHistoryListPopover } from "../../../components/VersionHistoryListPopover";
 
 export function VersionHistoryButton({
   configId,

@@ -12,7 +12,7 @@ import { Trash2 } from "react-feather";
 import { useFieldArray, useFormContext } from "react-hook-form";
 
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
-import { TypeSelector } from "../../ui/TypeSelector";
+import { TypeSelector } from "../../components/ui/TypeSelector";
 
 /**
  * Reusable component for a group of fields (inputs, outputs)

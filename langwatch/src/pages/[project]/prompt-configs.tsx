@@ -14,11 +14,11 @@ import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirm
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { PromptConfigPanel } from "~/prompt-configs/PromptConfigPanel";
+import { PromptConfigPanel } from "~/prompt-configs/components/PromptConfigPanel";
 import {
   createDefaultColumns,
   PromptConfigTable,
-} from "~/prompt-configs/PromptConfigTable";
+} from "~/prompt-configs/components/PromptConfigTable";
 import { api } from "~/utils/api";
 
 export default function PromptConfigsPage() {

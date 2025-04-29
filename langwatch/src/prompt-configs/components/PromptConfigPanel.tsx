@@ -1,8 +1,8 @@
 import { Box, Text, Spinner } from "@chakra-ui/react";
 import { useEffect, useMemo } from "react";
 
-import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
-import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
+import { PromptConfigForm } from "../forms/prompt-config-form/PromptConfigForm";
+import { usePromptConfigForm } from "../hooks/usePromptConfigForm";
 import { PanelHeader } from "./ui/PanelHeader";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
