@@ -61,8 +61,46 @@ export const getOrganizationProjectsCount = async (organizationId: string) => {
   });
 };
 
-export const getCurrentMonthMessagesCount = async (projectIds: string[]) => {
-  const client = await esClient({ projectId: projectIds[0] ?? "" });
+const cacheResult: {
+  projectIds: string[];
+  organizationId: string;
+  count: number;
+  lastUpdated: number;
+} = {
+  projectIds: [],
+  organizationId: "",
+  count: 0,
+  lastUpdated: 0,
+};
+
+export const getCurrentMonthMessagesCount = async (
+  projectIds: string[],
+  organizationId?: string
+) => {
+  const now = Date.now();
+  const ONE_HOUR = 60 * 60 * 1000;
+
+  if (
+    (cacheResult.projectIds === projectIds ||
+      cacheResult.organizationId === organizationId) &&
+    now - cacheResult.lastUpdated < ONE_HOUR
+  ) {
+    return cacheResult.count;
+  }
+
+  let projectIdsToUse = projectIds;
+  if (organizationId) {
+    projectIdsToUse = (
+      await prisma.project.findMany({
+        where: {
+          team: { organizationId },
+        },
+        select: { id: true },
+      })
+    ).map((project) => project.id);
+  }
+
+  const client = await esClient({ projectId: projectIdsToUse[0] ?? "" });
   const messagesCount = await client.count({
     index: TRACE_INDEX.alias,
     body: {
@@ -87,6 +125,10 @@ export const getCurrentMonthMessagesCount = async (projectIds: string[]) => {
     },
   });
 
+  cacheResult.projectIds = projectIds;
+  cacheResult.organizationId = organizationId ?? "";
+  cacheResult.count = messagesCount.count;
+  cacheResult.lastUpdated = now;
   return messagesCount.count;
 };
 

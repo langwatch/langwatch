@@ -80,20 +80,38 @@ export default async function handler(
     return res.status(401).json({ message: "Invalid auth token." });
   }
 
-  const currentMonthMessagesCount = await getCurrentMonthMessagesCount([
-    project.id,
-  ]);
-  const activePlan = await dependencies.subscriptionHandler.getActivePlan(
-    project.team.organizationId
-  );
-  if (currentMonthMessagesCount >= activePlan.maxMessagesPerMonth) {
-    console.log("[429] Reached plan limit", {
-      projectId: project.id,
-      currentMonthMessagesCount,
-    });
-    return res.status(429).json({
-      message: `ERR_PLAN_LIMIT: You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
-    });
+  try {
+    const currentMonthMessagesCount = await getCurrentMonthMessagesCount(
+      [project.id],
+      project.team.organizationId
+    );
+
+    const activePlan = await dependencies.subscriptionHandler.getActivePlan(
+      project.team.organizationId
+    );
+
+    if (currentMonthMessagesCount >= activePlan.maxMessagesPerMonth) {
+      if (dependencies.planLimits) {
+        await dependencies.planLimits(
+          project.team.organizationId,
+          activePlan.name ?? "free"
+        );
+      }
+      console.log("[429] Reached plan limit", {
+        projectId: project.id,
+        currentMonthMessagesCount,
+      });
+      return res.status(429).json({
+        message: `ERR_PLAN_LIMIT: You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
+      });
+    }
+  } catch (error) {
+    Sentry.captureException(
+      new Error("Error getting current month messages count"),
+      {
+        extra: { projectId: project.id, zodError: error },
+      }
+    );
   }
 
   getPayloadSizeHistogram("collector").observe(JSON.stringify(req.body).length);
