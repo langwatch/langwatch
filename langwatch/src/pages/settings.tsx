@@ -13,14 +13,13 @@ import {
 } from "@chakra-ui/react";
 import { PIIRedactionLevel, ProjectSensitiveDataVisibilityLevel, type Project } from "@prisma/client";
 import isEqual from "lodash.isequal";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   useForm,
   useWatch,
   type SubmitHandler,
   Controller,
 } from "react-hook-form";
-import { useDebouncedCallback } from "use-debounce";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import { ProjectSelector } from "../components/DashboardLayout";
 import SettingsLayout from "../components/SettingsLayout";
@@ -378,8 +377,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
   const { hasTeamPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
-  // const userIsAdmin = hasTeamPermission(TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY);
-  const userIsAdmin = false;
+  const userIsAdmin = hasTeamPermission(TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY);
 
   const defaultValues = {
     name: project.name,
