@@ -1,6 +1,6 @@
 import { generateSpecs } from "hono-openapi";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
-import { app as llmConfigsApp } from "../app/api/llmConfigs/[[...route]]/app";
+import { app as llmConfigsApp } from "../app/api/prompts/app";
 import deepmerge from "deepmerge";
 import currentSpec from "../app/api/openapiLangWatch.json";
 import fs from "fs";
