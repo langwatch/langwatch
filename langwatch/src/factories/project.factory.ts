@@ -1,5 +1,5 @@
 import { Factory } from "fishery";
-import { type Project, PIIRedactionLevel } from "@prisma/client";
+import { type Project, PIIRedactionLevel, ProjectSensitiveDataVisibilityLevel } from "@prisma/client";
 import { nanoid } from "nanoid";
 
 export const projectFactory = Factory.define<Project>(({ sequence }) => ({
@@ -16,6 +16,8 @@ export const projectFactory = Factory.define<Project>(({ sequence }) => ({
   updatedAt: new Date(),
   userLinkTemplate: null,
   piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
+  capturedInputVisibility: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+  capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
   defaultModel: null,
   topicClusteringModel: null,
   embeddingsModel: null,
