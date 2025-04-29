@@ -21,7 +21,7 @@ import {
 import { getOrganizationProjectsCount } from "./limits";
 import { dependencies } from "../../../injection/dependencies.server";
 import { allowedTopicClusteringModels } from "../../topicClustering/types";
-import { ProjectSensitiveDataVisibilityLevel, type Project, type PrismaClient } from "@prisma/client";
+import { ProjectSensitiveDataVisibilityLevel, type Project, type PrismaClient, TeamUserRole } from "@prisma/client";
 import { encrypt } from "~/utils/encryption";
 import type { Session } from "next-auth";
 
@@ -396,6 +396,63 @@ export const projectRouter = createTRPCRouter({
 
       return { success: true, projectSlug: updatedProject.slug };
     }),
+  getFieldRedactionStatus: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        field: z.enum(["input", "output"]),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .query(async ({ input, ctx }: { input: { projectId: string; field: 'input' | 'output' }, ctx: { session: Session, prisma: PrismaClient }}) => {
+      const { projectId, field } = input;
+      const prisma = ctx.prisma;
+
+      const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: {
+          capturedInputVisibility: true,
+          capturedOutputVisibility: true,
+        },
+      });
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found",
+        });
+      }
+
+      const teamsWithAccess = await prisma.teamUser.findMany({
+        where: {
+          userId: ctx.session.user.id,
+          team: {
+            projects: {
+              some: {
+                id: projectId,
+              },
+            },
+          },
+        },
+        select: {
+          role: true,
+        },
+      });
+
+      const isUserAdminOrOwnerInAnyTeam = teamsWithAccess.some(
+        (teamUser: { role: TeamUserRole }) => teamUser.role === TeamUserRole.ADMIN
+      );
+
+      const visibilitySetting = field === "input"
+          ? project.capturedInputVisibility
+          : project.capturedOutputVisibility;
+
+      const canUserSeeData = canAccessSensitiveData(
+        visibilitySetting,
+        isUserAdminOrOwnerInAnyTeam
+      );
+
+      return !canUserSeeData;
+    }),
 });
 
 const generateApiKey = (): string => {
@@ -424,4 +481,21 @@ async function checkCapturedDataVisibilityPermission({
     });
   }
   return next();
+};
+
+const canAccessSensitiveData = (
+  visibility: ProjectSensitiveDataVisibilityLevel,
+  userIsAdminOrOwner: boolean
+): boolean => {
+  switch (visibility) {
+    case ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL:
+      return false;
+    case ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL:
+      return true;
+    case ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN:
+      return userIsAdminOrOwner;
+    default:
+      console.error("Unexpected visibility level:", visibility);
+      return false; // Default to not showing
+  }
 };
