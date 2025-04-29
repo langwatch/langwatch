@@ -16,16 +16,18 @@ import type { z } from "zod";
  * Factory for creating LlmPromptConfig objects for testing purposes.
  * This follows the same pattern as the projectFactory to maintain consistency.
  */
-export const llmPromptConfigFactory = Factory.define<LlmPromptConfig>(
-  ({ sequence }) => ({
-    id: nanoid(),
-    name: `Test LLM Prompt Config ${sequence}`,
-    projectId: nanoid(), // This should be overridden with an actual project ID when used
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    deletedAt: null,
-  })
-);
+export const llmPromptConfigFactory = Factory.define<
+  LlmPromptConfig & {
+    versions?: LlmPromptConfigVersion[];
+  }
+>(({ sequence }) => ({
+  id: nanoid(),
+  name: `Test LLM Prompt Config ${sequence}`,
+  projectId: nanoid(), // This should be overridden with an actual project ID when used
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  deletedAt: null,
+}));
 
 type LlmPromptConfigVersionWithConfigData<T extends SchemaVersion> =
   LlmPromptConfigVersion & {
