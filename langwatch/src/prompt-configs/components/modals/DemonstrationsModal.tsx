@@ -1,7 +1,7 @@
 import { Dialog } from "~/components/ui/dialog";
 import { Box, Button, Heading } from "@chakra-ui/react";
 import { DatasetTable } from "~/components/datasets/DatasetTable";
-import type { PromptConfigFormValues } from "../hooks/usePromptConfigForm";
+import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
 
 type Demonstrations =
   PromptConfigFormValues["version"]["configData"]["demonstrations"];
