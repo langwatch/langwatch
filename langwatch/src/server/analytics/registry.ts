@@ -693,9 +693,9 @@ export const analyticsMetrics = {
       quickwitSupport: false,
     },
   },
-  sessions: {
-    average_duration_per_session: {
-      label: "Average Duration per Session",
+  threads: {
+    average_duration_per_thread: {
+      label: "Thread Duration",
       colorSet: "purpleTones",
       format: formatMilliseconds,
       increaseIs: "neutral",
@@ -734,13 +734,13 @@ export const analyticsMetrics = {
             },
           },
         },
-        average_duration_per_session_avg: {
+        average_duration_per_thread_avg: {
           avg_bucket: {
             buckets_path: "thread_sessions>session_duration.value",
           },
         },
       }),
-      extractionPath: () => "average_duration_per_session_avg",
+      extractionPath: () => "average_duration_per_thread_avg",
       quickwitSupport: false,
     },
   },
