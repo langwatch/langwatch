@@ -1,13 +1,14 @@
 import { z } from "zod";
 
-import type {
-  AggregationsAggregate,
-  QueryDslBoolQuery,
-  SearchResponse,
-  SearchTotalHits,
-  Sort,
+import {
+  type AggregationsAggregate,
+  type AggregationsBucketAggregationBase,
+  type QueryDslBoolQuery,
+  type SearchResponse,
+  type SearchTotalHits,
+  type Sort,
 } from "@elastic/elasticsearch/lib/api/types";
-import { PublicShareResourceTypes, type PrismaClient } from "@prisma/client";
+import { ProjectSensitiveDataVisibilityLevel, PublicShareResourceTypes, TeamUserRole, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import shuffle from "lodash/shuffle";
 import type { Session } from "next-auth";
@@ -20,6 +21,7 @@ import { prisma } from "~/server/db";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { evaluatePreconditions } from "../../evaluations/preconditions";
 import { checkPreconditionSchema } from "../../evaluations/types.generated";
+import type { Protections } from "../../elasticsearch/protections";
 
 import { getAnnotatedTraceIds } from "~/server/filters/annotations";
 import { sharedFiltersInputSchema } from "../../analytics/types";
@@ -32,16 +34,14 @@ import {
   type Trace,
 } from "../../tracer/types";
 import {
-  elasticSearchSpanToSpan,
-  elasticSearchTraceToTrace,
-} from "../../tracer/utils";
-import {
   TeamRoleGroup,
   backendHasTeamProjectPermission,
   checkPermissionOrPubliclyShared,
   checkUserPermissionForProject,
 } from "../permission";
 import { generateTracesPivotQueryConditions } from "./analytics/common";
+import { aggregateTraces, getTraceById, getTracesGroupedByThreadId, searchTraces } from "~/server/elasticsearch/traces";
+import { getUserProtectionsForProject } from "../utils";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
@@ -54,39 +54,6 @@ export const getAllForProjectInput = tracesFilterInput.extend({
   sortDirection: z.string().optional(),
   updatedAt: z.number().optional(),
 });
-
-export const esGetSpansByTraceId = async ({
-  traceId,
-  projectId,
-}: {
-  traceId: string;
-  projectId: string;
-}): Promise<ElasticSearchSpan[]> => {
-  const client = await esClient({ projectId });
-  const result = await client.search<ElasticSearchTrace>({
-    index: TRACE_INDEX.alias,
-    body: {
-      query: {
-        bool: {
-          must: [
-            { term: { trace_id: traceId } },
-            { term: { project_id: projectId } },
-          ] as QueryDslBoolQuery["must"],
-        } as QueryDslBoolQuery,
-      },
-    },
-    size: 10000,
-    routing: traceIndexId({
-      traceId,
-      projectId,
-    }),
-  });
-
-  return result.hits.hits
-    .map((hit) => hit._source!)
-    .filter((hit) => hit)
-    .flatMap((hit) => hit.spans ?? []);
-};
 
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -107,20 +74,13 @@ export const tracesRouter = createTRPCRouter({
       )
     )
     .query(async ({ ctx, input }) => {
-      const canSeeCosts =
-        ctx.publiclyShared ||
-        (await backendHasTeamProjectPermission(
-          ctx,
-          input,
-          TeamRoleGroup.COST_VIEW
-        ));
-
       const trace = await getTraceById({
-        projectId: input.projectId,
+        connConfig: { projectId: input.projectId },
         traceId: input.traceId,
-        canSeeCosts,
+        includeEvaluations: false,
+        includeSpans: false,
+        protections: await getUserProtectionsForProject(ctx, { projectId: input.projectId }),
       });
-
       if (!trace) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Trace not found." });
       }
@@ -171,15 +131,16 @@ export const tracesRouter = createTRPCRouter({
       const { pivotIndexConditions } =
         generateTracesPivotQueryConditions(input);
 
-      const client = await esClient({ projectId: input.projectId });
-      const topicCountsResult = await client.search<ElasticSearchTrace>({
-        index: TRACE_INDEX.alias,
-        size: 0, // We do not need the actual documents, just the aggregations
-        body: {
+      const result = await aggregateTraces({
+        connConfig: { projectId: input.projectId },
+        search: {
           query: {
             bool: {
               must: pivotIndexConditions,
-            } as QueryDslBoolQuery,
+              should: void 0,
+              must_not: void 0,
+              filter: void 0,
+            },
           },
           aggs: {
             topicCounts: {
@@ -210,13 +171,12 @@ export const tracesRouter = createTRPCRouter({
       );
 
       const mapBuckets = (
-        buckets: { key: string; doc_count: number }[],
+        buckets: Array<{ key: string; doc_count: number }>,
         includeParent = false
       ) => {
         return buckets.reduce(
           (acc, bucket) => {
             const topic = topicsMap[bucket.key];
-
             if (!topic) return acc;
 
             return [
@@ -229,22 +189,12 @@ export const tracesRouter = createTRPCRouter({
               },
             ];
           },
-          [] as { id: string; name: string; count: number }[]
+          [] as { id: string; name: string; count: number; parentId?: string | null }[]
         );
       };
 
-      const topicBuckets: { key: string; doc_count: number }[] =
-        (topicCountsResult.aggregations?.topicCounts as any)?.buckets ?? [];
-      const topicCounts = mapBuckets(topicBuckets);
-
-      const subtopicBuckets: { key: string; doc_count: number }[] =
-        (topicCountsResult.aggregations?.subtopicCounts as any)?.buckets ?? [];
-      const subtopicCounts = mapBuckets(subtopicBuckets, true) as {
-        id: string;
-        name: string;
-        count: number;
-        parentId: string;
-      }[];
+      const topicCounts = mapBuckets(result.topicCounts);
+      const subtopicCounts = mapBuckets(result.subtopicCounts, true);
 
       return { topicCounts, subtopicCounts };
     }),
@@ -255,12 +205,11 @@ export const tracesRouter = createTRPCRouter({
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
-    .query(async ({ input }) => {
-      const client = await esClient({ projectId: input.projectId });
-      const customersLabelsResult = await client.search<ElasticSearchTrace>({
-        index: TRACE_INDEX.alias,
-        size: 0, // We don't need the actual documents, just the aggregation results
-        body: {
+    .query(async ({ input, ctx }) => {
+      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+      const result = await aggregateTraces({
+        connConfig: { projectId: input.projectId },
+        search: {
           query: {
             term: {
               project_id: input.projectId,
@@ -281,26 +230,29 @@ export const tracesRouter = createTRPCRouter({
             },
           },
         },
+        protections,
       });
 
-      const customers: { key: string; doc_count: number }[] =
-        (customersLabelsResult.aggregations?.customers as any)?.buckets ?? [];
-      const labels: { key: string; doc_count: number }[] =
-        (customersLabelsResult.aggregations?.labels as any)?.buckets ?? [];
-
       return {
-        customers: customers.map((bucket) => bucket.key),
-        labels: labels.map((bucket) => bucket.key),
+        customers: result.customers.map((bucket) => bucket.key),
+        labels: result.labels.map((bucket) => bucket.key),
       };
     }),
   getTracesByThreadId: protectedProcedure
     .input(z.object({ projectId: z.string(), threadId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const { projectId, threadId } = input;
+      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+
+      // TODO: remove this?
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      return getTracesByThreadId({ projectId, threadId });
+      return getTracesGroupedByThreadId({
+        connConfig: { projectId },
+        threadId,
+        protections,
+      });
     }),
 
   getTracesWithSpans: protectedProcedure
@@ -717,48 +669,6 @@ export const getAllTracesForProject = async ({
     traceChecks: evaluations,
     scrollId: tracesResult._scroll_id,
   };
-};
-
-export const getSpansForTraceIds = async (
-  projectId: string,
-  traceIds: string[]
-) => {
-  const batchSize = 300; // Around the maximum IDs that ES supports without blowing up
-  const searchPromises = [];
-
-  for (let i = 0; i < traceIds.length; i += batchSize) {
-    const batchTraceIds = traceIds.slice(i, i + batchSize);
-    const client = await esClient({ projectId });
-
-    const searchPromise = client.search<ElasticSearchTrace>({
-      index: TRACE_INDEX.alias,
-      body: {
-        size: 10_000,
-        _source: ["trace_id", "spans"],
-        query: {
-          bool: {
-            filter: [
-              { terms: { trace_id: batchTraceIds } },
-              { term: { project_id: projectId } },
-            ] as QueryDslBoolQuery["filter"],
-          } as QueryDslBoolQuery,
-        },
-      },
-    });
-    searchPromises.push(searchPromise);
-  }
-  const results = await Promise.all(searchPromises);
-
-  return Object.fromEntries(
-    results
-      .flatMap((result) => result.hits.hits)
-      .map((hit) => hit._source!)
-      .filter((x) => x)
-      .map((trace) => [
-        trace.trace_id,
-        (trace.spans ?? []).map(elasticSearchSpanToSpan),
-      ])
-  );
 };
 
 export const getTracesWithSpans = async (
