@@ -1,8 +1,6 @@
 import { z } from "zod";
 
 import {
-  type AggregationsAggregate,
-  type QueryDslBoolQuery,
   type SearchResponse,
   type SearchTotalHits,
   type Sort,
@@ -26,7 +24,6 @@ import { getAnnotatedTraceIds } from "~/server/filters/annotations";
 import { sharedFiltersInputSchema } from "../../analytics/types";
 import { TRACE_INDEX, esClient } from "../../elasticsearch";
 import {
-  type ElasticSearchSpan,
   type ElasticSearchTrace,
   type EvaluationResult,
   type RAGChunk,
