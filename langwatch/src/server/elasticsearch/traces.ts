@@ -21,6 +21,40 @@ interface TestConnectionConfig {
 
 type ConnectionConfig = ProjectConnectionConfig | OrganizationConnectionConfig | TestConnectionConfig;
 
+interface SearchTracesWithInternalsOptions {
+  connConfig: ConnectionConfig;
+  search: Parameters<ElasticClient['search']>[0] & {
+    index?: typeof TRACE_INDEX[keyof typeof TRACE_INDEX];
+    size?: number;
+  };
+  protections: Protections;
+}
+
+export async function searchTracesWithInternals({
+  connConfig,
+  search: {
+    index = TRACE_INDEX.alias,
+    size = 10,
+    ...searchParams
+  },
+  protections = {},
+}: SearchTracesWithInternalsOptions): Promise<{ trace: Trace, hit: T.SearchHit, source: ElasticSearchTrace }[]> {
+  const client = await esClient(connConfig);
+  const result = await client.search<ElasticSearchTrace>({
+    index,
+    size,
+    ...searchParams
+  });
+
+  return result.hits.hits
+    .filter((hit) => hit._source)
+    .map((hit) => ({
+      trace: transformElasticSearchTraceToTrace(hit._source!, protections),
+      hit,
+      source: hit._source!,
+    }));
+}
+
 interface SearchTracesOptions {
   connConfig: ConnectionConfig;
   search: Parameters<ElasticClient['search']>[0] & {
@@ -39,19 +73,17 @@ export async function searchTraces({
   },
   protections = {},
 }: SearchTracesOptions): Promise<Trace[]> {
-  const client = await esClient(connConfig);
-  const result = await client.search<ElasticSearchTrace>({
-    index,
-    size,
-    ...searchParams
+  const tracesWithInternals = await searchTracesWithInternals({
+    connConfig,
+    search: {
+      index,
+      size,
+      ...searchParams
+    },
+    protections,
   });
 
-  const traces = result.hits.hits
-    .map((hit) => hit._source!)
-    .filter((x) => x)
-    .map((t) => transformElasticSearchTraceToTrace(t, protections));
-
-  return traces;
+  return tracesWithInternals.map(({ trace }) => trace);
 }
 
 interface AggregateTracesOptions<T extends Record<string, T.AggregationsAggregationContainer>> {
