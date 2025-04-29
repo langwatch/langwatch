@@ -68,6 +68,7 @@ app.get(
     description: "Get a specific prompt",
   }),
   async (c) => {
+    console.log("Getting prompt by ID");
     const repository = c.get("llmConfigRepository");
     const project = c.get("project");
     const { id } = c.req.param();
