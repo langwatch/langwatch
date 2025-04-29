@@ -693,6 +693,57 @@ export const analyticsMetrics = {
       quickwitSupport: false,
     },
   },
+  threads: {
+    average_duration_per_thread: {
+      label: "Thread Duration",
+      colorSet: "purpleTones",
+      format: formatMilliseconds,
+      increaseIs: "neutral",
+      allowedAggregations: ["avg"],
+      aggregation: () => ({
+        thread_sessions: {
+          terms: {
+            field: "metadata.thread_id",
+            size: 10000,
+          },
+          aggs: {
+            session_duration: {
+              scripted_metric: {
+                init_script:
+                  "state.min = Long.MAX_VALUE; state.max = Long.MIN_VALUE;",
+                map_script: `
+                  if (doc.containsKey('timestamps.started_at') && !doc['timestamps.started_at'].empty) {
+                    long timestamp = doc['timestamps.started_at'].value.toInstant().toEpochMilli();
+                    if (timestamp < state.min) state.min = timestamp;
+                    if (timestamp > state.max) state.max = timestamp;
+                  }
+                `,
+                combine_script: "return ['min': state.min, 'max': state.max];",
+                reduce_script: `
+                  long min = Long.MAX_VALUE;
+                  long max = Long.MIN_VALUE;
+                  for (state in states) {
+                    if (state.min < min && state.min != Long.MAX_VALUE) min = state.min;
+                    if (state.max > max && state.max != Long.MIN_VALUE) max = state.max;
+                  }
+                  if (min == Long.MAX_VALUE || max == Long.MIN_VALUE) return 0;
+                  long duration = max - min;
+                  return duration > 10800000 ? 10800000 : duration;
+                `,
+              },
+            },
+          },
+        },
+        average_duration_per_thread_avg: {
+          avg_bucket: {
+            buckets_path: "thread_sessions>session_duration.value",
+          },
+        },
+      }),
+      extractionPath: () => "average_duration_per_thread_avg",
+      quickwitSupport: false,
+    },
+  },
 } satisfies Record<string, Record<string, AnalyticsMetric>>;
 
 export type AnalyticsMetricsGroupsEnum = keyof typeof analyticsMetrics;
