@@ -19,20 +19,23 @@ export const transformElasticSearchTraceToTrace = (
   elasticSearchTrace: ElasticSearchTrace,
   protections: Protections,
 ): Trace => {
-  const { metadata = {}, events, evaluations, spans, input, output, metrics, ...traceFields } = elasticSearchTrace;
+  const {
+    metadata = {},
+    events,
+    evaluations,
+    spans,
+    input,
+    output,
+    metrics,
+    ...traceFields
+  } = elasticSearchTrace;
 
   const reservedMetadata = Object.fromEntries(
     Object.entries(metadata).filter(
       ([key]) => key in reservedTraceMetadataSchema.shape
     )
   ) as ReservedTraceMetadata;
-
   const customMetadata = metadata.custom ?? {};
-
-  const finalMetadata = {
-    ...reservedMetadata,
-    ...customMetadata,
-  };
 
   let transformedEvents: Event[] = [];
   let transformedEvaluations: Evaluation[] = [];
@@ -40,7 +43,7 @@ export const transformElasticSearchTraceToTrace = (
 
   let transformedInput: TraceInput | undefined = void 0;
   let transformedOutput: TraceOutput | undefined = void 0;
-  let transformedMetrics: Trace['metrics'] = void 0;
+  let transformedMetrics: Trace['metrics'] | undefined = void 0;
 
   if (input && protections.canSeeCapturedInput === true) {
     transformedInput = input;
@@ -70,7 +73,10 @@ export const transformElasticSearchTraceToTrace = (
 
   return {
     ...traceFields,
-    metadata: finalMetadata,
+    metadata: {
+      ...customMetadata,
+      ...reservedMetadata, // TODO(afr): I switched this, so that reserved metadata always takes precedence over custom metadata
+    },
     events: transformedEvents,
     evaluations: transformedEvaluations,
     spans: transformedSpans,
