@@ -26,7 +26,6 @@ trace_urls: dict[str, str] = {}
 class TraceIdCapturerExporter(SpanExporter):
     def export(self, spans):
         global last_trace
-        print("\n\nHERE\n\n")
 
         context = spans[0].get_span_context()
         if context is not None:

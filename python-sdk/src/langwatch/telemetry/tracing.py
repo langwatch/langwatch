@@ -199,6 +199,9 @@ class LangWatchTrace:
 
             self.root_span = LangWatchSpan(trace=self, **root_span_params)
             await self.root_span.__aenter__()
+            context = self.root_span.get_span_context()
+            if context is not None:
+                self._trace_id = context.trace_id
             return self.root_span
 
     def _cleanup(
