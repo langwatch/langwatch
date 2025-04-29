@@ -6,6 +6,7 @@ import {
   HStack,
   Spacer,
   Spinner,
+  Text,
   VStack,
 } from "@chakra-ui/react";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
@@ -16,6 +17,9 @@ import {
   LuChevronLeft,
   LuChevronRight,
   LuCode,
+  LuPanelLeft,
+  LuPanelLeftOpen,
+  LuPanelRightOpen,
 } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -43,6 +47,16 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
 
+  const [sidebarVisible, setSidebarVisible] = useState(true);
+
+  const { name } = useEvaluationWizardStore(
+    useShallow((state) => {
+      return {
+        name: state.wizardState.name,
+      };
+    })
+  );
+
   const { isAutosaving } = useEvaluationWizardStore(
     useShallow((state) => {
       // For easier debugging
@@ -58,54 +72,80 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
   );
 
   return (
-    <Dialog.Content width="full" height="full" minHeight="fit-content">
-      <Dialog.CloseTrigger />
-      <Dialog.Header
-        background="white"
-        paddingX={2}
-        paddingY={3}
-        borderBottom="1px solid"
-        borderBottomColor="gray.200"
-        display="flex"
-      >
-        <HStack width="full" justifyContent="start">
-          <Box
-            role="button"
-            onClick={() => void router.push(`/${project?.slug}/evaluations`)}
-            cursor="pointer"
+    <ReactFlowProvider>
+      <WizardProvider isInsideWizard={true}>
+        <Dialog.Content width="full" height="full" minHeight="fit-content">
+          <Dialog.CloseTrigger />
+          <Dialog.Header
+            background="white"
+            paddingLeft={2}
+            paddingY={3}
+            display="flex"
           >
-            <LogoIcon width={24} height={24} />
-          </Box>
-          {isAutosaving && (
-            <Tooltip content="Saving changes...">
-              <Box>
-                <Spinner size="sm" />
+            <HStack
+              width="full"
+              justifyContent="start"
+              minWidth="500px"
+              maxWidth="500px"
+              paddingLeft={2}
+              paddingRight={4}
+              gap={4}
+            >
+              <Box
+                role="button"
+                onClick={() =>
+                  void router.push(`/${project?.slug}/evaluations`)
+                }
+                cursor="pointer"
+              >
+                <LogoIcon width={24} height={24} />
               </Box>
-            </Tooltip>
-          )}
-        </HStack>
-        <HStack width="full" justifyContent="center">
-          <Heading as="h1" size="sm" fontWeight="normal">
-            Evaluation Wizard
-          </Heading>
-        </HStack>
-        <HStack width="full" justifyContent="end" paddingRight={10} />
-      </Dialog.Header>
-      <Dialog.Body
-        display="flex"
-        minHeight="fit-content"
-        background="white"
-        width="full"
-        padding={0}
-      >
-        <ReactFlowProvider>
-          <WizardProvider isInsideWizard={true}>
-            <WizardSidebar isLoading={isLoading} />
+              <Text fontSize="13px" fontWeight="medium">
+                {name}
+              </Text>
+              {isAutosaving && (
+                <Tooltip content="Saving changes...">
+                  <Box>
+                    <Spinner size="sm" />
+                  </Box>
+                </Tooltip>
+              )}
+              {sidebarVisible && <Spacer />}
+              <Tooltip
+                content={sidebarVisible ? "Hide sidebar" : "Show sidebar"}
+                openDelay={0}
+              >
+                <Button
+                  variant="ghost"
+                  onClick={() => setSidebarVisible(!sidebarVisible)}
+                  _icon={{
+                    color: "gray.600",
+                  }}
+                >
+                  {sidebarVisible ? <LuPanelLeft /> : <LuPanelLeftOpen />}
+                </Button>
+              </Tooltip>
+            </HStack>
+            <HStack width="full" justifyContent="center">
+              <Heading as="h1" size="sm" fontWeight="normal">
+                Evaluation Wizard
+              </Heading>
+            </HStack>
+            <HStack justifyContent="end" paddingRight={10} />
+          </Dialog.Header>
+          <Dialog.Body
+            display="flex"
+            minHeight="fit-content"
+            background="white"
+            width="full"
+            padding={0}
+          >
+            {sidebarVisible && <WizardSidebar isLoading={isLoading} />}
             <WizardWorkspace />
-          </WizardProvider>
-        </ReactFlowProvider>
-      </Dialog.Body>
-    </Dialog.Content>
+          </Dialog.Body>
+        </Dialog.Content>
+      </WizardProvider>
+    </ReactFlowProvider>
   );
 }
 
@@ -215,7 +255,7 @@ const WizardSidebar = memo(function WizardSidebar({
     if (step === "results") {
       setWizardState({ workspaceTab: "results" });
     }
-  }, [step, setWizardState, executionMethod, evaluatorNode]);
+  }, [step, setWizardState, executionMethod, evaluatorNode?.data?.evaluator]);
 
   return (
     <VStack

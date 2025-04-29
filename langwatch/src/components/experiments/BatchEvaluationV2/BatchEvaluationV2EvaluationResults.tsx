@@ -237,8 +237,6 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
     isFinished: boolean;
     size?: "sm" | "md";
   }) {
-    const [tabIndex, setTabIndex] = useState(0);
-
     const {
       run,
       datasetByIndex,
@@ -262,6 +260,8 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
         isFinished,
       }
     );
+
+    const [tabIndex, setTabIndex] = useState(0);
 
     if (run.error) {
       return (
@@ -369,6 +369,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
         flexDirection="column"
         minHeight="0"
         position="relative"
+        value={Object.keys(resultsByEvaluator)[tabIndex]}
         onValueChange={(change) =>
           setTabIndex(Object.keys(resultsByEvaluator).indexOf(change.value))
         }

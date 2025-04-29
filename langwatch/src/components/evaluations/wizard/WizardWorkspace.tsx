@@ -65,8 +65,11 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
       minHeight="calc(100vh - 50px)"
       borderLeft="1px solid"
       borderLeftColor="gray.200"
+      borderTop="1px solid"
+      borderTopColor="gray.200"
       minWidth="0"
       gap={0}
+      borderRadius="8px 0 0 0"
     >
       {(hasDataset || hasWorkflow || hasResults) && (
         <Tabs.Root

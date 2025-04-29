@@ -1,12 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useHandleServerMessage } from "./useSocketClient";
 import { useWorkflowStore } from "./useWorkflowStore";
-import type {
-  StudioClientEvent,
-  StudioServerEvent,
-} from "../types/events";
+import type { StudioClientEvent, StudioServerEvent } from "../types/events";
 import { getDebugger } from "../../utils/logger";
 import { toaster } from "../../components/ui/toaster";
 
@@ -59,6 +56,8 @@ export const usePostEvent = () => {
     [setEvaluationState]
   );
 
+  const postEventTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const postEvent = useCallback(
     (event: StudioClientEvent) => {
       if (!project) {
@@ -66,9 +65,8 @@ export const usePostEvent = () => {
       }
 
       void (async () => {
-        let timeout: NodeJS.Timeout | undefined;
         try {
-          timeout = setTimeout(() => {
+          postEventTimeoutRef.current = setTimeout(() => {
             handleTimeout(event);
           }, 20_000);
 
@@ -112,8 +110,8 @@ export const usePostEvent = () => {
                 );
                 debug("Received SSE event:", serverEvent);
 
-                if (timeout) {
-                  clearTimeout(timeout);
+                if (postEventTimeoutRef.current) {
+                  clearTimeout(postEventTimeoutRef.current);
                 }
 
                 handleServerMessage(serverEvent);
@@ -171,8 +169,8 @@ export const usePostEvent = () => {
             });
           }
         } finally {
-          if (timeout) {
-            clearTimeout(timeout);
+          if (postEventTimeoutRef.current) {
+            clearTimeout(postEventTimeoutRef.current);
           }
           setIsLoading(false);
         }
@@ -181,5 +179,12 @@ export const usePostEvent = () => {
     [handleServerMessage, handleTimeout, project, setEvaluationState]
   );
 
-  return { postEvent, isLoading };
+  const stopLoading = useCallback(() => {
+    if (postEventTimeoutRef.current) {
+      clearTimeout(postEventTimeoutRef.current);
+    }
+    setIsLoading(false);
+  }, [setIsLoading]);
+
+  return { postEvent, isLoading, stopLoading };
 };
