@@ -254,41 +254,20 @@ export function EvaluationResults({
         />
         <Spacer />
         {selectedRun && (
-          <BatchEvaluationV2EvaluationSummary run={selectedRun} />
+          <BatchEvaluationV2EvaluationSummary
+            run={selectedRun}
+            showProgress={
+              (!selectedRun || selectedRun.run_id === evaluationStateRunId) &&
+              !!evaluationStateRunId &&
+              evaluationState?.status === "running"
+            }
+            onStop={() =>
+              stopEvaluationExecution({
+                run_id: evaluationStateRunId ?? "",
+              })
+            }
+          />
         )}
-        {(!selectedRun || selectedRun.run_id === evaluationStateRunId) &&
-          evaluationStateRunId &&
-          evaluationState?.status === "running" && (
-            <HStack
-              width="full"
-              padding={3}
-              borderTop="1px solid"
-              borderColor="gray.200"
-              gap={2}
-            >
-              <Text whiteSpace="nowrap" marginTop="-1px" paddingX={2}>
-                Running
-              </Text>
-              <EvaluationProgressBar
-                evaluationState={evaluationState}
-                size="lg"
-              />
-              <Button
-                colorPalette="red"
-                onClick={() =>
-                  stopEvaluationExecution({
-                    run_id: evaluationStateRunId,
-                  })
-                }
-                minHeight="28px"
-                minWidth="0"
-                paddingY="6px"
-                marginLeft="8px"
-              >
-                <Box paddingX="6px">Stop</Box>
-              </Button>
-            </HStack>
-          )}
       </VStack>
     </HStack>
   );
