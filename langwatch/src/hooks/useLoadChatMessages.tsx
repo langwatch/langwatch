@@ -43,23 +43,42 @@ export function useLoadChatMessagesEffect({
 
   React.useEffect(() => {
     if (spanObj) {
-      const inputMessages = spanObj?.input
-        ? JSON.parse(spanObj.input.value)
-        : [];
-      const outputMessages = spanObj?.output
-        ? JSON.parse(spanObj.output.value)
-        : [];
+      const input = spanObj.input;
+      const output = spanObj.output;
+
+      const inputMessages: Message[] = [];
+      const outputMessages: Message[] = [];
+
+      if (input) {
+        if (typeof input === "string") {
+          inputMessages.push(...JSON.parse(input));
+        } else if (Array.isArray(input)) {
+          inputMessages.push(...input);
+        } else {
+          inputMessages.push(input as unknown as Message);
+        }
+      }
+      if (output) {
+        if (typeof output === "string") {
+          outputMessages.push(...JSON.parse(output));
+        } else if (Array.isArray(output)) {
+          outputMessages.push(...output);
+        } else {
+          outputMessages.push(output as unknown as Message);
+        }
+      }
+
       const inputMessagesArr = (
         Array.isArray(inputMessages) ? inputMessages : [inputMessages]
       ).map((message) =>
-        message.role ? message : { role: "user", content: message.toString() }
+        message.role ? message : { id: void 0, role: "user", content: message.toString() }
       );
       const outputMessagesArr = (
         Array.isArray(outputMessages) ? outputMessages : [outputMessages]
       ).map((message) =>
         message.role
           ? message
-          : { role: "assistant", content: message.toString() }
+          : { id: void 0, role: "assistant", content: message.toString() }
       );
 
       // Generate message id placeholders in case they are missing
@@ -75,7 +94,7 @@ export function useLoadChatMessagesEffect({
       const nonSystemMessages = messages.filter((m) => m.role !== "system");
 
       for (const chatWindowId of chatWindowIds) {
-        onSetMessages(chatWindowId, nonSystemMessages);
+        onSetMessages(chatWindowId, nonSystemMessages as Message[]);
         if (systemMessage) {
           onChangeSystemPrompt(chatWindowId, systemMessage.content);
         }

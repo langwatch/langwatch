@@ -100,7 +100,7 @@ export default async function handler(
   if (params.llmMode) {
     const llmModeTraces: LLMModeTrace[] = (traces as Trace[]).map((trace) => ({
       ...toLLMModeTrace(trace as Trace & { spans: Span[] }),
-      spans: undefined,
+      spans: [],
       evaluations: undefined,
     }));
     traces = llmModeTraces;
