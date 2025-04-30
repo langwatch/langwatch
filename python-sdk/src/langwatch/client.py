@@ -31,7 +31,7 @@ class Client(LangWatchClientProtocol):
 	_disable_sending: bool = False
 	_flush_on_exit: bool = True
 	_span_exporter_exclude_rules: List[SpanExporterExcludeRule] = []
-
+	_ignore_global_tracer_provider_override_warning: bool = False
 	def __init__(
 		self,
 		api_key: Optional[str] = None,
@@ -43,6 +43,7 @@ class Client(LangWatchClientProtocol):
 		disable_sending: bool = False,
 		flush_on_exit: bool = True,
 		span_exporter_exclude_rules: Optional[List[SpanExporterExcludeRule]] = None,
+		ignore_global_tracer_provider_override_warning: bool = False,
 	):
 		"""
 		Initialize the LangWatch tracing client.
@@ -64,7 +65,7 @@ class Client(LangWatchClientProtocol):
 		self._disable_sending = disable_sending
 		self._flush_on_exit = flush_on_exit
 		self._span_exporter_exclude_rules = span_exporter_exclude_rules or []
-
+		self._ignore_global_tracer_provider_override_warning = ignore_global_tracer_provider_override_warning
 		self.base_attributes = base_attributes or {}
 		self.base_attributes[AttributeName.LangWatchSDKName] = "langwatch-observability-sdk"
 		self.base_attributes[AttributeName.LangWatchSDKVersion] = str(__version__)
@@ -127,6 +128,7 @@ class Client(LangWatchClientProtocol):
 			if tracer_provider is not None:
 				if not isinstance(tracer_provider, TracerProvider): # type: ignore
 					raise ValueError("tracer_provider must be an instance of TracerProvider")
+				self.__set_langwatch_exporter(tracer_provider)
 				trace.set_tracer_provider(tracer_provider)
 				return tracer_provider
 
@@ -135,7 +137,9 @@ class Client(LangWatchClientProtocol):
 				if not isinstance(global_provider, TracerProvider):
 					raise ValueError("Global tracer provider must be an instance of TracerProvider")
 
-				logger.warning("There is already a global tracer provider set. LangWatch will not override it automatically, but this may result in telemetry not being sent to LangWatch if you have not configured it to do so yourself.")
+				if not self._ignore_global_tracer_provider_override_warning:
+					logger.warning("An existing global trace provider was found. LangWatch will not override it automatically, but instead is attaching another span processor and exporter to it. You can disable this warning by setting `ignore_global_tracer_provider_override_warning` to `True`.")
+				self.__set_langwatch_exporter(global_provider)
 
 				return global_provider
 
@@ -153,30 +157,7 @@ class Client(LangWatchClientProtocol):
 			sampler = ALWAYS_OFF if self._disable_sending else TraceIdRatioBased(1.0)
 			provider = TracerProvider(resource=resource, sampler=sampler)
 
-			if not self.api_key:
-				raise ValueError("LangWatch API key is required but not provided")
-
-			headers = {
-				"Authorization": f"Bearer {self.api_key}",
-				"X-LangWatch-SDK-Version": str(__version__),
-			}
-
-			if self.debug:
-				logger.info(f"Configuring OTLP exporter with endpoint: {self._endpoint_url}/api/otel/v1/traces")
-
-			otlp_exporter = OTLPSpanExporter(
-				endpoint=f"{self._endpoint_url}/api/otel/v1/traces",
-				headers=headers,
-				timeout=int(os.getenv("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", 30)),
-			)
-
-			provider.add_span_processor(BatchSpanProcessor(
-				span_exporter=otlp_exporter,
-				max_export_batch_size=int(os.getenv("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", 100)),
-				max_queue_size=int(os.getenv("OTEL_BSP_MAX_QUEUE_SIZE", 512)),
-				schedule_delay_millis=float(os.getenv("OTEL_BSP_SCHEDULE_DELAY", 1000)),
-				export_timeout_millis=float(os.getenv("OTEL_BSP_EXPORT_TIMEOUT", 10000)),
-			))
+			self.__set_langwatch_exporter(provider)
 
 			if self._flush_on_exit:
 				logger.info("Registering atexit handler to flush tracer provider on exit")
@@ -188,3 +169,29 @@ class Client(LangWatchClientProtocol):
 			return provider
 		except Exception as e:
 			raise RuntimeError(f"Failed to create and configure tracer provider: {str(e)}") from e
+
+	def __set_langwatch_exporter(self, provider: TracerProvider) -> None:
+		if not self.api_key:
+			raise ValueError("LangWatch API key is required but not provided")
+
+		headers = {
+			"Authorization": f"Bearer {self.api_key}",
+			"X-LangWatch-SDK-Version": str(__version__),
+		}
+
+		if self.debug:
+			logger.info(f"Configuring OTLP exporter with endpoint: {self._endpoint_url}/api/otel/v1/traces")
+
+		otlp_exporter = OTLPSpanExporter(
+			endpoint=f"{self._endpoint_url}/api/otel/v1/traces",
+			headers=headers,
+			timeout=int(os.getenv("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", 30)),
+		)
+
+		provider.add_span_processor(BatchSpanProcessor(
+			span_exporter=otlp_exporter,
+			max_export_batch_size=int(os.getenv("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", 100)),
+			max_queue_size=int(os.getenv("OTEL_BSP_MAX_QUEUE_SIZE", 512)),
+			schedule_delay_millis=float(os.getenv("OTEL_BSP_SCHEDULE_DELAY", 1000)),
+			export_timeout_millis=float(os.getenv("OTEL_BSP_EXPORT_TIMEOUT", 10000)),
+		))
