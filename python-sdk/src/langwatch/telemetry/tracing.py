@@ -396,7 +396,7 @@ class LangWatchTrace:
         conversation: Conversation = [],
         settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
-        data: Optional[Dict[str, Any]] = None,
+        data: Optional[Union[BasicEvaluateData, Dict[str, Any]]] = None,
     ):
         from langwatch import evaluations
 
@@ -425,7 +425,7 @@ class LangWatchTrace:
         conversation: Conversation = [],
         settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
-        data: Optional[Dict[str, Any]] = None,
+        data: Optional[Union[BasicEvaluateData, Dict[str, Any]]] = None,
     ):
         from langwatch import evaluations
 

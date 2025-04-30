@@ -20,6 +20,7 @@ import threading
 import inspect
 
 from langwatch.attributes import AttributeName
+from langwatch.evaluations import BasicEvaluateData
 from langwatch.utils.transformation import (
     SerializableWithStringFallback,
     rag_contexts,
@@ -426,7 +427,7 @@ class LangWatchSpan:
         conversation: Conversation = [],
         settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
-        data: Optional[Dict[str, Any]] = None,
+        data: Optional[Union[BasicEvaluateData, Dict[str, Any]]] = None,
     ):
         contexts = contexts or []
         conversation = conversation or []
@@ -458,7 +459,7 @@ class LangWatchSpan:
         conversation: Conversation = [],
         settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
-        data: Optional[Dict[str, Any]] = None,
+        data: Optional[Union[BasicEvaluateData, Dict[str, Any]]] = None,
     ):
         contexts = contexts or []
         conversation = conversation or []
