@@ -58,6 +58,11 @@ export function StepRadio({
       _active={{ background: "colorPalette.muted/20" }}
       _icon={{ color: "colorPalette.solid" }}
       {...props}
+      _disabled={{
+        opacity: 0.4,
+        pointerEvents: "none",
+        cursor: "not-allowed",
+      }}
     >
       <RadioCard.ItemHiddenInput />
       <RadioCard.ItemControl cursor="pointer" width="full">
