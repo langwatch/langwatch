@@ -61,31 +61,28 @@ export const getOrganizationProjectsCount = async (organizationId: string) => {
   });
 };
 
-const cacheResult: {
-  projectIds: string[];
-  organizationId: string;
+type CacheEntry = {
   count: number;
   lastUpdated: number;
-} = {
-  projectIds: [],
-  organizationId: "",
-  count: 0,
-  lastUpdated: 0,
 };
+
+const ONE_HOUR = 60 * 60 * 1000;
+const messageCountCache = new Map<string, CacheEntry>();
 
 export const getCurrentMonthMessagesCount = async (
   projectIds: string[],
   organizationId?: string
 ) => {
-  const now = Date.now();
-  const ONE_HOUR = 60 * 60 * 1000;
+  const cacheKey = organizationId
+    ? `org:${organizationId}`
+    : `projects:${projectIds.sort().join(",")}`;
 
-  if (
-    (cacheResult.projectIds === projectIds ||
-      cacheResult.organizationId === organizationId) &&
-    now - cacheResult.lastUpdated < ONE_HOUR
-  ) {
-    return cacheResult.count;
+  const now = Date.now();
+  const cachedResult = messageCountCache.get(cacheKey);
+
+  // Return cached result if valid
+  if (cachedResult && now - cachedResult.lastUpdated < ONE_HOUR) {
+    return cachedResult.count;
   }
 
   let projectIdsToUse = projectIds;
@@ -125,10 +122,12 @@ export const getCurrentMonthMessagesCount = async (
     },
   });
 
-  cacheResult.projectIds = projectIds;
-  cacheResult.organizationId = organizationId ?? "";
-  cacheResult.count = messagesCount.count;
-  cacheResult.lastUpdated = now;
+  // Store result in cache
+  messageCountCache.set(cacheKey, {
+    count: messagesCount.count,
+    lastUpdated: now,
+  });
+
   return messagesCount.count;
 };
 
