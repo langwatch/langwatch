@@ -113,7 +113,7 @@ export const projectRoutes = {
     title: "Triggers",
   },
   promptConfigs: {
-    path: "/[project]/prompt-configs",
+    path: "/[project]/prompts",
     title: "Prompts",
   },
 };

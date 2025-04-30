@@ -129,7 +129,7 @@ test("Prompt Management from Workflow", async ({ page }) => {
   await page.getByTestId("restore-version-button-0").click();
   await page.getByRole("button", { name: "close" }).click();
   await page.getByRole("link").first().click();
-  await page.goto("http://localhost:5560/fyes-lT_hZ2/prompt-configs");
+  await page.goto("http://localhost:5560/fyes-lT_hZ2/prompts");
   await page
     .getByRole("row", { name: "We will use this prompt in" })
     .getByRole("button")

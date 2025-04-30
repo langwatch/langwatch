@@ -14,7 +14,7 @@ test.setTimeout(60000);
  * 3. Delete a prompt config
  */
 test("Test happy paths for prompt management", async ({ page }) => {
-  await page.goto("http://localhost:5560/fyes-lT_hZ2/prompt-configs");
+  await page.goto("http://localhost:5560/fyes-lT_hZ2/prompts");
   await page.getByText("No prompt configurations").click();
   await page.getByRole("button", { name: "Create New" }).click();
   await page.getByText("New Prompt Config").click();
