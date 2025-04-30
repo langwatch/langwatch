@@ -26,6 +26,7 @@ import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "../CurrentDrawer";
 import { NoDataInfoBlock } from "../NoDataInfoBlock";
 import { RandomColorAvatar } from "../RandomColorAvatar";
+import { RedactedField } from "../ui/RedactedField";
 
 export const AnnotationsTable = ({
   allQueueItems,
@@ -454,28 +455,32 @@ export const AnnotationsTable = ({
                             )}
 
                             <Table.Cell minWidth={350}>
-                              <Tooltip content={item.trace?.input?.value}>
-                                <Text
-                                  lineClamp={2}
-                                  maxWidth="350px"
-                                  textOverflow="ellipsis"
-                                  wordBreak="break-word"
-                                >
-                                  {item.trace?.input?.value ?? "<empty>"}
-                                </Text>
-                              </Tooltip>
+                              <RedactedField field="input">
+                                <Tooltip content={item.trace?.input?.value ?? "<empty>"}>
+                                  <Text
+                                    lineClamp={2}
+                                    maxWidth="350px"
+                                    textOverflow="ellipsis"
+                                    wordBreak="break-word"
+                                  >
+                                    {item.trace?.input?.value ?? "<empty>"}
+                                  </Text>
+                                </Tooltip>
+                              </RedactedField>
                             </Table.Cell>
                             <Table.Cell minWidth={350}>
-                              <Tooltip content={item.trace?.output?.value}>
-                                <Text
-                                  lineClamp={2}
-                                  maxWidth="350px"
-                                  textOverflow="ellipsis"
-                                  wordBreak="break-word"
-                                >
-                                  {item.trace?.output?.value ?? "<empty>"}
-                                </Text>
-                              </Tooltip>
+                              <RedactedField field="output">
+                                <Tooltip content={item.trace?.output?.value ?? "<empty>"}>
+                                  <Text
+                                    lineClamp={2}
+                                    maxWidth="350px"
+                                    textOverflow="ellipsis"
+                                    wordBreak="break-word"
+                                  >
+                                    {item.trace?.output?.value ?? "<empty>"}
+                                  </Text>
+                                </Tooltip>
+                              </RedactedField>
                             </Table.Cell>
                             {hasExpectedOutput() && (
                               <Table.Cell minWidth={350}>

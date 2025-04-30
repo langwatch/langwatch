@@ -8,17 +8,18 @@ import {
   Spinner,
   Text,
   createListCollection,
+  Alert,
+  Badge,
 } from "@chakra-ui/react";
-import { PIIRedactionLevel, type Project } from "@prisma/client";
+import { PIIRedactionLevel, ProjectSensitiveDataVisibilityLevel, type Project } from "@prisma/client";
 import isEqual from "lodash.isequal";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   useForm,
   useWatch,
   type SubmitHandler,
   Controller,
 } from "react-hook-form";
-import { useDebouncedCallback } from "use-debounce";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import { ProjectSelector } from "../components/DashboardLayout";
 import SettingsLayout from "../components/SettingsLayout";
@@ -34,6 +35,8 @@ import { usePublicEnv } from "../hooks/usePublicEnv";
 import { HStack, VStack } from "@chakra-ui/react";
 import { toaster } from "../components/ui/toaster";
 import { Select } from "../components/ui/select";
+import { Tooltip } from "~/components/ui/tooltip";
+import { Lock } from "react-feather";
 
 type OrganizationFormData = {
   name: string;
@@ -296,6 +299,8 @@ type ProjectFormData = {
   s3SecretAccessKey?: string;
   s3Bucket?: string;
   piiRedactionLevel: PIIRedactionLevel;
+  capturedInputVisibility: ProjectSensitiveDataVisibilityLevel;
+  capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel;
 };
 
 function ProjectSettingsForm({ project }: { project: Project }) {
@@ -329,6 +334,51 @@ function ProjectSettingsForm({ project }: { project: Project }) {
     ],
   });
 
+  const capturedInputVisibilityCollection = createListCollection({
+    items: [
+      {
+        label: "Redacted to All",
+        value: ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL,
+        description: "Redacts captured input for all users",
+      },
+      {
+        label: "Visible to Admin",
+        value: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
+        description: "Redacts captured input for all users except admins",
+      },
+      {
+        label: "Visible to All",
+        value: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+        description: "Does not redact any captured input",
+      },
+    ],
+  });
+
+  const capturedOutputVisibilityCollection = createListCollection({
+    items: [
+      {
+        label: "Redacted to All",
+        value: ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL,
+        description: "Redacts captured output for all users",
+      },
+      {
+        label: "Visible to Admin",
+        value: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN,
+        description: "Redacts captured output for all users except admins",
+      },
+      {
+        label: "Visible to All",
+        value: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+        description: "Does not redact any captured output",
+      },
+    ],
+  });
+
+  const { hasTeamPermission } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
+  const userIsAdmin = hasTeamPermission(TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY);
+
   const defaultValues = {
     name: project.name,
     language: project.language,
@@ -339,6 +389,8 @@ function ProjectSettingsForm({ project }: { project: Project }) {
     s3SecretAccessKey: project.s3SecretAccessKey ?? "",
     s3Bucket: project.s3Bucket ?? "",
     piiRedactionLevel: project.piiRedactionLevel,
+    capturedInputVisibility: project.capturedInputVisibility,
+    capturedOutputVisibility: project.capturedOutputVisibility,
   };
   const [previousValues, setPreviousValues] =
     useState<ProjectFormData>(defaultValues);
@@ -365,6 +417,10 @@ function ProjectSettingsForm({ project }: { project: Project }) {
         s3AccessKeyId: data.s3AccessKeyId ?? "",
         s3SecretAccessKey: data.s3SecretAccessKey ?? "",
         s3Bucket: data.s3Bucket ?? "",
+
+        // Only admins can change the visibility settings, this is enforced in the backend
+        capturedInputVisibility: userIsAdmin ? data.capturedInputVisibility : void 0,
+        capturedOutputVisibility: userIsAdmin ? data.capturedOutputVisibility : void 0,
       },
       {
         onSuccess: () => {
@@ -477,6 +533,113 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                     </Select.Trigger>
                     <Select.Content width="300px">
                       {piiRedactionLevelCollection.items.map((option) => (
+                        <Select.Item key={option.value} item={option}>
+                          <VStack align="start" gap={0}>
+                            <Text>{option.label}</Text>
+                            <Text fontSize="13px" color="gray.500">
+                              {option.description}
+                            </Text>
+                          </VStack>
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select.Root>
+                )}
+              />
+            </HorizontalFormControl>
+
+            <HorizontalFormControl
+              label="Show Captured Input Data"
+              helper={
+                <VStack align="start" gap={1}>
+                  <Text>Manage who can see input data on traces and spans</Text>
+                  {!userIsAdmin && (
+                    <Badge colorPalette="blue" variant="surface" size={"xs"}>
+                      <Tooltip content="Contact your admin to change this setting">
+                        <HStack>
+                          <Lock size={10} />
+                          <Text>Admin only</Text>
+                        </HStack>
+                      </Tooltip>
+                    </Badge>
+                  )}
+                </VStack>
+              }
+              invalid={!!formState.errors.capturedInputVisibility}
+            >
+              <Controller
+                control={control}
+                name="capturedInputVisibility"
+                rules={{ required: userIsAdmin ? "Captured input visibility is required" : undefined }}
+                render={({ field }) => (
+                  <Select.Root
+                    collection={capturedInputVisibilityCollection}
+                    {...field}
+                    onChange={undefined}
+                    value={[field.value]}
+                    onValueChange={(e) => {
+                      field.onChange(e.value[0]);
+                    }}
+                    disabled={!userIsAdmin}
+                  >
+                    <Select.Trigger width="full">
+                      <Select.ValueText placeholder="Select captured input visibility" />
+                    </Select.Trigger>
+                    <Select.Content width="300px">
+                      {capturedInputVisibilityCollection.items.map((option) => (
+                        <Select.Item key={option.value} item={option}>
+                          <VStack align="start" gap={0}>
+                            <Text>{option.label}</Text>
+                            <Text fontSize="13px" color="gray.500">
+                              {option.description}
+                            </Text>
+                          </VStack>
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select.Root>
+                )}
+              />
+            </HorizontalFormControl>
+            <HorizontalFormControl
+              label="Show Captured Output Data"
+              helper={
+                <VStack align="start" gap={1}>
+                  <Text>Manage who can see output data on traces and spans</Text>
+                  {!userIsAdmin && (
+                    <Badge colorPalette="blue" variant="surface" size={"xs"}>
+                      <Tooltip content="Contact your admin to change this setting">
+                        <HStack>
+                          <Lock size={10} />
+                          <Text>Admin only</Text>
+                        </HStack>
+                      </Tooltip>
+                    </Badge>
+                  )}
+                </VStack>
+              }
+              invalid={!!formState.errors.capturedOutputVisibility}
+            >
+              <Controller
+                control={control}
+                name="capturedOutputVisibility"
+                rules={{ required: userIsAdmin ? "Captured output visibility is required" : undefined }}
+                render={({ field }) => (
+                  <Select.Root
+                    collection={capturedOutputVisibilityCollection}
+                    {...field}
+                    onChange={undefined}
+                    value={[field.value]}
+                    onValueChange={(e) => {
+                      field.onChange(e.value[0]);
+                    }}
+                    disabled={!userIsAdmin}
+                  >
+                    <Select.Trigger width="full">
+                      <Select.ValueText placeholder="Select captured output visibility" />
+                    </Select.Trigger>
+                    <Select.Content width="300px">
+                      {capturedOutputVisibilityCollection.items.map((option) => (
                         <Select.Item key={option.value} item={option}>
                           <VStack align="start" gap={0}>
                             <Text>{option.label}</Text>

@@ -300,7 +300,7 @@ export type Trace = {
 
   events?: Event[];
   evaluations?: Evaluation[];
-  // TODO: add spans here too
+  spans: Span[];
 };
 
 export type LLMModeTrace = Omit<Trace, "timestamps" | "indexing_md5s"> & {
@@ -311,9 +311,6 @@ export type LLMModeTrace = Omit<Trace, "timestamps" | "indexing_md5s"> & {
   };
   ascii_tree: string;
 };
-
-// TODO: kill this after previous todo is done
-export type TraceWithSpans = Trace & { spans: Span[] };
 
 export type ElasticSearchTrace = Omit<
   Trace,

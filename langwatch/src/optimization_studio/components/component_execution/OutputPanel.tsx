@@ -15,6 +15,7 @@ import { RenderInputOutput } from "../../../components/traces/RenderInputOutput"
 import { SpanDuration } from "../../../components/traces/SpanDetails";
 import type { Component } from "../../types/dsl";
 import { useDrawer } from "../../../components/CurrentDrawer";
+import { RedactedField } from "../../../components/ui/RedactedField";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import { useShallow } from "zustand/react/shallow";
 
@@ -216,7 +217,9 @@ const OutputBox = ({ value, ...props }: { value: any } & BoxProps) => {
       whiteSpace="pre-wrap"
       {...props}
     >
-      <RenderInputOutput value={value} showTools />
+      <RedactedField field="output">
+        <RenderInputOutput value={value} showTools />
+      </RedactedField>
     </Box>
   );
 };

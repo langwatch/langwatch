@@ -11,6 +11,7 @@ import {
   checkUserPermissionForProject,
 } from "../permission";
 import { getTracesWithSpans } from "./traces";
+import { getUserProtectionsForProject } from "../utils";
 const scoreOptionSchema = z.object({
   value: z
     .union([z.string(), z.array(z.string())])
@@ -300,7 +301,9 @@ export const annotationRouter = createTRPCRouter({
           )
         ),
       ];
-      const traces = await getTracesWithSpans(input.projectId, traceIds);
+
+      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+      const traces = await getTracesWithSpans(input.projectId, traceIds, protections);
       const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
 
       return queues.map((queue) => ({
@@ -330,8 +333,9 @@ export const annotationRouter = createTRPCRouter({
         },
       });
 
+      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
       const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
-      const traces = await getTracesWithSpans(input.projectId, traceIds);
+      const traces = await getTracesWithSpans(input.projectId, traceIds, protections);
       const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
 
       return queueItems.map((item) => ({

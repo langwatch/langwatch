@@ -3,7 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import { Worker, type Job } from "bullmq";
 import { nanoid } from "nanoid";
 import type { EvaluationJob } from "~/server/background/types";
-import type { Trace, TraceWithSpans } from "~/server/tracer/types";
+import type { Trace } from "~/server/tracer/types";
 import { env } from "../../../env.mjs";
 import {
   AVAILABLE_EVALUATORS,
@@ -21,7 +21,6 @@ import {
   prepareEnvKeys,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders";
-import { esGetSpansByTraceId, getTraceById } from "../../api/routers/traces";
 import { prisma } from "../../db";
 import {
   evaluationDurationHistogram,
@@ -45,7 +44,9 @@ import {
   type MappingState,
 } from "../../tracer/tracesMapping";
 import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
-import { elasticSearchSpanToSpan } from "../../tracer/utils";
+import type { Protections } from "~/server/elasticsearch/protections";
+import { getTraceById } from "~/server/elasticsearch/traces";
+import { getProtectionsForProject } from "~/server/api/utils";
 
 const debug = getDebugger("langwatch:workers:evaluationsWorker");
 
@@ -62,12 +63,15 @@ export async function runEvaluationJob(
     throw `check config ${job.data.check.evaluator_id} not found`;
   }
 
+  const protections = await getProtectionsForProject(prisma, { projectId: job.data.trace.project_id });
+
   return await runEvaluationForTrace({
     projectId: job.data.trace.project_id,
     traceId: job.data.trace.trace_id,
     evaluatorType: job.data.check.type,
     settings: check.parameters,
     mappings: check.mappings as MappingState,
+    protections,
   });
 }
 
@@ -104,18 +108,7 @@ const buildDataForEvaluation = async (
   trace: Trace,
   mappings: MappingState
 ): Promise<DataForEvaluation> => {
-  const spans = await esGetSpansByTraceId({
-    traceId: trace.trace_id,
-    projectId: trace.project_id,
-  });
-
-  const traceWithSpans: TraceWithSpans = {
-    ...trace,
-    spans: spans.map(elasticSearchSpanToSpan),
-  };
-
-  const data = switchMapping(traceWithSpans, mappings);
-
+  const data = switchMapping(trace, mappings);
   if (!data) {
     throw new Error("No mapped data found to run evaluator");
   }
@@ -145,16 +138,21 @@ export const runEvaluationForTrace = async ({
   evaluatorType,
   settings,
   mappings,
+  protections,
 }: {
   projectId: string;
   traceId: string;
   evaluatorType: EvaluatorTypes;
   settings: Record<string, any> | string | number | boolean | null;
   mappings: MappingState;
-}): Promise<SingleEvaluationResult> => {
+  protections: Protections;
+  }): Promise<SingleEvaluationResult> => {
   const trace = await getTraceById({
-    projectId,
+    connConfig: { projectId },
     traceId,
+    protections,
+    includeEvaluations: true,
+    includeSpans: true,
   });
   if (!trace) {
     throw "trace not found";

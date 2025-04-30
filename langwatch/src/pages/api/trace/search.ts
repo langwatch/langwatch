@@ -85,6 +85,13 @@ export default async function handler(
           : params.endDate,
       pageSize,
     },
+    ctx: {
+      prisma,
+      publiclyShared: false,
+
+      // We don't care about user level permissions here, as we're access the data via API key
+      session: null,
+    },
     downloadMode: !params.llmMode,
     scrollId: params.scrollId ?? undefined,
   });

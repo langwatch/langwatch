@@ -14,6 +14,7 @@ import type {
   ElasticSearchSpan,
   ErrorCapture,
   EvaluationResult,
+  Span,
 } from "../../server/tracer/types";
 import { durationColor } from "../../utils/durationColor";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
@@ -25,13 +26,14 @@ import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
 import { RenderInputOutput } from "./RenderInputOutput";
 import { OverflownTextWithTooltip } from "../OverflownText";
+import { RedactedField } from "../ui/RedactedField";
 
 export function SpanDetails({
   project,
   span,
 }: {
   project: Project;
-  span: ElasticSearchSpan;
+  span: Span;
 }) {
   const estimatedCost = (
     <Tooltip content="When `metrics.completion_tokens` and `metrics.prompt_tokens` are not available, they are estimated based on input, output and the model for calculating costs.">
@@ -47,7 +49,7 @@ export function SpanDetails({
         <SpanTypeTag span={span} />
         <Heading as="h2" fontSize="22px" asChild>
           <OverflownTextWithTooltip lineClamp={1} wordBreak="break-word">
-            {span.name ?? span.model}
+            {span.name ?? ('model' in span ? span.model : "(unnamed)")}
           </OverflownTextWithTooltip>
         </Heading>
         <Spacer />
@@ -101,7 +103,7 @@ export function SpanDetails({
             {span.metrics?.tokens_estimated && estimatedCost}
           </Text>
         )}
-        {(span.vendor !== undefined || span.model !== undefined) && (
+        {('vendor' in span || 'model' in span) && (
           <Text>
             <b>Model:</b> {[span.vendor, span.model].filter((x) => x).join("/")}
           </Text>
@@ -173,11 +175,13 @@ export function SpanDetails({
             width="full"
             whiteSpace="pre-wrap"
           >
-            <RenderInputOutput value={span.input?.value} showTools />
+            <RedactedField field="input">
+              <RenderInputOutput value={span.input?.value} showTools />
+            </RedactedField>
           </Box>
         </VStack>
       )}
-      {span.contexts && (
+      {('contexts' in span && span.contexts) && (
         <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
             fontSize="13px"
@@ -263,7 +267,9 @@ export function SpanDetails({
                 width="full"
                 whiteSpace="pre-wrap"
               >
-                <RenderInputOutput value={span.output.value} showTools />
+                <RedactedField field="output">
+                  <RenderInputOutput value={span.output.value} showTools />
+                </RedactedField>
               </Box>
             )}
           </VStack>
@@ -274,11 +280,19 @@ export function SpanDetails({
 }
 
 export const getEvaluationResult = (
-  span: ElasticSearchSpan
+  span: Span
 ): EvaluationResult | undefined => {
-  if (span.output?.type === "evaluation_result") {
+  if (!span.output?.value) {
+    return undefined;
+  }
+
+  if (span.output.type === "evaluation_result") {
     try {
-      return JSON.parse(span.output.value);
+      if (typeof span.output.value === "string") {
+        return JSON.parse(span.output.value);
+      }
+
+      return span.output.value;
     } catch (_) {
       return undefined;
     }
@@ -286,7 +300,7 @@ export const getEvaluationResult = (
   return undefined;
 };
 
-export const SpanTypeTag = ({ span }: { span: ElasticSearchSpan }) => {
+export const SpanTypeTag = ({ span }: { span: Span }) => {
   const evaluationResult = getEvaluationResult(span);
   const evaluationPassed_ =
     evaluationResult && evaluationPassed(evaluationResult);

@@ -1,14 +1,13 @@
 import { PublicShareResourceTypes } from "@prisma/client";
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { TRACE_INDEX, esClient } from "../../elasticsearch";
-import type { ElasticSearchTrace } from "../../tracer/types";
 import {
   TeamRoleGroup,
   checkPermissionOrPubliclyShared,
   checkUserPermissionForProject,
 } from "../permission";
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
+import { getUserProtectionsForProject } from "../utils";
+import { getTraceById } from "~/server/elasticsearch/traces";
 
 export const spansRouter = createTRPCRouter({
   getAllForTrace: publicProcedure
@@ -22,39 +21,34 @@ export const spansRouter = createTRPCRouter({
         }
       )
     )
-    .query(async ({ input }) => {
-      const client = await esClient({ projectId: input.projectId });
-      const result = await client.search<ElasticSearchTrace>({
-        index: TRACE_INDEX.alias,
-        size: 50,
-        body: {
-          query: {
-            bool: {
-              must: [
-                { term: { trace_id: input.traceId } },
-                { term: { project_id: input.projectId } },
-              ] as QueryDslBoolQuery["must"],
-            } as QueryDslBoolQuery,
-          },
-        },
-      });
+    .query(async ({ input, ctx }) => {
+      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
 
-      const spans = result.hits.hits
-        .map((hit) => hit._source!)
-        .filter((x) => x)
-        .flatMap((hit) => hit.spans ?? [])
+      const trace = await getTraceById({
+        connConfig: { projectId: input.projectId },
+        traceId: input.traceId,
+        protections,
+        includeSpans: true,
+      });
+      if (!trace?.spans) {
+        return [];
+      }
+
+      const sortedSpans = trace.spans
         .sort((a, b) => {
-          const startDiff =
-            (a.timestamps?.started_at ?? 0) - (b.timestamps?.started_at ?? 0);
+          const aStart = a.timestamps?.started_at ?? 0;
+          const bStart = b.timestamps?.started_at ?? 0;
+
+          const startDiff = aStart - bStart;
           if (startDiff === 0) {
-            return (
-              (b.timestamps?.finished_at ?? 0) -
-              (a.timestamps?.finished_at ?? 0)
-            );
+            const aEnd = a.timestamps?.finished_at ?? 0;
+            const bEnd = b.timestamps?.finished_at ?? 0;
+            return bEnd - aEnd;
           }
+
           return startDiff;
         });
 
-      return spans;
+      return sortedSpans;
     }),
 });
