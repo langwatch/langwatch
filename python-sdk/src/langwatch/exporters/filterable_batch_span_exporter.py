@@ -31,9 +31,10 @@ class FilterableBatchSpanProcessor(BatchSpanProcessor):
         )
         self._exclude_rules = exclude_rules or []
 
-    def emit(self, span: ReadableSpan) -> None:
+    def on_end(self, span: ReadableSpan) -> None:
         """
-        Emits the span to the exporter, checking exclusion rules first.
+        Called when a span ends. Filters the span based on exclusion rules
+        before passing it to the parent processor.
         """
         is_excluded = False
         for rule in self._exclude_rules:
@@ -54,7 +55,6 @@ class FilterableBatchSpanProcessor(BatchSpanProcessor):
                 elif match_operation == "ends_with" and span_name.endswith(match_value):
                     is_excluded = True
                     break
-            # Add checks for other field_names here if they are added later
 
         if not is_excluded:
-            super().emit(span)  # type: ignore 
+            super().on_end(span)
