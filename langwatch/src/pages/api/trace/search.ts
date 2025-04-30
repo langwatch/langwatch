@@ -85,6 +85,11 @@ export default async function handler(
           : params.endDate,
       pageSize,
     },
+    ctx: {
+      prisma,
+      session: null,
+      publiclyShared: false,
+    },
     downloadMode: !params.llmMode,
     scrollId: params.scrollId ?? undefined,
   });
