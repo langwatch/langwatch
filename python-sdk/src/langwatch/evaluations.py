@@ -28,6 +28,13 @@ from langwatch.utils.exceptions import capture_exception
 if TYPE_CHECKING:
     from langwatch.telemetry.tracing import LangWatchTrace
 
+class BasicEvaluateData(BaseModel):
+    input: Optional[str] = None
+    output: Optional[str] = None
+    expected_output: Optional[str] = None
+    contexts: Optional[Union[List[RAGChunk], List[str]]] = None
+    expected_contexts: Optional[Union[List[RAGChunk], List[str]]] = None
+    conversation: Optional[Conversation] = None
 
 class EvaluationResultModel(BaseModel):
     status: Literal["processed", "skipped", "error"]
@@ -53,7 +60,7 @@ def evaluate(
     trace: Optional["LangWatchTrace"] = None,
     span: Optional["LangWatchSpan"] = None,
     api_key: Optional[str] = None,
-    data: Optional[Dict[str, Any]] = None,
+    data: Optional[Union[BasicEvaluateData, Dict[str, Any]]] = None,
 ) -> EvaluationResultModel:  # type: ignore
     with langwatch.span(
         name=name or slug, type="guardrail" if as_guardrail else "evaluation"
@@ -99,7 +106,7 @@ async def async_evaluate(
     trace: Optional["LangWatchTrace"] = None,
     span: Optional["LangWatchSpan"] = None,
     api_key: Optional[str] = None,
-    data: Optional[Dict[str, Any]] = None,
+    data: Optional[Union[BasicEvaluateData, Dict[str, Any]]] = None,
 ) -> EvaluationResultModel:  # type: ignore
     with langwatch.span(
         name=name or slug, type="guardrail" if as_guardrail else "evaluation"
@@ -146,25 +153,31 @@ def prepare_data(
     span: Optional["LangWatchSpan"] = None,
     as_guardrail: bool = False,
     api_key: Optional[str] = None,
-    data: Optional[Dict[str, Any]] = None,
+    data: Optional[Union[BasicEvaluateData, Dict[str, Any]]] = None,
 ):
     span_ctx = get_current_span().get_span_context()
     dataDict = {
         "trace_id": format(span_ctx.trace_id, "x"),
         "span_id": format(span_ctx.span_id, "x"),
-        **(data or {}),
+        **(data.model_dump(exclude_unset=True, exclude_none=True) if isinstance(data, BasicEvaluateData) else data or {}),
     }
     if input is not None:
+        warn("For the `evaluate` or `async_evaluate` function, the `input` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.")
         dataDict["input"] = input
     if output is not None:
+        warn("For the `evaluate` or `async_evaluate` function, the `output` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.")
         dataDict["output"] = output
     if expected_output is not None:
+        warn("For the `evaluate` or `async_evaluate` function, the `expected_output` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.")
         dataDict["expected_output"] = expected_output
     if contexts is not None:
+        warn("For the `evaluate` or `async_evaluate` function, the `contexts` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.")
         dataDict["contexts"] = contexts
     if expected_contexts is not None:
+        warn("For the `evaluate` or `async_evaluate` function, the `expected_contexts` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.")
         dataDict["expected_contexts"] = expected_contexts
     if conversation is not None:
+        warn("For the `evaluate` or `async_evaluate` function, the `conversation` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.")
         dataDict["conversation"] = conversation
 
     if trace_id is not None:
