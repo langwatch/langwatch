@@ -92,7 +92,7 @@ export const useBatchEvaluationResults = ({
         if (!predictedColumns[node]) {
           predictedColumns[node] = new Set();
         }
-        predictedColumns[node].add(key);
+        predictedColumns[node]!.add(key);
       }
     }
   }
