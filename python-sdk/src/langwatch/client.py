@@ -62,6 +62,7 @@ class Client(LangWatchClientProtocol):
 		self._endpoint_url = endpoint_url or os.getenv("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
 		self._debug = debug or os.getenv("LANGWATCH_DEBUG") == "true"
 		self._disable_sending = disable_sending
+		self._flush_on_exit = flush_on_exit
 		self._span_exporter_exclude_rules = span_exporter_exclude_rules or []
 
 		self.base_attributes = base_attributes or {}
