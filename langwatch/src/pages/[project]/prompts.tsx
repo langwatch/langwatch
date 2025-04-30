@@ -83,10 +83,12 @@ export default function PromptConfigsPage() {
       }
 
       // Create with defaults
-      await createConfigWithInitialVersionMutation.mutateAsync({
+      const result = await createConfigWithInitialVersionMutation.mutateAsync({
         name: "New Prompt Config",
         projectId: project.id,
       });
+
+      setSelectedConfigId(result.id);
     } catch (error) {
       toaster.create({
         title: "Error creating prompt config",
@@ -96,13 +98,6 @@ export default function PromptConfigsPage() {
     }
 
     void refetchPromptConfigs();
-    toaster.create({
-      title: "Prompt config created",
-      type: "success",
-      meta: {
-        closable: true,
-      },
-    });
   };
 
   const handleDeleteConfig = (config: LlmPromptConfig) => {
