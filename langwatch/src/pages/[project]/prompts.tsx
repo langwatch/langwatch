@@ -1,13 +1,4 @@
-import {
-  Button,
-  Container,
-  HStack,
-  Heading,
-  VStack,
-  Flex,
-  Card,
-  Spacer,
-} from "@chakra-ui/react";
+import { Flex, Spacer } from "@chakra-ui/react";
 import { type LlmPromptConfig } from "@prisma/client";
 import { useState, useMemo } from "react";
 import { Plus } from "react-feather";
