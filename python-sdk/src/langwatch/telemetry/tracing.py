@@ -10,7 +10,6 @@ from langwatch.utils.transformation import (
     SerializableWithStringFallback,
     convert_typed_values,
 )
-from langwatch.evaluations import BasicEvaluateData
 from opentelemetry import trace as trace_api
 from opentelemetry.sdk.trace import TracerProvider
 from typing import (
@@ -52,6 +51,7 @@ from langwatch.utils.initialization import ensure_setup
 
 if TYPE_CHECKING:
     from openai import OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI
+    from langwatch.evaluations import BasicEvaluateData
 
 __all__ = ["trace", "LangWatchTrace"]
 
@@ -397,7 +397,7 @@ class LangWatchTrace:
         conversation: Conversation = [],
         settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
-        data: Optional[Union[BasicEvaluateData, Dict[str, Any]]] = None,
+        data: Optional[Union["BasicEvaluateData", Dict[str, Any]]] = None,
     ):
         from langwatch import evaluations
 
@@ -426,7 +426,7 @@ class LangWatchTrace:
         conversation: Conversation = [],
         settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
-        data: Optional[Union[BasicEvaluateData, Dict[str, Any]]] = None,
+        data: Optional[Union["BasicEvaluateData", Dict[str, Any]]] = None,
     ):
         from langwatch import evaluations
 
