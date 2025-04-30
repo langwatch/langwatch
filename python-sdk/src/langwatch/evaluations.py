@@ -149,7 +149,6 @@ def prepare_data(
     data: Optional[Dict[str, Any]] = None,
 ):
     span_ctx = get_current_span().get_span_context()
-
     dataDict = {
         "trace_id": format(span_ctx.trace_id, "x"),
         "span_id": format(span_ctx.span_id, "x"),
@@ -181,7 +180,7 @@ def prepare_data(
 
     if span:
         span.update(
-            input=TypedValueJson(type="json", value=data),
+            input=TypedValueJson(type="json", value=dataDict),
             params=settings,  # type: ignore
         )
 
