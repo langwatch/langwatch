@@ -130,6 +130,10 @@ export default function PromptConfigsPage() {
         handleDeleteConfig(config);
         return Promise.resolve();
       },
+      onEdit: (config) => {
+        setSelectedConfigId(config.id);
+        return Promise.resolve();
+      },
     });
   }, []);
 
