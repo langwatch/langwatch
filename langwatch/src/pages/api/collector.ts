@@ -92,10 +92,14 @@ export default async function handler(
 
     if (currentMonthMessagesCount >= activePlan.maxMessagesPerMonth) {
       if (dependencies.planLimits) {
-        await dependencies.planLimits(
-          project.team.organizationId,
-          activePlan.name ?? "free"
-        );
+        try {
+          await dependencies.planLimits(
+            project.team.organizationId,
+            activePlan.name ?? "free"
+          );
+        } catch (error) {
+          console.error("Error sending plan limit notification", error);
+        }
       }
       console.log("[429] Reached plan limit", {
         projectId: project.id,
