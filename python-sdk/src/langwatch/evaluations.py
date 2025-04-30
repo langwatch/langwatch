@@ -162,32 +162,34 @@ def prepare_data(
         **(data.model_dump(exclude_unset=True, exclude_none=True) if isinstance(data, BasicEvaluateData) else data or {}),
     }
     if input is not None:
-        warn("For the `evaluate` or `async_evaluate` function, the `input` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.")
+        warn("For the `evaluate` or `async_evaluate` function, the `input` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.", stacklevel=2)
         dataDict["input"] = input
     if output is not None:
-        warn("For the `evaluate` or `async_evaluate` function, the `output` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.")
+        warn("For the `evaluate` or `async_evaluate` function, the `output` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.", stacklevel=2)
         dataDict["output"] = output
     if expected_output is not None:
-        warn("For the `evaluate` or `async_evaluate` function, the `expected_output` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.")
+        warn("For the `evaluate` or `async_evaluate` function, the `expected_output` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.", stacklevel=2)
         dataDict["expected_output"] = expected_output
     if contexts is not None:
-        warn("For the `evaluate` or `async_evaluate` function, the `contexts` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.")
+        warn("For the `evaluate` or `async_evaluate` function, the `contexts` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.", stacklevel=2)
         dataDict["contexts"] = contexts
     if expected_contexts is not None:
-        warn("For the `evaluate` or `async_evaluate` function, the `expected_contexts` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.")
+        warn("For the `evaluate` or `async_evaluate` function, the `expected_contexts` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.", stacklevel=2)
         dataDict["expected_contexts"] = expected_contexts
     if conversation is not None:
-        warn("For the `evaluate` or `async_evaluate` function, the `conversation` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.")
+        warn("For the `evaluate` or `async_evaluate` function, the `conversation` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.", stacklevel=2)
         dataDict["conversation"] = conversation
 
     if trace_id is not None:
         warn(
-            "trace_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `trace_id` will be mapped to `deprecated.trace_id` in the data."
+            "trace_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `trace_id` will be mapped to `deprecated.trace_id` in the data.",
+            stacklevel=2
         )
         dataDict["deprecated.trace_id"] = str(trace_id)
     if span_id is not None:
         warn(
-            "span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the data."
+            "span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the data.",
+            stacklevel=2
         )
         dataDict["deprecated.span_id"] = str(span_id)
 

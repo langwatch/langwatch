@@ -10,6 +10,7 @@ from langwatch.utils.transformation import (
     SerializableWithStringFallback,
     convert_typed_values,
 )
+from langwatch.evaluations import BasicEvaluateData
 from opentelemetry import trace as trace_api
 from opentelemetry.sdk.trace import TracerProvider
 from typing import (
