@@ -33,6 +33,7 @@ import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
 export default function Datasets() {
   const addEditDatasetDrawer = useDisclosure();
@@ -135,154 +136,148 @@ export default function Datasets() {
 
   return (
     <DashboardLayout>
-      <Container maxW={"calc(100vw - 200px)"} padding={6} marginTop={8}>
-        <HStack width="full" align="top" gap={6}>
-          <Heading as={"h1"} size="lg" paddingBottom={6} paddingTop={1}>
-            Datasets and Evaluations
-          </Heading>
+      <PageLayout.Container
+        maxW={"calc(100vw - 200px)"}
+        padding={6}
+        marginTop={8}
+      >
+        <PageLayout.Header>
+          <PageLayout.Heading>Datasets and Evaluations</PageLayout.Heading>
           <Spacer />
-          <Button
-            colorPalette="blue"
+          <PageLayout.HeaderButton
             onClick={() => {
               openDrawer("batchEvaluation", {
                 selectDataset: true,
               });
             }}
-            minWidth="fit-content"
           >
             <Play height={16} /> Batch Evaluation
-          </Button>
-          <Button
-            colorPalette="blue"
-            onClick={() => uploadCSVModal.onOpen()}
-            minWidth="fit-content"
-          >
+          </PageLayout.HeaderButton>
+          <PageLayout.HeaderButton onClick={() => uploadCSVModal.onOpen()}>
             <Upload height={17} width={17} strokeWidth={2.5} /> Upload or Create
             Dataset
-          </Button>
-        </HStack>
-        <Card.Root>
-          <Card.Body>
-            {datasets.data && datasets.data.length == 0 ? (
-              <NoDataInfoBlock
-                title="No datasets yet"
-                description="Upload or create datasets on your messages to do further analysis or to train your own models."
-                docsInfo={
-                  <Text>
-                    To learn more about datasets, please visit our{" "}
-                    <Link
-                      color="orange.400"
-                      href="https://docs.langwatch.ai/features/datasets"
-                      isExternal
-                    >
-                      documentation
-                    </Link>
-                    .
-                  </Text>
-                }
-                icon={<TableIcon />}
-              />
-            ) : (
-              <Table.Root variant="line">
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeader>Name</Table.ColumnHeader>
-                    <Table.ColumnHeader>Columns</Table.ColumnHeader>
-                    <Table.ColumnHeader>Entries</Table.ColumnHeader>
-                    <Table.ColumnHeader width={240}>
-                      Last Update
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader width={20}></Table.ColumnHeader>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {datasets.isLoading
-                    ? Array.from({ length: 3 }).map((_, i) => (
-                        <Table.Row key={i}>
-                          {Array.from({ length: 4 }).map((_, i) => (
-                            <Table.Cell key={i}>
-                              <Skeleton height="20px" />
-                            </Table.Cell>
-                          ))}
-                        </Table.Row>
-                      ))
-                    : datasets.data
-                    ? datasets.data?.map((dataset) => (
-                        <Table.Row
-                          cursor="pointer"
-                          onClick={() => goToDataset(dataset.id)}
-                          key={dataset.id}
-                        >
-                          <Table.Cell>{dataset.name}</Table.Cell>
-                          <Table.Cell maxWidth="250px">
-                            <HStack wrap="wrap">
-                              {(
-                                (dataset.columnTypes as DatasetColumns) ?? []
-                              ).map(({ name }) => (
-                                <Badge size="sm" key={name}>
-                                  {name}
-                                </Badge>
-                              ))}
-                            </HStack>
+          </PageLayout.HeaderButton>
+        </PageLayout.Header>
+        <PageLayout.Content>
+          {datasets.data && datasets.data.length == 0 ? (
+            <NoDataInfoBlock
+              title="No datasets yet"
+              description="Upload or create datasets on your messages to do further analysis or to train your own models."
+              docsInfo={
+                <Text>
+                  To learn more about datasets, please visit our{" "}
+                  <Link
+                    color="orange.400"
+                    href="https://docs.langwatch.ai/features/datasets"
+                    isExternal
+                  >
+                    documentation
+                  </Link>
+                  .
+                </Text>
+              }
+              icon={<TableIcon />}
+            />
+          ) : (
+            <Table.Root variant="line">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Name</Table.ColumnHeader>
+                  <Table.ColumnHeader>Columns</Table.ColumnHeader>
+                  <Table.ColumnHeader>Entries</Table.ColumnHeader>
+                  <Table.ColumnHeader width={240}>
+                    Last Update
+                  </Table.ColumnHeader>
+                  <Table.ColumnHeader width={20}></Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {datasets.isLoading
+                  ? Array.from({ length: 3 }).map((_, i) => (
+                      <Table.Row key={i}>
+                        {Array.from({ length: 4 }).map((_, i) => (
+                          <Table.Cell key={i}>
+                            <Skeleton height="20px" />
                           </Table.Cell>
-                          <Table.Cell>
-                            {dataset.useS3
-                              ? dataset.s3RecordCount ?? 0
-                              : dataset._count.datasetRecords ?? 0}
-                          </Table.Cell>
-                          <Table.Cell>
-                            {new Date(dataset.createdAt).toLocaleString()}
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Menu.Root>
-                              <Menu.Trigger asChild>
-                                <Button
-                                  variant={"ghost"}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                  }}
-                                >
-                                  <MoreVertical />
-                                </Button>
-                              </Menu.Trigger>
-                              <Menu.Content>
-                                <Menu.Item
-                                  value="edit"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    setEditDataset({
-                                      datasetId: dataset.id,
-                                      name: dataset.name,
-                                      columnTypes:
-                                        dataset.columnTypes as DatasetColumns,
-                                    });
-                                    addEditDatasetDrawer.onOpen();
-                                  }}
-                                >
-                                  <Edit size={16} /> Edit dataset
-                                </Menu.Item>
-                                <Menu.Item
-                                  value="delete"
-                                  color="red.600"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    deleteDataset(dataset.id, dataset.name);
-                                  }}
-                                >
-                                  <Trash2 size={16} /> Delete dataset
-                                </Menu.Item>
-                              </Menu.Content>
-                            </Menu.Root>
-                          </Table.Cell>
-                        </Table.Row>
-                      ))
-                    : null}
-                </Table.Body>
-              </Table.Root>
-            )}
-          </Card.Body>
-        </Card.Root>
-      </Container>
+                        ))}
+                      </Table.Row>
+                    ))
+                  : datasets.data
+                  ? datasets.data?.map((dataset) => (
+                      <Table.Row
+                        cursor="pointer"
+                        onClick={() => goToDataset(dataset.id)}
+                        key={dataset.id}
+                      >
+                        <Table.Cell>{dataset.name}</Table.Cell>
+                        <Table.Cell maxWidth="250px">
+                          <HStack wrap="wrap">
+                            {(
+                              (dataset.columnTypes as DatasetColumns) ?? []
+                            ).map(({ name }) => (
+                              <Badge size="sm" key={name}>
+                                {name}
+                              </Badge>
+                            ))}
+                          </HStack>
+                        </Table.Cell>
+                        <Table.Cell>
+                          {dataset.useS3
+                            ? dataset.s3RecordCount ?? 0
+                            : dataset._count.datasetRecords ?? 0}
+                        </Table.Cell>
+                        <Table.Cell>
+                          {new Date(dataset.createdAt).toLocaleString()}
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Menu.Root>
+                            <Menu.Trigger asChild>
+                              <Button
+                                variant={"ghost"}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                }}
+                              >
+                                <MoreVertical />
+                              </Button>
+                            </Menu.Trigger>
+                            <Menu.Content>
+                              <Menu.Item
+                                value="edit"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setEditDataset({
+                                    datasetId: dataset.id,
+                                    name: dataset.name,
+                                    columnTypes:
+                                      dataset.columnTypes as DatasetColumns,
+                                  });
+                                  addEditDatasetDrawer.onOpen();
+                                }}
+                              >
+                                <Edit size={16} /> Edit dataset
+                              </Menu.Item>
+                              <Menu.Item
+                                value="delete"
+                                color="red.600"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  deleteDataset(dataset.id, dataset.name);
+                                }}
+                              >
+                                <Trash2 size={16} /> Delete dataset
+                              </Menu.Item>
+                            </Menu.Content>
+                          </Menu.Root>
+                        </Table.Cell>
+                      </Table.Row>
+                    ))
+                  : null}
+              </Table.Body>
+            </Table.Root>
+          )}
+        </PageLayout.Content>
+      </PageLayout.Container>
       <AddOrEditDatasetDrawer
         open={addEditDatasetDrawer.open}
         onClose={() => {

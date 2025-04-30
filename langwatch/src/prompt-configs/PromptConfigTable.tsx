@@ -1,4 +1,4 @@
-import { Box, Button, Table, Text } from "@chakra-ui/react";
+import { Box, Button, Card, Table, Text } from "@chakra-ui/react";
 import { Trash } from "react-feather";
 import type { LlmPromptConfig } from "@prisma/client";
 import { type ReactNode } from "react";
