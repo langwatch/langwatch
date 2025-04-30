@@ -106,7 +106,10 @@ class Client(LangWatchClientProtocol):
 		self._disable_sending = value
 
 		if value:
-			self.tracer_provider.shutdown()
+			if self.tracer_provider:
+				if self._flush_on_exit:
+					atexit.unregister(self.tracer_provider.force_flush)
+				self.tracer_provider.shutdown()
 		else:
 			self.tracer_provider = self.__ensure_otel_setup()
 
