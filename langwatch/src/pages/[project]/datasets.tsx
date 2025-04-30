@@ -67,7 +67,8 @@ export default function Datasets() {
             description: (
               <HStack>
                 <Button
-                  colorPalette="white"
+                  color="white"
+                  padding={0}
                   variant="plain"
                   textDecoration="underline"
                   onClick={() => {
