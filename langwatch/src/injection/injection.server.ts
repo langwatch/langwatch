@@ -46,7 +46,11 @@ export interface Dependencies {
     ) => Promise<void | NextApiResponse<any>>
   >;
   extraTRPCRoutes?: () => ProcedureRouterRecord;
-  postRegistrationCallback?: (user: RegistrationCbUser, org: RegistrationCbOrganization) => void | Promise<void>;
+  postRegistrationCallback?: (
+    user: RegistrationCbUser,
+    org: RegistrationCbOrganization
+  ) => void | Promise<void>;
+  planLimits?: (organizationId: string, plan: string) => void | Promise<void>;
 }
 
 const dependencies: Dependencies = {
