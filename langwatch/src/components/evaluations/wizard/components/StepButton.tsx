@@ -1,6 +1,7 @@
-import { HStack, RadioCard, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, RadioCard, Text, VStack } from "@chakra-ui/react";
 import { LuChevronRight } from "react-icons/lu";
 import { OverflownTextWithTooltip } from "../../../OverflownText";
+import { Tooltip } from "../../../ui/tooltip";
 
 export function StepButton({
   title,
@@ -51,39 +52,43 @@ export function StepRadio({
   value: string;
 } & RadioCard.ItemProps) {
   return (
-    <RadioCard.Item
-      value={value}
-      width="full"
-      minWidth={0}
-      _active={{ background: "colorPalette.muted/20" }}
-      _icon={{ color: "colorPalette.solid" }}
-      {...props}
-      _disabled={{
-        opacity: 0.4,
-        pointerEvents: "none",
-        cursor: "not-allowed",
-      }}
-    >
-      <RadioCard.ItemHiddenInput />
-      <RadioCard.ItemControl cursor="pointer" width="full">
-        <RadioCard.ItemContent width="full">
-          <HStack
-            align="start"
-            gap={3}
-            width="full"
-            _icon={{ width: "22px", height: "22px" }}
-          >
-            {icon}
-            <VStack align="start" gap={1} width="full">
-              <OverflownTextWithTooltip>{title}</OverflownTextWithTooltip>
-              <Text fontSize="sm" color="gray.500" fontWeight="normal">
-                {description}
-              </Text>
-            </VStack>
-          </HStack>
-        </RadioCard.ItemContent>
-        <RadioCard.ItemIndicator />
-      </RadioCard.ItemControl>
-    </RadioCard.Item>
+    <Tooltip disabled={!props.disabled} content={"Coming Soon"}>
+      <Box>
+        <RadioCard.Item
+          value={value}
+          width="full"
+          minWidth={0}
+          _active={{ background: "colorPalette.muted/20" }}
+          _icon={{ color: "colorPalette.solid" }}
+          {...props}
+          _disabled={{
+            opacity: 0.4,
+            pointerEvents: "none",
+            cursor: "not-allowed",
+          }}
+        >
+          <RadioCard.ItemHiddenInput />
+          <RadioCard.ItemControl cursor="pointer" width="full">
+            <RadioCard.ItemContent width="full">
+              <HStack
+                align="start"
+                gap={3}
+                width="full"
+                _icon={{ width: "22px", height: "22px" }}
+              >
+                {icon}
+                <VStack align="start" gap={1} width="full">
+                  <OverflownTextWithTooltip>{title}</OverflownTextWithTooltip>
+                  <Text fontSize="sm" color="gray.500" fontWeight="normal">
+                    {description}
+                  </Text>
+                </VStack>
+              </HStack>
+            </RadioCard.ItemContent>
+            <RadioCard.ItemIndicator />
+          </RadioCard.ItemControl>
+        </RadioCard.Item>
+      </Box>
+    </Tooltip>
   );
 }
