@@ -7,7 +7,6 @@ import {
 import { TRACE_INDEX, esClient } from "../elasticsearch";
 import type { Protections } from "./protections";
 import { transformElasticSearchTraceToTrace } from "./transformers";
-import type { AggregationsAggregate, AggregationsAggregationContainer, QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 
 interface ProjectConnectionConfig {
   projectId: string;
@@ -170,7 +169,6 @@ export const getTraceById = async ({
       index: TRACE_INDEX.alias,
       size: 1,
       _source: {
-        // TODO: do we really need to exclude both keys and nested keys for embeddings?
         excludes: [
           "input.embeddings",
           "input.embeddings.embeddings",
@@ -218,7 +216,6 @@ export const getTracesGroupedByThreadId = async ({
     search: {
       size: 1000,
       _source: {
-        // TODO: do we really need to exclude both keys and nested keys for embeddings?
         excludes: [
           "input.embeddings",
           "input.embeddings.embeddings",

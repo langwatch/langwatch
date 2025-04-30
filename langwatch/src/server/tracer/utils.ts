@@ -1,4 +1,3 @@
-import omit from "lodash.omit";
 import {
   flattenSpanTree,
   organizeSpansIntoTree,
@@ -9,17 +8,13 @@ import {
   type ElasticSearchEvent,
   type ElasticSearchInputOutput,
   type ElasticSearchSpan,
-  type ElasticSearchTrace,
   type Event,
-  type ReservedTraceMetadata,
   type Span,
   type SpanInputOutput,
-  type Trace,
   type ElasticSearchEvaluation,
   type Evaluation,
   type RAGChunk,
 } from "./types";
-import { reservedTraceMetadataSchema } from "./types.generated";
 
 export const getRAGChunks = (
   spans: (ElasticSearchSpan | Span)[]

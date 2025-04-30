@@ -242,9 +242,6 @@ export const tracesRouter = createTRPCRouter({
       const { projectId, threadId } = input;
       const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
 
-      // TODO: remove this?
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
       return getTracesGroupedByThreadId({
         connConfig: { projectId },
         threadId,
@@ -464,7 +461,6 @@ export const getAllTracesForProject = async ({
       scroll: downloadMode ? "1m" : undefined,
       _source: {
         excludes: [
-          // TODO: do we really need to exclude both keys and nested keys for embeddings?
           "input.embeddings",
           "input.embeddings.embeddings",
           "output.embeddings",
