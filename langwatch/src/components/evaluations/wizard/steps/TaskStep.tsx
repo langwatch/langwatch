@@ -26,7 +26,7 @@ export function TaskStep() {
     });
     setTimeout(() => {
       setWizardState({
-        step: "dataset",
+        step: task === "real_time" ? "execution" : "dataset",
       });
     }, 48);
   };

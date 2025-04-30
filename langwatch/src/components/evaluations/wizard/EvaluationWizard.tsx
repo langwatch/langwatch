@@ -237,8 +237,13 @@ const WizardSidebar = memo(function WizardSidebar({
   }, []);
 
   const stepCompletedValue = useStepCompletedValue();
-  const evaluationDisabled =
-    !stepCompletedValue("all") || isAutosaving || !experimentId || !project;
+  const enableMonitoringDisabled =
+    !stepCompletedValue("task") ||
+    !stepCompletedValue("execution") ||
+    !stepCompletedValue("evaluation") ||
+    isAutosaving ||
+    !experimentId ||
+    !project;
   const saveAsMonitor = api.experiments.saveAsMonitor.useMutation();
   const router = useRouter();
   const reactFlow = useReactFlow();
@@ -378,7 +383,7 @@ const WizardSidebar = memo(function WizardSidebar({
               executionMethod === "realtime_on_message" && (
                 <Tooltip
                   content={
-                    evaluationDisabled
+                    enableMonitoringDisabled
                       ? "Complete all the steps to enable monitoring"
                       : ""
                   }
@@ -388,10 +393,10 @@ const WizardSidebar = memo(function WizardSidebar({
                 >
                   <Button
                     colorPalette="green"
-                    disabled={evaluationDisabled}
+                    disabled={enableMonitoringDisabled}
                     loading={saveAsMonitor.isLoading}
                     onClick={() => {
-                      if (evaluationDisabled) {
+                      if (enableMonitoringDisabled) {
                         return;
                       }
 

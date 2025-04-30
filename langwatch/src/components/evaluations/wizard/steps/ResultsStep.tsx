@@ -1,5 +1,6 @@
 import {
   Alert,
+  Box,
   Button,
   Heading,
   HStack,
@@ -20,6 +21,7 @@ import { RunEvaluationButton } from "../components/RunTrialEvaluationButton";
 import { useStepCompletedValue } from "../hooks/useStepCompletedValue";
 import { useModelProviderKeys } from "../../../../optimization_studio/hooks/useModelProviderKeys";
 import { AddModelProviderKey } from "../../../../optimization_studio/components/AddModelProviderKey";
+import { Link } from "../../../ui/link";
 
 export function ResultsStep() {
   const { name, wizardState, setWizardState, getDSL } =
@@ -48,7 +50,6 @@ export function ResultsStep() {
   };
 
   const stepCompletedValue = useStepCompletedValue();
-  const trialDisabled = !stepCompletedValue("all");
 
   useEffect(() => {
     setWizardState({ workspaceTab: "results" });
@@ -102,22 +103,27 @@ export function ResultsStep() {
             <Alert.Content>
               <Alert.Description>
                 <VStack align="start" gap={4}>
-                  Try out your real-time evaluation with the sample before
-                  enabling monitoring.
-                  <Tooltip
-                    content={
-                      trialDisabled
-                        ? "Select a dataset and evaluation to run a trial"
-                        : ""
-                    }
-                    positioning={{
-                      placement: "top",
-                    }}
-                  >
-                    <RunEvaluationButton colorPalette="blue">
-                      Run Trial Evaluation
-                    </RunEvaluationButton>
-                  </Tooltip>
+                  {stepCompletedValue("dataset") ? (
+                    <>
+                      Try out your real-time evaluation with the sample before
+                      enabling monitoring.
+                    </>
+                  ) : (
+                    <Box>
+                      <Link
+                        href="#"
+                        textDecoration="underline"
+                        onClick={() => setWizardState({ step: "dataset" })}
+                      >
+                        Select a dataset
+                      </Link>{" "}
+                      to try out your real-time evaluation with the sample
+                      before enabling monitoring.
+                    </Box>
+                  )}
+                  <RunEvaluationButton isTrial colorPalette="blue">
+                    Run Trial Evaluation
+                  </RunEvaluationButton>
                 </VStack>
               </Alert.Description>
             </Alert.Content>

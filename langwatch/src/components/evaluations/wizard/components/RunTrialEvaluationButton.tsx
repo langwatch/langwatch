@@ -14,8 +14,9 @@ import { toaster } from "../../../ui/toaster";
  */
 export function RunEvaluationButton({
   children,
+  isTrial = false,
   ...props
-}: Omit<ButtonProps, "onClick">) {
+}: Omit<ButtonProps, "onClick"> & { isTrial?: boolean }) {
   const completedStepValue = useStepCompletedValue();
   const { getDSL, setWizardState } = useEvaluationWizardStore(
     useShallow((state) => ({
@@ -29,15 +30,17 @@ export function RunEvaluationButton({
   const { hasProvidersWithoutCustomKeys } = useModelProviderKeys({
     workflow: getDSL(),
   });
-  const trialDisabled = !stepCompletedValue("all")
-    ? "Complete all the previous steps to run the evaluation"
+  const evaluationDisabled = !stepCompletedValue("all")
+    ? isTrial && !stepCompletedValue("dataset")
+      ? "Select a dataset to run a trial evaluation"
+      : "Complete all the previous steps to run the evaluation"
     : hasProvidersWithoutCustomKeys
     ? "Add your API keys to run the evaluation"
     : undefined;
 
   return (
     <Tooltip
-      content={trialDisabled}
+      content={evaluationDisabled}
       positioning={{
         placement: "top",
       }}
@@ -49,7 +52,7 @@ export function RunEvaluationButton({
           minHeight: props._icon?.minHeight ?? "18px",
         }}
         loading={props.loading ?? isLoading}
-        disabled={props.disabled ?? !!trialDisabled}
+        disabled={props.disabled ?? !!evaluationDisabled}
         onClick={() => {
           const workflowId = getDSL().workflow_id;
           if (!completedStepValue("all") || !workflowId) {

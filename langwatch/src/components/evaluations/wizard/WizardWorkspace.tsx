@@ -30,7 +30,7 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 export const WizardWorkspace = memo(function WizardWorkspace() {
   const {
     getDatasetId,
-    workspaceTab,
+    workspaceTab: workspaceTab_,
     setWizardState,
     workflowId,
     experimentId,
@@ -67,6 +67,21 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
   useEffect(() => {
     setDatasetGridRef(datasetGridRef);
   }, [datasetGridRef, setDatasetGridRef]);
+
+  // Fix for not falling into a tab that doesn't exist, fallback to first available tab
+  const availableTabs = {
+    dataset: hasDataset,
+    workflow: hasWorkflow,
+    results: hasResults,
+    "code-implementation": hasCodeImplementation,
+  };
+  const firstAvailableTab = Object.entries(availableTabs).find(
+    ([_, hasTab]) => hasTab
+  )?.[0];
+  const workspaceTab =
+    workspaceTab_ && !availableTabs[workspaceTab_]
+      ? firstAvailableTab
+      : workspaceTab_;
 
   return (
     <VStack

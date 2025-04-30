@@ -137,7 +137,7 @@ export const createEvaluatorNodeSlice: StateCreator<
           },
         };
 
-        const entryNode = get().getNodesByType("entry")[0] as Node<Entry>;
+        const entryNode = get().getNodesByType("entry")[0] as Node<Entry> | undefined;
         let newEdges = buildEntryToTargetEdges(entryNode, evaluatorNode);
 
         // If there is an executor node, update the edges

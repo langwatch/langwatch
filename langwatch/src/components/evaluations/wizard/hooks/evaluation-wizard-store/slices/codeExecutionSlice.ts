@@ -45,7 +45,7 @@ export const createCodeExecutionSlice: StateCreator<
       // Create a new code node based on the default structure
       const node = get().createNewCodeExecutionNode();
       // Create an edge from the entry node to the code node if an entry node exists
-      const entryNode = get().getNodesByType("entry")[0] as Node<Entry>;
+      const entryNode = get().getNodesByType("entry")[0] as Node<Entry> | undefined;
       const newEdges: Edge[] = entryNode
         ? buildEntryToTargetEdges(entryNode, node)
         : [];

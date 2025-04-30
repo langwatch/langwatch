@@ -91,13 +91,13 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
  * match from the source outputs based on the dataset inferred mappings.
  */
 export const buildEntryToTargetEdges = (
-  entryNode: Node<Entry>,
-  targetNode: Node<Component>
+  entryNode: Node<Entry> | undefined,
+  targetNode: Node<Component> | undefined
 ): Edge[] => {
   const edges: Edge[] = [];
 
   // Skip if target node has no inputs or entry node has no outputs
-  if (!targetNode.data.inputs || !entryNode.data.outputs) {
+  if (!targetNode?.data?.inputs || !entryNode?.data?.outputs) {
     return edges;
   }
 

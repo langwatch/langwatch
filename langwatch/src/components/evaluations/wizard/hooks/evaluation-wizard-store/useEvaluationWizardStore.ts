@@ -310,7 +310,7 @@ const store = (
         // And then connecting it again using defaults with the other existing components
         const newEntryNode = newNodes.find(
           (node) => node.type === "entry"
-        ) as Node<Entry>;
+        ) as Node<Entry> | undefined;
         const otherNodes = newNodes.filter((node) => node.type !== "entry");
 
         const newEdgesTargetHandles = newEdges.map(
