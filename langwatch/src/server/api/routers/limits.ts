@@ -9,6 +9,19 @@ import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { prisma } from "../../db";
 import { dependencies } from "../../../injection/dependencies.server";
 
+export const getProjectIdsForOrganization = async (
+  organizationId: string
+): Promise<string[]> => {
+  return (
+    await prisma.project.findMany({
+      where: {
+        team: { organizationId },
+      },
+      select: { id: true },
+    })
+  ).map((project) => project.id);
+};
+
 export const limitsRouter = createTRPCRouter({
   getUsage: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
@@ -20,14 +33,7 @@ export const limitsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const { organizationId } = input;
 
-      const projectIds = (
-        await prisma.project.findMany({
-          where: {
-            team: { organizationId },
-          },
-          select: { id: true },
-        })
-      ).map((project) => project.id);
+      const projectIds = await getProjectIdsForOrganization(organizationId);
 
       const projectsCount = projectIds.length;
       const currentMonthMessagesCount =
@@ -87,14 +93,7 @@ export const getCurrentMonthMessagesCount = async (
 
   let projectIdsToUse = projectIds;
   if (organizationId) {
-    projectIdsToUse = (
-      await prisma.project.findMany({
-        where: {
-          team: { organizationId },
-        },
-        select: { id: true },
-      })
-    ).map((project) => project.id);
+    projectIdsToUse = await getProjectIdsForOrganization(organizationId);
   }
 
   const client = await esClient({ projectId: projectIdsToUse[0] ?? "" });
