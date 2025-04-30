@@ -57,6 +57,7 @@ class Client(LangWatchClientProtocol):
 			disable_sending: Optional. If True, no traces will be sent to the server.
 			flush_on_exit: Optional. If True, the tracer provider will flush all spans when the program exits.
 			span_exporter_exclude_rules: Optional. The rules to exclude from the span exporter.
+			ignore_global_tracer_provider_override_warning: Optional. If True, the warning about the global tracer provider being overridden will be ignored.
 		"""
 
 		self._api_key = api_key or os.getenv("LANGWATCH_API_KEY", "")
