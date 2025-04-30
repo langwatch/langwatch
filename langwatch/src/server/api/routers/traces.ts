@@ -391,7 +391,11 @@ export const getAllTracesForProject = async ({
   scrollId = undefined,
 }: {
   input: z.infer<typeof getAllForProjectInput>;
-  ctx?: { prisma: PrismaClient; session: Session, publiclyShared?: boolean };
+  ctx: {
+    prisma: PrismaClient;
+    session: Session | null;
+    publiclyShared?: boolean;
+  };
   downloadMode?: boolean;
   includeContexts?: boolean;
   scrollId?: string;
@@ -438,12 +442,11 @@ export const getAllTracesForProject = async ({
     pageSize = 10_000;
   }
 
-  const baseProtections: Protections = ctx?.prisma
-    ? await getUserProtectionsForProject(ctx, { projectId: input.projectId })
-    : { canSeeCapturedInput: true, canSeeCapturedOutput: true, canSeeCosts: true };
-  const protections: Protections = downloadMode
-    ? { ...baseProtections, canSeeCapturedInput: false, canSeeCapturedOutput: false }
-    : baseProtections;
+  const protections = await getUserProtectionsForProject({
+    prisma: ctx.prisma,
+    session: ctx.session,
+    publiclyShared: ctx.publiclyShared,
+  }, { projectId: input.projectId });
 
   let tracesResult: SearchResponse<ElasticSearchTrace>;
   if (scrollId) {
