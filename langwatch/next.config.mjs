@@ -14,7 +14,7 @@ const aliasPath =
 
 const cspHeader = `
     default-src 'self';
-    script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.googletagmanager.com https://cdn.eu.pendo.io https://client.crisp.chat https://static.hsappstatic.net https://*.google-analytics.com;
+    script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.googletagmanager.com https://cdn.eu.pendo.io https://client.crisp.chat https://app.eu.pendo.io https://static.hsappstatic.net https://*.google-analytics.com;
     style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.eu.pendo.io https://client.crisp.chat;
     img-src 'self' blob: data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://image.crisp.chat https://www.googletagmanager.com https://data.eu.pendo.io https://*.google-analytics.com;
     font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://client.crisp.chat;
