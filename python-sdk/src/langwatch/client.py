@@ -5,18 +5,19 @@ from typing import List, Optional, Sequence
 
 from langwatch.__version__ import __version__
 from langwatch.attributes import AttributeName
-from langwatch.domain import SpanExporterExcludeRule
+from langwatch.domain import SpanProcessingExcludeRule
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.trace.sampling import TraceIdRatioBased, ALWAYS_OFF
 
+from .exporters.filterable_batch_span_exporter import FilterableBatchSpanProcessor
 from .typings import Instrumentor
 from .types import LangWatchClientProtocol, BaseAttributes
 
 logger = logging.getLogger(__name__)
+
 
 class Client(LangWatchClientProtocol):
 	"""
@@ -30,8 +31,9 @@ class Client(LangWatchClientProtocol):
 	base_attributes: BaseAttributes = {}
 	_disable_sending: bool = False
 	_flush_on_exit: bool = True
-	_span_exporter_exclude_rules: List[SpanExporterExcludeRule] = []
+	_span_exclude_rules: List[SpanProcessingExcludeRule] = []
 	_ignore_global_tracer_provider_override_warning: bool = False
+
 	def __init__(
 		self,
 		api_key: Optional[str] = None,
@@ -42,7 +44,7 @@ class Client(LangWatchClientProtocol):
 		debug: bool = False,
 		disable_sending: bool = False,
 		flush_on_exit: bool = True,
-		span_exporter_exclude_rules: Optional[List[SpanExporterExcludeRule]] = None,
+		span_exclude_rules: Optional[List[SpanProcessingExcludeRule]] = None,
 		ignore_global_tracer_provider_override_warning: bool = False,
 	):
 		"""
@@ -56,7 +58,7 @@ class Client(LangWatchClientProtocol):
 			tracer_provider: Optional. The tracer provider to use for the LangWatch tracing client. If none is provided, the global tracer provider will be used. If that does not exist, a new tracer provider will be created.
 			disable_sending: Optional. If True, no traces will be sent to the server.
 			flush_on_exit: Optional. If True, the tracer provider will flush all spans when the program exits.
-			span_exporter_exclude_rules: Optional. The rules to exclude from the span exporter.
+			span_exclude_rules: Optional. The rules to exclude from the span exporter.
 			ignore_global_tracer_provider_override_warning: Optional. If True, the warning about the global tracer provider being overridden will be ignored.
 		"""
 
@@ -65,7 +67,7 @@ class Client(LangWatchClientProtocol):
 		self._debug = debug or os.getenv("LANGWATCH_DEBUG") == "true"
 		self._disable_sending = disable_sending
 		self._flush_on_exit = flush_on_exit
-		self._span_exporter_exclude_rules = span_exporter_exclude_rules or []
+		self._span_exclude_rules = span_exclude_rules or []
 		self._ignore_global_tracer_provider_override_warning = ignore_global_tracer_provider_override_warning
 		self.base_attributes = base_attributes or {}
 		self.base_attributes[AttributeName.LangWatchSDKName] = "langwatch-observability-sdk"
@@ -119,7 +121,10 @@ class Client(LangWatchClientProtocol):
 		if value:
 			if self.tracer_provider:
 				if self._flush_on_exit:
-					atexit.unregister(self.tracer_provider.force_flush)
+					try:
+						atexit.unregister(self.tracer_provider.force_flush)
+					except ValueError:
+						pass # Handler was never registered – nothing to do.
 				self.tracer_provider.shutdown()
 		else:
 			self.tracer_provider = self.__ensure_otel_setup()
@@ -189,10 +194,12 @@ class Client(LangWatchClientProtocol):
 			timeout=int(os.getenv("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", 30)),
 		)
 
-		provider.add_span_processor(BatchSpanProcessor(
+		processor = FilterableBatchSpanProcessor(
 			span_exporter=otlp_exporter,
+			exclude_rules=self._span_exclude_rules,
 			max_export_batch_size=int(os.getenv("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", 100)),
 			max_queue_size=int(os.getenv("OTEL_BSP_MAX_QUEUE_SIZE", 512)),
 			schedule_delay_millis=float(os.getenv("OTEL_BSP_SCHEDULE_DELAY", 1000)),
 			export_timeout_millis=float(os.getenv("OTEL_BSP_EXPORT_TIMEOUT", 10000)),
-		))
+		)
+		provider.add_span_processor(processor)
