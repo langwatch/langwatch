@@ -173,18 +173,18 @@ enum ProjectSensitiveDataVisibilityLevel {
 }
 
 model Project {
-    id                       String                @id @default(nanoid())
+    id                       String                              @id @default(nanoid())
     name                     String
-    slug                     String                @unique
-    apiKey                   String                @unique
+    slug                     String                              @unique
+    apiKey                   String                              @unique
     teamId                   String
-    team                     Team                  @relation(fields: [teamId], references: [id])
+    team                     Team                                @relation(fields: [teamId], references: [id])
     language                 String
     framework                String
-    firstMessage             Boolean               @default(false)
-    integrated               Boolean               @default(false)
-    createdAt                DateTime              @default(now())
-    updatedAt                DateTime              @default(now()) @updatedAt
+    firstMessage             Boolean                             @default(false)
+    integrated               Boolean                             @default(false)
+    createdAt                DateTime                            @default(now())
+    updatedAt                DateTime                            @default(now()) @updatedAt
     userLinkTemplate         String?
     checks                   Monitor[]
     costs                    Cost[]
@@ -193,7 +193,7 @@ model Project {
     datasetRecords           DatasetRecord[]
     customGraphs             CustomGraph[]
     batchEvaluations         BatchEvaluation[]
-    piiRedactionLevel        PIIRedactionLevel     @default(ESSENTIAL)
+    piiRedactionLevel        PIIRedactionLevel                   @default(ESSENTIAL)
     capturedInputVisibility  ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
     capturedOutputVisibility ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
     triggers                 Trigger[]

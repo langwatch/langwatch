@@ -96,33 +96,25 @@ export async function getUserProtectionsForProject(
   const isAdminInAnyTeam = teamsWithAccess.some(team => team.role === TeamUserRole.ADMIN);
   const isMemberInAnyTeam = teamsWithAccess.length > 0;
 
-  const canAccessSensitiveData = (
-    visibility: ProjectSensitiveDataVisibilityLevel,
-    userAccess: { isAdmin: boolean; isMember: boolean }
-  ): boolean => {
+  const obtainVisibilityLevel = (visibility: ProjectSensitiveDataVisibilityLevel): boolean => {
     switch (true) {
-      case !userAccess.isMember:
+      case !isMemberInAnyTeam:
         return false;
       case visibility === ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL:
         return false;
       case visibility === ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL:
         return true;
       case visibility === ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN:
-        return userAccess.isAdmin;
+        return isAdminInAnyTeam;
       default:
         console.error('Unexpected state for visibility:', visibility);
         return false;
     }
   };
 
-  const userAccess = {
-    isAdmin: isAdminInAnyTeam,
-    isMember: isMemberInAnyTeam,
-  };
-
   return {
     canSeeCosts,
-    canSeeCapturedInput: canAccessSensitiveData(project.capturedInputVisibility, userAccess),
-    canSeeCapturedOutput: canAccessSensitiveData(project.capturedOutputVisibility, userAccess),
+    canSeeCapturedInput: obtainVisibilityLevel(project.capturedInputVisibility),
+    canSeeCapturedOutput: obtainVisibilityLevel(project.capturedOutputVisibility),
   };
 }

@@ -87,8 +87,10 @@ export default async function handler(
     },
     ctx: {
       prisma,
-      session: null,
       publiclyShared: false,
+
+      // We don't care about user level permissions here, as we're access the data via API key
+      session: null,
     },
     downloadMode: !params.llmMode,
     scrollId: params.scrollId ?? undefined,

@@ -278,7 +278,7 @@ export const useOrganizationTeamProject = (
     isRefetching: organizations.isRefetching,
     organizations: organizations.data,
     organization,
-    team, // The team associated with the current project
+    team,
     project: publicShareProject.data ?? project,
     hasOrganizationPermission,
     hasTeamPermission,
