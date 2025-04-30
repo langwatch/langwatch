@@ -54,7 +54,7 @@ export const createDefaultColumns = ({
               void onEdit(config);
             }}
           >
-            <Edit size={16} /> Edit dataset
+            <Edit size={16} /> Edit prompt
           </Menu.Item>
           <Menu.Item
             value="delete"
@@ -64,7 +64,7 @@ export const createDefaultColumns = ({
               void onDelete(config);
             }}
           >
-            <Trash2 size={16} /> Delete dataset
+            <Trash2 size={16} /> Delete prompt
           </Menu.Item>
         </Menu.Content>
       </Menu.Root>
