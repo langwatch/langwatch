@@ -1,3 +1,4 @@
+import atexit
 import os
 import logging
 from typing import List, Optional, Sequence
@@ -9,10 +10,8 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.trace.sampling import TraceIdRatioBased, ALWAYS_OFF
-
-from langwatch.exporters.async_batch_exporter import AsyncBatchExporter
 
 from .typings import Instrumentor
 from .types import LangWatchClientProtocol, BaseAttributes
@@ -30,6 +29,7 @@ class Client(LangWatchClientProtocol):
 	instrumentors: Sequence[Instrumentor] = []
 	base_attributes: BaseAttributes = {}
 	_disable_sending: bool = False
+	_flush_on_exit: bool = True
 	_span_exporter_exclude_rules: List[SpanExporterExcludeRule] = []
 
 	def __init__(
@@ -41,6 +41,7 @@ class Client(LangWatchClientProtocol):
 		tracer_provider: Optional[TracerProvider] = None,
 		debug: bool = False,
 		disable_sending: bool = False,
+		flush_on_exit: bool = True,
 		span_exporter_exclude_rules: Optional[List[SpanExporterExcludeRule]] = None,
 	):
 		"""
@@ -53,6 +54,8 @@ class Client(LangWatchClientProtocol):
 			instrumentors: Optional. The instrumentors to use for the LangWatch tracing client.
 			tracer_provider: Optional. The tracer provider to use for the LangWatch tracing client. If none is provided, the global tracer provider will be used. If that does not exist, a new tracer provider will be created.
 			disable_sending: Optional. If True, no traces will be sent to the server.
+			flush_on_exit: Optional. If True, the tracer provider will flush all spans when the program exits.
+			span_exporter_exclude_rules: Optional. The rules to exclude from the span exporter.
 		"""
 
 		self._api_key = api_key or os.getenv("LANGWATCH_API_KEY", "")
@@ -86,6 +89,11 @@ class Client(LangWatchClientProtocol):
 	def endpoint_url(self) -> str:
 		"""Get the endpoint URL for the client."""
 		return self._endpoint_url
+
+	@property
+	def flush_on_exit(self) -> bool:
+		"""Get the flush on exit flag for the client."""
+		return self._flush_on_exit
 
 	@property
 	def api_key(self) -> str:
@@ -158,17 +166,20 @@ class Client(LangWatchClientProtocol):
 			otlp_exporter = OTLPSpanExporter(
 				endpoint=f"{self._endpoint_url}/api/otel/v1/traces",
 				headers=headers,
-				timeout=30,
-			)
-			async_exporter = AsyncBatchExporter(
-				exporter=otlp_exporter,
-				export_interval=5.0,
-				max_export_batch_size=100,
-				max_queue_size=512,
-				span_exporter_exclude_rules=self._span_exporter_exclude_rules,
+				timeout=int(os.getenv("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", 30)),
 			)
 
-			provider.add_span_processor(SimpleSpanProcessor(async_exporter))
+			provider.add_span_processor(BatchSpanProcessor(
+				span_exporter=otlp_exporter,
+				max_export_batch_size=int(os.getenv("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", 100)),
+				max_queue_size=int(os.getenv("OTEL_BSP_MAX_QUEUE_SIZE", 512)),
+				schedule_delay_millis=float(os.getenv("OTEL_BSP_SCHEDULE_DELAY", 1000)),
+				export_timeout_millis=float(os.getenv("OTEL_BSP_EXPORT_TIMEOUT", 10000)),
+			))
+
+			if self._flush_on_exit:
+				logger.info("Registering atexit handler to flush tracer provider on exit")
+				atexit.register(provider.force_flush)
 
 			if self.debug:
 				logger.info("Successfully configured tracer provider with OTLP exporter")

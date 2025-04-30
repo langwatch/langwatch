@@ -27,3 +27,4 @@ def get_api_key() -> str:
     if __instance is None:
         return os.getenv("LANGWATCH_API_KEY", "")
     return __instance.api_key
+
