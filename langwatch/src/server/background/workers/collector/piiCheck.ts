@@ -305,7 +305,7 @@ type PIICheckOptions = {
 };
 
 export const cleanupPIIs = async (
-  trace: Trace | ElasticSearchTrace,
+  trace: Trace | Omit<ElasticSearchTrace, "spans">,
   spans: ElasticSearchSpan[],
   options: PIICheckOptions
 ): Promise<void> => {
