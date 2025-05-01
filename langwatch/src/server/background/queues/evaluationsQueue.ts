@@ -58,15 +58,11 @@ export const scheduleEvaluation = async ({
   if (currentJob) {
     const state = await currentJob.getState();
     if (state == "failed" || state == "completed") {
-      logger.info(
-        `retrying ${check.type} (checkId: ${check.evaluator_id}) for trace ${trace.trace_id}`
-      );
+      logger.info({ check, trace, state }, 'retrying'); 
       await currentJob.retry(state);
     }
   } else {
-    logger.info(
-      `scheduling ${check.type} (checkId: ${check.evaluator_id}) for trace ${trace.trace_id}`
-    );
+    logger.info({ check, trace }, 'scheduling');
     await evaluationsQueue.add(
       check.type,
       {

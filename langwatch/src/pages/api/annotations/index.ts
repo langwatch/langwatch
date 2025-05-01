@@ -42,10 +42,7 @@ export default async function handler(
 
     return res.status(200).json({ data: annotations });
   } catch (e) {
-    logger.error("Error fetching annotations", {
-      error: e,
-      projectId: project.id,
-    });
+    logger.error({ error: e, projectId: project.id }, 'error fetching annotations');
     return res
       .status(500)
       .json({ status: "error", message: "Internal server error." });

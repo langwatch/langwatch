@@ -183,9 +183,8 @@ const clearPII = async (
       }
     }
     logger.debug(
-      `Error running ${firstMethod} PII check, running ${secondMethod} as fallback, error: ${
-        e as any
-      }`
+      { error: e as any },
+      `error running ${firstMethod} PII check, running ${secondMethod} as fallback`
     );
 
     try {
@@ -335,7 +334,7 @@ export const cleanupPIIs = async (
       return;
     }
 
-    logger.debug("Checking PII for trace", trace.trace_id);
+    logger.debug({ traceId: trace.trace_id }, "checking PII for trace");
 
     const clearPIIPromises = [
       clearPII(trace, ["input", "value"], options),

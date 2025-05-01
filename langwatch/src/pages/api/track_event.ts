@@ -82,10 +82,7 @@ export default async function handler(
   try {
     body = trackEventRESTParamsValidatorSchema.parse(req.body);
   } catch (error) {
-    logger.error(
-      "Invalid event received",
-      { error, body: req.body, projectId: project.id },
-    );
+    logger.error({ error, body: req.body, projectId: project.id }, 'invalid event received');
     Sentry.captureException(error);
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
@@ -95,10 +92,7 @@ export default async function handler(
     try {
       predefinedEventsSchemas.parse(req.body);
     } catch (error) {
-      logger.error(
-        "Invalid event received",
-        { error, body: req.body, projectId: project.id },
-      );
+      logger.error({ error, body: req.body, projectId: project.id }, 'invalid event received');
       Sentry.captureException(error);
       const validationError = fromZodError(error as ZodError);
       return res.status(400).json({ error: validationError.message });

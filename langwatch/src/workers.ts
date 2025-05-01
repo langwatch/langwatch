@@ -5,7 +5,7 @@ loadEnvConfig(process.cwd());
 
 const logger = createLogger("langwatch:workers");
 
-logger.info("Starting up workers");
+logger.info("starting");
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 require("./server/background/worker")

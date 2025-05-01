@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         throw new Error("Spans are empty, likely an invalid format");
       }
     } catch (jsonError) {
-      logger.error("Error parsing traces:", Buffer.from(body).toString("base64"));
+      logger.error({ error: jsonError, traceRequest: Buffer.from(body).toString("base64") }, "error parsing traces");
       Sentry.captureException(error, {
         extra: {
           projectId: project.id,
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
-    logger.info(`collecting traceId ${traceForCollection.traceId}`);
+    logger.info({ traceId: traceForCollection.traceId }, 'collecting traces');
 
     promises.push(
       scheduleTraceCollectionWithFallback({

@@ -61,7 +61,7 @@ export const start = (
     incrementWorkerRestartCount();
 
     const closingListener = () => {
-      logger.info("Worker closing before expected, restarting");
+      logger.info("closed before expected, restarting");
       reject(new WorkersRestart("Worker closing before expected, restarting"));
     };
 
@@ -72,7 +72,7 @@ export const start = (
 
     if (maxRuntimeMs) {
       setTimeout(() => {
-        logger.info("Max runtime reached, closing worker");
+        logger.info("max runtime reached, closing worker");
 
         void (async () => {
           collectorWorker?.off("closing", closingListener);
@@ -122,7 +122,7 @@ const incrementWorkerRestartCount = () => {
       workerRestartsCounter.inc();
     }
   } catch (error) {
-    logger.error("Error incrementing worker restart count", error);
+    logger.error({ error }, "error incrementing worker restart count");
   }
 };
 
@@ -148,6 +148,6 @@ const startMetricsServer = () => {
   });
 
   server.listen(2999, () => {
-    logger.info("Workers metrics server listening on port 2999");
+    logger.info("metrics server listening on port 2999");
   });
 };

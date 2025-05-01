@@ -55,9 +55,8 @@ export const clusterTopicsForProject = async (
   const getCurrentCost = await getCurrentMonthCost(project.team.organizationId);
   if (getCurrentCost >= maxMonthlyUsage) {
     logger.info(
-      "Skipping clustering for project",
-      projectId,
-      "as monthly limit has been reached"
+      { projectId },
+      "skipping clustering for project as monthly limit has been reached"
     );
   }
 
@@ -116,9 +115,8 @@ export const clusterTopicsForProject = async (
       new Date(Date.now() - daysFrequency * 24 * 60 * 60 * 1000)
   ) {
     logger.info(
-      "Skipping clustering for project",
-      projectId,
-      `as last topic from batch processing was created less than ${daysFrequency} days ago`
+      { projectId },
+      `skipping clustering for project as last topic from batch processing was created less than ${daysFrequency} days ago`
     );
     return;
   }
@@ -220,9 +218,8 @@ export const clusterTopicsForProject = async (
 
   if (traces.length < minimumTraces) {
     logger.info(
-      `Less than ${minimumTraces} traces found for project`,
-      projectId,
-      "skipping topic clustering"
+      { projectId },
+      `less than ${minimumTraces} traces found for project, skipping topic clustering`
     );
     return;
   }
@@ -240,25 +237,21 @@ export const clusterTopicsForProject = async (
       | undefined;
     if (lastTraceSort) {
       logger.info(
-        "Scheduling the next page for clustering for project",
-        projectId,
-        "next page",
-        lastTraceSort
+        { projectId, lastTraceSort },
+        "scheduling the next page for clustering"
       );
       if (scheduleNextPage) {
         await scheduleTopicClusteringNextPage(projectId, lastTraceSort);
       } else {
         logger.info(
-          "Skipping scheduling next page for project",
-          projectId,
-          "which would be",
-          lastTraceSort
+          { projectId, lastTraceSort },
+          "skipping scheduling next page for project"
         );
       }
     }
   }
 
-  logger.info("Done! Project", projectId);
+  logger.info({ projectId }, "done! project");
 };
 
 const getProjectTopicClusteringModelProvider = async (project: Project) => {
@@ -277,7 +270,8 @@ const getProjectTopicClusteringModelProvider = async (project: Project) => {
   }
   if (!modelProvider.enabled) {
     logger.info(
-      `Topic clustering model provider ${provider} is not enabled, skipping topic clustering`
+      { provider },
+      "topic cluste ring model provider is not enabled, skipping topic clustering"
     );
     return;
   }
@@ -290,10 +284,8 @@ export const batchClusterTraces = async (
   traces: TopicClusteringTrace[]
 ) => {
   logger.info(
-    "Batch clustering topics for",
-    traces.length,
-    "traces on project",
-    project.id
+    { tracesLength: traces.length, projectId: project.id },
+    "batch clustering topics"
   );
 
   const topicModel = await getProjectTopicClusteringModelProvider(project);
@@ -324,10 +316,8 @@ export const incrementalClustering = async (
   traces: TopicClusteringTrace[]
 ) => {
   logger.info(
-    "Incremental topic clustering for",
-    traces.length,
-    "traces on project",
-    project.id
+    { tracesLength: traces.length, projectId: project.id },
+    "incremental topic clustering"
   );
 
   const topics: TopicClusteringTopic[] = (
@@ -404,13 +394,13 @@ export const storeResults = async (
   };
 
   logger.info(
-    `Found ${topics.length} new topics, ${subtopics.length} new subtopics, and`,
-    Object.keys(tracesToAssign).length,
-    "traces to assign for project",
-    projectId,
-    Object.keys(tracesToAssign).length > 0
-      ? "- Updating ElasticSearch"
-      : "- Skipping ElasticSearch update"
+    {
+      topicsLength: topics.length,
+      subtopicsLength: subtopics.length,
+      tracesToAssignLength: Object.keys(tracesToAssign).length,
+      projectId,
+    },
+    "found new topics, subtopics and traces to assign for project"
   );
 
   if (!isIncremental) {
@@ -510,10 +500,8 @@ export const fetchTopicsBatchClustering = async (
   getPayloadSizeHistogram("topic_clustering_batch").observe(size);
 
   logger.info(
-    "Uploading",
-    size / 125000,
-    "mb of traces data for project",
-    projectId
+    { sizeMb: size / 125000, projectId },
+    "uploading traces data for project"
   );
 
   const response = await fetchHTTP2(
@@ -528,7 +516,7 @@ export const fetchTopicsBatchClustering = async (
         .split("\n")
         .slice(0, 10)
         .join("\n");
-    } catch {}
+    } catch { }
     throw new Error(
       `Failed to fetch topics batch clustering: ${response.statusText}\n\n${body}`
     );
@@ -553,10 +541,10 @@ export const fetchTopicsIncrementalClustering = async (
   const size = JSON.stringify(params).length;
   getPayloadSizeHistogram("topic_clustering_incremental").observe(size);
 
-  logger.info("Uploading", {
-    sizeMb: size / 125000,
-    projectId,
-  });
+  logger.info(
+    { sizeMb: size / 125000, projectId },
+    "uploading traces data for project"
+  );
 
   const response = await fetchHTTP2(
     `${env.TOPIC_CLUSTERING_SERVICE}/topics/incremental_clustering`,

@@ -19,21 +19,21 @@ export const connection =
       });
 
 connection?.on("connect", () => {
-  logger.info("Redis connected");
+  logger.info("connected to redis");
 });
 
 connection?.on("error", (error) => {
-  logger.error("Redis Error:", error);
+  logger.error({ error }, "redis error");
 });
 
 connection?.on("ready", () => {
-  logger.info("Redis is ready to accept commands");
+  logger.info("ready to accept commands");
 });
 
 connection?.on("close", () => {
-  logger.info("Redis connection closed");
+  logger.info("connection closed");
 });
 
 connection?.on("reconnecting", () => {
-  logger.info("Redis reconnecting...");
+  logger.info("reconnecting...");
 });

@@ -102,10 +102,7 @@ export default async function handler(
   try {
     params = batchEvaluationInputSchema.parse(req.body);
   } catch (error) {
-    logger.error(
-      "Invalid evaluation params received",
-      { error, body: req.body, projectId: project.id },
-    );
+    logger.error({ error, body: req.body, projectId: project.id }, 'invalid evaluation params received');
     Sentry.captureException(error, { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);
@@ -175,10 +172,7 @@ export default async function handler(
       });
     }
   } catch (error) {
-    logger.error(
-      "Invalid evaluation data received",
-      { error, body: req.body, projectId: project.id },
-    );
+    logger.error({ error, body: req.body, projectId: project.id }, 'invalid evaluation data received');
     Sentry.captureException(error, { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);

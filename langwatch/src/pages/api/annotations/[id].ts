@@ -36,10 +36,7 @@ export default async function handler(
         .status(200)
         .json({ status: "success", message: "Annotation deleted." });
     } catch (e) {
-      logger.error("Error deleting annotation", {
-        error: e,
-        projectId: project.id,
-      });
+      logger.error({ error: e, projectId: project.id }, 'error deleting annotation');
       return res
         .status(500)
         .json({ status: "error", message: "ID not found." });
@@ -79,10 +76,7 @@ export default async function handler(
 
       return res.status(200).json({ data: patchAnnotation });
     } catch (e) {
-      logger.error("Error patching annotation", {
-        error: e,
-        projectId: project.id,
-      });
+      logger.error({ error: e, projectId: project.id }, 'error patching annotation');
       return res.status(500).json({ status: "error", message: "Not found" });
     }
   }
@@ -100,10 +94,7 @@ export default async function handler(
       }
       return res.status(200).json({ data: annotation });
     } catch (e) {
-      logger.error("Error fetching annotation", {
-        error: e,
-        projectId: project.id,
-      });
+      logger.error({ error: e, projectId: project.id }, 'error fetching annotation');
       return res
         .status(500)
         .json({ status: "error", message: "Internal server error." });

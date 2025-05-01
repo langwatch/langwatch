@@ -184,11 +184,7 @@ export default async function handler(
   try {
     params = collectorRESTParamsValidatorSchema.parse(req.body);
   } catch (error) {
-    logger.error("Invalid trace received", {
-      error,
-      body: req.body,
-      projectId: project.id,
-    });
+    logger.error({ error, body: req.body, projectId: project.id }, 'invalid trace received');
     Sentry.captureException(new Error("ZodError on parsing body"), {
       extra: { projectId: project.id, body: req.body, zodError: error },
     });
@@ -332,11 +328,7 @@ export default async function handler(
     try {
       spanValidatorSchema.parse(span);
     } catch (error) {
-      logger.error("Invalid span received", {
-        error,
-        span,
-        projectId: project.id,
-      });
+      logger.error({ error, span, projectId: project.id }, 'invalid span received');
       Sentry.captureException(new Error("ZodError on parsing spans"), {
         extra: { projectId: project.id, span, zodError: error },
       });
@@ -355,10 +347,7 @@ export default async function handler(
       (span.timestamps.first_token_at &&
         span.timestamps.first_token_at.toString().length !== 13)
     ) {
-      logger.error("Timestamps not in milliseconds for", {
-        traceId,
-        projectId: project.id,
-      });
+      logger.error({ traceId, projectId: project.id }, 'timestamps not in milliseconds for span');
       return res.status(400).json({
         error:
           "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",

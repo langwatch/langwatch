@@ -42,7 +42,7 @@ const initTikToken = async (
   while (loadingModel.has(tokenizer)) {
     await new Promise((resolve) => setTimeout(resolve, 100));
     if (Date.now() - startedWaiting > 10000) {
-      logger.warn(`Timeout waiting for ${tokenizer} tokenizer`);
+      logger.warn({ tokenizer }, "timeout waiting for tokenizer");
       loadingModel.delete(tokenizer);
       break;
     }

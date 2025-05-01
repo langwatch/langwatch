@@ -80,10 +80,7 @@ export default async function handler(
   try {
     params = eSBatchEvaluationRESTParamsSchema.parse(req.body);
   } catch (error) {
-    logger.error(
-      "Invalid log_results data received",
-      { error, body: req.body, projectId: project.id },
-    );
+    logger.error({ error, body: req.body, projectId: project.id }, 'invalid log_results data received');
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
     Sentry.captureException(error, { extra: { projectId: project.id } });
 
@@ -101,14 +98,11 @@ export default async function handler(
     params.timestamps?.created_at &&
     params.timestamps.created_at.toString().length === 10
   ) {
-    logger.error(
-      "Timestamps not in milliseconds for batch evaluation run",
-      {
-        runId: params.run_id,
-        experimentSlug: params.experiment_slug,
-        experimentId: params.experiment_id,
-      },
-    );
+    logger.error({
+      runId: params.run_id,
+      experimentSlug: params.experiment_slug,
+      experimentId: params.experiment_id,
+    }, 'timestamps not in milliseconds for batch evaluation run');
     return res.status(400).json({
       error:
         "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
@@ -119,10 +113,7 @@ export default async function handler(
     await processBatchEvaluation(project, params);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      logger.error(
-        "Failed to validate data for batch evaluation",
-        { error, body: params, projectId: project.id },
-      );
+      logger.error({ error, body: params, projectId: project.id }, 'failed to validate data for batch evaluation');
       Sentry.captureException(error, {
         extra: { projectId: project.id, param: params },
       });
@@ -130,10 +121,7 @@ export default async function handler(
       const validationError = fromZodError(error);
       return res.status(400).json({ error: validationError.message });
     } else {
-      logger.error(
-        "Internal server error processing batch evaluation",
-        { error, body: params, projectId: project.id },
-      );
+      logger.error({ error, body: params, projectId: project.id }, 'internal server error processing batch evaluation');
       Sentry.captureException(error, {
         extra: { projectId: project.id, param: params },
       });

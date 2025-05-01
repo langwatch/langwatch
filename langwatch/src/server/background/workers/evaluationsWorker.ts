@@ -364,7 +364,7 @@ export const startEvaluationsWorker = (
   ) => Promise<SingleEvaluationResult>
 ) => {
   if (!connection) {
-    logger.info("No redis connection, skipping trace checks worker");
+    logger.info("no redis connection, skipping trace checks worker");
     return;
   }
 
@@ -382,7 +382,7 @@ export const startEvaluationsWorker = (
       const start = Date.now();
 
       try {
-        logger.info(`Processing job ${job.id} with data::`, job.data);
+        logger.info({ jobId: job.id, data: job.data }, "processing job");
 
         let processed = false;
         const timeout = new Promise((resolve, reject) => {
@@ -443,7 +443,7 @@ export const startEvaluationsWorker = (
             : {}),
           details: "details" in result ? result.details ?? "" : "",
         });
-        logger.info("Successfully processed job:", job.id);
+        logger.info({ jobId: job.id }, "successfully processed job");
 
         const duration = Date.now() - start;
         getJobProcessingDurationHistogram("evaluation").observe(duration);
@@ -455,7 +455,7 @@ export const startEvaluationsWorker = (
           status: "error",
           error: error,
         });
-        logger.error("Failed to process job::", job.id, error);
+        logger.error({ jobId: job.id, error }, "failed to process job");
 
         if (
           typeof error === "object" &&
@@ -484,12 +484,12 @@ export const startEvaluationsWorker = (
   );
 
   traceChecksWorker.on("ready", () => {
-    logger.info("Trace worker active, waiting for jobs!");
+    logger.info("trace worker active, waiting for jobs!");
   });
 
   traceChecksWorker.on("failed", (job, err) => {
     getJobProcessingCounter("evaluation", "failed").inc();
-    logger.error(`Job ${job?.id} failed with error ${err.message}`);
+    logger.error({ jobId: job?.id, error: err.message }, "job failed");
     Sentry.withScope((scope) => {
       scope.setTag("worker", "traceChecks");
       scope.setExtra("job", job?.data);
@@ -497,7 +497,7 @@ export const startEvaluationsWorker = (
     });
   });
 
-  logger.info("Trace checks worker registered");
+  logger.info("trace checks worker registered");
   return traceChecksWorker;
 };
 

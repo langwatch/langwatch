@@ -18,7 +18,7 @@ import {
 const logger = createLogger("langwatch:workers:trackEventWorker");
 
 export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
-  logger.info(`Processing job ${job.id} with data:`, job.data);
+  logger.info({ jobId: job.id, data: job.data }, "processing job");
   getJobProcessingCounter("track_event", "processing").inc();
   const start = Date.now();
   let event: ElasticSearchEvent = {
@@ -106,7 +106,7 @@ export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
 
 export const startTrackEventsWorker = () => {
   if (!connection) {
-    logger.info("No redis connection, skipping track events worker");
+    logger.info("no redis connection, skipping track events worker");
     return;
   }
 
@@ -120,11 +120,11 @@ export const startTrackEventsWorker = () => {
   );
 
   trackEventsWorker.on("ready", () => {
-    logger.info("Track event worker active, waiting for jobs!");
+    logger.info("track event worker active, waiting for jobs!");
   });
 
   trackEventsWorker.on("failed", (job, err) => {
-    logger.error(`Job ${job?.id} failed with error ${err.message}`);
+    logger.error({ jobId: job?.id, error: err.message }, "job failed");
     getJobProcessingCounter("track_event", "failed").inc();
     Sentry.withScope((scope) => {
       scope.setTag("worker", "trackEvents");
@@ -133,6 +133,6 @@ export const startTrackEventsWorker = () => {
     });
   });
 
-  logger.info("Track events worker registered");
+  logger.info("track events worker registered");
   return trackEventsWorker;
 };

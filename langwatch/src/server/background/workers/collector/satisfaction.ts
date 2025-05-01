@@ -32,7 +32,8 @@ export const scoreSatisfactionFromInput = async ({
 
   if (!input?.value) {
     logger.warn(
-      `Trace ID ${traceId} input is empty, skipping satisfaction score`
+      { traceId },
+      "trace ID input is empty, skipping satisfaction score"
     );
     return;
   }

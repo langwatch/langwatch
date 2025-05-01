@@ -41,11 +41,7 @@ export default async function handler(
 
       return res.status(200).json({ data: annotationsByTrace });
     } catch (e) {
-      logger.error("Error fetching annotations for trace", {
-        error: e,
-        trace: req.query.trace,
-        projectId: project.id,
-      });
+      logger.error({ error: e, trace: req.query.trace, projectId: project.id }, 'error fetching annotations for trace');
       return res
         .status(500)
         .json({ status: "error", message: "Internal server error." });
@@ -93,11 +89,7 @@ export default async function handler(
 
       return res.status(200).json({ data: addAnnotation });
     } catch (e) {
-      logger.error("Error creating annotation", {
-        error: e,
-        trace: req.query.trace,
-        projectId: project.id,
-      });
+      logger.error({ error: e, trace: req.query.trace, projectId: project.id }, 'error creating annotation');
       return res
         .status(500)
         .json({ status: "error", message: "Internal server error." });
