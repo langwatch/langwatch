@@ -115,11 +115,11 @@ export const useOrganizationTeamProject = (
   const organization = teamsMatchingSlug?.[0]
     ? teamsMatchingSlug?.[0].organization
     : projectsTeamsOrganizationsMatchingSlug?.[0]
-      ? projectsTeamsOrganizationsMatchingSlug?.[0].organization
-      : organizations.data
-      ? organizations.data.find((org) => org.id == localStorageOrganizationId) ??
-        organizations.data[0]
-      : undefined;
+    ? projectsTeamsOrganizationsMatchingSlug?.[0].organization
+    : organizations.data
+    ? organizations.data.find((org) => org.id == localStorageOrganizationId) ??
+      organizations.data[0]
+    : undefined;
 
   const team = projectsTeamsOrganizationsMatchingSlug?.[0]
     ? projectsTeamsOrganizationsMatchingSlug?.[0].team
@@ -137,8 +137,8 @@ export const useOrganizationTeamProject = (
     { projectId: project?.id ?? "" },
     {
       enabled: !!project?.id,
-      staleTime: keepFetching ? undefined : Infinity,
       refetchOnMount: false,
+      refetchOnWindowFocus: true,
     }
   );
 
