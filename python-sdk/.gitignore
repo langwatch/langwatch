@@ -6,3 +6,4 @@
 chainlit.md
 __pycache__
 dist/
+local_cache/

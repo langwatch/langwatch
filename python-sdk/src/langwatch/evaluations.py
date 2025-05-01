@@ -28,6 +28,13 @@ from langwatch.utils.exceptions import capture_exception
 if TYPE_CHECKING:
     from langwatch.telemetry.tracing import LangWatchTrace
 
+class BasicEvaluateData(BaseModel):
+    input: Optional[str] = None
+    output: Optional[str] = None
+    expected_output: Optional[str] = None
+    contexts: Optional[Union[List[RAGChunk], List[str]]] = None
+    expected_contexts: Optional[Union[List[RAGChunk], List[str]]] = None
+    conversation: Optional[Conversation] = None
 
 class EvaluationResultModel(BaseModel):
     status: Literal["processed", "skipped", "error"]
@@ -53,6 +60,7 @@ def evaluate(
     trace: Optional["LangWatchTrace"] = None,
     span: Optional["LangWatchSpan"] = None,
     api_key: Optional[str] = None,
+    data: Optional[Union[BasicEvaluateData, Dict[str, Any]]] = None,
 ) -> EvaluationResultModel:  # type: ignore
     with langwatch.span(
         name=name or slug, type="guardrail" if as_guardrail else "evaluation"
@@ -70,6 +78,7 @@ def evaluate(
             span=span,
             as_guardrail=as_guardrail,
             api_key=api_key,
+            data=data,
         )
         try:
             with httpx.Client(timeout=900) as client:
@@ -97,6 +106,7 @@ async def async_evaluate(
     trace: Optional["LangWatchTrace"] = None,
     span: Optional["LangWatchSpan"] = None,
     api_key: Optional[str] = None,
+    data: Optional[Union[BasicEvaluateData, Dict[str, Any]]] = None,
 ) -> EvaluationResultModel:  # type: ignore
     with langwatch.span(
         name=name or slug, type="guardrail" if as_guardrail else "evaluation"
@@ -114,6 +124,7 @@ async def async_evaluate(
             span=span,
             as_guardrail=as_guardrail,
             api_key=api_key,
+            data=data,
         )
         try:
             async with httpx.AsyncClient(timeout=900) as client:
@@ -142,38 +153,49 @@ def prepare_data(
     span: Optional["LangWatchSpan"] = None,
     as_guardrail: bool = False,
     api_key: Optional[str] = None,
+    data: Optional[Union[BasicEvaluateData, Dict[str, Any]]] = None,
 ):
     span_ctx = get_current_span().get_span_context()
-
-    data = {
+    dataDict = {
         "trace_id": format(span_ctx.trace_id, "x"),
         "span_id": format(span_ctx.span_id, "x"),
+        **(data.model_dump(exclude_unset=True, exclude_none=True) if isinstance(data, BasicEvaluateData) else data or {}),
     }
     if input is not None:
-        data["input"] = input
+        warn("For the `evaluate` or `async_evaluate` function, the `input` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.", stacklevel=2)
+        dataDict["input"] = input
     if output is not None:
-        data["output"] = output
+        warn("For the `evaluate` or `async_evaluate` function, the `output` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.", stacklevel=2)
+        dataDict["output"] = output
     if expected_output is not None:
-        data["expected_output"] = expected_output
+        warn("For the `evaluate` or `async_evaluate` function, the `expected_output` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.", stacklevel=2)
+        dataDict["expected_output"] = expected_output
     if contexts is not None:
-        data["contexts"] = contexts
+        warn("For the `evaluate` or `async_evaluate` function, the `contexts` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.", stacklevel=2)
+        dataDict["contexts"] = contexts
     if expected_contexts is not None:
-        data["expected_contexts"] = expected_contexts
+        warn("For the `evaluate` or `async_evaluate` function, the `expected_contexts` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.", stacklevel=2)
+        dataDict["expected_contexts"] = expected_contexts
     if conversation is not None:
-        data["conversation"] = conversation
+        warn("For the `evaluate` or `async_evaluate` function, the `conversation` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.", stacklevel=2)
+        dataDict["conversation"] = conversation
+
     if trace_id is not None:
         warn(
-            "trace_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `trace_id` will be mapped to `deprecated.trace_id` in the data."
+            "trace_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `trace_id` will be mapped to `deprecated.trace_id` in the data.",
+            stacklevel=2
         )
-        data["deprecated.trace_id"] = str(trace_id)
+        dataDict["deprecated.trace_id"] = str(trace_id)
     if span_id is not None:
         warn(
-            "span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the data."
+            "span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the data.",
+            stacklevel=2
         )
-        data["deprecated.span_id"] = str(span_id)
+        dataDict["deprecated.span_id"] = str(span_id)
+
     if span:
         span.update(
-            input=TypedValueJson(type="json", value=data),
+            input=TypedValueJson(type="json", value=dataDict),
             params=settings,  # type: ignore
         )
 
@@ -183,7 +205,7 @@ def prepare_data(
             "trace_id": format(span_ctx.trace_id, "x"),
             "span_id": format(span_ctx.span_id, "x"),
             "name": name,
-            "data": data,
+            "data": dataDict,
             "settings": settings,
             "as_guardrail": as_guardrail,
         },

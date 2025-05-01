@@ -1,23 +1,23 @@
+import atexit
 import os
 import logging
 from typing import List, Optional, Sequence
 
 from langwatch.__version__ import __version__
 from langwatch.attributes import AttributeName
-from langwatch.domain import SpanExporterExcludeRule
+from langwatch.domain import SpanProcessingExcludeRule
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.sampling import TraceIdRatioBased, ALWAYS_OFF
 
-from langwatch.exporters.async_batch_exporter import AsyncBatchExporter
-
+from .exporters.filterable_batch_span_exporter import FilterableBatchSpanProcessor
 from .typings import Instrumentor
 from .types import LangWatchClientProtocol, BaseAttributes
 
 logger = logging.getLogger(__name__)
+
 
 class Client(LangWatchClientProtocol):
 	"""
@@ -30,7 +30,9 @@ class Client(LangWatchClientProtocol):
 	instrumentors: Sequence[Instrumentor] = []
 	base_attributes: BaseAttributes = {}
 	_disable_sending: bool = False
-	_span_exporter_exclude_rules: List[SpanExporterExcludeRule] = []
+	_flush_on_exit: bool = True
+	_span_exclude_rules: List[SpanProcessingExcludeRule] = []
+	_ignore_global_tracer_provider_override_warning: bool = False
 
 	def __init__(
 		self,
@@ -41,7 +43,9 @@ class Client(LangWatchClientProtocol):
 		tracer_provider: Optional[TracerProvider] = None,
 		debug: bool = False,
 		disable_sending: bool = False,
-		span_exporter_exclude_rules: Optional[List[SpanExporterExcludeRule]] = None,
+		flush_on_exit: bool = True,
+		span_exclude_rules: Optional[List[SpanProcessingExcludeRule]] = None,
+		ignore_global_tracer_provider_override_warning: bool = False,
 	):
 		"""
 		Initialize the LangWatch tracing client.
@@ -53,14 +57,18 @@ class Client(LangWatchClientProtocol):
 			instrumentors: Optional. The instrumentors to use for the LangWatch tracing client.
 			tracer_provider: Optional. The tracer provider to use for the LangWatch tracing client. If none is provided, the global tracer provider will be used. If that does not exist, a new tracer provider will be created.
 			disable_sending: Optional. If True, no traces will be sent to the server.
+			flush_on_exit: Optional. If True, the tracer provider will flush all spans when the program exits.
+			span_exclude_rules: Optional. The rules to exclude from the span exporter.
+			ignore_global_tracer_provider_override_warning: Optional. If True, the warning about the global tracer provider being overridden will be ignored.
 		"""
 
 		self._api_key = api_key or os.getenv("LANGWATCH_API_KEY", "")
 		self._endpoint_url = endpoint_url or os.getenv("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
 		self._debug = debug or os.getenv("LANGWATCH_DEBUG") == "true"
 		self._disable_sending = disable_sending
-		self._span_exporter_exclude_rules = span_exporter_exclude_rules or []
-
+		self._flush_on_exit = flush_on_exit
+		self._span_exclude_rules = span_exclude_rules or []
+		self._ignore_global_tracer_provider_override_warning = ignore_global_tracer_provider_override_warning
 		self.base_attributes = base_attributes or {}
 		self.base_attributes[AttributeName.LangWatchSDKName] = "langwatch-observability-sdk"
 		self.base_attributes[AttributeName.LangWatchSDKVersion] = str(__version__)
@@ -88,6 +96,11 @@ class Client(LangWatchClientProtocol):
 		return self._endpoint_url
 
 	@property
+	def flush_on_exit(self) -> bool:
+		"""Get the flush on exit flag for the client."""
+		return self._flush_on_exit
+
+	@property
 	def api_key(self) -> str:
 		"""Get the API key for the client."""
 		return self._api_key
@@ -106,7 +119,13 @@ class Client(LangWatchClientProtocol):
 		self._disable_sending = value
 
 		if value:
-			self.tracer_provider.shutdown()
+			if self.tracer_provider:
+				if self._flush_on_exit:
+					try:
+						atexit.unregister(self.tracer_provider.force_flush)
+					except ValueError:
+						pass # Handler was never registered – nothing to do.
+				self.tracer_provider.shutdown()
 		else:
 			self.tracer_provider = self.__ensure_otel_setup()
 
@@ -115,6 +134,7 @@ class Client(LangWatchClientProtocol):
 			if tracer_provider is not None:
 				if not isinstance(tracer_provider, TracerProvider): # type: ignore
 					raise ValueError("tracer_provider must be an instance of TracerProvider")
+				self.__set_langwatch_exporter(tracer_provider)
 				trace.set_tracer_provider(tracer_provider)
 				return tracer_provider
 
@@ -123,7 +143,9 @@ class Client(LangWatchClientProtocol):
 				if not isinstance(global_provider, TracerProvider):
 					raise ValueError("Global tracer provider must be an instance of TracerProvider")
 
-				logger.warning("There is already a global tracer provider set. LangWatch will not override it automatically, but this may result in telemetry not being sent to LangWatch if you have not configured it to do so yourself.")
+				if not self._ignore_global_tracer_provider_override_warning:
+					logger.warning("An existing global trace provider was found. LangWatch will not override it automatically, but instead is attaching another span processor and exporter to it. You can disable this warning by setting `ignore_global_tracer_provider_override_warning` to `True`.")
+				self.__set_langwatch_exporter(global_provider)
 
 				return global_provider
 
@@ -141,31 +163,11 @@ class Client(LangWatchClientProtocol):
 			sampler = ALWAYS_OFF if self._disable_sending else TraceIdRatioBased(1.0)
 			provider = TracerProvider(resource=resource, sampler=sampler)
 
-			if not self.api_key:
-				raise ValueError("LangWatch API key is required but not provided")
+			self.__set_langwatch_exporter(provider)
 
-			headers = {
-				"Authorization": f"Bearer {self.api_key}",
-				"X-LangWatch-SDK-Version": str(__version__),
-			}
-
-			if self.debug:
-				logger.info(f"Configuring OTLP exporter with endpoint: {self._endpoint_url}/api/otel/v1/traces")
-
-			otlp_exporter = OTLPSpanExporter(
-				endpoint=f"{self._endpoint_url}/api/otel/v1/traces",
-				headers=headers,
-				timeout=30,
-			)
-			async_exporter = AsyncBatchExporter(
-				exporter=otlp_exporter,
-				export_interval=5.0,
-				max_export_batch_size=100,
-				max_queue_size=512,
-				span_exporter_exclude_rules=self._span_exporter_exclude_rules,
-			)
-
-			provider.add_span_processor(SimpleSpanProcessor(async_exporter))
+			if self._flush_on_exit:
+				logger.info("Registering atexit handler to flush tracer provider on exit")
+				atexit.register(provider.force_flush)
 
 			if self.debug:
 				logger.info("Successfully configured tracer provider with OTLP exporter")
@@ -173,3 +175,31 @@ class Client(LangWatchClientProtocol):
 			return provider
 		except Exception as e:
 			raise RuntimeError(f"Failed to create and configure tracer provider: {str(e)}") from e
+
+	def __set_langwatch_exporter(self, provider: TracerProvider) -> None:
+		if not self.api_key:
+			raise ValueError("LangWatch API key is required but not provided")
+
+		headers = {
+			"Authorization": f"Bearer {self.api_key}",
+			"X-LangWatch-SDK-Version": str(__version__),
+		}
+
+		if self.debug:
+			logger.info(f"Configuring OTLP exporter with endpoint: {self._endpoint_url}/api/otel/v1/traces")
+
+		otlp_exporter = OTLPSpanExporter(
+			endpoint=f"{self._endpoint_url}/api/otel/v1/traces",
+			headers=headers,
+			timeout=int(os.getenv("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", 30)),
+		)
+
+		processor = FilterableBatchSpanProcessor(
+			span_exporter=otlp_exporter,
+			exclude_rules=self._span_exclude_rules,
+			max_export_batch_size=int(os.getenv("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", 100)),
+			max_queue_size=int(os.getenv("OTEL_BSP_MAX_QUEUE_SIZE", 512)),
+			schedule_delay_millis=float(os.getenv("OTEL_BSP_SCHEDULE_DELAY", 1000)),
+			export_timeout_millis=float(os.getenv("OTEL_BSP_EXPORT_TIMEOUT", 10000)),
+		)
+		provider.add_span_processor(processor)

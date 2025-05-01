@@ -51,6 +51,7 @@ from langwatch.utils.initialization import ensure_setup
 
 if TYPE_CHECKING:
     from openai import OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI
+    from langwatch.evaluations import BasicEvaluateData
 
 __all__ = ["trace", "LangWatchTrace"]
 
@@ -396,6 +397,7 @@ class LangWatchTrace:
         conversation: Conversation = [],
         settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
+        data: Optional[Union["BasicEvaluateData", Dict[str, Any]]] = None,
     ):
         from langwatch import evaluations
 
@@ -410,6 +412,7 @@ class LangWatchTrace:
             conversation=conversation,
             settings=settings,
             as_guardrail=as_guardrail,
+            data=data,
         )
 
     async def async_evaluate(
@@ -423,6 +426,7 @@ class LangWatchTrace:
         conversation: Conversation = [],
         settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
+        data: Optional[Union["BasicEvaluateData", Dict[str, Any]]] = None,
     ):
         from langwatch import evaluations
 
@@ -437,6 +441,7 @@ class LangWatchTrace:
             conversation=conversation,
             settings=settings,
             as_guardrail=as_guardrail,
+            data=data,
         )
 
     def __call__(self, func: T) -> T:
