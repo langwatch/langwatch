@@ -1,14 +1,11 @@
 import type { Annotation, AnnotationScore, User } from "@prisma/client";
 import { getRAGChunks, getRAGInfo } from "./utils";
 import { z } from "zod";
-import type {
-  DatasetSpan,
-  Evaluation,
-  Span,
-} from "./types";
+import type { DatasetSpan, Evaluation, Span } from "./types";
 import type { Trace as BaseTrace } from "./types";
 import { getSpanNameOrModel } from "../../utils/trace";
 import { datasetSpanSchema } from "../datasets/types";
+import { reservedTraceMetadataSchema } from "./types.generated";
 
 // Define a Trace type that includes annotations for use within this file
 // This assumes the Annotation type comes from Prisma
@@ -31,8 +28,7 @@ export const TRACE_MAPPINGS = {
     mapping: (trace: TraceWithAnnotations) => trace.output?.value ?? "",
   },
   contexts: {
-    mapping: (trace: TraceWithAnnotations) =>
-      getRAGChunks(trace.spans ?? []),
+    mapping: (trace: TraceWithAnnotations) => getRAGChunks(trace.spans ?? []),
   },
   "contexts.string_list": {
     mapping: (trace: TraceWithAnnotations) => {
@@ -44,20 +40,17 @@ export const TRACE_MAPPINGS = {
     },
   },
   "metrics.total_cost": {
-    mapping: (trace: TraceWithAnnotations) =>
-      trace.metrics?.total_cost ?? 0,
+    mapping: (trace: TraceWithAnnotations) => trace.metrics?.total_cost ?? 0,
   },
   "metrics.first_token_ms": {
     mapping: (trace: TraceWithAnnotations) =>
       trace.metrics?.first_token_ms ?? 0,
   },
   "metrics.total_time_ms": {
-    mapping: (trace: TraceWithAnnotations) =>
-      trace.metrics?.total_time_ms ?? 0,
+    mapping: (trace: TraceWithAnnotations) => trace.metrics?.total_time_ms ?? 0,
   },
   "metrics.prompt_tokens": {
-    mapping: (trace: TraceWithAnnotations) =>
-      trace.metrics?.prompt_tokens ?? 0,
+    mapping: (trace: TraceWithAnnotations) => trace.metrics?.prompt_tokens ?? 0,
   },
   "metrics.completion_tokens": {
     mapping: (trace: TraceWithAnnotations) =>
@@ -95,11 +88,7 @@ export const TRACE_MAPPINGS = {
           label: key,
         }));
     },
-    mapping: (
-      trace: TraceWithAnnotations,
-      key: string,
-      subkey: string
-    ) => {
+    mapping: (trace: TraceWithAnnotations, key: string, subkey: string) => {
       const traceSpans = esSpansToDatasetSpans(trace.spans ?? []);
       if (!key) {
         return traceSpans;
@@ -129,10 +118,26 @@ export const TRACE_MAPPINGS = {
     expandable_by: "spans.llm.span_id",
   },
   metadata: {
-    keys: (traces: TraceWithAnnotations[]) =>
-      Array.from(
+    keys: (traces: TraceWithAnnotations[]) => {
+      const allKeys = Array.from(
         new Set(traces.flatMap((trace) => Object.keys(trace.metadata ?? {})))
-      ).map((key) => ({ key, label: key })),
+      );
+
+      const reservedKeys = Object.keys(reservedTraceMetadataSchema.shape);
+
+      const mergedKeys = Array.from(new Set([...allKeys, ...reservedKeys]));
+
+      const excludedKeys = ["custom", "all_keys"];
+      const filteredKeys = mergedKeys.filter(
+        (key) => !excludedKeys.includes(key)
+      );
+
+      // Return all keys, marking reserved ones
+      return filteredKeys.map((key) => ({
+        key,
+        label: reservedKeys.includes(key) ? `${key}` : key,
+      }));
+    },
     mapping: (trace: TraceWithAnnotations, key: string) =>
       key ? (trace.metadata?.[key] as any) : JSON.stringify(trace.metadata),
   },
@@ -169,11 +174,7 @@ export const TRACE_MAPPINGS = {
           label: key,
         }));
     },
-    mapping: (
-      trace: TraceWithAnnotations,
-      key: string,
-      subkey: string
-    ) => {
+    mapping: (trace: TraceWithAnnotations, key: string, subkey: string) => {
       if (!key) {
         return trace.evaluations ?? [];
       }
@@ -224,7 +225,11 @@ export const TRACE_MAPPINGS = {
         return trace.annotations ?? [];
       }
       return (trace.annotations ?? []).map((annotation) => {
-        if (subkey && typeof annotation.scoreOptions === "object" && annotation.scoreOptions !== null) {
+        if (
+          subkey &&
+          typeof annotation.scoreOptions === "object" &&
+          annotation.scoreOptions !== null
+        ) {
           if (key === "score") {
             return (annotation.scoreOptions as any)[subkey]?.value;
           }
@@ -236,8 +241,9 @@ export const TRACE_MAPPINGS = {
           Object.fromEntries(
             Object.entries(annotation.scoreOptions ?? {})
               .map(([key, score]) => [
-                data.annotationScoreOptions?.find((scoreOpt) => scoreOpt.id === key)
-                  ?.name ?? key,
+                data.annotationScoreOptions?.find(
+                  (scoreOpt) => scoreOpt.id === key
+                )?.name ?? key,
                 score,
               ])
               .filter(([_, scoreValue]) => (scoreValue as any)?.value !== null)
@@ -289,11 +295,7 @@ export const TRACE_MAPPINGS = {
         })
       );
     },
-    mapping: (
-      trace: TraceWithAnnotations,
-      key: string,
-      subkey: string
-    ) => {
+    mapping: (trace: TraceWithAnnotations, key: string, subkey: string) => {
       if (!key) {
         return trace.events;
       }
@@ -320,9 +322,7 @@ export const TRACE_MAPPINGS = {
 } satisfies Record<
   string,
   {
-    keys?: (
-      traces: TraceWithAnnotations[]
-    ) => { key: string; label: string }[];
+    keys?: (traces: TraceWithAnnotations[]) => { key: string; label: string }[];
     subkeys?: (
       traces: TraceWithAnnotations[],
       key: string,
@@ -369,10 +369,12 @@ export const TRACE_EXPANSIONS = {
     label: "annotation",
     expansion: (trace: TraceWithAnnotations) => {
       const annotations = trace.annotations ?? [];
-      return annotations.map((annotation: Annotation & { user?: User | null }) => ({
-        ...trace,
-        annotations: [annotation],
-      }));
+      return annotations.map(
+        (annotation: Annotation & { user?: User | null }) => ({
+          ...trace,
+          annotations: [annotation],
+        })
+      );
     },
   },
   "events.event_id": {
@@ -389,9 +391,7 @@ export const TRACE_EXPANSIONS = {
   string,
   {
     label: string;
-    expansion: (
-      trace: TraceWithAnnotations
-    ) => TraceWithAnnotations[];
+    expansion: (trace: TraceWithAnnotations) => TraceWithAnnotations[];
   }
 >;
 
@@ -436,9 +436,7 @@ export const mapTraceToDatasetEntry = (
   expansions: Set<keyof typeof TRACE_EXPANSIONS>,
   annotationScoreOptions?: AnnotationScore[]
 ): Record<string, string | number>[] => {
-  let expandedTraces: TraceWithAnnotations[] = [
-    trace as TraceWithAnnotations,
-  ];
+  let expandedTraces: TraceWithAnnotations[] = [trace as TraceWithAnnotations];
 
   for (const expansion of expansions) {
     const expanded = expandedTraces.flatMap((trace) =>
