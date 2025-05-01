@@ -57,6 +57,7 @@ import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
 import { EvaluatorSelection, evaluatorTempNameMap } from "./EvaluatorSelection";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 export interface CheckConfigFormData {
   name: string;
@@ -85,6 +86,7 @@ export default function CheckConfigForm({
   const { project } = useOrganizationTeamProject();
   const isNameAvailable = api.monitors.isNameAvailable.useMutation();
   const [isNameAlreadyInUse, setIsNameAlreadyInUse] = useState(false);
+  const publicEnv = usePublicEnv();
 
   const validateNameUniqueness = async (name: string) => {
     const result = await isNameAvailable.mutateAsync({
@@ -213,7 +215,7 @@ export default function CheckConfigForm({
     };
 
     setDefaultSettings(
-      getEvaluatorDefaultSettings(availableEvaluators[checkType]),
+      getEvaluatorDefaultSettings(availableEvaluators[checkType], undefined, publicEnv.data?.IS_ATLA_DEFAULT_JUDGE),
       "settings"
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps

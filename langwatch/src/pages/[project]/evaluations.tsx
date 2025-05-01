@@ -333,44 +333,51 @@ export default function EvaluationsV2() {
                                     experiment.updatedAt
                                   ).toLocaleString()}
                                 </Table.Cell>
-                                <Table.Cell display="flex" justifyContent="end">
-                                  <Menu.Root>
-                                    <Menu.Trigger
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                      }}
-                                    >
-                                      <MoreVertical size={16} />
-                                    </Menu.Trigger>
-                                    <Menu.Content>
-                                      <Menu.Item
-                                        value="edit"
+                                <Table.Cell>
+                                  <Box
+                                    width="full"
+                                    height="full"
+                                    display="flex"
+                                    justifyContent="end"
+                                  >
+                                    <Menu.Root>
+                                      <Menu.Trigger
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          void router.push(
-                                            `/${project?.slug}/evaluations/wizard/${experiment.slug}`
-                                          );
                                         }}
                                       >
-                                        <LuPencil size={16} />
-                                        Edit
-                                      </Menu.Item>
-                                      <Menu.Item
-                                        value="delete"
-                                        color="red.500"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeleteExperiment(
-                                            experiment.id,
-                                            experiment.name ?? experiment.slug
-                                          );
-                                        }}
-                                      >
-                                        <LuTrash size={16} />
-                                        Delete
-                                      </Menu.Item>
-                                    </Menu.Content>
-                                  </Menu.Root>
+                                        <MoreVertical size={16} />
+                                      </Menu.Trigger>
+                                      <Menu.Content>
+                                        <Menu.Item
+                                          value="edit"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            void router.push(
+                                              `/${project?.slug}/evaluations/wizard/${experiment.slug}`
+                                            );
+                                          }}
+                                        >
+                                          <LuPencil size={16} />
+                                          Edit
+                                        </Menu.Item>
+                                        <Menu.Item
+                                          value="delete"
+                                          color="red.500"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteExperiment(
+                                              experiment.id,
+                                              experiment.name ?? experiment.slug
+                                            );
+                                          }}
+                                        >
+                                          <LuTrash size={16} />
+                                          Delete
+                                        </Menu.Item>
+                                      </Menu.Content>
+                                    </Menu.Root>
+                                  </Box>
                                 </Table.Cell>
                               </Table.Row>
                             ))

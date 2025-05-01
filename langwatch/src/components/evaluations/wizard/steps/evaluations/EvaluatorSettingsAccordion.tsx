@@ -11,11 +11,13 @@ import { StepAccordion } from "../../components/StepAccordion";
 import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
 import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
 import type { EvaluatorTypes } from "../../../../../server/evaluations/evaluators.generated";
+import { usePublicEnv } from "../../../../../hooks/usePublicEnv";
 
 export const EvaluatorSettingsAccordion = () => {
   const { project } = useOrganizationTeamProject();
   const { wizardState, getFirstEvaluatorNode, setFirstEvaluator } =
     useEvaluationWizardStore();
+  const publicEnv = usePublicEnv();
 
   const evaluator = getFirstEvaluatorNode();
   const evaluatorType = evaluator?.data.evaluator;
@@ -47,7 +49,8 @@ export const EvaluatorSettingsAccordion = () => {
       : evaluatorType
       ? getEvaluatorDefaultSettings(
           availableEvaluators[evaluatorType as EvaluatorTypes],
-          project
+          project,
+          publicEnv.data?.IS_ATLA_DEFAULT_JUDGE
         )
       : undefined;
 
@@ -60,15 +63,6 @@ export const EvaluatorSettingsAccordion = () => {
       customMapping: {},
     },
   });
-
-  useEffect(() => {
-    if (!defaultSettings) return;
-
-    form.reset({
-      settings: defaultSettings,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [evaluatorType]);
 
   const onSubmit = useCallback(
     (data: { settings?: Record<string, any> }) => {
@@ -92,6 +86,16 @@ export const EvaluatorSettingsAccordion = () => {
     },
     [availableEvaluators, evaluatorType, setFirstEvaluator]
   );
+
+  useEffect(() => {
+    if (!defaultSettings) return;
+
+    form.reset({
+      settings: defaultSettings,
+    });
+    onSubmit({ settings: defaultSettings });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evaluatorType]);
 
   const formRenderedFor = useRef<string>(evaluatorType);
 

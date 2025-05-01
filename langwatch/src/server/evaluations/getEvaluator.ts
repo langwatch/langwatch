@@ -15,12 +15,16 @@ export const getEvaluatorDefinitions = (evaluator: string) => {
 
 export const getEvaluatorDefaultSettings = <T extends EvaluatorTypes>(
   evaluator: EvaluatorDefinition<T> | undefined,
-  project?: { defaultModel?: string | null; embeddingsModel?: string | null }
+  project?: { defaultModel?: string | null; embeddingsModel?: string | null },
+  useAtlaModelForJudges?: boolean
 ) => {
   if (!evaluator) return {};
   return Object.fromEntries(
     Object.entries(evaluator.settings).map(([key, setting]) => {
-      if (key === "model") {
+      if (key === "model" && evaluator.name.includes("LLM-as-a-Judge")) {
+        if (useAtlaModelForJudges) {
+          return [key, "atla/atla-selene"];
+        }
         return [key, project?.defaultModel ?? DEFAULT_MODEL];
       }
       if (key === "embeddings_model") {
