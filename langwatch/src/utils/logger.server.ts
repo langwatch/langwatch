@@ -7,6 +7,18 @@ export const createLogger = (name: string) => {
     name,
     level: process.env.PINO_LOG_LEVEL || "info",
     timestamp: pino.stdTimeFunctions.isoTime,
+    formatters: {
+      bindings: (bindings) => {
+        if (process.env.NODE_ENV === "development") {
+          return bindings;
+        }
+
+        return bindings; // TODO(afr): Later, add git commit hash, and other stuff
+      },
+      level: (label) => {
+        return { level: label.toUpperCase() };
+      },
+    }
   };
 
   return (pino as any).default(
