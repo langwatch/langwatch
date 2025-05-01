@@ -284,7 +284,7 @@ const processCollectorJob_ = async (
   }
 
   // Create the trace 
-  const trace: ElasticSearchTrace = {
+  const trace: Omit<ElasticSearchTrace, "spans"> = {
     trace_id: traceId,
     project_id: project.id,
     metadata: {
@@ -304,7 +304,6 @@ const processCollectorJob_ = async (
         ])
       ),
     },
-    spans: [], // skipped as stored elsewhere
     timestamps: {
       started_at:
         Math.min(...allSpans.map((span) => span.timestamps.started_at)) ??
@@ -382,7 +381,7 @@ const processCollectorJob_ = async (
 };
 
 const updateTrace = async (
-  trace: ElasticSearchTrace,
+  trace: Omit<ElasticSearchTrace, "spans">,
   esSpans: ElasticSearchSpan[],
   evaluations: Evaluation[] | undefined
 ) => {
@@ -403,6 +402,9 @@ const updateTrace = async (
       doc_as_upsert: true,
     });
   }
+
+  // @ts-expect-error
+  delete trace.spans;
 
   try {
     const client = await esClient({ projectId: trace.project_id });
