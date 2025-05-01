@@ -1,7 +1,12 @@
 import { z } from "zod";
 import type { ModelProvider } from "@prisma/client";
 // @ts-ignore
-import * as llmModelCosts from "./llmModelCosts.json";
+import * as llmModelCostsRaw from "./llmModelCosts.json";
+
+const llmModelCosts = llmModelCostsRaw as unknown as Record<
+  string,
+  { mode?: "chat" | "embedding"; litellm_provider: string }
+>;
 
 type ModelProviderDefinition = {
   name: string;
