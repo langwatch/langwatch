@@ -45,6 +45,7 @@ def evaluate(
     trace: Optional[ContextTrace] = None,
     span: Optional[ContextSpan] = None,
     api_key: Optional[str] = None,
+    **kwargs,
 ):
     with _optional_create_span(
         trace=trace,
@@ -67,6 +68,7 @@ def evaluate(
             span=span,
             as_guardrail=as_guardrail,
             api_key=api_key,
+            custom_data=kwargs,
         )
         try:
             with httpx.Client(timeout=900) as client:
@@ -92,6 +94,7 @@ async def async_evaluate(
     trace: Optional[ContextTrace] = None,
     span: Optional[ContextSpan] = None,
     api_key: Optional[str] = None,
+    **kwargs,
 ):
     with _optional_create_span(
         trace=trace,
@@ -114,6 +117,7 @@ async def async_evaluate(
             span=span,
             as_guardrail=as_guardrail,
             api_key=api_key,
+            custom_data=kwargs,
         )
         try:
             async with httpx.AsyncClient(timeout=900) as client:
@@ -165,6 +169,7 @@ def prepare_data(
     span: Optional[ContextSpan] = None,
     as_guardrail: bool = False,
     api_key: Optional[str] = None,
+    custom_data: Optional[dict] = None,
 ):
     data = {}
     if input is not None:
@@ -184,6 +189,10 @@ def prepare_data(
             input=TypedValueJson(type="json", value=data),
             params=settings,  # type: ignore
         )
+    if custom_data:
+        for key, value in custom_data.items():
+            if key not in data and value is not None:
+                data[key] = value
 
     return {
         "url": langwatch.endpoint + f"/api/evaluations/{slug}/evaluate",

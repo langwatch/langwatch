@@ -147,7 +147,7 @@ export function PromptSourceHeader({
         <InputGroup
           startElement={<Text fontSize="12px">Name:</Text>}
           startOffset="-24px"
-          // startOffset="50px"
+          width="100%"
         >
           <Input
             size="sm"
