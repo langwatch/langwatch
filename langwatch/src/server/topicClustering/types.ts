@@ -4,7 +4,7 @@ import { allLitellmModels } from "../modelProviders/registry";
 export type ModelOption = {
   value: string;
   isDisabled: boolean;
-  mode?: "chat" | "embedding" | "evaluator" | undefined;
+  mode?: "chat" | "embedding" | undefined;
 };
 
 export const allowedTopicClusteringModels = Object.entries(allLitellmModels)

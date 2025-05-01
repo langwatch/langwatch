@@ -22,7 +22,7 @@ export type ModelOption = {
   value: string;
   icon: React.ReactNode;
   isDisabled: boolean;
-  mode?: "chat" | "embedding" | "evaluator" | undefined;
+  mode?: "chat" | "embedding" | undefined;
 };
 
 export const modelSelectorOptions: ModelOption[] = Object.entries(
@@ -92,7 +92,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   options: string[];
   onChange: (model: string) => void;
   size?: "sm" | "md" | "full";
-  mode?: "chat" | "embedding" | "evaluator";
+  mode?: "chat" | "embedding";
 }) {
   const { selectOptions } = useModelSelectionOptions(options, model, mode);
 
@@ -259,7 +259,7 @@ export const ModelSelector = React.memo(function ModelSelector({
 const getCustomModels = (
   modelProviders: Record<string, any>,
   options: string[],
-  mode: "chat" | "embedding" | "evaluator" = "chat"
+  mode: "chat" | "embedding" = "chat"
 ) => {
   const models: string[] = [];
 
