@@ -1,8 +1,8 @@
-import asyncio
 from dotenv import load_dotenv
-load_dotenv(dotenv_path="../.env")
+load_dotenv()
 
 from openai import OpenAI
+import asyncio
 import langwatch
 
 client = OpenAI()
@@ -18,13 +18,13 @@ async def main():
 
 @langwatch.span(name="run")
 async def run():
-    message = "Which album does Taylor Swift sing about Tim McGraw?"
+    message = "How do I edit my password on my account?"
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
-                "content": "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.",
+                "content": "You are the assistant bot for a company that sends emails to customers. You are given a question and you need to answer it in a way that is helpful and informative.",
             },
             {"role": "user", "content": message},
         ],
@@ -40,11 +40,11 @@ async def run():
             text += token
 
     result = langwatch.get_current_span().evaluate(
-        "azure/content_safety",
-        name="Draft Evaluation (1)",
+        "custom/workflow_MoMAq3MKwJLvYz96GyyZj",
+        name="Example SDK Evaluation",
         data={
-            "input": message,
-            "output": text,
+            "question": message,
+            "answer": text,
         },
     )
 
