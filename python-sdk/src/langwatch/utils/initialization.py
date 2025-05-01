@@ -34,7 +34,7 @@ def setup(
     base_attributes: Optional[BaseAttributes] = None,
     tracer_provider: Optional[TracerProvider] = None,
     instrumentors: Optional[Sequence[Instrumentor]] = None,
-    span_exporter_exclude_rules: Optional[List[SpanProcessingExcludeRule]] = [],
+    span_exclude_rules: Optional[List[SpanProcessingExcludeRule]] = [],
     debug: bool = False,
 ) -> Client:
     """
@@ -46,7 +46,7 @@ def setup(
         base_attributes: The base attributes for the LangWatch client.
         tracer_provider: The tracer provider for the LangWatch client.
         instrumentors: The instrumentors for the LangWatch client.
-        span_exporter_exclude_rules: Optional. A list of rules that will be applied to spans processed by the exporter.
+        span_exclude_rules: Optional. A list of rules that will be applied to spans processed by the exporter.
         debug: Whether to enable debug logging for the LangWatch client.
 
     Returns:
@@ -64,7 +64,7 @@ def setup(
         tracer_provider=tracer_provider,
         instrumentors=instrumentors,
         debug=debug,
-        span_exporter_exclude_rules=span_exporter_exclude_rules,
+        span_exclude_rules=span_exclude_rules,
     )
 
     if debug:
