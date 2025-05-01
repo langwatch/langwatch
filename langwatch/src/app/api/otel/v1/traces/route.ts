@@ -13,15 +13,15 @@ import {
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { prisma } from "../../../../../server/db";
 import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/opentelemetry";
-import { getDebugger } from "../../../../../utils/logger";
 import * as Sentry from "@sentry/nextjs";
 import * as crypto from "crypto";
 import {
   fetchExistingMD5s,
   scheduleTraceCollectionWithFallback,
 } from "../../../../../server/background/workers/collectorWorker";
+import { createLogger } from "../../../../../utils/logger.server";
 
-const debug = getDebugger("langwatch:otel:v1:traces");
+const debug = createLogger("langwatch:otel:v1:traces");
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
