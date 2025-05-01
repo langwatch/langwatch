@@ -13,7 +13,7 @@ import { type Span } from "../../../tracer/types";
 import { elasticSearchEvaluationSchema } from "../../../tracer/types.generated";
 import { scheduleEvaluation } from "../../queues/evaluationsQueue";
 import type { CollectorJob, EvaluationJob } from "../../types";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger.server";
 
 const logger = createLogger("langwatch:workers:collector:evaluations");
 

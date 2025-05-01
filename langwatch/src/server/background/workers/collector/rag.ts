@@ -7,7 +7,7 @@ import {
   type SpanWithChildren,
 } from "./common";
 import crypto from "crypto";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger.server";
 
 const logger = createLogger("langwatch:workers:collector:rag");
 

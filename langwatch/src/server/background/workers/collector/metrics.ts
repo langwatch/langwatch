@@ -6,7 +6,7 @@ import {
   matchingLLMModelCost,
   tokenizeAndEstimateCost,
 } from "./cost";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger.server";
 
 const logger = createLogger("langwatch:workers:collector:metrics");
 

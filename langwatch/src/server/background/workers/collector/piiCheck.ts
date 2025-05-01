@@ -14,7 +14,7 @@ import {
   getPiiChecksCounter,
 } from "../../../metrics";
 import * as Sentry from "@sentry/nextjs";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger.server";
 
 const logger = createLogger("langwatch:workers:collector:piiCheck");
 
