@@ -8,7 +8,7 @@ from opentelemetry import trace
 
 from langwatch.state import get_instance, set_instance
 from langwatch.client import Client
-from langwatch.domain import SpanExporterExcludeRule
+from langwatch.domain import SpanProcessingExcludeRule
 from langwatch.types import BaseAttributes
 from langwatch.typings import Instrumentor
 
@@ -34,7 +34,7 @@ def setup(
     base_attributes: Optional[BaseAttributes] = None,
     tracer_provider: Optional[TracerProvider] = None,
     instrumentors: Optional[Sequence[Instrumentor]] = None,
-    span_exporter_exclude_rules: Optional[List[SpanExporterExcludeRule]] = [],
+    span_exporter_exclude_rules: Optional[List[SpanProcessingExcludeRule]] = [],
     debug: bool = False,
 ) -> Client:
     """

@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = ">=3.9, !=3.9.7, <3.13"
 resolution-markers = [
     "python_full_version >= '3.12.4'",
@@ -2121,7 +2122,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.2.0rc3"
+version = "0.2.0rc4"
 source = { editable = "." }
 dependencies = [
     { name = "coolname" },
@@ -2146,7 +2147,7 @@ dev = [
 dspy = [
     { name = "dspy-ai" },
 ]
-test = [
+tests = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
 ]
@@ -2177,6 +2178,9 @@ examples = [
     { name = "streamlit" },
     { name = "uvicorn" },
 ]
+tests = [
+    { name = "pytest-asyncio" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -2192,12 +2196,13 @@ requires-dist = [
     { name = "opentelemetry-api", specifier = ">=1.32.1" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.32.1" },
     { name = "opentelemetry-sdk", specifier = ">=1.32.1" },
-    { name = "pytest", marker = "extra == 'test'", specifier = ">=7.4.2,<8.0.0" },
-    { name = "pytest-asyncio", marker = "extra == 'test'", specifier = ">=0.21.1,<0.22.0" },
+    { name = "pytest", marker = "extra == 'tests'", specifier = ">=7.4.2,<8.0.0" },
+    { name = "pytest-asyncio", marker = "extra == 'tests'", specifier = ">=0.21.1,<0.22.0" },
     { name = "retry", specifier = ">=0.9.2" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.1" },
     { name = "termcolor", specifier = ">=3.0.1" },
 ]
+provides-extras = ["dspy", "dev", "tests"]
 
 [package.metadata.requires-dev]
 examples = [
@@ -2225,6 +2230,7 @@ examples = [
     { name = "streamlit", specifier = ">=1.37.1,<2.0.0" },
     { name = "uvicorn", specifier = ">=0.25.0,<0.26.0" },
 ]
+tests = [{ name = "pytest-asyncio", specifier = ">=0.21.2" }]
 
 [[package]]
 name = "lazify"

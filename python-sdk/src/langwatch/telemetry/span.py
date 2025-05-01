@@ -59,6 +59,8 @@ from langwatch.utils.initialization import ensure_setup
 
 if TYPE_CHECKING:
     from .tracing import LangWatchTrace
+    from langwatch.evaluations import BasicEvaluateData
+
 
 __all__ = ["span", "LangWatchSpan"]
 
@@ -426,6 +428,7 @@ class LangWatchSpan:
         conversation: Conversation = [],
         settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
+        data: Optional[Union["BasicEvaluateData", Dict[str, Any]]] = None,
     ):
         contexts = contexts or []
         conversation = conversation or []
@@ -443,6 +446,7 @@ class LangWatchSpan:
             conversation=conversation,
             settings=settings,
             as_guardrail=as_guardrail,
+            data=data,
         )
 
     async def async_evaluate(
@@ -456,6 +460,7 @@ class LangWatchSpan:
         conversation: Conversation = [],
         settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
+        data: Optional[Union["BasicEvaluateData", Dict[str, Any]]] = None,
     ):
         contexts = contexts or []
         conversation = conversation or []
@@ -473,6 +478,7 @@ class LangWatchSpan:
             conversation=conversation,
             settings=settings,
             as_guardrail=as_guardrail,
+            data=data,
         )
 
     def end(
