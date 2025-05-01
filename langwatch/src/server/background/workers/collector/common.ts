@@ -6,6 +6,9 @@ import type {
   SpanInputOutput,
   TypedValueJson,
 } from "../../../tracer/types";
+import { createLogger } from "../../../../utils/logger";
+
+const logger = createLogger("langwatch:workers:collector:common");
 
 export const getFirstInputAsText = (spans: Span[]): string => {
   const topmostSpans = flattenSpanTree(
