@@ -424,15 +424,12 @@ class LangWatchSpan:
         input: Optional[str] = None,
         output: Optional[str] = None,
         expected_output: Optional[str] = None,
-        contexts: Union[List[RAGChunk], List[str]] = [],
-        conversation: Conversation = [],
+        contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
+        conversation: Optional[Conversation] = None,
         settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
         data: Optional[Union["BasicEvaluateData", Dict[str, Any]]] = None,
     ):
-        contexts = contexts or []
-        conversation = conversation or []
-
         from langwatch import evaluations
 
         return evaluations.evaluate(
@@ -456,15 +453,12 @@ class LangWatchSpan:
         input: Optional[str] = None,
         output: Optional[str] = None,
         expected_output: Optional[str] = None,
-        contexts: Union[List[RAGChunk], List[str]] = [],
-        conversation: Conversation = [],
+        contexts: Optional[Union[List[RAGChunk], List[str]]] = None,
+        conversation: Optional[Conversation] = None,
         settings: Optional[Dict[str, Any]] = None,
         as_guardrail: bool = False,
         data: Optional[Union["BasicEvaluateData", Dict[str, Any]]] = None,
     ):
-        contexts = contexts or []
-        conversation = conversation or []
-
         from langwatch import evaluations
 
         return await evaluations.async_evaluate(
