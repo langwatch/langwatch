@@ -1,5 +1,5 @@
 import type { Context, Next } from "hono"
-import { createLogger } from "~/utils/logger.server"
+import { createLogger } from "../../../utils/logger"
 
 const logger = createLogger("langwatch:api:hono");
 
@@ -27,7 +27,7 @@ export const loggerMiddleware = () => {
       };
 
       if (error) {
-        logData.err = error;
+        logData.error = error instanceof Error ? error : JSON.stringify(error);
         logger.error(logData, "error handling request");
       } else {
         logger.info(logData, "request handled");

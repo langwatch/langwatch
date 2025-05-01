@@ -7,6 +7,10 @@ import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositorie
 import { prisma } from "~/server/db";
 import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { createLogger } from "~/utils/logger";
+import { loggerMiddleware } from "../../hono-middleware/logger";
+
+const logger = createLogger("langwatch:api:prompts");
 
 patchZodOpenapi();
 
@@ -24,6 +28,7 @@ type Variables = {
 export const app = new Hono<{
   Variables: Variables;
 }>().basePath("/api/prompts");
+app.use(loggerMiddleware());
 
 // Auth middleware that validates API key and extracts project
 app.use("/*", async (c, next) => {
@@ -68,10 +73,11 @@ app.get(
     description: "Get a specific prompt",
   }),
   async (c) => {
-    console.log("Getting prompt by ID");
     const repository = c.get("llmConfigRepository");
     const project = c.get("project");
     const { id } = c.req.param();
+
+    logger.info({ projectId: project.id, promptId: id }, "Getting prompt by ID");
 
     try {
       const config = await repository.getConfigByIdWithLatestVersions(

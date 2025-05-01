@@ -15,13 +15,15 @@ import {
   type StudioClientEvent,
   type StudioServerEvent,
 } from "../../../../optimization_studio/types/events";
-import { createLogger } from "../../../../utils/logger.server";
+import { createLogger } from "../../../../utils/logger";
 import type { NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { loggerMiddleware } from "../../hono-middleware/logger";
 
 const logger = createLogger("langwatch:post_message");
 
 const app = new Hono().basePath("/api/workflows");
+app.use(loggerMiddleware());
 
 app.post(
   "/post_event",
