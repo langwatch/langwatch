@@ -9,13 +9,13 @@ import {
 import React, { useEffect, useState } from "react";
 import { Search } from "react-feather";
 
-import models from "../../models.json";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
 import { api } from "../utils/api";
 
 import { InputGroup } from "./ui/input-group";
 import { Select } from "./ui/select";
+import { allLitellmModels } from "../server/modelProviders/registry";
 
 export type ModelOption = {
   label: string;
@@ -25,17 +25,17 @@ export type ModelOption = {
   mode?: "chat" | "embedding" | "evaluator" | undefined;
 };
 
-export const modelSelectorOptions: ModelOption[] = Object.entries(models).map(
-  ([key, value]) => ({
-    label: key,
-    value: key,
-    icon: modelProviderIcons[
-      key.split("/")[0] as keyof typeof modelProviderIcons
-    ],
-    isDisabled: false,
-    mode: value.mode as "chat" | "embedding" | "evaluator",
-  })
-);
+export const modelSelectorOptions: ModelOption[] = Object.entries(
+  allLitellmModels
+).map(([key, value]) => ({
+  label: key,
+  value: key,
+  icon: modelProviderIcons[
+    key.split("/")[0] as keyof typeof modelProviderIcons
+  ],
+  isDisabled: false,
+  mode: value.mode as "chat" | "embedding",
+}));
 
 export const allModelOptions = modelSelectorOptions.map(
   (option) => option.value
@@ -44,7 +44,7 @@ export const allModelOptions = modelSelectorOptions.map(
 export const useModelSelectionOptions = (
   options: string[],
   model: string,
-  mode: "chat" | "embedding" | "evaluator" = "chat"
+  mode: "chat" | "embedding" = "chat"
 ) => {
   const { project } = useOrganizationTeamProject();
   const modelProviders = api.modelProvider.getAllForProject.useQuery(

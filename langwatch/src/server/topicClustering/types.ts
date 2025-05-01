@@ -1,23 +1,15 @@
 import type { Money } from "../../utils/types";
-
-import models from "../../../models.json";
+import { allLitellmModels } from "../modelProviders/registry";
 
 export type ModelOption = {
   value: string;
   isDisabled: boolean;
   mode?: "chat" | "embedding" | "evaluator" | undefined;
 };
-export const modelSelectorOptions: ModelOption[] = Object.entries(models).map(
-  ([key, value]) => ({
-    value: key,
-    isDisabled: false,
-    mode: value.mode as "chat" | "embedding" | "evaluator",
-  })
-);
 
-export const allowedTopicClusteringModels = modelSelectorOptions
-  .filter((option) => option.mode === "chat")
-  .map((option) => option.value);
+export const allowedTopicClusteringModels = Object.entries(allLitellmModels)
+  .filter(([_, value]) => value.mode === "chat")
+  .map(([key, _]) => key);
 
 export type TopicClusteringTrace = {
   trace_id: string;
