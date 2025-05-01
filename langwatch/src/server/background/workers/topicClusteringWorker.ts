@@ -1,7 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { type Job, Worker } from "bullmq";
 import type { TopicClusteringJob } from "~/server/background/types";
-import { getDebugger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger.server";
 import { connection } from "../../redis";
 import { clusterTopicsForProject } from "../../topicClustering/topicClustering";
 import { TOPIC_CLUSTERING_QUEUE_NAME } from "../queues/topicClusteringQueue";
@@ -10,14 +10,14 @@ import {
   getJobProcessingDurationHistogram,
 } from "../../metrics";
 
-const debug = getDebugger("langwatch:workers:topicClusteringWorker");
+const logger = createLogger("langwatch:workers:topicClusteringWorker");
 
 export async function runTopicClusteringJob(
   job: Job<TopicClusteringJob, void, string>
 ) {
   getJobProcessingCounter("topic_clustering", "processing").inc();
   const start = Date.now();
-  debug(`Processing job ${job.id} with data:`, job.data);
+  logger.info(`Processing job ${job.id} with data:`, job.data);
 
   await clusterTopicsForProject(job.data.project_id, job.data.search_after);
   getJobProcessingCounter("topic_clustering", "completed").inc();
@@ -27,7 +27,7 @@ export async function runTopicClusteringJob(
 
 export const startTopicClusteringWorker = () => {
   if (!connection) {
-    debug("No redis connection, skipping collector worker");
+    logger.info("No redis connection, skipping collector worker");
     return;
   }
 
@@ -41,12 +41,12 @@ export const startTopicClusteringWorker = () => {
   );
 
   topicClusteringWorker.on("ready", () => {
-    debug("Topic clustering worker active, waiting for jobs!");
+    logger.info("Topic clustering worker active, waiting for jobs!");
   });
 
   topicClusteringWorker.on("failed", (job, err) => {
     getJobProcessingCounter("topic_clustering", "failed").inc();
-    debug(`Job ${job?.id} failed with error ${err.message}`);
+    logger.error(`Job ${job?.id} failed with error ${err.message}`);
     Sentry.withScope((scope) => {
       scope.setTag("worker", "topicClustering");
       scope.setExtra("job", job?.data);
@@ -54,6 +54,6 @@ export const startTopicClusteringWorker = () => {
     });
   });
 
-  debug("Topic clustering checks worker registered");
+  logger.info("Topic clustering checks worker registered");
   return topicClusteringWorker;
 };

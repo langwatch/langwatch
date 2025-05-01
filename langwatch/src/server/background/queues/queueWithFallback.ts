@@ -7,10 +7,10 @@ import {
 } from "bullmq";
 import { EventEmitter } from "events";
 import { connection } from "../../redis";
-import { getDebugger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger.server";
 import * as Sentry from "@sentry/nextjs";
 
-export const debug = getDebugger("langwatch:queueWithFallback");
+const logger = createLogger("langwatch:queueWithFallback");
 
 // Queue that falls back to calling the worker directly if the queue is not available
 export class QueueWithFallback<
@@ -70,7 +70,7 @@ export class QueueWithFallback<
 
       return job as Job<DataType, ResultType, NameType>;
     } catch (error) {
-      debug(
+      logger.error(
         "Failed sending to redis collector queue inserting trace directly, processing job synchronously.",
         "Exception:",
         error
@@ -127,7 +127,7 @@ export class QueueWithFallback<
 
       return job as Job<DataType, ResultType, NameType>;
     } catch (error) {
-      debug("Failed getting job from redis", error);
+      logger.error("Failed getting job from redis", error);
       return undefined;
     }
   }

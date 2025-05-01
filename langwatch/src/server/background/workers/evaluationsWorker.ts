@@ -47,8 +47,9 @@ import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
 import type { Protections } from "~/server/elasticsearch/protections";
 import { getTraceById } from "~/server/elasticsearch/traces";
 import { getProtectionsForProject } from "~/server/api/utils";
+import { createLogger } from "../../../utils/logger.server";
 
-const debug = getDebugger("langwatch:workers:evaluationsWorker");
+const logger = createLogger("langwatch:workers:evaluationsWorker");
 
 export async function runEvaluationJob(
   job: Job<EvaluationJob, any, string>
@@ -364,7 +365,7 @@ export const startEvaluationsWorker = (
   ) => Promise<SingleEvaluationResult>
 ) => {
   if (!connection) {
-    debug("No redis connection, skipping trace checks worker");
+    logger.info("No redis connection, skipping trace checks worker");
     return;
   }
 
@@ -382,7 +383,7 @@ export const startEvaluationsWorker = (
       const start = Date.now();
 
       try {
-        debug(`Processing job ${job.id} with data::`, job.data);
+        logger.info(`Processing job ${job.id} with data::`, job.data);
 
         let processed = false;
         const timeout = new Promise((resolve, reject) => {
@@ -443,7 +444,7 @@ export const startEvaluationsWorker = (
             : {}),
           details: "details" in result ? result.details ?? "" : "",
         });
-        debug("Successfully processed job:", job.id);
+        logger.info("Successfully processed job:", job.id);
 
         const duration = Date.now() - start;
         getJobProcessingDurationHistogram("evaluation").observe(duration);
@@ -455,7 +456,7 @@ export const startEvaluationsWorker = (
           status: "error",
           error: error,
         });
-        debug("Failed to process job::", job.id, error);
+        logger.error("Failed to process job::", job.id, error);
 
         if (
           typeof error === "object" &&
@@ -484,12 +485,12 @@ export const startEvaluationsWorker = (
   );
 
   traceChecksWorker.on("ready", () => {
-    debug("Trace worker active, waiting for jobs!");
+    logger.info("Trace worker active, waiting for jobs!");
   });
 
   traceChecksWorker.on("failed", (job, err) => {
     getJobProcessingCounter("evaluation", "failed").inc();
-    debug(`Job ${job?.id} failed with error ${err.message}`);
+    logger.error(`Job ${job?.id} failed with error ${err.message}`);
     Sentry.withScope((scope) => {
       scope.setTag("worker", "traceChecks");
       scope.setExtra("job", job?.data);
@@ -497,7 +498,7 @@ export const startEvaluationsWorker = (
     });
   });
 
-  debug("Trace checks worker registered");
+  logger.info("Trace checks worker registered");
   return traceChecksWorker;
 };
 
