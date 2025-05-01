@@ -1,8 +1,8 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "../../../server/db";
-import { getDebugger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger.server";
 
-export const debug = getDebugger("langwatch:auth:validate");
+const logger = createLogger("langwatch:auth:validate");
 
 export default async function handler(
   req: NextApiRequest,

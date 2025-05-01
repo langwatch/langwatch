@@ -1,11 +1,11 @@
 import { loadEnvConfig } from "@next/env";
-import { getDebugger } from "./utils/logger";
+import { createLogger } from "./utils/logger.server";
 
 loadEnvConfig(process.cwd());
 
-const debug = getDebugger("langwatch:workers");
+const logger = createLogger("langwatch:workers");
 
-debug("Starting up workers");
+logger.info("Starting up workers");
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 require("./server/background/worker")

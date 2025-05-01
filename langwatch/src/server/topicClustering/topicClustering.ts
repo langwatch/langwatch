@@ -6,7 +6,7 @@ import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { fetch as fetchHTTP2 } from "fetch-h2";
 import { nanoid } from "nanoid";
 import { env } from "../../env.mjs";
-import { getDebugger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger.server";
 import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
 import { prisma } from "../db";
 import { TRACE_INDEX, esClient, traceIndexId } from "../elasticsearch";
@@ -35,7 +35,7 @@ import {
   OPENAI_EMBEDDING_DIMENSION,
 } from "../../utils/constants";
 
-const debug = getDebugger("langwatch:topicClustering");
+const logger = createLogger("langwatch:topicClustering");
 
 export const clusterTopicsForProject = async (
   projectId: string,
@@ -54,7 +54,7 @@ export const clusterTopicsForProject = async (
   );
   const getCurrentCost = await getCurrentMonthCost(project.team.organizationId);
   if (getCurrentCost >= maxMonthlyUsage) {
-    debug(
+    logger.info(
       "Skipping clustering for project",
       projectId,
       "as monthly limit has been reached"
@@ -115,7 +115,7 @@ export const clusterTopicsForProject = async (
     lastTopicCreatedAt >
       new Date(Date.now() - daysFrequency * 24 * 60 * 60 * 1000)
   ) {
-    debug(
+    logger.info(
       "Skipping clustering for project",
       projectId,
       `as last topic from batch processing was created less than ${daysFrequency} days ago`
@@ -219,7 +219,7 @@ export const clusterTopicsForProject = async (
   const minimumTraces = isIncrementalProcessing ? 1 : 10;
 
   if (traces.length < minimumTraces) {
-    debug(
+    logger.info(
       `Less than ${minimumTraces} traces found for project`,
       projectId,
       "skipping topic clustering"
@@ -239,7 +239,7 @@ export const clusterTopicsForProject = async (
       | [number, string]
       | undefined;
     if (lastTraceSort) {
-      debug(
+      logger.info(
         "Scheduling the next page for clustering for project",
         projectId,
         "next page",
@@ -248,7 +248,7 @@ export const clusterTopicsForProject = async (
       if (scheduleNextPage) {
         await scheduleTopicClusteringNextPage(projectId, lastTraceSort);
       } else {
-        debug(
+        logger.info(
           "Skipping scheduling next page for project",
           projectId,
           "which would be",
@@ -258,7 +258,7 @@ export const clusterTopicsForProject = async (
     }
   }
 
-  debug("Done! Project", projectId);
+  logger.info("Done! Project", projectId);
 };
 
 const getProjectTopicClusteringModelProvider = async (project: Project) => {
@@ -276,7 +276,7 @@ const getProjectTopicClusteringModelProvider = async (project: Project) => {
     throw new Error(`Topic clustering model provider ${provider} not found`);
   }
   if (!modelProvider.enabled) {
-    debug(
+    logger.info(
       `Topic clustering model provider ${provider} is not enabled, skipping topic clustering`
     );
     return;
@@ -289,7 +289,7 @@ export const batchClusterTraces = async (
   project: Project,
   traces: TopicClusteringTrace[]
 ) => {
-  debug(
+  logger.info(
     "Batch clustering topics for",
     traces.length,
     "traces on project",
@@ -323,7 +323,7 @@ export const incrementalClustering = async (
   project: Project,
   traces: TopicClusteringTrace[]
 ) => {
-  debug(
+  logger.info(
     "Incremental topic clustering for",
     traces.length,
     "traces on project",
@@ -403,7 +403,7 @@ export const storeResults = async (
     cost: undefined,
   };
 
-  debug(
+  logger.info(
     `Found ${topics.length} new topics, ${subtopics.length} new subtopics, and`,
     Object.keys(tracesToAssign).length,
     "traces to assign for project",
@@ -509,7 +509,12 @@ export const fetchTopicsBatchClustering = async (
   const size = JSON.stringify(params).length;
   getPayloadSizeHistogram("topic_clustering_batch").observe(size);
 
-  debug("Uploading", size / 125000, "mb of traces data for project", projectId);
+  logger.info(
+    "Uploading",
+    size / 125000,
+    "mb of traces data for project",
+    projectId
+  );
 
   const response = await fetchHTTP2(
     `${env.TOPIC_CLUSTERING_SERVICE}/topics/batch_clustering`,
@@ -548,7 +553,12 @@ export const fetchTopicsIncrementalClustering = async (
   const size = JSON.stringify(params).length;
   getPayloadSizeHistogram("topic_clustering_incremental").observe(size);
 
-  debug("Uploading", size / 125000, "mb of traces data for project", projectId);
+  logger.info(
+    "Uploading",
+    size / 125000,
+    "mb of traces data for project",
+    projectId
+  );
 
   const response = await fetchHTTP2(
     `${env.TOPIC_CLUSTERING_SERVICE}/topics/incremental_clustering`,

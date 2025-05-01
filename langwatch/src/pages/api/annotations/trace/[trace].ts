@@ -1,10 +1,10 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "../../../../server/db";
 
-import { getDebugger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger.server";
 import { nanoid } from "nanoid";
 
-export const debug = getDebugger("langwatch:analytics");
+const logger = createLogger("langwatch:annotations:trace");
 
 export default async function handler(
   req: NextApiRequest,
@@ -41,7 +41,11 @@ export default async function handler(
 
       return res.status(200).json({ data: annotationsByTrace });
     } catch (e) {
-      debug(e);
+      logger.error("Error fetching annotations for trace", {
+        error: e,
+        trace: req.query.trace,
+        projectId: project.id,
+      });
       return res
         .status(500)
         .json({ status: "error", message: "Internal server error." });
@@ -89,7 +93,11 @@ export default async function handler(
 
       return res.status(200).json({ data: addAnnotation });
     } catch (e) {
-      debug(e);
+      logger.error("Error creating annotation", {
+        error: e,
+        trace: req.query.trace,
+        projectId: project.id,
+      });
       return res
         .status(500)
         .json({ status: "error", message: "Internal server error." });

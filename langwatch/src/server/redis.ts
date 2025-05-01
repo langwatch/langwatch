@@ -1,9 +1,9 @@
 import IORedis from "ioredis";
 import { env } from "../env.mjs";
-import { getDebugger } from "../utils/logger";
+import { createLogger } from "../utils/logger.server";
 import { PHASE_PRODUCTION_BUILD } from "next/constants";
 
-const debug = getDebugger("langwatch:redis");
+const logger = createLogger("langwatch:redis");
 
 export const connection =
   process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD ||
@@ -19,21 +19,21 @@ export const connection =
       });
 
 connection?.on("connect", () => {
-  debug("Redis connected");
+  logger.info("Redis connected");
 });
 
 connection?.on("error", (error) => {
-  debug("Redis Error:", error);
+  logger.error("Redis Error:", error);
 });
 
 connection?.on("ready", () => {
-  debug("Redis is ready to accept commands");
+  logger.info("Redis is ready to accept commands");
 });
 
 connection?.on("close", () => {
-  debug("Redis connection closed");
+  logger.info("Redis connection closed");
 });
 
 connection?.on("reconnecting", () => {
-  debug("Redis reconnecting...");
+  logger.info("Redis reconnecting...");
 });
