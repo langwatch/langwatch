@@ -266,14 +266,6 @@ export type ReservedTraceMetadata = {
   subtopic_id?: string | null;
   sdk_version?: string | null;
   sdk_language?: string | null;
-  'user.id'?: string | null;
-  'service.name'?: string | null;
-  'service.version'?: string | null;
-  'service.namespace'?: string | null;
-  'service.instance.id'?: string | null;
-  'langwatch.sdk.version'?: string | null;
-  'langwatch.sdk.name'?: string | null;
-  'langwatch.sdk.language'?: string | null;
 };
 
 export type CustomMetadata = Record<
