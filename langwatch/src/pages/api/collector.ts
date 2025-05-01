@@ -24,13 +24,13 @@ import {
   spanSchema,
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
-import { getDebugger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger.server";
 import {
   getPayloadSizeHistogram,
   traceSpanCountHistogram,
 } from "../../server/metrics";
 
-const debug = getDebugger("langwatch:collector");
+const logger = createLogger("langwatch:collector");
 
 export const config = {
   api: {
@@ -184,12 +184,11 @@ export default async function handler(
   try {
     params = collectorRESTParamsValidatorSchema.parse(req.body);
   } catch (error) {
-    debug(
-      "Invalid trace received",
+    logger.error("Invalid trace received", {
       error,
-      JSON.stringify(req.body, null, "  "),
-      { projectId: project.id }
-    );
+      body: req.body,
+      projectId: project.id,
+    });
     Sentry.captureException(new Error("ZodError on parsing body"), {
       extra: { projectId: project.id, body: req.body, zodError: error },
     });
@@ -333,7 +332,9 @@ export default async function handler(
     try {
       spanValidatorSchema.parse(span);
     } catch (error) {
-      debug("Invalid span received", error, JSON.stringify(span, null, "  "), {
+      logger.error("Invalid span received", {
+        error,
+        span,
         projectId: project.id,
       });
       Sentry.captureException(new Error("ZodError on parsing spans"), {
@@ -354,12 +355,10 @@ export default async function handler(
       (span.timestamps.first_token_at &&
         span.timestamps.first_token_at.toString().length !== 13)
     ) {
-      debug(
-        "Timestamps not in milliseconds for",
+      logger.error("Timestamps not in milliseconds for", {
         traceId,
-        "on project",
-        project.id
-      );
+        projectId: project.id,
+      });
       return res.status(400).json({
         error:
           "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",

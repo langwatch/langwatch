@@ -6,7 +6,7 @@ import { trackEventsQueue } from "../../server/background/queues/trackEventsQueu
 import { prisma } from "../../server/db"; // Adjust the import based on your setup
 import { type TrackEventRESTParamsValidator } from "../../server/tracer/types";
 import { trackEventRESTParamsValidatorSchema } from "../../server/tracer/types.generated";
-import { getDebugger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger.server";
 import { fromZodError } from "zod-validation-error";
 
 const thumbsUpDownSchema = z.object({
@@ -54,7 +54,7 @@ const predefinedEventTypes = predefinedEventsSchemas.options.map(
   (schema) => schema.shape.event_type.value
 );
 
-export const debug = getDebugger("langwatch:track_event");
+const logger = createLogger("langwatch:track_event");
 
 export default async function handler(
   req: NextApiRequest,
@@ -82,10 +82,9 @@ export default async function handler(
   try {
     body = trackEventRESTParamsValidatorSchema.parse(req.body);
   } catch (error) {
-    debug(
+    logger.error(
       "Invalid event received",
-      error,
-      JSON.stringify(req.body, null, "  ")
+      { error, body: req.body, projectId: project.id },
     );
     Sentry.captureException(error);
     const validationError = fromZodError(error as ZodError);
@@ -96,10 +95,9 @@ export default async function handler(
     try {
       predefinedEventsSchemas.parse(req.body);
     } catch (error) {
-      debug(
+      logger.error(
         "Invalid event received",
-        error,
-        JSON.stringify(req.body, null, "  ")
+        { error, body: req.body, projectId: project.id },
       );
       Sentry.captureException(error);
       const validationError = fromZodError(error as ZodError);

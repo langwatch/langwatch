@@ -2,7 +2,7 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { prisma } from "../../../server/db";
 
-import { getDebugger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger.server";
 
 import { ExperimentType, type Project } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
@@ -34,7 +34,7 @@ import {
 import { getPayloadSizeHistogram } from "../../../server/metrics";
 import { safeTruncate } from "../../../utils/truncate";
 
-export const debug = getDebugger("langwatch:dspy_log_steps");
+const logger = createLogger("langwatch:dspy_log_steps");
 
 export const config = {
   api: {
@@ -74,11 +74,9 @@ export default async function handler(
   try {
     params = z.array(dSPyStepRESTParamsSchema).parse(req.body);
   } catch (error) {
-    debug(
+    logger.error(
       "Invalid log_steps data received",
-      error,
-      JSON.stringify(req.body, null, "  "),
-      { projectId: project.id }
+      { error, body: req.body, projectId: project.id },
     );
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
     Sentry.captureException(error, { extra: { projectId: project.id } });
@@ -92,13 +90,9 @@ export default async function handler(
       param.timestamps.created_at &&
       param.timestamps.created_at.toString().length === 10
     ) {
-      debug(
+      logger.error(
         "Timestamps not in milliseconds for step",
-        param.index,
-        "run",
-        param.run_id,
-        "on experiment",
-        param.experiment_slug
+        { param, projectId: project.id },
       );
       return res.status(400).json({
         error:
@@ -112,10 +106,9 @@ export default async function handler(
       await processDSPyStep(project, param);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        debug(
+        logger.error(
           "Failed to validate data for DSPy step",
-          error,
-          JSON.stringify(param, null, "  ")
+          { error, body: param, projectId: project.id },
         );
         Sentry.captureException(error, {
           extra: { projectId: project.id, param },
@@ -124,15 +117,9 @@ export default async function handler(
         const validationError = fromZodError(error as ZodError);
         return res.status(400).json({ error: validationError.message });
       } else {
-        debug(
+        logger.error(
           "Internal server error processing DSPy step",
-          error,
-          JSON.stringify(param, null, "  ").slice(0, 1000)
-        );
-        console.log(
-          "Internal server error processing DSPy step",
-          error,
-          JSON.stringify(param, null, "  ").slice(0, 1000)
+          { error, body: param, projectId: project.id },
         );
         Sentry.captureException(error, {
           extra: { projectId: project.id, param },

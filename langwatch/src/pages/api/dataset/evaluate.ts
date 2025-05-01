@@ -2,7 +2,7 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { prisma } from "../../../server/db";
 
-import { getDebugger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger.server";
 
 import { CostReferenceType, CostType } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
@@ -32,7 +32,7 @@ import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
 import type { JsonArray } from "@prisma/client/runtime/library";
 import type { Edge, Node } from "@xyflow/react";
 
-export const debug = getDebugger("langwatch:guardrail:evaluate");
+const logger = createLogger("langwatch:guardrail:evaluate");
 
 const batchEvaluationInputSchema = z.object({
   evaluation: z.string(),
@@ -102,11 +102,9 @@ export default async function handler(
   try {
     params = batchEvaluationInputSchema.parse(req.body);
   } catch (error) {
-    debug(
+    logger.error(
       "Invalid evaluation params received",
-      error,
-      JSON.stringify(req.body, null, "  "),
-      { projectId: project.id }
+      { error, body: req.body, projectId: project.id },
     );
     Sentry.captureException(error, { extra: { projectId: project.id } });
 
@@ -177,11 +175,9 @@ export default async function handler(
       });
     }
   } catch (error) {
-    debug(
+    logger.error(
       "Invalid evaluation data received",
-      error,
-      JSON.stringify(req.body, null, "  "),
-      { projectId: project.id }
+      { error, body: req.body, projectId: project.id },
     );
     Sentry.captureException(error, { extra: { projectId: project.id } });
 

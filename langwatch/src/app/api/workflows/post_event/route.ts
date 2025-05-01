@@ -15,11 +15,11 @@ import {
   type StudioClientEvent,
   type StudioServerEvent,
 } from "../../../../optimization_studio/types/events";
-import { getDebugger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger.server";
 import type { NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
-const debug = getDebugger("langwatch:post_message");
+const logger = createLogger("langwatch:post_message");
 
 const app = new Hono().basePath("/api/workflows");
 
@@ -34,7 +34,10 @@ app.post(
   ),
   async (c) => {
     const { event: eventWithoutEnvs, projectId } = await c.req.json();
-    debug("post_event", eventWithoutEnvs.type, projectId);
+    logger.info("post_event", {
+      event: eventWithoutEnvs.type,
+      projectId,
+    });
 
     const session = await getServerSession(
       authOptions(c.req.raw as NextRequest)
@@ -65,7 +68,10 @@ app.post(
         projectId
       );
     } catch (error) {
-      console.error("error", error);
+      logger.error("error", {
+        error,
+        projectId,
+      });
       Sentry.captureException(error, {
         extra: {
           projectId,
@@ -97,7 +103,7 @@ app.post(
             }
           },
         }).catch((error) => {
-          console.error("error", error);
+          logger.error("error", error);
           Sentry.captureException(error, {
             extra: {
               projectId,

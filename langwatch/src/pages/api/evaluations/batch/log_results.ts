@@ -1,6 +1,6 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 
-import { getDebugger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger.server";
 import { prisma } from "../../../../server/db";
 import type {
   ESBatchEvaluation,
@@ -23,7 +23,7 @@ import {
 import { getPayloadSizeHistogram } from "../../../../server/metrics";
 import { safeTruncate } from "../../../../utils/truncate";
 
-export const debug = getDebugger("langwatch:evaluations:batch:log_results");
+const logger = createLogger("langwatch:evaluations:batch:log_results");
 
 export const config = {
   api: {
@@ -80,11 +80,9 @@ export default async function handler(
   try {
     params = eSBatchEvaluationRESTParamsSchema.parse(req.body);
   } catch (error) {
-    debug(
+    logger.error(
       "Invalid log_results data received",
-      error,
-      JSON.stringify(req.body, null, "  "),
-      { projectId: project.id }
+      { error, body: req.body, projectId: project.id },
     );
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
     Sentry.captureException(error, { extra: { projectId: project.id } });
@@ -103,11 +101,13 @@ export default async function handler(
     params.timestamps?.created_at &&
     params.timestamps.created_at.toString().length === 10
   ) {
-    debug(
+    logger.error(
       "Timestamps not in milliseconds for batch evaluation run",
-      params.run_id,
-      "on experiment",
-      params.experiment_slug ?? params.experiment_id
+      {
+        runId: params.run_id,
+        experimentSlug: params.experiment_slug,
+        experimentId: params.experiment_id,
+      },
     );
     return res.status(400).json({
       error:
@@ -119,10 +119,9 @@ export default async function handler(
     await processBatchEvaluation(project, params);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      debug(
+      logger.error(
         "Failed to validate data for batch evaluation",
-        error,
-        JSON.stringify(params, null, "  ")
+        { error, body: params, projectId: project.id },
       );
       Sentry.captureException(error, {
         extra: { projectId: project.id, param: params },
@@ -131,10 +130,9 @@ export default async function handler(
       const validationError = fromZodError(error);
       return res.status(400).json({ error: validationError.message });
     } else {
-      debug(
+      logger.error(
         "Internal server error processing batch evaluation",
-        error,
-        JSON.stringify(params, null, "  ")
+        { error, body: params, projectId: project.id },
       );
       Sentry.captureException(error, {
         extra: { projectId: project.id, param: params },

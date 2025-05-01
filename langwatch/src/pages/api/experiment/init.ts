@@ -2,7 +2,7 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { prisma } from "~/server/db";
 
-import { getDebugger } from "~/utils/logger";
+import { createLogger } from "~/utils/logger.server";
 
 import {
   type Experiment,
@@ -14,7 +14,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { slugify } from "~/utils/slugify";
 
-export const debug = getDebugger("langwatch:dspy:init");
+const logger = createLogger("langwatch:dspy:init");
 
 const dspyInitParamsSchema = z
   .object({
@@ -63,7 +63,7 @@ export default async function handler(
   try {
     params = dspyInitParamsSchema.parse(req.body);
   } catch (error) {
-    debug(
+    logger.error(
       "Invalid init data received",
       error,
       JSON.stringify(req.body, null, "  "),
