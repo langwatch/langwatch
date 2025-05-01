@@ -130,29 +130,19 @@ class Client(LangWatchClientProtocol):
 			self.tracer_provider = self.__ensure_otel_setup()
 
 	def __ensure_otel_setup(self, tracer_provider: Optional[TracerProvider] = None) -> TracerProvider:
+		settable_tracer_provider = tracer_provider or self.__create_new_tracer_provider()
+
 		try:
-			if tracer_provider is not None:
-				if not isinstance(tracer_provider, TracerProvider): # type: ignore
-					raise ValueError("tracer_provider must be an instance of TracerProvider")
-				self.__set_langwatch_exporter(tracer_provider)
-				trace.set_tracer_provider(tracer_provider)
-				return tracer_provider
-
 			global_provider = trace.get_tracer_provider()
-			if global_provider is not None and not isinstance(global_provider, trace.ProxyTracerProvider): # type: ignore
-				if not isinstance(global_provider, TracerProvider):
-					raise ValueError("Global tracer provider must be an instance of TracerProvider")
+			if isinstance(global_provider, trace.ProxyTracerProvider):
+				trace.set_tracer_provider(settable_tracer_provider)
+				return settable_tracer_provider
 
-				if not self._ignore_global_tracer_provider_override_warning:
-					logger.warning("An existing global trace provider was found. LangWatch will not override it automatically, but instead is attaching another span processor and exporter to it. You can disable this warning by setting `ignore_global_tracer_provider_override_warning` to `True`.")
-				self.__set_langwatch_exporter(global_provider)
+			if not self._ignore_global_tracer_provider_override_warning:
+				logger.warning("An existing global trace provider was found. LangWatch will not override it automatically, but instead is attaching another span processor and exporter to it. You can disable this warning by setting `ignore_global_tracer_provider_override_warning` to `True`.")
+			self.__set_langwatch_exporter(settable_tracer_provider)
 
-				return global_provider
-
-			provider = self.__create_new_tracer_provider()
-			trace.set_tracer_provider(provider)
-
-			return provider
+			return settable_tracer_provider
 
 		except Exception as e:
 			raise RuntimeError(f"Failed to setup OpenTelemetry tracer provider: {str(e)}") from e
