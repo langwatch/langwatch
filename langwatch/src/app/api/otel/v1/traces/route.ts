@@ -21,7 +21,7 @@ import {
 } from "../../../../../server/background/workers/collectorWorker";
 import { createLogger } from "../../../../../utils/logger.server";
 
-const debug = createLogger("langwatch:otel:v1:traces");
+const logger = createLogger("langwatch:otel:v1:traces");
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         throw new Error("Spans are empty, likely an invalid format");
       }
     } catch (jsonError) {
-      debug("Error parsing traces:", Buffer.from(body).toString("base64"));
+      logger.error("Error parsing traces:", Buffer.from(body).toString("base64"));
       Sentry.captureException(error, {
         extra: {
           projectId: project.id,
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
-    debug(`collecting traceId ${traceForCollection.traceId}`);
+    logger.info(`collecting traceId ${traceForCollection.traceId}`);
 
     promises.push(
       scheduleTraceCollectionWithFallback({

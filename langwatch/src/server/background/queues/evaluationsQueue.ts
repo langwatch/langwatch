@@ -4,14 +4,14 @@ import { captureError } from "../../../utils/captureError";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
-import { getDebugger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger.server";
 import { QueueWithFallback } from "./queueWithFallback";
 import { runEvaluationJob } from "../workers/evaluationsWorker";
 import type { ConnectionOptions } from "bullmq";
 
 export const EVALUATIONS_QUEUE_NAME = "evaluations";
 
-const debug = getDebugger("langwatch:evaluations:queue");
+const logger = createLogger("langwatch:evaluations:queue");
 
 export const evaluationsQueue = new QueueWithFallback<
   EvaluationJob,
@@ -58,13 +58,13 @@ export const scheduleEvaluation = async ({
   if (currentJob) {
     const state = await currentJob.getState();
     if (state == "failed" || state == "completed") {
-      debug(
+      logger.info(
         `retrying ${check.type} (checkId: ${check.evaluator_id}) for trace ${trace.trace_id}`
       );
       await currentJob.retry(state);
     }
   } else {
-    debug(
+    logger.info(
       `scheduling ${check.type} (checkId: ${check.evaluator_id}) for trace ${trace.trace_id}`
     );
     await evaluationsQueue.add(

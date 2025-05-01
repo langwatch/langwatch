@@ -9,7 +9,7 @@ import type {
   EvaluatorTypes,
   SingleEvaluationResult,
 } from "../../server/evaluations/evaluators.generated";
-import { getDebugger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger.server";
 import { startTopicClusteringWorker } from "./workers/topicClusteringWorker";
 import {
   runEvaluationJob,
@@ -32,7 +32,7 @@ class WorkersRestart extends Error {
   }
 }
 
-const debug = getDebugger("langwatch:workers");
+const logger = createLogger("langwatch:workers");
 
 type Workers = {
   collectorWorker: Worker<CollectorJob, void, string> | undefined;
@@ -61,7 +61,7 @@ export const start = (
     incrementWorkerRestartCount();
 
     const closingListener = () => {
-      debug("Worker closing before expected, restarting");
+      logger.info("Worker closing before expected, restarting");
       reject(new WorkersRestart("Worker closing before expected, restarting"));
     };
 
@@ -72,7 +72,7 @@ export const start = (
 
     if (maxRuntimeMs) {
       setTimeout(() => {
-        debug("Max runtime reached, closing worker");
+        logger.info("Max runtime reached, closing worker");
 
         void (async () => {
           collectorWorker?.off("closing", closingListener);
@@ -122,7 +122,7 @@ const incrementWorkerRestartCount = () => {
       workerRestartsCounter.inc();
     }
   } catch (error) {
-    debug("Error incrementing worker restart count", error);
+    logger.error("Error incrementing worker restart count", error);
   }
 };
 
@@ -148,6 +148,6 @@ const startMetricsServer = () => {
   });
 
   server.listen(2999, () => {
-    debug("Workers metrics server listening on port 2999");
+    logger.info("Workers metrics server listening on port 2999");
   });
 };

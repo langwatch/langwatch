@@ -10,5 +10,5 @@ export const createLogger = (name: string) => {
       level: process.env.PINO_LOG_LEVEL || "info",
     },
     process.env.NODE_ENV === "development" ? prettyStream : process.stdout
-  );
+  ) as ReturnType<typeof pino>;
 };

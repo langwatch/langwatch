@@ -5,7 +5,7 @@ import {
   type ElasticSearchEvent,
   type ElasticSearchTrace,
 } from "../../../server/tracer/types";
-import { getDebugger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger.server";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
 import { elasticSearchEventSchema } from "../../tracer/types.generated";
@@ -15,10 +15,10 @@ import {
   getJobProcessingDurationHistogram,
 } from "../../metrics";
 
-const debug = getDebugger("langwatch:workers:trackEventWorker");
+const logger = createLogger("langwatch:workers:trackEventWorker");
 
 export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
-  debug(`Processing job ${job.id} with data:`, job.data);
+  logger.info(`Processing job ${job.id} with data:`, job.data);
   getJobProcessingCounter("track_event", "processing").inc();
   const start = Date.now();
   let event: ElasticSearchEvent = {
@@ -106,7 +106,7 @@ export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
 
 export const startTrackEventsWorker = () => {
   if (!connection) {
-    debug("No redis connection, skipping track events worker");
+    logger.info("No redis connection, skipping track events worker");
     return;
   }
 
@@ -120,11 +120,11 @@ export const startTrackEventsWorker = () => {
   );
 
   trackEventsWorker.on("ready", () => {
-    debug("Track event worker active, waiting for jobs!");
+    logger.info("Track event worker active, waiting for jobs!");
   });
 
   trackEventsWorker.on("failed", (job, err) => {
-    debug(`Job ${job?.id} failed with error ${err.message}`);
+    logger.error(`Job ${job?.id} failed with error ${err.message}`);
     getJobProcessingCounter("track_event", "failed").inc();
     Sentry.withScope((scope) => {
       scope.setTag("worker", "trackEvents");
@@ -133,6 +133,6 @@ export const startTrackEventsWorker = () => {
     });
   });
 
-  debug("Track events worker registered");
+  logger.info("Track events worker registered");
   return trackEventsWorker;
 };
