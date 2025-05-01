@@ -1,4 +1,4 @@
-import pino, { type Logger, type LoggerOptions } from "pino";
+import pino, { type LoggerOptions } from "pino";
 
 const isBrowser = typeof window !== "undefined";
 const isNodeDev = !isBrowser && process.env.NODE_ENV !== "production";
@@ -35,6 +35,5 @@ export const createLogger = (name: string) => {
   };
 
   const destination = getDestinationStream();
-
-  return (pino as any).default(options, destination as any) as ReturnType<typeof pino>;
+  return (pino as any).default(options, destination) as ReturnType<typeof pino>;
 };

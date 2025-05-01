@@ -188,11 +188,10 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
     // shut down the process completely
     setTimeout(() => {
       process.abort(); // exit immediately and generate a core dump file
-    }, 1000).unref()
-    process.exit(1);
+    }, 1000).unref();
   });
 
   process.on('unhandledRejection', (reason, promise) => {
-    logger.fatal({ reason, promise }, 'unhandled rejection detected');
+    logger.fatal({ reason: reason instanceof Error ? reason : { value: reason }, promise }, 'unhandled rejection detected');logger.fatal({ reason: reason instanceof Error ? reason : { value: reason }, promise }, 'unhandled rejection detected');
   });
 };

@@ -489,7 +489,7 @@ export const startEvaluationsWorker = (
 
   traceChecksWorker.on("failed", (job, err) => {
     getJobProcessingCounter("evaluation", "failed").inc();
-    logger.error({ jobId: job?.id, error: err.message }, "job failed");
+    logger.error({ jobId: job?.id, error: err }, "job failed");
     Sentry.withScope((scope) => {
       scope.setTag("worker", "traceChecks");
       scope.setExtra("job", job?.data);
