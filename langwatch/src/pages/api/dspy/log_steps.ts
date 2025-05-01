@@ -121,11 +121,6 @@ export default async function handler(
           "Internal server error processing DSPy step",
           { error, body: param, projectId: project.id },
         );
-        console.log(
-          "Internal server error processing DSPy step",
-          error,
-          JSON.stringify(param, null, "  ").slice(0, 1000)
-        );
         Sentry.captureException(error, {
           extra: { projectId: project.id, param },
         });

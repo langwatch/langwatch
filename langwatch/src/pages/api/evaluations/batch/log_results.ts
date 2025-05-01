@@ -103,9 +103,11 @@ export default async function handler(
   ) {
     logger.error(
       "Timestamps not in milliseconds for batch evaluation run",
-      params.run_id,
-      "on experiment",
-      params.experiment_slug ?? params.experiment_id
+      {
+        runId: params.run_id,
+        experimentSlug: params.experiment_slug,
+        experimentId: params.experiment_id,
+      },
     );
     return res.status(400).json({
       error:

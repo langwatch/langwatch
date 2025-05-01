@@ -34,7 +34,10 @@ app.post(
   ),
   async (c) => {
     const { event: eventWithoutEnvs, projectId } = await c.req.json();
-    logger.info("post_event", eventWithoutEnvs.type, projectId);
+    logger.info("post_event", {
+      event: eventWithoutEnvs.type,
+      projectId,
+    });
 
     const session = await getServerSession(
       authOptions(c.req.raw as NextRequest)
@@ -65,7 +68,10 @@ app.post(
         projectId
       );
     } catch (error) {
-      logger.error("error", error);
+      logger.error("error", {
+        error,
+        projectId,
+      });
       Sentry.captureException(error, {
         extra: {
           projectId,

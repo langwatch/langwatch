@@ -553,12 +553,10 @@ export const fetchTopicsIncrementalClustering = async (
   const size = JSON.stringify(params).length;
   getPayloadSizeHistogram("topic_clustering_incremental").observe(size);
 
-  logger.info(
-    "Uploading",
-    size / 125000,
-    "mb of traces data for project",
-    projectId
-  );
+  logger.info("Uploading", {
+    sizeMb: size / 125000,
+    projectId,
+  });
 
   const response = await fetchHTTP2(
     `${env.TOPIC_CLUSTERING_SERVICE}/topics/incremental_clustering`,
