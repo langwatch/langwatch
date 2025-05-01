@@ -19,7 +19,7 @@ import {
   fetchExistingMD5s,
   scheduleTraceCollectionWithFallback,
 } from "../../../../../server/background/workers/collectorWorker";
-import { createLogger } from "../../../../../utils/logger.server";
+import { createLogger } from "../../../../../utils/logger";
 
 const logger = createLogger("langwatch:otel:v1:traces");
 

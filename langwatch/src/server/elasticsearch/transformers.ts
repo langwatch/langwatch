@@ -21,12 +21,15 @@ import { datasetSpanSchema } from "../datasets/types";
 import { z } from "zod";
 import { reservedTraceMetadataSchema } from "../tracer/types.generated";
 import type { Protections } from "./protections";
+import { createLogger } from "../../utils/logger";
+
+const logger = createLogger("langwatch:elasticsearch:transformers");
 
 export const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
   try {
     return z.array(datasetSpanSchema).parse(spans);
   } catch (e) {
-    console.error('DatasetSpan validation failed', e);
+    logger.error({ error: e }, "DatasetSpan validation failed");
     return spans as unknown as DatasetSpan[];
   }
 };

@@ -6,7 +6,7 @@ import type {
   CollectorJob,
 } from "~/server/background/types";
 import { env } from "../../../env.mjs";
-import { createLogger } from "../../../utils/logger.server";
+import { createLogger } from "../../../utils/logger";
 import { safeTruncate } from "../../../utils/truncate";
 import { flattenObjectKeys, getProtectionsForProject } from "../../api/utils";
 import { prisma } from "../../db";

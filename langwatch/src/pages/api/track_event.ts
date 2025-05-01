@@ -6,7 +6,7 @@ import { trackEventsQueue } from "../../server/background/queues/trackEventsQueu
 import { prisma } from "../../server/db"; // Adjust the import based on your setup
 import { type TrackEventRESTParamsValidator } from "../../server/tracer/types";
 import { trackEventRESTParamsValidatorSchema } from "../../server/tracer/types.generated";
-import { createLogger } from "../../utils/logger.server";
+import { createLogger } from "../../utils/logger";
 import { fromZodError } from "zod-validation-error";
 
 const thumbsUpDownSchema = z.object({

@@ -10,7 +10,7 @@ import {
 } from "../../../modelProviders/llmModelCost";
 import * as Sentry from "@sentry/nextjs";
 import NodeFetchCache, { FileSystemCache } from "node-fetch-cache";
-import { createLogger } from "../../../../utils/logger.server";
+import { createLogger } from "../../../../utils/logger";
 
 const logger = createLogger("langwatch:workers:collector:cost");
 

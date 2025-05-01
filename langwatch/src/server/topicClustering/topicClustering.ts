@@ -6,7 +6,7 @@ import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { fetch as fetchHTTP2 } from "fetch-h2";
 import { nanoid } from "nanoid";
 import { env } from "../../env.mjs";
-import { createLogger } from "../../utils/logger.server";
+import { createLogger } from "../../utils/logger";
 import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
 import { prisma } from "../db";
 import { TRACE_INDEX, esClient, traceIndexId } from "../elasticsearch";
@@ -490,9 +490,7 @@ export const fetchTopicsBatchClustering = async (
   params: BatchClusteringParams
 ): Promise<TopicClusteringResponse | undefined> => {
   if (!env.TOPIC_CLUSTERING_SERVICE) {
-    console.warn(
-      "Topic clustering service URL not set, skipping topic clustering"
-    );
+    logger.warn({ projectId }, "Topic clustering service URL not set, skipping topic clustering");
     return;
   }
 
@@ -532,9 +530,7 @@ export const fetchTopicsIncrementalClustering = async (
   params: IncrementalClusteringParams
 ): Promise<TopicClusteringResponse | undefined> => {
   if (!env.TOPIC_CLUSTERING_SERVICE) {
-    console.warn(
-      "Topic clustering service URL not set, skipping topic clustering"
-    );
+    logger.warn({ projectId }, "Topic clustering service URL not set, skipping topic clustering");
     return;
   }
 

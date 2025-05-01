@@ -46,7 +46,7 @@ import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
 import type { Protections } from "~/server/elasticsearch/protections";
 import { getTraceById } from "~/server/elasticsearch/traces";
 import { getProtectionsForProject } from "~/server/api/utils";
-import { createLogger } from "../../../utils/logger.server";
+import { createLogger } from "../../../utils/logger";
 
 const logger = createLogger("langwatch:workers:evaluationsWorker");
 

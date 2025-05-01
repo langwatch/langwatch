@@ -1,5 +1,5 @@
 import { loadEnvConfig } from "@next/env";
-import { createLogger } from "./utils/logger.server";
+import { createLogger } from "./utils/logger";
 import fs from "fs";
 import path from "path";
 

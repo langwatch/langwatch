@@ -2,7 +2,7 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { prisma } from "../../../../../server/db"; // Adjust the import based on your setup
 
-import { createLogger } from "../../../../../utils/logger.server";
+import { createLogger } from "../../../../../utils/logger";
 
 import { CostReferenceType, CostType } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";

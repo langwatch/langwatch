@@ -9,7 +9,7 @@ import type {
   EvaluatorTypes,
   SingleEvaluationResult,
 } from "../../server/evaluations/evaluators.generated";
-import { createLogger } from "../../utils/logger.server";
+import { createLogger } from "../../utils/logger";
 import { startTopicClusteringWorker } from "./workers/topicClusteringWorker";
 import {
   runEvaluationJob,

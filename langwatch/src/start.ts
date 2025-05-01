@@ -5,7 +5,7 @@ import path from "path";
 import type { Duplex } from "stream";
 import { register } from "prom-client";
 import promBundle from "express-prom-bundle";
-import { createLogger } from "./utils/logger.server";
+import { createLogger } from "./utils/logger";
 
 const logger = createLogger("langwatch:start");
 

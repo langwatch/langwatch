@@ -5,7 +5,7 @@ import {
   type ElasticSearchEvent,
   type ElasticSearchTrace,
 } from "../../../server/tracer/types";
-import { createLogger } from "../../../utils/logger.server";
+import { createLogger } from "../../../utils/logger";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
 import { elasticSearchEventSchema } from "../../tracer/types.generated";
@@ -106,7 +106,7 @@ export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
 
 export const startTrackEventsWorker = () => {
   if (!connection) {
-    logger.info("no redis connection, skipping track events worker");
+  logger.info(" no redis connection, skipping track events worker");
     return;
   }
 

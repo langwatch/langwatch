@@ -4,7 +4,7 @@ import { captureError } from "../../../utils/captureError";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
-import { createLogger } from "../../../utils/logger.server";
+import { createLogger } from "../../../utils/logger";
 import { QueueWithFallback } from "./queueWithFallback";
 import { runEvaluationJob } from "../workers/evaluationsWorker";
 import type { ConnectionOptions } from "bullmq";

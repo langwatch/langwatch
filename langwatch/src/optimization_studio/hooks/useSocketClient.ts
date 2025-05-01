@@ -1,20 +1,13 @@
 import { useCallback, useEffect, useRef } from "react";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { getDebugger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger";
 import type { BaseComponent } from "../types/dsl";
 import type { StudioClientEvent, StudioServerEvent } from "../types/events";
 import { useAlertOnComponent } from "./useAlertOnComponent";
 import { useWorkflowStore, type WorkflowStore } from "./useWorkflowStore";
 
-const DEBUGGING_ENABLED = true;
-
-if (DEBUGGING_ENABLED) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require("debug").enable("langwatch:studio:*");
-}
-
-const debug = getDebugger("langwatch:studio:socket");
+const logger = createLogger("langwatch:studio:socket");
 
 let socketInstance: WebSocket | null = null;
 let pythonDisconnectedTimeout: NodeJS.Timeout | null = null;
@@ -40,7 +33,7 @@ export const useSocketClient = () => {
   const handleMessage = useCallback(
     (event: MessageEvent) => {
       const data: StudioServerEvent = JSON.parse(event.data);
-      debug(data.type, "payload" in data ? data.payload : undefined);
+      logger.info({ event: data.type, payload: "payload" in data ? data.payload : undefined }, "received message");
 
       handleServerMessage(data);
     },
@@ -60,7 +53,7 @@ export const useSocketClient = () => {
     );
 
     socketInstance.onopen = () => {
-      debug("Socket opened, connecting to python");
+      logger.info("socket opened, connecting to python");
       setSocketStatus((socketStatus) => {
         if (
           socketStatus === "disconnected" ||
@@ -76,14 +69,13 @@ export const useSocketClient = () => {
 
     socketInstance.onclose = () => {
       if (socketInstance?.readyState === WebSocket.OPEN) return;
-      debug("Socket closed, reconnecting");
+      logger.info("socket closed, reconnecting");
       setSocketStatus("disconnected");
       scheduleReconnect();
     };
 
     socketInstance.onerror = (error) => {
-      debug("Socket error, reconnecting");
-      console.error("WebSocket error:", error);
+      logger.error("socket error, reconnecting", { error });
       setSocketStatus("disconnected");
       scheduleReconnect();
     };
@@ -93,7 +85,7 @@ export const useSocketClient = () => {
   }, [project, setSocketStatus]);
 
   const disconnect = useCallback(() => {
-    debug("Socket disconnect triggered, closing socket");
+    logger.info("socket disconnect triggered, closing socket");
     if (socketInstance) {
       socketInstance.close();
       socketInstance = null;
@@ -241,7 +233,7 @@ export const useHandleServerMessage = ({
             clearTimeout(pythonDisconnectedTimeout);
             pythonDisconnectedTimeout = null;
           }
-          debug("Python is alive, setting status to connected");
+          logger.info("python is alive, setting status to connected");
           setSocketStatus("connected");
           break;
         case "component_state_change":

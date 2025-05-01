@@ -1,7 +1,7 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "../../../../server/db";
 
-import { createLogger } from "../../../../utils/logger.server";
+import { createLogger } from "../../../../utils/logger";
 import { nanoid } from "nanoid";
 
 const logger = createLogger("langwatch:annotations:trace");

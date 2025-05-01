@@ -24,7 +24,7 @@ import {
   spanSchema,
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
-import { createLogger } from "../../utils/logger.server";
+import { createLogger } from "../../utils/logger";
 import {
   getPayloadSizeHistogram,
   traceSpanCountHistogram,
@@ -98,18 +98,16 @@ export default async function handler(
             activePlan.name ?? "free"
           );
         } catch (error) {
-          console.error("Error sending plan limit notification", error);
+          logger.error({ error, projectId: project.id }, "Error sending plan limit notification");
         }
       }
-      console.log("[429] Reached plan limit", {
-        projectId: project.id,
-        currentMonthMessagesCount,
-      });
+      logger.info({ projectId: project.id, currentMonthMessagesCount }, "[429] Reached plan limit");
       return res.status(429).json({
         message: `ERR_PLAN_LIMIT: You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
       });
     }
   } catch (error) {
+    logger.error({ error, projectId: project.id }, "Error getting current month messages count");
     Sentry.captureException(
       new Error("Error getting current month messages count"),
       {
@@ -204,10 +202,7 @@ export default async function handler(
   traceSpanCountHistogram.observe(req.body.spans?.length ?? 0);
 
   if (req.body.spans?.length > 200) {
-    console.log("[429] Too many spans", {
-      projectId: project.id,
-      spansCount: req.body.spans?.length,
-    });
+    logger.info({ projectId: project.id, spansCount: req.body.spans?.length }, "[429] Too many spans");
     return res.status(429).json({
       message: "Too many spans, maximum of 200 per trace",
     });

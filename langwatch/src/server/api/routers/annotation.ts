@@ -12,6 +12,7 @@ import {
 } from "../permission";
 import { getTracesWithSpans } from "./traces";
 import { getUserProtectionsForProject } from "../utils";
+import { createLogger } from "../../../utils/logger";
 const scoreOptionSchema = z.object({
   value: z
     .union([z.string(), z.array(z.string())])
@@ -19,6 +20,8 @@ const scoreOptionSchema = z.object({
     .nullable(),
   reason: z.string().optional().nullable(),
 });
+
+const logger = createLogger("langwatch:api:annotation");
 
 const scoreOptions = z.record(z.string(), scoreOptionSchema);
 
@@ -36,7 +39,7 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      console.log(input);
+      logger.info({ input }, "create annotation");
       return ctx.prisma.annotation.create({
         data: {
           id: nanoid(),

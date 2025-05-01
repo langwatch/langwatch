@@ -1,6 +1,6 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 
-import { createLogger } from "../../../../utils/logger.server";
+import { createLogger } from "../../../../utils/logger";
 import { prisma } from "../../../../server/db";
 import type {
   ESBatchEvaluation,

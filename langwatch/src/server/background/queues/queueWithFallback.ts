@@ -7,7 +7,7 @@ import {
 } from "bullmq";
 import { EventEmitter } from "events";
 import { connection } from "../../redis";
-import { createLogger } from "../../../utils/logger.server";
+import { createLogger } from "../../../utils/logger";
 import * as Sentry from "@sentry/nextjs";
 
 const logger = createLogger("langwatch:queueWithFallback");

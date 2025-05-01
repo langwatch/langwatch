@@ -1,7 +1,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { type Job, Worker } from "bullmq";
 import type { TopicClusteringJob } from "~/server/background/types";
-import { createLogger } from "../../../utils/logger.server";
+import { createLogger } from "../../../utils/logger";
 import { connection } from "../../redis";
 import { clusterTopicsForProject } from "../../topicClustering/topicClustering";
 import { TOPIC_CLUSTERING_QUEUE_NAME } from "../queues/topicClusteringQueue";
