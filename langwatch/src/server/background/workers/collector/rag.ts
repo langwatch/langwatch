@@ -7,9 +7,6 @@ import {
   type SpanWithChildren,
 } from "./common";
 import crypto from "crypto";
-import { createLogger } from "../../../../utils/logger";
-
-const logger = createLogger("langwatch:workers:collector:rag");
 
 export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
   const inputOutputMap: Record<

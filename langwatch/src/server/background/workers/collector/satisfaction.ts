@@ -5,7 +5,7 @@ import type { Trace } from "../../../tracer/types";
 import { prepareLitellmParams } from "~/server/api/routers/modelProviders";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../../../utils/constants";
 import { lambdaFetch } from "../../../../utils/lambdaFetch";
-import { createLogger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger.server";
 
 const logger = createLogger("langwatch:workers:collector:satisfaction");
 
