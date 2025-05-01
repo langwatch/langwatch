@@ -11,7 +11,6 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "../../../server/evaluations/evaluators.generated";
-import { getDebugger } from "../../../utils/logger";
 import {
   getCurrentMonthCost,
   maxMonthlyUsageLimit,
