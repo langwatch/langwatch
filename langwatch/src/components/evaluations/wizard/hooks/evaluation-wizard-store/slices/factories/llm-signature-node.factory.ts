@@ -15,7 +15,6 @@ const DEFAULT_SIGNATURE_NODE_PROPERTIES = (
 ): LlmSignatureNode => ({
   type: "signature",
   id: "llm_node",
-  deletable: false,
   data: {
     name: "LLM Node",
     description: "LLM calling node",
