@@ -1,4 +1,4 @@
-import { Separator, Spinner, VStack } from "@chakra-ui/react";
+import { Spinner, VStack } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import debounce from "lodash.debounce";
 import { useEffect, useMemo, useRef } from "react";
@@ -26,7 +26,6 @@ import {
   OutputsFieldGroup,
 } from "~/prompt-configs/forms/fields/PromptConfigVersionFieldGroup";
 import { PromptField } from "~/prompt-configs/forms/fields/PromptField";
-import { PromptNameField } from "~/prompt-configs/forms/fields/PromptNameField";
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import {
   usePromptConfigForm,
@@ -92,6 +91,7 @@ function SignaturePropertiesPanelInner({
   // Initialize form with values from node data
   const initialConfigValues =
     safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(node.data);
+
   const formProps = usePromptConfigForm({
     configId,
     initialConfigValues,
@@ -141,15 +141,17 @@ function SignaturePropertiesPanelInner({
     }
   };
 
-  const handleTriggerSaveVersion = async (
+  const handleTriggerSaveVersion = (
     configId: string,
     saveFormValues: PromptConfigFormValues
   ) => {
-    // Check form value validity
-    const isValid = await formProps.methods.trigger();
-    if (!isValid) return;
+    void (async () => {
+      // Check form value validity
+      const isValid = await formProps.methods.trigger();
+      if (!isValid) return;
 
-    triggerSaveVersion(configId, saveFormValues);
+      triggerSaveVersion(configId, saveFormValues);
+    })();
   };
 
   // TODO: Consider refactoring the BasePropertiesPanel so that we don't need to hide everything like this
