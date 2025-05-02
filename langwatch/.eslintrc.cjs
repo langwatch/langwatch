@@ -5,6 +5,7 @@ const localConfig = (() => {
   try {
     return require("./.eslintrc.local.cjs");
   } catch (error) {
+    console.error("Error loading .eslintrc.local.cjs", error);
     return {};
   }
 })();
