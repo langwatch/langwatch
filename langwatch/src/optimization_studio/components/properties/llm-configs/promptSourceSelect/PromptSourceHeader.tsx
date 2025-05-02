@@ -106,7 +106,7 @@ export function PromptSourceHeader({
     void (async () => {
       if (!savedConfig) {
         // This should never happen
-        logger.error("Missing llm prompt config");
+        logger.error({ versionId, projectId }, "Missing llm prompt config");
         toaster.error({
           title: "Failed to restore prompt version",
           description: "Missing prompt",
@@ -134,7 +134,7 @@ export function PromptSourceHeader({
           version: newFormValues.version,
         });
       } catch (error) {
-        logger.error({ error, versionId });
+        logger.error({ error, versionId }, "Failed to restore prompt version");
         toaster.error({
           title: "Failed to restore prompt version",
           description: "Please try again.",
