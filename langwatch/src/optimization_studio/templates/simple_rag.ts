@@ -4,7 +4,7 @@ import type { End, Entry, Evaluator, Retriever, Workflow } from "../types/dsl";
 export const simpleRagTemplate: Workflow = {
   spec_version: "1.3",
   name: "Simple RAG",
-  icon: "🧩",
+  icon: "🔍",
   description:
     "Query transformation, vector database search and answer generation",
   version: "1.0",

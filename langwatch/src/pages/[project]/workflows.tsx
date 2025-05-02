@@ -54,7 +54,6 @@ export default function Workflows() {
     <DashboardLayout>
       <Container maxWidth="1200px" padding={6}>
         <VStack gap={8} width="full" align="start">
-          <IntroducingStudio />
           <HStack align="center" gap={6}>
             <Heading as={"h1"} size="lg" paddingTop={1}>
               Optimization Studio Workflows

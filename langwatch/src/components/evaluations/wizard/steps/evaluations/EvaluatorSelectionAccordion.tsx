@@ -1,4 +1,4 @@
-import { Grid, RadioCard } from "@chakra-ui/react";
+import { EmptyState, Grid, RadioCard } from "@chakra-ui/react";
 import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useAnimatedFocusElementById } from "../../../../../hooks/useAnimatedFocusElementById";
 import { StepAccordion } from "../../components/StepAccordion";
@@ -6,12 +6,16 @@ import { StepRadio } from "../../components/StepButton";
 import { useEvaluatorCategories } from "./CategorySelectionAccordion";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
+import { PuzzleIcon } from "../../../../icons/PuzzleIcon";
+import { Link } from "../../../../ui/link";
+import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
 
 export const EvaluatorSelectionAccordion = ({
   setAccordeonValue,
 }: {
   setAccordeonValue: (value: string[]) => void;
 }) => {
+  const { project } = useOrganizationTeamProject();
   const { wizardState, getFirstEvaluatorNode, setFirstEvaluator } =
     useEvaluationWizardStore();
 
@@ -45,6 +49,9 @@ export const EvaluatorSelectionAccordion = ({
   };
 
   const evaluatorCategories = useEvaluatorCategories();
+  const evaluators =
+    evaluatorCategories.find((c) => c.id === wizardState.evaluatorCategory)
+      ?.evaluators ?? [];
 
   return (
     <StepAccordion
@@ -66,31 +73,51 @@ export const EvaluatorSelectionAccordion = ({
         paddingX="1px"
       >
         <Grid width="full" gap={3}>
-          {evaluatorCategories
-            .find((c) => c.id === wizardState.evaluatorCategory)
-            ?.evaluators.map((evaluator) => (
-              <StepRadio
-                key={evaluator.id}
-                value={evaluator.id}
-                title={
-                  evaluator.name + (evaluator.future ? " (Coming Soon)" : "")
+          {evaluators.map((evaluator) => (
+            <StepRadio
+              key={evaluator.id}
+              value={evaluator.id}
+              title={
+                evaluator.name + (evaluator.future ? " (Coming Soon)" : "")
+              }
+              description={evaluator.description}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!evaluator.future && !evaluator.disabled) {
+                  handleEvaluatorSelect(evaluator.id);
                 }
-                description={evaluator.description}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (!evaluator.future && !evaluator.disabled) {
-                    handleEvaluatorSelect(evaluator.id);
-                  }
-                }}
-                opacity={evaluator.future ?? evaluator.disabled ? 0.5 : 1}
-                cursor={
-                  evaluator.future ?? evaluator.disabled
-                    ? "not-allowed"
-                    : "pointer"
-                }
-              />
-            ))}
+              }}
+              opacity={evaluator.future ?? evaluator.disabled ? 0.5 : 1}
+              cursor={
+                evaluator.future ?? evaluator.disabled
+                  ? "not-allowed"
+                  : "pointer"
+              }
+            />
+          ))}
+          {wizardState.evaluatorCategory === "custom_evaluators" &&
+            evaluators.length === 0 && (
+              <EmptyState.Root>
+                <EmptyState.Content>
+                  <EmptyState.Indicator>
+                    <PuzzleIcon />
+                  </EmptyState.Indicator>
+                  <EmptyState.Title>
+                    No custom evaluators published yet
+                  </EmptyState.Title>
+                  <EmptyState.Description>
+                    <Link
+                      href={`/${project?.slug}/workflows`}
+                      textDecoration="underline"
+                    >
+                      Go to Workflows
+                    </Link>{" "}
+                    to create your first custom evaluator.
+                  </EmptyState.Description>
+                </EmptyState.Content>
+              </EmptyState.Root>
+            )}
         </Grid>
       </RadioCard.Root>
     </StepAccordion>

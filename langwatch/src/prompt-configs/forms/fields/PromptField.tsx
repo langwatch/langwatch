@@ -21,6 +21,8 @@ export function PromptField() {
       <Textarea
         {...register("version.configData.prompt")}
         placeholder="You are a helpful assistant"
+        autoresize
+        maxHeight="33vh"
         rows={4}
       />
     </VerticalFormControl>
