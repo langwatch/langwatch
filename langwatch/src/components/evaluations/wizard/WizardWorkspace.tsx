@@ -257,6 +257,10 @@ const WizardOptimizationStudioCanvas = memo(
         }}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onBeforeDelete={() => {
+          // We don't delete nodes in the wizard
+          return Promise.resolve(false);
+        }}
         onConnect={(connection) => {
           const result = onConnect(connection);
           if (result?.error) {
