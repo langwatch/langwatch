@@ -2,12 +2,12 @@
 import type { LlmPromptConfigVersion } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
 import { DATASET_COLUMN_TYPES } from "../../datasets/types";
-
 import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
+import { LlmConfigInputTypes, LlmConfigOutputTypes } from "../../../types";
+import { createLogger } from "../../../utils/logger";
 
-import { LlmConfigInputTypes, LlmConfigOutputTypes } from "~/types";
+const logger = createLogger("langwatch:prompt-config:llm-config-version-schema");
 
 /**
  * Schema version enum for LLM configuration
@@ -126,10 +126,7 @@ export function parseLlmConfigVersion(
   const validator = getVersionValidator(schemaVersion as SchemaVersion);
 
   if (!validator) {
-    console.error(
-      `Unknown schema llmConfigVersion: ${schemaVersion}`,
-      llmConfigVersion
-    );
+    logger.error({ schemaVersion, llmConfigVersion }, "Unknown schema llmConfigVersion");
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: `Unknown schema llmConfigVersion: ${schemaVersion}`,

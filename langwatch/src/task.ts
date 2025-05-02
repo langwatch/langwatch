@@ -1,5 +1,5 @@
 import { loadEnvConfig } from "@next/env";
-import { createLogger } from "./utils/logger.server";
+import { createLogger } from "./utils/logger";
 import fs from "fs";
 import path from "path";
 
@@ -33,14 +33,14 @@ const runAsync = async () => {
   };
 
   try {
-    logger.info(`Running ${taskName}`);
+    logger.info({ taskName }, 'running');
     await script.default(...args.slice(1));
-    logger.info(`Done!`);
   } catch (e) {
-    logger.error(`SCRIPT RUNNER: failed to execute ${taskName}`);
+    logger.error({ error: e, taskName }, 'failed');
     throw e;
   } finally {
     redis?.disconnect();
+    logger.info('done');
   }
 
   process.exit(0);

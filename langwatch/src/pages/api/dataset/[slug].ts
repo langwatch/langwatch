@@ -1,7 +1,7 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "../../../server/db";
 
-import { createLogger } from "../../../utils/logger.server";
+import { createLogger } from "../../../utils/logger";
 
 const logger = createLogger("langwatch:dataset:slug");
 
@@ -52,10 +52,7 @@ export default async function handler(
 
     return res.status(200).json({ data: datasetRecords });
   } catch (e) {
-    logger.error("Error fetching dataset records", {
-      error: e,
-      projectId: project.id,
-    });
+    logger.error({ error: e, projectId: project.id }, 'error fetching dataset records');
     return res
       .status(500)
       .json({ status: "error", message: "Internal server error." });

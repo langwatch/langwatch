@@ -7,7 +7,7 @@ import {
 } from "bullmq";
 import { EventEmitter } from "events";
 import { connection } from "../../redis";
-import { createLogger } from "../../../utils/logger.server";
+import { createLogger } from "../../../utils/logger";
 import * as Sentry from "@sentry/nextjs";
 
 const logger = createLogger("langwatch:queueWithFallback");
@@ -70,11 +70,7 @@ export class QueueWithFallback<
 
       return job as Job<DataType, ResultType, NameType>;
     } catch (error) {
-      logger.error(
-        "Failed sending to redis collector queue inserting trace directly, processing job synchronously.",
-        "Exception:",
-        error
-      );
+      logger.error({ error }, "failed sending to redis collector queue inserting trace directly, processing job synchronously");
       Sentry.captureException(error, {
         extra: {
           message:
@@ -127,7 +123,7 @@ export class QueueWithFallback<
 
       return job as Job<DataType, ResultType, NameType>;
     } catch (error) {
-      logger.error("Failed getting job from redis", error);
+      logger.error({ error }, "failed getting job from redis");
       return undefined;
     }
   }

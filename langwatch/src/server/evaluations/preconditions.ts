@@ -7,6 +7,9 @@ import { getEvaluatorDefinitions } from "./getEvaluator";
 import type { CheckPreconditions } from "./types";
 import { extractRAGTextualContext } from "../background/workers/collector/rag";
 import safe from "safe-regex2";
+import { createLogger } from "../../utils/logger";
+
+const logger = createLogger("langwatch:evaluations:preconditions");
 
 export type PreconditionTrace = Pick<
   ElasticSearchTrace,
@@ -86,9 +89,7 @@ export function evaluatePreconditions(
             return false;
           }
         } catch (error) {
-          console.error(
-            `Invalid regex in preconditions: ${precondition.value}`
-          );
+          logger.error({ error, precondition: precondition.value }, "Invalid regex in preconditions");
           return false;
         }
         break;

@@ -4,17 +4,10 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { useHandleServerMessage } from "./useSocketClient";
 import { useWorkflowStore } from "./useWorkflowStore";
 import type { StudioClientEvent, StudioServerEvent } from "../types/events";
-import { getDebugger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger";
 import { toaster } from "../../components/ui/toaster";
 
-const DEBUGGING_ENABLED = true;
-
-if (DEBUGGING_ENABLED) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  require("debug").enable("langwatch:wizard:*");
-}
-
-const debug = getDebugger("langwatch:wizard:usePostEvent");
+const logger = createLogger("langwatch:wizard:usePostEvent");
 
 export const usePostEvent = () => {
   const { project } = useOrganizationTeamProject();
@@ -108,7 +101,7 @@ export const usePostEvent = () => {
                 const serverEvent: StudioServerEvent = JSON.parse(
                   event_.slice(6)
                 );
-                debug("Received SSE event:", serverEvent);
+                logger.info({ serverEvent, event }, "received message");
 
                 if (postEventTimeoutRef.current) {
                   clearTimeout(postEventTimeoutRef.current);

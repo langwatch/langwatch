@@ -2,7 +2,7 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { prisma } from "~/server/db";
 
-import { createLogger } from "~/utils/logger.server";
+import { createLogger } from "../../../utils/logger";
 
 import {
   type Experiment,
@@ -63,12 +63,7 @@ export default async function handler(
   try {
     params = dspyInitParamsSchema.parse(req.body);
   } catch (error) {
-    logger.error(
-      "Invalid init data received",
-      error,
-      JSON.stringify(req.body, null, "  "),
-      { projectId: project.id }
-    );
+    logger.error({ error, body: req.body, projectId: project.id }, 'invalid init data received');
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
     Sentry.captureException(error, { extra: { projectId: project.id } });
 

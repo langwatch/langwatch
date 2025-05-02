@@ -2,7 +2,6 @@ import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
 
 import type {
-  DatasetColumns,
   DatasetColumnType,
 } from "~/server/datasets/types";
 import {

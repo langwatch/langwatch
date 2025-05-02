@@ -15,13 +15,15 @@ import {
   type StudioClientEvent,
   type StudioServerEvent,
 } from "../../../../optimization_studio/types/events";
-import { createLogger } from "../../../../utils/logger.server";
+import { createLogger } from "../../../../utils/logger";
 import type { NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { loggerMiddleware } from "../../hono-middleware/logger";
 
 const logger = createLogger("langwatch:post_message");
 
 const app = new Hono().basePath("/api/workflows");
+app.use(loggerMiddleware());
 
 app.post(
   "/post_event",
@@ -34,10 +36,7 @@ app.post(
   ),
   async (c) => {
     const { event: eventWithoutEnvs, projectId } = await c.req.json();
-    logger.info("post_event", {
-      event: eventWithoutEnvs.type,
-      projectId,
-    });
+    logger.info({ event: eventWithoutEnvs.type, projectId }, 'post_event');
 
     const session = await getServerSession(
       authOptions(c.req.raw as NextRequest)
@@ -68,10 +67,7 @@ app.post(
         projectId
       );
     } catch (error) {
-      logger.error("error", {
-        error,
-        projectId,
-      });
+      logger.error({ error, projectId }, 'error');
       Sentry.captureException(error, {
         extra: {
           projectId,
@@ -103,7 +99,7 @@ app.post(
             }
           },
         }).catch((error) => {
-          logger.error("error", error);
+          logger.error({ error, projectId }, 'error');
           Sentry.captureException(error, {
             extra: {
               projectId,

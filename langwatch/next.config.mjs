@@ -41,7 +41,7 @@ await import("./src/env.mjs");
 /** @type {import("next").NextConfig} */
 const config = {
   reactStrictMode: true,
-
+  logging: false,
   distDir: process.env.NEXTJS_DIST_DIR ?? ".next",
 
   experimental: {

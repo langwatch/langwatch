@@ -6,7 +6,7 @@ import type {
   CollectorJob,
 } from "~/server/background/types";
 import { env } from "../../../env.mjs";
-import { createLogger } from "../../../utils/logger.server";
+import { createLogger } from "../../../utils/logger";
 import { safeTruncate } from "../../../utils/truncate";
 import { flattenObjectKeys, getProtectionsForProject } from "../../api/utils";
 import { prisma } from "../../db";
@@ -46,7 +46,7 @@ export const scheduleTraceCollectionWithFallback = async (
   forceSync = false
 ) => {
   if (forceSync || !collectorQueue) {
-    logger.debug("Force sync enabled, processing job synchronously.");
+    logger.debug("force sync enabled, processing job synchronously");
     await processCollectorJob(undefined, collectorJob);
     return;
   }
@@ -93,7 +93,7 @@ export const scheduleTraceCollectionWithGrouping = async (
     }
 
     if (existingJob && "spans" in existingJob.data) {
-      logger.debug(`Found existing job for trace ${collectorJob.traceId}, merging...`);
+      logger.debug({ collectionJobTraceId: collectorJob.traceId }, "found existing job trace, merging...");
       const mergedJob = mergeCollectorJobs(existingJob.data, collectorJob);
       await existingJob.remove();
       await collectorQueue.add("collector", mergedJob, {
@@ -101,7 +101,7 @@ export const scheduleTraceCollectionWithGrouping = async (
         delay: 10_000,
       });
     } else {
-      logger.debug(`collecting traceId ${collectorJob.traceId}`);
+      logger.debug({ collectionJobTraceId: collectorJob.traceId }, "collecting job trace");
       await collectorQueue.add("collector", collectorJob, {
         jobId,
         delay: index > 1 ? 10_000 : 0,
@@ -145,7 +145,7 @@ export async function processCollectorJob(
   data: CollectorJob | CollectorCheckAndAdjustJob
 ) {
   if ("spans" in data && data.spans?.length > 200) {
-    logger.warn("Too many spans, maximum of 200 per trace, dropping job");
+    logger.warn({ spansLength: data.spans?.length, jobId: id }, "too many spans, maximum of 200 per trace, dropping job");
     return;
   }
 
@@ -191,7 +191,7 @@ const processCollectorJob_ = async (
   id: string | undefined,
   data: CollectorJob
 ) => {
-  logger.debug(`Processing job ${id} with data:`, JSON.stringify(data));
+  logger.debug({ jobId: id, data }, "processing job");
 
   let spans = data.spans;
   const {
@@ -211,10 +211,7 @@ const processCollectorJob_ = async (
   try {
     spans = await addLLMTokensCount(projectId, spans);
   } catch (error) {
-    logger.debug("Failed to add LLM tokens count", error, {
-      projectId: project.id,
-      traceId,
-    });
+    logger.debug({ error, projectId: project.id, traceId }, "failed to add LLM tokens count");
     Sentry.captureException(new Error("Failed to add LLM tokens count"), {
       extra: { projectId: project.id, traceId, error: error },
     });
@@ -521,7 +518,7 @@ const updateTrace = async (
     if (
       (error as any).toString().includes("version_conflict_engine_exception")
     ) {
-      logger.debug("Version conflict, skipping update");
+      logger.debug("version conflict, skipping update");
       return;
     }
     throw error;
@@ -532,7 +529,7 @@ export const processCollectorCheckAndAdjustJob = async (
   id: string | undefined,
   data: CollectorCheckAndAdjustJob
 ) => {
-  logger.debug(`Post-processing job ${id}`);
+  logger.debug({ jobId: id }, "post-processing job");
 
   const { traceId, projectId } = data;
   const client = await esClient({ projectId });
@@ -644,13 +641,13 @@ export const processCollectorCheckAndAdjustJob = async (
       input,
     });
   } catch {
-    logger.debug("Failed to score satisfaction for", traceId);
+    logger.debug({ traceId }, "failed to score satisfaction for");
   }
 };
 
 export const startCollectorWorker = () => {
   if (!connection) {
-    logger.debug("No redis connection, skipping collector worker");
+    logger.debug("no redis connection, skipping collector worker");
     return;
   }
 
@@ -664,7 +661,7 @@ export const startCollectorWorker = () => {
   );
 
   collectorWorker.on("ready", () => {
-    logger.debug("Collector worker active, waiting for jobs!");
+    logger.debug("collector worker active, waiting for jobs!");
   });
 
   collectorWorker.on("failed", (job, err) => {
@@ -677,7 +674,7 @@ export const startCollectorWorker = () => {
     } else {
       getJobProcessingCounter("collector", "failed").inc();
     }
-    logger.debug(`Job ${job?.id} failed with error ${err.message}`);
+    logger.debug({ jobId: job?.id, error: err.message }, "job failed");
     Sentry.withScope((scope) => {
       scope.setTag("worker", "collector");
       scope.setExtra("job", job?.data);
@@ -685,7 +682,7 @@ export const startCollectorWorker = () => {
     });
   });
 
-  logger.debug("Collector worker registered");
+  logger.debug("collector worker registered");
   return collectorWorker;
 };
 

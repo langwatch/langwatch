@@ -11,7 +11,6 @@ import {
   esClient,
   traceIndexId,
 } from "../../server/elasticsearch";
-import { DEFAULT_EMBEDDINGS_MODEL } from "../../server/embeddings";
 import {
   type CollectorRESTParams,
   type ElasticSearchTrace,
@@ -20,6 +19,7 @@ import {
 } from "../../server/tracer/types";
 import { getTestProject, waitForResult } from "../../utils/testUtils";
 import handler from "./collector";
+import { DEFAULT_EMBEDDINGS_MODEL } from "~/utils/constants";
 
 const sampleSpan: LLMSpan = {
   type: "llm",

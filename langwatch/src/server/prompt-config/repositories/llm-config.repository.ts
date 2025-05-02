@@ -7,6 +7,9 @@ import {
   type LatestConfigVersionSchema,
 } from "./llm-config-version-schema";
 import { LlmConfigVersionsRepository } from "./llm-config-versions.repository";
+import { createLogger } from "../../../utils/logger";
+
+const logger = createLogger("langwatch:prompt-config:llm-config.repository");
 
 /**
  * Interface for LLM Config data transfer objects
@@ -72,7 +75,7 @@ export class LlmConfigRepository {
             latestVersion: parseLlmConfigVersion(config.versions[0]),
           };
         } catch (error) {
-          console.error(error);
+          logger.error({ error, configId: config.id }, "Error parsing LLM config version");
           return null;
         }
       })
