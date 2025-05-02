@@ -24,6 +24,9 @@ export const createLogger = (name: string) => {
     level: isBrowser ? "info" : (process.env.PINO_LOG_LEVEL || "info"),
     timestamp: isBrowser ? undefined : pino.stdTimeFunctions.isoTime,
     browser: isBrowser ? { asObject: true } : void 0,
+    serializers: {
+      error: pino.stdSerializers.err,
+    },
     formatters: {
       bindings: (bindings) => {
         return bindings; // TODO(afr): Later, add git commit hash, and other stuff for production Node.js

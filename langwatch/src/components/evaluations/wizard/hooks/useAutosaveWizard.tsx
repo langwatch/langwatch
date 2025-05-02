@@ -10,6 +10,7 @@ import { useShallow } from "zustand/react/shallow";
 import { getWorkflow } from "../../../../optimization_studio/hooks/useWorkflowStore";
 import * as Sentry from "@sentry/nextjs";
 import { toaster } from "../../../ui/toaster";
+import { getRandomWorkflowIcon } from "../../../../optimization_studio/components/workflow/NewWorkflowForm";
 
 const stringifiedInitialState = JSON.stringify({
   wizardState: initialState.wizardState,
@@ -105,11 +106,15 @@ const useAutosaveWizard = () => {
     if (!!experiment.data?.id || stringifiedState !== stringifiedInitialState) {
       void (async () => {
         try {
+          const icon = dsl.workflow_id ? dsl.icon : getRandomWorkflowIcon();
           const updatedExperiment = await saveExperiment.mutateAsync({
             projectId: project.id,
             experimentId: experiment.data?.id,
             wizardState,
-            dsl,
+            dsl: {
+              ...dsl,
+              icon,
+            },
           });
 
           // Sometimes autosave would keep true even after the mutation is done, this ensures it's set to false
@@ -123,6 +128,7 @@ const useAutosaveWizard = () => {
           setWizardState({ name: updatedExperiment.name ?? undefined });
           setWorkflow({
             workflow_id: updatedExperiment.workflowId ?? undefined,
+            icon,
             experiment_id: updatedExperiment.id,
           });
         } catch (error) {

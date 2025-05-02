@@ -19,6 +19,7 @@ import { StepRadio } from "../../components/StepButton";
 import { api } from "../../../../../utils/api";
 import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
 import { useMemo } from "react";
+import { PuzzleIcon } from "../../../../icons/PuzzleIcon";
 
 type EvaluationCategoryConfig = {
   id: (typeof EVALUATOR_CATEGORIES)[number];
@@ -165,7 +166,7 @@ export const useEvaluatorCategories = (): EvaluationCategoryConfig[] => {
           id: "custom_evaluators",
           name: "Custom Evaluators",
           description: "Evaluate with your own custom evaluators",
-          icon: <LuCode />,
+          icon: <PuzzleIcon />,
           evaluators: (availableCustomEvaluators.data ?? []).map(
             (evaluator) => ({
               id: `custom/${evaluator.id}`,

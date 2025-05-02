@@ -45,7 +45,12 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
   const availableEvaluators = useAvailableEvaluators();
 
   useEffect(() => {
-    if (!evaluator || !(evaluator in availableEvaluators)) return;
+    if (
+      !evaluator ||
+      !availableEvaluators ||
+      !(evaluator in availableEvaluators)
+    )
+      return;
     if (node.data.parameters) return;
 
     const evaluatorDefinition =

@@ -4,7 +4,10 @@ import { type EvaluatorTypes } from "../../server/evaluations/evaluators.generat
 import type { Evaluator, Field } from "../types/dsl";
 
 export const convertEvaluators = (
-  evaluators: ReturnType<typeof useAvailableEvaluators>
+  evaluators: Exclude<
+    ReturnType<typeof useAvailableEvaluators>,
+    undefined
+  >
 ): Evaluator[] => {
   return Object.entries(evaluators)
     .filter(([evaluator, definition]) => {
@@ -32,7 +35,10 @@ export const convertEvaluators = (
  */
 export const buildEvaluatorFromType = (
   evaluatorType: EvaluatorTypes | `custom/${string}`,
-  availableEvaluators: ReturnType<typeof useAvailableEvaluators>
+  availableEvaluators: Exclude<
+    ReturnType<typeof useAvailableEvaluators>,
+    undefined
+  >
 ): Evaluator => {
   const definition = availableEvaluators[evaluatorType];
 
