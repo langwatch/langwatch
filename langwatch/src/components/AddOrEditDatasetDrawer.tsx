@@ -344,7 +344,7 @@ export const tryToConvertRowsToAppropriateType = (
       } else if (type === "boolean") {
         if (
           ["true", "1", "yes", "y", "on", "ok"].includes(
-            (value ?? "").toLowerCase()
+            `${value ?? ""}`.toLowerCase()
           )
         ) {
           convertedRecord[key] = true;
@@ -359,7 +359,7 @@ export const tryToConvertRowsToAppropriateType = (
             "no",
             "n",
             "off",
-          ].includes((value ?? "").toLowerCase())
+          ].includes(`${value ?? ""}`.toLowerCase())
         ) {
           convertedRecord[key] = false;
         }
