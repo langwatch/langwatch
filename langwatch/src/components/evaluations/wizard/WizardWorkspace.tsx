@@ -306,7 +306,7 @@ function CodeImplementation() {
 
   const availableEvaluators = useAvailableEvaluators();
 
-  if (!checkType) return null;
+  if (!checkType || !availableEvaluators) return null;
 
   return (
     <Card.Root width="full" height="full" position="sticky" top={6}>

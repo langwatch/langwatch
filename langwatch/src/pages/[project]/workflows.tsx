@@ -13,7 +13,6 @@ import {
 } from "@chakra-ui/react";
 import { Lock, Plus } from "react-feather";
 import { DashboardLayout } from "../../components/DashboardLayout";
-import { IntroducingStudio } from "../../components/IntroducingStudio";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { NewWorkflowModal } from "../../optimization_studio/components/workflow/NewWorkflowModal";
 import {

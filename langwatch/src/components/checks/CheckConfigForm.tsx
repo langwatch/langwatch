@@ -32,7 +32,7 @@ import {
 } from "../../server/evaluations/evaluationMappings";
 import {
   type Evaluators,
-  type EvaluatorTypes
+  type EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
 import {
   evaluatorsSchema,
@@ -177,6 +177,7 @@ export default function CheckConfigForm({
   }, [checkType, isChoosing, router]);
 
   useEffect(() => {
+    if (!availableEvaluators) return;
     if (defaultValues?.settings && defaultValues.checkType === checkType)
       return;
 
@@ -215,7 +216,11 @@ export default function CheckConfigForm({
     };
 
     setDefaultSettings(
-      getEvaluatorDefaultSettings(availableEvaluators[checkType], undefined, publicEnv.data?.IS_ATLA_DEFAULT_JUDGE),
+      getEvaluatorDefaultSettings(
+        availableEvaluators[checkType],
+        undefined,
+        publicEnv.data?.IS_ATLA_DEFAULT_JUDGE
+      ),
       "settings"
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -237,7 +242,7 @@ export default function CheckConfigForm({
   );
 
   const evaluatorDefinition = useMemo(
-    () => checkType && availableEvaluators[checkType],
+    () => checkType && availableEvaluators?.[checkType],
     [checkType, availableEvaluators]
   );
 
@@ -257,7 +262,7 @@ export default function CheckConfigForm({
         })}
         style={{ width: "100%" }}
       >
-        {!checkType || isChoosing ? (
+        {!checkType || isChoosing || !availableEvaluators ? (
           <EvaluatorSelection form={form} />
         ) : (
           <VStack gap={6} align="start" width="full">

@@ -36,7 +36,10 @@ export interface EvaluatorNodeSlice {
     evaluator: Partial<Evaluator> & {
       evaluator: EvaluatorTypes | `custom/${string}`;
     },
-    availableEvaluators: ReturnType<typeof useAvailableEvaluators>
+    availableEvaluators: Exclude<
+      ReturnType<typeof useAvailableEvaluators>,
+      undefined
+    >
   ) => void;
   getFirstEvaluatorNode: () => Node<Evaluator> | undefined;
   setFirstEvaluatorEdges: (edges: Workflow["edges"]) => void;
@@ -80,7 +83,10 @@ export const createEvaluatorNodeSlice: StateCreator<
       evaluator: Partial<Evaluator> & {
         evaluator: EvaluatorTypes | `custom/${string}`;
       },
-      availableEvaluators: ReturnType<typeof useAvailableEvaluators>
+      availableEvaluators: Exclude<
+        ReturnType<typeof useAvailableEvaluators>,
+        undefined
+      >
     ) {
       get().workflowStore.setWorkflow((current) => {
         // Find existing evaluator node if any
@@ -137,7 +143,9 @@ export const createEvaluatorNodeSlice: StateCreator<
           },
         };
 
-        const entryNode = get().getNodesByType("entry")[0] as Node<Entry> | undefined;
+        const entryNode = get().getNodesByType("entry")[0] as
+          | Node<Entry>
+          | undefined;
         let newEdges = buildEntryToTargetEdges(entryNode, evaluatorNode);
 
         // If there is an executor node, update the edges

@@ -26,6 +26,7 @@ export const EvaluatorSelectionAccordion = ({
   const handleEvaluatorSelect = (
     evaluatorType: EvaluatorTypes | `custom/${string}`
   ) => {
+    if (!availableEvaluators) return;
     // This initializes the evaluator node without any properties
     setFirstEvaluator(
       {
