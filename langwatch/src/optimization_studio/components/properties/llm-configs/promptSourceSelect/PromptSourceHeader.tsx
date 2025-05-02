@@ -24,6 +24,11 @@ import {
   llmConfigToPromptConfigFormValues,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger(
+  "langwatch:optimization_studio:prompt_source_header"
+);
 
 export function PromptSourceHeader({
   node,
@@ -99,9 +104,18 @@ export function PromptSourceHeader({
   // TODO: Move this outside of the component
   const handleRestore = (versionId: string) => {
     void (async () => {
+      if (!savedConfig) {
+        // This should never happen
+        logger.error("Missing llm prompt config");
+        toaster.error({
+          title: "Failed to restore prompt version",
+          description: "Missing prompt",
+        });
+        return;
+      }
+
       try {
-        console.log("handleRestore", versionId);
-        // Get the saved version
+        // Get the saved version by id
         const savedVersion = await trpc.llmConfigs.versions.getById.fetch({
           versionId,
           projectId,
@@ -111,7 +125,7 @@ export function PromptSourceHeader({
         const newFormValues = llmConfigToPromptConfigFormValues({
           ...savedConfig,
           latestVersion: parseLlmConfigVersion(savedVersion),
-        } as LlmConfigWithLatestVersion);
+        });
 
         // Update the form values
         const currentFormValues = formProps.getValues();
@@ -120,7 +134,7 @@ export function PromptSourceHeader({
           version: newFormValues.version,
         });
       } catch (error) {
-        console.error(error);
+        logger.error({ error, versionId });
         toaster.error({
           title: "Failed to restore prompt version",
           description: "Please try again.",
