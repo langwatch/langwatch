@@ -1,10 +1,15 @@
 import { HStack, Input, Text } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useMemo } from "react";
+import { useFormContext } from "react-hook-form";
+
+import { parseLlmConfigVersion } from "~/server/prompt-config/repositories/llm-config-version-schema";
+import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
+
+import { InputGroup } from "../../../../../components/ui/input-group";
 
 import { PromptSource } from "./PromptSource";
 
-import { useFormContext } from "react-hook-form";
 import { toaster } from "~/components/ui/toaster";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -18,10 +23,12 @@ import {
   llmConfigToOptimizationStudioNodeData,
   llmConfigToPromptConfigFormValues,
 } from "~/prompt-configs/llmPromptConfigUtils";
-import { parseLlmConfigVersion } from "~/server/prompt-config/repositories/llm-config-version-schema";
-import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 import { api } from "~/utils/api";
-import { InputGroup } from "../../../../../components/ui/input-group";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger(
+  "langwatch:optimization_studio:prompt_source_header"
+);
 
 export function PromptSourceHeader({
   node,
@@ -95,32 +102,45 @@ export function PromptSourceHeader({
   };
 
   // TODO: Move this outside of the component
-  const handleRestore = async (versionId: string) => {
-    try {
-      // Get the saved version
-      const savedVersion = await trpc.llmConfigs.versions.getById.fetch({
-        versionId,
-        projectId,
-      });
+  const handleRestore = (versionId: string) => {
+    void (async () => {
+      if (!savedConfig) {
+        // This should never happen
+        logger.error({ versionId, projectId }, "Missing llm prompt config");
+        toaster.error({
+          title: "Failed to restore prompt version",
+          description: "Missing prompt",
+        });
+        return;
+      }
 
-      // Convert the saved version to a form values object
-      const newFormValues = llmConfigToPromptConfigFormValues({
-        ...savedConfig,
-        latestVersion: parseLlmConfigVersion(savedVersion),
-      } as LlmConfigWithLatestVersion);
+      try {
+        // Get the saved version by id
+        const savedVersion = await trpc.llmConfigs.versions.getById.fetch({
+          versionId,
+          projectId,
+        });
 
-      // Update the form values
-      formProps.setValue(
-        "version.configData",
-        newFormValues.version.configData
-      );
-    } catch (error) {
-      console.error(error);
-      toaster.error({
-        title: "Failed to restore prompt version",
-        description: "Please try again.",
-      });
-    }
+        // Convert the saved version to a form values object
+        const newFormValues = llmConfigToPromptConfigFormValues({
+          ...savedConfig,
+          latestVersion: parseLlmConfigVersion(savedVersion),
+        });
+
+        // Update the form values
+        const currentFormValues = formProps.getValues();
+        formProps.reset({
+          ...currentFormValues,
+          version: newFormValues.version,
+        });
+      } catch (error) {
+        logger.error({ error, versionId }, "Failed to restore prompt version");
+        toaster.error({
+          title: "Failed to restore prompt version",
+          description: "Please try again.",
+        });
+      }
+    })();
   };
 
   const { register, formState } = useFormContext<PromptConfigFormValues>();

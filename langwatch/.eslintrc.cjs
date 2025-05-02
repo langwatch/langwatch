@@ -5,6 +5,7 @@ const localConfig = (() => {
   try {
     return require("./.eslintrc.local.cjs");
   } catch (error) {
+    console.error("Error loading .eslintrc.local.cjs", error);
     return {};
   }
 })();
@@ -22,6 +23,7 @@ const config = deepmerge(
       "plugin:@typescript-eslint/recommended-type-checked",
       "plugin:@typescript-eslint/stylistic-type-checked",
     ],
+    files: ["src/**/*.ts", "src/**/*.tsx"],
     rules: {
       // These opinionated rules are enabled in stylistic-type-checked above.
       // Feel free to reconfigure them to your own preference.
