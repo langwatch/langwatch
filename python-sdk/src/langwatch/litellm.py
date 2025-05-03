@@ -337,6 +337,7 @@ class LiteLLMPatch:
             "parallel_tool_calls",
             "functions",
             "user",
+            "response_format",
         ]
         for param in params:
             if kwargs.get(param):

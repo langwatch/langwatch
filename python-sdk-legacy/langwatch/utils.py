@@ -97,7 +97,7 @@ def list_get(l, i, default=None):
 
 
 def autoconvert_typed_values(
-    value: Union[SpanInputOutput, ChatMessage, str, dict, list]
+    value: Union[SpanInputOutput, ChatMessage, str, dict, list],
 ) -> SpanInputOutput:
     value_ = value
 
@@ -199,6 +199,8 @@ class SerializableAndPydanticEncoder(json.JSONEncoder):
 
         if isinstance(o, BaseModel):
             return o.model_dump(exclude_unset=True)
+        if issubclass(o, BaseModel):  # type: ignore
+            return {"__class__": o.__name__, "json_schema": o.model_json_schema()}
         return super().default(o)
 
 

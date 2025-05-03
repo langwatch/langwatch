@@ -13,7 +13,10 @@ from deprecated import deprecated
 
 from langwatch.telemetry.context import get_current_trace
 from langwatch.tracer import ContextTrace
-from langwatch.utils.capture import capture_async_chunks_with_timings_and_reyield, capture_chunks_with_timings_and_reyield
+from langwatch.utils.capture import (
+    capture_async_chunks_with_timings_and_reyield,
+    capture_chunks_with_timings_and_reyield,
+)
 from langwatch.utils.utils import milliseconds_timestamp, safe_get
 import nanoid
 from langwatch.telemetry.span import LangWatchSpan
@@ -357,6 +360,9 @@ class OpenAICompletionTracer:
         tool_choice = kwargs.get("tool_choice", None)
         if tool_choice:
             params["tool_choice"] = tool_choice
+        response_format = kwargs.get("response_format", None)
+        if response_format:
+            params["response_format"] = response_format
 
         vendor = (
             "azure"
@@ -703,6 +709,9 @@ class OpenAIChatCompletionTracer:
         tool_choice = kwargs.get("tool_choice", None)
         if tool_choice:
             params["tool_choice"] = tool_choice
+        response_format = kwargs.get("response_format", None)
+        if response_format:
+            params["response_format"] = response_format
 
         vendor = (
             "azure"
