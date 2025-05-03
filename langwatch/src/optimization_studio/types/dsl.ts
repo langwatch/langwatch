@@ -17,6 +17,7 @@ export const FIELD_TYPES = [
   "list[float]",
   "list[int]",
   "list[bool]",
+  "json_schema",
   "dict",
   "signature",
   "llm",
@@ -33,6 +34,7 @@ export type Field = {
   desc?: string;
   prefix?: string;
   hidden?: boolean;
+  json_schema?: object;
 };
 
 export type ExecutionStatus =

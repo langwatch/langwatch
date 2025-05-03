@@ -85,6 +85,7 @@
     "@vercel/analytics": "^1.1.1",
     "@xyflow/react": "^12.1.0",
     "ai": "^4.3.5",
+    "ajv": "^8.17.1",
     "bcrypt": "^5.1.1",
     "bullmq": "^5.34.5",
     "chakra-react-select": "^6.0.1",

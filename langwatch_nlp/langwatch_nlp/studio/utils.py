@@ -276,6 +276,10 @@ def normalize_to_variable_name(name: str) -> str:
     return name
 
 
+def snake_case_to_pascal_case(name: str) -> str:
+    return "".join(word.capitalize() for word in name.split("_"))
+
+
 class SerializableWithPydanticAndPredictEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, dspy.Prediction):

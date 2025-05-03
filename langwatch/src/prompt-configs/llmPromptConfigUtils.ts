@@ -1,9 +1,7 @@
 import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
 
-import type {
-  DatasetColumnType,
-} from "~/server/datasets/types";
+import type { DatasetColumnType } from "~/server/datasets/types";
 import {
   parseLlmConfigVersion,
   type LatestConfigVersionSchema,
@@ -151,6 +149,10 @@ function safeOutputs(
         return {
           identifier: output.identifier,
           type: output.type as LlmConfigOutputType,
+          ...(output.json_schema && {
+            json_schema:
+              output.json_schema as PromptConfigFormValues["version"]["configData"]["outputs"][number]["json_schema"],
+          }),
         };
       }
       return {
@@ -182,9 +184,9 @@ export function inputsAndOutputsToDemostrationColumns(
 }
 
 function inputOutputTypeToDatasetColumnType(
-  type: Omit<LlmConfigInputType | LlmConfigOutputType, "image">
+  type_: LlmConfigInputType | LlmConfigOutputType
 ): DatasetColumnType {
-  switch (type) {
+  switch (type_) {
     case "str":
       return "string";
     case "float":
@@ -195,8 +197,11 @@ function inputOutputTypeToDatasetColumnType(
       return "list";
     case "image":
       throw new Error("Image is not supported in demonstrations");
+    case "json_schema":
+      return "json";
     default:
-      throw new Error(`Unknown input/output type: ${type}`);
+      type_ satisfies never;
+      throw new Error(`Unknown input/output type: ${type_}`);
   }
 }
 
