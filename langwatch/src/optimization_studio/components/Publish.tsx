@@ -21,6 +21,7 @@ import {
   Code,
   Lock,
   Play,
+  Share2,
 } from "react-feather";
 import { RenderCode } from "~/components/code/RenderCode";
 import { SmallLabel } from "../../components/SmallLabel";
@@ -44,6 +45,10 @@ import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { trackEvent } from "../../utils/tracking";
+import {
+  datasetDatabaseRecordsToInMemoryDataset,
+  inMemoryDatasetToNodeDataset,
+} from "../utils/datasetUtils";
 import { checkIsEvaluator, getEntryInputs } from "../utils/nodeUtils";
 
 export function Publish({ isDisabled }: { isDisabled: boolean }) {
@@ -96,6 +101,38 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
   );
 }
 
+const exportWorkflow = async (
+  publishedWorkflow: Workflow,
+  datasetData?: any
+) => {
+  let dsl = publishedWorkflow;
+
+  if (datasetData && datasetData.datasetRecords?.length > 0) {
+    const inMemoryDataset =
+      datasetDatabaseRecordsToInMemoryDataset(datasetData);
+    delete inMemoryDataset.datasetId;
+    const dataset = inMemoryDatasetToNodeDataset(inMemoryDataset);
+
+    if (dsl.nodes?.[0]?.data) {
+      dsl.nodes[0].data.dataset = dataset;
+    }
+  }
+
+  // // Create and trigger download
+  const url = window.URL.createObjectURL(new Blob([JSON.stringify(dsl)]));
+  const link = document.createElement("a");
+  link.href = url;
+
+  const today = new Date();
+  const formattedDate = today.toISOString().split("T")[0];
+  const fileName = `Workflow - ${formattedDate}.json`;
+
+  link.setAttribute("download", fileName);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+
 function PublishMenu({
   project,
   onTogglePublish,
@@ -114,7 +151,6 @@ function PublishMenu({
   const endNodes = nodes.filter((node) => node.type === "end");
 
   const isEvaluator = endNodes.some(checkIsEvaluator);
-
   const { canSaveNewVersion, versionToBeEvaluated } = useVersionState({
     project,
     allowSaveIfAutoSaveIsCurrentButNotLatest: false,
@@ -129,6 +165,24 @@ function PublishMenu({
     },
     {
       enabled: !!project?.id,
+    }
+  );
+
+  // Add dataset fetching hooks here
+  const datasetId = publishedWorkflow.data?.dsl
+    ? (
+        (publishedWorkflow.data.dsl as unknown as Workflow).nodes[0]
+          ?.data as any
+      )?.dataset?.id
+    : undefined;
+
+  const datasetRecords = api.datasetRecord.getAll.useQuery(
+    {
+      datasetId: datasetId ?? "",
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!datasetId && !!project?.id,
     }
   );
 
@@ -273,6 +327,16 @@ function PublishMenu({
     );
   };
 
+  const handleExportWorkflow = () => {
+    if (!publishedWorkflow.data) return;
+
+    // Type cast the publishedWorkflow.data to avoid type errors
+    exportWorkflow(
+      publishedWorkflow.data.dsl as unknown as Workflow,
+      datasetRecords.data
+    );
+  };
+
   return (
     <>
       {publishedWorkflow.data?.version && (
@@ -296,35 +360,37 @@ function PublishMenu({
           : "Publish Current Version"}
       </SubscriptionMenuItem>
 
-      <SubscriptionMenuItem
-        tooltip={publishDisabledLabel}
-        disabled={!!publishDisabledLabel || isEvaluator}
-        value="component"
-        onClick={toggleSaveAsComponent}
-      >
-        <BoxIcon size={16} />{" "}
-        {publishedWorkflow.data?.isComponent
-          ? "Delete Component"
-          : "Save as Component"}
-      </SubscriptionMenuItem>
-
-      <SubscriptionMenuItem
-        tooltip={
-          publishDisabledLabel
-            ? publishDisabledLabel
-            : !isEvaluator
-            ? "Toggle the end node's type to 'Evaluator' to enable this option"
-            : undefined
-        }
-        disabled={!!publishDisabledLabel || !isEvaluator}
-        onClick={toggleSaveAsEvaluator}
-        value="evaluator"
-      >
-        <CheckCircle size={16} />{" "}
-        {publishedWorkflow.data?.isEvaluator
-          ? "Delete Evaluator"
-          : "Save as Evaluator"}
-      </SubscriptionMenuItem>
+      {isEvaluator ? (
+        <SubscriptionMenuItem
+          tooltip={
+            publishDisabledLabel
+              ? publishDisabledLabel
+              : !isEvaluator
+              ? "Toggle the end node's type to 'Evaluator' to enable this option"
+              : undefined
+          }
+          disabled={!!publishDisabledLabel || !isEvaluator}
+          onClick={toggleSaveAsEvaluator}
+          value="evaluator"
+        >
+          <CheckCircle size={16} />{" "}
+          {publishedWorkflow.data?.isEvaluator
+            ? "Delete Evaluator"
+            : "Save as Evaluator"}
+        </SubscriptionMenuItem>
+      ) : (
+        <SubscriptionMenuItem
+          tooltip={publishDisabledLabel}
+          disabled={!!publishDisabledLabel || isEvaluator}
+          value="component"
+          onClick={toggleSaveAsComponent}
+        >
+          <BoxIcon size={16} />{" "}
+          {publishedWorkflow.data?.isComponent
+            ? "Delete Component"
+            : "Save as Component"}
+        </SubscriptionMenuItem>
+      )}
 
       <Link
         href={
@@ -353,6 +419,14 @@ function PublishMenu({
         value="api-reference"
       >
         <Code size={16} /> View API Reference
+      </SubscriptionMenuItem>
+      <SubscriptionMenuItem
+        tooltip={publishDisabledLabel}
+        onClick={handleExportWorkflow}
+        disabled={!!publishDisabledLabel}
+        value="export-workflow"
+      >
+        <Share2 size={16} /> Export Workflow
       </SubscriptionMenuItem>
     </>
   );

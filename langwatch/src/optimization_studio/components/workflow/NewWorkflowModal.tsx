@@ -1,11 +1,20 @@
-import { useEffect, useState } from "react";
-import { Button, Separator, Grid, HStack, Text } from "@chakra-ui/react";
+import { useEffect, useState, useRef } from "react";
+import {
+  Button,
+  Separator,
+  Grid,
+  HStack,
+  Text,
+  Box,
+  VStack,
+} from "@chakra-ui/react";
 import { Dialog } from "../../../components/ui/dialog";
 import { WorkflowCard } from "./WorkflowCard";
-import { ChevronLeft, File } from "react-feather";
+import { ChevronLeft, File, Upload } from "react-feather";
 import { NewWorkflowForm } from "./NewWorkflowForm";
 import type { Workflow } from "../../types/dsl";
 import { TEMPLATES } from "../../templates/registry";
+import { toaster } from "../../../components/ui/toaster";
 
 type Step = { step: "select" } | { step: "create"; template: Workflow };
 
@@ -17,12 +26,35 @@ export const NewWorkflowModal = ({
   onClose: () => void;
 }) => {
   const [step, setStep] = useState<Step>({ step: "select" });
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) {
       setStep({ step: "select" });
     }
   }, [open]);
+
+  const handleFileUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const workflowTemplate = JSON.parse(content) as Workflow;
+        setStep({ step: "create", template: workflowTemplate });
+      } catch (error) {
+        toaster.create({
+          title: "Invalid workflow file",
+          description:
+            "The file you uploaded is not a valid workflow JSON file.",
+          type: "error",
+          placement: "top-end",
+          meta: { closable: true },
+        });
+      }
+    };
+    reader.readAsText(file);
+  };
 
   return (
     <Dialog.Root
@@ -88,6 +120,53 @@ export const NewWorkflowModal = ({
                   }
                 />
               ))}
+              <Box
+                as="div"
+                borderWidth="1px"
+                borderRadius="md"
+                cursor="pointer"
+                backgroundColor="white"
+                data-testid="new-workflow-card-import"
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  const file = e.dataTransfer.files[0];
+                  if (file) handleFileUpload(file);
+                }}
+                borderColor={isDragging ? "blue.500" : "gray.200"}
+                transition="all 0.2s"
+                _hover={{ borderColor: "blue.300" }}
+                p={4}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileUpload(file);
+                  }}
+                />
+                <VStack align="center" gap={2}>
+                  <Box p={2}>
+                    <Upload color="#666" size={16} />
+                  </Box>
+                  <Text fontWeight="bold">From Export</Text>
+                  <Text fontSize="sm" color="gray.600" textAlign="center">
+                    Import a workflow from an exported JSON file
+                  </Text>
+                  <Text fontSize="xs" color="gray.500">
+                    Drag and drop or click to select
+                  </Text>
+                </VStack>
+              </Box>
             </Grid>
           </Dialog.Body>
         ) : (
