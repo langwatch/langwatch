@@ -744,11 +744,30 @@ class DSPyTracer:
         def call(self: dspy.LM, prompt=None, messages=None, **kwargs):
             all_kwargs = self.kwargs | kwargs
             model = self.model
-            params = {}
-            if "temperature" in all_kwargs:
-                params["temperature"] = all_kwargs["temperature"]
-            if "max_tokens" in all_kwargs:
-                params["max_tokens"] = all_kwargs["max_tokens"]
+            span_params = {}
+            params = [
+                "frequency_penalty",
+                "logit_bias",
+                "logprobs",
+                "top_logprobs",
+                "max_tokens",
+                "n",
+                "presence_penalty",
+                "seed",
+                "stop",
+                "stream",
+                "temperature",
+                "top_p",
+                "tools",
+                "tool_choice",
+                "parallel_tool_calls",
+                "functions",
+                "user",
+                "response_format",
+            ]
+            for param in params:
+                if all_kwargs.get(param):
+                    span_params[param] = all_kwargs.get(param, None)
 
             span = self_.safe_get_current_span()
             if span:
@@ -758,7 +777,7 @@ class DSPyTracer:
                     input=(
                         messages if messages else [{"role": "user", "content": prompt}]
                     ),
-                    params=params,
+                    params=span_params,
                 )
 
             result = self.__class__.__original_call__(self, prompt, messages, **kwargs)  # type: ignore
