@@ -142,10 +142,12 @@ function FieldRow({
   const fieldIdBase = `version.configData.${name}.${index}`;
   const identifierFieldId = `${fieldIdBase}.identifier`;
   const typeFieldId = `${fieldIdBase}.type`;
+  const jsonSchemaFieldId = `${fieldIdBase}.json_schema`;
 
   const currentIdentifier =
     getValues(identifierFieldId) ?? field.identifier ?? "";
   const currentType = getValues(typeFieldId) ?? field.type ?? "str";
+  const currentJsonSchema = getValues(jsonSchemaFieldId);
 
   return (
     <Field.Root key={field.id} invalid={!!error}>
@@ -190,8 +192,10 @@ function FieldRow({
           <TypeSelector
             name={typeFieldId}
             value={currentType}
-            onChange={(value) => {
+            jsonSchema={currentJsonSchema}
+            onChange={(value, jsonSchema) => {
               onChange(typeFieldId, value);
+              onChange(jsonSchemaFieldId, jsonSchema);
             }}
             isInput={name === "inputs"}
             readOnly={readOnly}

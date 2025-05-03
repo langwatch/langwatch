@@ -70,7 +70,7 @@ export function CodeEditorModal({
       >
         <Dialog.Header>
           <Dialog.Title>Edit Code</Dialog.Title>
-          <Dialog.CloseTrigger />
+          <Dialog.CloseTrigger color="white" _hover={{ color: "black" }} />
         </Dialog.Header>
         <Dialog.Body padding="0">
           {open && (
@@ -103,14 +103,16 @@ const onKeyDown = {
   fn: () => {},
 };
 
-function CodeEditor({
+export function CodeEditor({
   code,
   setCode,
   onClose,
+  defaultLanguage = "python",
 }: {
   code: string;
   setCode: (code: string) => void;
   onClose: () => void;
+  defaultLanguage?: string;
 }) {
   useEffect(() => {
     onKeyDown.fn = onClose;
@@ -119,7 +121,7 @@ function CodeEditor({
   return (
     <MonacoEditor
       height="100%"
-      defaultLanguage="python"
+      defaultLanguage={defaultLanguage}
       defaultValue={code}
       onChange={(code) => code && setCode(code)}
       theme="monokai"

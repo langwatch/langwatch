@@ -7,7 +7,9 @@ import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
 import { LlmConfigInputTypes, LlmConfigOutputTypes } from "../../../types";
 import { createLogger } from "../../../utils/logger";
 
-const logger = createLogger("langwatch:prompt-config:llm-config-version-schema");
+const logger = createLogger(
+  "langwatch:prompt-config:llm-config-version-schema"
+);
 
 /**
  * Schema version enum for LLM configuration
@@ -28,9 +30,15 @@ const inputsSchema = z.object({
   type: z.enum(LlmConfigInputTypes),
 });
 
-const outputsSchema = z.object({
+export const outputsSchema = z.object({
   identifier: z.string().min(1, "Identifier cannot be empty"),
   type: z.enum(LlmConfigOutputTypes),
+  json_schema: z
+    .object({
+      type: z.string().min(1, "Type cannot be empty"),
+    })
+    .passthrough()
+    .optional(),
 });
 
 /**
@@ -60,12 +68,14 @@ const demonstrationsSchema = z.object({
  * Validates the configData JSON field in LlmPromptConfigVersion
  */
 const configSchemaV1_0 = z.object({
+  id: z.string().optional(),
   authorId: z.string().nullable().optional(),
   projectId: z.string().min(1, "Project ID cannot be empty"),
   configId: z.string().min(1, "Config ID cannot be empty"),
   schemaVersion: z.literal(SchemaVersion.V1_0),
   commitMessage: z.string(),
   version: z.number(),
+  createdAt: z.date().optional(),
   configData: z.object({
     version: z.number().min(1, "Version must be greater than 0").optional(),
     prompt: z.string().min(1, "Prompt cannot be empty"),
@@ -126,7 +136,10 @@ export function parseLlmConfigVersion(
   const validator = getVersionValidator(schemaVersion as SchemaVersion);
 
   if (!validator) {
-    logger.error({ schemaVersion, llmConfigVersion }, "Unknown schema llmConfigVersion");
+    logger.error(
+      { schemaVersion, llmConfigVersion },
+      "Unknown schema llmConfigVersion"
+    );
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: `Unknown schema llmConfigVersion: ${schemaVersion}`,
