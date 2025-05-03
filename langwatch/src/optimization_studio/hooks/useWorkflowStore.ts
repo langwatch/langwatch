@@ -685,6 +685,7 @@ const typesMap: Record<Field["type"], string> = {
   "list[int]": "list[int]",
   "list[bool]": "list[bool]",
   dict: "dict[str, Any]",
+  json_schema: "Any",
   signature: "dspy.Signature",
   llm: "Any",
   prompting_technique: "Any",
