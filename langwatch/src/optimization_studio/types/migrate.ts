@@ -73,8 +73,15 @@ export const migrateDSLVersion = (dsl_: Workflow) => {
 
   // @ts-expect-error
   if (dsl.spec_version === "1.2") {
+    // @ts-expect-error
     dsl.spec_version = "1.3";
     dsl.enable_tracing = true;
+  }
+
+  // @ts-expect-error
+  if (dsl.spec_version === "1.3") {
+    dsl.spec_version = "1.4";
+    dsl.template_adapter = "dspy_chat_adapter";
   }
 
   return dsl;

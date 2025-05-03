@@ -41,7 +41,7 @@ async def execute_component(event: ExecuteComponentPayload):
             if trace:
                 trace.autotrack_dspy()
             code, class_name, kwargs = parse_component(
-                normalized_node(node), event.workflow
+                normalized_node(node), event.workflow, standalone=True
             )
             with materialized_component_class(
                 component_code=code, class_name=class_name

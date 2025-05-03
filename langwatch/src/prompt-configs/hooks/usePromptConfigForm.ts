@@ -17,6 +17,7 @@ const formSchema = promptConfigSchema.extend({
   version: z.object({
     configData: z.object({
       prompt: latestConfigVersionSchema.shape.configData.shape.prompt,
+      messages: latestConfigVersionSchema.shape.configData.shape.messages,
       inputs: latestConfigVersionSchema.shape.configData.shape.inputs,
       outputs: latestConfigVersionSchema.shape.configData.shape.outputs,
       llm: z.object({

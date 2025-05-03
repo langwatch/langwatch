@@ -54,6 +54,11 @@ export function llmConfigToOptimizationStudioNodeData(
         type: "dataset",
         value: version.configData.demonstrations,
       },
+      {
+        identifier: "messages",
+        type: "chat_messages",
+        value: version.configData.messages ?? [],
+      },
     ],
   };
 }
@@ -83,6 +88,11 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
         type: "dataset",
         value: formValues.version?.configData?.demonstrations,
       },
+      {
+        identifier: "messages",
+        type: "chat_messages",
+        value: formValues.version?.configData?.messages ?? [],
+      },
     ],
   };
 }
@@ -96,6 +106,7 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   const llmParameter = parametersMap.llm as LlmConfigParameter | undefined;
   const inputs = safeInputs(nodeData.inputs);
   const outputs = safeOutputs(nodeData.outputs);
+
   return {
     name: nodeData.name ?? "",
     version: {
@@ -107,6 +118,9 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
           typeof parametersMap.instructions?.value === "string"
             ? parametersMap.instructions.value
             : undefined,
+        messages: Array.isArray(parametersMap.messages?.value)
+          ? parametersMap.messages.value
+          : [],
         demonstrations: {
           columns: inputsAndOutputsToDemostrationColumns(inputs, outputs),
           rows:

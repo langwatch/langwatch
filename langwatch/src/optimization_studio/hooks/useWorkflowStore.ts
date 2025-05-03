@@ -123,7 +123,7 @@ const DEFAULT_LLM_CONFIG: LLMConfig = {
 
 export const initialDSL: Workflow = {
   workflow_id: undefined,
-  spec_version: "1.3",
+  spec_version: "1.4",
   name: "Loading...",
   icon: "🧩",
   description: "",
@@ -131,6 +131,7 @@ export const initialDSL: Workflow = {
   nodes: [],
   edges: [],
   default_llm: DEFAULT_LLM_CONFIG,
+  template_adapter: "default",
   enable_tracing: true,
   state: {},
 };
@@ -159,6 +160,7 @@ export const getWorkflow = (state: State) => {
     description: state.description,
     version: state.version,
     default_llm: state.default_llm,
+    template_adapter: state.template_adapter,
     enable_tracing: state.enable_tracing,
     nodes: state.nodes,
     edges: state.edges,
@@ -686,6 +688,7 @@ const typesMap: Record<Field["type"], string> = {
   "list[bool]": "list[bool]",
   dict: "dict[str, Any]",
   json_schema: "Any",
+  chat_messages: "list[dict[str, Any]]",
   signature: "dspy.Signature",
   llm: "Any",
   prompting_technique: "Any",

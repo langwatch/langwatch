@@ -1,18 +1,44 @@
-import { Field, Textarea } from "@chakra-ui/react";
-import { useFormContext } from "react-hook-form";
+import { Field, HStack, Spacer, Textarea } from "@chakra-ui/react";
+import { useFormContext, type UseFieldArrayReturn } from "react-hook-form";
 
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
 
 import { VerticalFormControl } from "~/components/VerticalFormControl";
+import { PropertySectionTitle } from "../../../optimization_studio/components/properties/BasePropertiesPanel";
+import { AddRemoveMessageFieldButton } from "./PromptMessagesField";
 
-export function PromptField() {
+export function PromptField({
+  templateAdapter,
+  messageFields,
+}: {
+  templateAdapter: "default" | "dspy_chat_adapter";
+  messageFields: UseFieldArrayReturn<
+    PromptConfigFormValues,
+    "version.configData.messages",
+    "id"
+  >;
+}) {
   const form = useFormContext<PromptConfigFormValues>();
   const { register, formState } = form;
   const { errors } = formState;
 
   return (
     <VerticalFormControl
-      label="Prompt"
+      label={
+        <HStack width="full">
+          <Field.Label margin={0}>
+            <PropertySectionTitle padding={0}>
+              System Prompt
+            </PropertySectionTitle>
+          </Field.Label>
+          <Spacer />
+
+          {templateAdapter === "default" &&
+            messageFields.fields.length === 0 && (
+              <AddRemoveMessageFieldButton messageFields={messageFields} />
+            )}
+        </HStack>
+      }
       invalid={!!errors.version?.configData?.prompt}
       helper={errors.version?.configData?.prompt?.message?.toString()}
       error={errors.version?.configData?.prompt}
@@ -24,6 +50,8 @@ export function PromptField() {
         autoresize
         maxHeight="33vh"
         rows={4}
+        fontFamily="mono"
+        fontSize="13px"
       />
     </VerticalFormControl>
   );

@@ -1,5 +1,10 @@
 import { VStack } from "@chakra-ui/react";
-import { FormProvider, type UseFormReturn } from "react-hook-form";
+import {
+  FormProvider,
+  useFieldArray,
+  useFormContext,
+  type UseFormReturn,
+} from "react-hook-form";
 
 import { PromptConfigProvider } from "../../providers/PromptConfigProvider";
 import { DemonstrationsField } from "../fields/DemonstrationsField";
@@ -18,6 +23,7 @@ import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/h
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
+import { PromptMessagesField } from "../fields/PromptMessagesField";
 
 interface PromptConfigFormProps {
   configId: string;
@@ -35,6 +41,19 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
   const saveEnabled = methods.formState.isDirty;
   const { data: savedConfig } =
     useGetPromptConfigByIdWithLatestVersionQuery(configId);
+
+  const form = useFormContext<PromptConfigFormValues>();
+
+  /**
+   * It is a known limitation of react-hook-form useFieldArray that we cannot
+   * access the fields array from the form provider using the context.
+   *
+   * So we need to create this in the parent and prop drill it down.
+   */
+  const messageFields = useFieldArray({
+    control: form.control,
+    name: "version.configData.messages",
+  });
 
   if (!savedConfig) return null;
 
@@ -54,7 +73,11 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
             />
           </VerticalFormControl>
           <ModelSelectField />
-          <PromptField />
+          <PromptField
+            templateAdapter="default"
+            messageFields={messageFields}
+          />
+          <PromptMessagesField messageFields={messageFields} />
           <InputsFieldGroup />
           <OutputsFieldGroup />
           <DemonstrationsField />

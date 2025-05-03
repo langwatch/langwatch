@@ -213,6 +213,36 @@ export const WorkflowPropertiesPanel = () => {
           }}
         />
       </PropertyField>
+      <PropertyField
+        title="Template Adapter"
+        tooltip={
+          <Text>
+            Template Adapter for the LLM prompts.
+            <br />
+            <br />
+            Default template uses OpenAI messages and json schema structured
+            output formats, while DSPy adapter uses primary pure text output
+            format, useful for smaller models that do not support strict
+            structured output.
+          </Text>
+        }
+      >
+        <NativeSelect.Root size="sm">
+          <NativeSelect.Field
+            value={workflow.template_adapter}
+            onChange={(e) => {
+              setWorkflow({
+                template_adapter: e.target.value as
+                  | "default"
+                  | "dspy_chat_adapter",
+              });
+            }}
+          >
+            <option value="default">Default</option>
+            <option value="dspy_chat_adapter">DSPy Adapter</option>
+          </NativeSelect.Field>
+        </NativeSelect.Root>
+      </PropertyField>
       <PropertyField title="Enable Tracing">
         <HStack paddingX={2} width="full">
           <Text fontSize="14px">

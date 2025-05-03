@@ -133,7 +133,7 @@ def parsed_and_materialized_workflow_class(
 
 
 def parse_component(
-    node: Node, workflow: Workflow, format=False, debug_level=0
+    node: Node, workflow: Workflow, standalone=False, format=False, debug_level=0
 ) -> Tuple[str, str, Dict[str, Any]]:
     match node.type:
         case "signature":
@@ -160,6 +160,7 @@ def parse_component(
                     node_id=node.id,
                     component=node.data,
                     workflow=workflow,
+                    standalone=standalone,
                     parameters=parameters,
                     prompting_technique=prompting_technique,
                     llm_config=llm_config,

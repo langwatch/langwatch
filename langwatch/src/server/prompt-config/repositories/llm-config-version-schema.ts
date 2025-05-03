@@ -79,6 +79,16 @@ const configSchemaV1_0 = z.object({
   configData: z.object({
     version: z.number().min(1, "Version must be greater than 0").optional(),
     prompt: z.string().min(1, "Prompt cannot be empty"),
+    messages: z
+      .array(
+        z
+          .object({
+            role: z.enum(["user", "assistant", "system"]),
+            content: z.string(),
+          })
+          .passthrough()
+      )
+      .min(1, "At least one message is required"),
     inputs: z.array(inputsSchema).min(1, "At least one input is required"),
     outputs: z.array(outputsSchema).min(1, "At least one output is required"),
     model: z.string().min(1, "Model identifier cannot be empty"),

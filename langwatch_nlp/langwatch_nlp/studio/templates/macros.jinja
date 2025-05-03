@@ -36,3 +36,6 @@ dspy.LM(
     {{ raise("Invalid source: " + source_parts[0] + " for edge " + edge.id) }}
 {% endif %}
 {% endmacro %}
+
+{% macro escape_prompt(prompt) %}
+""{{ prompt | tojson | replace('\\n', '\n') | replace('\\t', '\t') | replace('\\"', '"') | replace('"""', '\\"\\"\\"') }}""{% endmacro %}
