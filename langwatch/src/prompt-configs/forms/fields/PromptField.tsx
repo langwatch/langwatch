@@ -49,7 +49,7 @@ export function PromptField({
         placeholder="You are a helpful assistant"
         autoresize
         maxHeight="33vh"
-        rows={4}
+        rows={3}
         fontFamily="mono"
         fontSize="13px"
       />

@@ -233,7 +233,7 @@ export const simpleRagTemplate: Workflow = {
             identifier: "instructions",
             type: "str",
             value:
-              "given the question, generate a short wikipedia search query to find info about it",
+              "generate a short wikipedia search query to find info about it",
           },
           {
             identifier: "messages",

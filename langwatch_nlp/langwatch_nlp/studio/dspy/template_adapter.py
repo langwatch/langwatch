@@ -1,7 +1,8 @@
 import json
+import re
 from typing import Any, Type, cast
 import dspy
-from dspy.signatures.signature import Signature
+from dspy.signatures.signature import Signature, _default_instructions
 from dspy.adapters.types.image import try_expand_image_tags
 
 from dspy.adapters.chat_adapter import ChatAdapter
@@ -66,13 +67,15 @@ class TemplateAdapter(dspy.JSONAdapter):
 
         _messages = getattr(signature, "_messages", Field(default=[])).default
 
+        instructions = signature.instructions
+        if instructions == _default_instructions(signature):
+            instructions = ""
+
         messages = []
         messages.append(
             {
                 "role": "system",
-                "content": self._format_template_inputs(
-                    signature.instructions, inputs_copy
-                ),
+                "content": self._format_template_inputs(instructions, inputs_copy),
             }
         )
         messages.extend(self.format_demos(signature, demos))
@@ -100,7 +103,9 @@ class TemplateAdapter(dspy.JSONAdapter):
             def __missing__(self, key):
                 return "{{" + key + "}}"
 
-        template_fmt = template.replace("{{", "{").replace("}}", "}")
+        # Normalize template: shrink all {{   anything    }} to {{anything}}
+        template_clean = re.sub(r"{{\s*(.*?)\s*}}", r"{{\1}}", template)
+        template_fmt = template_clean.replace("{{", "{").replace("}}", "}")
         str_inputs: dict[str, str] = {}
         for k, v in inputs.items():
             str_inputs[k] = (

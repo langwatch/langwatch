@@ -98,7 +98,7 @@ const promptOutputSchema = z.object({
       })
       .passthrough()
   ),
-  response_format: responseFormatSchema.optional(),
+  response_format: responseFormatSchema.nullable(),
 });
 
 // Get prompt by ID
@@ -130,8 +130,6 @@ app.get(
         project.id
       );
 
-      let outputsToResponseFormat = undefined;
-
       const response = {
         id,
         name: config.name,
@@ -145,9 +143,11 @@ app.get(
             role: "system",
             content: config.latestVersion.configData.prompt,
           },
+          ...config.latestVersion.configData.messages,
         ],
         response_format: getOutputsToResponseFormat(config),
       } satisfies z.infer<typeof promptOutputSchema>;
+
       return c.json(response);
     } catch (error: any) {
       return c.json({ error: error.message }, 404);
@@ -164,10 +164,10 @@ const llmOutputFieldToJsonSchemaTypeMap: Record<LlmConfigOutputType, string> = {
 
 const getOutputsToResponseFormat = (
   config: LlmConfigWithLatestVersion
-): z.infer<typeof responseFormatSchema> | undefined => {
+): z.infer<typeof responseFormatSchema> | null => {
   const outputs = config.latestVersion.configData.outputs;
   if (!outputs.length || (outputs.length === 1 && outputs[0]?.type === "str")) {
-    return undefined;
+    return null;
   }
 
   return {

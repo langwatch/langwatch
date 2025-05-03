@@ -2,6 +2,7 @@ import {
   Box,
   HStack,
   Input,
+  List,
   Spacer,
   Text,
   Textarea,
@@ -217,13 +218,12 @@ export const WorkflowPropertiesPanel = () => {
         title="Template Adapter"
         tooltip={
           <Text>
-            Template Adapter for the LLM prompts.
+            <b>Default Template</b> - Uses OpenAI-style messages and json schema
+            structured output formats for the LLM prompts.
             <br />
             <br />
-            Default template uses OpenAI messages and json schema structured
-            output formats, while DSPy adapter uses primary pure text output
-            format, useful for smaller models that do not support strict
-            structured output.
+            <b>DSPy Adapter</b> - Uses primary pure text output format and parse
+            it later, may be more performatic, useful for smaller models as well.
           </Text>
         }
       >

@@ -22,7 +22,6 @@ export function PromptNameField({ label }: PromptNameFieldProps) {
       helper={errors.name?.message?.toString()}
       error={errors.name}
       size="sm"
-      paddingBottom={4}
     >
       <Input
         size="sm"

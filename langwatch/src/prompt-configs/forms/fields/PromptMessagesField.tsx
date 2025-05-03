@@ -115,7 +115,7 @@ export function PromptMessagesField({
         placeholder="Message content"
         autoresize
         maxHeight="33vh"
-        rows={4}
+        rows={3}
         _invalid={
           getMessageError(idx, "content")
             ? { borderColor: "red.500" }

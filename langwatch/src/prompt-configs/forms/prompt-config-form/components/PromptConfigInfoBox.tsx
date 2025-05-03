@@ -23,7 +23,7 @@ export function PromptConfigInfoBox({
 
   return (
     <Box
-      padding={4}
+      padding={2}
       borderRadius="md"
       borderWidth="1px"
       borderColor="gray.200"
@@ -34,10 +34,10 @@ export function PromptConfigInfoBox({
         <HStack justifyContent="space-between" width="full">
           <VStack align="start" gap={1}>
             <HStack>
-              <Text fontSize="md" fontWeight="medium">
+              <Text fontSize="sm" fontWeight="medium">
                 {commitMessage || "No commit message"}
               </Text>
-              <Tag.Root size="md" colorScheme="orange" fontWeight="bold">
+              <Tag.Root size="sm" colorScheme="orange" fontWeight="bold">
                 <Tag.Label>v{version}</Tag.Label>
               </Tag.Root>
             </HStack>
