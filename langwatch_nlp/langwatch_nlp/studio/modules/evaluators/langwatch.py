@@ -7,7 +7,7 @@ from langwatch_nlp.studio.dspy.evaluation import (
     Money,
 )
 from langwatch.evaluations import EvaluationResultModel
-from dspy.dsp.cache_utils import CacheMemory
+from dspy.clients.cache import request_cache
 
 
 class LangWatchEvaluator(Evaluator):
@@ -74,7 +74,7 @@ class LangWatchEvaluator(Evaluator):
             )
 
 
-@CacheMemory.cache
+@request_cache(ignored_args_for_cache_key=["api_key"])
 def _cached_langwatch_evaluate(
     evaluator: str, name: str, settings: dict, api_key: str, **kwargs
 ) -> EvaluationResultModel:
