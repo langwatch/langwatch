@@ -71,27 +71,19 @@ export const usePromptConfigForm = ({
     }
   }, [formData]);
 
-  // useEffect(() => {
-  //   console.log("formData changed!");
-  // }, [formData]);
-
-  // useEffect(() => {
-  //   console.log("onChange changed!");
-  // }, [onChange]);
-
-  // useEffect(() => {
-  //   console.log("initialConfigValues changed!");
-  // }, [initialConfigValues]);
-
   // Provides forward sync of parent component to form values
   useEffect(() => {
     if (disableNodeSync) return;
-    console.log("triggering reverse sync!", Date.now());
     disableOnChange = true;
     for (const [key, value] of Object.entries(
       initialConfigValues?.version?.configData ?? {}
     )) {
-      methods.setValue(`version.configData.${key}` as any, value as any);
+      const currentValue = methods.getValues(
+        `version.configData.${key}` as any
+      );
+      if (!isEqual(currentValue, value)) {
+        methods.setValue(`version.configData.${key}` as any, value as any);
+      }
     }
     setTimeout(() => {
       disableOnChange = false;

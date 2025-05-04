@@ -191,7 +191,7 @@ function SignaturePropertiesPanelInner({
 
   const availableFields = useMemo(() => {
     return node.data.inputs.map((input) => input.identifier);
-  }, [node.data.inputs]);
+  }, [JSON.stringify(node.data.inputs)]);
 
   // Find all nodes that depends on this node based on the edges
   const otherNodesFields = useMemo(() => {
@@ -226,7 +226,7 @@ function SignaturePropertiesPanelInner({
             ) ?? [],
         ])
     );
-  }, [edges, nodes, node.id]);
+  }, [edges, nodes, node.id, JSON.stringify(node.data.outputs)]);
 
   const updateNodeInternals = useUpdateNodeInternals();
 
@@ -235,12 +235,15 @@ function SignaturePropertiesPanelInner({
     updateNodeInternals(node.id);
 
     let templateRef = newHandle + "}}";
-    if (content.endsWith("{") && !content.endsWith("{{")) {
+    let content_ = content.substring(0, content.lastIndexOf("{"));
+    if (content_.endsWith("{") && !content_.endsWith("{{")) {
       templateRef = "{" + templateRef;
+    } else if (!content_.endsWith("{")) {
+      templateRef = "{{" + templateRef;
     }
 
     const stateNode = getWorkflow().nodes.find((n) => n.id === node.id)!;
-    return { node: stateNode, newPrompt: content + templateRef };
+    return { node: stateNode, newPrompt: content_ + templateRef };
   };
 
   const onAddPromptEdge = (id: string, handle: string, content: string) => {

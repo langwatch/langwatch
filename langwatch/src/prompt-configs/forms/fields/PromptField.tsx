@@ -6,7 +6,7 @@ import {
   Text,
   type BoxProps,
 } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   useFormContext,
   type UseFieldArrayReturn,
@@ -126,7 +126,7 @@ export function PromptTextArea({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasAnyTemplateMarkers = value?.match(/{{.*?}}/g);
 
-  useEffect(() => {
+  const updateInvalidMentions = useCallback(() => {
     if (!boxRef.current) return;
     const mentions = boxRef.current.querySelectorAll(".mention");
     mentions.forEach((mention) => {
@@ -137,6 +137,10 @@ export function PromptTextArea({
         mention.classList.remove("invalid");
       }
     });
+  }, [availableIds]);
+
+  useEffect(() => {
+    updateInvalidMentions();
   }, [value, availableIds]);
 
   return (
@@ -177,6 +181,26 @@ export function PromptTextArea({
           value={value ?? ""}
           onChange={(event) => {
             onChange && onChange(event);
+          }}
+          onBlur={() => {
+            setTimeout(() => {
+              updateInvalidMentions();
+            }, 1);
+          }}
+          onFocus={() => {
+            setTimeout(() => {
+              updateInvalidMentions();
+            }, 1);
+          }}
+          onKeyUp={() => {
+            setTimeout(() => {
+              updateInvalidMentions();
+            }, 1);
+          }}
+          onClick={() => {
+            setTimeout(() => {
+              updateInvalidMentions();
+            }, 1);
           }}
           style={{
             control: {
