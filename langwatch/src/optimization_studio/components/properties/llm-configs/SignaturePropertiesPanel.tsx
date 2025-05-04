@@ -256,6 +256,7 @@ function SignaturePropertiesPanelInner({
                 availableFields={availableFields}
                 otherNodesFields={otherNodesFields}
                 onAddEdge={onAddEdge}
+                isTemplateSupported={templateAdapter === "default"}
               />
               {templateAdapter === "default" && (
                 <PromptMessagesField

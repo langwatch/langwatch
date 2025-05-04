@@ -3,12 +3,12 @@ import {
   Field,
   HStack,
   Spacer,
+  Text,
   type BoxProps,
-  type TextareaProps,
 } from "@chakra-ui/react";
+import { useRef } from "react";
 import { useFormContext, type UseFieldArrayReturn } from "react-hook-form";
-import { MentionsInput, Mention } from "react-mentions";
-import { useEffect, useRef } from "react";
+import { Mention, MentionsInput } from "react-mentions";
 
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
 
@@ -22,6 +22,7 @@ export function PromptField({
   availableFields,
   otherNodesFields,
   onAddEdge,
+  isTemplateSupported = true,
 }: {
   templateAdapter: "default" | "dspy_chat_adapter";
   messageFields: UseFieldArrayReturn<
@@ -32,6 +33,7 @@ export function PromptField({
   availableFields: string[];
   otherNodesFields: Record<string, string[]>;
   onAddEdge?: (id: string, handle: string) => string;
+  isTemplateSupported?: boolean;
 }) {
   const form = useFormContext<PromptConfigFormValues>();
   const { formState } = form;
@@ -81,6 +83,7 @@ export function PromptField({
             );
           }
         }}
+        isTemplateSupported={isTemplateSupported}
       />
     </VerticalFormControl>
   );
@@ -93,6 +96,7 @@ export function PromptTextArea({
   placeholder,
   otherNodesFields,
   onAddEdge,
+  isTemplateSupported = true,
   ...props
 }: {
   availableFields: string[];
@@ -101,6 +105,7 @@ export function PromptTextArea({
   placeholder?: string;
   otherNodesFields: Record<string, string[]>;
   onAddEdge?: (id: string, handle: string) => void;
+  isTemplateSupported?: boolean;
 } & Omit<BoxProps, "onChange">) {
   const mentionData = [
     ...availableFields.map((field) => ({
@@ -116,116 +121,125 @@ export function PromptTextArea({
   ];
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const hasAnyTemplateMarkers = value?.match(/{{.*?}}/g);
 
   return (
-    <Box
-      fontFamily="mono"
-      fontSize={13}
-      css={{
-        "& textarea": {
-          border: "1px solid #E2E8F0",
-          borderRadius: 6,
-          padding: "8px 10px",
-          backgroundClip: "padding-box",
-        },
-        "& textarea:focus": {
-          borderWidth: "2px",
-          borderColor: "blue.500",
-          padding: "7px 9px",
-        },
-        "& .mention": {
-          backgroundColor: "blue.50",
-          borderRadius: "4px",
-          border: "1px solid",
-          borderColor: "blue.200",
-          marginLeft: "-2px",
-          marginRight: "-2px",
-          padding: "1px",
-        },
-      }}
-      {...props}
-    >
-      <MentionsInput
-        value={value ?? ""}
-        onChange={(event) => {
-          onChange && onChange(event);
-        }}
-        style={{
-          control: {
-            fontSize: 13,
-            minHeight: 80,
-            maxHeight: "33vh",
-            border: "none",
-            background: "transparent",
+    <>
+      <Box
+        fontFamily="mono"
+        fontSize={13}
+        css={{
+          "& textarea": {
+            border: "1px solid #E2E8F0",
+            borderRadius: 6,
+            padding: "8px 10px",
+            backgroundClip: "padding-box",
           },
-          suggestions: {
-            background: "transparent",
-          },
-          highlighter: {
-            overflow: "hidden",
+          "& textarea:focus": {
+            borderWidth: "2px",
+            borderColor: "blue.500",
             padding: "7px 9px",
-            maxHeight: "33vh",
           },
-          input: {
-            minHeight: 80,
-            maxHeight: "33vh",
-            outline: "none",
-            background: "transparent",
-            overflow: "auto",
+          "& .mention": {
+            backgroundColor: "blue.50",
+            borderRadius: "4px",
+            border: "1px solid",
+            borderColor: "blue.200",
+            marginLeft: "-2px",
+            marginRight: "-2px",
+            padding: "1px",
           },
         }}
-        inputRef={textareaRef}
-        customSuggestionsContainer={(children) => (
-          <Box
-            background="white"
-            border="1px solid #e2e8f0"
-            borderRadius={4}
-            padding="4px"
-            boxShadow="0 2px 8px rgba(0,0,0,0.08)"
-            marginLeft="12px"
-            marginTop="-4px"
-          >
-            {children}
-          </Box>
-        )}
-        placeholder={placeholder}
+        {...props}
       >
-        {["{", "{{"].map((trigger) => (
-          <Mention
-            key={trigger}
-            trigger={trigger}
-            markup="{{__id__}}"
-            data={mentionData}
-            displayTransform={(id: string) => `{{${id}}}`}
-            className="mention"
-            onAdd={(id) => {
-              if (typeof id === "string" && id.includes(".")) {
-                const [nodeId, field] = id.split(".");
-                if (!nodeId || !field) return;
-                onAddEdge?.(nodeId, field);
-              }
-            }}
-            renderSuggestion={(
-              _suggestion,
-              _search,
-              highlightedDisplay,
-              _index,
-              focused
-            ) => (
-              <Box
-                background={focused ? "blue.100" : "white"}
-                color={focused ? "blue.800" : "gray.800"}
-                padding="4px 8px"
-                cursor="pointer"
-                borderRadius={2}
-                fontFamily="body"
-              >
-                {highlightedDisplay}
-              </Box>
-            )}
-          />
-        ))}
-      </MentionsInput>
-    </Box>
+        <MentionsInput
+          value={value ?? ""}
+          onChange={(event) => {
+            onChange && onChange(event);
+          }}
+          style={{
+            control: {
+              fontSize: 13,
+              minHeight: 80,
+              maxHeight: "33vh",
+              border: "none",
+              background: "transparent",
+            },
+            suggestions: {
+              background: "transparent",
+            },
+            highlighter: {
+              overflow: "hidden",
+              padding: "7px 9px",
+              maxHeight: "33vh",
+            },
+            input: {
+              minHeight: 80,
+              maxHeight: "33vh",
+              outline: "none",
+              background: "transparent",
+              overflow: "auto",
+            },
+          }}
+          inputRef={textareaRef}
+          customSuggestionsContainer={(children) => (
+            <Box
+              background="white"
+              border="1px solid #e2e8f0"
+              borderRadius={4}
+              padding="4px"
+              boxShadow="0 2px 8px rgba(0,0,0,0.08)"
+              marginLeft="12px"
+              marginTop="-4px"
+            >
+              {children}
+            </Box>
+          )}
+          placeholder={placeholder}
+        >
+          {["{", "{{"].map((trigger) => (
+            <Mention
+              key={trigger}
+              trigger={trigger}
+              markup="{{__id__}}"
+              data={mentionData}
+              displayTransform={(id: string) => `{{${id}}}`}
+              className="mention"
+              onAdd={(id) => {
+                if (typeof id === "string" && id.includes(".")) {
+                  const [nodeId, field] = id.split(".");
+                  if (!nodeId || !field) return;
+                  onAddEdge?.(nodeId, field);
+                }
+              }}
+              renderSuggestion={(
+                _suggestion,
+                _search,
+                highlightedDisplay,
+                _index,
+                focused
+              ) => (
+                <Box
+                  background={focused ? "blue.100" : "white"}
+                  color={focused ? "blue.800" : "gray.800"}
+                  padding="4px 8px"
+                  cursor="pointer"
+                  borderRadius={2}
+                  fontFamily="body"
+                >
+                  {highlightedDisplay}
+                </Box>
+              )}
+            />
+          ))}
+        </MentionsInput>
+      </Box>
+      {hasAnyTemplateMarkers && !isTemplateSupported && (
+        <Text fontSize="xs" color="red.800" paddingTop={2}>
+          Template {"{{markers}}"} are not supported by DSPy Adapter, instead, input variables are included automatically.
+          Please change to default template adapter if you want to use them.
+        </Text>
+      )}
+    </>
   );
 }

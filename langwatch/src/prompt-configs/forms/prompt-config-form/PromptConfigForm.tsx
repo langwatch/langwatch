@@ -81,6 +81,7 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
             messageFields={messageFields}
             availableFields={availableFields}
             otherNodesFields={{}}
+            isTemplateSupported={true}
           />
           <PromptMessagesField
             messageFields={messageFields}
