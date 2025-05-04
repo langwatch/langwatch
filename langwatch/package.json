@@ -207,7 +207,7 @@
     "simple-statistics": "^7.8.3",
     "ts-to-zod": "^3.4.1",
     "tsx": "^4.7.0",
-    "typescript": "^5.1.6",
+    "typescript": "^5.8.3",
     "vitest": "^0.34.6"
   },
   "overrides": {

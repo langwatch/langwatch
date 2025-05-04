@@ -305,7 +305,7 @@ export const store = (
                       ...(node.data.inputs ?? []),
                       { identifier: newHandle, type },
                     ],
-              },
+              } as Component,
             }
           : node
       ),

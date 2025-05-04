@@ -3,6 +3,7 @@ const deepmerge = require("deepmerge");
 
 const localConfig = (() => {
   try {
+    // @ts-ignore
     return require("./.eslintrc.local.cjs");
   } catch (error) {
     console.error("Error loading .eslintrc.local.cjs", error);

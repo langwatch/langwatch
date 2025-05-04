@@ -205,7 +205,7 @@ function SignaturePropertiesPanelInner({
       .filter((edge) => edge.target === node.id)
       .map((edge) => edge.source + "." + edge.sourceHandle);
 
-    let dependentNodes = [];
+    let dependentNodes: string[] = [];
     let toVisit = [node.id];
     while (toVisit.length > 0) {
       const currentNode = toVisit.shift();
