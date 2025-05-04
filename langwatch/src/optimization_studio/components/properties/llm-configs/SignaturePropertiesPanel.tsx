@@ -69,15 +69,24 @@ function SignaturePropertiesPanelInner({
   const configId = node.data.configId;
   const setNode = useSmartSetNode();
 
-  const { templateAdapter, nodes, edges, edgeConnectToNewHandle } =
-    useWorkflowStore(
-      useShallow((state) => ({
-        templateAdapter: state.getWorkflow().template_adapter,
-        nodes: state.getWorkflow().nodes,
-        edges: state.getWorkflow().edges,
-        edgeConnectToNewHandle: state.edgeConnectToNewHandle,
-      }))
-    );
+  const {
+    templateAdapter,
+    nodes,
+    edges,
+    edgeConnectToNewHandle,
+    getWorkflow,
+    setNodeParameter,
+  } = useWorkflowStore(
+    useShallow((state) => ({
+      templateAdapter: state.getWorkflow().template_adapter,
+      nodes: state.getWorkflow().nodes,
+      edges: state.getWorkflow().edges,
+      edgeConnectToNewHandle: state.edgeConnectToNewHandle,
+      setNode: state.setNode,
+      getWorkflow: state.getWorkflow,
+      setNodeParameter: state.setNodeParameter,
+    }))
+  );
 
   /**
    * Converts form values to node data and updates the workflow store.
@@ -221,10 +230,48 @@ function SignaturePropertiesPanelInner({
 
   const updateNodeInternals = useUpdateNodeInternals();
 
-  const onAddEdge = (id: string, handle: string) => {
+  const onAddEdge = (id: string, handle: string, content: string) => {
     const newHandle = edgeConnectToNewHandle(id, handle, node.id);
     updateNodeInternals(node.id);
-    return newHandle;
+
+    let templateRef = newHandle + "}}";
+    if (content.endsWith("{") && !content.endsWith("{{")) {
+      templateRef = "{" + templateRef;
+    }
+
+    const stateNode = getWorkflow().nodes.find((n) => n.id === node.id)!;
+    return { node: stateNode, newPrompt: content + templateRef };
+  };
+
+  const onAddPromptEdge = (id: string, handle: string, content: string) => {
+    const { node, newPrompt } = onAddEdge(id, handle, content);
+
+    setNodeParameter(node.id, {
+      identifier: "instructions",
+      type: "str",
+      value: newPrompt,
+    });
+  };
+
+  const onAddMessageEdge = (
+    id: string,
+    handle: string,
+    content: string,
+    idx: number
+  ) => {
+    const { node, newPrompt } = onAddEdge(id, handle, content);
+    const messagesParam = node.data.parameters?.find(
+      (param) => param.identifier === "messages"
+    );
+    if (!messagesParam) return;
+
+    setNodeParameter(node.id, {
+      identifier: "messages",
+      type: "chat_messages",
+      value: (messagesParam.value as any[]).map((field, i) =>
+        i === idx ? { ...field, content: newPrompt } : field
+      ),
+    });
   };
 
   // TODO: Consider refactoring the BasePropertiesPanel so that we don't need to hide everything like this
@@ -255,7 +302,7 @@ function SignaturePropertiesPanelInner({
                 templateAdapter={templateAdapter}
                 availableFields={availableFields}
                 otherNodesFields={otherNodesFields}
-                onAddEdge={onAddEdge}
+                onAddEdge={onAddPromptEdge}
                 isTemplateSupported={templateAdapter === "default"}
               />
               {templateAdapter === "default" && (
@@ -263,7 +310,7 @@ function SignaturePropertiesPanelInner({
                   messageFields={messageFields}
                   availableFields={availableFields}
                   otherNodesFields={otherNodesFields}
-                  onAddEdge={onAddEdge}
+                  onAddEdge={onAddMessageEdge}
                 />
               )}
               <InputsFieldGroup />

@@ -42,6 +42,10 @@ interface UsePromptConfigFormProps {
   onChange?: (formValues: PromptConfigFormValues) => void;
 }
 
+let disableOnChange = false;
+let disableNodeSync = false;
+let disableFormSyncTimeout: NodeJS.Timeout | null = null;
+
 export const usePromptConfigForm = ({
   configId,
   onChange,
@@ -67,32 +71,45 @@ export const usePromptConfigForm = ({
     }
   }, [formData]);
 
-  const disableOnChange = useRef(false);
-  const disableNodeSync = useRef(false);
+  // useEffect(() => {
+  //   console.log("formData changed!");
+  // }, [formData]);
 
-  // Provides forward sync of form values to the parent component
+  // useEffect(() => {
+  //   console.log("onChange changed!");
+  // }, [onChange]);
+
+  // useEffect(() => {
+  //   console.log("initialConfigValues changed!");
+  // }, [initialConfigValues]);
+
+  // Provides forward sync of parent component to form values
   useEffect(() => {
+    if (disableNodeSync) return;
+    console.log("triggering reverse sync!", Date.now());
+    disableOnChange = true;
+    for (const [key, value] of Object.entries(
+      initialConfigValues?.version?.configData ?? {}
+    )) {
+      methods.setValue(`version.configData.${key}` as any, value as any);
+    }
     setTimeout(() => {
-      if (disableOnChange.current) return;
-      disableNodeSync.current = true;
-      onChange?.(formData);
-      disableNodeSync.current = false;
-    }, 0);
-  }, [formData, onChange]);
+      disableOnChange = false;
+    }, 1);
+  }, [initialConfigValues]);
 
   // Provides reverse sync of form values to the parent component
   useEffect(() => {
-    if (disableNodeSync.current) return;
-    disableOnChange.current = true;
-    // TODO: add other fields that might get updated from the store into the form
-    methods.setValue(
-      "version.configData.inputs",
-      (initialConfigValues?.version?.configData?.inputs as any) ?? []
-    );
-    setTimeout(() => {
-      disableOnChange.current = false;
+    if (disableOnChange) return;
+    disableNodeSync = true;
+    onChange?.(formData);
+    if (disableFormSyncTimeout) {
+      clearTimeout(disableFormSyncTimeout);
+    }
+    disableFormSyncTimeout = setTimeout(() => {
+      disableNodeSync = false;
     }, 1);
-  }, [initialConfigValues]);
+  }, [formData, onChange]);
 
   return {
     methods,

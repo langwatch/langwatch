@@ -7,7 +7,11 @@ import {
   type BoxProps,
 } from "@chakra-ui/react";
 import { useRef } from "react";
-import { useFormContext, type UseFieldArrayReturn } from "react-hook-form";
+import {
+  useFormContext,
+  type UseFieldArrayReturn,
+  type UseFormReturn,
+} from "react-hook-form";
 import { Mention, MentionsInput } from "react-mentions";
 
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
@@ -73,17 +77,7 @@ export function PromptField({
         }}
         availableFields={availableFields}
         otherNodesFields={otherNodesFields}
-        onAddEdge={(id, handle) => {
-          const newHandle = onAddEdge?.(id, handle);
-          if (newHandle) {
-            const value = form.getValues("version.configData.prompt");
-            form.setValue(
-              "version.configData.prompt",
-              value.replace(`{{${id}.${handle}}}`, `{{${newHandle}}}`),
-              { shouldValidate: true }
-            );
-          }
-        }}
+        onAddEdge={onAddEdge}
         isTemplateSupported={isTemplateSupported}
       />
     </VerticalFormControl>
@@ -105,7 +99,7 @@ export function PromptTextArea({
   onChange?: (event: { target: { value: string } }) => void;
   placeholder?: string;
   otherNodesFields: Record<string, string[]>;
-  onAddEdge?: (id: string, handle: string) => void;
+  onAddEdge?: (id: string, handle: string, content: string) => void;
   isTemplateSupported?: boolean;
 } & Omit<BoxProps, "onChange">) {
   const mentionData = [
@@ -210,7 +204,7 @@ export function PromptTextArea({
                 if (typeof id === "string" && id.includes(".")) {
                   const [nodeId, field] = id.split(".");
                   if (!nodeId || !field) return;
-                  onAddEdge?.(nodeId, field);
+                  onAddEdge?.(nodeId, field, value ?? "");
                 }
               }}
               renderSuggestion={(

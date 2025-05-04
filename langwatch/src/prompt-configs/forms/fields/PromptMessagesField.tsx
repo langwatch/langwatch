@@ -33,7 +33,12 @@ export function PromptMessagesField({
   >;
   availableFields: string[];
   otherNodesFields: Record<string, string[]>;
-  onAddEdge?: (id: string, handle: string) => string;
+  onAddEdge?: (
+    id: string,
+    handle: string,
+    content: string,
+    idx: number
+  ) => void;
 }) {
   const form = useFormContext<PromptConfigFormValues>();
   const { register, formState } = form;
@@ -133,16 +138,8 @@ export function PromptMessagesField({
                   ? { borderColor: "red.500" }
                   : undefined
               }
-              onAddEdge={(id, handle) => {
-                const newHandle = onAddEdge?.(id, handle);
-                if (newHandle) {
-                  const value = field.value;
-                  let templateRef = newHandle + "}}";
-                  if (value.endsWith("{") && !value.endsWith("{{")) {
-                    templateRef = "{" + templateRef;
-                  }
-                  field.onChange(value + templateRef);
-                }
+              onAddEdge={(id, handle, content) => {
+                onAddEdge?.(id, handle, content, idx);
               }}
             />
           )}
