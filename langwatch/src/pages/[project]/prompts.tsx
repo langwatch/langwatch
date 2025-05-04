@@ -28,10 +28,13 @@ export default function PromptConfigsPage() {
   };
 
   // Fetch prompt configs
-  const { data: promptConfigs, refetch: refetchPromptConfigs } =
-    api.llmConfigs.getPromptConfigs.useQuery(
-      {
-        projectId: project?.id ?? "",
+  const {
+    data: promptConfigs,
+    refetch: refetchPromptConfigs,
+    isLoading,
+  } = api.llmConfigs.getPromptConfigs.useQuery(
+    {
+      projectId: project?.id ?? "",
       },
       {
         enabled: !!project?.id,
@@ -162,7 +165,7 @@ export default function PromptConfigsPage() {
           <PageLayout.Content>
             <PromptConfigTable
               configs={promptConfigs ?? []}
-              isLoading={false}
+              isLoading={isLoading}
               onRowClick={(config) => setSelectedConfigId(config.id)}
               columns={defaultColumns}
             />

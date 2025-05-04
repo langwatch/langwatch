@@ -13,11 +13,15 @@ from langwatch_nlp.studio.dspy import (
     PredictionWithEvaluationAndMetadata,
     {# We can probably remove this import once we have LLM Answer Match migrated to langevals #}
     LLMConfig,
+    TemplateAdapter,
 )
 
 {% if workflow.default_llm %}
 lm = {{ node_llm_config_to_dspy_lm(workflow.default_llm) }}
 dspy.configure(lm=lm)
+{% endif %}
+{% if workflow.template_adapter == "default" %}
+dspy.configure(adapter=TemplateAdapter())
 {% endif %}
 
 class WorkflowModule(LangWatchWorkflowModule):

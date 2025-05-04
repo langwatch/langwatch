@@ -99,7 +99,7 @@ export function LlmPromptPropertiesStepAccordion() {
               />
             )}
           </PropertyField>
-          <PropertyField title="Instructions">
+          <PropertyField title="System Prompt">
             <Textarea
               height="100px"
               fontFamily="monospace"

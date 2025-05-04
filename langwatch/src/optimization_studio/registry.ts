@@ -36,6 +36,16 @@ const signature: Signature = {
       value: undefined,
     },
     {
+      identifier: "messages",
+      type: "chat_messages",
+      value: [
+        {
+          role: "user",
+          content: "{{question}}",
+        },
+      ],
+    },
+    {
       identifier: "demonstrations",
       type: "dataset",
       value: undefined,

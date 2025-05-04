@@ -1,5 +1,11 @@
 import { VStack } from "@chakra-ui/react";
-import { FormProvider, type UseFormReturn } from "react-hook-form";
+import {
+  FormProvider,
+  useFieldArray,
+  useFormContext,
+  type Control,
+  type UseFormReturn,
+} from "react-hook-form";
 
 import { PromptConfigProvider } from "../../providers/PromptConfigProvider";
 import { DemonstrationsField } from "../fields/DemonstrationsField";
@@ -18,6 +24,7 @@ import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/h
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
+import { PromptMessagesField } from "../fields/PromptMessagesField";
 
 interface PromptConfigFormProps {
   configId: string;
@@ -36,14 +43,28 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
   const { data: savedConfig } =
     useGetPromptConfigByIdWithLatestVersionQuery(configId);
 
+  /**
+   * It is a known limitation of react-hook-form useFieldArray that we cannot
+   * access the fields array from the form provider using the context.
+   *
+   * So we need to create this in the parent and prop drill it down.
+   */
+  const messageFields = useFieldArray({
+    control: methods.control,
+    name: "version.configData.messages",
+  });
+
+  const availableFields = (
+    methods.watch("version.configData.inputs") ?? []
+  ).map((input) => input.identifier);
+
   if (!savedConfig) return null;
 
   return (
     <FormProvider {...methods}>
       <form style={{ width: "100%" }}>
         <VStack width="full" gap={6}>
-          <PromptNameField />
-          <VerticalFormControl label="Current Version">
+          <VerticalFormControl label="Current Version" size="sm">
             <PromptConfigInfoBox
               isSaving={isLoading}
               config={savedConfig}
@@ -53,8 +74,19 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
               }
             />
           </VerticalFormControl>
+          <PromptNameField />
           <ModelSelectField />
-          <PromptField />
+          <PromptField
+            templateAdapter="default"
+            messageFields={messageFields}
+            availableFields={availableFields}
+            otherNodesFields={{}}
+          />
+          <PromptMessagesField
+            messageFields={messageFields}
+            availableFields={availableFields}
+            otherNodesFields={{}}
+          />
           <InputsFieldGroup />
           <OutputsFieldGroup />
           <DemonstrationsField />

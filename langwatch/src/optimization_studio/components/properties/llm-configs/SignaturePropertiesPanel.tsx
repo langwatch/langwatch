@@ -1,8 +1,8 @@
 import { Spinner, VStack } from "@chakra-ui/react";
-import type { Node } from "@xyflow/react";
+import { useUpdateNodeInternals, type Node } from "@xyflow/react";
 import debounce from "lodash.debounce";
 import { useEffect, useMemo, useRef } from "react";
-import { FormProvider } from "react-hook-form";
+import { FormProvider, useFieldArray } from "react-hook-form";
 
 import type { LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
@@ -40,6 +40,9 @@ import {
 import { PromptConfigProvider } from "~/prompt-configs/providers/PromptConfigProvider";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import { api } from "~/utils/api";
+import { PromptMessagesField } from "../../../../prompt-configs/forms/fields/PromptMessagesField";
+import { useShallow } from "zustand/react/shallow";
+
 /**
  * Properties panel for the Signature node in the optimization studio.
  *
@@ -66,6 +69,16 @@ function SignaturePropertiesPanelInner({
   const configId = node.data.configId;
   const setNode = useSmartSetNode();
 
+  const { templateAdapter, nodes, edges, edgeConnectToNewHandle } =
+    useWorkflowStore(
+      useShallow((state) => ({
+        templateAdapter: state.getWorkflow().template_adapter,
+        nodes: state.getWorkflow().nodes,
+        edges: state.getWorkflow().edges,
+        edgeConnectToNewHandle: state.edgeConnectToNewHandle,
+      }))
+    );
+
   /**
    * Converts form values to node data and updates the workflow store.
    * This ensures the node's data stays in sync with the form state.
@@ -74,23 +87,25 @@ function SignaturePropertiesPanelInner({
    */
   const syncNodeDataWithFormValues = useMemo(
     () =>
-      // Debounce the sync to prevent excessive re-renders when the user is typing
       debounce((formValues: PromptConfigFormValues) => {
         const newNodeData = promptConfigFormValuesToOptimizationStudioNodeData(
           configId,
           formValues
         );
         setNode({
-          ...node,
+          id: node.id,
           data: newNodeData,
         });
-      }, 1000),
-    [configId, node, setNode]
+      }, 200),
+    [configId, node.id, setNode]
   );
 
   // Initialize form with values from node data
-  const initialConfigValues =
-    safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(node.data);
+  const initialConfigValues = useMemo(
+    () =>
+      safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(node.data),
+    [node.data]
+  );
 
   const formProps = usePromptConfigForm({
     configId,
@@ -154,6 +169,64 @@ function SignaturePropertiesPanelInner({
     })();
   };
 
+  /**
+   * It is a known limitation of react-hook-form useFieldArray that we cannot
+   * access the fields array from the form provider using the context.
+   *
+   * So we need to create this in the parent and prop drill it down.
+   */
+  const messageFields = useFieldArray({
+    control: formProps.methods.control,
+    name: "version.configData.messages",
+  });
+
+  const availableFields = useMemo(() => {
+    return node.data.inputs.map((input) => input.identifier);
+  }, [node.data.inputs]);
+
+  // Find all nodes that depends on this node based on the edges
+  const otherNodesFields = useMemo(() => {
+    const currentConnections = edges
+      .filter((edge) => edge.target === node.id)
+      .map((edge) => edge.source + "." + edge.sourceHandle);
+
+    let dependentNodes = [];
+    let toVisit = [node.id];
+    while (toVisit.length > 0) {
+      const currentNode = toVisit.shift();
+      if (!currentNode) continue;
+      dependentNodes.push(currentNode);
+      toVisit.push(
+        ...edges
+          .filter((edge) => edge.source === currentNode)
+          .map((edge) => edge.target)
+      );
+    }
+
+    return Object.fromEntries(
+      nodes
+        .filter(
+          (node) => !dependentNodes.includes(node.id) && node.id !== "end"
+        )
+        .map((node) => [
+          node.id,
+          node.data.outputs
+            ?.map((output) => output.identifier)
+            .filter(
+              (id) => !currentConnections.includes(`${node.id}.outputs.${id}`)
+            ) ?? [],
+        ])
+    );
+  }, [edges, nodes, node.id]);
+
+  const updateNodeInternals = useUpdateNodeInternals();
+
+  const onAddEdge = (id: string, handle: string) => {
+    const newHandle = edgeConnectToNewHandle(id, handle, node.id);
+    updateNodeInternals(node.id);
+    return newHandle;
+  };
+
   // TODO: Consider refactoring the BasePropertiesPanel so that we don't need to hide everything like this
   return (
     <BasePropertiesPanel
@@ -177,7 +250,21 @@ function SignaturePropertiesPanelInner({
                 values={formProps.methods.getValues()}
               />
               <WrappedOptimizationStudioLLMConfigField />
-              <PromptField />
+              <PromptField
+                messageFields={messageFields}
+                templateAdapter={templateAdapter}
+                availableFields={availableFields}
+                otherNodesFields={otherNodesFields}
+                onAddEdge={onAddEdge}
+              />
+              {templateAdapter === "default" && (
+                <PromptMessagesField
+                  messageFields={messageFields}
+                  availableFields={availableFields}
+                  otherNodesFields={otherNodesFields}
+                  onAddEdge={onAddEdge}
+                />
+              )}
               <InputsFieldGroup />
               <OutputsFieldGroup />
               <DemonstrationsField />
@@ -253,9 +340,10 @@ export function SignaturePropertiesPanel({
           const newVersion = await createNewVersion(
             newConfig.id,
             {
-              prompt: rest?.prompt ?? currentConfigData.prompt,
+              prompt: rest?.prompt ?? "",
               inputs: rest?.inputs ?? currentConfigData.inputs,
               outputs: rest?.outputs ?? currentConfigData.outputs,
+              messages: rest?.messages ?? currentConfigData.messages,
               model: llm?.model ?? currentConfigData.model,
               temperature: llm?.temperature ?? currentConfigData.temperature,
               max_tokens: llm?.max_tokens ?? currentConfigData.max_tokens,

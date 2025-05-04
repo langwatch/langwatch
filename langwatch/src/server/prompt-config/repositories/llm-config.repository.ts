@@ -211,6 +211,12 @@ export class LlmConfigRepository {
           configData: {
             model: defaultModel?.defaultModel ?? "openai/gpt-4o-mini",
             prompt: "You are a helpful assistant",
+            messages: [
+              {
+                role: "user",
+                content: "{{input}}",
+              },
+            ],
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
             demonstrations: {

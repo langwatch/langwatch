@@ -1,8 +1,12 @@
+import json
+import re
 from typing import Any, Type, cast
 import dspy
-from dspy.signatures.signature import Signature
+from dspy.signatures.signature import Signature, _default_instructions
 from dspy.adapters.types.image import try_expand_image_tags
 
+from dspy.adapters.chat_adapter import ChatAdapter
+from dspy.adapters.json_adapter import _get_structured_outputs_response_format
 from langwatch_nlp.studio.utils import SerializableWithStringFallback
 from pydantic import Field
 
@@ -17,6 +21,29 @@ class TemplateAdapter(dspy.JSONAdapter):
     pick up the same prompts and json schemas and use in any other frameworks as is, since all of them adhere to the
     raw OpenAI way of interating with LLMs.
     """
+
+    def __call__(
+        self,
+        lm,
+        lm_kwargs: dict[str, Any],
+        signature: Type[Signature],
+        demos: list[dict[str, Any]],
+        inputs: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        # If the signature has only one output field and it's a string, we can use the text only completion
+        if self._use_text_only_completion(signature, inputs):
+            return ChatAdapter.__call__(self, lm, lm_kwargs, signature, demos, inputs)  # type: ignore
+
+        # Replace the DSPyProgramOutputs title from the json schema with the signature name to bias the LLM in the right direction instead of randomly towards DSPy
+        model = _get_structured_outputs_response_format(signature)
+        schema = model.model_json_schema()
+        if schema.get("title", None) == "DSPyProgramOutputs":
+            new_name = signature.__name__.replace("Signature", "")
+            schema["title"] = new_name
+            model.__name__ = new_name
+            model.model_json_schema = lambda *args, **kwargs: schema
+        lm_kwargs["response_format"] = model
+        return ChatAdapter.__call__(self, lm, lm_kwargs, signature, demos, inputs)  # type: ignore
 
     def format(
         self,
@@ -40,13 +67,15 @@ class TemplateAdapter(dspy.JSONAdapter):
 
         _messages = getattr(signature, "_messages", Field(default=[])).default
 
+        instructions = signature.instructions
+        if instructions == _default_instructions(signature):
+            instructions = ""
+
         messages = []
         messages.append(
             {
                 "role": "system",
-                "content": self._format_template_inputs(
-                    signature.instructions, inputs_copy
-                ),
+                "content": self._format_template_inputs(instructions, inputs_copy),
             }
         )
         messages.extend(self.format_demos(signature, demos))
@@ -74,7 +103,9 @@ class TemplateAdapter(dspy.JSONAdapter):
             def __missing__(self, key):
                 return "{{" + key + "}}"
 
-        template_fmt = template.replace("{{", "{").replace("}}", "}")
+        # Normalize template: shrink all {{   anything    }} to {{anything}}
+        template_clean = re.sub(r"{{\s*(.*?)\s*}}", r"{{\1}}", template)
+        template_fmt = template_clean.replace("{{", "{").replace("}}", "}")
         str_inputs: dict[str, str] = {}
         for k, v in inputs.items():
             str_inputs[k] = (
@@ -83,3 +114,19 @@ class TemplateAdapter(dspy.JSONAdapter):
                 else json.dumps(v, cls=SerializableWithStringFallback)
             )
         return template_fmt.format_map(SafeDict(str_inputs))  # type: ignore
+
+    def parse(self, signature, completion):
+        if len(signature.output_fields) == 0:
+            return {}
+
+        first_field = list(signature.output_fields.items())[0]
+        if self._use_text_only_completion(signature, completion):
+            return {first_field[0]: completion}
+
+        return super().parse(signature, completion)
+
+    def _use_text_only_completion(self, signature, completion):
+        return len(signature.output_fields) == 0 or (
+            len(signature.output_fields) == 1
+            and list(signature.output_fields.values())[0].annotation == str
+        )

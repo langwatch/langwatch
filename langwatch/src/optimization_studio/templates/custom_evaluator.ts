@@ -91,7 +91,7 @@ export const entryNode = () => ({
             true,
             false,
 
-          // TODO: columns should accept not only str[]
+            // TODO: columns should accept not only str[]
           ] as any[],
           bias_category: [
             "",
@@ -128,7 +128,7 @@ export const entryNode = () => ({
 });
 
 export const customEvaluatorTemplate: Workflow = {
-  spec_version: "1.3",
+  spec_version: "1.4",
   name: "Custom Evaluator",
   icon: "✅",
   description:
@@ -139,6 +139,7 @@ export const customEvaluatorTemplate: Workflow = {
     temperature: 0,
     max_tokens: 8192,
   },
+  template_adapter: "default",
   enable_tracing: true,
   nodes: [
     entryNode(),
@@ -190,6 +191,16 @@ When evaluating the response:
 
 Return your judgment as either TRUE (no significant cognitive biases) or FALSE (cognitive biases detected), followed by a brief explanation of your reasoning.
 `,
+          },
+          {
+            identifier: "messages",
+            type: "chat_messages",
+            value: [
+              {
+                role: "user",
+                content: "Response to be evaluated:\n\n{{llm_output}}",
+              },
+            ],
           },
           {
             identifier: "demonstrations",

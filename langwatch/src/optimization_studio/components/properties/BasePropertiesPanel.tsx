@@ -9,6 +9,7 @@ import {
   Text,
   useDisclosure,
   VStack,
+  type StackProps,
 } from "@chakra-ui/react";
 import { Field } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
@@ -476,12 +477,13 @@ export function FieldsForm({
 export function PropertySectionTitle({
   children,
   tooltip,
+  ...props
 }: {
   children: React.ReactNode;
   tooltip?: React.ReactNode;
-}) {
+} & StackProps) {
   return (
-    <HStack paddingLeft={2}>
+    <HStack paddingLeft={2} {...props}>
       <NodeSectionTitle fontSize="12px">{children}</NodeSectionTitle>
       {tooltip && (
         <Tooltip content={tooltip}>

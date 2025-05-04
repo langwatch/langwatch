@@ -601,9 +601,9 @@ class LangWatchTrackedMIPROv2(MIPROv2):
 
             result = original_evaluate_call(self, program, *args, **kwargs)  # type: ignore
             if isinstance(result, tuple):
-                score : float = result[0]
+                score: float = result[0]
             else:
-                score : float = result
+                score: float = result
 
             scores.append(score)
 
@@ -787,7 +787,13 @@ class DSPyTracer:
                 span.update(output=result)
 
             history = self.history[-1] if len(self.history) > 0 else None
-            if history and "usage" in history and span:
+            if (
+                history
+                and "usage" in history
+                and "completion_tokens" in history["usage"]
+                and "prompt_tokens" in history["usage"]
+                and span
+            ):
                 span.update(
                     metrics={
                         "completion_tokens": history["usage"]["completion_tokens"],

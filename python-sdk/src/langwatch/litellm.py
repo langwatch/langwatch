@@ -244,8 +244,8 @@ class LiteLLMPatch:
             ],
             metrics=(
                 SpanMetrics(
-                    prompt_tokens=usage.prompt_tokens if usage else None,
-                    completion_tokens=usage.completion_tokens if usage else None,
+                    prompt_tokens=safe_get(usage, "prompt_tokens"),
+                    completion_tokens=safe_get(usage, "completion_tokens"),
                 )
                 if usage
                 else SpanMetrics()

@@ -14,6 +14,10 @@ export const LlmConfigInputTypes = [
   "bool",
   "image",
   "list[str]",
+  "list[float]",
+  "list[int]",
+  "list[bool]",
+  "dict",
 ] as const;
 export type LlmConfigInputType = (typeof LlmConfigInputTypes)[number];
 
