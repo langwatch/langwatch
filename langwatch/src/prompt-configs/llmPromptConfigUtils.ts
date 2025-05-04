@@ -213,6 +213,14 @@ function inputOutputTypeToDatasetColumnType(
       throw new Error("Image is not supported in demonstrations");
     case "json_schema":
       return "json";
+    case "list[float]":
+      return "list";
+    case "list[int]":
+      return "list";
+    case "list[bool]":
+      return "list";
+    case "dict":
+      return "json";
     default:
       type_ satisfies never;
       throw new Error(`Unknown input/output type: ${type_}`);
