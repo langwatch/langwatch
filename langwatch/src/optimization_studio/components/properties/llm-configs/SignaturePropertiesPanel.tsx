@@ -25,7 +25,10 @@ import {
   InputsFieldGroup,
   OutputsFieldGroup,
 } from "~/prompt-configs/forms/fields/PromptConfigVersionFieldGroup";
-import { PromptField } from "~/prompt-configs/forms/fields/PromptField";
+import {
+  PromptField,
+  type PromptTextAreaOnAddMention,
+} from "~/prompt-configs/forms/fields/PromptField";
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import {
   usePromptConfigForm,
@@ -230,23 +233,29 @@ function SignaturePropertiesPanelInner({
 
   const updateNodeInternals = useUpdateNodeInternals();
 
-  const onAddEdge = (id: string, handle: string, content: string) => {
+  const onAddEdge = (
+    id: string,
+    handle: string,
+    content: PromptTextAreaOnAddMention
+  ) => {
     const newHandle = edgeConnectToNewHandle(id, handle, node.id);
     updateNodeInternals(node.id);
 
-    let templateRef = newHandle + "}}";
-    let content_ = content.substring(0, content.lastIndexOf("{"));
-    if (content_.endsWith("{") && !content_.endsWith("{{")) {
-      templateRef = "{" + templateRef;
-    } else if (!content_.endsWith("{")) {
-      templateRef = "{{" + templateRef;
-    }
+    const templateRef = `{{${newHandle}}}`;
+    const content_ =
+      content.value.substring(0, content.startPos) +
+      templateRef +
+      content.value.substring(content.endPos);
 
     const stateNode = getWorkflow().nodes.find((n) => n.id === node.id)!;
-    return { node: stateNode, newPrompt: content_ + templateRef };
+    return { node: stateNode, newPrompt: content_ };
   };
 
-  const onAddPromptEdge = (id: string, handle: string, content: string) => {
+  const onAddPromptEdge = (
+    id: string,
+    handle: string,
+    content: PromptTextAreaOnAddMention
+  ) => {
     const { node, newPrompt } = onAddEdge(id, handle, content);
 
     setNodeParameter(node.id, {
@@ -259,7 +268,7 @@ function SignaturePropertiesPanelInner({
   const onAddMessageEdge = (
     id: string,
     handle: string,
-    content: string,
+    content: PromptTextAreaOnAddMention,
     idx: number
   ) => {
     const { node, newPrompt } = onAddEdge(id, handle, content);

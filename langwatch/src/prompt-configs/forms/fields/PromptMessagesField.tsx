@@ -18,7 +18,7 @@ import { LuMinus, LuPlus } from "react-icons/lu";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { ChevronDown } from "lucide-react";
 import { PropertySectionTitle } from "../../../optimization_studio/components/properties/BasePropertiesPanel";
-import { PromptTextArea } from "./PromptField";
+import { PromptTextArea, type PromptTextAreaOnAddMention } from "./PromptField";
 
 export function PromptMessagesField({
   messageFields,
@@ -36,7 +36,7 @@ export function PromptMessagesField({
   onAddEdge?: (
     id: string,
     handle: string,
-    content: string,
+    content: PromptTextAreaOnAddMention,
     idx: number
   ) => void;
 }) {

@@ -7,11 +7,7 @@ import {
   type BoxProps,
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import {
-  useFormContext,
-  type UseFieldArrayReturn,
-  type UseFormReturn,
-} from "react-hook-form";
+import { useFormContext, type UseFieldArrayReturn } from "react-hook-form";
 import { Mention, MentionsInput } from "react-mentions";
 
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
@@ -36,7 +32,11 @@ export function PromptField({
   >;
   availableFields: string[];
   otherNodesFields: Record<string, string[]>;
-  onAddEdge?: (id: string, handle: string, content: string) => void;
+  onAddEdge?: (
+    id: string,
+    handle: string,
+    content: PromptTextAreaOnAddMention
+  ) => void;
   isTemplateSupported?: boolean;
 }) {
   const form = useFormContext<PromptConfigFormValues>();
@@ -84,6 +84,13 @@ export function PromptField({
   );
 }
 
+export type PromptTextAreaOnAddMention = {
+  value: string;
+  display: string;
+  startPos: number;
+  endPos: number;
+};
+
 export function PromptTextArea({
   availableFields,
   value,
@@ -99,7 +106,11 @@ export function PromptTextArea({
   onChange?: (event: { target: { value: string } }) => void;
   placeholder?: string;
   otherNodesFields: Record<string, string[]>;
-  onAddEdge?: (id: string, handle: string, content: string) => void;
+  onAddEdge?: (
+    id: string,
+    handle: string,
+    content: PromptTextAreaOnAddMention
+  ) => void;
   isTemplateSupported?: boolean;
 } & Omit<BoxProps, "onChange">) {
   const mentionData = useMemo(
@@ -250,11 +261,16 @@ export function PromptTextArea({
               data={mentionData}
               displayTransform={(id: string) => `{{${id}}}`}
               className="mention"
-              onAdd={(id) => {
+              onAdd={(id, display, startPos, endPos) => {
                 if (typeof id === "string" && id.includes(".")) {
                   const [nodeId, field] = id.split(".");
                   if (!nodeId || !field) return;
-                  onAddEdge?.(nodeId, field, value ?? "");
+                  onAddEdge?.(nodeId, field, {
+                    value: value ?? "",
+                    display,
+                    startPos,
+                    endPos,
+                  });
                 }
               }}
               renderSuggestion={(
