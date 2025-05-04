@@ -211,7 +211,8 @@ function JsonSchemaDialog({
                   checkForErrors(code);
                 }}
                 onClose={onClose}
-                defaultLanguage="json"
+                language="json"
+                technologies={["json", "json schema"]}
               />
             )}
             {error && <Text>Error: {error}</Text>}
