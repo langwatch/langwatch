@@ -219,7 +219,7 @@ def normalize_name_to_class_name(node_name: str) -> str:
     # Keep only alphanumeric characters
     import re
 
-    class_name = re.sub(r"[^a-zA-Z0-9]", "", node_name)
+    class_name = re.sub(r"[^a-zA-Z0-9]", "", node_name).capitalize()
 
     return class_name
 
