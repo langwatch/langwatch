@@ -27,6 +27,8 @@ import { WizardContext } from "../../components/evaluations/wizard/hooks/useWiza
 import { useEvaluationWizardStore } from "../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useShallow } from "zustand/react/shallow";
 import { findLowestAvailableName } from "../utils/nodeUtils";
+import { LlmConfigInputTypes } from "../../types";
+import { nanoid } from "nanoid";
 
 export type SocketStatus =
   | "disconnected"
@@ -70,6 +72,11 @@ export type WorkflowStore = State & {
   onConnect: (connection: Connection) => { error?: string } | undefined;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
+  edgeConnectToNewHandle: (
+    source: string,
+    sourceHandle: string,
+    target: string
+  ) => string;
   /**
    * Update a node in the workflow.
    * This will find the node by id and update it.
@@ -252,6 +259,64 @@ export const store = (
   },
   setEdges: (edges: Edge[]) => {
     set({ edges });
+  },
+  edgeConnectToNewHandle: (
+    source: string,
+    sourceHandle: string,
+    target: string
+  ) => {
+    const nodes = get().nodes;
+    const inputs = nodes
+      .find((node) => node.id === target)
+      ?.data.inputs?.map((input) => input.identifier);
+
+    let inc = 2;
+    let newHandle = sourceHandle;
+    while (inputs?.includes(newHandle)) {
+      newHandle = `${sourceHandle}${inc}`;
+      inc++;
+    }
+
+    const sourceField = nodes
+      .find((node) => node.id === source)
+      ?.data.outputs?.find((output) => output.identifier === sourceHandle);
+    let type = sourceField?.type;
+    if (type === "json_schema") {
+      type = "dict";
+    }
+    if (!type || !(type in LlmConfigInputTypes)) {
+      type = "str";
+    }
+
+    set({
+      nodes: nodes.map((node) =>
+        node.id === target
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                inputs: [
+                  ...(node.data.inputs ?? []),
+                  { identifier: newHandle, type },
+                ],
+              },
+            }
+          : node
+      ),
+      edges: [
+        ...get().edges,
+        {
+          id: `edge-${nanoid()}`,
+          source,
+          target,
+          sourceHandle: `outputs.${sourceHandle}`,
+          targetHandle: `inputs.${newHandle}`,
+          type: "default",
+        },
+      ],
+    });
+
+    return newHandle;
   },
   setNode: (node: Partial<Node> & { id: string }, newId?: string) => {
     set(

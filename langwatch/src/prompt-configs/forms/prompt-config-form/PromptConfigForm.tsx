@@ -80,10 +80,12 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
             templateAdapter="default"
             messageFields={messageFields}
             availableFields={availableFields}
+            otherNodesFields={{}}
           />
           <PromptMessagesField
             messageFields={messageFields}
             availableFields={availableFields}
+            otherNodesFields={{}}
           />
           <InputsFieldGroup />
           <OutputsFieldGroup />

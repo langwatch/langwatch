@@ -20,6 +20,8 @@ export function PromptField({
   templateAdapter,
   messageFields,
   availableFields,
+  otherNodesFields,
+  onAddEdge,
 }: {
   templateAdapter: "default" | "dspy_chat_adapter";
   messageFields: UseFieldArrayReturn<
@@ -28,6 +30,8 @@ export function PromptField({
     "id"
   >;
   availableFields: string[];
+  otherNodesFields: Record<string, string[]>;
+  onAddEdge?: (id: string, handle: string) => string;
 }) {
   const form = useFormContext<PromptConfigFormValues>();
   const { formState } = form;
@@ -66,7 +70,17 @@ export function PromptField({
           }
         }}
         availableFields={availableFields}
-        placeholder="You are a helpful assistant"
+        otherNodesFields={otherNodesFields}
+        onAddEdge={(id, handle) => {
+          const newHandle = onAddEdge?.(id, handle);
+          if (newHandle) {
+            form.setValue(
+              "version.configData.prompt",
+              value.replace(`{{${id}.${handle}}}`, `{{${newHandle}}}`),
+              { shouldValidate: true }
+            );
+          }
+        }}
       />
     </VerticalFormControl>
   );
@@ -77,17 +91,29 @@ export function PromptTextArea({
   value,
   onChange,
   placeholder,
+  otherNodesFields,
+  onAddEdge,
   ...props
 }: {
   availableFields: string[];
   value?: string;
   onChange?: (event: { target: { value: string } }) => void;
   placeholder?: string;
+  otherNodesFields: Record<string, string[]>;
+  onAddEdge?: (id: string, handle: string) => void;
 } & Omit<BoxProps, "onChange">) {
-  const mentionData = availableFields.map((field) => ({
-    id: field,
-    display: field,
-  }));
+  const mentionData = [
+    ...availableFields.map((field) => ({
+      id: field,
+      display: field,
+    })),
+    ...Object.entries(otherNodesFields).flatMap(([nodeId, fields]) =>
+      fields.map((field) => ({
+        id: `${nodeId}.${field}`,
+        display: `${nodeId}.${field}`,
+      }))
+    ),
+  ];
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -172,6 +198,13 @@ export function PromptTextArea({
             data={mentionData}
             displayTransform={(id: string) => `{{${id}}}`}
             className="mention"
+            onAdd={(id) => {
+              if (typeof id === "string" && id.includes(".")) {
+                const [nodeId, field] = id.split(".");
+                if (!nodeId || !field) return;
+                onAddEdge?.(nodeId, field);
+              }
+            }}
             renderSuggestion={(
               _suggestion,
               _search,

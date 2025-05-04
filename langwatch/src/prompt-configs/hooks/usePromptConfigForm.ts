@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useForm, type DeepPartial } from "react-hook-form";
 import { z } from "zod";
 
@@ -67,10 +67,32 @@ export const usePromptConfigForm = ({
     }
   }, [formData]);
 
-  // Provides on change callback to the parent component
+  const disableOnChange = useRef(false);
+  const disableNodeSync = useRef(false);
+
+  // Provides forward sync of form values to the parent component
   useEffect(() => {
-    onChange?.(formData);
+    setTimeout(() => {
+      if (disableOnChange.current) return;
+      disableNodeSync.current = true;
+      onChange?.(formData);
+      disableNodeSync.current = false;
+    }, 0);
   }, [formData, onChange]);
+
+  // Provides reverse sync of form values to the parent component
+  useEffect(() => {
+    if (disableNodeSync.current) return;
+    disableOnChange.current = true;
+    // TODO: add other fields that might get updated from the store into the form
+    methods.setValue(
+      "version.configData.inputs",
+      (initialConfigValues?.version?.configData?.inputs as any) ?? []
+    );
+    setTimeout(() => {
+      disableOnChange.current = false;
+    }, 1);
+  }, [initialConfigValues]);
 
   return {
     methods,

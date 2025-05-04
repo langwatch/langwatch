@@ -20,10 +20,13 @@ import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { ChevronDown } from "lucide-react";
 import { PropertySectionTitle } from "../../../optimization_studio/components/properties/BasePropertiesPanel";
 import { PromptTextArea } from "./PromptField";
+import { useUpdateNodeInternals } from "@xyflow/react";
 
 export function PromptMessagesField({
   messageFields,
   availableFields,
+  otherNodesFields,
+  onAddEdge,
 }: {
   messageFields: UseFieldArrayReturn<
     PromptConfigFormValues,
@@ -31,6 +34,8 @@ export function PromptMessagesField({
     "id"
   >;
   availableFields: string[];
+  otherNodesFields: Record<string, string[]>;
+  onAddEdge?: (id: string, handle: string) => string;
 }) {
   const form = useFormContext<PromptConfigFormValues>();
   const { register, formState } = form;
@@ -122,6 +127,7 @@ export function PromptMessagesField({
           render={({ field }) => (
             <PromptTextArea
               availableFields={availableFields}
+              otherNodesFields={otherNodesFields}
               value={field.value}
               onChange={field.onChange}
               _invalid={
@@ -129,6 +135,17 @@ export function PromptMessagesField({
                   ? { borderColor: "red.500" }
                   : undefined
               }
+              onAddEdge={(id, handle) => {
+                const newHandle = onAddEdge?.(id, handle);
+                if (newHandle) {
+                  const value = field.value;
+                  let templateRef = newHandle + "}}";
+                  if (value.endsWith("{") && !value.endsWith("{{")) {
+                    templateRef = "{" + templateRef;
+                  }
+                  field.onChange(value + templateRef);
+                }
+              }}
             />
           )}
         />

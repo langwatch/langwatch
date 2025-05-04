@@ -1,5 +1,5 @@
 import { Spinner, VStack } from "@chakra-ui/react";
-import type { Node } from "@xyflow/react";
+import { useUpdateNodeInternals, type Node } from "@xyflow/react";
 import debounce from "lodash.debounce";
 import { useEffect, useMemo, useRef } from "react";
 import { FormProvider, useFieldArray } from "react-hook-form";
@@ -69,11 +69,15 @@ function SignaturePropertiesPanelInner({
   const configId = node.data.configId;
   const setNode = useSmartSetNode();
 
-  const { templateAdapter } = useWorkflowStore(
-    useShallow((state) => ({
-      templateAdapter: state.getWorkflow().template_adapter,
-    }))
-  );
+  const { templateAdapter, nodes, edges, edgeConnectToNewHandle } =
+    useWorkflowStore(
+      useShallow((state) => ({
+        templateAdapter: state.getWorkflow().template_adapter,
+        nodes: state.getWorkflow().nodes,
+        edges: state.getWorkflow().edges,
+        edgeConnectToNewHandle: state.edgeConnectToNewHandle,
+      }))
+    );
 
   /**
    * Converts form values to node data and updates the workflow store.
@@ -97,8 +101,11 @@ function SignaturePropertiesPanelInner({
   );
 
   // Initialize form with values from node data
-  const initialConfigValues =
-    safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(node.data);
+  const initialConfigValues = useMemo(
+    () =>
+      safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(node.data),
+    [node.data]
+  );
 
   const formProps = usePromptConfigForm({
     configId,
@@ -177,6 +184,49 @@ function SignaturePropertiesPanelInner({
     return node.data.inputs.map((input) => input.identifier);
   }, [node.data.inputs]);
 
+  // Find all nodes that depends on this node based on the edges
+  const otherNodesFields = useMemo(() => {
+    const currentConnections = edges
+      .filter((edge) => edge.target === node.id)
+      .map((edge) => edge.source + "." + edge.sourceHandle);
+
+    let dependentNodes = [];
+    let toVisit = [node.id];
+    while (toVisit.length > 0) {
+      const currentNode = toVisit.shift();
+      if (!currentNode) continue;
+      dependentNodes.push(currentNode);
+      toVisit.push(
+        ...edges
+          .filter((edge) => edge.source === currentNode)
+          .map((edge) => edge.target)
+      );
+    }
+
+    return Object.fromEntries(
+      nodes
+        .filter(
+          (node) => !dependentNodes.includes(node.id) && node.id !== "end"
+        )
+        .map((node) => [
+          node.id,
+          node.data.outputs
+            ?.map((output) => output.identifier)
+            .filter(
+              (id) => !currentConnections.includes(`${node.id}.outputs.${id}`)
+            ) ?? [],
+        ])
+    );
+  }, [edges, nodes, node.id]);
+
+  const updateNodeInternals = useUpdateNodeInternals();
+
+  const onAddEdge = (id: string, handle: string) => {
+    const newHandle = edgeConnectToNewHandle(id, handle, node.id);
+    updateNodeInternals(node.id);
+    return newHandle;
+  };
+
   // TODO: Consider refactoring the BasePropertiesPanel so that we don't need to hide everything like this
   return (
     <BasePropertiesPanel
@@ -204,11 +254,15 @@ function SignaturePropertiesPanelInner({
                 messageFields={messageFields}
                 templateAdapter={templateAdapter}
                 availableFields={availableFields}
+                otherNodesFields={otherNodesFields}
+                onAddEdge={onAddEdge}
               />
               {templateAdapter === "default" && (
                 <PromptMessagesField
                   messageFields={messageFields}
                   availableFields={availableFields}
+                  otherNodesFields={otherNodesFields}
+                  onAddEdge={onAddEdge}
                 />
               )}
               <InputsFieldGroup />
