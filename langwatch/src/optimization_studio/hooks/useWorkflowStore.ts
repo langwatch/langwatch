@@ -266,9 +266,10 @@ export const store = (
     target: string
   ) => {
     const nodes = get().nodes;
-    const inputs = nodes
-      .find((node) => node.id === target)
-      ?.data.inputs?.map((input) => input.identifier);
+    const edges = get().edges;
+    const inputs = edges
+      .filter((edge) => edge.target === target)
+      ?.map((edge) => edge.targetHandle?.split(".")[1]);
 
     let inc = 2;
     let newHandle = sourceHandle;
@@ -288,6 +289,9 @@ export const store = (
       type = "str";
     }
 
+    const existingInputs = nodes
+      .find((node) => node.id === target)
+      ?.data.inputs?.map((input) => input.identifier);
     set({
       nodes: nodes.map((node) =>
         node.id === target
@@ -295,16 +299,18 @@ export const store = (
               ...node,
               data: {
                 ...node.data,
-                inputs: [
-                  ...(node.data.inputs ?? []),
-                  { identifier: newHandle, type },
-                ],
+                inputs: existingInputs?.includes(newHandle)
+                  ? node.data.inputs
+                  : [
+                      ...(node.data.inputs ?? []),
+                      { identifier: newHandle, type },
+                    ],
               },
             }
           : node
       ),
       edges: [
-        ...get().edges,
+        ...edges,
         {
           id: `edge-${nanoid()}`,
           source,

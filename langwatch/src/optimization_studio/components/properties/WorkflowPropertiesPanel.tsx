@@ -223,7 +223,8 @@ export const WorkflowPropertiesPanel = () => {
             <br />
             <br />
             <b>DSPy Adapter</b> - Uses primary pure text output format and parse
-            it later, may be more performatic, useful for smaller models as well.
+            it later, may be more performatic, useful for smaller models as
+            well.
           </Text>
         }
       >
@@ -241,6 +242,7 @@ export const WorkflowPropertiesPanel = () => {
             <option value="default">Default</option>
             <option value="dspy_chat_adapter">DSPy Adapter</option>
           </NativeSelect.Field>
+          <NativeSelect.Indicator />
         </NativeSelect.Root>
       </PropertyField>
       <PropertyField title="Enable Tracing">

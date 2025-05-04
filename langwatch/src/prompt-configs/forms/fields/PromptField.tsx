@@ -76,6 +76,7 @@ export function PromptField({
         onAddEdge={(id, handle) => {
           const newHandle = onAddEdge?.(id, handle);
           if (newHandle) {
+            const value = form.getValues("version.configData.prompt");
             form.setValue(
               "version.configData.prompt",
               value.replace(`{{${id}.${handle}}}`, `{{${newHandle}}}`),
@@ -236,8 +237,9 @@ export function PromptTextArea({
       </Box>
       {hasAnyTemplateMarkers && !isTemplateSupported && (
         <Text fontSize="xs" color="red.800" paddingTop={2}>
-          Template {"{{markers}}"} are not supported by DSPy Adapter, instead, input variables are included automatically.
-          Please change to default template adapter if you want to use them.
+          Template {"{{markers}}"} are not supported by DSPy Adapter, instead,
+          input variables are included automatically. Please change to default
+          template adapter if you want to use them.
         </Text>
       )}
     </>

@@ -5,7 +5,6 @@ import {
   HStack,
   NativeSelect,
   Spacer,
-  Textarea,
 } from "@chakra-ui/react";
 import {
   useFormContext,
@@ -20,7 +19,6 @@ import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { ChevronDown } from "lucide-react";
 import { PropertySectionTitle } from "../../../optimization_studio/components/properties/BasePropertiesPanel";
 import { PromptTextArea } from "./PromptField";
-import { useUpdateNodeInternals } from "@xyflow/react";
 
 export function PromptMessagesField({
   messageFields,
