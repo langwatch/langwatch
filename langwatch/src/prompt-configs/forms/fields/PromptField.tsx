@@ -6,7 +6,7 @@ import {
   Text,
   type BoxProps,
 } from "@chakra-ui/react";
-import { useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   useFormContext,
   type UseFieldArrayReturn,
@@ -36,7 +36,7 @@ export function PromptField({
   >;
   availableFields: string[];
   otherNodesFields: Record<string, string[]>;
-  onAddEdge?: (id: string, handle: string) => string;
+  onAddEdge?: (id: string, handle: string, content: string) => void;
   isTemplateSupported?: boolean;
 }) {
   const form = useFormContext<PromptConfigFormValues>();
@@ -102,25 +102,47 @@ export function PromptTextArea({
   onAddEdge?: (id: string, handle: string, content: string) => void;
   isTemplateSupported?: boolean;
 } & Omit<BoxProps, "onChange">) {
-  const mentionData = [
-    ...availableFields.map((field) => ({
-      id: field,
-      display: field,
-    })),
-    ...Object.entries(otherNodesFields).flatMap(([nodeId, fields]) =>
-      fields.map((field) => ({
-        id: `${nodeId}.${field}`,
-        display: `${nodeId}.${field}`,
-      }))
-    ),
-  ];
+  const mentionData = useMemo(
+    () => [
+      ...availableFields.map((field) => ({
+        id: field,
+        display: field,
+      })),
+      ...Object.entries(otherNodesFields).flatMap(([nodeId, fields]) =>
+        fields.map((field) => ({
+          id: `${nodeId}.${field}`,
+          display: `${nodeId}.${field}`,
+        }))
+      ),
+    ],
+    [availableFields, otherNodesFields]
+  );
+  const availableIds = useMemo(
+    () => mentionData.map((m) => m.id),
+    [mentionData]
+  );
 
+  const boxRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasAnyTemplateMarkers = value?.match(/{{.*?}}/g);
+
+  useEffect(() => {
+    if (!boxRef.current) return;
+    const mentions = boxRef.current.querySelectorAll(".mention");
+    mentions.forEach((mention) => {
+      const id = mention.textContent?.match(/\{\{(.*?)\}\}/)?.[1];
+      if (id && !availableIds.includes(id)) {
+        mention.classList.add("invalid");
+      } else {
+        mention.classList.remove("invalid");
+      }
+    });
+  }, [value, availableIds]);
 
   return (
     <>
       <Box
+        ref={boxRef}
         fontFamily="mono"
         fontSize={13}
         css={{
@@ -143,6 +165,10 @@ export function PromptTextArea({
             marginLeft: "-2px",
             marginRight: "-2px",
             padding: "1px",
+          },
+          "& .mention.invalid": {
+            borderColor: "red.200",
+            backgroundColor: "red.50",
           },
         }}
         {...props}
