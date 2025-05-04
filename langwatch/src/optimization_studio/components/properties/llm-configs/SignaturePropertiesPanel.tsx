@@ -173,6 +173,10 @@ function SignaturePropertiesPanelInner({
     name: "version.configData.messages",
   });
 
+  const availableFields = useMemo(() => {
+    return node.data.inputs.map((input) => input.identifier);
+  }, [node.data.inputs]);
+
   // TODO: Consider refactoring the BasePropertiesPanel so that we don't need to hide everything like this
   return (
     <BasePropertiesPanel
@@ -199,9 +203,13 @@ function SignaturePropertiesPanelInner({
               <PromptField
                 messageFields={messageFields}
                 templateAdapter={templateAdapter}
+                availableFields={availableFields}
               />
               {templateAdapter === "default" && (
-                <PromptMessagesField messageFields={messageFields} />
+                <PromptMessagesField
+                  messageFields={messageFields}
+                  availableFields={availableFields}
+                />
               )}
               <InputsFieldGroup />
               <OutputsFieldGroup />

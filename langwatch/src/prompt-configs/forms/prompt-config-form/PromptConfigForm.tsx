@@ -54,6 +54,10 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
     name: "version.configData.messages",
   });
 
+  const availableFields = (
+    methods.watch("version.configData.inputs") ?? []
+  ).map((input) => input.identifier);
+
   if (!savedConfig) return null;
 
   return (
@@ -75,8 +79,12 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
           <PromptField
             templateAdapter="default"
             messageFields={messageFields}
+            availableFields={availableFields}
           />
-          <PromptMessagesField messageFields={messageFields} />
+          <PromptMessagesField
+            messageFields={messageFields}
+            availableFields={availableFields}
+          />
           <InputsFieldGroup />
           <OutputsFieldGroup />
           <DemonstrationsField />

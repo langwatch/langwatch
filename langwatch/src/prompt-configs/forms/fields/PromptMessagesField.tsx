@@ -19,15 +19,18 @@ import { LuMinus, LuPlus } from "react-icons/lu";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { ChevronDown } from "lucide-react";
 import { PropertySectionTitle } from "../../../optimization_studio/components/properties/BasePropertiesPanel";
+import { PromptTextArea } from "./PromptField";
 
 export function PromptMessagesField({
   messageFields,
+  availableFields,
 }: {
   messageFields: UseFieldArrayReturn<
     PromptConfigFormValues,
     "version.configData.messages",
     "id"
   >;
+  availableFields: string[];
 }) {
   const form = useFormContext<PromptConfigFormValues>();
   const { register, formState } = form;
@@ -44,94 +47,99 @@ export function PromptMessagesField({
     return messageErrors[index]?.[key];
   };
 
-  return messageFields.fields.map((field, idx) => (
-    <VerticalFormControl
-      key={field.id}
-      label={
-        <Controller
-          control={form.control}
-          name={`version.configData.messages.${idx}.role`}
-          render={({ field }) => (
-            <HStack width="full">
-              <HStack position="relative">
-                <PropertySectionTitle padding={0}>
-                  {field.value}
-                </PropertySectionTitle>
-                <Box color="gray.600" paddingTop={1}>
-                  <ChevronDown size={14} />
-                </Box>
-                <NativeSelect.Root
-                  size="sm"
-                  position="absolute"
-                  top={0}
-                  left={0}
-                  height="32px"
-                  width="100%"
-                  cursor="pointer"
-                  zIndex={10}
-                  opacity={0}
-                >
-                  <NativeSelect.Field
-                    {...field}
+  return messageFields.fields.map((field, idx) => {
+    register(`version.configData.messages.${idx}.content` as const);
+
+    return (
+      <VerticalFormControl
+        key={field.id}
+        label={
+          <Controller
+            control={form.control}
+            name={`version.configData.messages.${idx}.role`}
+            render={({ field }) => (
+              <HStack width="full">
+                <HStack position="relative">
+                  <PropertySectionTitle padding={0}>
+                    {field.value}
+                  </PropertySectionTitle>
+                  <Box color="gray.600" paddingTop={1}>
+                    <ChevronDown size={14} />
+                  </Box>
+                  <NativeSelect.Root
+                    size="sm"
+                    position="absolute"
+                    top={0}
+                    left={0}
+                    height="32px"
+                    width="100%"
                     cursor="pointer"
-                    _invalid={
-                      getMessageError(idx, "role")
-                        ? { borderColor: "red.500" }
-                        : undefined
-                    }
+                    zIndex={10}
+                    opacity={0}
                   >
-                    <option value="user">User</option>
-                    <option value="assistant">Assistant</option>
-                  </NativeSelect.Field>
-                </NativeSelect.Root>
+                    <NativeSelect.Field
+                      {...field}
+                      cursor="pointer"
+                      _invalid={
+                        getMessageError(idx, "role")
+                          ? { borderColor: "red.500" }
+                          : undefined
+                      }
+                    >
+                      <option value="user">User</option>
+                      <option value="assistant">Assistant</option>
+                    </NativeSelect.Field>
+                  </NativeSelect.Root>
+                </HStack>
+                <Spacer />
+                {idx === messageFields.fields.length - 1 && (
+                  <AddRemoveMessageFieldButton messageFields={messageFields} />
+                )}
               </HStack>
-              <Spacer />
-              {idx === messageFields.fields.length - 1 && (
-                <AddRemoveMessageFieldButton messageFields={messageFields} />
-              )}
-            </HStack>
-          )}
-        />
-      }
-      invalid={!!errors.version?.configData?.messages}
-      helper={
-        Array.isArray(errors.version?.configData?.messages)
-          ? undefined
-          : typeof errors.version?.configData?.messages === "string"
-          ? errors.version?.configData?.messages
-          : undefined
-      }
-      error={
-        Array.isArray(errors.version?.configData?.messages)
-          ? undefined
-          : typeof errors.version?.configData?.messages === "string"
-          ? errors.version?.configData?.messages
-          : undefined
-      }
-      size="sm"
-    >
-      <Textarea
-        {...register(`version.configData.messages.${idx}.content` as const)}
-        placeholder="Message content"
-        autoresize
-        maxHeight="33vh"
-        rows={3}
-        _invalid={
-          getMessageError(idx, "content")
-            ? { borderColor: "red.500" }
+            )}
+          />
+        }
+        invalid={!!errors.version?.configData?.messages}
+        helper={
+          Array.isArray(errors.version?.configData?.messages)
+            ? undefined
+            : typeof errors.version?.configData?.messages === "string"
+            ? errors.version?.configData?.messages
+            : undefined
+        }
+        error={
+          Array.isArray(errors.version?.configData?.messages)
+            ? undefined
+            : typeof errors.version?.configData?.messages === "string"
+            ? errors.version?.configData?.messages
             : undefined
         }
         size="sm"
-        fontFamily="mono"
-        fontSize="13px"
-      />
-      {getMessageError(idx, "content") && (
-        <Field.ErrorText fontSize="13px">
-          {String(getMessageError(idx, "content")?.message ?? "")}
-        </Field.ErrorText>
-      )}
-    </VerticalFormControl>
-  ));
+      >
+        <Controller
+          control={form.control}
+          name={`version.configData.messages.${idx}.content`}
+          render={({ field }) => (
+            <PromptTextArea
+              availableFields={availableFields}
+              value={field.value}
+              onChange={field.onChange}
+              _invalid={
+                getMessageError(idx, "content")
+                  ? { borderColor: "red.500" }
+                  : undefined
+              }
+            />
+          )}
+        />
+        {getMessageError(idx, "content") && (
+          <Field.ErrorText fontSize="13px">
+            {String(getMessageError(idx, "content")?.message ?? "")}
+          </Field.ErrorText>
+        )}
+      </VerticalFormControl>
+    );
+  });
 }
 
 export function AddRemoveMessageFieldButton({
