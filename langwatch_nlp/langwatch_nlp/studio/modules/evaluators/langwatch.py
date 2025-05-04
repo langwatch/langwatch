@@ -66,6 +66,7 @@ class LangWatchEvaluator(Evaluator):
                 duration=duration,
             )
         else:
+            print(f"Error running {self.evaluator} evaluator:", result.details)
             return EvaluationResultWithMetadata(
                 status="error",
                 details=result.details or "",

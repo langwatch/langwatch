@@ -45,6 +45,7 @@ import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigP
 import { api } from "~/utils/api";
 import { PromptMessagesField } from "../../../../prompt-configs/forms/fields/PromptMessagesField";
 import { useShallow } from "zustand/react/shallow";
+import { useWizardContext } from "../../../../components/evaluations/wizard/hooks/useWizardContext";
 
 /**
  * Properties panel for the Signature node in the optimization studio.
@@ -90,6 +91,8 @@ function SignaturePropertiesPanelInner({
       setNodeParameter: state.setNodeParameter,
     }))
   );
+
+  const { isInsideWizard } = useWizardContext();
 
   /**
    * Converts form values to node data and updates the workflow store.
@@ -294,6 +297,12 @@ function SignaturePropertiesPanelInner({
       hideInputs
       hideOutputs
       hideDescription
+      {...(isInsideWizard && {
+        hideHeader: true,
+        width: "full",
+        maxWidth: "full",
+        paddingX: "0",
+      })}
     >
       <VStack width="full" gap={4}>
         {/* Prompt Configuration Form */}
@@ -327,7 +336,7 @@ function SignaturePropertiesPanelInner({
               )}
               <InputsFieldGroup />
               <OutputsFieldGroup />
-              <DemonstrationsField />
+              {!isInsideWizard && <DemonstrationsField />}
             </VStack>
           </form>
         </FormProvider>
@@ -448,9 +457,21 @@ export function SignaturePropertiesPanel({
     defaultLLMConfig,
   ]);
 
+  const { isInsideWizard } = useWizardContext();
+
   if (!nodeHasConfigId) {
     return (
-      <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs>
+      <BasePropertiesPanel
+        node={node}
+        hideParameters
+        hideInputs
+        hideOutputs
+        {...(isInsideWizard && {
+          hideHeader: true,
+          width: "full",
+          maxWidth: "full",
+        })}
+      >
         <Spinner />
       </BasePropertiesPanel>
     );
