@@ -257,6 +257,7 @@ reserved_keywords = [
     "while",
     "with",
     "yield",
+    "items"
 ]
 
 
