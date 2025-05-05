@@ -25,8 +25,6 @@ export function GeneratePromptApiSnippetButton({
     return null;
   }
 
-  console.log(snippets);
-
   const snippetsWithValues = snippets.map((snippet) => ({
     ...snippet,
     content: snippet.content

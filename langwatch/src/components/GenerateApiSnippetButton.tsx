@@ -2,7 +2,7 @@ import { Button, HStack, IconButton, Portal, VStack } from "@chakra-ui/react";
 import { Dialog } from "../components/ui/dialog";
 import { Menu } from "../components/ui/menu";
 import { useDisclosure } from "@chakra-ui/react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ChevronDownIcon, CheckIcon, UnplugIcon } from "lucide-react";
 import { RenderCode } from "./code/RenderCode";
 import type { PrismLanguage } from "@react-email/components";
@@ -39,18 +39,20 @@ export function GenerateApiSnippetButton({
 
   const handleSetTarget = (target: Target) => {
     setSelectedTarget(target);
-    const language = SnippetTargetToPrismLanguageMap[target];
+  };
+
+  useEffect(() => {
+    if (!selectedTarget) return;
 
     const snippet = snippets.find(
-      (snippet) => SnippetTargetToPrismLanguageMap[snippet.target] === language
+      (snippet) => snippet.target === selectedTarget
     );
 
     if (snippet) {
       setSelectedSnippet(snippet);
     }
-  };
+  }, [snippets, selectedTarget]);
 
-  console.log(selectedSnippet, snippets);
   if (!selectedSnippet) {
     return null;
   }
