@@ -196,6 +196,7 @@ const retrievers: Retriever[] = [
 ];
 
 const ALLOWED_EVALUATORS = [
+  "langevals/llm_answer_match",
   "ragas/factual_correctness",
   "lingua/language_detection",
   "langevals/llm_boolean",
@@ -235,20 +236,6 @@ const evaluators: Evaluator[] = [
       { identifier: "score", type: "float" },
     ],
   },
-  {
-    cls: "AnswerCorrectnessEvaluator",
-    name: "LLM Answer Match",
-    description:
-      "Uses an LLM to judge to check if the generated output and the expected output are the same",
-    parameters: [{ identifier: "llm", type: "llm" }],
-    inputs: [
-      { identifier: "input", type: "str" },
-      { identifier: "output", type: "str" },
-      { identifier: "expected_output", type: "str" },
-    ],
-    outputs: [{ identifier: "passed", type: "bool" }],
-  },
-
   ...convertEvaluators(
     Object.fromEntries(
       Object.entries(AVAILABLE_EVALUATORS)
