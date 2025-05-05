@@ -9,10 +9,37 @@ export const patchForOpensearchCompatibility = (esClient: ElasticClient) => {
   };
 
   const originalSearch = esClient.search.bind(esClient);
+
   // @ts-ignore
-  esClient.search = async (...params) => {
+  esClient.search = async function patchedSearch(params, options) {
+    // Clone the params to avoid modifying the original
+    if (params) {
+      const modifiedParams = JSON.parse(JSON.stringify(params));
+
+      // Handle top-level query parameter (needs to be inside body)
+      if (modifiedParams.query && !modifiedParams.body) {
+        modifiedParams.body = { query: modifiedParams.query };
+        delete modifiedParams.query;
+      }
+
+      // Check if this is a bool/must query and normalize it if needed
+      if (modifiedParams.body?.query?.bool?.must) {
+        // Handle single item in must (convert to array if needed)
+        if (!Array.isArray(modifiedParams.body.query.bool.must)) {
+          modifiedParams.body.query.bool.must = [
+            modifiedParams.body.query.bool.must,
+          ];
+        }
+      }
+
+      // Call original with modified params but same options
+      // @ts-ignore
+      return (await originalSearch(modifiedParams, options)).body;
+    }
+
+    // If no params, just pass through to original
     // @ts-ignore
-    return (await originalSearch(...params)).body;
+    return (await originalSearch(params, options)).body;
   };
 
   const originalGet = esClient.get.bind(esClient);

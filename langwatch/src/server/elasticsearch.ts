@@ -6,7 +6,6 @@ import { patchForOpensearchCompatibility } from "./elasticsearch/patchOpensearch
 import { patchForQuickwitCompatibility } from "./elasticsearch/patchQuickwitCompatibility";
 import { prisma } from "./db";
 import { decrypt } from "../utils/encryption";
-import { patchForQueryCompatibility } from "./elasticsearch/patchForQueryCompatibility";
 export type IndexSpec = {
   alias: string;
   base: string;
@@ -104,13 +103,11 @@ export const esClient = async (
   // Apply patches to this specific client instance
   if (env.IS_OPENSEARCH) {
     patchForOpensearchCompatibility(client);
-    patchForQueryCompatibility(client);
   }
 
   if (env.IS_QUICKWIT) {
     patchForOpensearchCompatibility(client);
     patchForQuickwitCompatibility(client);
-    patchForQueryCompatibility(client);
   }
 
   return client;
