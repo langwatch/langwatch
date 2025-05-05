@@ -25,6 +25,7 @@ import {
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
+import { GeneratePromptApiSnippetButton } from "~/prompt-configs/components/GeneratePromptApiSnippetButton";
 
 const logger = createLogger(
   "langwatch:optimization_studio:prompt_source_header"
@@ -175,6 +176,7 @@ export function PromptSourceHeader({
             {...register("name")}
           />
         </InputGroup>
+        <GeneratePromptApiSnippetButton configId={configId} />
         <HStack flex={1} width="50%">
           <PromptSource configId={configId} onSelect={onPromptSourceSelect} />
         </HStack>

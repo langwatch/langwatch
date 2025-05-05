@@ -1,5 +1,6 @@
 import { Highlight, Prism } from "prism-react-renderer";
 import { monokaiTheme } from "./monokaiTheme";
+import type { PrismLanguage } from "@react-email/components";
 
 (typeof global !== "undefined" ? global : window).Prism = Prism;
 require("prismjs/components/prism-bash");
@@ -11,7 +12,7 @@ export const RenderCode = ({
   style: propsStyle = {},
 }: {
   code: string;
-  language: string;
+  language: PrismLanguage;
   style?: React.CSSProperties;
 }) => {
   return (
