@@ -9,6 +9,8 @@ from langwatch_nlp.studio.types.dsl import (
 )
 import dspy
 
+from langwatch_nlp.studio.utils import SerializableWithPydanticAndPredictEncoder
+
 
 def parse_fields(fields: List[Field], autoparse=True) -> Dict[str, Any]:
     return {
@@ -41,7 +43,7 @@ def autoparse_field_value(field: Field, value: Optional[Any]) -> Optional[Any]:
         if type(value) == str:
             return value
         try:
-            return json.dumps(value)
+            return json.dumps(value, cls=SerializableWithPydanticAndPredictEncoder)
         except Exception:
             if isinstance(value, object):
                 return repr(value)

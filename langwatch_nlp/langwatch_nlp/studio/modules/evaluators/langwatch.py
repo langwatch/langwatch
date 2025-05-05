@@ -1,3 +1,4 @@
+import json
 import time
 import langwatch
 
@@ -8,6 +9,8 @@ from langwatch_nlp.studio.dspy.evaluation import (
 )
 from langwatch.evaluations import EvaluationResultModel
 from dspy.clients.cache import request_cache
+
+from langwatch_nlp.studio.utils import SerializableWithPydanticAndPredictEncoder
 
 
 class LangWatchEvaluator(Evaluator):
@@ -31,6 +34,14 @@ class LangWatchEvaluator(Evaluator):
             kwargs["contexts"] = [kwargs["contexts"]]
         if "expected_contexts" in kwargs and type(kwargs["expected_contexts"]) != list:
             kwargs["expected_contexts"] = [kwargs["expected_contexts"]]
+        if "input" in kwargs and type(kwargs["input"]) != str:
+            kwargs["input"] = json.dumps(
+                kwargs["input"], cls=SerializableWithPydanticAndPredictEncoder
+            )
+        if "output" in kwargs and type(kwargs["output"]) != str:
+            kwargs["output"] = json.dumps(
+                kwargs["output"], cls=SerializableWithPydanticAndPredictEncoder
+            )
 
         start_time = time.time()
         result = _cached_langwatch_evaluate(
