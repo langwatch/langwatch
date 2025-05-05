@@ -5,7 +5,6 @@ export function patchForQueryCompatibility(client: ElasticClient): void {
 
   // @ts-expect-error -- We're intentionally replacing the search method
   client.search = async function patchedSearch(params, options) {
-    console.log("params", params);
     // Clone the params to avoid modifying the original
     if (params) {
       const modifiedParams = JSON.parse(JSON.stringify(params));
