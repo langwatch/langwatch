@@ -1,6 +1,7 @@
 import React from "react";
 import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
 import { generateGetPromptApiSnippets } from "../utils/generatePromptApiSnippet";
+import { getGetPromptSnippets } from "../utils/snippets";
 
 interface GeneratePromptApiSnippetButtonProps {
   configId: string;
@@ -19,9 +20,14 @@ interface GeneratePromptApiSnippetButtonProps {
 export function GeneratePromptApiSnippetButton({
   configId,
 }: GeneratePromptApiSnippetButtonProps) {
-  const { snippets, targets } = generateGetPromptApiSnippets() ?? {};
+  // const { snippets, targets } = generateGetPromptApiSnippets() ?? {};
+  const snippets = getGetPromptSnippets({
+    promptId: configId,
+    apiKey: "API_KEY",
+  });
+  const targets = snippets.map((snippet) => snippet.target);
 
-  if (!snippets || !targets) {
+  if (!snippets) {
     return null;
   }
 
@@ -33,6 +39,13 @@ export function GeneratePromptApiSnippetButton({
   }));
 
   return (
-    <GenerateApiSnippetButton snippets={snippetsWithValues} targets={targets} />
+    <GenerateApiSnippetButton
+      snippets={snippetsWithValues}
+      targets={targets}
+      variables={{
+        id: configId,
+        apiKey: "API_KEY",
+      }}
+    />
   );
 }

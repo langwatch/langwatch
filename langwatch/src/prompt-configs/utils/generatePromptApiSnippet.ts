@@ -1,20 +1,9 @@
 import OpenAPISnippet from "openapi-snippet";
 import specs from "../../../src/app/api/openapiLangWatch.json";
 import { createLogger } from "~/utils/logger";
+import type { Snippet } from "../types";
 
 const logger = createLogger("generatePromptApiSnippet");
-
-/**
- * Represents a code snippet for API usage
- */
-export type Snippet = {
-  /** The actual code content of the snippet */
-  content: string;
-  /** The programming language/framework target of the snippet */
-  target: Target;
-  /** Human-readable title for the snippet */
-  title: string;
-};
 
 /**
  * Raw result structure returned by the OpenAPISnippet library

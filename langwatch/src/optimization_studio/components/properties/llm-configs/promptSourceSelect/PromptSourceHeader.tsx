@@ -176,7 +176,10 @@ export function PromptSourceHeader({
             {...register("name")}
           />
         </InputGroup>
-        <GeneratePromptApiSnippetButton configId={configId} />
+        <GeneratePromptApiSnippetButton
+          configId={configId}
+          apiKey={project?.apiKey}
+        />
         <HStack flex={1} width="50%">
           <PromptSource configId={configId} onSelect={onPromptSourceSelect} />
         </HStack>

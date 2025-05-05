@@ -1,19 +1,26 @@
-import { Button, HStack, IconButton, Portal, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  HStack,
+  IconButton,
+  Portal,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { Dialog } from "../components/ui/dialog";
 import { Menu } from "../components/ui/menu";
 import { useDisclosure } from "@chakra-ui/react";
 import React, { useEffect, useState } from "react";
-import { ChevronDownIcon, CheckIcon, UnplugIcon } from "lucide-react";
+import { ChevronDownIcon, CheckIcon, UnplugIcon, CopyIcon } from "lucide-react";
 import { RenderCode } from "./code/RenderCode";
 import type { PrismLanguage } from "@react-email/components";
-import type {
-  Snippet,
-  Target,
-} from "../prompt-configs/utils/generatePromptApiSnippet";
+import type { Target } from "../prompt-configs/utils/generatePromptApiSnippet";
+import type { Snippet } from "../prompt-configs/types";
+import { toaster } from "./ui/toaster";
 
 interface GenerateApiSnippetButtonProps {
   snippets: Snippet[];
   targets: Target[];
+  variables?: Record<string, string>;
 }
 
 /**
@@ -29,6 +36,7 @@ interface GenerateApiSnippetButtonProps {
 export function GenerateApiSnippetButton({
   snippets,
   targets,
+  variables,
 }: GenerateApiSnippetButtonProps) {
   // Chakra v3's useDisclosure for modal open/close state
   const { open, onOpen, onClose } = useDisclosure();
@@ -101,7 +109,37 @@ export function GenerateApiSnippetButton({
             />
           </Dialog.Body>
           <Dialog.Footer>
-            {/* Placeholder for future copy button(s) */}
+            {/* Variables section with copy buttons */}
+            {variables && Object.keys(variables).length > 0 && (
+              <VStack width="100%" align="stretch" gap={2} mb={4}>
+                <Text fontWeight="medium">Variables:</Text>
+                {Object.entries(variables).map(([key, value], index) => (
+                  <HStack
+                    key={index}
+                    justifyContent="space-between"
+                    p={2}
+                    bg="gray.50"
+                    borderRadius="md"
+                  >
+                    <Text fontFamily="monospace">
+                      {key}: {value}
+                    </Text>
+                    <IconButton
+                      aria-label={`Copy ${key}`}
+                      children={<CopyIcon />}
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        navigator.clipboard.writeText(value);
+                        toaster.success({
+                          title: "Copied to clipboard",
+                        });
+                      }}
+                    />
+                  </HStack>
+                ))}
+              </VStack>
+            )}
           </Dialog.Footer>
         </Dialog.Content>
       </Dialog.Root>
