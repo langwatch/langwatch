@@ -25,5 +25,16 @@ export function GeneratePromptApiSnippetButton({
     return null;
   }
 
-  return <GenerateApiSnippetButton snippets={snippets} targets={targets} />;
+  console.log(snippets);
+
+  const snippetsWithValues = snippets.map((snippet) => ({
+    ...snippet,
+    content: snippet.content
+      .replace("%7Bid%7D", configId)
+      .replace("REPLACE_KEY_VALUE", "API_KEY"),
+  }));
+
+  return (
+    <GenerateApiSnippetButton snippets={snippetsWithValues} targets={targets} />
+  );
 }

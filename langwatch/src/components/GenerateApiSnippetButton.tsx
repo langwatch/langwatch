@@ -73,23 +73,29 @@ export function GenerateApiSnippetButton({
       >
         <Dialog.Backdrop />
         <Dialog.Content>
-          <VStack width="100%">
-            <Dialog.CloseTrigger />
-            <Dialog.Header>
-              <HStack justifyContent="space-between" width="100%">
-                <Dialog.Title>API Usage Code</Dialog.Title>
-                <LanguageMenu
-                  selectedTarget={selectedTarget}
-                  setSelectedTarget={handleSetTarget}
-                  targets={targets}
-                />
-              </HStack>
-            </Dialog.Header>
-          </VStack>
+          <Dialog.CloseTrigger />
+          <Dialog.Header width="100%" marginTop={4}>
+            <HStack justifyContent="space-between" width="100%">
+              <Dialog.Title>API Usage Code</Dialog.Title>
+              <LanguageMenu
+                selectedTarget={selectedTarget}
+                setSelectedTarget={handleSetTarget}
+                targets={targets}
+              />
+            </HStack>
+          </Dialog.Header>
           <Dialog.Body>
             <RenderCode
               code={selectedSnippet.content}
               language={SnippetTargetToPrismLanguageMap[selectedTarget]}
+              style={{
+                fontSize: "12px",
+                lineHeight: "1.5",
+                fontFamily: "monospace",
+                whiteSpace: "pre-wrap",
+                padding: "20px",
+                borderRadius: "5px",
+              }}
             />
           </Dialog.Body>
           <Dialog.Footer>
