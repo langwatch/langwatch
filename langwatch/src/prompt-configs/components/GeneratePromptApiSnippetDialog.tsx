@@ -1,21 +1,23 @@
 import React from "react";
-import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
+import { GenerateApiSnippetDialog } from "~/components/GenerateApiSnippetDialog";
 import { getGetPromptSnippets } from "../utils/snippets/getGetPromptSnippets";
 
 interface GeneratePromptApiSnippetButtonProps {
   configId: string;
   apiKey?: string;
+  children?: React.ReactNode;
 }
 
 /**
- * GeneratePromptApiSnippetButton
+ * GeneratePromptApiSnippetDialog
  *
  * Renders an icon-only button that, when clicked, opens a modal (Dialog)
  * for displaying API code snippets for prompt usage.
  */
-export function GeneratePromptApiSnippetButton({
+export function GeneratePromptApiSnippetDialog({
   configId,
   apiKey,
+  children,
 }: GeneratePromptApiSnippetButtonProps) {
   const snippets = getGetPromptSnippets({
     promptId: configId,
@@ -29,10 +31,11 @@ export function GeneratePromptApiSnippetButton({
   }
 
   return (
-    <GenerateApiSnippetButton
-      snippets={snippets}
-      targets={targets}
-      title="Get Prompt by ID"
-    />
+    <GenerateApiSnippetDialog snippets={snippets} targets={targets}>
+      {children}
+    </GenerateApiSnippetDialog>
   );
 }
+
+// Re-export the Trigger subcomponent for composability
+GeneratePromptApiSnippetDialog.Trigger = GenerateApiSnippetDialog.Trigger;
