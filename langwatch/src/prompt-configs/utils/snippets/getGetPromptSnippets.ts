@@ -26,18 +26,19 @@ curl --request GET \\
     },
     {
       content: `
-import requests
+import httpx
 
 url = "https://app.langwatch.ai/api/prompts/${promptId}"
 
 headers = {"X-Auth-Token": "${apiKey}"}
 
-response = requests.request("GET", url, headers=headers)
+with httpx.Client() as client:
+    response = client.get(url, headers=headers)
 
 print(response.text)
 `,
-      target: "python_requests",
-      title: "Get Prompts (Python)",
+      target: "python_python3",
+      title: "Get Prompts (Python httpx)",
     },
     {
       content: `
@@ -90,7 +91,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 )
 
@@ -103,7 +104,7 @@ func main() {
 	res, _ := http.DefaultClient.Do(req)
 	defer res.Body.Close()
 	
-	body, _ := ioutil.ReadAll(res.Body)
+	body, _ := io.ReadAll(res.Body)
 
 	fmt.Println(res)
 	fmt.Println(string(body))

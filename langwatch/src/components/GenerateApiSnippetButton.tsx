@@ -16,11 +16,12 @@ export function GenerateApiSnippetButton({
     >
       <IconButton
         aria-label="Show API code snippet"
-        children={<UnplugIcon />}
         size="sm"
         variant="outline"
         onClick={onClick}
-      />
+      >
+        <UnplugIcon />
+      </IconButton>
     </Tooltip>
   );
 }

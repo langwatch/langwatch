@@ -3,7 +3,7 @@ import { GenerateApiSnippetDialog } from "~/components/GenerateApiSnippetDialog"
 import { getGetPromptSnippets } from "../utils/snippets/getGetPromptSnippets";
 
 interface GeneratePromptApiSnippetButtonProps {
-  configId: string;
+  configId?: string;
   apiKey?: string;
   children?: React.ReactNode;
 }
@@ -26,8 +26,8 @@ export function GeneratePromptApiSnippetDialog({
 
   const targets = snippets.map((snippet) => snippet.target);
 
-  if (!snippets || !apiKey) {
-    return null;
+  if (!snippets) {
+    return children;
   }
 
   return (

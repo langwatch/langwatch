@@ -138,14 +138,14 @@ export function PromptConfigTable({
         </Table.Header>
         <Table.Body>
           {configs.map((config) => (
-            <GeneratePromptApiSnippetDialog
-              configId={config.id}
-              apiKey={project?.apiKey}
+            <Table.Row
+              key={config.id}
+              onClick={() => onRowClick?.(config)}
+              cursor={onRowClick ? "pointer" : "default"}
             >
-              <Table.Row
-                key={config.id}
-                onClick={() => onRowClick?.(config)}
-                cursor={onRowClick ? "pointer" : "default"}
+              <GeneratePromptApiSnippetDialog
+                configId={config.id}
+                apiKey={project?.apiKey}
               >
                 {columns.map((column) => (
                   <Table.Cell
@@ -155,8 +155,8 @@ export function PromptConfigTable({
                     {column.render(config)}
                   </Table.Cell>
                 ))}
-              </Table.Row>
-            </GeneratePromptApiSnippetDialog>
+              </GeneratePromptApiSnippetDialog>
+            </Table.Row>
           ))}
         </Table.Body>
       </Table.Root>
