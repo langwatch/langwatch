@@ -77,7 +77,11 @@ export function AutoSave() {
                 setRecentlySaved(false);
               }, 5000);
               void (async () => {
-                await trpc.workflow.getVersions.refetch();
+                await trpc.workflow.getVersions.refetch({
+                  workflowId: workflow.data.id,
+                  projectId: project.id,
+                  returnDSL: "previousVersion",
+                });
                 setPreviousWorkflow(stateWorkflow);
               })();
             },

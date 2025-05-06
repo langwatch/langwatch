@@ -125,6 +125,13 @@ const config = {
     // eslint-disable-next-line @typescript-eslint/dot-notation
     config.resolve.alias["zod"] = `${__dirname}/node_modules/zod`;
 
+    // Add fallback for pino logger requirements
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      worker_threads: false,
+      fs: false,
+    };
+
     config.module.rules.push({
       test: /\.(js|jsx|ts|tsx)$/,
       use: [

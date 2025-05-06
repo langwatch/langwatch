@@ -61,7 +61,9 @@ ${JSON.stringify(dataset)}
     `,
   });
 
-  const model = await getVercelAIModel(projectId);
+  const model = await getVercelAIModel(projectId, undefined, {
+    parallelToolCalls: false,
+  });
 
   const result = streamText({
     model,

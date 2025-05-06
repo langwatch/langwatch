@@ -1,3 +1,4 @@
+import json
 import time
 import langwatch
 
@@ -7,7 +8,9 @@ from langwatch_nlp.studio.dspy.evaluation import (
     Money,
 )
 from langwatch.evaluations import EvaluationResultModel
-from dspy.dsp.cache_utils import CacheMemory
+from dspy.clients.cache import request_cache
+
+from langwatch_nlp.studio.utils import SerializableWithPydanticAndPredictEncoder
 
 
 class LangWatchEvaluator(Evaluator):
@@ -31,6 +34,14 @@ class LangWatchEvaluator(Evaluator):
             kwargs["contexts"] = [kwargs["contexts"]]
         if "expected_contexts" in kwargs and type(kwargs["expected_contexts"]) != list:
             kwargs["expected_contexts"] = [kwargs["expected_contexts"]]
+        if "input" in kwargs and type(kwargs["input"]) != str:
+            kwargs["input"] = json.dumps(
+                kwargs["input"], cls=SerializableWithPydanticAndPredictEncoder
+            )
+        if "output" in kwargs and type(kwargs["output"]) != str:
+            kwargs["output"] = json.dumps(
+                kwargs["output"], cls=SerializableWithPydanticAndPredictEncoder
+            )
 
         start_time = time.time()
         result = _cached_langwatch_evaluate(
@@ -66,6 +77,7 @@ class LangWatchEvaluator(Evaluator):
                 duration=duration,
             )
         else:
+            print(f"Error running {self.evaluator} evaluator:", result.details)
             return EvaluationResultWithMetadata(
                 status="error",
                 details=result.details or "",
@@ -74,7 +86,7 @@ class LangWatchEvaluator(Evaluator):
             )
 
 
-@CacheMemory.cache
+@request_cache(ignored_args_for_cache_key=["api_key"])
 def _cached_langwatch_evaluate(
     evaluator: str, name: str, settings: dict, api_key: str, **kwargs
 ) -> EvaluationResultModel:

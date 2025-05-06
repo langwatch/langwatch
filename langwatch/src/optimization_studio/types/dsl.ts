@@ -5,6 +5,7 @@ import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 
 import type { DatasetColumns } from "../../server/datasets/types";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
+import type { ChatMessage } from "../../server/tracer/types";
 
 export const FIELD_TYPES = [
   "str",
@@ -18,6 +19,8 @@ export const FIELD_TYPES = [
   "list[int]",
   "list[bool]",
   "dict",
+  "json_schema",
+  "chat_messages",
   "signature",
   "llm",
   "prompting_technique",
@@ -33,6 +36,7 @@ export type Field = {
   desc?: string;
   prefix?: string;
   hidden?: boolean;
+  json_schema?: object;
 };
 
 export type ExecutionStatus =
@@ -130,6 +134,15 @@ type InstructionsParameter = StronglyTypedFieldBase & {
   value: string;
 };
 
+/**
+ * Chat Messages parameter
+ */
+type MessagesParameter = StronglyTypedFieldBase & {
+  type: "chat_messages";
+  identifier: "messages";
+  value: ChatMessage[];
+};
+
 export type LlmPromptConfigComponent = Signature & {
   configId: string;
   name: string;
@@ -140,6 +153,7 @@ export type LlmPromptConfigComponent = Signature & {
     | PromptingTechniqueParameter
     | DemonstrationsParameter
     | InstructionsParameter
+    | MessagesParameter
   )[];
 };
 
@@ -225,7 +239,7 @@ export const workflowJsonSchema = z
   .passthrough();
 
 export type Workflow = {
-  spec_version: "1.3";
+  spec_version: "1.4";
   workflow_id?: string;
   experiment_id?: string;
   name: string;
@@ -236,6 +250,7 @@ export type Workflow = {
   nodes: Node<Component>[];
   edges: Edge[];
   data?: Record<string, any>;
+  template_adapter: "default" | "dspy_chat_adapter";
   enable_tracing: boolean;
 
   state: {

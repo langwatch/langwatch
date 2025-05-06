@@ -2,6 +2,7 @@ import {
   Box,
   HStack,
   Input,
+  List,
   Spacer,
   Text,
   Textarea,
@@ -212,6 +213,37 @@ export const WorkflowPropertiesPanel = () => {
             setWorkflow({ default_llm: llmConfig });
           }}
         />
+      </PropertyField>
+      <PropertyField
+        title="Template Adapter"
+        tooltip={
+          <Text>
+            <b>Default Template</b> - Uses OpenAI-style messages and json schema
+            structured output formats for the LLM prompts.
+            <br />
+            <br />
+            <b>DSPy Adapter</b> - Uses primary pure text output format and parse
+            it later, may be more performatic, useful for smaller models as
+            well.
+          </Text>
+        }
+      >
+        <NativeSelect.Root size="sm">
+          <NativeSelect.Field
+            value={workflow.template_adapter}
+            onChange={(e) => {
+              setWorkflow({
+                template_adapter: e.target.value as
+                  | "default"
+                  | "dspy_chat_adapter",
+              });
+            }}
+          >
+            <option value="default">Default</option>
+            <option value="dspy_chat_adapter">DSPy Adapter</option>
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
       </PropertyField>
       <PropertyField title="Enable Tracing">
         <HStack paddingX={2} width="full">

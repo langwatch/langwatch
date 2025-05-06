@@ -11,10 +11,12 @@ import type { Node, Edge } from "@xyflow/react";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 import type { JsonArray } from "@prisma/client/runtime/library";
 
-export const useAvailableEvaluators = (): Record<
-  EvaluatorTypes | `custom/${string}`,
-  EvaluatorDefinition<EvaluatorTypes>
-> => {
+export const useAvailableEvaluators = ():
+  | Record<
+      EvaluatorTypes | `custom/${string}`,
+      EvaluatorDefinition<EvaluatorTypes>
+    >
+  | undefined => {
   const { project } = useOrganizationTeamProject();
 
   const availableCustomEvaluators =
@@ -23,8 +25,11 @@ export const useAvailableEvaluators = (): Record<
       { enabled: !!project }
     );
 
-  const availableEvaluators = useMemo(
-    () => ({
+  const availableEvaluators = useMemo(() => {
+    if (!availableCustomEvaluators.data) {
+      return undefined;
+    }
+    return {
       ...AVAILABLE_EVALUATORS,
       ...Object.fromEntries(
         (availableCustomEvaluators.data ?? []).map((evaluator) => {
@@ -52,9 +57,8 @@ export const useAvailableEvaluators = (): Record<
           ];
         })
       ),
-    }),
-    [availableCustomEvaluators.data]
-  );
+    };
+  }, [availableCustomEvaluators.data]);
 
   return availableEvaluators;
 };

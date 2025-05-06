@@ -6,6 +6,7 @@ import httpx
 import dspy
 
 from langwatch_nlp.studio.dspy.evaluation import EvaluationResultWithMetadata, Evaluator
+from langwatch_nlp.studio.utils import SerializableWithPydanticAndPredictEncoder
 
 
 class CustomNode(dspy.Module):
@@ -29,8 +30,8 @@ class CustomNode(dspy.Module):
 
         response = httpx.post(
             url,
-            headers={"X-Auth-Token": self.api_key},
-            json=kwargs,
+            headers={"X-Auth-Token": self.api_key, "Content-Type": "application/json"},
+            content=json.dumps(kwargs, cls=SerializableWithPydanticAndPredictEncoder),
             timeout=600,  # 10 minutes
         )
 

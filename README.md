@@ -110,7 +110,7 @@ def main():
 
 ![A view of a trace in the LangWatch app](assets/trace-view.webp)
 
-You can also view a public share of the trace [**here**](https://app.langwatch.ai/share/454HTo7XvvbWoPkR56giP).
+You can also view a public share of the trace [**here**](https://app.langwatch.ai/share/pA8sBaRf5Nn2sa7OkhJfi).
 
 ## 🗺️ Integrations
 

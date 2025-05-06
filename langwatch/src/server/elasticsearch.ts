@@ -4,7 +4,6 @@ import { Client as OpenSearchClient } from "@opensearch-project/opensearch";
 import { env } from "../env.mjs";
 import { patchForOpensearchCompatibility } from "./elasticsearch/patchOpensearchCompatibility";
 import { patchForQuickwitCompatibility } from "./elasticsearch/patchQuickwitCompatibility";
-
 import { prisma } from "./db";
 import { decrypt } from "../utils/encryption";
 export type IndexSpec = {

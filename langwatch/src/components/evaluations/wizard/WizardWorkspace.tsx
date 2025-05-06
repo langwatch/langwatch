@@ -257,6 +257,10 @@ const WizardOptimizationStudioCanvas = memo(
         }}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onBeforeDelete={() => {
+          // We don't delete nodes in the wizard
+          return Promise.resolve(false);
+        }}
         onConnect={(connection) => {
           const result = onConnect(connection);
           if (result?.error) {
@@ -302,7 +306,7 @@ function CodeImplementation() {
 
   const availableEvaluators = useAvailableEvaluators();
 
-  if (!checkType) return null;
+  if (!checkType || !availableEvaluators) return null;
 
   return (
     <Card.Root width="full" height="full" position="sticky" top={6}>

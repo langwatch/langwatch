@@ -173,6 +173,7 @@ class SpanParams(TypedDict, total=False):
     parallel_tool_calls: Optional[bool]
     functions: Optional[List[Dict[str, Any]]]
     user: Optional[str]
+    response_format: Optional[Union[Dict[str, Any], BaseModel]]
 
 
 class BaseSpan(TypedDict):

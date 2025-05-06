@@ -219,7 +219,7 @@ def normalize_name_to_class_name(node_name: str) -> str:
     # Keep only alphanumeric characters
     import re
 
-    class_name = re.sub(r"[^a-zA-Z0-9]", "", node_name)
+    class_name = re.sub(r"[^a-zA-Z0-9]", "", node_name).capitalize()
 
     return class_name
 
@@ -257,6 +257,7 @@ reserved_keywords = [
     "while",
     "with",
     "yield",
+    "items"
 ]
 
 
@@ -274,6 +275,10 @@ def normalize_to_variable_name(name: str) -> str:
         name = f"{name}_"
 
     return name
+
+
+def snake_case_to_pascal_case(name: str) -> str:
+    return "".join(word.capitalize() for word in name.split("_"))
 
 
 class SerializableWithPydanticAndPredictEncoder(json.JSONEncoder):

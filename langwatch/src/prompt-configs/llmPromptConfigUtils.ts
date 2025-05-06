@@ -1,9 +1,7 @@
 import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
 
-import type {
-  DatasetColumnType,
-} from "~/server/datasets/types";
+import type { DatasetColumnType } from "~/server/datasets/types";
 import {
   parseLlmConfigVersion,
   type LatestConfigVersionSchema,
@@ -56,6 +54,11 @@ export function llmConfigToOptimizationStudioNodeData(
         type: "dataset",
         value: version.configData.demonstrations,
       },
+      {
+        identifier: "messages",
+        type: "chat_messages",
+        value: version.configData.messages ?? [],
+      },
     ],
   };
 }
@@ -85,6 +88,11 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
         type: "dataset",
         value: formValues.version?.configData?.demonstrations,
       },
+      {
+        identifier: "messages",
+        type: "chat_messages",
+        value: formValues.version?.configData?.messages ?? [],
+      },
     ],
   };
 }
@@ -98,6 +106,7 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   const llmParameter = parametersMap.llm as LlmConfigParameter | undefined;
   const inputs = safeInputs(nodeData.inputs);
   const outputs = safeOutputs(nodeData.outputs);
+
   return {
     name: nodeData.name ?? "",
     version: {
@@ -109,6 +118,9 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
           typeof parametersMap.instructions?.value === "string"
             ? parametersMap.instructions.value
             : undefined,
+        messages: Array.isArray(parametersMap.messages?.value)
+          ? parametersMap.messages.value
+          : [],
         demonstrations: {
           columns: inputsAndOutputsToDemostrationColumns(inputs, outputs),
           rows:
@@ -151,6 +163,10 @@ function safeOutputs(
         return {
           identifier: output.identifier,
           type: output.type as LlmConfigOutputType,
+          ...(output.json_schema && {
+            json_schema:
+              output.json_schema as PromptConfigFormValues["version"]["configData"]["outputs"][number]["json_schema"],
+          }),
         };
       }
       return {
@@ -182,9 +198,9 @@ export function inputsAndOutputsToDemostrationColumns(
 }
 
 function inputOutputTypeToDatasetColumnType(
-  type: Omit<LlmConfigInputType | LlmConfigOutputType, "image">
+  type_: LlmConfigInputType | LlmConfigOutputType
 ): DatasetColumnType {
-  switch (type) {
+  switch (type_) {
     case "str":
       return "string";
     case "float":
@@ -195,8 +211,19 @@ function inputOutputTypeToDatasetColumnType(
       return "list";
     case "image":
       throw new Error("Image is not supported in demonstrations");
+    case "json_schema":
+      return "json";
+    case "list[float]":
+      return "list";
+    case "list[int]":
+      return "list";
+    case "list[bool]":
+      return "list";
+    case "dict":
+      return "json";
     default:
-      throw new Error(`Unknown input/output type: ${type}`);
+      type_ satisfies never;
+      throw new Error(`Unknown input/output type: ${type_}`);
   }
 }
 

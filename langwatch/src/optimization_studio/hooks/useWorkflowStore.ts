@@ -27,6 +27,8 @@ import { WizardContext } from "../../components/evaluations/wizard/hooks/useWiza
 import { useEvaluationWizardStore } from "../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useShallow } from "zustand/react/shallow";
 import { findLowestAvailableName } from "../utils/nodeUtils";
+import { LlmConfigInputTypes } from "../../types";
+import { nanoid } from "nanoid";
 
 export type SocketStatus =
   | "disconnected"
@@ -70,6 +72,11 @@ export type WorkflowStore = State & {
   onConnect: (connection: Connection) => { error?: string } | undefined;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
+  edgeConnectToNewHandle: (
+    source: string,
+    sourceHandle: string,
+    target: string
+  ) => string;
   /**
    * Update a node in the workflow.
    * This will find the node by id and update it.
@@ -123,7 +130,7 @@ const DEFAULT_LLM_CONFIG: LLMConfig = {
 
 export const initialDSL: Workflow = {
   workflow_id: undefined,
-  spec_version: "1.3",
+  spec_version: "1.4",
   name: "Loading...",
   icon: "🧩",
   description: "",
@@ -131,6 +138,7 @@ export const initialDSL: Workflow = {
   nodes: [],
   edges: [],
   default_llm: DEFAULT_LLM_CONFIG,
+  template_adapter: "default",
   enable_tracing: true,
   state: {},
 };
@@ -159,6 +167,7 @@ export const getWorkflow = (state: State) => {
     description: state.description,
     version: state.version,
     default_llm: state.default_llm,
+    template_adapter: state.template_adapter,
     enable_tracing: state.enable_tracing,
     nodes: state.nodes,
     edges: state.edges,
@@ -250,6 +259,70 @@ export const store = (
   },
   setEdges: (edges: Edge[]) => {
     set({ edges });
+  },
+  edgeConnectToNewHandle: (
+    source: string,
+    sourceHandle: string,
+    target: string
+  ) => {
+    const nodes = get().nodes;
+    const edges = get().edges;
+    const inputs = edges
+      .filter((edge) => edge.target === target)
+      ?.map((edge) => edge.targetHandle?.split(".")[1]);
+
+    let inc = 2;
+    let newHandle = sourceHandle;
+    while (inputs?.includes(newHandle)) {
+      newHandle = `${sourceHandle}${inc}`;
+      inc++;
+    }
+
+    const sourceField = nodes
+      .find((node) => node.id === source)
+      ?.data.outputs?.find((output) => output.identifier === sourceHandle);
+    let type = sourceField?.type;
+    if (type === "json_schema") {
+      type = "dict";
+    }
+    if (!type || !(type in LlmConfigInputTypes)) {
+      type = "str";
+    }
+
+    const existingInputs = nodes
+      .find((node) => node.id === target)
+      ?.data.inputs?.map((input) => input.identifier);
+    set({
+      nodes: nodes.map((node) =>
+        node.id === target
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                inputs: existingInputs?.includes(newHandle)
+                  ? node.data.inputs
+                  : [
+                      ...(node.data.inputs ?? []),
+                      { identifier: newHandle, type },
+                    ],
+              } as Component,
+            }
+          : node
+      ),
+      edges: [
+        ...edges,
+        {
+          id: `edge-${nanoid()}`,
+          source,
+          target,
+          sourceHandle: `outputs.${sourceHandle}`,
+          targetHandle: `inputs.${newHandle}`,
+          type: "default",
+        },
+      ],
+    });
+
+    return newHandle;
   },
   setNode: (node: Partial<Node> & { id: string }, newId?: string) => {
     set(
@@ -685,6 +758,8 @@ const typesMap: Record<Field["type"], string> = {
   "list[int]": "list[int]",
   "list[bool]": "list[bool]",
   dict: "dict[str, Any]",
+  json_schema: "Any",
+  chat_messages: "list[dict[str, Any]]",
   signature: "dspy.Signature",
   llm: "Any",
   prompting_technique: "Any",

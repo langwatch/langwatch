@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useForm, type DeepPartial } from "react-hook-form";
 import { z } from "zod";
 
@@ -17,6 +17,7 @@ const formSchema = promptConfigSchema.extend({
   version: z.object({
     configData: z.object({
       prompt: latestConfigVersionSchema.shape.configData.shape.prompt,
+      messages: latestConfigVersionSchema.shape.configData.shape.messages,
       inputs: latestConfigVersionSchema.shape.configData.shape.inputs,
       outputs: latestConfigVersionSchema.shape.configData.shape.outputs,
       llm: z.object({
@@ -40,6 +41,10 @@ interface UsePromptConfigFormProps {
   initialConfigValues?: DeepPartial<PromptConfigFormValues>;
   onChange?: (formValues: PromptConfigFormValues) => void;
 }
+
+let disableOnChange = false;
+let disableNodeSync = false;
+let disableFormSyncTimeout: NodeJS.Timeout | null = null;
 
 export const usePromptConfigForm = ({
   configId,
@@ -66,9 +71,36 @@ export const usePromptConfigForm = ({
     }
   }, [formData]);
 
-  // Provides on change callback to the parent component
+  // Provides forward sync of parent component to form values
   useEffect(() => {
+    if (disableNodeSync) return;
+    disableOnChange = true;
+    for (const [key, value] of Object.entries(
+      initialConfigValues?.version?.configData ?? {}
+    )) {
+      const currentValue = methods.getValues(
+        `version.configData.${key}` as any
+      );
+      if (!isEqual(currentValue, value)) {
+        methods.setValue(`version.configData.${key}` as any, value as any);
+      }
+    }
+    setTimeout(() => {
+      disableOnChange = false;
+    }, 1);
+  }, [initialConfigValues]);
+
+  // Provides reverse sync of form values to the parent component
+  useEffect(() => {
+    if (disableOnChange) return;
+    disableNodeSync = true;
     onChange?.(formData);
+    if (disableFormSyncTimeout) {
+      clearTimeout(disableFormSyncTimeout);
+    }
+    disableFormSyncTimeout = setTimeout(() => {
+      disableNodeSync = false;
+    }, 1);
   }, [formData, onChange]);
 
   return {

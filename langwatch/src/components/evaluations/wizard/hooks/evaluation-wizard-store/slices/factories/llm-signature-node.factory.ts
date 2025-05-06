@@ -15,7 +15,6 @@ const DEFAULT_SIGNATURE_NODE_PROPERTIES = (
 ): LlmSignatureNode => ({
   type: "signature",
   id: "llm_node",
-  deletable: false,
   data: {
     name: "LLM Node",
     description: "LLM calling node",
@@ -38,16 +37,26 @@ const DEFAULT_SIGNATURE_NODE_PROPERTIES = (
         value: "You are a helpful assistant.",
       },
       {
+        identifier: "messages",
+        type: "chat_messages" as const,
+        value: [
+          {
+            role: "user",
+            content: "{{input}}",
+          },
+        ],
+      },
+      {
         identifier: "demonstrations",
         type: "dataset" as const,
         value: {
           columns: [
             {
-              name: "Input",
+              name: "input",
               type: "string",
             },
             {
-              name: "Output",
+              name: "output",
               type: "string",
             },
           ],

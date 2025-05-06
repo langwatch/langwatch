@@ -7,7 +7,11 @@ import {
 import { prisma } from "../db";
 import { env } from "../../env.mjs";
 
-export const getVercelAIModel = async (projectId: string, model?: string) => {
+export const getVercelAIModel = async (
+  projectId: string,
+  model?: string,
+  settings?: any
+) => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
@@ -43,6 +47,6 @@ export const getVercelAIModel = async (projectId: string, model?: string) => {
   });
 
   return vercelProvider(model_, {
-    parallelToolCalls: false,
+    ...settings,
   });
 };

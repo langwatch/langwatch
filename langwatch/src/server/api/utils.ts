@@ -1,7 +1,12 @@
-import { ProjectSensitiveDataVisibilityLevel, TeamUserRole, type PrismaClient } from "@prisma/client";
+import {
+  ProjectSensitiveDataVisibilityLevel,
+  TeamUserRole,
+  type PrismaClient,
+} from "@prisma/client";
 import { backendHasTeamProjectPermission, TeamRoleGroup } from "./permission";
 import type { Protections } from "../elasticsearch/protections";
 import type { Session } from "next-auth";
+import { isDemoProject } from "./permission";
 
 export const extractCheckKeys = (
   inputObject: Record<string, any>
@@ -40,39 +45,55 @@ export const flattenObjectKeys = (
   }, []);
 };
 
-
 export async function getProtectionsForProject(
   prisma: PrismaClient,
   { projectId }: { projectId: string } & Record<string, unknown>
 ): Promise<Protections> {
-  return await getUserProtectionsForProject({ prisma, session: null, publiclyShared: false }, { projectId });
+  return await getUserProtectionsForProject(
+    { prisma, session: null, publiclyShared: false },
+    { projectId }
+  );
 }
 
 export async function getUserProtectionsForProject(
-  ctx: { prisma: PrismaClient; session: Session | null; publiclyShared?: boolean },
+  ctx: {
+    prisma: PrismaClient;
+    session: Session | null;
+    publiclyShared?: boolean;
+  },
   { projectId }: { projectId: string } & Record<string, unknown>
 ): Promise<Protections> {
   // TODO(afr): Should we show cost if public? I would assume the opposite.
-  const canSeeCosts = ctx.publiclyShared || await backendHasTeamProjectPermission(
-    ctx,
-    { projectId },
-    TeamRoleGroup.COST_VIEW
-  );
+  const canSeeCosts =
+    ctx.publiclyShared ||
+    (await backendHasTeamProjectPermission(
+      ctx,
+      { projectId },
+      TeamRoleGroup.COST_VIEW
+    ));
 
   const project = await ctx.prisma.project.findUniqueOrThrow({
     where: { id: projectId },
-    select: { 
+    select: {
       capturedInputVisibility: true,
       capturedOutputVisibility: true,
     },
   });
 
   // For public shares or non-signed in users, we only check project settings
-  if (ctx.publiclyShared || !ctx.session?.user?.id) {
+  if (
+    ctx.publiclyShared ||
+    !ctx.session?.user?.id ||
+    isDemoProject(projectId, TeamRoleGroup.MESSAGES_VIEW)
+  ) {
     return {
       canSeeCosts,
-      canSeeCapturedInput: project.capturedInputVisibility === ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-      canSeeCapturedOutput: project.capturedOutputVisibility === ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+      canSeeCapturedInput:
+        project.capturedInputVisibility ===
+        ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+      canSeeCapturedOutput:
+        project.capturedOutputVisibility ===
+        ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
     };
   }
 
@@ -83,20 +104,24 @@ export async function getUserProtectionsForProject(
       team: {
         projects: {
           some: {
-            id: projectId
-          }
-        }
-      }
+            id: projectId,
+          },
+        },
+      },
     },
     select: {
-      role: true
+      role: true,
     },
   });
 
-  const isAdminInAnyTeam = teamsWithAccess.some(team => team.role === TeamUserRole.ADMIN);
+  const isAdminInAnyTeam = teamsWithAccess.some(
+    (team) => team.role === TeamUserRole.ADMIN
+  );
   const isMemberInAnyTeam = teamsWithAccess.length > 0;
 
-  const obtainVisibilityLevel = (visibility: ProjectSensitiveDataVisibilityLevel): boolean => {
+  const obtainVisibilityLevel = (
+    visibility: ProjectSensitiveDataVisibilityLevel
+  ): boolean => {
     switch (true) {
       case !isMemberInAnyTeam:
         return false;
@@ -107,7 +132,7 @@ export async function getUserProtectionsForProject(
       case visibility === ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN:
         return isAdminInAnyTeam;
       default:
-        console.error('Unexpected state for visibility:', visibility);
+        console.error("Unexpected state for visibility:", visibility);
         return false;
     }
   };
@@ -115,6 +140,8 @@ export async function getUserProtectionsForProject(
   return {
     canSeeCosts,
     canSeeCapturedInput: obtainVisibilityLevel(project.capturedInputVisibility),
-    canSeeCapturedOutput: obtainVisibilityLevel(project.capturedOutputVisibility),
+    canSeeCapturedOutput: obtainVisibilityLevel(
+      project.capturedOutputVisibility
+    ),
   };
 }

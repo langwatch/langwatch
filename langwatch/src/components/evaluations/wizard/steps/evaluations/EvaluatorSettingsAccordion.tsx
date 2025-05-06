@@ -24,7 +24,7 @@ export const EvaluatorSettingsAccordion = () => {
   const availableEvaluators = useAvailableEvaluators();
 
   const schema =
-    evaluatorType && evaluatorType in availableEvaluators
+    evaluatorType && availableEvaluators && evaluatorType in availableEvaluators
       ? evaluatorsSchema.shape[evaluatorType as EvaluatorTypes]?.shape.settings
       : undefined;
 
@@ -46,7 +46,7 @@ export const EvaluatorSettingsAccordion = () => {
     | undefined =
     Object.keys(settingsFromParameters).length > 0
       ? (settingsFromParameters as any)
-      : evaluatorType
+      : evaluatorType && availableEvaluators
       ? getEvaluatorDefaultSettings(
           availableEvaluators[evaluatorType as EvaluatorTypes],
           project,
@@ -66,7 +66,7 @@ export const EvaluatorSettingsAccordion = () => {
 
   const onSubmit = useCallback(
     (data: { settings?: Record<string, any> }) => {
-      if (!evaluatorType) return;
+      if (!evaluatorType || !availableEvaluators) return;
 
       // This updates the evaluator node with the settings
       setFirstEvaluator(

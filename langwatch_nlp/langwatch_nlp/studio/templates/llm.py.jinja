@@ -1,8 +1,8 @@
-{% from 'macros.jinja' import node_llm_config_to_dspy_lm %}
+{% from 'macros.jinja' import node_llm_config_to_dspy_lm, escape_prompt %}
 
 import dspy
 from typing import Dict, Any, List, Optional
-from langwatch_nlp.studio.dspy.llm_node import LLMNode
+from langwatch_nlp.studio.dspy import LLMNode, TemplateAdapter
 
 {% set class_name = component.name or "Anonymous" %}
 
@@ -14,16 +14,36 @@ from langwatch_nlp.studio.dspy.llm_node import LLMNode
     {% endif %}
 {% endfor %}
 
+{% for key, value in json_schema_types.items() %}
+{{ value["code"] }}
+{% endfor %}
+
+{% if standalone and workflow.template_adapter == "default" %}
+dspy.configure(adapter=TemplateAdapter())
+{% endif %}
+
 class {{ class_name }}Signature(dspy.Signature):
     {% if parameters.get('instructions', '') %}
-    """{{ parameters.get('instructions', '') }}"""
+    {{ escape_prompt(parameters.get('instructions', '')) }}
 
     {% endif %}
+    {% if parameters.get('messages', '') %}
+    _messages = [
+        {% for message in parameters.get('messages', []) %}
+        {"role": "{{ message.role }}", "content": {{ escape_prompt(message.content) }}},
+        {% endfor %}
+    ]
+    {% endif %}
+
     {% for input_field in component.inputs or [] %}
     {{ input_field.identifier }}: {{ FIELD_TYPE_TO_DSPY_TYPE[input_field.type.value] }} = dspy.InputField()
     {% endfor %}
     {% for output_field in component.outputs or [] %}
+    {% if output_field.type == "json_schema" %}
+    {{ output_field.identifier }}: {{ json_schema_types[output_field.identifier]["model_name"] }} = dspy.OutputField()
+    {% else %}
     {{ output_field.identifier }}: {{ FIELD_TYPE_TO_DSPY_TYPE[output_field.type.value] }} = dspy.OutputField()
+    {% endif %}
     {% endfor %}
     {% if not component.inputs and not component.outputs %}
     pass

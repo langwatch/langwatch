@@ -1,4 +1,14 @@
-from langwatch.domain import ChatMessage, EvaluationResult, SpanInputOutput, TypedValueChatMessages, TypedValueEvaluationResult, TypedValueJson, TypedValueRaw, TypedValueText, RAGChunk
+from langwatch.domain import (
+    ChatMessage,
+    EvaluationResult,
+    SpanInputOutput,
+    TypedValueChatMessages,
+    TypedValueEvaluationResult,
+    TypedValueJson,
+    TypedValueRaw,
+    TypedValueText,
+    RAGChunk,
+)
 import json
 from typing import List, Optional, TypeVar, Union, cast
 from pydantic import BaseModel, ValidationError
@@ -37,6 +47,8 @@ class SerializableAndPydanticEncoder(json.JSONEncoder):
 
         if isinstance(o, BaseModel):
             return o.model_dump(exclude_unset=True)
+        if issubclass(o, BaseModel):  # type: ignore
+            return {"__class__": o.__name__, "json_schema": o.model_json_schema()}
         return super().default(o)
 
 
@@ -66,7 +78,7 @@ def validate_safe(type_, item: dict, min_required_keys_for_pydantic_1: List[str]
             required_fields = getattr(type_, "__required_keys__", set())
             if not all(key in item for key in required_fields):
                 return False
-            
+
             # Check if all values match their annotations
             annotations = type_.__annotations__
             return all(
@@ -108,7 +120,7 @@ def rag_contexts(value: Union[List[RAGChunk], List[str]]) -> List[RAGChunk]:
 
 
 def convert_typed_values(
-    value: Union[SpanInputOutput, ChatMessage, str, dict, list]
+    value: Union[SpanInputOutput, ChatMessage, str, dict, list],
 ) -> SpanInputOutput:
     value_ = value
 
@@ -215,4 +227,3 @@ def truncate_object_recursively(
 
     else:
         return obj
-

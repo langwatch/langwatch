@@ -86,7 +86,7 @@ export function PromptConfigTable({
   onRowClick,
 }: PromptConfigTableProps) {
   if (isLoading) {
-    return <Text>Loading prompt configurations...</Text>;
+    return <Text>Loading prompts...</Text>;
   }
 
   if (configs.length === 0) {

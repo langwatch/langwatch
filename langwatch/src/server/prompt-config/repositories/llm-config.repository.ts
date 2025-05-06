@@ -8,6 +8,7 @@ import {
 } from "./llm-config-version-schema";
 import { LlmConfigVersionsRepository } from "./llm-config-versions.repository";
 import { createLogger } from "../../../utils/logger";
+import { nanoid } from "nanoid";
 
 const logger = createLogger("langwatch:prompt-config:llm-config.repository");
 
@@ -75,7 +76,10 @@ export class LlmConfigRepository {
             latestVersion: parseLlmConfigVersion(config.versions[0]),
           };
         } catch (error) {
-          logger.error({ error, configId: config.id }, "Error parsing LLM config version");
+          logger.error(
+            { error, configId: config.id },
+            "Error parsing LLM config version"
+          );
           return null;
         }
       })
@@ -185,6 +189,7 @@ export class LlmConfigRepository {
       // Create the config within the transaction
       const newConfig = await tx.llmPromptConfig.create({
         data: {
+          id: `prompt_${nanoid()}`,
           name: configData.name,
           projectId: configData.projectId,
         },
@@ -198,6 +203,7 @@ export class LlmConfigRepository {
       // Create the initial version within the same transaction
       const newVersion = await tx.llmPromptConfigVersion.create({
         data: {
+          id: `prompt_version_${nanoid()}`,
           configId: newConfig.id,
           projectId: configData.projectId,
           authorId: configData.authorId,
@@ -205,6 +211,12 @@ export class LlmConfigRepository {
           configData: {
             model: defaultModel?.defaultModel ?? "openai/gpt-4o-mini",
             prompt: "You are a helpful assistant",
+            messages: [
+              {
+                role: "user",
+                content: "{{input}}",
+              },
+            ],
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
             demonstrations: {

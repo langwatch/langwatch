@@ -1,8 +1,8 @@
-import { Separator, Spinner, VStack } from "@chakra-ui/react";
-import type { Node } from "@xyflow/react";
+import { Spinner, VStack } from "@chakra-ui/react";
+import { useUpdateNodeInternals, type Node } from "@xyflow/react";
 import debounce from "lodash.debounce";
 import { useEffect, useMemo, useRef } from "react";
-import { FormProvider } from "react-hook-form";
+import { FormProvider, useFieldArray } from "react-hook-form";
 
 import type { LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
@@ -25,8 +25,10 @@ import {
   InputsFieldGroup,
   OutputsFieldGroup,
 } from "~/prompt-configs/forms/fields/PromptConfigVersionFieldGroup";
-import { PromptField } from "~/prompt-configs/forms/fields/PromptField";
-import { PromptNameField } from "~/prompt-configs/forms/fields/PromptNameField";
+import {
+  PromptField,
+  type PromptTextAreaOnAddMention,
+} from "~/prompt-configs/forms/fields/PromptField";
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import {
   usePromptConfigForm,
@@ -41,6 +43,10 @@ import {
 import { PromptConfigProvider } from "~/prompt-configs/providers/PromptConfigProvider";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import { api } from "~/utils/api";
+import { PromptMessagesField } from "../../../../prompt-configs/forms/fields/PromptMessagesField";
+import { useShallow } from "zustand/react/shallow";
+import { useWizardContext } from "../../../../components/evaluations/wizard/hooks/useWizardContext";
+
 /**
  * Properties panel for the Signature node in the optimization studio.
  *
@@ -67,6 +73,27 @@ function SignaturePropertiesPanelInner({
   const configId = node.data.configId;
   const setNode = useSmartSetNode();
 
+  const {
+    templateAdapter,
+    nodes,
+    edges,
+    edgeConnectToNewHandle,
+    getWorkflow,
+    setNodeParameter,
+  } = useWorkflowStore(
+    useShallow((state) => ({
+      templateAdapter: state.getWorkflow().template_adapter,
+      nodes: state.getWorkflow().nodes,
+      edges: state.getWorkflow().edges,
+      edgeConnectToNewHandle: state.edgeConnectToNewHandle,
+      setNode: state.setNode,
+      getWorkflow: state.getWorkflow,
+      setNodeParameter: state.setNodeParameter,
+    }))
+  );
+
+  const { isInsideWizard } = useWizardContext();
+
   /**
    * Converts form values to node data and updates the workflow store.
    * This ensures the node's data stays in sync with the form state.
@@ -75,23 +102,26 @@ function SignaturePropertiesPanelInner({
    */
   const syncNodeDataWithFormValues = useMemo(
     () =>
-      // Debounce the sync to prevent excessive re-renders when the user is typing
       debounce((formValues: PromptConfigFormValues) => {
         const newNodeData = promptConfigFormValuesToOptimizationStudioNodeData(
           configId,
           formValues
         );
         setNode({
-          ...node,
+          id: node.id,
           data: newNodeData,
         });
-      }, 1000),
-    [configId, node, setNode]
+      }, 200),
+    [configId, node.id, setNode]
   );
 
   // Initialize form with values from node data
-  const initialConfigValues =
-    safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(node.data);
+  const initialConfigValues = useMemo(
+    () =>
+      safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(node.data),
+    [node.data]
+  );
+
   const formProps = usePromptConfigForm({
     configId,
     initialConfigValues,
@@ -141,15 +171,122 @@ function SignaturePropertiesPanelInner({
     }
   };
 
-  const handleTriggerSaveVersion = async (
+  const handleTriggerSaveVersion = (
     configId: string,
     saveFormValues: PromptConfigFormValues
   ) => {
-    // Check form value validity
-    const isValid = await formProps.methods.trigger();
-    if (!isValid) return;
+    void (async () => {
+      // Check form value validity
+      const isValid = await formProps.methods.trigger();
+      if (!isValid) return;
 
-    triggerSaveVersion(configId, saveFormValues);
+      triggerSaveVersion(configId, saveFormValues);
+    })();
+  };
+
+  /**
+   * It is a known limitation of react-hook-form useFieldArray that we cannot
+   * access the fields array from the form provider using the context.
+   *
+   * So we need to create this in the parent and prop drill it down.
+   */
+  const messageFields = useFieldArray({
+    control: formProps.methods.control,
+    name: "version.configData.messages",
+  });
+
+  const availableFields = useMemo(() => {
+    return node.data.inputs.map((input) => input.identifier);
+  }, [JSON.stringify(node.data.inputs)]);
+
+  // Find all nodes that depends on this node based on the edges
+  const otherNodesFields = useMemo(() => {
+    const currentConnections = edges
+      .filter((edge) => edge.target === node.id)
+      .map((edge) => edge.source + "." + edge.sourceHandle);
+
+    let dependentNodes: string[] = [];
+    let toVisit = [node.id];
+    while (toVisit.length > 0) {
+      const currentNode = toVisit.shift();
+      if (!currentNode) continue;
+      dependentNodes.push(currentNode);
+      toVisit.push(
+        ...edges
+          .filter((edge) => edge.source === currentNode)
+          .map((edge) => edge.target)
+      );
+    }
+
+    return Object.fromEntries(
+      nodes
+        .filter(
+          (node) => !dependentNodes.includes(node.id) && node.id !== "end"
+        )
+        .map((node) => [
+          node.id,
+          node.data.outputs
+            ?.map((output) => output.identifier)
+            .filter(
+              (id) => !currentConnections.includes(`${node.id}.outputs.${id}`)
+            ) ?? [],
+        ])
+    );
+  }, [edges, nodes, node.id, JSON.stringify(node.data.outputs)]);
+
+  const updateNodeInternals = useUpdateNodeInternals();
+
+  const onAddEdge = (
+    id: string,
+    handle: string,
+    content: PromptTextAreaOnAddMention
+  ) => {
+    const newHandle = edgeConnectToNewHandle(id, handle, node.id);
+    updateNodeInternals(node.id);
+
+    const templateRef = `{{${newHandle}}}`;
+    const content_ =
+      content.value.substring(0, content.startPos) +
+      templateRef +
+      content.value.substring(content.endPos);
+
+    const stateNode = getWorkflow().nodes.find((n) => n.id === node.id)!;
+    return { node: stateNode, newPrompt: content_ };
+  };
+
+  const onAddPromptEdge = (
+    id: string,
+    handle: string,
+    content: PromptTextAreaOnAddMention
+  ) => {
+    const { node, newPrompt } = onAddEdge(id, handle, content);
+
+    setNodeParameter(node.id, {
+      identifier: "instructions",
+      type: "str",
+      value: newPrompt,
+    });
+  };
+
+  const onAddMessageEdge = (
+    id: string,
+    handle: string,
+    content: PromptTextAreaOnAddMention,
+    idx: number
+  ) => {
+    const { node, newPrompt } = onAddEdge(id, handle, content);
+    const messagesParam = node.data.parameters?.find(
+      (param) => param.identifier === "messages"
+    );
+    if (!messagesParam) return;
+
+    setNodeParameter(node.id, {
+      identifier: "messages",
+      type: "chat_messages",
+      value: (messagesParam.value as any[]).map((field, i) =>
+        i === idx ? { ...field, content: newPrompt } : field
+      ),
+    });
   };
 
   // TODO: Consider refactoring the BasePropertiesPanel so that we don't need to hide everything like this
@@ -160,6 +297,12 @@ function SignaturePropertiesPanelInner({
       hideInputs
       hideOutputs
       hideDescription
+      {...(isInsideWizard && {
+        hideHeader: true,
+        width: "full",
+        maxWidth: "full",
+        paddingX: "0",
+      })}
     >
       <VStack width="full" gap={4}>
         {/* Prompt Configuration Form */}
@@ -175,10 +318,25 @@ function SignaturePropertiesPanelInner({
                 values={formProps.methods.getValues()}
               />
               <WrappedOptimizationStudioLLMConfigField />
-              <PromptField />
+              <PromptField
+                messageFields={messageFields}
+                templateAdapter={templateAdapter}
+                availableFields={availableFields}
+                otherNodesFields={otherNodesFields}
+                onAddEdge={onAddPromptEdge}
+                isTemplateSupported={templateAdapter === "default"}
+              />
+              {templateAdapter === "default" && (
+                <PromptMessagesField
+                  messageFields={messageFields}
+                  availableFields={availableFields}
+                  otherNodesFields={otherNodesFields}
+                  onAddEdge={onAddMessageEdge}
+                />
+              )}
               <InputsFieldGroup />
               <OutputsFieldGroup />
-              <DemonstrationsField />
+              {!isInsideWizard && <DemonstrationsField />}
             </VStack>
           </form>
         </FormProvider>
@@ -251,9 +409,10 @@ export function SignaturePropertiesPanel({
           const newVersion = await createNewVersion(
             newConfig.id,
             {
-              prompt: rest?.prompt ?? currentConfigData.prompt,
+              prompt: rest?.prompt ?? "",
               inputs: rest?.inputs ?? currentConfigData.inputs,
               outputs: rest?.outputs ?? currentConfigData.outputs,
+              messages: rest?.messages ?? currentConfigData.messages,
               model: llm?.model ?? currentConfigData.model,
               temperature: llm?.temperature ?? currentConfigData.temperature,
               max_tokens: llm?.max_tokens ?? currentConfigData.max_tokens,
@@ -298,9 +457,21 @@ export function SignaturePropertiesPanel({
     defaultLLMConfig,
   ]);
 
+  const { isInsideWizard } = useWizardContext();
+
   if (!nodeHasConfigId) {
     return (
-      <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs>
+      <BasePropertiesPanel
+        node={node}
+        hideParameters
+        hideInputs
+        hideOutputs
+        {...(isInsideWizard && {
+          hideHeader: true,
+          width: "full",
+          maxWidth: "full",
+        })}
+      >
         <Spinner />
       </BasePropertiesPanel>
     );

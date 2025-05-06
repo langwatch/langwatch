@@ -1,11 +1,12 @@
 import {
-  type PrismaClient,
-  type LlmPromptConfigVersion,
-  type User,
   type LlmPromptConfig,
+  type LlmPromptConfigVersion,
+  type PrismaClient,
+  type User,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
+import { nanoid } from "nanoid";
 import {
   type LatestConfigVersionSchema,
   type SchemaVersion,
@@ -156,7 +157,9 @@ export class LlmConfigVersionsRepository {
       const newVersion = await tx.llmPromptConfigVersion.create({
         data: {
           ...versionData,
+          id: `prompt_version_${nanoid()}`,
           version: count, // Since we start at zero, this is correct
+          configData: versionData.configData as any,
         },
       });
 

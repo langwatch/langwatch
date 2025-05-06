@@ -1,5 +1,6 @@
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Book } from "react-feather";
+import { formatTimeAgo } from "../../../../../../utils/formatTimeAgo";
 
 // Prompt List Component
 interface PromptListProps {
@@ -72,7 +73,7 @@ function PromptListItem({ prompt, onSelect }: PromptListItemProps) {
           </Text>
           <HStack width="full">
             <Text fontSize="xs" color="gray.500">
-              Updated: {new Date(prompt.updatedAt).toLocaleDateString()}
+              Updated: {formatTimeAgo(prompt.updatedAt.getTime())}
             </Text>
             <Text fontSize="xs" fontWeight="medium" color="gray.600">
               (v{prompt.latestVersion.version})

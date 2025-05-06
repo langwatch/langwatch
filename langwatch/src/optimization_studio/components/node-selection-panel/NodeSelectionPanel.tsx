@@ -167,7 +167,7 @@ export const NodeSelectionPanel = ({
                       custom.id === workflow?.workflow_id;
                     return (
                       <NodeDraggable
-                        key={custom.name}
+                        key={custom.id}
                         component={createCustomComponent(custom as Custom)}
                         type="custom"
                         disableDrag={isCurrentWorkflow}
@@ -229,7 +229,7 @@ export const NodeSelectionPanel = ({
                       custom.id === workflow?.workflow_id;
                     return (
                       <NodeDraggable
-                        key={custom.name}
+                        key={custom.id}
                         component={createCustomComponent(custom as Custom)}
                         type="custom"
                         behave_as="evaluator"

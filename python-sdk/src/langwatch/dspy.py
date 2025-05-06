@@ -600,9 +600,9 @@ class LangWatchTrackedMIPROv2(MIPROv2):
 
             result = original_evaluate_call(self, program, *args, **kwargs)  # type: ignore
             if isinstance(result, tuple):
-                score : float = result[0]
+                score: float = result[0]
             else:
-                score : float = result
+                score: float = result
 
             scores.append(score)
 
@@ -744,11 +744,30 @@ class DSPyTracer:
         def call(self: dspy.LM, prompt=None, messages=None, **kwargs):
             all_kwargs = self.kwargs | kwargs
             model = self.model
-            params = {}
-            if "temperature" in all_kwargs:
-                params["temperature"] = all_kwargs["temperature"]
-            if "max_tokens" in all_kwargs:
-                params["max_tokens"] = all_kwargs["max_tokens"]
+            span_params = {}
+            params = [
+                "frequency_penalty",
+                "logit_bias",
+                "logprobs",
+                "top_logprobs",
+                "max_tokens",
+                "n",
+                "presence_penalty",
+                "seed",
+                "stop",
+                "stream",
+                "temperature",
+                "top_p",
+                "tools",
+                "tool_choice",
+                "parallel_tool_calls",
+                "functions",
+                "user",
+                "response_format",
+            ]
+            for param in params:
+                if all_kwargs.get(param):
+                    span_params[param] = all_kwargs.get(param, None)
 
             span = self_.safe_get_current_span()
             if span:
@@ -758,7 +777,7 @@ class DSPyTracer:
                     input=(
                         messages if messages else [{"role": "user", "content": prompt}]
                     ),
-                    params=params,
+                    params=span_params,
                 )
 
             result = self.__class__.__original_call__(self, prompt, messages, **kwargs)  # type: ignore
@@ -767,7 +786,13 @@ class DSPyTracer:
                 span.update(output=result)
 
             history = self.history[-1] if len(self.history) > 0 else None
-            if history and "usage" in history and span:
+            if (
+                history
+                and "usage" in history
+                and "completion_tokens" in history["usage"]
+                and "prompt_tokens" in history["usage"]
+                and span
+            ):
                 span.update(
                     metrics={
                         "completion_tokens": history["usage"]["completion_tokens"],

@@ -9,10 +9,89 @@ export const patchForOpensearchCompatibility = (esClient: ElasticClient) => {
   };
 
   const originalSearch = esClient.search.bind(esClient);
+
   // @ts-ignore
-  esClient.search = async (...params) => {
+  esClient.search = async function patchedSearch(params, options) {
+    // Clone the params to avoid modifying the original
+    if (params) {
+      const modifiedParams = JSON.parse(JSON.stringify(params));
+
+      // Handle top-level query parameter (needs to be inside body)
+      if (modifiedParams.query && !modifiedParams.body) {
+        modifiedParams.body = { query: modifiedParams.query };
+        delete modifiedParams.query;
+      }
+
+      // Handle top-level aggs parameter (needs to be inside body)
+      if (modifiedParams.aggs && !modifiedParams.body) {
+        modifiedParams.body = modifiedParams.body || {};
+        modifiedParams.body.aggs = modifiedParams.aggs;
+        delete modifiedParams.aggs;
+      } else if (modifiedParams.aggs && modifiedParams.body) {
+        modifiedParams.body.aggs = modifiedParams.aggs;
+        delete modifiedParams.aggs;
+      }
+
+      // Handle top-level sort parameter (needs to be inside body)
+      if (modifiedParams.sort) {
+        if (!modifiedParams.body) {
+          modifiedParams.body = {};
+        }
+
+        // Ensure sort is properly formatted
+        if (Array.isArray(modifiedParams.sort)) {
+          // Format each sort item if it's an array of sort instructions
+          modifiedParams.body.sort = modifiedParams.sort.map((sortItem) => {
+            // If sort item is an object like { field: { order: 'asc' } }
+            if (
+              typeof sortItem === "object" &&
+              sortItem !== null &&
+              !Array.isArray(sortItem)
+            ) {
+              const field = Object.keys(sortItem)[0];
+              const options = sortItem[field];
+              // If the options is an object, it's already in the right format
+              if (typeof options === "object" && options !== null) {
+                return { [field]: options };
+              } else {
+                // If options is just 'asc' or 'desc', format it properly
+                return { [field]: { order: options } };
+              }
+            }
+            return sortItem;
+          });
+        } else if (
+          typeof modifiedParams.sort === "object" &&
+          modifiedParams.sort !== null
+        ) {
+          // If sort is a single object, put it in an array
+          modifiedParams.body.sort = [modifiedParams.sort];
+        } else {
+          // Simple string or other type
+          modifiedParams.body.sort = modifiedParams.sort;
+        }
+
+        delete modifiedParams.sort;
+      }
+
+      // Check if this is a bool/must query and normalize it if needed
+      if (modifiedParams.body?.query?.bool?.must) {
+        // Handle single item in must (convert to array if needed)
+        if (!Array.isArray(modifiedParams.body.query.bool.must)) {
+          modifiedParams.body.query.bool.must = [
+            modifiedParams.body.query.bool.must,
+          ];
+        }
+      }
+
+      // Call original with modified params but same options
+      // @ts-ignore
+      return (await originalSearch(modifiedParams, options)).body;
+    }
+
+    // If no params, just pass through to original
     // @ts-ignore
-    return (await originalSearch(...params)).body;
+    return (await originalSearch(params, options)).body;
   };
 
   const originalGet = esClient.get.bind(esClient);
