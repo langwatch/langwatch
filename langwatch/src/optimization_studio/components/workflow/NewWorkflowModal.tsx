@@ -37,6 +37,17 @@ export const NewWorkflowModal = ({
 
   const handleFileUpload = (file: File) => {
     const reader = new FileReader();
+
+    if (file.size > 5 * 1024 * 1024) {
+      toaster.create({
+        title: "File too large",
+        description: "Please upload a file smaller than 5MB.",
+        type: "error",
+        placement: "top-end",
+        meta: { closable: true },
+      });
+      return;
+    }
     reader.onload = (e) => {
       try {
         const content = e.target?.result as string;
