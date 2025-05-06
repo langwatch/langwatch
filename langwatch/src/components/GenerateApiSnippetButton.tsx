@@ -14,8 +14,6 @@ import { ChevronDownIcon, CheckIcon, UnplugIcon, CopyIcon } from "lucide-react";
 import { RenderCode } from "./code/RenderCode";
 import type { Target } from "../prompt-configs/utils/generatePromptApiSnippet";
 import type { Snippet } from "../prompt-configs/types";
-import { toaster } from "./ui/toaster";
-import type { SupportedLanguage } from "./code/RenderCode";
 
 interface GenerateApiSnippetButtonProps {
   snippets: Snippet[];

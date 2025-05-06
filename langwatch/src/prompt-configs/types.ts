@@ -1,5 +1,3 @@
-import type { Target } from "./utils/generatePromptApiSnippet";
-
 /**
  * Represents a code snippet for API usage
  */
@@ -11,3 +9,34 @@ export type Snippet = {
   /** Human-readable title for the snippet */
   title: string;
 };
+
+/**
+ * List of all available programming language/framework targets supported by OpenAPISnippet
+ */
+const AVAILABLE_TARGETS = [
+  "c_libcurl",
+  "csharp_restsharp",
+  "csharp_httpclient",
+  "go_native",
+  "java_okhttp",
+  "java_unirest",
+  "javascript_jquery",
+  "javascript_xhr",
+  "node_native",
+  "node_request",
+  "node_unirest",
+  "objc_nsurlsession",
+  "ocaml_cohttp",
+  "php_curl",
+  "php_http1",
+  "php_http2",
+  "python_python3",
+  "python_requests",
+  "ruby_native",
+  "shell_curl",
+  "shell_httpie",
+  "shell_wget",
+  "swift_nsurlsession",
+] as const;
+
+export type Target = (typeof AVAILABLE_TARGETS)[number];
