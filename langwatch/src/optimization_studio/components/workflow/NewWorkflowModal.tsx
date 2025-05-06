@@ -122,8 +122,9 @@ export const NewWorkflowModal = ({
               ))}
               <Box
                 as="div"
-                borderWidth="1px"
+                borderWidth="2px"
                 borderRadius="md"
+                borderStyle="dashed"
                 cursor="pointer"
                 backgroundColor="white"
                 data-testid="new-workflow-card-import"
@@ -154,7 +155,7 @@ export const NewWorkflowModal = ({
                     if (file) handleFileUpload(file);
                   }}
                 />
-                <VStack align="center" gap={2}>
+                <VStack align="center" gap={2} paddingY={4}>
                   <Box p={2}>
                     <Upload color="#666" size={16} />
                   </Box>

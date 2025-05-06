@@ -34,7 +34,7 @@ import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
 
 import { Separator } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
+import type { Dataset, DatasetRecord, Project } from "@prisma/client";
 import { type Edge } from "@xyflow/react";
 import { ChevronDown } from "react-feather";
 import { useForm } from "react-hook-form";
@@ -50,6 +50,12 @@ import {
   inMemoryDatasetToNodeDataset,
 } from "../utils/datasetUtils";
 import { checkIsEvaluator, getEntryInputs } from "../utils/nodeUtils";
+
+// Type with dataset property
+interface NodeDataWithDataset {
+  dataset: any;
+  [key: string]: any;
+}
 
 export function Publish({ isDisabled }: { isDisabled: boolean }) {
   const publishModal = useDisclosure();
@@ -103,20 +109,26 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
 
 const exportWorkflow = async (
   publishedWorkflow: Workflow,
-  datasetData?: any
+  datasetData?: Dataset & { datasetRecords: DatasetRecord[] }
 ) => {
   let dsl = publishedWorkflow;
 
-  if (datasetData && datasetData.datasetRecords?.length > 0) {
+  if (
+    datasetData &&
+    datasetData.datasetRecords &&
+    datasetData.datasetRecords.length > 0
+  ) {
     const inMemoryDataset =
       datasetDatabaseRecordsToInMemoryDataset(datasetData);
     delete inMemoryDataset.datasetId;
     const dataset = inMemoryDatasetToNodeDataset(inMemoryDataset);
 
     if (dsl.nodes?.[0]?.data) {
-      dsl.nodes[0].data.dataset = dataset;
+      (dsl.nodes[0].data as NodeDataWithDataset).dataset = dataset;
     }
   }
+
+  dsl.workflow_id = "";
 
   // // Create and trigger download
   const url = window.URL.createObjectURL(new Blob([JSON.stringify(dsl)]));
@@ -333,7 +345,7 @@ function PublishMenu({
     // Type cast the publishedWorkflow.data to avoid type errors
     exportWorkflow(
       publishedWorkflow.data.dsl as unknown as Workflow,
-      datasetRecords.data
+      datasetRecords.data ?? undefined
     );
   };
 
