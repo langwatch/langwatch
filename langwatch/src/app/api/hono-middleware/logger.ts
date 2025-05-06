@@ -1,5 +1,5 @@
-import type { Context, Next } from "hono"
-import { createLogger } from "../../../utils/logger"
+import type { Context, Next } from "hono";
+import { createLogger } from "../../../utils/logger";
 
 const logger = createLogger("langwatch:api:hono");
 
@@ -35,4 +35,3 @@ export const loggerMiddleware = () => {
     }
   };
 };
-

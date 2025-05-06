@@ -15,7 +15,7 @@ import {
   versionInputSchema,
   versionOutputSchema,
 } from "./schemas";
-import { authMiddleware } from "./middleware/auth";
+import { authMiddleware, repositoryMiddleware } from "./middleware";
 import { getOutputsToResponseFormat } from "./utils";
 import { baseResponses } from "./constants";
 
@@ -34,6 +34,7 @@ export const app = new Hono<{
 }>().basePath("/api/prompts");
 app.use(loggerMiddleware());
 app.use("/*", authMiddleware);
+app.use("/*", repositoryMiddleware);
 
 // Get all prompts
 app.get(
@@ -52,7 +53,16 @@ app.get(
   async (c) => {
     const repository = c.get("llmConfigRepository");
     const project = c.get("project");
+
+    logger.info({ projectId: project.id }, "Getting all prompts for project");
+
     const configs = await repository.getAllWithLatestVersion(project.id);
+
+    logger.info(
+      { projectId: project.id, count: configs.length },
+      "Retrieved prompts for project"
+    );
+
     return c.json(configs);
   }
 );
@@ -106,8 +116,17 @@ app.get(
         response_format: getOutputsToResponseFormat(config),
       } satisfies z.infer<typeof promptOutputSchema>;
 
+      logger.info(
+        { projectId: project.id, promptId: id, name: config.name },
+        "Successfully retrieved prompt"
+      );
+
       return c.json(response);
     } catch (error: any) {
+      logger.error(
+        { projectId: project.id, promptId: id, error: error.message },
+        "Error retrieving prompt"
+      );
       return c.json({ error: error.message }, 404);
     }
   }
@@ -138,12 +157,30 @@ app.post(
     const data = c.req.valid("json");
     const { name } = data;
 
-    const newConfig = await repository.createConfigWithInitialVersion({
-      name,
-      projectId: project.id,
-    });
+    logger.info(
+      { projectId: project.id, promptName: name },
+      "Creating new prompt with initial version"
+    );
 
-    return c.json(newConfig);
+    try {
+      const newConfig = await repository.createConfigWithInitialVersion({
+        name,
+        projectId: project.id,
+      });
+
+      logger.info(
+        { projectId: project.id, promptId: newConfig.id, promptName: name },
+        "Successfully created new prompt"
+      );
+
+      return c.json(newConfig);
+    } catch (error: any) {
+      logger.error(
+        { projectId: project.id, promptName: name, error: error.message },
+        "Error creating new prompt"
+      );
+      return c.json({ error: error.message }, 500);
+    }
   }
 );
 
@@ -166,13 +203,28 @@ app.get(
     const project = c.get("project");
     const { id } = c.req.param();
 
+    logger.info(
+      { projectId: project.id, promptId: id },
+      "Getting versions for prompt"
+    );
+
     try {
       const versions = await repository.versions.getVersionsForConfigById({
         configId: id,
         projectId: project.id,
       });
+
+      logger.info(
+        { projectId: project.id, promptId: id, versionCount: versions.length },
+        "Successfully retrieved prompt versions"
+      );
+
       return c.json(versions);
     } catch (error: any) {
+      logger.error(
+        { projectId: project.id, promptId: id, error: error.message },
+        "Error retrieving prompt versions"
+      );
       return c.json({ error: error.message }, 404);
     }
   }
@@ -199,14 +251,34 @@ app.post(
     const { id } = c.req.param();
     const data = c.req.valid("json");
 
+    logger.info(
+      { projectId: project.id, promptId: id, model: data.configData?.model },
+      "Creating new version for prompt"
+    );
+
     try {
       const version = await repository.versions.createVersion({
         ...data,
         configId: id,
         projectId: project.id,
       });
+
+      logger.info(
+        {
+          projectId: project.id,
+          promptId: id,
+          versionId: version.id,
+          version: version.version,
+        },
+        "Successfully created new prompt version"
+      );
+
       return c.json(version);
     } catch (error: any) {
+      logger.error(
+        { projectId: project.id, promptId: id, error: error.message },
+        "Error creating new prompt version"
+      );
       return c.json({ error: error.message }, 404);
     }
   }
@@ -236,10 +308,25 @@ app.put(
     const { id } = c.req.param();
     const data = c.req.valid("json");
 
+    logger.info(
+      { projectId: project.id, promptId: id, newName: data.name },
+      "Updating prompt"
+    );
+
     try {
       const updatedConfig = await repository.updateConfig(id, project.id, data);
+
+      logger.info(
+        { projectId: project.id, promptId: id, name: updatedConfig.name },
+        "Successfully updated prompt"
+      );
+
       return c.json(updatedConfig);
     } catch (error: any) {
+      logger.error(
+        { projectId: project.id, promptId: id, error: error.message },
+        "Error updating prompt"
+      );
       return c.json({ error: error.message }, 404);
     }
   }
@@ -264,10 +351,22 @@ app.delete(
     const project = c.get("project");
     const { id } = c.req.param();
 
+    logger.info({ projectId: project.id, promptId: id }, "Deleting prompt");
+
     try {
       const result = await repository.deleteConfig(id, project.id);
+
+      logger.info(
+        { projectId: project.id, promptId: id, success: result.success },
+        "Successfully deleted prompt"
+      );
+
       return c.json(result satisfies z.infer<typeof successSchema>);
     } catch (error: any) {
+      logger.error(
+        { projectId: project.id, promptId: id, error: error.message },
+        "Error deleting prompt"
+      );
       return c.json(
         { error: error.message } satisfies z.infer<typeof badRequestSchema>,
         404

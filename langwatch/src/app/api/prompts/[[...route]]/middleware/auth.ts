@@ -1,6 +1,5 @@
 import { type MiddlewareHandler } from "hono";
 import { prisma } from "~/server/db";
-import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
 
 export const authMiddleware: MiddlewareHandler = async (c, next) => {
   const apiKey =
@@ -17,7 +16,6 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
 
   // Store project and repository for use in route handlers
   c.set("project", project);
-  c.set("llmConfigRepository", new LlmConfigRepository(prisma));
 
   return next();
 };
