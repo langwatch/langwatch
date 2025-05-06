@@ -8,6 +8,10 @@ export type Snippet = {
   target: Target;
   /** Human-readable title for the snippet */
   title: string;
+  /** Human-readable description for the snippet */
+  path?: string;
+  /** The HTTP method for the snippet */
+  method?: string;
 };
 
 /**

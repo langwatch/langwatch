@@ -20,7 +20,9 @@ curl --request GET \\
   --header 'X-Auth-Token: ${apiKey}'
 `,
       target: "shell_curl",
-      title: "Get Prompts",
+      title: "Get Prompts (cURL)",
+      path: "/api/prompts/{id}",
+      method: "GET",
     },
     {
       content: `
@@ -35,7 +37,7 @@ response = requests.request("GET", url, headers=headers)
 print(response.text)
 `,
       target: "python_requests",
-      title: "Get Prompts",
+      title: "Get Prompts (Python)",
     },
     {
       content: `
@@ -80,7 +82,7 @@ if ($err) {
 }
 `,
       target: "php_curl",
-      title: "Get Prompts",
+      title: "Get Prompts (PHP cURL)",
     },
     {
       content: `
@@ -108,7 +110,7 @@ func main() {
 }
 `,
       target: "go_native",
-      title: "Get Prompts",
+      title: "Get Prompts (Go)",
     },
     {
       content: `
@@ -131,7 +133,7 @@ public class GetPrompt {
 }
 `,
       target: "java_unirest",
-      title: "Get Prompts",
+      title: "Get Prompts (Java)",
     },
   ];
 }

@@ -28,5 +28,11 @@ export function GeneratePromptApiSnippetButton({
     return null;
   }
 
-  return <GenerateApiSnippetButton snippets={snippets} targets={targets} />;
+  return (
+    <GenerateApiSnippetButton
+      snippets={snippets}
+      targets={targets}
+      title="Get Prompt by ID"
+    />
+  );
 }

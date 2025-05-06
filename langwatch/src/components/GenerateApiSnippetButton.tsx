@@ -1,11 +1,4 @@
-import {
-  Button,
-  HStack,
-  IconButton,
-  Portal,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "../components/ui/dialog";
 import { Menu } from "../components/ui/menu";
 import { useDisclosure } from "@chakra-ui/react";
@@ -18,6 +11,8 @@ import type { PrismLanguage } from "@react-email/components";
 interface GenerateApiSnippetButtonProps {
   snippets: Snippet[];
   targets: Target[];
+  title?: string;
+  description?: string;
 }
 
 /**
@@ -33,6 +28,8 @@ interface GenerateApiSnippetButtonProps {
 export function GenerateApiSnippetButton({
   snippets,
   targets,
+  title,
+  description,
 }: GenerateApiSnippetButtonProps) {
   // Chakra v3's useDisclosure for modal open/close state
   const { open, onOpen, onClose } = useDisclosure();
@@ -76,19 +73,46 @@ export function GenerateApiSnippetButton({
       <Dialog.Root
         open={open}
         onOpenChange={({ open }) => (open ? onOpen() : onClose())}
+        size="xl"
       >
         <Dialog.Backdrop />
-        <Dialog.Content width="800px !important">
+        <Dialog.Content>
           <Dialog.CloseTrigger />
           <Dialog.Header width="100%" marginTop={4}>
             <HStack justifyContent="space-between" width="100%">
-              <Dialog.Title>API Usage Code</Dialog.Title>
+              <Dialog.Title>{title ?? "API Usage"}</Dialog.Title>
               <LanguageMenu
                 selectedTarget={selectedTarget}
                 setSelectedTarget={handleSetTarget}
                 targets={targets}
               />
             </HStack>
+            <Dialog.Description>
+              <VStack alignItems="flex-start" gap={2}>
+                {description && description}
+                <HStack>
+                  <Text
+                    fontSize="sm"
+                    color="green.500"
+                    backgroundColor="gray.100"
+                    paddingX={2}
+                    paddingY={1}
+                    borderRadius={5}
+                  >
+                    {selectedSnippet.method}
+                  </Text>
+
+                  <Text
+                    fontSize="sm"
+                    color="gray.500"
+                    fontWeight="bold"
+                    fontFamily="monospace"
+                  >
+                    {selectedSnippet.path}
+                  </Text>
+                </HStack>
+              </VStack>
+            </Dialog.Description>
           </Dialog.Header>
           <Dialog.Body>
             <RenderCode
