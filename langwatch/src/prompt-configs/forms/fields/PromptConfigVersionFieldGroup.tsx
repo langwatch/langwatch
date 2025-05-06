@@ -11,9 +11,9 @@ import { Plus } from "lucide-react";
 import { Trash2 } from "react-feather";
 import { useFieldArray, useFormContext } from "react-hook-form";
 
-import { PropertySectionTitle } from "../../../optimization_studio/components/properties/BasePropertiesPanel";
-import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
-import { TypeSelector } from "../../ui/TypeSelector";
+import { PropertySectionTitle } from "~/optimization_studio/components/properties/BasePropertiesPanel";
+import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
+import { TypeSelector } from "~/prompt-configs/components/ui/TypeSelector";
 
 /**
  * Reusable component for a group of fields (inputs, outputs)

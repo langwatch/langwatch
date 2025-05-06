@@ -41,25 +41,32 @@ export const patchForOpensearchCompatibility = (esClient: ElasticClient) => {
         // Ensure sort is properly formatted
         if (Array.isArray(modifiedParams.sort)) {
           // Format each sort item if it's an array of sort instructions
-          modifiedParams.body.sort = modifiedParams.sort.map((sortItem) => {
-            // If sort item is an object like { field: { order: 'asc' } }
-            if (
-              typeof sortItem === "object" &&
-              sortItem !== null &&
-              !Array.isArray(sortItem)
-            ) {
-              const field = Object.keys(sortItem)[0];
-              const options = sortItem[field];
-              // If the options is an object, it's already in the right format
-              if (typeof options === "object" && options !== null) {
-                return { [field]: options };
-              } else {
-                // If options is just 'asc' or 'desc', format it properly
-                return { [field]: { order: options } };
+
+          modifiedParams.body.sort = modifiedParams.sort.map(
+            (sortItem: unknown) => {
+              // If sort item is an object like { field: { order: 'asc' } }
+              if (
+                typeof sortItem === "object" &&
+                sortItem !== null &&
+                !Array.isArray(sortItem)
+              ) {
+                const sortItemObj = sortItem as Record<string, unknown>;
+                const field = Object.keys(sortItemObj)[0];
+                if (!field) return sortItem;
+
+                const options = sortItemObj[field];
+                // If the options is an object, it's already in the right format
+                if (typeof options === "object" && options !== null) {
+                  return { [field]: options };
+                } else {
+                  // If options is just 'asc' or 'desc', format it properly
+                  return { [field]: { order: options } };
+                }
               }
+              return sortItem;
             }
-            return sortItem;
-          });
+          );
+
         } else if (
           typeof modifiedParams.sort === "object" &&
           modifiedParams.sort !== null
