@@ -31,7 +31,12 @@ export function GeneratePromptApiSnippetDialog({
   }
 
   return (
-    <GenerateApiSnippetDialog snippets={snippets} targets={targets}>
+    <GenerateApiSnippetDialog
+      snippets={snippets}
+      targets={targets}
+      title="Get Prompt by ID"
+      description="Use the following API code snippets to interact with the prompt."
+    >
       {children}
     </GenerateApiSnippetDialog>
   );

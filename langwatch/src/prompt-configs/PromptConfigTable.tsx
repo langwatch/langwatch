@@ -152,7 +152,7 @@ export function PromptConfigTable({
                     key={`${config.id}-${column.key}`}
                     textAlign={column.textAlign}
                   >
-                    {column.render({ ...config })}
+                    {column.render(config)}
                   </Table.Cell>
                 ))}
               </Table.Row>

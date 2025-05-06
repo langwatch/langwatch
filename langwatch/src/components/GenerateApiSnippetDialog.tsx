@@ -7,6 +7,7 @@ import { ChevronDownIcon, CheckIcon } from "lucide-react";
 import { RenderCode } from "./code/RenderCode";
 import type { Snippet, Target } from "../prompt-configs/types";
 import type { PrismLanguage } from "@react-email/components";
+import { uppercaseFirstLetter } from "~/utils/stringCasing";
 
 // Add context for dialog state
 const ApiSnippetDialogContext = createContext<{
@@ -147,7 +148,7 @@ GenerateApiSnippetDialog.Trigger = function Trigger({
     throw new Error("Trigger must be used within GenerateApiSnippetDialog");
   // Clone the child and inject onClick to open the dialog
   return React.cloneElement(children as React.ReactElement<any>, {
-    onClick: (e: React.MouseEvent<HTMLButtonElement>) => ctx.onOpen(e),
+    onClick: ctx.onOpen,
   });
 } as React.FC<{ children: React.ReactElement }>;
 
@@ -172,17 +173,18 @@ const LanguageMenu = React.memo(function LanguageMenu({
     >
       <Menu.Trigger asChild>
         <Button aria-label="Select language" size="sm" variant="outline">
-          {selectedTarget}
+          {formatTarget(selectedTarget)}
           <ChevronDownIcon />
         </Button>
       </Menu.Trigger>
       <Menu.Content zIndex="popover">
         {targets.map((target) => (
           <Menu.Item
+            key={target}
             value={target}
             onClick={() => setSelectedTarget(target as Target)}
           >
-            {target}
+            {formatTarget(target)}
             {selectedTarget === target && <CheckIcon />}
           </Menu.Item>
         ))}
@@ -190,6 +192,12 @@ const LanguageMenu = React.memo(function LanguageMenu({
     </Menu.Root>
   );
 });
+
+function formatTarget(target: Target) {
+  const [language, framework] = target.split("_");
+  if (!language || !framework) return target;
+  return `${uppercaseFirstLetter(language)} (${framework})`;
+}
 
 /**
  * Map of snippet targets to Prism languages.
