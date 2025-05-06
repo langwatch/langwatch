@@ -41,6 +41,7 @@ export const patchForOpensearchCompatibility = (esClient: ElasticClient) => {
         // Ensure sort is properly formatted
         if (Array.isArray(modifiedParams.sort)) {
           // Format each sort item if it's an array of sort instructions
+
           modifiedParams.body.sort = modifiedParams.sort.map(
             (sortItem: unknown) => {
               // If sort item is an object like { field: { order: 'asc' } }
@@ -65,6 +66,7 @@ export const patchForOpensearchCompatibility = (esClient: ElasticClient) => {
               return sortItem;
             }
           );
+
         } else if (
           typeof modifiedParams.sort === "object" &&
           modifiedParams.sort !== null
