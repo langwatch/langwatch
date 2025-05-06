@@ -3,29 +3,25 @@ import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
-import {
-  getLatestConfigVersionSchema,
-  schemaValidators,
-  SchemaVersion,
-} from "~/server/prompt-config/repositories/llm-config-version-schema";
-import { prisma } from "~/server/db";
-import {
-  LlmConfigRepository,
-  type LlmConfigWithLatestVersion,
-} from "~/server/prompt-config/repositories/llm-config.repository";
+import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger";
 import { loggerMiddleware } from "../../hono-middleware/logger";
-import type { LlmConfigOutputType } from "../../../../types";
+import {
+  badRequestSchema,
+  llmPromptConfigSchema,
+  promptOutputSchema,
+  successSchema,
+  versionInputSchema,
+  versionOutputSchema,
+} from "./schemas";
+import { authMiddleware } from "./middleware/auth";
+import { getOutputsToResponseFormat } from "./utils";
+import { baseResponses } from "./constants";
 
 const logger = createLogger("langwatch:api:prompts");
 
 patchZodOpenapi();
-
-// Reuse schema definitions
-const baseConfigSchema = z.object({
-  name: z.string().min(1, "Name cannot be empty."),
-});
 
 // Define types for our Hono context variables
 type Variables = {
@@ -37,69 +33,29 @@ export const app = new Hono<{
   Variables: Variables;
 }>().basePath("/api/prompts");
 app.use(loggerMiddleware());
-
-// Auth middleware that validates API key and extracts project
-app.use("/*", async (c, next) => {
-  const apiKey =
-    c.req.header("X-Auth-Token") ??
-    c.req.header("Authorization")?.split(" ")[1];
-
-  const project = await prisma.project.findUnique({
-    where: { apiKey },
-  });
-
-  if (!project || apiKey !== project.apiKey) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-
-  // Store project and repository for use in route handlers
-  c.set("project", project);
-  c.set("llmConfigRepository", new LlmConfigRepository(prisma));
-
-  return next();
-});
+app.use("/*", authMiddleware);
 
 // Get all prompts
 app.get(
   "/",
   describeRoute({
     description: "Get all prompts for a project",
+    responses: {
+      ...baseResponses,
+      200: {
+        content: {
+          "application/json": { schema: z.array(promptOutputSchema) },
+        },
+      },
+    },
   }),
   async (c) => {
     const repository = c.get("llmConfigRepository");
     const project = c.get("project");
-
     const configs = await repository.getAllWithLatestVersion(project.id);
     return c.json(configs);
   }
 );
-
-const responseFormatSchema = z.object({
-  type: z.enum(["json_schema"]),
-  json_schema: z.object({
-    name: z.string(),
-    schema: z.object({}),
-  }),
-});
-
-const promptOutputSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  version: z.number(),
-  versionId: z.string(),
-  versionCreatedAt: z.date(),
-  model: z.string(),
-  prompt: z.string(),
-  messages: z.array(
-    z
-      .object({
-        role: z.enum(["user", "assistant", "system"]),
-        content: z.string(),
-      })
-      .passthrough()
-  ),
-  response_format: responseFormatSchema.nullable(),
-});
 
 // Get prompt by ID
 app.get(
@@ -107,6 +63,7 @@ app.get(
   describeRoute({
     description: "Get a specific prompt",
     responses: {
+      ...baseResponses,
       200: {
         content: {
           "application/json": { schema: promptOutputSchema },
@@ -138,6 +95,7 @@ app.get(
         versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
         model: config.latestVersion.configData.model,
         prompt: config.latestVersion.configData.prompt,
+        updatedAt: config.updatedAt,
         messages: [
           {
             role: "system",
@@ -155,57 +113,25 @@ app.get(
   }
 );
 
-const llmOutputFieldToJsonSchemaTypeMap: Record<LlmConfigOutputType, string> = {
-  str: "string",
-  float: "number",
-  bool: "boolean",
-  json_schema: "object",
-};
-
-const getOutputsToResponseFormat = (
-  config: LlmConfigWithLatestVersion
-): z.infer<typeof responseFormatSchema> | null => {
-  const outputs = config.latestVersion.configData.outputs;
-  if (!outputs.length || (outputs.length === 1 && outputs[0]?.type === "str")) {
-    return null;
-  }
-
-  return {
-    type: "json_schema",
-    json_schema: {
-      name: "outputs",
-      schema: {
-        type: "object",
-        properties: Object.fromEntries(
-          outputs.map((output) => {
-            if (output.type === "json_schema") {
-              return [
-                output.identifier,
-                output.json_schema ?? { type: "object", properties: {} },
-              ];
-            }
-            return [
-              output.identifier,
-              {
-                type: llmOutputFieldToJsonSchemaTypeMap[output.type],
-              },
-            ];
-          })
-        ),
-        required: outputs.map((output) => output.identifier),
-      },
-    },
-  };
-};
-
 // Create prompt with initial version
 // TODO: Consider allowing for the initial version to be customized via params
 app.post(
   "/",
   describeRoute({
     description: "Create a new prompt with default initial version",
+    responses: {
+      ...baseResponses,
+      200: {
+        content: {
+          "application/json": { schema: promptOutputSchema },
+        },
+      },
+    },
   }),
-  zValidator("json", baseConfigSchema),
+  zValidator(
+    "json",
+    z.object({ name: z.string().min(1, "Name cannot be empty") })
+  ),
   async (c) => {
     const repository = c.get("llmConfigRepository");
     const project = c.get("project");
@@ -226,6 +152,14 @@ app.get(
   "/:id/versions",
   describeRoute({
     description: "Get all versions for a prompt",
+    responses: {
+      ...baseResponses,
+      200: {
+        content: {
+          "application/json": { schema: z.array(promptOutputSchema) },
+        },
+      },
+    },
   }),
   async (c) => {
     const repository = c.get("llmConfigRepository");
@@ -249,8 +183,16 @@ app.post(
   "/:id/versions",
   describeRoute({
     description: "Create a new version for a prompt",
+    responses: {
+      ...baseResponses,
+      200: {
+        content: {
+          "application/json": { schema: versionOutputSchema },
+        },
+      },
+    },
   }),
-  zValidator("json", getLatestConfigVersionSchema()),
+  zValidator("json", versionInputSchema),
   async (c) => {
     const repository = c.get("llmConfigRepository");
     const project = c.get("project");
@@ -275,8 +217,19 @@ app.put(
   "/:id",
   describeRoute({
     description: "Update a prompt",
+    responses: {
+      ...baseResponses,
+      200: {
+        content: {
+          "application/json": { schema: llmPromptConfigSchema },
+        },
+      },
+    },
   }),
-  zValidator("json", baseConfigSchema.partial()),
+  zValidator(
+    "json",
+    z.object({ name: z.string().min(1, "Name cannot be empty") })
+  ),
   async (c) => {
     const repository = c.get("llmConfigRepository");
     const project = c.get("project");
@@ -297,6 +250,14 @@ app.delete(
   "/:id",
   describeRoute({
     description: "Delete a prompt",
+    responses: {
+      ...baseResponses,
+      200: {
+        content: {
+          "application/json": { schema: successSchema },
+        },
+      },
+    },
   }),
   async (c) => {
     const repository = c.get("llmConfigRepository");
@@ -305,9 +266,12 @@ app.delete(
 
     try {
       const result = await repository.deleteConfig(id, project.id);
-      return c.json(result);
+      return c.json(result satisfies z.infer<typeof successSchema>);
     } catch (error: any) {
-      return c.json({ error: error.message }, 404);
+      return c.json(
+        { error: error.message } satisfies z.infer<typeof badRequestSchema>,
+        404
+      );
     }
   }
 );
