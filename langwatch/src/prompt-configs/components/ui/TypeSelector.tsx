@@ -11,10 +11,10 @@ import { ChevronDown } from "react-feather";
 import { LuBraces } from "react-icons/lu";
 import { TypeLabel } from "~/optimization_studio/components/nodes/Nodes";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
-import { Dialog } from "../../components/ui/dialog";
-import { CodeEditor } from "../../optimization_studio/components/code/CodeEditorModal";
+import { Dialog } from "~/components/ui/dialog";
+import { CodeEditor } from "~/optimization_studio/components/code/CodeEditorModal";
 import Ajv from "ajv";
-import { outputsSchema } from "../../server/prompt-config/repositories/llm-config-version-schema";
+import { outputsSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import { fromZodError } from "zod-validation-error";
 
 /**

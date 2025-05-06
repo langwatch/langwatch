@@ -3,7 +3,7 @@ import { useEffect, useMemo } from "react";
 
 import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
 import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
-import { PanelHeader } from "./ui/PanelHeader";
+import { PanelHeader } from "./components/ui/PanelHeader";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { llmConfigToPromptConfigFormValues } from "~/prompt-configs/llmPromptConfigUtils";
