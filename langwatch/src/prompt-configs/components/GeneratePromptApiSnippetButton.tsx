@@ -28,14 +28,5 @@ export function GeneratePromptApiSnippetButton({
     return null;
   }
 
-  return (
-    <GenerateApiSnippetButton
-      snippets={snippets}
-      targets={targets}
-      variables={{
-        id: configId,
-        apiKey,
-      }}
-    />
-  );
+  return <GenerateApiSnippetButton snippets={snippets} targets={targets} />;
 }

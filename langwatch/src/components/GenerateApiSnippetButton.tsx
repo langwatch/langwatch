@@ -12,13 +12,12 @@ import { useDisclosure } from "@chakra-ui/react";
 import React, { useEffect, useState } from "react";
 import { ChevronDownIcon, CheckIcon, UnplugIcon, CopyIcon } from "lucide-react";
 import { RenderCode } from "./code/RenderCode";
-import type { Target } from "../prompt-configs/utils/generatePromptApiSnippet";
-import type { Snippet } from "../prompt-configs/types";
+import type { Snippet, Target } from "../prompt-configs/types";
+import type { PrismLanguage } from "@react-email/components";
 
 interface GenerateApiSnippetButtonProps {
   snippets: Snippet[];
   targets: Target[];
-  variables?: Record<string, string>;
 }
 
 /**
@@ -34,7 +33,6 @@ interface GenerateApiSnippetButtonProps {
 export function GenerateApiSnippetButton({
   snippets,
   targets,
-  variables,
 }: GenerateApiSnippetButtonProps) {
   // Chakra v3's useDisclosure for modal open/close state
   const { open, onOpen, onClose } = useDisclosure();
@@ -80,7 +78,7 @@ export function GenerateApiSnippetButton({
         onOpenChange={({ open }) => (open ? onOpen() : onClose())}
       >
         <Dialog.Backdrop />
-        <Dialog.Content width="700px">
+        <Dialog.Content width="800px !important">
           <Dialog.CloseTrigger />
           <Dialog.Header width="100%" marginTop={4}>
             <HStack justifyContent="space-between" width="100%">
@@ -154,8 +152,10 @@ const LanguageMenu = React.memo(function LanguageMenu({
  * Map of snippet targets to Prism languages.
  *
  * If a target is not supported by our Prism implementation, we use closest (or bash)
+ *
+ * NOTE: Note all targets are supported by the RenderCode component.
  */
-const SnippetTargetToPrismLanguageMap: Record<Target, SupportedLanguage> = {
+const SnippetTargetToPrismLanguageMap: Record<Target, PrismLanguage> = {
   c_libcurl: "bash",
   csharp_restsharp: "bash",
   csharp_httpclient: "bash",
