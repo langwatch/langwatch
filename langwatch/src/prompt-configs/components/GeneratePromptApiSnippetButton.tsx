@@ -5,6 +5,7 @@ import { getGetPromptSnippets } from "../utils/snippets";
 
 interface GeneratePromptApiSnippetButtonProps {
   configId: string;
+  apiKey?: string;
 }
 
 /**
@@ -19,32 +20,27 @@ interface GeneratePromptApiSnippetButtonProps {
  */
 export function GeneratePromptApiSnippetButton({
   configId,
+  apiKey,
 }: GeneratePromptApiSnippetButtonProps) {
   // const { snippets, targets } = generateGetPromptApiSnippets() ?? {};
   const snippets = getGetPromptSnippets({
     promptId: configId,
-    apiKey: "API_KEY",
+    apiKey,
   });
+
   const targets = snippets.map((snippet) => snippet.target);
 
-  if (!snippets) {
+  if (!snippets || !apiKey) {
     return null;
   }
 
-  const snippetsWithValues = snippets.map((snippet) => ({
-    ...snippet,
-    content: snippet.content
-      .replace("%7Bid%7D", configId)
-      .replace("REPLACE_KEY_VALUE", "API_KEY"),
-  }));
-
   return (
     <GenerateApiSnippetButton
-      snippets={snippetsWithValues}
+      snippets={snippets}
       targets={targets}
       variables={{
         id: configId,
-        apiKey: "API_KEY",
+        apiKey,
       }}
     />
   );

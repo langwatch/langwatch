@@ -12,10 +12,10 @@ import { useDisclosure } from "@chakra-ui/react";
 import React, { useEffect, useState } from "react";
 import { ChevronDownIcon, CheckIcon, UnplugIcon, CopyIcon } from "lucide-react";
 import { RenderCode } from "./code/RenderCode";
-import type { PrismLanguage } from "@react-email/components";
 import type { Target } from "../prompt-configs/utils/generatePromptApiSnippet";
 import type { Snippet } from "../prompt-configs/types";
 import { toaster } from "./ui/toaster";
+import type { SupportedLanguage } from "./code/RenderCode";
 
 interface GenerateApiSnippetButtonProps {
   snippets: Snippet[];
@@ -82,7 +82,7 @@ export function GenerateApiSnippetButton({
         onOpenChange={({ open }) => (open ? onOpen() : onClose())}
       >
         <Dialog.Backdrop />
-        <Dialog.Content>
+        <Dialog.Content width="700px">
           <Dialog.CloseTrigger />
           <Dialog.Header width="100%" marginTop={4}>
             <HStack justifyContent="space-between" width="100%">
@@ -108,39 +108,7 @@ export function GenerateApiSnippetButton({
               }}
             />
           </Dialog.Body>
-          <Dialog.Footer>
-            {/* Variables section with copy buttons */}
-            {variables && Object.keys(variables).length > 0 && (
-              <VStack width="100%" align="stretch" gap={2} mb={4}>
-                <Text fontWeight="medium">Variables:</Text>
-                {Object.entries(variables).map(([key, value], index) => (
-                  <HStack
-                    key={index}
-                    justifyContent="space-between"
-                    p={2}
-                    bg="gray.50"
-                    borderRadius="md"
-                  >
-                    <Text fontFamily="monospace">
-                      {key}: {value}
-                    </Text>
-                    <IconButton
-                      aria-label={`Copy ${key}`}
-                      children={<CopyIcon />}
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        navigator.clipboard.writeText(value);
-                        toaster.success({
-                          title: "Copied to clipboard",
-                        });
-                      }}
-                    />
-                  </HStack>
-                ))}
-              </VStack>
-            )}
-          </Dialog.Footer>
+          <Dialog.Footer></Dialog.Footer>
         </Dialog.Content>
       </Dialog.Root>
     </>
@@ -184,28 +152,33 @@ const LanguageMenu = React.memo(function LanguageMenu({
   );
 });
 
-const SnippetTargetToPrismLanguageMap: Record<Target, PrismLanguage> = {
-  c_libcurl: "c",
-  csharp_restsharp: "csharp",
-  csharp_httpclient: "csharp",
+/**
+ * Map of snippet targets to Prism languages.
+ *
+ * If a target is not supported by our Prism implementation, we use closest (or bash)
+ */
+const SnippetTargetToPrismLanguageMap: Record<Target, SupportedLanguage> = {
+  c_libcurl: "bash",
+  csharp_restsharp: "bash",
+  csharp_httpclient: "bash",
   go_native: "go",
-  java_okhttp: "java",
-  java_unirest: "java",
+  java_okhttp: "bash",
+  java_unirest: "bash",
   javascript_jquery: "javascript",
   javascript_xhr: "javascript",
   node_native: "javascript",
   node_request: "javascript",
   node_unirest: "javascript",
-  objc_nsurlsession: "objectivec",
-  ocaml_cohttp: "ocaml",
+  objc_nsurlsession: "bash",
+  ocaml_cohttp: "bash",
   php_curl: "php",
   php_http1: "php",
   php_http2: "php",
   python_python3: "python",
   python_requests: "python",
-  ruby_native: "ruby",
+  ruby_native: "bash",
   shell_curl: "bash",
   shell_httpie: "bash",
   shell_wget: "bash",
-  swift_nsurlsession: "swift",
+  swift_nsurlsession: "bash",
 } as const;
