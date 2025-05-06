@@ -21,7 +21,12 @@ import {
 import { getOrganizationProjectsCount } from "./limits";
 import { dependencies } from "../../../injection/dependencies.server";
 import { allowedTopicClusteringModels } from "../../topicClustering/types";
-import { ProjectSensitiveDataVisibilityLevel, type Project, type PrismaClient, TeamUserRole } from "@prisma/client";
+import {
+  ProjectSensitiveDataVisibilityLevel,
+  type Project,
+  type PrismaClient,
+  TeamUserRole,
+} from "@prisma/client";
 import { encrypt } from "~/utils/encryption";
 import type { Session } from "next-auth";
 
@@ -197,8 +202,10 @@ export const projectRouter = createTRPCRouter({
             env.NODE_ENV === "development" || !env.IS_SAAS
               ? "DISABLED"
               : "ESSENTIAL",
-          capturedInputVisibility: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-          capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+          capturedInputVisibility:
+            ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+          capturedOutputVisibility:
+            ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
         },
       });
 
@@ -233,8 +240,12 @@ export const projectRouter = createTRPCRouter({
           language: z.string(),
           framework: z.string(),
           piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]),
-          capturedInputVisibility: z.enum(["REDACTED_TO_ALL", "VISIBLE_TO_ADMIN", "VISIBLE_TO_ALL"]).optional(),
-          capturedOutputVisibility: z.enum(["REDACTED_TO_ALL", "VISIBLE_TO_ADMIN", "VISIBLE_TO_ALL"]).optional(),
+          capturedInputVisibility: z
+            .enum(["REDACTED_TO_ALL", "VISIBLE_TO_ADMIN", "VISIBLE_TO_ALL"])
+            .optional(),
+          capturedOutputVisibility: z
+            .enum(["REDACTED_TO_ALL", "VISIBLE_TO_ADMIN", "VISIBLE_TO_ALL"])
+            .optional(),
           userLinkTemplate: z.string().optional(),
           s3Endpoint: z.string().optional(),
           s3AccessKeyId: z.string().optional(),
@@ -291,8 +302,10 @@ export const projectRouter = createTRPCRouter({
           framework: input.framework,
           piiRedactionLevel: input.piiRedactionLevel,
           userLinkTemplate: input.userLinkTemplate,
-          capturedInputVisibility: input.capturedInputVisibility ?? project.capturedInputVisibility,
-          capturedOutputVisibility: input.capturedOutputVisibility ?? project.capturedOutputVisibility,
+          capturedInputVisibility:
+            input.capturedInputVisibility ?? project.capturedInputVisibility,
+          capturedOutputVisibility:
+            input.capturedOutputVisibility ?? project.capturedOutputVisibility,
           s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null,
           s3AccessKeyId: input.s3AccessKeyId
             ? encrypt(input.s3AccessKeyId)
@@ -403,56 +416,66 @@ export const projectRouter = createTRPCRouter({
         field: z.enum(["input", "output"]),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
-    .query(async ({ input, ctx }: { input: { projectId: string; field: 'input' | 'output' }, ctx: { session: Session, prisma: PrismaClient }}) => {
-      const { projectId, field } = input;
-      const prisma = ctx.prisma;
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROJECT_VIEW))
+    .query(
+      async ({
+        input,
+        ctx,
+      }: {
+        input: { projectId: string; field: "input" | "output" };
+        ctx: { session: Session; prisma: PrismaClient };
+      }) => {
+        const { projectId, field } = input;
+        const prisma = ctx.prisma;
 
-      const project = await prisma.project.findUnique({
-        where: { id: projectId },
-        select: {
-          capturedInputVisibility: true,
-          capturedOutputVisibility: true,
-        },
-      });
-      if (!project) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found",
+        const project = await prisma.project.findUnique({
+          where: { id: projectId },
+          select: {
+            capturedInputVisibility: true,
+            capturedOutputVisibility: true,
+          },
         });
-      }
+        if (!project) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Project not found",
+          });
+        }
 
-      const teamsWithAccess = await prisma.teamUser.findMany({
-        where: {
-          userId: ctx.session.user.id,
-          team: {
-            projects: {
-              some: {
-                id: projectId,
+        const teamsWithAccess = await prisma.teamUser.findMany({
+          where: {
+            userId: ctx.session.user.id,
+            team: {
+              projects: {
+                some: {
+                  id: projectId,
+                },
               },
             },
           },
-        },
-        select: {
-          role: true,
-        },
-      });
+          select: {
+            role: true,
+          },
+        });
 
-      const isUserPrivileged = teamsWithAccess.some(
-        (teamUser: { role: TeamUserRole }) => teamUser.role === TeamUserRole.ADMIN
-      );
+        const isUserPrivileged = teamsWithAccess.some(
+          (teamUser: { role: TeamUserRole }) =>
+            teamUser.role === TeamUserRole.ADMIN
+        );
 
-      const visibilitySetting = field === "input"
-          ? project.capturedInputVisibility
-          : project.capturedOutputVisibility;
+        const visibilitySetting =
+          field === "input"
+            ? project.capturedInputVisibility
+            : project.capturedOutputVisibility;
 
-      const canUserSeeData = canAccessSensitiveData(
-        visibilitySetting,
-        isUserPrivileged,
-      );
+        const canUserSeeData = canAccessSensitiveData(
+          visibilitySetting,
+          isUserPrivileged
+        );
 
-      return !canUserSeeData;
-    }),
+        return !canUserSeeData;
+      }
+    ),
 });
 
 const generateApiKey = (): string => {
@@ -468,20 +491,30 @@ async function checkCapturedDataVisibilityPermission({
   next,
 }: {
   ctx: { prisma: PrismaClient; session: Session; permissionChecked: boolean };
-  input: { projectId: string; capturedInputVisibility?: string; capturedOutputVisibility?: string };
+  input: {
+    projectId: string;
+    capturedInputVisibility?: string;
+    capturedOutputVisibility?: string;
+  };
   next: () => Promise<any>;
 }) {
   if (
-    (input.capturedInputVisibility !== void 0 || input.capturedOutputVisibility !== void 0) &&
-    !(await backendHasTeamProjectPermission(ctx, { projectId: input.projectId }, TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY))
+    (input.capturedInputVisibility !== void 0 ||
+      input.capturedOutputVisibility !== void 0) &&
+    !(await backendHasTeamProjectPermission(
+      ctx,
+      { projectId: input.projectId },
+      TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY
+    ))
   ) {
     throw new TRPCError({
       code: "FORBIDDEN",
-      message: "You don't have permission to change captured data visibility settings",
+      message:
+        "You don't have permission to change captured data visibility settings",
     });
   }
   return next();
-};
+}
 
 const canAccessSensitiveData = (
   visibility: ProjectSensitiveDataVisibilityLevel,
