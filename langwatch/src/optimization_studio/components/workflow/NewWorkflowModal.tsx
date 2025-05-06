@@ -15,7 +15,7 @@ import { NewWorkflowForm } from "./NewWorkflowForm";
 import type { Workflow } from "../../types/dsl";
 import { TEMPLATES } from "../../templates/registry";
 import { toaster } from "../../../components/ui/toaster";
-
+import { workflowJsonSchema } from "../../types/dsl";
 type Step = { step: "select" } | { step: "create"; template: Workflow };
 
 export const NewWorkflowModal = ({
@@ -51,15 +51,27 @@ export const NewWorkflowModal = ({
     reader.onload = (e) => {
       try {
         const content = e.target?.result as string;
-        const workflowTemplate = JSON.parse(content) as Workflow;
+        const jsonContent = JSON.parse(content);
+
+        const result = workflowJsonSchema.safeParse(jsonContent);
+
+        if (!result.success) {
+          throw new Error(`Invalid workflow format: ${result.error.message}`);
+        }
+
+        const workflowTemplate = jsonContent as Workflow;
+
         setStep({ step: "create", template: workflowTemplate });
       } catch (error) {
         toaster.create({
           title: "Invalid workflow file",
           description:
-            "The file you uploaded is not a valid workflow JSON file.",
+            error instanceof Error
+              ? `The file could not be imported: ${error.message}`
+              : "The file you uploaded is not a valid workflow JSON file.",
           type: "error",
           placement: "top-end",
+          duration: 5000,
           meta: { closable: true },
         });
       }
