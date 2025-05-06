@@ -1,7 +1,7 @@
 import type { Project } from "@prisma/client";
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
-import { validator as zValidator } from "hono-openapi/zod";
+import { validator as zValidator, resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -44,8 +44,9 @@ app.get(
     responses: {
       ...baseResponses,
       200: {
+        description: "Success",
         content: {
-          "application/json": { schema: z.array(promptOutputSchema) },
+          "application/json": { schema: resolver(z.array(promptOutputSchema)) },
         },
       },
     },
@@ -75,8 +76,9 @@ app.get(
     responses: {
       ...baseResponses,
       200: {
+        description: "Success",
         content: {
-          "application/json": { schema: promptOutputSchema },
+          "application/json": { schema: resolver(promptOutputSchema) },
         },
       },
     },
@@ -141,8 +143,9 @@ app.post(
     responses: {
       ...baseResponses,
       200: {
+        description: "Success",
         content: {
-          "application/json": { schema: promptOutputSchema },
+          "application/json": { schema: resolver(promptOutputSchema) },
         },
       },
     },
@@ -192,8 +195,11 @@ app.get(
     responses: {
       ...baseResponses,
       200: {
+        description: "Success",
         content: {
-          "application/json": { schema: z.array(promptOutputSchema) },
+          "application/json": {
+            schema: resolver(z.array(versionOutputSchema)),
+          },
         },
       },
     },
@@ -238,8 +244,9 @@ app.post(
     responses: {
       ...baseResponses,
       200: {
+        description: "Success",
         content: {
-          "application/json": { schema: versionOutputSchema },
+          "application/json": { schema: resolver(versionOutputSchema) },
         },
       },
     },
@@ -292,8 +299,9 @@ app.put(
     responses: {
       ...baseResponses,
       200: {
+        description: "Success",
         content: {
-          "application/json": { schema: llmPromptConfigSchema },
+          "application/json": { schema: resolver(llmPromptConfigSchema) },
         },
       },
     },
@@ -340,8 +348,9 @@ app.delete(
     responses: {
       ...baseResponses,
       200: {
+        description: "Success",
         content: {
-          "application/json": { schema: successSchema },
+          "application/json": { schema: resolver(successSchema) },
         },
       },
     },

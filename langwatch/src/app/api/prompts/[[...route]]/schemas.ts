@@ -70,14 +70,14 @@ export const versionOutputSchema = getLatestConfigVersionSchema().merge(
  * Schema for unauthorized error responses
  */
 export const unauthorizedSchema = z.object({
-  error: z.string().describe("Unauthorized"),
+  error: z.string(),
 });
 
 /**
  * Schema for bad request error responses
  */
 export const badRequestSchema = z.object({
-  error: z.string().describe("Bad Request"),
+  error: z.string(),
 });
 
 /**
