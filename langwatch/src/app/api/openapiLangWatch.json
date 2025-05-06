@@ -948,7 +948,10 @@
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "Bad Request"
+                      ]
                     }
                   },
                   "required": [
@@ -967,12 +970,16 @@
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "Unauthorized"
+                      ]
                     }
                   },
                   "required": [
                     "error"
-                  ]
+                  ],
+                  "error": "Unauthorized"
                 }
               }
             },
@@ -1099,7 +1106,10 @@
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "Bad Request"
+                      ]
                     }
                   },
                   "required": [
@@ -1118,12 +1128,16 @@
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "Unauthorized"
+                      ]
                     }
                   },
                   "required": [
                     "error"
-                  ]
+                  ],
+                  "error": "Unauthorized"
                 }
               }
             },
@@ -1270,7 +1284,10 @@
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "Bad Request"
+                      ]
                     }
                   },
                   "required": [
@@ -1289,12 +1306,16 @@
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "Unauthorized"
+                      ]
                     }
                   },
                   "required": [
                     "error"
-                  ]
+                  ],
+                  "error": "Unauthorized"
                 }
               }
             },
@@ -1351,7 +1372,10 @@
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "Bad Request"
+                      ]
                     }
                   },
                   "required": [
@@ -1370,12 +1394,16 @@
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "Unauthorized"
+                      ]
                     }
                   },
                   "required": [
                     "error"
-                  ]
+                  ],
+                  "error": "Unauthorized"
                 }
               }
             },
@@ -1442,7 +1470,10 @@
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "Bad Request"
+                      ]
                     }
                   },
                   "required": [
@@ -1461,12 +1492,16 @@
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "Unauthorized"
+                      ]
                     }
                   },
                   "required": [
                     "error"
-                  ]
+                  ],
+                  "error": "Unauthorized"
                 }
               }
             },
@@ -1494,7 +1529,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
+                  "type": "object",
                   "items": {
                     "type": "object",
                     "properties": {
@@ -1737,7 +1772,247 @@
                       "createdAt",
                       "configData"
                     ]
-                  }
+                  },
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "authorId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "configId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "schemaVersion": {
+                      "type": "string",
+                      "const": "1.0"
+                    },
+                    "commitMessage": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "version": {
+                      "type": "number"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "configData": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "number",
+                          "minimum": 1
+                        },
+                        "prompt": {
+                          "type": "string"
+                        },
+                        "messages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "assistant",
+                                  "system"
+                                ]
+                              },
+                              "content": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "role",
+                              "content"
+                            ],
+                            "additionalProperties": true
+                          },
+                          "default": []
+                        },
+                        "inputs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "identifier": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "str",
+                                  "float",
+                                  "bool",
+                                  "image",
+                                  "list[str]",
+                                  "list[float]",
+                                  "list[int]",
+                                  "list[bool]",
+                                  "dict"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "identifier",
+                              "type"
+                            ]
+                          },
+                          "minItems": 1
+                        },
+                        "outputs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "identifier": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "str",
+                                  "float",
+                                  "bool",
+                                  "json_schema"
+                                ]
+                              },
+                              "json_schema": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "type"
+                                ],
+                                "additionalProperties": true
+                              }
+                            },
+                            "required": [
+                              "identifier",
+                              "type"
+                            ]
+                          },
+                          "minItems": 1
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "temperature": {
+                          "type": "number"
+                        },
+                        "max_tokens": {
+                          "type": "number"
+                        },
+                        "demonstrations": {
+                          "type": "object",
+                          "properties": {
+                            "columns": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "string",
+                                      "boolean",
+                                      "number",
+                                      "date",
+                                      "list",
+                                      "json",
+                                      "spans",
+                                      "rag_contexts",
+                                      "chat_messages",
+                                      "annotations",
+                                      "evaluations"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "type"
+                                ]
+                              }
+                            },
+                            "rows": {
+                              "type": "array",
+                              "items": {
+                                "allOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "id"
+                                    ]
+                                  },
+                                  {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  }
+                                ]
+                              },
+                              "default": []
+                            }
+                          },
+                          "required": [
+                            "columns",
+                            "rows"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "prompt",
+                        "messages",
+                        "inputs",
+                        "outputs",
+                        "model",
+                        "demonstrations"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "authorId",
+                    "projectId",
+                    "configId",
+                    "schemaVersion",
+                    "version",
+                    "createdAt",
+                    "configData"
+                  ]
                 }
               }
             },
@@ -1751,7 +2026,10 @@
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "Bad Request"
+                      ]
                     }
                   },
                   "required": [
@@ -1770,12 +2048,16 @@
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "Unauthorized"
+                      ]
                     }
                   },
                   "required": [
                     "error"
-                  ]
+                  ],
+                  "error": "Unauthorized"
                 }
               }
             },
@@ -2056,7 +2338,10 @@
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "Bad Request"
+                      ]
                     }
                   },
                   "required": [
@@ -2075,12 +2360,16 @@
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "Unauthorized"
+                      ]
                     }
                   },
                   "required": [
                     "error"
-                  ]
+                  ],
+                  "error": "Unauthorized"
                 }
               }
             },

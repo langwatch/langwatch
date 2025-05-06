@@ -16,7 +16,10 @@ import {
   versionOutputSchema,
 } from "./schemas";
 import { authMiddleware, repositoryMiddleware } from "./middleware";
-import { getOutputsToResponseFormat } from "./utils";
+import {
+  buildStandardSuccessResponse,
+  getOutputsToResponseFormat,
+} from "./utils";
 import { baseResponses } from "./constants";
 
 const logger = createLogger("langwatch:api:prompts");
@@ -75,12 +78,7 @@ app.get(
     description: "Get a specific prompt",
     responses: {
       ...baseResponses,
-      200: {
-        description: "Success",
-        content: {
-          "application/json": { schema: resolver(promptOutputSchema) },
-        },
-      },
+      200: buildStandardSuccessResponse(promptOutputSchema),
     },
   }),
   async (c) => {
@@ -142,12 +140,7 @@ app.post(
     description: "Create a new prompt with default initial version",
     responses: {
       ...baseResponses,
-      200: {
-        description: "Success",
-        content: {
-          "application/json": { schema: resolver(promptOutputSchema) },
-        },
-      },
+      200: buildStandardSuccessResponse(promptOutputSchema),
     },
   }),
   zValidator(
@@ -194,14 +187,7 @@ app.get(
     description: "Get all versions for a prompt",
     responses: {
       ...baseResponses,
-      200: {
-        description: "Success",
-        content: {
-          "application/json": {
-            schema: resolver(z.array(versionOutputSchema)),
-          },
-        },
-      },
+      200: buildStandardSuccessResponse(versionOutputSchema),
     },
   }),
   async (c) => {
@@ -243,12 +229,7 @@ app.post(
     description: "Create a new version for a prompt",
     responses: {
       ...baseResponses,
-      200: {
-        description: "Success",
-        content: {
-          "application/json": { schema: resolver(versionOutputSchema) },
-        },
-      },
+      200: buildStandardSuccessResponse(versionOutputSchema),
     },
   }),
   zValidator("json", versionInputSchema),
@@ -298,12 +279,7 @@ app.put(
     description: "Update a prompt",
     responses: {
       ...baseResponses,
-      200: {
-        description: "Success",
-        content: {
-          "application/json": { schema: resolver(llmPromptConfigSchema) },
-        },
-      },
+      200: buildStandardSuccessResponse(llmPromptConfigSchema),
     },
   }),
   zValidator(
@@ -347,12 +323,7 @@ app.delete(
     description: "Delete a prompt",
     responses: {
       ...baseResponses,
-      200: {
-        description: "Success",
-        content: {
-          "application/json": { schema: resolver(successSchema) },
-        },
-      },
+      200: buildStandardSuccessResponse(successSchema),
     },
   }),
   async (c) => {

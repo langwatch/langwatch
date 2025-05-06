@@ -1,7 +1,9 @@
+import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 import type { z } from "zod";
 import { responseFormatSchema } from "./schemas";
 import { llmOutputFieldToJsonSchemaTypeMap } from "./constants";
-import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/types";
+import { resolver } from "hono-openapi/zod";
+import type { RouteResponse } from "./types";
 
 export const getOutputsToResponseFormat = (
   config: LlmConfigWithLatestVersion
@@ -35,6 +37,15 @@ export const getOutputsToResponseFormat = (
         ),
         required: outputs.map((output) => output.identifier),
       },
+    },
+  };
+};
+
+export const buildStandardSuccessResponse = (zodSchema: any): RouteResponse => {
+  return {
+    description: "Success",
+    content: {
+      "application/json": { schema: resolver(zodSchema) },
     },
   };
 };

@@ -1,6 +1,7 @@
 import type { LlmConfigOutputType } from "~/types";
 import { badRequestSchema, unauthorizedSchema } from "./schemas";
 import { resolver } from "hono-openapi/zod";
+import type { RouteResponse } from "./types";
 
 export const llmOutputFieldToJsonSchemaTypeMap: Record<
   LlmConfigOutputType,
@@ -12,7 +13,7 @@ export const llmOutputFieldToJsonSchemaTypeMap: Record<
   json_schema: "object",
 } as const;
 
-export const baseResponses = {
+export const baseResponses: Record<number, RouteResponse> = {
   401: {
     description: "Unauthorized",
     content: {
