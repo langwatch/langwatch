@@ -324,6 +324,12 @@ app.delete(
     responses: {
       ...baseResponses,
       200: buildStandardSuccessResponse(successSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
     },
   }),
   async (c) => {
@@ -342,13 +348,18 @@ app.delete(
       );
 
       return c.json(result satisfies z.infer<typeof successSchema>);
-    } catch (error: any) {
+    } catch (error) {
       logger.error(
-        { projectId: project.id, promptId: id, error: error.message },
+        {
+          projectId: project.id,
+          promptId: id,
+          error,
+        },
         "Error deleting prompt"
       );
+
       return c.json(
-        { error: error.message } satisfies z.infer<typeof badRequestSchema>,
+        { error: "Not Found" } satisfies z.infer<typeof badRequestSchema>,
         404
       );
     }
