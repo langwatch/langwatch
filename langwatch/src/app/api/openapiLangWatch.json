@@ -831,13 +831,355 @@
     },
     "/api/prompts": {
       "get": {
-        "responses": {},
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "updatedAt": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "type": "number"
+                      },
+                      "versionId": {
+                        "type": "string"
+                      },
+                      "versionCreatedAt": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "prompt": {
+                        "type": "string"
+                      },
+                      "messages": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "role": {
+                              "type": "string",
+                              "enum": [
+                                "user",
+                                "assistant",
+                                "system"
+                              ]
+                            },
+                            "content": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "role",
+                            "content"
+                          ],
+                          "additionalProperties": true
+                        }
+                      },
+                      "response_format": {
+                        "type": [
+                          "object",
+                          "null"
+                        ],
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "json_schema"
+                            ]
+                          },
+                          "json_schema": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "schema": {
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "schema"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "json_schema"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "updatedAt",
+                      "version",
+                      "versionId",
+                      "versionCreatedAt",
+                      "model",
+                      "prompt",
+                      "messages",
+                      "response_format"
+                    ]
+                  }
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "Bad Request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "Unauthorized"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "error": "Unauthorized"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "getApiPrompts",
         "parameters": [],
         "description": "Get all prompts for a project"
       },
       "post": {
-        "responses": {},
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "number"
+                    },
+                    "versionId": {
+                      "type": "string"
+                    },
+                    "versionCreatedAt": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "user",
+                              "assistant",
+                              "system"
+                            ]
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "role",
+                          "content"
+                        ],
+                        "additionalProperties": true
+                      }
+                    },
+                    "response_format": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "json_schema"
+                          ]
+                        },
+                        "json_schema": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "schema": {
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "schema"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "json_schema"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "updatedAt",
+                    "version",
+                    "versionId",
+                    "versionCreatedAt",
+                    "model",
+                    "prompt",
+                    "messages",
+                    "response_format"
+                  ]
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "Bad Request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "Unauthorized"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "error": "Unauthorized"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "postApiPrompts",
         "parameters": [],
         "description": "Create a new prompt with default initial version",
@@ -863,7 +1205,195 @@
     },
     "/api/prompts/{id}": {
       "get": {
-        "responses": {},
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "number"
+                    },
+                    "versionId": {
+                      "type": "string"
+                    },
+                    "versionCreatedAt": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "user",
+                              "assistant",
+                              "system"
+                            ]
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "role",
+                          "content"
+                        ],
+                        "additionalProperties": true
+                      }
+                    },
+                    "response_format": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "json_schema"
+                          ]
+                        },
+                        "json_schema": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "schema": {
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "schema"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "json_schema"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "updatedAt",
+                    "version",
+                    "versionId",
+                    "versionCreatedAt",
+                    "model",
+                    "prompt",
+                    "messages",
+                    "response_format"
+                  ]
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "Bad Request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "Unauthorized"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "error": "Unauthorized"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Prompt not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "getApiPromptsById",
         "parameters": [
           {
@@ -878,7 +1408,116 @@
         "description": "Get a specific prompt"
       },
       "put": {
-        "responses": {},
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "updatedAt"
+                  ]
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "Bad Request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "Unauthorized"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "error": "Unauthorized"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Prompt not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "putApiPromptsById",
         "parameters": [
           {
@@ -901,14 +1540,118 @@
                     "type": "string",
                     "minLength": 1
                   }
-                }
+                },
+                "required": [
+                  "name"
+                ]
               }
             }
           }
         }
       },
       "delete": {
-        "responses": {},
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "Bad Request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "Unauthorized"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "error": "Unauthorized"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Prompt not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "deleteApiPromptsById",
         "parameters": [
           {
@@ -925,7 +1668,582 @@
     },
     "/api/prompts/{id}/versions": {
       "get": {
-        "responses": {},
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "authorId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "projectId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "configId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "schemaVersion": {
+                        "type": "string",
+                        "const": "1.0"
+                      },
+                      "commitMessage": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "version": {
+                        "type": "number"
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      },
+                      "configData": {
+                        "type": "object",
+                        "properties": {
+                          "version": {
+                            "type": "number",
+                            "minimum": 1
+                          },
+                          "prompt": {
+                            "type": "string"
+                          },
+                          "messages": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "role": {
+                                  "type": "string",
+                                  "enum": [
+                                    "user",
+                                    "assistant",
+                                    "system"
+                                  ]
+                                },
+                                "content": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "role",
+                                "content"
+                              ],
+                              "additionalProperties": true
+                            },
+                            "default": []
+                          },
+                          "inputs": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "identifier": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "str",
+                                    "float",
+                                    "bool",
+                                    "image",
+                                    "list[str]",
+                                    "list[float]",
+                                    "list[int]",
+                                    "list[bool]",
+                                    "dict"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "identifier",
+                                "type"
+                              ]
+                            },
+                            "minItems": 1
+                          },
+                          "outputs": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "identifier": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "type": {
+                                  "type": "string",
+                                  "enum": [
+                                    "str",
+                                    "float",
+                                    "bool",
+                                    "json_schema"
+                                  ]
+                                },
+                                "json_schema": {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "type"
+                                  ],
+                                  "additionalProperties": true
+                                }
+                              },
+                              "required": [
+                                "identifier",
+                                "type"
+                              ]
+                            },
+                            "minItems": 1
+                          },
+                          "model": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "temperature": {
+                            "type": "number"
+                          },
+                          "max_tokens": {
+                            "type": "number"
+                          },
+                          "demonstrations": {
+                            "type": "object",
+                            "properties": {
+                              "columns": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "type": {
+                                      "type": "string",
+                                      "enum": [
+                                        "string",
+                                        "boolean",
+                                        "number",
+                                        "date",
+                                        "list",
+                                        "json",
+                                        "spans",
+                                        "rag_contexts",
+                                        "chat_messages",
+                                        "annotations",
+                                        "evaluations"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name",
+                                    "type"
+                                  ]
+                                }
+                              },
+                              "rows": {
+                                "type": "array",
+                                "items": {
+                                  "allOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        }
+                                      },
+                                      "required": [
+                                        "id"
+                                      ]
+                                    },
+                                    {
+                                      "type": "object",
+                                      "additionalProperties": {}
+                                    }
+                                  ]
+                                },
+                                "default": []
+                              }
+                            },
+                            "required": [
+                              "columns",
+                              "rows"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "prompt",
+                          "messages",
+                          "inputs",
+                          "outputs",
+                          "model",
+                          "demonstrations"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "authorId",
+                      "projectId",
+                      "configId",
+                      "schemaVersion",
+                      "version",
+                      "createdAt",
+                      "configData"
+                    ]
+                  },
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "authorId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "configId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "schemaVersion": {
+                      "type": "string",
+                      "const": "1.0"
+                    },
+                    "commitMessage": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "version": {
+                      "type": "number"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "configData": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "number",
+                          "minimum": 1
+                        },
+                        "prompt": {
+                          "type": "string"
+                        },
+                        "messages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "assistant",
+                                  "system"
+                                ]
+                              },
+                              "content": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "role",
+                              "content"
+                            ],
+                            "additionalProperties": true
+                          },
+                          "default": []
+                        },
+                        "inputs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "identifier": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "str",
+                                  "float",
+                                  "bool",
+                                  "image",
+                                  "list[str]",
+                                  "list[float]",
+                                  "list[int]",
+                                  "list[bool]",
+                                  "dict"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "identifier",
+                              "type"
+                            ]
+                          },
+                          "minItems": 1
+                        },
+                        "outputs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "identifier": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "str",
+                                  "float",
+                                  "bool",
+                                  "json_schema"
+                                ]
+                              },
+                              "json_schema": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "type"
+                                ],
+                                "additionalProperties": true
+                              }
+                            },
+                            "required": [
+                              "identifier",
+                              "type"
+                            ]
+                          },
+                          "minItems": 1
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "temperature": {
+                          "type": "number"
+                        },
+                        "max_tokens": {
+                          "type": "number"
+                        },
+                        "demonstrations": {
+                          "type": "object",
+                          "properties": {
+                            "columns": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "string",
+                                      "boolean",
+                                      "number",
+                                      "date",
+                                      "list",
+                                      "json",
+                                      "spans",
+                                      "rag_contexts",
+                                      "chat_messages",
+                                      "annotations",
+                                      "evaluations"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "type"
+                                ]
+                              }
+                            },
+                            "rows": {
+                              "type": "array",
+                              "items": {
+                                "allOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "id"
+                                    ]
+                                  },
+                                  {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  }
+                                ]
+                              },
+                              "default": []
+                            }
+                          },
+                          "required": [
+                            "columns",
+                            "rows"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "prompt",
+                        "messages",
+                        "inputs",
+                        "outputs",
+                        "model",
+                        "demonstrations"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "authorId",
+                    "projectId",
+                    "configId",
+                    "schemaVersion",
+                    "version",
+                    "createdAt",
+                    "configData"
+                  ]
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "Bad Request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "Unauthorized"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "error": "Unauthorized"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Prompt not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "getApiPromptsByIdVersions",
         "parameters": [
           {
@@ -940,7 +2258,340 @@
         "description": "Get all versions for a prompt"
       },
       "post": {
-        "responses": {},
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "authorId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "projectId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "configId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "schemaVersion": {
+                      "type": "string",
+                      "const": "1.0"
+                    },
+                    "commitMessage": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "version": {
+                      "type": "number"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "configData": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "number",
+                          "minimum": 1
+                        },
+                        "prompt": {
+                          "type": "string"
+                        },
+                        "messages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "assistant",
+                                  "system"
+                                ]
+                              },
+                              "content": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "role",
+                              "content"
+                            ],
+                            "additionalProperties": true
+                          },
+                          "default": []
+                        },
+                        "inputs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "identifier": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "str",
+                                  "float",
+                                  "bool",
+                                  "image",
+                                  "list[str]",
+                                  "list[float]",
+                                  "list[int]",
+                                  "list[bool]",
+                                  "dict"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "identifier",
+                              "type"
+                            ]
+                          },
+                          "minItems": 1
+                        },
+                        "outputs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "identifier": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "str",
+                                  "float",
+                                  "bool",
+                                  "json_schema"
+                                ]
+                              },
+                              "json_schema": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "type"
+                                ],
+                                "additionalProperties": true
+                              }
+                            },
+                            "required": [
+                              "identifier",
+                              "type"
+                            ]
+                          },
+                          "minItems": 1
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "temperature": {
+                          "type": "number"
+                        },
+                        "max_tokens": {
+                          "type": "number"
+                        },
+                        "demonstrations": {
+                          "type": "object",
+                          "properties": {
+                            "columns": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "string",
+                                      "boolean",
+                                      "number",
+                                      "date",
+                                      "list",
+                                      "json",
+                                      "spans",
+                                      "rag_contexts",
+                                      "chat_messages",
+                                      "annotations",
+                                      "evaluations"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "type"
+                                ]
+                              }
+                            },
+                            "rows": {
+                              "type": "array",
+                              "items": {
+                                "allOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "id"
+                                    ]
+                                  },
+                                  {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  }
+                                ]
+                              },
+                              "default": []
+                            }
+                          },
+                          "required": [
+                            "columns",
+                            "rows"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "prompt",
+                        "messages",
+                        "inputs",
+                        "outputs",
+                        "model",
+                        "demonstrations"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "authorId",
+                    "projectId",
+                    "configId",
+                    "schemaVersion",
+                    "version",
+                    "createdAt",
+                    "configData"
+                  ]
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "Bad Request"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "_cached": null,
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "Unauthorized"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "error": "Unauthorized"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Prompt not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "operationId": "postApiPromptsByIdVersions",
         "parameters": [
           {
@@ -959,6 +2610,9 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "id": {
+                    "type": "string"
+                  },
                   "authorId": {
                     "type": [
                       "string",
@@ -980,21 +2634,46 @@
                   "commitMessage": {
                     "type": "string"
                   },
+                  "version": {
+                    "type": "number"
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
                   "configData": {
                     "type": "object",
                     "properties": {
                       "version": {
                         "type": "number",
-                        "const": "1.0",
                         "minimum": 1
                       },
                       "prompt": {
-                        "type": "string",
-                        "minLength": 1
+                        "type": "string"
                       },
-                      "model": {
-                        "type": "string",
-                        "minLength": 1
+                      "messages": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "role": {
+                              "type": "string",
+                              "enum": [
+                                "user",
+                                "assistant",
+                                "system"
+                              ]
+                            },
+                            "content": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "role",
+                            "content"
+                          ],
+                          "additionalProperties": true
+                        },
+                        "default": []
                       },
                       "inputs": {
                         "type": "array",
@@ -1007,13 +2686,16 @@
                             },
                             "type": {
                               "type": "string",
-                              "minLength": 1,
                               "enum": [
                                 "str",
                                 "float",
                                 "bool",
                                 "image",
-                                "list[str]"
+                                "list[str]",
+                                "list[float]",
+                                "list[int]",
+                                "list[bool]",
+                                "dict"
                               ]
                             }
                           },
@@ -1035,12 +2717,25 @@
                             },
                             "type": {
                               "type": "string",
-                              "minLength": 1,
                               "enum": [
                                 "str",
                                 "float",
-                                "bool"
+                                "bool",
+                                "json_schema"
                               ]
+                            },
+                            "json_schema": {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": [
+                                "type"
+                              ],
+                              "additionalProperties": true
                             }
                           },
                           "required": [
@@ -1050,6 +2745,16 @@
                         },
                         "minItems": 1
                       },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "temperature": {
+                        "type": "number"
+                      },
+                      "max_tokens": {
+                        "type": "number"
+                      },
                       "demonstrations": {
                         "type": "object",
                         "properties": {
@@ -1058,13 +2763,16 @@
                             "items": {
                               "type": "object",
                               "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
                                 "name": {
                                   "type": "string",
                                   "minLength": 1
                                 },
                                 "type": {
                                   "type": "string",
-                                  "minLength": 1,
                                   "enum": [
                                     "string",
                                     "boolean",
@@ -1078,10 +2786,6 @@
                                     "annotations",
                                     "evaluations"
                                   ]
-                                },
-                                "id": {
-                                  "type": "string",
-                                  "minLength": 1
                                 }
                               },
                               "required": [
@@ -1094,8 +2798,6 @@
                           "rows": {
                             "type": "array",
                             "items": {
-                              "type": "object",
-                              "additionalProperties": {},
                               "allOf": [
                                 {
                                   "type": "object",
@@ -1121,12 +2823,6 @@
                         "required": [
                           "columns"
                         ]
-                      },
-                      "temperature": {
-                        "type": "number"
-                      },
-                      "max_tokens": {
-                        "type": "number"
                       }
                     },
                     "required": [
@@ -1136,9 +2832,6 @@
                       "model",
                       "demonstrations"
                     ]
-                  },
-                  "version": {
-                    "type": "number"
                   }
                 },
                 "required": [
