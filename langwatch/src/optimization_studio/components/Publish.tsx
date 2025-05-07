@@ -21,6 +21,7 @@ import {
   Code,
   Lock,
   Play,
+  Share2,
 } from "react-feather";
 import { RenderCode } from "~/components/code/RenderCode";
 import { SmallLabel } from "../../components/SmallLabel";
@@ -33,7 +34,7 @@ import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
 
 import { Separator } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
+import type { Dataset, DatasetRecord, Project } from "@prisma/client";
 import { type Edge } from "@xyflow/react";
 import { ChevronDown } from "react-feather";
 import { useForm } from "react-hook-form";
@@ -44,7 +45,17 @@ import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { trackEvent } from "../../utils/tracking";
+import {
+  datasetDatabaseRecordsToInMemoryDataset,
+  inMemoryDatasetToNodeDataset,
+} from "../utils/datasetUtils";
 import { checkIsEvaluator, getEntryInputs } from "../utils/nodeUtils";
+
+// Type with dataset property
+interface NodeDataWithDataset {
+  dataset: any;
+  [key: string]: any;
+}
 
 export function Publish({ isDisabled }: { isDisabled: boolean }) {
   const publishModal = useDisclosure();
@@ -96,6 +107,54 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
   );
 }
 
+/**
+ * Extracts the dataset from a published workflow and converts it to an inline format.
+ * This allows the dataset to be included in the workflow JSON when exporting,
+ * making it possible to import the workflow into another project with its dataset intact.
+ */
+
+const exportWorkflow = async (
+  publishedWorkflow: Workflow,
+  datasetData?: Dataset & { datasetRecords: DatasetRecord[] }
+) => {
+  let dsl = { ...publishedWorkflow };
+  try {
+    if (datasetData && datasetData.datasetRecords.length > 0) {
+      const inMemoryDataset =
+        datasetDatabaseRecordsToInMemoryDataset(datasetData);
+      inMemoryDataset.datasetId = undefined;
+      const dataset = inMemoryDatasetToNodeDataset(inMemoryDataset);
+
+      if (dsl.nodes?.[0]?.data) {
+        (dsl.nodes[0].data as NodeDataWithDataset).dataset = dataset;
+      }
+    }
+
+    dsl.workflow_id = "";
+
+    //Create and trigger download
+    const url = window.URL.createObjectURL(new Blob([JSON.stringify(dsl)]));
+    const link = document.createElement("a");
+    link.href = url;
+
+    const today = new Date();
+    const formattedDate = today.toISOString().split("T")[0];
+    const fileName = `Workflow - ${formattedDate}.json`;
+
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } catch (error) {
+    toaster.create({
+      title: "Error exporting workflow",
+      description: "An error occurred while exporting the workflow.",
+      type: "error",
+      meta: { closable: true },
+    });
+  }
+};
+
 function PublishMenu({
   project,
   onTogglePublish,
@@ -114,7 +173,6 @@ function PublishMenu({
   const endNodes = nodes.filter((node) => node.type === "end");
 
   const isEvaluator = endNodes.some(checkIsEvaluator);
-
   const { canSaveNewVersion, versionToBeEvaluated } = useVersionState({
     project,
     allowSaveIfAutoSaveIsCurrentButNotLatest: false,
@@ -129,6 +187,24 @@ function PublishMenu({
     },
     {
       enabled: !!project?.id,
+    }
+  );
+
+  // Add dataset fetching hooks here
+  const datasetId = publishedWorkflow.data?.dsl
+    ? (
+        (publishedWorkflow.data.dsl as unknown as Workflow).nodes[0]
+          ?.data as any
+      )?.dataset?.id
+    : undefined;
+
+  const datasetRecords = api.datasetRecord.getAll.useQuery(
+    {
+      datasetId: datasetId ?? "",
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!datasetId && !!project?.id,
     }
   );
 
@@ -273,6 +349,16 @@ function PublishMenu({
     );
   };
 
+  const handleExportWorkflow = () => {
+    if (!publishedWorkflow.data) return;
+
+    // Type cast the publishedWorkflow.data to avoid type errors
+    exportWorkflow(
+      publishedWorkflow.data.dsl as unknown as Workflow,
+      datasetRecords.data ?? undefined
+    );
+  };
+
   return (
     <>
       {publishedWorkflow.data?.version && (
@@ -298,25 +384,8 @@ function PublishMenu({
 
       <SubscriptionMenuItem
         tooltip={publishDisabledLabel}
-        disabled={!!publishDisabledLabel || isEvaluator}
-        value="component"
-        onClick={toggleSaveAsComponent}
-      >
-        <BoxIcon size={16} />{" "}
-        {publishedWorkflow.data?.isComponent
-          ? "Delete Component"
-          : "Save as Component"}
-      </SubscriptionMenuItem>
-
-      <SubscriptionMenuItem
-        tooltip={
-          publishDisabledLabel
-            ? publishDisabledLabel
-            : !isEvaluator
-            ? "Toggle the end node's type to 'Evaluator' to enable this option"
-            : undefined
-        }
-        disabled={!!publishDisabledLabel || !isEvaluator}
+        disabled={!!canPublish}
+        hidden={!isEvaluator}
         onClick={toggleSaveAsEvaluator}
         value="evaluator"
       >
@@ -324,6 +393,19 @@ function PublishMenu({
         {publishedWorkflow.data?.isEvaluator
           ? "Delete Evaluator"
           : "Save as Evaluator"}
+      </SubscriptionMenuItem>
+
+      <SubscriptionMenuItem
+        tooltip={publishDisabledLabel}
+        disabled={!!publishDisabledLabel}
+        hidden={isEvaluator}
+        value="component"
+        onClick={toggleSaveAsComponent}
+      >
+        <BoxIcon size={16} />{" "}
+        {publishedWorkflow.data?.isComponent
+          ? "Delete Component"
+          : "Save as Component"}
       </SubscriptionMenuItem>
 
       <Link
@@ -353,6 +435,14 @@ function PublishMenu({
         value="api-reference"
       >
         <Code size={16} /> View API Reference
+      </SubscriptionMenuItem>
+      <SubscriptionMenuItem
+        tooltip={publishDisabledLabel}
+        onClick={handleExportWorkflow}
+        disabled={!!publishDisabledLabel}
+        value="export-workflow"
+      >
+        <Share2 size={16} /> Export Workflow
       </SubscriptionMenuItem>
     </>
   );
