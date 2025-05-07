@@ -15,7 +15,11 @@ import {
   versionInputSchema,
   versionOutputSchema,
 } from "./schemas";
-import { authMiddleware, repositoryMiddleware } from "./middleware";
+import {
+  authMiddleware,
+  repositoryMiddleware,
+  errorMiddleware,
+} from "./middleware";
 import {
   buildStandardSuccessResponse,
   getOutputsToResponseFormat,
@@ -32,12 +36,16 @@ type Variables = {
   llmConfigRepository: LlmConfigRepository;
 };
 
+// Define the Hono app
 export const app = new Hono<{
   Variables: Variables;
 }>().basePath("/api/prompts");
+
+// Middleware
 app.use(loggerMiddleware());
 app.use("/*", authMiddleware);
 app.use("/*", repositoryMiddleware);
+app.use("/*", errorMiddleware);
 
 // Get all prompts
 app.get(
@@ -79,6 +87,12 @@ app.get(
     responses: {
       ...baseResponses,
       200: buildStandardSuccessResponse(promptOutputSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
     },
   }),
   async (c) => {
@@ -91,44 +105,36 @@ app.get(
       "Getting prompt by ID"
     );
 
-    try {
-      const config = await repository.getConfigByIdWithLatestVersions(
-        id,
-        project.id
-      );
+    const config = await repository.getConfigByIdWithLatestVersions(
+      id,
+      project.id
+    );
 
-      const response = {
-        id,
-        name: config.name,
-        version: config.latestVersion.version,
-        versionId: config.latestVersion.id ?? "",
-        versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
-        model: config.latestVersion.configData.model,
-        prompt: config.latestVersion.configData.prompt,
-        updatedAt: config.updatedAt,
-        messages: [
-          {
-            role: "system",
-            content: config.latestVersion.configData.prompt,
-          },
-          ...config.latestVersion.configData.messages,
-        ],
-        response_format: getOutputsToResponseFormat(config),
-      } satisfies z.infer<typeof promptOutputSchema>;
+    const response = {
+      id,
+      name: config.name,
+      version: config.latestVersion.version,
+      versionId: config.latestVersion.id ?? "",
+      versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
+      model: config.latestVersion.configData.model,
+      prompt: config.latestVersion.configData.prompt,
+      updatedAt: config.updatedAt,
+      messages: [
+        {
+          role: "system",
+          content: config.latestVersion.configData.prompt,
+        },
+        ...config.latestVersion.configData.messages,
+      ],
+      response_format: getOutputsToResponseFormat(config),
+    } satisfies z.infer<typeof promptOutputSchema>;
 
-      logger.info(
-        { projectId: project.id, promptId: id, name: config.name },
-        "Successfully retrieved prompt"
-      );
+    logger.info(
+      { projectId: project.id, promptId: id, name: config.name },
+      "Successfully retrieved prompt"
+    );
 
-      return c.json(response);
-    } catch (error: any) {
-      logger.error(
-        { projectId: project.id, promptId: id, error: error.message },
-        "Error retrieving prompt"
-      );
-      return c.json({ error: error.message }, 404);
-    }
+    return c.json(response);
   }
 );
 
@@ -158,25 +164,17 @@ app.post(
       "Creating new prompt with initial version"
     );
 
-    try {
-      const newConfig = await repository.createConfigWithInitialVersion({
-        name,
-        projectId: project.id,
-      });
+    const newConfig = await repository.createConfigWithInitialVersion({
+      name,
+      projectId: project.id,
+    });
 
-      logger.info(
-        { projectId: project.id, promptId: newConfig.id, promptName: name },
-        "Successfully created new prompt"
-      );
+    logger.info(
+      { projectId: project.id, promptId: newConfig.id, promptName: name },
+      "Successfully created new prompt"
+    );
 
-      return c.json(newConfig);
-    } catch (error: any) {
-      logger.error(
-        { projectId: project.id, promptName: name, error: error.message },
-        "Error creating new prompt"
-      );
-      return c.json({ error: error.message }, 500);
-    }
+    return c.json(newConfig);
   }
 );
 
@@ -188,6 +186,12 @@ app.get(
     responses: {
       ...baseResponses,
       200: buildStandardSuccessResponse(versionOutputSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
     },
   }),
   async (c) => {
@@ -200,25 +204,17 @@ app.get(
       "Getting versions for prompt"
     );
 
-    try {
-      const versions = await repository.versions.getVersionsForConfigById({
-        configId: id,
-        projectId: project.id,
-      });
+    const versions = await repository.versions.getVersionsForConfigById({
+      configId: id,
+      projectId: project.id,
+    });
 
-      logger.info(
-        { projectId: project.id, promptId: id, versionCount: versions.length },
-        "Successfully retrieved prompt versions"
-      );
+    logger.info(
+      { projectId: project.id, promptId: id, versionCount: versions.length },
+      "Successfully retrieved prompt versions"
+    );
 
-      return c.json(versions);
-    } catch (error: any) {
-      logger.error(
-        { projectId: project.id, promptId: id, error: error.message },
-        "Error retrieving prompt versions"
-      );
-      return c.json({ error: error.message }, 404);
-    }
+    return c.json(versions);
   }
 );
 
@@ -230,6 +226,12 @@ app.post(
     responses: {
       ...baseResponses,
       200: buildStandardSuccessResponse(versionOutputSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
     },
   }),
   zValidator("json", versionInputSchema),
@@ -244,31 +246,23 @@ app.post(
       "Creating new version for prompt"
     );
 
-    try {
-      const version = await repository.versions.createVersion({
-        ...data,
-        configId: id,
+    const version = await repository.versions.createVersion({
+      ...data,
+      configId: id,
+      projectId: project.id,
+    });
+
+    logger.info(
+      {
         projectId: project.id,
-      });
+        promptId: id,
+        versionId: version.id,
+        version: version.version,
+      },
+      "Successfully created new prompt version"
+    );
 
-      logger.info(
-        {
-          projectId: project.id,
-          promptId: id,
-          versionId: version.id,
-          version: version.version,
-        },
-        "Successfully created new prompt version"
-      );
-
-      return c.json(version);
-    } catch (error: any) {
-      logger.error(
-        { projectId: project.id, promptId: id, error: error.message },
-        "Error creating new prompt version"
-      );
-      return c.json({ error: error.message }, 404);
-    }
+    return c.json(version);
   }
 );
 
@@ -280,6 +274,12 @@ app.put(
     responses: {
       ...baseResponses,
       200: buildStandardSuccessResponse(llmPromptConfigSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
     },
   }),
   zValidator(
@@ -297,22 +297,14 @@ app.put(
       "Updating prompt"
     );
 
-    try {
-      const updatedConfig = await repository.updateConfig(id, project.id, data);
+    const updatedConfig = await repository.updateConfig(id, project.id, data);
 
-      logger.info(
-        { projectId: project.id, promptId: id, name: updatedConfig.name },
-        "Successfully updated prompt"
-      );
+    logger.info(
+      { projectId: project.id, promptId: id, name: updatedConfig.name },
+      "Successfully updated prompt"
+    );
 
-      return c.json(updatedConfig);
-    } catch (error: any) {
-      logger.error(
-        { projectId: project.id, promptId: id, error: error.message },
-        "Error updating prompt"
-      );
-      return c.json({ error: error.message }, 404);
-    }
+    return c.json(updatedConfig);
   }
 );
 
@@ -339,29 +331,13 @@ app.delete(
 
     logger.info({ projectId: project.id, promptId: id }, "Deleting prompt");
 
-    try {
-      const result = await repository.deleteConfig(id, project.id);
+    const result = await repository.deleteConfig(id, project.id);
 
-      logger.info(
-        { projectId: project.id, promptId: id, success: result.success },
-        "Successfully deleted prompt"
-      );
+    logger.info(
+      { projectId: project.id, promptId: id, success: result.success },
+      "Successfully deleted prompt"
+    );
 
-      return c.json(result satisfies z.infer<typeof successSchema>);
-    } catch (error) {
-      logger.error(
-        {
-          projectId: project.id,
-          promptId: id,
-          error,
-        },
-        "Error deleting prompt"
-      );
-
-      return c.json(
-        { error: "Not Found" } satisfies z.infer<typeof badRequestSchema>,
-        404
-      );
-    }
+    return c.json(result satisfies z.infer<typeof successSchema>);
   }
 );
