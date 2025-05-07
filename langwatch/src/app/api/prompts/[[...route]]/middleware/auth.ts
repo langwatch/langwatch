@@ -6,12 +6,16 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
     c.req.header("X-Auth-Token") ??
     c.req.header("Authorization")?.split(" ")[1];
 
+  if (!apiKey) {
+    return c.json({ error: "Unauthorized", message: "Missing API key" }, 401);
+  }
+
   const project = await prisma.project.findUnique({
     where: { apiKey },
   });
 
-  if (!project || apiKey !== project.apiKey) {
-    return c.json({ error: "Unauthorized" }, 401);
+  if (!project) {
+    return c.json({ error: "Unauthorized", message: "Invalid API key" }, 401);
   }
 
   // Store project and repository for use in route handlers
