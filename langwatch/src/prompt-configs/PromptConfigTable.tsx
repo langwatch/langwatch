@@ -49,11 +49,15 @@ export const createDefaultColumns = ({
             <MoreVertical />
           </Button>
         </Menu.Trigger>
-        <Menu.Content>
+        <Menu.Content
+          onClick={(event) => {
+            // Prevent clicking from bubbling up to the onRowClick handler
+            event.stopPropagation();
+          }}
+        >
           <Menu.Item
             value="edit"
             onClick={(event) => {
-              event.stopPropagation();
               void onEdit(config);
             }}
           >
@@ -71,7 +75,6 @@ export const createDefaultColumns = ({
             value="delete"
             color="red.600"
             onClick={(event) => {
-              event.stopPropagation();
               void onDelete(config);
             }}
           >
@@ -138,14 +141,14 @@ export function PromptConfigTable({
         </Table.Header>
         <Table.Body>
           {configs.map((config) => (
-            <Table.Row
-              key={config.id}
-              onClick={() => onRowClick?.(config)}
-              cursor={onRowClick ? "pointer" : "default"}
+            <GeneratePromptApiSnippetDialog
+              configId={config.id}
+              apiKey={project?.apiKey}
             >
-              <GeneratePromptApiSnippetDialog
-                configId={config.id}
-                apiKey={project?.apiKey}
+              <Table.Row
+                key={config.id}
+                onClick={() => onRowClick?.(config)}
+                cursor={onRowClick ? "pointer" : "default"}
               >
                 {columns.map((column) => (
                   <Table.Cell
@@ -155,8 +158,8 @@ export function PromptConfigTable({
                     {column.render(config)}
                   </Table.Cell>
                 ))}
-              </GeneratePromptApiSnippetDialog>
-            </Table.Row>
+              </Table.Row>
+            </GeneratePromptApiSnippetDialog>
           ))}
         </Table.Body>
       </Table.Root>
