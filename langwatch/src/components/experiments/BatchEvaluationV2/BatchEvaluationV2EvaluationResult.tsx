@@ -96,19 +96,28 @@ const evaluationResultsTableRow = (
               );
             }
 
+            let value = datasetEntry?.predicted?.[node]?.[column];
+            if (value === undefined && node === "end") {
+              value = datasetEntry?.predicted?.[column];
+            }
+
             return (
               <Table.Cell key={`predicted-${node}-${column}`} maxWidth="250px">
-                {datasetEntry?.predicted?.[node]?.[column] ? (
-                  <HoverableBigText>
-                    {stringify(datasetEntry.predicted?.[node]?.[column])}
-                  </HoverableBigText>
+                {value ? (
+                  <HoverableBigText>{stringify(value)}</HoverableBigText>
                 ) : (
                   "-"
                 )}
               </Table.Cell>
             );
           },
-          value: () => stringify(datasetEntry?.predicted?.[node]?.[column]),
+          value: () => {
+            let value = datasetEntry?.predicted?.[node]?.[column];
+            if (value === undefined && node === "end") {
+              value = datasetEntry?.predicted?.[column];
+            }
+            return stringify(value);
+          },
         }))
     ),
     cost: {
