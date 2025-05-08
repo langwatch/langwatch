@@ -696,6 +696,7 @@ const addOpenTelemetrySpanAsSpan = (
   }
 
   // Metadata
+  const mappedMetadata = applyMappingsToMetadata(metadata);
   const { reservedTraceMetadata, customMetadata } =
     extractReservedAndCustomMetadata(mappedMetadata);
 
@@ -896,6 +897,19 @@ const removeEmptyKeys = (obj: Record<string, any>): Record<string, any> => {
 
   return Object.keys(result).length > 0 ? result : {};
 };
+
+const applyMappingsToMetadata = (metadata: any) => {
+  return Object.fromEntries(
+    Object.entries(metadata).map(([key, value]) => {
+      const langWatchKey = openTelemetryToLangWatchMetadataMapping[key];
+      if (!langWatchKey) {
+        return [key, value];
+      }
+
+      return [langWatchKey, value];
+    })
+  );
+}
 
 const extractReservedAndCustomMetadata = (metadata: any) => {
   if ("threadId" in metadata) {
