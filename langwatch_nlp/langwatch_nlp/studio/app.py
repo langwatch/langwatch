@@ -42,7 +42,7 @@ from langwatch_nlp.studio.types.events import (
     component_error_event,
     get_trace_id,
 )
-from langwatch_nlp.studio.utils import shutdown_handler
+from langwatch_nlp.studio.utils import SerializableWithPydanticAndPredictEncoder, shutdown_handler
 
 logger = get_logger(__name__)
 
@@ -94,7 +94,12 @@ async def handle_interruption(event: StudioClientEvent):
         EvaluationReporting.post_results(
             event.payload.workflow.api_key,
             {
-                "experiment_slug": event.payload.workflow.workflow_id,
+                "experiment_id": event.payload.workflow.experiment_id,
+                "experiment_slug": (
+                    None
+                    if event.payload.workflow.experiment_id
+                    else event.payload.workflow.workflow_id
+                ),
                 "run_id": event.payload.run_id,
                 "timestamps": {
                     "finished_at": int(time.time() * 1000),
@@ -188,6 +193,9 @@ async def execute_event_on_a_subprocess(
             runtime.kill_process(process)
 
     except Exception as e:
+        import traceback
+
+        traceback.print_exc()
         yield Error(payload=ErrorPayload(message=f"Unexpected error: {repr(e)}"))
     finally:
         # Ensure the process is terminated and resources are cleaned up
@@ -197,7 +205,7 @@ async def execute_event_on_a_subprocess(
 
 async def event_encoder(event_generator: AsyncGenerator[StudioServerEvent, None]):
     async for event in event_generator:
-        yield f"data: {json.dumps(event.model_dump(exclude_none=True))}\n\n"
+        yield f"data: {json.dumps(event.model_dump(exclude_none=True), cls=SerializableWithPydanticAndPredictEncoder)}\n\n"
 
 
 @app.post("/execute")

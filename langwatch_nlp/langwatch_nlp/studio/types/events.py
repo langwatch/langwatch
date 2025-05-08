@@ -13,6 +13,7 @@ from langwatch_nlp.studio.types.dsl import (
     Workflow,
     WorkflowExecutionState,
 )
+from langevals_core.base_evaluator import Money
 
 
 class IsAlive(BaseModel):
@@ -220,8 +221,17 @@ def start_component_event(
 
 
 def end_component_event(
-    node: Node, trace_id: str, outputs: Dict[str, Any], cost: Optional[float] = None
+    node: Node, trace_id: str, result: Any, cost: Optional[Union[float, Money]] = None
 ):
+    try:
+        outputs = dict(result)
+        if "inputs" in outputs and type(outputs["inputs"]) == dict:
+            del outputs["inputs"]
+    except Exception:
+        raise ValueError(
+            f"Node {node.id} must return a dict or dict-like object, instead got: {result.__repr__()}"
+        )
+
     return ComponentStateChange(
         payload=ComponentStateChangePayload(
             component_id=node.id,
@@ -230,7 +240,7 @@ def end_component_event(
                 trace_id=trace_id,
                 timestamps=Timestamps(finished_at=int(time.time() * 1000)),
                 outputs=outputs,
-                cost=cost,
+                cost=cost.amount if isinstance(cost, Money) else cost,
             ),
         )
     )

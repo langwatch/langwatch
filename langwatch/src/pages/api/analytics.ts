@@ -2,8 +2,6 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { prisma } from "../../server/db"; // Adjust the import based on your setup
 
-import { getDebugger } from "../../utils/logger";
-
 import {
   timeseriesSeriesInput,
   type TimeseriesInputType,
@@ -13,7 +11,9 @@ import { sharedFiltersInputSchema } from "../../server/analytics/types";
 import { timeseries } from "../../server/analytics/timeseries";
 import { TRPCError } from "@trpc/server";
 
-export const debug = getDebugger("langwatch:analytics");
+import { createLogger } from "../../utils/logger";
+
+const logger = createLogger("langwatch:analytics");
 
 export default async function handler(
   req: NextApiRequest,

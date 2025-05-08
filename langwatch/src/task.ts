@@ -1,5 +1,5 @@
 import { loadEnvConfig } from "@next/env";
-import { getDebugger } from "./utils/logger";
+import { createLogger } from "./utils/logger";
 import fs from "fs";
 import path from "path";
 
@@ -8,7 +8,7 @@ loadEnvConfig(process.cwd());
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { connection: redis } = require("./server/redis");
 
-const debug = getDebugger("langwatch:task");
+const logger = createLogger("langwatch:task");
 
 const TASKS: Record<string, { default: (...args: any[]) => void }> = {};
 const files = fs.readdirSync(path.join(__dirname, "./tasks"));
@@ -33,14 +33,14 @@ const runAsync = async () => {
   };
 
   try {
-    debug(`Running ${taskName}`);
+    logger.info({ taskName }, 'running');
     await script.default(...args.slice(1));
-    debug(`Done!`);
   } catch (e) {
-    debug(`SCRIPT RUNNER: failed to execute ${taskName}`);
+    logger.error({ error: e, taskName }, 'failed');
     throw e;
   } finally {
     redis?.disconnect();
+    logger.info('done');
   }
 
   process.exit(0);

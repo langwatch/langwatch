@@ -1,23 +1,39 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import { prisma } from "../../../server/db";
+import { prisma } from "~/server/db";
 
-import { getDebugger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger";
 
-import { type ExperimentType, type Project } from "@prisma/client";
+import {
+  type Experiment,
+  type ExperimentType,
+  type Project,
+} from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { experimentSlugify } from "../../../server/experiments/utils";
+import { slugify } from "~/utils/slugify";
 
-export const debug = getDebugger("langwatch:dspy:init");
+const logger = createLogger("langwatch:dspy:init");
 
-const dspyInitParamsSchema = z.object({
-  experiment_slug: z.string(),
-  experiment_type: z.enum(["DSPY", "BATCH_EVALUATION", "BATCH_EVALUATION_V2"]),
-  experiment_name: z.string().optional(),
-  workflowId: z.string().optional(),
-});
+const dspyInitParamsSchema = z
+  .object({
+    experiment_id: z.string().optional().nullable(),
+    experiment_slug: z.string().optional().nullable(),
+    experiment_type: z.enum([
+      "DSPY",
+      "BATCH_EVALUATION",
+      "BATCH_EVALUATION_V2",
+    ]),
+    experiment_name: z.string().optional(),
+    workflowId: z.string().optional(),
+  })
+  .refine((data) => {
+    if (!data.experiment_id && !data.experiment_slug) {
+      return false;
+    }
+    return true;
+  });
 
 export default async function handler(
   req: NextApiRequest,
@@ -47,12 +63,7 @@ export default async function handler(
   try {
     params = dspyInitParamsSchema.parse(req.body);
   } catch (error) {
-    debug(
-      "Invalid init data received",
-      error,
-      JSON.stringify(req.body, null, "  "),
-      { projectId: project.id }
-    );
+    logger.error({ error, body: req.body, projectId: project.id }, 'invalid init data received');
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
     Sentry.captureException(error, { extra: { projectId: project.id } });
 
@@ -60,13 +71,13 @@ export default async function handler(
     return res.status(400).json({ error: validationError.message });
   }
 
-  const experiment = await findOrCreateExperiment(
+  const experiment = await findOrCreateExperiment({
     project,
-    params.experiment_slug,
-    params.experiment_type,
-    params.experiment_name,
-    params.workflowId
-  );
+    experiment_slug: params.experiment_slug,
+    experiment_type: params.experiment_type,
+    experiment_name: params.experiment_name,
+    workflowId: params.workflowId,
+  });
 
   return res.status(200).json({
     path: `/${project.slug}/experiments/${experiment.slug}`,
@@ -74,19 +85,45 @@ export default async function handler(
   });
 }
 
-export const findOrCreateExperiment = async (
-  project: Project,
-  experiment_slug: string,
-  experiment_type: ExperimentType,
-  experiment_name?: string,
-  workflowId?: string
-) => {
-  const slug_ = experimentSlugify(experiment_slug);
-  let experiment = await prisma.experiment.findUnique({
-    where: { projectId_slug: { projectId: project.id, slug: slug_ } },
-  });
+export const findOrCreateExperiment = async ({
+  project,
+  experiment_id,
+  experiment_slug,
+  experiment_type,
+  experiment_name,
+  workflowId,
+}: {
+  project: Project;
+  experiment_id?: string | null;
+  experiment_slug?: string | null;
+  experiment_type: ExperimentType;
+  experiment_name?: string;
+  workflowId?: string;
+}) => {
+  let experiment: Experiment | null = null;
 
-  if (!experiment) {
+  if (experiment_id) {
+    experiment = await prisma.experiment.findUnique({
+      where: { projectId: project.id, id: experiment_id },
+    });
+    if (!experiment) {
+      throw new Error("Experiment not found");
+    }
+  }
+
+  let slug_ = null;
+  if (experiment_slug) {
+    slug_ = slugify(experiment_slug);
+    experiment = await prisma.experiment.findUnique({
+      where: { projectId_slug: { projectId: project.id, slug: slug_ } },
+    });
+  }
+
+  if (!experiment && !slug_) {
+    throw new Error("Either experiment_id or experiment_slug is required");
+  }
+
+  if (!experiment && slug_) {
     experiment = await prisma.experiment.create({
       data: {
         id: `experiment_${nanoid()}`,
@@ -97,13 +134,15 @@ export const findOrCreateExperiment = async (
         workflowId: workflowId,
       },
     });
-  } else {
+  } else if (experiment) {
     if (!!experiment_name || !!workflowId) {
       await prisma.experiment.update({
         where: { id: experiment.id, projectId: project.id },
         data: { name: experiment_name, workflowId: workflowId },
       });
     }
+  } else {
+    throw new Error("Experiment not found");
   }
   return experiment;
 };

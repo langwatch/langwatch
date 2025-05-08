@@ -32,6 +32,8 @@ import { SmallLabel } from "../SmallLabel";
 import { Tooltip } from "../ui/tooltip";
 import { Switch } from "../ui/switch";
 import type { CheckConfigFormData } from "./CheckConfigForm";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL } from "../../utils/constants";
 
 const DynamicZodForm = ({
   schema,
@@ -51,6 +53,7 @@ const DynamicZodForm = ({
   skipFields?: string[];
 }) => {
   const { control, register } = useFormContext();
+  const { project } = useOrganizationTeamProject();
 
   const renderField = <T extends EvaluatorTypes>(
     fieldSchema: ZodType,
@@ -58,9 +61,17 @@ const DynamicZodForm = ({
     evaluator: EvaluatorDefinition<T> | undefined
   ): React.JSX.Element | null => {
     const fullPath = prefix ? `${prefix}.${fieldName}` : fieldName;
-    const defaultValue =
+    let defaultValue =
       evaluator?.settings?.[fieldName as keyof Evaluators[T]["settings"]]
         ?.default;
+
+    if (fieldName === "model") {
+      defaultValue = (project?.defaultModel ?? DEFAULT_MODEL) as any;
+    }
+    if (fieldName === "embeddings_model") {
+      defaultValue = (project?.embeddingsModel ??
+        DEFAULT_EMBEDDINGS_MODEL) as any;
+    }
 
     const fieldSchema_ =
       fieldSchema instanceof z.ZodOptional ? fieldSchema.unwrap() : fieldSchema;

@@ -1,6 +1,6 @@
 import { AVAILABLE_EVALUATORS } from "../server/evaluations/evaluators.generated";
+
 import {
-  type BaseComponent,
   type Code,
   type Evaluator,
   type Field,
@@ -10,8 +10,14 @@ import {
 } from "./types/dsl";
 import { convertEvaluators } from "./utils/registryUtils";
 
+/**
+ * Default Empty LLM Signature Node
+ *
+ * This is an empty llm signature node
+ * Use this when adding a new signature node to the workspace.
+ */
 const signature: Signature = {
-  name: "LLM Signature",
+  name: "LLM Node",
   description: "LLM calling node",
   parameters: [
     {
@@ -28,6 +34,16 @@ const signature: Signature = {
       identifier: "instructions",
       type: "str",
       value: undefined,
+    },
+    {
+      identifier: "messages",
+      type: "chat_messages",
+      value: [
+        {
+          role: "user",
+          content: "{{question}}",
+        },
+      ],
     },
     {
       identifier: "demonstrations",
@@ -180,6 +196,7 @@ const retrievers: Retriever[] = [
 ];
 
 const ALLOWED_EVALUATORS = [
+  "langevals/llm_answer_match",
   "ragas/factual_correctness",
   "lingua/language_detection",
   "langevals/llm_boolean",
@@ -219,20 +236,6 @@ const evaluators: Evaluator[] = [
       { identifier: "score", type: "float" },
     ],
   },
-  {
-    cls: "AnswerCorrectnessEvaluator",
-    name: "LLM Answer Match",
-    description:
-      "Uses an LLM to judge to check if the generated output and the expected output are the same",
-    parameters: [{ identifier: "llm", type: "llm" }],
-    inputs: [
-      { identifier: "input", type: "str" },
-      { identifier: "output", type: "str" },
-      { identifier: "expected_output", type: "str" },
-    ],
-    outputs: [{ identifier: "passed", type: "bool" }],
-  },
-
   ...convertEvaluators(
     Object.fromEntries(
       Object.entries(AVAILABLE_EVALUATORS)

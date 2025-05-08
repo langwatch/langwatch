@@ -13,7 +13,6 @@ import {
 } from "@chakra-ui/react";
 import { Lock, Plus } from "react-feather";
 import { DashboardLayout } from "../../components/DashboardLayout";
-import { IntroducingStudio } from "../../components/IntroducingStudio";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { NewWorkflowModal } from "../../optimization_studio/components/workflow/NewWorkflowModal";
 import {
@@ -54,7 +53,6 @@ export default function Workflows() {
     <DashboardLayout>
       <Container maxWidth="1200px" padding={6}>
         <VStack gap={8} width="full" align="start">
-          <IntroducingStudio />
           <HStack align="center" gap={6}>
             <Heading as={"h1"} size="lg" paddingTop={1}>
               Optimization Studio Workflows
@@ -93,7 +91,13 @@ export default function Workflows() {
                 </Tooltip>
               </WorkflowCardBase>
             ) : (
-              <WorkflowCardBase onClick={onOpen}>
+              <WorkflowCardBase
+                // This lets us test the happy path for prompt management from workflow
+                // since otherwise both versions look the same, but we need to wait
+                // for this one to be clickable
+                data-testid="active-create-new-workflow-button"
+                onClick={onOpen}
+              >
                 <Center width="full" height="full">
                   <HStack gap={3}>
                     <Box

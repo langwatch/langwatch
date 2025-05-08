@@ -2,27 +2,30 @@ import { useEffect, useState } from "react";
 import { Box, Image, Text } from "@chakra-ui/react";
 import { Tooltip } from "../components/ui/tooltip";
 
-export const isImageUrl = (str: string): boolean => {
+export const isImageUrl = (str: unknown): boolean => {
   if (!str) {
     return false;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string
+  const str_ = str.toString();
+
   // Check for base64 image
-  if (str.startsWith("data:image/")) {
+  if (str_.startsWith("data:image/")) {
     const base64Regex =
       /^data:image\/(jpeg|jpg|gif|png|webp|svg\+xml|bmp);base64,/i;
-    return base64Regex.test(str);
+    return base64Regex.test(str_);
   }
 
   try {
     // Try to create URL object to validate URL format
-    const url_ = new URL(str);
+    const url_ = new URL(str_);
 
     // Check for common image extensions
     const imageExtensionRegex = /\.(jpeg|jpg|gif|png|webp|svg|bmp)(\?.*)?$/i;
 
     // Check if URL contains an image file extension
-    if (imageExtensionRegex.test(str)) {
+    if (imageExtensionRegex.test(str_)) {
       return true;
     }
 

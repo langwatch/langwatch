@@ -13,15 +13,15 @@ import {
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { prisma } from "../../../../../server/db";
 import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/opentelemetry";
-import { getDebugger } from "../../../../../utils/logger";
 import * as Sentry from "@sentry/nextjs";
 import * as crypto from "crypto";
 import {
   fetchExistingMD5s,
   scheduleTraceCollectionWithFallback,
 } from "../../../../../server/background/workers/collectorWorker";
+import { createLogger } from "../../../../../utils/logger";
 
-const debug = getDebugger("langwatch:otel:v1:traces");
+const logger = createLogger("langwatch:otel:v1:traces");
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   const authToken =
     xAuthToken ??
-    (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
+    (authHeader?.toLowerCase().startsWith("bearer ") ? authHeader.slice(7) : null);
 
   if (!authToken) {
     return NextResponse.json(
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         throw new Error("Spans are empty, likely an invalid format");
       }
     } catch (jsonError) {
-      debug("Error parsing traces:", Buffer.from(body).toString("base64"));
+      logger.error({ error: jsonError, traceRequest: Buffer.from(body).toString("base64") }, "error parsing traces");
       Sentry.captureException(error, {
         extra: {
           projectId: project.id,
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
-    debug(`collecting traceId ${traceForCollection.traceId}`);
+    logger.info({ traceId: traceForCollection.traceId }, 'collecting traces');
 
     promises.push(
       scheduleTraceCollectionWithFallback({

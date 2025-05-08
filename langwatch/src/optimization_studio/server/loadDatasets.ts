@@ -97,7 +97,7 @@ export const loadDatasets = async (
   );
 
   const workflow: Workflow = {
-    ...event.payload.workflow,
+    ...(event.payload.workflow as Workflow),
     nodes,
   };
 

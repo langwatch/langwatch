@@ -21,7 +21,7 @@ export const planRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       return await dependencies.subscriptionHandler.getActivePlan(
         input.organizationId,
-        ctx.session.user,
+        ctx.session.user
       );
     }),
 });

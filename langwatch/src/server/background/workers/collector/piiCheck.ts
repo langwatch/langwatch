@@ -2,7 +2,6 @@ import { DlpServiceClient } from "@google-cloud/dlp";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
 import type { PIIRedactionLevel } from "@prisma/client";
 import { env } from "../../../../env.mjs";
-import { getDebugger } from "../../../../utils/logger";
 import type { BatchEvaluationResult } from "../../../evaluations/evaluators.generated";
 import type {
   ElasticSearchSpan,
@@ -15,8 +14,9 @@ import {
   getPiiChecksCounter,
 } from "../../../metrics";
 import * as Sentry from "@sentry/nextjs";
+import { createLogger } from "../../../../utils/logger";
 
-const debug = getDebugger("langwatch:trace_checks:piiCheck");
+const logger = createLogger("langwatch:workers:collector:piiCheck");
 
 // Instantiates a client using the environment variable
 const credentials = env.GOOGLE_APPLICATION_CREDENTIALS
@@ -176,16 +176,15 @@ const clearPII = async (
       if (enforced) {
         throw e;
       } else {
-        console.warn(
+        logger.warn(
           "⚠️  WARNING: Fail to redact PII with error but allowed to continue, this will fail in production by default."
         );
         return;
       }
     }
-    debug(
-      `Error running ${firstMethod} PII check, running ${secondMethod} as fallback, error: ${
-        e as any
-      }`
+    logger.debug(
+      { error: e as any },
+      `error running ${firstMethod} PII check, running ${secondMethod} as fallback`
     );
 
     try {
@@ -194,7 +193,7 @@ const clearPII = async (
       if (enforced) {
         throw e;
       }
-      console.warn(
+      logger.warn(
         "⚠️  WARNING: Fail to redact PII with error but allowed to continue, this will fail in production by default."
       );
     }
@@ -305,7 +304,7 @@ type PIICheckOptions = {
 };
 
 export const cleanupPIIs = async (
-  trace: Trace | ElasticSearchTrace,
+  trace: Trace | Omit<ElasticSearchTrace, "spans">,
   spans: ElasticSearchSpan[],
   options: PIICheckOptions
 ): Promise<void> => {
@@ -318,7 +317,7 @@ export const cleanupPIIs = async (
           "GOOGLE_APPLICATION_CREDENTIALS is not set, PII check cannot be performed"
         );
       }
-      console.warn(
+      logger.warn(
         "⚠️  WARNING: GOOGLE_APPLICATION_CREDENTIALS is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default"
       );
       return;
@@ -329,13 +328,13 @@ export const cleanupPIIs = async (
           "LANGEVALS_ENDPOINT is not set, PII check cannot be performed"
         );
       }
-      console.warn(
+      logger.warn(
         "⚠️  WARNING: LANGEVALS_ENDPOINT is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default"
       );
       return;
     }
 
-    debug("Checking PII for trace", trace.trace_id);
+    logger.debug({ traceId: trace.trace_id }, "checking PII for trace");
 
     const clearPIIPromises = [
       clearPII(trace, ["input", "value"], options),

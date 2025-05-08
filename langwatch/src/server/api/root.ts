@@ -5,7 +5,7 @@ import { teamRouter } from "./routers/team";
 import { tracesRouter } from "./routers/traces";
 import { spansRouter } from "./routers/spans";
 import { analyticsRouter } from "./routers/analytics";
-import { checksRouter } from "./routers/checks";
+import { monitorsRouter } from "./routers/monitors";
 import { costsRouter } from "./routers/costs";
 import { planRouter } from "./routers/plan";
 import { topicsRouter } from "./routers/topics";
@@ -29,6 +29,8 @@ import { translateRouter } from "./routers/translate";
 import { workflowRouter } from "./routers/workflows";
 import { optimizationRouter } from "./routers/optimization";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
+import { onboardingRouter } from "./routers/onboarding";
+import { llmConfigsRouter } from "./routers/llm-prompt-configs/llmConfigs";
 /**
  * This is the primary router for your server.
  *
@@ -41,7 +43,7 @@ export const appRouter = createTRPCRouter({
   traces: tracesRouter,
   spans: spansRouter,
   analytics: analyticsRouter,
-  checks: checksRouter,
+  monitors: monitorsRouter,
   costs: costsRouter,
   plan: planRouter,
   topics: topicsRouter,
@@ -64,6 +66,8 @@ export const appRouter = createTRPCRouter({
   workflow: workflowRouter,
   optimization: optimizationRouter,
   integrationsChecks: integrationsChecksRouter,
+  onboarding: onboardingRouter,
+  llmConfigs: llmConfigsRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),
 });
 

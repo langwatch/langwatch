@@ -13,7 +13,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { Trash2 } from "react-feather";
 import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
-import slugify from "slugify";
+import { slugify } from "~/utils/slugify";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
@@ -344,7 +344,7 @@ export const tryToConvertRowsToAppropriateType = (
       } else if (type === "boolean") {
         if (
           ["true", "1", "yes", "y", "on", "ok"].includes(
-            (value ?? "").toLowerCase()
+            `${value ?? ""}`.toLowerCase()
           )
         ) {
           convertedRecord[key] = true;
@@ -359,7 +359,7 @@ export const tryToConvertRowsToAppropriateType = (
             "no",
             "n",
             "off",
-          ].includes((value ?? "").toLowerCase())
+          ].includes(`${value ?? ""}`.toLowerCase())
         ) {
           convertedRecord[key] = false;
         }

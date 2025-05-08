@@ -112,6 +112,10 @@ export const projectRoutes = {
     path: "/[project]/triggers",
     title: "Triggers",
   },
+  promptConfigs: {
+    path: "/[project]/prompts",
+    title: "Prompts",
+  },
 };
 
 export type Route = {

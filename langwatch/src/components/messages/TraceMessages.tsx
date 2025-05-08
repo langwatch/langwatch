@@ -38,6 +38,7 @@ import {
 } from "./MessageHoverActions";
 
 import { AnnotationExpectedOutputs } from "../../components/AnnotationExpectedOutputs";
+import { RedactedField } from "../ui/RedactedField";
 
 export const TraceMessages = React.forwardRef(function TraceMessages(
   {
@@ -155,12 +156,14 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
               paddingTop="20px"
             >
               <Text paddingY="6px" marginBottom="38px">
-                <Markdown className="markdown">
-                  {translationState.translatedTextInput &&
-                  translationState.translationActive
-                    ? translationState.translatedTextInput
-                    : getExtractedInput(trace)}
-                </Markdown>
+                <RedactedField field="input">
+                  <Markdown className="markdown">
+                    {translationState.translatedTextInput &&
+                    translationState.translationActive
+                      ? translationState.translatedTextInput
+                      : getExtractedInput(trace)}
+                  </Markdown>
+                </RedactedField>
               </Text>
             </Message>
             <Message
@@ -213,12 +216,14 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                         });
                       }}
                     >
-                      <Markdown className="markdown">
-                        {translationState.translatedTextOutput &&
-                        translationState.translationActive
-                          ? translationState.translatedTextOutput
-                          : trace.output.value}
-                      </Markdown>
+                      <RedactedField field="output">
+                        <Markdown className="markdown">
+                          {translationState.translatedTextOutput &&
+                          translationState.translationActive
+                            ? translationState.translatedTextOutput
+                            : trace.output.value}
+                        </Markdown>
+                      </RedactedField>
                     </Box>
                   )}
                   <AnnotationExpectedOutputs

@@ -13,30 +13,28 @@ async def main(message: cl.Message):
         content="",
     )
 
-    trace = langwatch.trace()
+    with langwatch.trace() as trace:
+        # Create two spans, one for the RAG, and one for the "LLM call" inside it
+        with trace.span(type="rag", input=message.content) as rag_span:
+            contexts = ["context1", "context2"]
+            rag_span.update(contexts=contexts)
 
-    # Create two spans, one for the RAG, and one for the "LLM call" inside it
-    rag_span = trace.span(type="rag", input=message.content)
-    contexts = ["context1", "context2"]
-    rag_span.update(contexts=contexts)
+            with rag_span.span(type="llm", input=str(contexts) + " " + message.content) as llm_span:
+                generated_message = "Hello there! How can I help?"
+                llm_span.update(output=generated_message)
 
-    llm_span = rag_span.span(type="llm", input=str(contexts) + " " + message.content)
-    generated_message = "Hello there! How can I help?"
-    llm_span.end(output=generated_message)
-    rag_span.end(output=generated_message)
+        # Set what is the expected output of the trace, to be used on evaluations like Ragas Correctness
+        trace.update(
+            expected_output="Hello there! How can I be helpful?"
+        )
 
-    # Set what is the expected output of the trace, to be used on evaluations like Ragas Correctness
-    trace.update(
-        expected_output="Hello there! How can I be helpful?"
-    )
+        # Send the trace in the background
+        trace.deferred_send_spans()
+        # OR send the trace synchonously to be sure before generating the url, maybe a better option
+        # trace.send_spans()
 
-    # Send the trace in the background
-    trace.deferred_send_spans()
-    # OR send the trace synchonously to be sure before generating the url, maybe a better option
-    # trace.send_spans()
-
-    public_url = trace.share() # it works even before the trace was fully synced, but users might take a second to see on the UI
-    print("See the trace at:", public_url)
+        public_url = trace.share() # it works even before the trace was fully synced, but users might take a second to see on the UI
+        print("See the trace at:", public_url)
 
     await msg.stream_token(generated_message)
     await msg.update()

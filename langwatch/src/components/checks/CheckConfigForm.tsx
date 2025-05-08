@@ -1,8 +1,6 @@
 import {
   Accordion,
-  AccordionItemIndicator,
   Alert,
-  Box,
   Button,
   Card,
   Field,
@@ -15,24 +13,24 @@ import {
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EvaluationExecutionMode } from "@prisma/client";
-import type { JsonArray } from "@prisma/client/runtime/library";
-import type { Edge, Node } from "@xyflow/react";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
-import { ArrowRight, ChevronDown, Edit2, HelpCircle } from "react-feather";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, Edit2, HelpCircle } from "react-feather";
 import {
   Controller,
   FormProvider,
   useFieldArray,
   useForm,
-  type UseFormRegister,
 } from "react-hook-form";
-import slugify from "slugify";
+import { slugify } from "~/utils/slugify";
 import { z } from "zod";
+import { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { getInputsOutputs } from "../../optimization_studio/utils/nodeUtils";
 import {
-  AVAILABLE_EVALUATORS,
+  DEFAULT_MAPPINGS,
+  migrateLegacyMappings,
+} from "../../server/evaluations/evaluationMappings";
+import {
   type Evaluators,
   type EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
@@ -46,7 +44,12 @@ import {
 } from "../../server/evaluations/getEvaluator";
 import type { CheckPreconditions } from "../../server/evaluations/types";
 import { checkPreconditionsSchema } from "../../server/evaluations/types.generated";
+import {
+  mappingStateSchema,
+  type MappingState,
+} from "../../server/tracer/tracesMapping";
 import { api } from "../../utils/api";
+import { EvaluatorTracesMapping } from "../evaluations/EvaluatorTracesMapping";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Tooltip } from "../ui/tooltip";
 import DynamicZodForm from "./DynamicZodForm";
@@ -54,6 +57,7 @@ import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
 import { EvaluatorSelection, evaluatorTempNameMap } from "./EvaluatorSelection";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 export interface CheckConfigFormData {
   name: string;
@@ -63,8 +67,7 @@ export interface CheckConfigFormData {
   settings: Evaluators[EvaluatorTypes]["settings"];
   executionMode: EvaluationExecutionMode;
   storeSettingsOnCode: boolean;
-  mappings: Record<string, string>;
-  customMapping: Record<string, string>;
+  mappings: MappingState;
 }
 
 interface CheckConfigFormProps {
@@ -81,8 +84,9 @@ export default function CheckConfigForm({
   loading,
 }: CheckConfigFormProps) {
   const { project } = useOrganizationTeamProject();
-  const isNameAvailable = api.checks.isNameAvailable.useMutation();
+  const isNameAvailable = api.monitors.isNameAvailable.useMutation();
   const [isNameAlreadyInUse, setIsNameAlreadyInUse] = useState(false);
+  const publicEnv = usePublicEnv();
 
   const validateNameUniqueness = async (name: string) => {
     const result = await isNameAvailable.mutateAsync({
@@ -95,34 +99,6 @@ export default function CheckConfigForm({
 
     return result.available;
   };
-
-  const DEFAULT_MAPPINGS: CheckConfigFormData["mappings"] = {
-    spans: "spans",
-    input: "trace.input",
-    output: "trace.output",
-    contexts: "trace.first_rag_context",
-    expected_output: "metadata.expected_output",
-    expected_contexts: "metadata.expected_contexts",
-  };
-
-  const MAPPING_OPTIONS = [
-    { value: "spans", label: "spans" },
-    { value: "trace.input", label: "trace.input" },
-    { value: "trace.output", label: "trace.output" },
-    { value: "trace.first_rag_context", label: "trace.first_rag_context" },
-    { value: "metadata.expected_output", label: "metadata.expected_output" },
-    {
-      value: "metadata.expected_contexts",
-      label: "metadata.expected_contexts",
-    },
-  ];
-
-  if (defaultValues) {
-    defaultValues.mappings = {
-      ...DEFAULT_MAPPINGS,
-      ...(defaultValues.mappings ?? {}),
-    } as CheckConfigFormData["mappings"];
-  }
 
   const form = useForm<CheckConfigFormData>({
     defaultValues,
@@ -144,8 +120,7 @@ export default function CheckConfigForm({
               EvaluationExecutionMode.MANUALLY,
             ])
             .optional(),
-          mappings: z.record(z.string(), z.string().optional()),
-          customMapping: z.record(z.string(), z.string().optional()),
+          mappings: mappingStateSchema,
         })
       )({ ...data, settings: data.settings || {} }, ...args);
     },
@@ -165,6 +140,14 @@ export default function CheckConfigForm({
   const sample = watch("sample");
   const executionMode = watch("executionMode");
   const storeSettingsOnCode = watch("storeSettingsOnCode");
+  const mappings = watch("mappings") ?? DEFAULT_MAPPINGS;
+  const settings = watch("settings");
+
+  useEffect(() => {
+    if (mappings && !mappings.mapping) {
+      form.setValue("mappings", migrateLegacyMappings(mappings as any));
+    }
+  }, [form, mappings]);
 
   const {
     fields: fieldsPrecondition,
@@ -174,8 +157,6 @@ export default function CheckConfigForm({
     control,
     name: "preconditions",
   });
-  const evaluatorDefinition = checkType && getEvaluatorDefinitions(checkType);
-
   const slug = slugify(nameValue || "", {
     lower: true,
     strict: true,
@@ -184,41 +165,7 @@ export default function CheckConfigForm({
   const router = useRouter();
   const isChoosing = router.pathname.endsWith("/choose");
 
-  const availableCustomEvaluators =
-    api.evaluations.availableCustomEvaluators.useQuery(
-      { projectId: project?.id ?? "" },
-      { enabled: !!project }
-    );
-
-  const availableEvaluators = {
-    ...AVAILABLE_EVALUATORS,
-    ...Object.fromEntries(
-      (availableCustomEvaluators.data ?? []).map((evaluator) => {
-        const { inputs, outputs } = getInputsOutputs(
-          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-            ?.edges as Edge[],
-          JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-            ?.nodes as JsonArray as unknown[] as Node[]
-        );
-        const requiredFields = inputs.map((input) => input.identifier);
-
-        return [
-          `custom/${evaluator.id}`,
-          {
-            name: evaluator.name,
-            description: evaluator.description,
-            category: "custom",
-            isGuardrail: false,
-            requiredFields: requiredFields,
-            optionalFields: [],
-            settings: {},
-            result: {},
-            envVars: [],
-          },
-        ];
-      })
-    ),
-  };
+  const availableEvaluators = useAvailableEvaluators();
 
   useEffect(() => {
     if (!checkType && !isChoosing) {
@@ -230,6 +177,7 @@ export default function CheckConfigForm({
   }, [checkType, isChoosing, router]);
 
   useEffect(() => {
+    if (!availableEvaluators) return;
     if (defaultValues?.settings && defaultValues.checkType === checkType)
       return;
 
@@ -268,7 +216,11 @@ export default function CheckConfigForm({
     };
 
     setDefaultSettings(
-      getEvaluatorDefaultSettings(availableEvaluators[checkType]),
+      getEvaluatorDefaultSettings(
+        availableEvaluators[checkType],
+        undefined,
+        publicEnv.data?.IS_ATLA_DEFAULT_JUDGE
+      ),
       "settings"
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -289,17 +241,28 @@ export default function CheckConfigForm({
     </Text>
   );
 
+  const evaluatorDefinition = useMemo(
+    () => checkType && availableEvaluators?.[checkType],
+    [checkType, availableEvaluators]
+  );
+
+  const fields = useMemo(() => {
+    return [
+      ...(evaluatorDefinition?.requiredFields ?? []),
+      ...(evaluatorDefinition?.optionalFields ?? []),
+    ];
+  }, [evaluatorDefinition]);
+
   return (
     <FormProvider {...form}>
-      {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onSubmit={handleSubmit((data) => {
-          data.mappings = data.customMapping;
           return onSubmit(data);
         })}
         style={{ width: "100%" }}
       >
-        {!checkType || isChoosing ? (
+        {!checkType || isChoosing || !availableEvaluators ? (
           <EvaluatorSelection form={form} />
         ) : (
           <VStack gap={6} align="start" width="full">
@@ -420,8 +383,13 @@ export default function CheckConfigForm({
                   {executionMode !== EvaluationExecutionMode.ON_MESSAGE && (
                     <EvaluationManualIntegration
                       slug={slug}
-                      evaluatorDefinition={availableEvaluators[checkType]}
+                      evaluatorDefinition={availableEvaluators[checkType]!}
                       form={form}
+                      checkType={checkType}
+                      name={nameValue}
+                      executionMode={executionMode}
+                      settings={settings}
+                      storeSettingsOnCode={storeSettingsOnCode}
                     />
                   )}
                 </VStack>
@@ -430,7 +398,6 @@ export default function CheckConfigForm({
                   <Accordion.Root
                     value={accordionValue}
                     onValueChange={({ value }) => {
-                      console.log("value", value);
                       setAccordionValue(value);
                     }}
                     multiple
@@ -457,18 +424,12 @@ export default function CheckConfigForm({
                           label="Mappings"
                           helper="Map which fields from the trace will be used to run the evaluation"
                         >
-                          <MappingsFields
-                            register={register}
-                            mappingOptions={MAPPING_OPTIONS}
-                            defaultValues={
-                              defaultValues?.mappings ?? DEFAULT_MAPPINGS
-                            }
-                            optionalFields={
-                              availableEvaluators[checkType].optionalFields
-                            }
-                            requiredFields={
-                              availableEvaluators[checkType].requiredFields
-                            }
+                          <EvaluatorTracesMapping
+                            targetFields={fields}
+                            traceMapping={mappings}
+                            setTraceMapping={(mapping) => {
+                              form.setValue("mappings", mapping);
+                            }}
                           />
                         </HorizontalFormControl>
                         <PreconditionsField
@@ -568,71 +529,3 @@ export default function CheckConfigForm({
     </FormProvider>
   );
 }
-
-const MappingsFields = ({
-  register,
-  mappingOptions,
-  optionalFields,
-  requiredFields,
-  defaultValues,
-}: {
-  register: UseFormRegister<CheckConfigFormData>;
-  mappingOptions: { value: string; label: string }[];
-  optionalFields: string[];
-  requiredFields: string[];
-  defaultValues: CheckConfigFormData["mappings"];
-}) => {
-  return (
-    <>
-      <VStack gap={2} align="start" width="full">
-        {requiredFields.length > 0 && (
-          <>
-            {requiredFields.map((field) => (
-              <HStack width="full" key={field}>
-                <NativeSelect.Root maxWidth="50%">
-                  <NativeSelect.Field
-                    defaultValue={defaultValues[field]}
-                    {...register(`customMapping.${field}`)}
-                  >
-                    {mappingOptions.map(({ value, label }) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-                <ArrowRight />
-                <Text>{field} (required)</Text>
-              </HStack>
-            ))}
-          </>
-        )}
-        {optionalFields.length > 0 && (
-          <>
-            {optionalFields.map((field) => (
-              <HStack width="full" key={field}>
-                <NativeSelect.Root maxWidth="50%">
-                  <NativeSelect.Field
-                    defaultValue={defaultValues[field]}
-                    {...register(`customMapping.${field}`)}
-                  >
-                    <option value="">(empty)</option>
-                    {mappingOptions.map(({ value, label }) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-                <ArrowRight />
-                <Text>{field} (optional)</Text>
-              </HStack>
-            ))}
-          </>
-        )}
-      </VStack>
-    </>
-  );
-};

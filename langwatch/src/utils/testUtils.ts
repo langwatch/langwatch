@@ -1,6 +1,7 @@
 import {
   OrganizationUserRole,
   PIIRedactionLevel,
+  ProjectSensitiveDataVisibilityLevel,
   TeamUserRole,
   type Project,
 } from "@prisma/client";
@@ -157,6 +158,8 @@ export async function getTestProject(namespace: string): Promise<Project> {
         apiKey: `test-auth-token-${nanoid()}`,
         teamId: team.id,
         piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
+        capturedInputVisibility: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+        capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
       },
     });
   }

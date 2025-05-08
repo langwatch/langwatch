@@ -27,6 +27,7 @@ import { toaster } from "../../components/ui/toaster";
 export default function SignUp({ session }: { session: Session | null }) {
   const publicEnv = usePublicEnv();
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
+  const isAzureAD = publicEnv.data?.NEXTAUTH_PROVIDER === "azure-ad";
   const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
 
   useEffect(() => {
@@ -37,7 +38,11 @@ export default function SignUp({ session }: { session: Session | null }) {
     if (!session && isAuth0) {
       void signIn("auth0", { callbackUrl });
     }
-  }, [publicEnv.data, session, callbackUrl, isAuth0]);
+
+    if (!session && isAzureAD) {
+      void signIn("azure-ad", { callbackUrl });
+    }
+  }, [publicEnv.data, session, callbackUrl, isAuth0, isAzureAD]);
 
   if (!publicEnv.data) {
     return null;

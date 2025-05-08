@@ -38,7 +38,7 @@ export function EditDataset({
   });
 
   // Only update the datset from parent to child once the modal is open again
-  const inMemoryDataset = useMemo(
+  const inMemoryDataset = useMemo<InMemoryDataset>(
     () => ({
       name: editingDataset?.name,
       datasetRecords: rows ?? [],

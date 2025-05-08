@@ -37,7 +37,7 @@ export const useBatchEvaluationResults = ({
   const run = api.experiments.getExperimentBatchEvaluationRun.useQuery(
     {
       projectId: project.id,
-      experimentSlug: experiment.slug,
+      experimentId: experiment.id,
       runId: runId ?? "",
     },
     {
@@ -72,11 +72,42 @@ export const useBatchEvaluationResults = ({
     )
   );
 
-  const predictedColumns = new Set(
-    Object.values(datasetByIndex ?? {}).flatMap((item) =>
-      Object.keys(item.predicted ?? {})
-    )
+  // Retrocompatibility with old evaluations
+  const isItJustEndNode = !Object.values(datasetByIndex ?? {}).every(
+    (value) =>
+      Object.values(value?.predicted ?? {}).every(
+        (v) => typeof v === "object" && !Array.isArray(v)
+      )
   );
+  let entriesPredictions = Object.values(datasetByIndex ?? {})
+    .map((value) => value.predicted!)
+    .filter(Boolean);
+  if (isItJustEndNode) {
+    entriesPredictions = entriesPredictions.map((value) => ({
+      end: value,
+    }));
+  }
+
+  let predictedColumns: Record<string, Set<string>> = {};
+  for (const entry of entriesPredictions) {
+    for (const [node, value] of Object.entries(entry)) {
+      for (const key of Object.keys(value)) {
+        if (!predictedColumns[node]) {
+          predictedColumns[node] = new Set();
+        }
+        predictedColumns[node]!.add(key);
+      }
+    }
+  }
+
+  const hasErrors = Object.values(datasetByIndex ?? {}).some(
+    (value) => value.error
+  );
+  if (Object.keys(predictedColumns).length === 0 && hasErrors) {
+    predictedColumns = {
+      "": new Set(["error"]),
+    };
+  }
 
   let resultsByEvaluator = run.data?.evaluations.reduce(
     (acc, evaluation) => {
@@ -170,8 +201,13 @@ export const useBatchEvaluationDownloadCSV = ({
 
     const csvHeaders = [
       ...Array.from(tableData.headers.datasetColumns),
-      ...Array.from(tableData.headers.predictedColumns).map((c) =>
-        tableData.headers.datasetColumns.has(c) ? `predicted_${c}` : c
+      ...Object.entries(tableData.headers.predictedColumns).flatMap(
+        ([node, columns]) =>
+          Array.from(columns).map((c) =>
+            tableData.headers.datasetColumns.has(c)
+              ? `${node}.${c}`
+              : `${node}.${c}`
+          )
       ),
       tableData.headers.cost,
       tableData.headers.duration,
@@ -237,8 +273,6 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
     isFinished: boolean;
     size?: "sm" | "md";
   }) {
-    const [tabIndex, setTabIndex] = useState(0);
-
     const {
       run,
       datasetByIndex,
@@ -262,6 +296,8 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
         isFinished,
       }
     );
+
+    const [tabIndex, setTabIndex] = useState(0);
 
     if (run.error) {
       return (
@@ -369,6 +405,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
         flexDirection="column"
         minHeight="0"
         position="relative"
+        value={Object.keys(resultsByEvaluator)[tabIndex]}
         onValueChange={(change) =>
           setTabIndex(Object.keys(resultsByEvaluator).indexOf(change.value))
         }
@@ -382,24 +419,22 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
           borderColor="gray.200"
         >
           <Tabs.List minWidth={0}>
-            {Object.entries(resultsByEvaluator).map(
-              ([evaluator, results], idx) => (
-                <Tabs.Trigger
-                  key={evaluator}
-                  value={evaluator}
-                  css={{
-                    "& span": {
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      minWidth: 0,
-                    },
-                  }}
-                >
-                  {results.find((r) => r.name)?.name ?? evaluator}
-                </Tabs.Trigger>
-              )
-            )}
+            {Object.entries(resultsByEvaluator).map(([evaluator, results]) => (
+              <Tabs.Trigger
+                key={evaluator}
+                value={evaluator}
+                css={{
+                  "& span": {
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    minWidth: 0,
+                  },
+                }}
+              >
+                {results.find((r) => r.name)?.name ?? evaluator}
+              </Tabs.Trigger>
+            ))}
           </Tabs.List>
           <Spacer />
           <Text color="gray.400" fontSize="12px" flexShrink={0}>

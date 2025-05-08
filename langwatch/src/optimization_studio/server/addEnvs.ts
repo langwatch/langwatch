@@ -4,7 +4,7 @@ import {
 } from "../../server/api/routers/modelProviders";
 import { prisma } from "../../server/db";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
-import type { LLMConfig, ServerWorkflow } from "../types/dsl";
+import type { LLMConfig, ServerWorkflow, Workflow } from "../types/dsl";
 import type { StudioClientEvent } from "../types/events";
 import crypto from "crypto";
 
@@ -50,10 +50,10 @@ export const addEnvs = async (
   };
 
   const workflow: ServerWorkflow = {
-    ...event.payload.workflow,
+    ...(event.payload.workflow as Workflow),
     workflow_id,
     api_key: apiKey,
-    nodes: event.payload.workflow.nodes.map((node) => {
+    nodes: (event.payload.workflow.nodes as Workflow["nodes"]).map((node) => {
       const parameters = node.data.parameters?.map((p) => {
         if (p.type === "llm") {
           return {

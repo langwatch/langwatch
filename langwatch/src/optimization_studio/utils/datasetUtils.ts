@@ -50,11 +50,13 @@ const fieldToColumnTypeMap: Record<Field["type"], DatasetColumnType> = {
   "list[int]": "list",
   "list[bool]": "list",
   dict: "json",
+  json_schema: "json",
   signature: "string",
   llm: "string",
   prompting_technique: "string",
   dataset: "string",
   code: "string",
+  chat_messages: "json",
 };
 
 const columnTypeToFieldTypeMap: Record<DatasetColumnType, Field["type"]> = {
@@ -66,7 +68,7 @@ const columnTypeToFieldTypeMap: Record<DatasetColumnType, Field["type"]> = {
   list: "list",
   spans: "dict",
   rag_contexts: "dict",
-  chat_messages: "dict",
+  chat_messages: "chat_messages",
   annotations: "dict",
   evaluations: "dict",
 };

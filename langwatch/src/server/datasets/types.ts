@@ -1,11 +1,28 @@
 import { z } from "zod";
 import {
-  datasetSpanSchema,
+  baseSpanSchema,
   chatMessageSchema,
+  lLMSpanSchema,
   rAGChunkSchema,
+  rAGSpanSchema,
 } from "../tracer/types.generated";
 
 export type DatasetRecordEntry = { id: string } & Record<string, any>;
+
+// TODO: fix this list being repeated 3 times
+export const datasetColumnTypeSchema = z.union([
+  z.literal("string"),
+  z.literal("boolean"),
+  z.literal("number"),
+  z.literal("date"),
+  z.literal("list"),
+  z.literal("json"),
+  z.literal("spans"),
+  z.literal("rag_contexts"),
+  z.literal("chat_messages"),
+  z.literal("annotations"),
+  z.literal("evaluations"),
+]);
 
 export type DatasetColumnType =
   | "string"
@@ -19,6 +36,20 @@ export type DatasetColumnType =
   | "chat_messages"
   | "annotations"
   | "evaluations";
+
+export const DATASET_COLUMN_TYPES = [
+  "string",
+  "boolean",
+  "number",
+  "date",
+  "list",
+  "json",
+  "spans",
+  "rag_contexts",
+  "chat_messages",
+  "annotations",
+  "evaluations",
+] as const;
 
 export type DatasetColumns = { name: string; type: DatasetColumnType }[];
 
@@ -53,6 +84,42 @@ type Json = Literal | { [key: string]: Json } | Json[];
 export const jsonSchema: z.ZodType<Json> = z.lazy(() =>
   z.union([literalSchema, z.array(jsonSchema), z.record(jsonSchema)])
 );
+
+export const datasetSpanSchema = z.union([
+  baseSpanSchema
+    .omit({
+      trace_id: true,
+      timestamps: true,
+      metrics: true,
+      params: true,
+    })
+    .extend({
+      params: z.record(z.string(), z.any()),
+      model: z.string().optional(),
+    }),
+  lLMSpanSchema
+    .omit({
+      trace_id: true,
+      timestamps: true,
+      metrics: true,
+      params: true,
+    })
+    .extend({
+      params: z.record(z.string(), z.any()),
+      model: z.string().optional(),
+    }),
+  rAGSpanSchema
+    .omit({
+      trace_id: true,
+      timestamps: true,
+      metrics: true,
+      params: true,
+    })
+    .extend({
+      params: z.record(z.string(), z.any()),
+      model: z.string().optional(),
+    }),
+]);
 
 export const datasetColumnTypeMapping: {
   [key in DatasetColumnType]: z.ZodType<any>;

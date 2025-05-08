@@ -1,41 +1,48 @@
 import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
 import type { IndexSpec } from "../src/server/elasticsearch";
 import { esClient } from "../src/server/elasticsearch";
-
+import { Client as ElasticClient } from "@elastic/elasticsearch";
 export const recreateIndexAndMigrate = async ({
   indexSpec,
   migrationKey,
   mapping,
+  client,
 }: {
   indexSpec: IndexSpec;
   migrationKey: string;
   mapping: Record<string, MappingProperty>;
+  client: ElasticClient;
 }) => {
   const newIndex = `${indexSpec.base}-${migrationKey}`;
   await createIndex({
     index: newIndex,
     mappings: mapping,
+    client,
   });
 
   const previousIndex = await getCurrentWriteIndex({
     indexSpec,
     newIndex,
+    client,
   });
   await reindexWithAlias({
     indexSpec,
     previousIndex,
     newIndex,
+    client,
   });
 };
 
 export const getCurrentWriteIndex = async ({
   indexSpec,
   newIndex = undefined,
+  client,
 }: {
   indexSpec: IndexSpec;
   newIndex?: string;
+  client: ElasticClient;
 }) => {
-  const aliasInfo: Record<string, unknown> = await esClient.indices.getAlias({
+  const aliasInfo: Record<string, unknown> = await client.indices.getAlias({
     name: indexSpec.alias,
   });
   const currentIndices = Object.keys(aliasInfo).filter(
@@ -55,22 +62,24 @@ export const getCurrentWriteIndex = async ({
 export const createIndex = async ({
   index,
   mappings,
+  client,
 }: {
   index: string;
   mappings: Record<string, MappingProperty>;
+  client: ElasticClient;
 }) => {
-  const indexExists = await esClient.indices.exists({ index });
+  const indexExists = await client.indices.exists({ index });
   if (!indexExists) {
-    await esClient.indices.create({
+    await client.indices.create({
       index,
       settings: {
-        number_of_shards: 1,
+        number_of_shards: 4,
         number_of_replicas: 0,
       },
       mappings: { properties: mappings },
     });
   }
-  await esClient.indices.putMapping({
+  await client.indices.putMapping({
     index,
     properties: mappings,
   });
@@ -80,14 +89,16 @@ export const reindexWithAlias = async ({
   indexSpec,
   previousIndex,
   newIndex,
+  client,
 }: {
   indexSpec: IndexSpec;
   previousIndex: string;
   newIndex: string;
+  client: ElasticClient;
 }) => {
   console.log(`Reindexing from ${previousIndex} to ${newIndex}`);
 
-  const response = await esClient.reindex({
+  const response = await client.reindex({
     wait_for_completion: false,
     slices: "auto",
     requests_per_second: 200,
@@ -108,7 +119,7 @@ export const reindexWithAlias = async ({
 
   console.log(`Reindex task started: ${taskId}`);
 
-  await esClient.indices.updateAliases({
+  await client.indices.updateAliases({
     body: {
       actions: [
         {
@@ -131,7 +142,7 @@ export const reindexWithAlias = async ({
 
   try {
     while (true) {
-      const task = await esClient.tasks.get({
+      const task = await client.tasks.get({
         task_id: taskId.toString(),
       });
 
@@ -161,7 +172,7 @@ export const reindexWithAlias = async ({
       }
     }
 
-    await esClient.indices.updateAliases({
+    await client.indices.updateAliases({
       body: {
         actions: [
           {
@@ -175,10 +186,10 @@ export const reindexWithAlias = async ({
     });
     console.log(`Deleting old index in 10 seconds...`);
     await new Promise((resolve) => setTimeout(resolve, 10_000));
-    await esClient.indices.delete({ index: previousIndex });
+    await client.indices.delete({ index: previousIndex });
     console.log(`Deleted old index ${previousIndex}`);
   } catch (error) {
-    await esClient.indices.updateAliases({
+    await client.indices.updateAliases({
       body: {
         actions: [
           {

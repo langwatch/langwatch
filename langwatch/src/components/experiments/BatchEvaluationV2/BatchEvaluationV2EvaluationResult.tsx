@@ -35,7 +35,7 @@ const evaluationResultsTableRow = (
     ESBatchEvaluation["evaluations"][number] | undefined
   >,
   datasetColumns: Set<string>,
-  predictedColumns: Set<string>,
+  predictedColumns: Record<string, Set<string>>,
   evaluationColumns: Record<
     string,
     {
@@ -68,7 +68,7 @@ const evaluationResultsTableRow = (
               maxHeight="120px"
               maxWidth="100%"
             />
-          ) : datasetEntry ? (
+          ) : datasetEntry?.entry?.[column] ? (
             <HoverableBigText>
               {stringify(datasetEntry.entry[column])}
             </HoverableBigText>
@@ -79,23 +79,41 @@ const evaluationResultsTableRow = (
       ),
       value: () => stringify(datasetEntry?.entry[column]),
     })),
-    predictedColumns: Array.from(predictedColumns).map((column) => ({
-      render: () => (
-        <Table.Cell key={`predicted-${column}`} maxWidth="250px">
-          {datasetEntry ? (
-            <HoverableBigText>
-              {stringify(datasetEntry.predicted?.[column])}
-            </HoverableBigText>
-          ) : (
-            "-"
-          )}
-        </Table.Cell>
-      ),
-      value: () => stringify(datasetEntry?.predicted?.[column]),
-    })),
+    predictedColumns: Object.entries(predictedColumns).flatMap(
+      ([node, columns]) =>
+        Array.from(columns).map((column) => ({
+          render: () => {
+            if (datasetEntry?.error) {
+              return (
+                <Table.Cell key={`predicted-${column}`} background="red.200">
+                  <Tooltip
+                    content={datasetEntry.error}
+                    positioning={{ placement: "top" }}
+                  >
+                    <Box lineClamp={1}>Error</Box>
+                  </Tooltip>
+                </Table.Cell>
+              );
+            }
+
+            return (
+              <Table.Cell key={`predicted-${node}-${column}`} maxWidth="250px">
+                {datasetEntry?.predicted?.[node]?.[column] ? (
+                  <HoverableBigText>
+                    {stringify(datasetEntry.predicted?.[node]?.[column])}
+                  </HoverableBigText>
+                ) : (
+                  "-"
+                )}
+              </Table.Cell>
+            );
+          },
+          value: () => stringify(datasetEntry?.predicted?.[node]?.[column]),
+        }))
+    ),
     cost: {
       render: () => (
-        <Table.Cell>
+        <Table.Cell whiteSpace="nowrap">
           <Tooltip
             content={
               <VStack align="start" gap={0}>
@@ -316,7 +334,7 @@ export const evaluationResultsTableData = (
   resultsByEvaluator: Record<string, ESBatchEvaluation["evaluations"]>,
   datasetByIndex: Record<number, ESBatchEvaluation["dataset"][number]>,
   datasetColumns: Set<string>,
-  predictedColumns: Set<string>
+  predictedColumns: Record<string, Set<string>>
 ) => {
   const evaluationColumns = Object.fromEntries(
     Object.entries(resultsByEvaluator).map(([evaluator, results]) => [
@@ -420,7 +438,7 @@ export function BatchEvaluationV2EvaluationResult({
   results: ESBatchEvaluation["evaluations"];
   datasetByIndex: Record<number, ESBatchEvaluation["dataset"][number]>;
   datasetColumns: Set<string>;
-  predictedColumns: Set<string>;
+  predictedColumns: Record<string, Set<string>>;
   isFinished: boolean;
   size?: "sm" | "md";
   hasScrolled: boolean;
@@ -494,22 +512,17 @@ export function BatchEvaluationV2EvaluationResult({
               </Table.ColumnHeader>
             )}
 
-            {predictedColumns.size > 0 && (
+            {Object.keys(predictedColumns ?? {}).map((node) => (
               <Table.ColumnHeader
-                colSpan={predictedColumns.size}
+                colSpan={predictedColumns[node]?.size ?? 0}
                 paddingY={2}
                 borderTop="none"
               >
                 <HStack>
-                  <Box>Predicted</Box>
-                  {workflowId && (
-                    <Tooltip content="Values plugged in the End node will show up here">
-                      <Info size={14} />
-                    </Tooltip>
-                  )}
+                  <Box>{node}</Box>
                 </HStack>
               </Table.ColumnHeader>
-            )}
+            ))}
 
             {results.length > 0 &&
               evaluatorHeaders.evaluationInputsColumns.size > 0 && (
@@ -547,11 +560,16 @@ export function BatchEvaluationV2EvaluationResult({
                 {column}
               </Table.ColumnHeader>
             ))}
-            {Array.from(tableData.headers.predictedColumns).map((column) => (
-              <Table.ColumnHeader key={`predicted-${column}`} paddingY={2}>
-                {column}
-              </Table.ColumnHeader>
-            ))}
+            {Object.entries(predictedColumns ?? {}).map(([node, columns]) =>
+              Array.from(columns).map((column) => (
+                <Table.ColumnHeader
+                  key={`predicted-${node}-${column}`}
+                  paddingY={2}
+                >
+                  {column}
+                </Table.ColumnHeader>
+              ))
+            )}
             {Array.from(evaluatorHeaders.evaluationInputsColumns).map(
               (column) => (
                 <Table.ColumnHeader

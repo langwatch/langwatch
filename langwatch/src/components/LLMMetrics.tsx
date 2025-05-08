@@ -198,27 +198,26 @@ export function LLMMetrics() {
                       )}
                     </VStack>
                   </Tabs.Trigger>
+                  <Tabs.Indicator
+                    mt="-1.5px"
+                    height="4px"
+                    bg="orange.400"
+                    borderRadius="1px"
+                    bottom={0}
+                  />
                 </Tabs.List>
-                <Tabs.Indicator
-                  mt="-1.5px"
-                  height="4px"
-                  bg="orange.400"
-                  borderRadius="1px"
-                />
-                <Tabs.Content value="llmCallsGraph">
-                  {isNotQuickwit && (
-                    <Tabs.Content value="llmCallsGraph">
-                      <CustomGraph input={llmCallsGraph} />
-                    </Tabs.Content>
-                  )}
-                  {hasTeamPermission(TeamRoleGroup.COST_VIEW) && (
-                    <Tabs.Content value="totalCostGraph">
-                      <CustomGraph input={totalCostGraph} />
-                    </Tabs.Content>
-                  )}
-                  <Tabs.Content value="tokensGraph">
-                    <CustomGraph input={tokensGraph} />
+                {isNotQuickwit && (
+                  <Tabs.Content value="llmCallsGraph">
+                    <CustomGraph input={llmCallsGraph} />
                   </Tabs.Content>
+                )}
+                {hasTeamPermission(TeamRoleGroup.COST_VIEW) && (
+                  <Tabs.Content value="totalCostGraph">
+                    <CustomGraph input={totalCostGraph} />
+                  </Tabs.Content>
+                )}
+                <Tabs.Content value="tokensGraph">
+                  <CustomGraph input={tokensGraph} />
                 </Tabs.Content>
               </Tabs.Root>
             </Card.Body>

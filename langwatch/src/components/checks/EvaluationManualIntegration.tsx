@@ -11,7 +11,9 @@ import { Checkbox } from "../ui/checkbox";
 import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { AVAILABLE_EVALUATORS } from "../../server/evaluations/evaluators.generated";
+import type {
+  AVAILABLE_EVALUATORS,
+} from "../../server/evaluations/evaluators.generated";
 import { api } from "../../utils/api";
 import { RenderCode } from "../code/RenderCode";
 import { langwatchEndpoint } from "../code/langwatchEndpointEnv";
@@ -24,17 +26,23 @@ export function EvaluationManualIntegration({
   slug,
   evaluatorDefinition,
   form,
+  checkType,
+  name,
+  executionMode,
+  settings,
+  storeSettingsOnCode,
 }: {
-  slug: string;
+  slug?: string;
   evaluatorDefinition: (typeof AVAILABLE_EVALUATORS)[keyof typeof AVAILABLE_EVALUATORS];
-  form: UseFormReturn<CheckConfigFormData>;
+  form?: UseFormReturn<CheckConfigFormData>;
+  checkType: string;
+  name: string;
+  executionMode: EvaluationExecutionMode;
+  settings: Record<string, unknown>;
+  storeSettingsOnCode: boolean;
+  checkSlug?: string;
 }) {
-  const checkType = form.watch("checkType");
-  const name = form.watch("name");
-  const executionMode = form.watch("executionMode");
   const isGuardrail = executionMode === EvaluationExecutionMode.AS_GUARDRAIL;
-  const settings = form.watch("settings");
-  const storeSettingsOnCode = form.watch("storeSettingsOnCode");
   const checkSlug = storeSettingsOnCode ? checkType : slug;
 
   const { project } = useOrganizationTeamProject();
@@ -289,19 +297,21 @@ ${
         {isGuardrail ? "guardrail" : "evaluator"} in your LLM pipeline, save
         changes first for the {isGuardrail ? "guardrail" : "evaluator"} to work.
       </Text>
-      <HStack>
-        <Checkbox {...form.register("storeSettingsOnCode")}>
-          Store settings on code
-        </Checkbox>
-        <Tooltip
-          content="Store the settings on the code to keep it versioned on your side instead of on LangWatch dashboard."
-          positioning={{ placement: "top" }}
-        >
-          <Box>
-            <Info size={16} />
-          </Box>
-        </Tooltip>
-      </HStack>
+      {form && (
+        <HStack>
+          <Checkbox {...form.register("storeSettingsOnCode")}>
+            Store settings on code
+          </Checkbox>
+          <Tooltip
+            content="Store the settings on the code to keep it versioned on your side instead of on LangWatch dashboard."
+            positioning={{ placement: "top" }}
+          >
+            <Box>
+              <Info size={16} />
+            </Box>
+          </Tooltip>
+        </HStack>
+      )}
       <Tabs.Root defaultValue="python" width="full" colorPalette="orange">
         <Tabs.List marginBottom={4}>
           <Tabs.Trigger value="python">Python</Tabs.Trigger>

@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Card,
+  Center,
   Heading,
   HStack,
   Spacer,
@@ -10,7 +11,14 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import Parse from "papaparse";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import {
   ChevronDown,
   Download,
@@ -41,6 +49,7 @@ import { AddRowsFromCSVModal } from "./AddRowsFromCSVModal";
 
 import { toaster } from "../ui/toaster";
 import { Menu } from "../ui/menu";
+import { ErrorBoundary } from "react-error-boundary";
 
 export type InMemoryDataset = {
   datasetId?: string;
@@ -56,19 +65,30 @@ export function DatasetTable({
   inMemoryDataset,
   onUpdateDataset,
   isEmbedded = false,
+  insideWizard = false,
   title,
   hideButtons = false,
   bottomSpace = "300px",
   loadingOverlayComponent,
+  gridRef: parentGridRef,
+  canEditDatasetRecord = true,
 }: {
   datasetId?: string;
   inMemoryDataset?: InMemoryDataset;
   onUpdateDataset?: (dataset: InMemoryDataset & { datasetId?: string }) => void;
   isEmbedded?: boolean;
+  insideWizard?: boolean;
   title?: string;
   hideButtons?: boolean;
   bottomSpace?: string;
   loadingOverlayComponent?: (() => React.ReactNode) | null;
+  gridRef?: RefObject<AgGridReact<any> | null>;
+  /**
+   * Whether the user can edit the dataset records in the database.
+   * Generally disabled when you want to force InMemoryDataset only mode.
+   * This disables the "Edit Columns" button and the edit dataset drawer.
+   */
+  canEditDatasetRecord?: boolean;
 }) {
   const { project } = useOrganizationTeamProject();
 
@@ -86,8 +106,18 @@ export function DatasetTable({
     {
       enabled: !!project && !!datasetId,
       refetchOnWindowFocus: false,
+      onError: (error) => {
+        toaster.create({
+          title: "Error fetching dataset",
+          description: error.message,
+          type: "error",
+          duration: 5000,
+          meta: { closable: true },
+        });
+      },
     }
   );
+
   const dataset = useMemo(
     () =>
       databaseDataset.data
@@ -349,8 +379,10 @@ export function DatasetTable({
         (rows) => rows?.filter((row) => !recordIds.includes(row.id))
       );
 
-      if (gridRef.current?.api) {
-        gridRef.current.api.applyTransaction({
+      const grid = parentGridRef ?? gridRef;
+
+      if (grid.current?.api) {
+        grid.current.api.applyTransaction({
           remove: recordIds.map((id) => ({ id })),
         });
       }
@@ -375,7 +407,7 @@ export function DatasetTable({
             databaseDataset
               .refetch()
               .then(() => {
-                gridRef.current?.api.refreshCells();
+                grid.current?.api.refreshCells();
               })
               .catch(() => {
                 // ignore
@@ -397,6 +429,7 @@ export function DatasetTable({
   }, [
     selectedEntryIds,
     setParentRowData,
+    parentGridRef,
     datasetId,
     deleteDatasetRecord,
     project?.id,
@@ -404,7 +437,8 @@ export function DatasetTable({
   ]);
 
   const onAddNewRow = useCallback(() => {
-    if (!gridRef.current?.api) return;
+    const grid = parentGridRef ?? gridRef;
+    if (!grid.current?.api) return;
 
     // Create a new empty row
     const newRow: Record<string, any> = { id: nanoid() };
@@ -418,7 +452,7 @@ export function DatasetTable({
       (col) => col.editable !== false && col.field !== "selected"
     );
 
-    const result = gridRef.current.api.applyTransaction({ add: [newRow] });
+    const result = grid.current.api.applyTransaction({ add: [newRow] });
 
     // Get the index of the newly added row
     const newRowIndex = result?.add[0]?.rowIndex ?? 0; // editableRowData.length;
@@ -429,7 +463,7 @@ export function DatasetTable({
 
       const focus = () => {
         // Start editing the first editable cell in the new row
-        gridRef.current?.api.startEditingCell({
+        grid.current?.api.startEditingCell({
           rowIndex: newRowIndex,
           colKey: firstEditableColumn.field!,
         });
@@ -446,27 +480,45 @@ export function DatasetTable({
         }, 1500);
       }
     }, 100);
-  }, [columnDefs, dataset]);
+  }, [columnDefs, dataset, parentGridRef]);
 
   return (
     <>
       <HStack width="full" verticalAlign={"middle"} paddingBottom={6} gap={6}>
-        <Heading as={"h1"} size="lg">
-          {title ? (
-            title
+        <HStack gap={2}>
+          {insideWizard ? (
+            <Heading as="h3" size="md" fontWeight="600">
+              {dataset?.name ?? DEFAULT_DATASET_NAME}
+            </Heading>
           ) : (
-            <>
-              {isEmbedded ? "Edit Dataset" : "Dataset"}{" "}
-              {`- ${
-                dataset?.name
-                  ? dataset.name
-                  : datasetId
-                  ? ""
-                  : DEFAULT_DATASET_NAME
-              }`}
-            </>
+            <Heading as="h1" size="lg">
+              {title ? (
+                title
+              ) : (
+                <>
+                  {isEmbedded ? "Edit Dataset" : "Dataset"}{" "}
+                  {`- ${
+                    dataset?.name
+                      ? dataset.name
+                      : datasetId
+                      ? ""
+                      : DEFAULT_DATASET_NAME
+                  }`}
+                </>
+              )}
+            </Heading>
           )}
-        </Heading>
+          {canEditDatasetRecord && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => editDataset.onOpen()}
+              minWidth="fit-content"
+            >
+              <Edit2 />
+            </Button>
+          )}
+        </HStack>
         <Text fontSize={"14px"} color="gray.400">
           {databaseDataset.data?.count ?? parentRowData?.length} records
         </Text>
@@ -505,25 +557,29 @@ export function DatasetTable({
                 Upload or Create Dataset
               </Button>
             )}
-            <Button
-              colorPalette="gray"
-              minWidth="fit-content"
-              onClick={() => dataset && void downloadCSV()}
-              loading={downloadDataset.isLoading}
-              loadingText="Downloading..."
-            >
-              <Download />
-              Export
-            </Button>
-            <Button
-              colorPalette="gray"
-              onClick={() => editDataset.onOpen()}
-              minWidth="fit-content"
-            >
-              <Edit2 />
-              Edit Columns
-            </Button>
-            {datasetId && !isEmbedded && (
+            {!insideWizard && (
+              <Button
+                colorPalette="gray"
+                minWidth="fit-content"
+                onClick={() => dataset && void downloadCSV()}
+                loading={downloadDataset.isLoading}
+                loadingText="Downloading..."
+              >
+                <Download />
+                Export
+              </Button>
+            )}
+            {canEditDatasetRecord && (
+              <Button
+                colorPalette="gray"
+                onClick={() => editDataset.onOpen()}
+                minWidth="fit-content"
+              >
+                <Edit2 />
+                Edit Columns
+              </Button>
+            )}
+            {datasetId && !isEmbedded && !insideWizard && (
               <Button
                 colorPalette="blue"
                 onClick={() => {
@@ -552,16 +608,24 @@ export function DatasetTable({
                 </Alert.Content>
               </Alert.Root>
             )}
-            <DatasetGrid
-              columnDefs={columnDefs}
-              rowData={localRowData}
-              onCellValueChanged={onCellValueChanged}
-              ref={gridRef}
-              domLayout="normal"
-              {...(loadingOverlayComponent !== undefined
-                ? { loadingOverlayComponent }
-                : {})}
-            />
+            <ErrorBoundary
+              fallback={
+                <Center width="full" height="full">
+                  Error rendering the dataset, please refresh the page
+                </Center>
+              }
+            >
+              <DatasetGrid
+                columnDefs={columnDefs}
+                rowData={localRowData}
+                onCellValueChanged={onCellValueChanged}
+                ref={parentGridRef ?? gridRef}
+                domLayout="normal"
+                {...(loadingOverlayComponent !== undefined
+                  ? { loadingOverlayComponent }
+                  : {})}
+              />
+            </ErrorBoundary>
           </Box>
         </Card.Body>
       </Card.Root>
@@ -572,7 +636,7 @@ export function DatasetTable({
             left="0"
             bottom={isEmbedded ? "32px" : 6}
             marginTop={6}
-            marginLeft={6}
+            marginLeft={insideWizard ? 0 : 6}
             backgroundColor="#ffffff"
             padding="8px"
             paddingX="16px"

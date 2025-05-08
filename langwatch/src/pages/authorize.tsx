@@ -20,7 +20,7 @@ export default function Authorize() {
 
   return (
     <DashboardLayout>
-      <Container paddingTop="200px">
+      <Container maxWidth="600px" paddingTop="200px">
         <Card.Root>
           <Card.Header>
             <HStack width="full" align="center">
@@ -37,7 +37,7 @@ export default function Authorize() {
             </HStack>
           </Card.Header>
           <Card.Body>
-            <VStack gap={6}>
+            <VStack align="start" gap={6}>
               <Text>
                 Copy your LangWatch API key below and paste it into your command
                 line or notebook to authorize it.

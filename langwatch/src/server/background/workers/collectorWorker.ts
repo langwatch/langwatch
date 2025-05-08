@@ -1,16 +1,14 @@
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import type { Project } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { Worker } from "bullmq";
-import { nanoid } from "nanoid";
 import type {
   CollectorCheckAndAdjustJob,
   CollectorJob,
 } from "~/server/background/types";
 import { env } from "../../../env.mjs";
-import { getDebugger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger";
 import { safeTruncate } from "../../../utils/truncate";
-import { flattenObjectKeys } from "../../api/utils";
+import { flattenObjectKeys, getProtectionsForProject } from "../../api/utils";
 import { prisma } from "../../db";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import {
@@ -28,7 +26,6 @@ import {
   type Span,
   type SpanInputOutput,
 } from "../../tracer/types";
-import { elasticSearchSpanToSpan } from "../../tracer/utils";
 import { COLLECTOR_QUEUE, collectorQueue } from "../queues/collectorQueue";
 import { getFirstInputAsText, getLastOutputAsText } from "./collector/common";
 import { mapEvaluations, scheduleEvaluations } from "./collector/evaluations";
@@ -40,15 +37,16 @@ import {
 import { cleanupPIIs } from "./collector/piiCheck";
 import { addInputAndOutputForRAGs } from "./collector/rag";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
+import { searchTraces, getTraceById, searchTracesWithInternals } from "~/server/elasticsearch/traces";
 
-export const debug = getDebugger("langwatch:workers:collectorWorker");
+const logger = createLogger("langwatch:workers:collectorWorker");
 
 export const scheduleTraceCollectionWithFallback = async (
   collectorJob: CollectorJob,
   forceSync = false
 ) => {
   if (forceSync || !collectorQueue) {
-    debug("Force sync enabled, processing job synchronously.");
+    logger.debug("force sync enabled, processing job synchronously");
     await processCollectorJob(undefined, collectorJob);
     return;
   }
@@ -95,7 +93,7 @@ export const scheduleTraceCollectionWithGrouping = async (
     }
 
     if (existingJob && "spans" in existingJob.data) {
-      debug(`Found existing job for trace ${collectorJob.traceId}, merging...`);
+      logger.debug({ collectionJobTraceId: collectorJob.traceId }, "found existing job trace, merging...");
       const mergedJob = mergeCollectorJobs(existingJob.data, collectorJob);
       await existingJob.remove();
       await collectorQueue.add("collector", mergedJob, {
@@ -103,7 +101,7 @@ export const scheduleTraceCollectionWithGrouping = async (
         delay: 10_000,
       });
     } else {
-      debug(`collecting traceId ${collectorJob.traceId}`);
+      logger.debug({ collectionJobTraceId: collectorJob.traceId }, "collecting job trace");
       await collectorQueue.add("collector", collectorJob, {
         jobId,
         delay: index > 1 ? 10_000 : 0,
@@ -147,7 +145,7 @@ export async function processCollectorJob(
   data: CollectorJob | CollectorCheckAndAdjustJob
 ) {
   if ("spans" in data && data.spans?.length > 200) {
-    console.log("Too many spans, maximum of 200 per trace, dropping job");
+    logger.warn({ spansLength: data.spans?.length, jobId: id }, "too many spans, maximum of 200 per trace, dropping job");
     return;
   }
 
@@ -193,7 +191,7 @@ const processCollectorJob_ = async (
   id: string | undefined,
   data: CollectorJob
 ) => {
-  debug(`Processing job ${id} with data:`, JSON.stringify(data));
+  logger.debug({ jobId: id, data }, "processing job");
 
   let spans = data.spans;
   const {
@@ -213,10 +211,7 @@ const processCollectorJob_ = async (
   try {
     spans = await addLLMTokensCount(projectId, spans);
   } catch (error) {
-    debug("Failed to add LLM tokens count", error, {
-      projectId: project.id,
-      traceId,
-    });
+    logger.debug({ error, projectId: project.id, traceId }, "failed to add LLM tokens count");
     Sentry.captureException(new Error("Failed to add LLM tokens count"), {
       extra: { projectId: project.id, traceId, error: error },
     });
@@ -247,30 +242,26 @@ const processCollectorJob_ = async (
     return esSpan;
   });
 
-  let existingSpans: Span[] = [];
-  let existingEvaluations: Evaluation[] | undefined;
+  const existingSpans: Span[] = [];
+  const existingEvaluations: Evaluation[] = [];
+
   if (existingTrace?.inserted_at) {
     // TODO: check for quickwit
-    const existingTraceResponse = await esClient.search<ElasticSearchTrace>({
-      index: TRACE_INDEX.alias,
-      body: {
-        size: 1,
-        query: {
-          bool: {
-            must: [
-              { term: { trace_id: traceId } },
-              { term: { project_id: project.id } },
-            ] as QueryDslBoolQuery["must"],
-          } as QueryDslBoolQuery,
-        },
-        _source: ["spans", "evaluations"],
-      },
+    const protections = await getProtectionsForProject(prisma, { projectId: project.id });
+    const existingTraceResponse = await getTraceById({
+      connConfig: { projectId: project.id },
+      traceId: traceId,
+      protections,
+      includeEvaluations: true,
+      includeSpans: true,
     });
-    existingSpans = (
-      existingTraceResponse.hits.hits[0]?._source?.spans ?? []
-    ).map(elasticSearchSpanToSpan);
-    existingEvaluations =
-      existingTraceResponse.hits.hits[0]?._source?.evaluations;
+    if (existingTraceResponse) {
+      existingSpans.push(...existingTraceResponse.spans);
+
+      if (existingTraceResponse.evaluations) {
+        existingEvaluations.push(...existingTraceResponse.evaluations);
+      }
+    }
   }
 
   const allSpans = existingSpans.concat(spans);
@@ -280,7 +271,7 @@ const processCollectorJob_ = async (
   ]);
   const error = getLastOutputError(spans);
 
-  const evaluations = mapEvaluations(data)?.concat(existingEvaluations ?? []);
+  const evaluations = mapEvaluations(data)?.concat(existingEvaluations);
 
   const customExistingMetadata = existingTrace?.existing_metadata?.custom ?? {};
   const existingAllKeys = existingTrace?.existing_metadata?.all_keys ?? [];
@@ -289,8 +280,8 @@ const processCollectorJob_ = async (
     delete existingTrace?.existing_metadata.all_keys;
   }
 
-  // Create the trace
-  const trace: ElasticSearchTrace = {
+  // Create the trace 
+  const trace: Omit<ElasticSearchTrace, "spans"> = {
     trace_id: traceId,
     project_id: project.id,
     metadata: {
@@ -298,9 +289,9 @@ const processCollectorJob_ = async (
       ...reservedTraceMetadata,
       ...(Object.keys(customMetadata).length > 0
         ? {
-            ...customExistingMetadata,
-            custom: safeTruncate(customMetadata),
-          }
+          ...customExistingMetadata,
+          custom: safeTruncate(customMetadata),
+        }
         : {}),
       all_keys: Array.from(
         new Set([
@@ -387,12 +378,13 @@ const processCollectorJob_ = async (
 };
 
 const updateTrace = async (
-  trace: ElasticSearchTrace,
+  trace: Omit<ElasticSearchTrace, "spans">,
   esSpans: ElasticSearchSpan[],
   evaluations: Evaluation[] | undefined
 ) => {
   if (env.IS_QUICKWIT) {
-    return await esClient.update({
+    const client = await esClient({ projectId: trace.project_id });
+    return await client.update({
       index: TRACE_INDEX.alias,
       id: traceIndexId({
         traceId: trace.trace_id,
@@ -408,8 +400,12 @@ const updateTrace = async (
     });
   }
 
+  // @ts-expect-error
+  delete trace.spans;
+
   try {
-    await esClient.update({
+    const client = await esClient({ projectId: trace.project_id });
+    await client.update({
       index: TRACE_INDEX.alias,
       id: traceIndexId({
         traceId: trace.trace_id,
@@ -522,7 +518,7 @@ const updateTrace = async (
     if (
       (error as any).toString().includes("version_conflict_engine_exception")
     ) {
-      debug("Version conflict, skipping update");
+      logger.debug("version conflict, skipping update");
       return;
     }
     throw error;
@@ -533,20 +529,24 @@ export const processCollectorCheckAndAdjustJob = async (
   id: string | undefined,
   data: CollectorCheckAndAdjustJob
 ) => {
-  debug(`Post-processing job ${id}`);
+  logger.debug({ jobId: id }, "post-processing job");
 
   const { traceId, projectId } = data;
-  const existingTraceResponse = await esClient.search<ElasticSearchTrace>({
-    index: TRACE_INDEX.alias,
-    body: {
+  const client = await esClient({ projectId });
+  const protections = await getProtectionsForProject(prisma, { projectId });
+  const existingTraceResponse = await searchTraces({
+    connConfig: { projectId },
+    search: {
       size: 1,
       query: {
         bool: {
           must: [
             { term: { trace_id: traceId } },
             { term: { project_id: projectId } },
-          ] as QueryDslBoolQuery["must"],
-        } as QueryDslBoolQuery,
+          ],
+          should: void 0,
+          must_not: void 0,
+        }
       },
       _source: [
         "spans",
@@ -555,14 +555,14 @@ export const processCollectorCheckAndAdjustJob = async (
         "expected_output",
       ],
     },
+    protections,
   });
-
-  const existingTrace = existingTraceResponse.hits.hits[0]?._source;
+  const existingTrace = existingTraceResponse[0];
   if (!existingTrace) {
     return;
   }
 
-  const spans = existingTrace.spans?.map(elasticSearchSpanToSpan) ?? [];
+  const spans = existingTrace.spans;
   const [input, output] = await Promise.all([
     { value: getFirstInputAsText(spans) },
     { value: getLastOutputAsText(spans) },
@@ -588,7 +588,7 @@ export const processCollectorCheckAndAdjustJob = async (
     expected_output: existingTrace.expected_output,
   };
 
-  await esClient.update({
+  await client.update({
     index: TRACE_INDEX.alias,
     id: traceIndexId({ traceId, projectId }),
     retry_on_conflict: 10,
@@ -616,13 +616,20 @@ export const processCollectorCheckAndAdjustJob = async (
     refresh: true,
   });
 
+  const customMetadata = existingTrace.metadata.custom;
+  const isCustomMetadataObject =
+    typeof customMetadata === "object" &&
+    customMetadata !== null &&
+    !Array.isArray(customMetadata);
+
   if (
     // Does not re-schedule trace checks for too old traces being resynced
     (!existingTrace?.timestamps?.inserted_at ||
       existingTrace.timestamps.inserted_at > Date.now() - 30 * 1000) &&
     // Does not schedule evaluations for traces that are not from the studio in development
-    (existingTrace.metadata.custom?.platform !== "optimization_studio" ||
-      existingTrace.metadata.custom?.environment !== "development")
+    (!isCustomMetadataObject || // If it's not an object, proceed with evaluations
+      customMetadata?.platform !== "optimization_studio" ||
+      customMetadata?.environment !== "development") 
   ) {
     await scheduleEvaluations(trace, spans);
   }
@@ -634,13 +641,13 @@ export const processCollectorCheckAndAdjustJob = async (
       input,
     });
   } catch {
-    debug("Failed to score satisfaction for", traceId);
+    logger.debug({ traceId }, "failed to score satisfaction for");
   }
 };
 
 export const startCollectorWorker = () => {
   if (!connection) {
-    debug("No redis connection, skipping collector worker");
+    logger.debug("no redis connection, skipping collector worker");
     return;
   }
 
@@ -654,7 +661,7 @@ export const startCollectorWorker = () => {
   );
 
   collectorWorker.on("ready", () => {
-    debug("Collector worker active, waiting for jobs!");
+    logger.debug("collector worker active, waiting for jobs!");
   });
 
   collectorWorker.on("failed", (job, err) => {
@@ -667,7 +674,7 @@ export const startCollectorWorker = () => {
     } else {
       getJobProcessingCounter("collector", "failed").inc();
     }
-    debug(`Job ${job?.id} failed with error ${err.message}`);
+    logger.debug({ jobId: job?.id, error: err.message }, "job failed");
     Sentry.withScope((scope) => {
       scope.setTag("worker", "collector");
       scope.setExtra("job", job?.data);
@@ -675,7 +682,7 @@ export const startCollectorWorker = () => {
     });
   });
 
-  debug("Collector worker registered");
+  logger.debug("collector worker registered");
   return collectorWorker;
 };
 
@@ -716,10 +723,10 @@ const markProjectFirstMessage = async (
           metadata.custom?.platform === "optimization_studio"
             ? "other"
             : metadata.sdk_language === "python"
-            ? "python"
-            : metadata.sdk_language === "typescript"
-            ? "typescript"
-            : "other",
+              ? "python"
+              : metadata.sdk_language === "typescript"
+                ? "typescript"
+                : "other",
       },
     });
   }
@@ -730,40 +737,48 @@ export const fetchExistingMD5s = async (
   projectId: string
 ): Promise<
   | {
-      indexing_md5s: ElasticSearchTrace["indexing_md5s"];
-      inserted_at: number | undefined;
-      existing_metadata: ElasticSearchTrace["metadata"];
-      version: number | undefined;
-    }
+    indexing_md5s: ElasticSearchTrace["indexing_md5s"];
+    inserted_at: number | undefined;
+    existing_metadata: ElasticSearchTrace["metadata"];
+    version: number | undefined;
+  }
   | undefined
 > => {
-  const existingTraceResponse = await esClient.search<ElasticSearchTrace>({
-    index: TRACE_INDEX.alias,
-    version: true,
-    body: {
+  const existingTracesWithInternals = await searchTracesWithInternals({
+    connConfig: { projectId },
+    protections: {
+      canSeeCapturedInput: true,
+      canSeeCapturedOutput: true,
+      canSeeCosts: true,
+    },
+    search: {
       size: 1,
       query: {
         bool: {
           must: [
             { term: { trace_id: traceId } },
             { term: { project_id: projectId } },
-          ] as QueryDslBoolQuery["must"],
-        } as QueryDslBoolQuery,
+          ],
+          must_not: void 0,
+          should: void 0,
+        },
       },
       _source: ["indexing_md5s", "timestamps.inserted_at", "metadata"],
     },
   });
 
-  const existingTrace = existingTraceResponse.hits.hits[0]?._source;
-  const version = existingTraceResponse.hits.hits[0]?._version;
-  if (!existingTrace) {
-    return undefined;
+  const existingTraceWithInternals = existingTracesWithInternals[0];
+  if (!existingTraceWithInternals) {
+    return void 0;
   }
 
+  const source = existingTraceWithInternals.source;
+  const version = existingTraceWithInternals.hit?._version;
+
   return {
-    indexing_md5s: existingTrace.indexing_md5s,
-    inserted_at: existingTrace.timestamps?.inserted_at,
-    existing_metadata: existingTrace.metadata,
+    indexing_md5s: source.indexing_md5s,
+    inserted_at: source.timestamps?.inserted_at,
+    existing_metadata: source.metadata,
     version,
   };
 };

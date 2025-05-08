@@ -2,6 +2,8 @@ import {
   Alert,
   Box,
   Button,
+  Center,
+  EmptyState,
   Heading,
   HStack,
   Skeleton,
@@ -10,11 +12,13 @@ import {
   Text,
   useDisclosure,
   VStack,
+  type StackProps,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
 import type { Node } from "@xyflow/react";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, X } from "react-feather";
+import { LuSquareCheckBig } from "react-icons/lu";
 import {
   BatchEvaluationV2RunList,
   useBatchEvaluationState,
@@ -32,14 +36,15 @@ import {
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppliedOptimization } from "../../server/experiments/types";
-import { experimentSlugify } from "../../server/experiments/utils";
 import { api } from "../../utils/api";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import type { Field, Signature } from "../types/dsl";
+import type { Field, Signature, Workflow } from "../types/dsl";
 import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
 import { OptimizationProgressBar } from "./ProgressToast";
+import { slugify } from "../../utils/slugify";
+import { useRunEvalution } from "../hooks/useRunEvalution";
 
 export function ResultsPanel({
   isCollapsed,
@@ -55,6 +60,14 @@ export function ResultsPanel({
   useEffect(() => {
     setTabIndex(defaultTab);
   }, [defaultTab]);
+
+  const { workflowId, experimentId, evaluationState } = useWorkflowStore(
+    ({ workflow_id: workflowId, experiment_id: experimentId, state }) => ({
+      workflowId,
+      experimentId,
+      evaluationState: state.evaluation,
+    })
+  );
 
   return (
     <HStack
@@ -100,7 +113,13 @@ export function ResultsPanel({
           padding={0}
           height="calc(100% - 32px)"
         >
-          {!isCollapsed && tabIndex === "evaluations" && <EvaluationResults />}
+          {!isCollapsed && tabIndex === "evaluations" && (
+            <EvaluationResults
+              workflowId={workflowId}
+              experimentId={experimentId}
+              evaluationState={evaluationState}
+            />
+          )}
         </Tabs.Content>
         <Tabs.Content
           value="optimizations"
@@ -116,22 +135,26 @@ export function ResultsPanel({
   );
 }
 
-export function EvaluationResults() {
-  const { workflowId, evaluationState } = useWorkflowStore(
-    ({ workflow_id: workflowId, state }) => ({
-      workflowId,
-      evaluationState: state.evaluation,
-    })
-  );
-
+export function EvaluationResults({
+  workflowId,
+  experimentId,
+  evaluationState,
+  sidebarProps,
+}: {
+  workflowId?: string;
+  experimentId?: string;
+  evaluationState: Workflow["state"]["evaluation"];
+  sidebarProps?: StackProps;
+}) {
   const { project } = useOrganizationTeamProject();
 
   const [keepFetching, setKeepFetching] = useState(false);
 
-  const experiment = api.experiments.getExperimentBySlug.useQuery(
+  const experiment = api.experiments.getExperimentBySlugOrId.useQuery(
     {
       projectId: project?.id ?? "",
-      experimentSlug: experimentSlugify(workflowId ?? ""),
+      experimentId: experimentId,
+      experimentSlug: experimentId ? undefined : slugify(workflowId ?? ""),
     },
     {
       enabled: !!project && !!workflowId,
@@ -157,7 +180,11 @@ export function EvaluationResults() {
     evaluationState?.run_id
   );
 
-  const { stopEvaluationExecution } = useEvaluationExecution();
+  useEffect(() => {
+    setSelectedRunId(evaluationState?.run_id);
+  }, [evaluationState?.run_id]);
+
+  const { stopEvaluation } = useRunEvalution();
 
   const {
     selectedRun,
@@ -171,11 +198,30 @@ export function EvaluationResults() {
     setSelectedRunId,
   });
 
-  if (experiment.isError && experiment.error.data?.httpStatus === 404) {
+  if (
+    (experiment.isError && experiment.error.data?.httpStatus === 404) ||
+    batchEvaluationRuns.data?.runs.length === 0 ||
+    !experiment.data ||
+    !project
+  ) {
     if (keepFetching) {
       return <Text padding={4}>Loading...</Text>;
     }
-    return <Text padding={4}>No evaluations started yet</Text>;
+    return (
+      <Center width="full" height="full">
+        <EmptyState.Root marginTop="-60px">
+          <EmptyState.Content>
+            <EmptyState.Indicator>
+              <LuSquareCheckBig />
+            </EmptyState.Indicator>
+            <EmptyState.Title>Waiting for evaluation results</EmptyState.Title>
+            <EmptyState.Description>
+              Run your first evaluation to see the results here
+            </EmptyState.Description>
+          </EmptyState.Content>
+        </EmptyState.Root>
+      </Center>
+    );
   }
 
   if (experiment.isError) {
@@ -185,10 +231,6 @@ export function EvaluationResults() {
         Error loading evaluation results
       </Alert.Root>
     );
-  }
-
-  if (!experiment.data || !project) {
-    return <Text padding={4}>Loading...</Text>;
   }
 
   const evaluationStateRunId = evaluationState?.run_id;
@@ -201,6 +243,7 @@ export function EvaluationResults() {
         selectedRunId={selectedRunId_}
         setSelectedRunId={setSelectedRunId}
         size="sm"
+        {...sidebarProps}
       />
       <VStack gap={0} width="full" height="full" minWidth="0">
         <BatchEvaluationV2EvaluationResults
@@ -212,41 +255,20 @@ export function EvaluationResults() {
         />
         <Spacer />
         {selectedRun && (
-          <BatchEvaluationV2EvaluationSummary run={selectedRun} />
+          <BatchEvaluationV2EvaluationSummary
+            run={selectedRun}
+            showProgress={
+              (!selectedRun || selectedRun.run_id === evaluationStateRunId) &&
+              !!evaluationStateRunId &&
+              evaluationState?.status === "running"
+            }
+            onStop={() =>
+              stopEvaluation({
+                run_id: evaluationStateRunId ?? "",
+              })
+            }
+          />
         )}
-        {(!selectedRun || selectedRun.run_id === evaluationStateRunId) &&
-          evaluationStateRunId &&
-          evaluationState?.status === "running" && (
-            <HStack
-              width="full"
-              padding={3}
-              borderTop="1px solid"
-              borderColor="gray.200"
-              gap={2}
-            >
-              <Text whiteSpace="nowrap" marginTop="-1px" paddingX={2}>
-                Running
-              </Text>
-              <EvaluationProgressBar
-                evaluationState={evaluationState}
-                size="lg"
-              />
-              <Button
-                colorPalette="red"
-                onClick={() =>
-                  stopEvaluationExecution({
-                    run_id: evaluationStateRunId,
-                  })
-                }
-                minHeight="28px"
-                minWidth="0"
-                paddingY="6px"
-                marginLeft="8px"
-              >
-                <Box paddingX="6px">Stop</Box>
-              </Button>
-            </HStack>
-          )}
       </VStack>
     </HStack>
   );
@@ -264,10 +286,10 @@ export function OptimizationResults() {
 
   const [keepFetching, setKeepFetching] = useState(false);
 
-  const experiment = api.experiments.getExperimentBySlug.useQuery(
+  const experiment = api.experiments.getExperimentBySlugOrId.useQuery(
     {
       projectId: project?.id ?? "",
-      experimentSlug: experimentSlugify(`${workflowId ?? ""}-optimizations`),
+      experimentSlug: slugify(`${workflowId ?? ""}-optimizations`),
     },
     {
       enabled: !!project && !!workflowId,

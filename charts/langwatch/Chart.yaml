@@ -1,0 +1,6 @@
+apiVersion: v2
+name: langwatch
+description: Helm chart for LangWatch application
+type: application
+version: 0.1.1
+appVersion: "1.0.0"

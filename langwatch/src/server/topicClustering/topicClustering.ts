@@ -6,7 +6,7 @@ import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { fetch as fetchHTTP2 } from "fetch-h2";
 import { nanoid } from "nanoid";
 import { env } from "../../env.mjs";
-import { getDebugger } from "../../utils/logger";
+import { createLogger } from "../../utils/logger";
 import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
 import { prisma } from "../db";
 import { TRACE_INDEX, esClient, traceIndexId } from "../elasticsearch";
@@ -35,7 +35,7 @@ import {
   OPENAI_EMBEDDING_DIMENSION,
 } from "../../utils/constants";
 
-const debug = getDebugger("langwatch:topicClustering");
+const logger = createLogger("langwatch:topicClustering");
 
 export const clusterTopicsForProject = async (
   projectId: string,
@@ -54,14 +54,14 @@ export const clusterTopicsForProject = async (
   );
   const getCurrentCost = await getCurrentMonthCost(project.team.organizationId);
   if (getCurrentCost >= maxMonthlyUsage) {
-    debug(
-      "Skipping clustering for project",
-      projectId,
-      "as monthly limit has been reached"
+    logger.info(
+      { projectId },
+      "skipping clustering for project as monthly limit has been reached"
     );
   }
 
-  const assignedTracesCount = await esClient.count({
+  const client = await esClient({ projectId });
+  const assignedTracesCount = await client.count({
     index: TRACE_INDEX.alias,
     body: {
       query: {
@@ -114,10 +114,9 @@ export const clusterTopicsForProject = async (
     lastTopicCreatedAt >
       new Date(Date.now() - daysFrequency * 24 * 60 * 60 * 1000)
   ) {
-    debug(
-      "Skipping clustering for project",
-      projectId,
-      `as last topic from batch processing was created less than ${daysFrequency} days ago`
+    logger.info(
+      { projectId },
+      `skipping clustering for project as last topic from batch processing was created less than ${daysFrequency} days ago`
     );
     return;
   }
@@ -172,7 +171,8 @@ export const clusterTopicsForProject = async (
   }
 
   // Fetch last 2000 traces that were not classified in sorted and paginated, with only id, input fields and their current topics
-  const result = await esClient.search<Trace>({
+
+  const result = await client.search<Trace>({
     index: TRACE_INDEX.alias,
     body: {
       query: {
@@ -217,10 +217,9 @@ export const clusterTopicsForProject = async (
   const minimumTraces = isIncrementalProcessing ? 1 : 10;
 
   if (traces.length < minimumTraces) {
-    debug(
-      `Less than ${minimumTraces} traces found for project`,
-      projectId,
-      "skipping topic clustering"
+    logger.info(
+      { projectId },
+      `less than ${minimumTraces} traces found for project, skipping topic clustering`
     );
     return;
   }
@@ -237,26 +236,22 @@ export const clusterTopicsForProject = async (
       | [number, string]
       | undefined;
     if (lastTraceSort) {
-      debug(
-        "Scheduling the next page for clustering for project",
-        projectId,
-        "next page",
-        lastTraceSort
+      logger.info(
+        { projectId, lastTraceSort },
+        "scheduling the next page for clustering"
       );
       if (scheduleNextPage) {
         await scheduleTopicClusteringNextPage(projectId, lastTraceSort);
       } else {
-        debug(
-          "Skipping scheduling next page for project",
-          projectId,
-          "which would be",
-          lastTraceSort
+        logger.info(
+          { projectId, lastTraceSort },
+          "skipping scheduling next page for project"
         );
       }
     }
   }
 
-  debug("Done! Project", projectId);
+  logger.info({ projectId }, "done! project");
 };
 
 const getProjectTopicClusteringModelProvider = async (project: Project) => {
@@ -274,8 +269,9 @@ const getProjectTopicClusteringModelProvider = async (project: Project) => {
     throw new Error(`Topic clustering model provider ${provider} not found`);
   }
   if (!modelProvider.enabled) {
-    debug(
-      `Topic clustering model provider ${provider} is not enabled, skipping topic clustering`
+    logger.info(
+      { provider },
+      "topic cluste ring model provider is not enabled, skipping topic clustering"
     );
     return;
   }
@@ -287,11 +283,9 @@ export const batchClusterTraces = async (
   project: Project,
   traces: TopicClusteringTrace[]
 ) => {
-  debug(
-    "Batch clustering topics for",
-    traces.length,
-    "traces on project",
-    project.id
+  logger.info(
+    { tracesLength: traces.length, projectId: project.id },
+    "batch clustering topics"
   );
 
   const topicModel = await getProjectTopicClusteringModelProvider(project);
@@ -321,11 +315,9 @@ export const incrementalClustering = async (
   project: Project,
   traces: TopicClusteringTrace[]
 ) => {
-  debug(
-    "Incremental topic clustering for",
-    traces.length,
-    "traces on project",
-    project.id
+  logger.info(
+    { tracesLength: traces.length, projectId: project.id },
+    "incremental topic clustering"
   );
 
   const topics: TopicClusteringTopic[] = (
@@ -401,14 +393,14 @@ export const storeResults = async (
     cost: undefined,
   };
 
-  debug(
-    `Found ${topics.length} new topics, ${subtopics.length} new subtopics, and`,
-    Object.keys(tracesToAssign).length,
-    "traces to assign for project",
-    projectId,
-    Object.keys(tracesToAssign).length > 0
-      ? "- Updating ElasticSearch"
-      : "- Skipping ElasticSearch update"
+  logger.info(
+    {
+      topicsLength: topics.length,
+      subtopicsLength: subtopics.length,
+      tracesToAssignLength: Object.keys(tracesToAssign).length,
+      projectId,
+    },
+    "found new topics, subtopics and traces to assign for project"
   );
 
   if (!isIncremental) {
@@ -463,7 +455,8 @@ export const storeResults = async (
   ]);
 
   if (body.length > 0) {
-    await esClient.bulk({
+    const client = await esClient({ projectId });
+    await client.bulk({
       index: TRACE_INDEX.alias,
       refresh: true,
       body,
@@ -497,16 +490,17 @@ export const fetchTopicsBatchClustering = async (
   params: BatchClusteringParams
 ): Promise<TopicClusteringResponse | undefined> => {
   if (!env.TOPIC_CLUSTERING_SERVICE) {
-    console.warn(
-      "Topic clustering service URL not set, skipping topic clustering"
-    );
+    logger.warn({ projectId }, "Topic clustering service URL not set, skipping topic clustering");
     return;
   }
 
   const size = JSON.stringify(params).length;
   getPayloadSizeHistogram("topic_clustering_batch").observe(size);
 
-  debug("Uploading", size / 125000, "mb of traces data for project", projectId);
+  logger.info(
+    { sizeMb: size / 125000, projectId },
+    "uploading traces data for project"
+  );
 
   const response = await fetchHTTP2(
     `${env.TOPIC_CLUSTERING_SERVICE}/topics/batch_clustering`,
@@ -520,7 +514,7 @@ export const fetchTopicsBatchClustering = async (
         .split("\n")
         .slice(0, 10)
         .join("\n");
-    } catch {}
+    } catch { }
     throw new Error(
       `Failed to fetch topics batch clustering: ${response.statusText}\n\n${body}`
     );
@@ -536,16 +530,17 @@ export const fetchTopicsIncrementalClustering = async (
   params: IncrementalClusteringParams
 ): Promise<TopicClusteringResponse | undefined> => {
   if (!env.TOPIC_CLUSTERING_SERVICE) {
-    console.warn(
-      "Topic clustering service URL not set, skipping topic clustering"
-    );
+    logger.warn({ projectId }, "Topic clustering service URL not set, skipping topic clustering");
     return;
   }
 
   const size = JSON.stringify(params).length;
   getPayloadSizeHistogram("topic_clustering_incremental").observe(size);
 
-  debug("Uploading", size / 125000, "mb of traces data for project", projectId);
+  logger.info(
+    { sizeMb: size / 125000, projectId },
+    "uploading traces data for project"
+  );
 
   const response = await fetchHTTP2(
     `${env.TOPIC_CLUSTERING_SERVICE}/topics/incremental_clustering`,

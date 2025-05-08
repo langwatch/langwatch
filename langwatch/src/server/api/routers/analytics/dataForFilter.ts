@@ -46,7 +46,8 @@ export const dataForFilter = protectedProcedure
       },
     });
 
-    const response = await esClient.search({
+    const client = await esClient({ projectId: input.projectId });
+    const response = await client.search({
       index: TRACE_INDEX.alias,
       body: {
         size: 0,
@@ -71,6 +72,12 @@ export const dataForFilter = protectedProcedure
             {
               key: "true",
               doc_count: annotatedTraceIds.length,
+            },
+            {
+              key: "false",
+              doc_count:
+                ((response.hits.total as any)?.value ?? 0) -
+                annotatedTraceIds.length,
             },
           ],
         },
