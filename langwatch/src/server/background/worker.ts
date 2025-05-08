@@ -151,18 +151,3 @@ const startMetricsServer = () => {
     logger.info("metrics server listening on port 2999");
   });
 };
-
-// Global error handlers for uncaught exceptions and unhandled promise rejections
-process.on('uncaughtException', (err) => {
-  logger.fatal({ error: err }, 'uncaught exception detected');
-
-  // If a graceful shutdown is not achieved after 1 second,
-  // shut down the process completely
-  setTimeout(() => {
-    process.abort(); // exit immediately and generate a core dump file
-  }, 1000).unref();
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  logger.fatal({ reason: reason instanceof Error ? reason : { value: reason }, promise }, 'unhandled rejection detected');logger.fatal({ reason: reason instanceof Error ? reason : { value: reason }, promise }, 'unhandled rejection detected');
-});
