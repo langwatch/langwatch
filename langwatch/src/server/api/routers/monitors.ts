@@ -1,7 +1,7 @@
 import { ZodError, z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
-import slugify from "slugify";
+import { slugify } from "~/utils/slugify";
 import { TRPCError } from "@trpc/server";
 import { checkPreconditionsSchema } from "../../evaluations/types.generated";
 import { nanoid } from "nanoid";

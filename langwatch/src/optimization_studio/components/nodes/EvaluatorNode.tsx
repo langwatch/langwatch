@@ -8,5 +8,5 @@ export const EvaluatorNode = forwardRef(function EvaluatorNode(
   props: NodeProps<Node<Evaluator>>,
   ref: Ref<HTMLDivElement>
 ) {
-  return <ComponentNode ref={ref} {...props} hideOutputHandles />;
+  return <ComponentNode ref={ref} {...props} />;
 });

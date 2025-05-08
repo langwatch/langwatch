@@ -11,7 +11,7 @@ install:
 	@if ! command -v uv &> /dev/null; then \
 		curl -LsSf https://astral.sh/uv/install.sh | sh; \
 	fi
-	uv sync --all-extras
+	uv sync --all-groups --all-extras
 
 example:
 	@args="$(filter-out $@,$(MAKECMDGOALS))"; \

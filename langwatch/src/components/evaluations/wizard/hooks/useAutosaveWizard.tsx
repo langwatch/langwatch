@@ -1,13 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   initialState,
   useEvaluationWizardStore,
-} from "./useEvaluationWizardStore";
+} from "./evaluation-wizard-store/useEvaluationWizardStore";
 import { api } from "../../../../utils/api";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useRouter } from "next/router";
 import { useShallow } from "zustand/react/shallow";
 import { getWorkflow } from "../../../../optimization_studio/hooks/useWorkflowStore";
+import * as Sentry from "@sentry/nextjs";
+import { toaster } from "../../../ui/toaster";
+import { getRandomWorkflowIcon } from "../../../../optimization_studio/components/workflow/NewWorkflowForm";
 
 const stringifiedInitialState = JSON.stringify({
   wizardState: initialState.wizardState,
@@ -16,6 +19,9 @@ const stringifiedInitialState = JSON.stringify({
 
 let lastAutosave = 0;
 
+/**
+ * Manages syncing the client-side wizard state with the database
+ */
 const useAutosaveWizard = () => {
   const { project } = useOrganizationTeamProject();
   const {
@@ -99,26 +105,51 @@ const useAutosaveWizard = () => {
 
     if (!!experiment.data?.id || stringifiedState !== stringifiedInitialState) {
       void (async () => {
-        const updatedExperiment = await saveExperiment.mutateAsync({
-          projectId: project.id,
-          experimentId: experiment.data?.id,
-          wizardState,
-          dsl,
-        });
+        try {
+          const icon = dsl.workflow_id ? dsl.icon : getRandomWorkflowIcon();
+          const updatedExperiment = await saveExperiment.mutateAsync({
+            projectId: project.id,
+            experimentId: experiment.data?.id,
+            wizardState,
+            dsl: {
+              ...dsl,
+              icon,
+            },
+          });
 
-        // Sometimes autosave would keep true even after the mutation is done, this ensures it's set to false
-        setIsAutosaving(false);
+          // Sometimes autosave would keep true even after the mutation is done, this ensures it's set to false
+          setIsAutosaving(false);
 
-        // Prevent re-triggering autosave on name changes
-        skipNextAutosave();
+          // Prevent re-triggering autosave on name changes
+          skipNextAutosave();
 
-        setExperimentId(updatedExperiment.id);
-        setExperimentSlug(updatedExperiment.slug);
-        setWizardState({ name: updatedExperiment.name ?? undefined });
-        setWorkflow({
-          workflow_id: updatedExperiment.workflowId ?? undefined,
-          experiment_id: updatedExperiment.id,
-        });
+          setExperimentId(updatedExperiment.id);
+          setExperimentSlug(updatedExperiment.slug);
+          setWizardState({ name: updatedExperiment.name ?? undefined });
+          setWorkflow({
+            workflow_id: updatedExperiment.workflowId ?? undefined,
+            icon,
+            experiment_id: updatedExperiment.id,
+          });
+        } catch (error) {
+          console.log("Failed to autosave evaluation:", error);
+          toaster.create({
+            title: "Failed to autosave evaluation",
+            type: "error",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
+          });
+          Sentry.captureException(error, {
+            extra: {
+              context: "Failed to autosave evaluation",
+              projectId: project.id,
+              wizardState,
+              dsl,
+            },
+          });
+        }
       })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,0 +1,14 @@
+__pycache__
+build
+dist
+.pytest_cache
+.venv
+examples/.chainlit
+examples/chainlit.md
+examples/.ipynb_checkpoints
+optimized_rag.json
+repl.ipynb
+chainlit.md
+.env
+.chainlit
+*.ignored.*

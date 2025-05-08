@@ -14,6 +14,7 @@ import {
   type ProcedureParams,
   type Simplify,
 } from "@trpc/server";
+import * as Sentry from "@sentry/node";
 import { type CreateNextContextOptions } from "@trpc/server/adapters/next";
 import type { inferParser } from "@trpc/server";
 import type { NextApiRequest, NextApiResponse } from "next";
@@ -27,6 +28,9 @@ import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { type PermissionMiddleware } from "./permission";
 import { auditLog } from "../auditLog";
+import { createLogger } from "../../utils/logger";
+
+const logger = createLogger("langwatch:trpc");
 
 /**
  * 1. CONTEXT
@@ -196,6 +200,38 @@ const auditLogMutations = t.middleware(
   }
 );
 
+export const loggerMiddleware = t.middleware(async ({ path, type, input, ctx, next }) => {
+  const start = Date.now();
+  let error: unknown = null;
+
+  try {
+    return await next();
+  } catch (err) {
+    error = err;
+    throw err;
+  } finally {
+    const duration = Date.now() - start;
+    const logData: Record<string, any> = {
+      path,
+      type,
+      duration,
+      userId: (ctx.session?.user?.id) || null,
+      projectId: (input as any)?.projectId,
+      organizationId: (input as any)?.organizationId,
+    };
+
+    if (error) {
+      logData.error = error instanceof Error ? error : JSON.stringify(error);
+
+      Sentry.captureException(error);
+
+      logger.error(logData, "trpc error");
+    } else {
+      logger.info(logData, "trpc call");
+    }
+  }
+});
+
 /**
  * Protected (authenticated) procedure
  *
@@ -251,6 +287,7 @@ const permissionProcedureBuilder = <TParams extends ProcedureParams>(
     },
     use: (middleware) => {
       return procedure
+        .use(loggerMiddleware as any)
         .use(middleware as any)
         .use(enforcePermissionCheck as any)
         .use(auditLogMutations as any) as any;

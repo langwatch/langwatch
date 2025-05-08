@@ -2,7 +2,7 @@ from typing import Any, Union
 
 from pydantic.fields import FieldInfo
 
-from dspy.adapters.image_utils import Image
+from dspy.adapters.types import Image
 import dspy.adapters.chat_adapter
 
 _original_format_field_value = dspy.adapters.chat_adapter.format_field_value

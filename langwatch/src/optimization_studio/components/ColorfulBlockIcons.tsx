@@ -163,11 +163,14 @@ export function WorkflowIcon({
       border="1px solid"
       borderColor="gray.200"
       width={sizeMap[size]}
+      minWidth={sizeMap[size]}
       height={sizeMap[size]}
+      minHeight={sizeMap[size]}
       display="flex"
       alignItems="center"
       justifyContent="center"
       color="white"
+      fontSize={fontSizeMap[size]}
     >
       {icon}
     </Box>

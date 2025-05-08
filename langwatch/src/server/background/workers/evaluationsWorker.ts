@@ -3,11 +3,7 @@ import * as Sentry from "@sentry/nextjs";
 import { Worker, type Job } from "bullmq";
 import { nanoid } from "nanoid";
 import type { EvaluationJob } from "~/server/background/types";
-import type {
-  ElasticSearchSpan,
-  Trace,
-  TraceWithSpans,
-} from "~/server/tracer/types";
+import type { Trace } from "~/server/tracer/types";
 import { env } from "../../../env.mjs";
 import {
   AVAILABLE_EVALUATORS,
@@ -15,7 +11,6 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "../../../server/evaluations/evaluators.generated";
-import { getDebugger } from "../../../utils/logger";
 import {
   getCurrentMonthCost,
   maxMonthlyUsageLimit,
@@ -25,7 +20,6 @@ import {
   prepareEnvKeys,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders";
-import { esGetSpansByTraceId, getTraceById } from "../../api/routers/traces";
 import { prisma } from "../../db";
 import {
   evaluationDurationHistogram,
@@ -49,9 +43,12 @@ import {
   type MappingState,
 } from "../../tracer/tracesMapping";
 import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
-import { elasticSearchSpanToSpan } from "../../tracer/utils";
+import type { Protections } from "~/server/elasticsearch/protections";
+import { getTraceById } from "~/server/elasticsearch/traces";
+import { getProtectionsForProject } from "~/server/api/utils";
+import { createLogger } from "../../../utils/logger";
 
-const debug = getDebugger("langwatch:workers:evaluationsWorker");
+const logger = createLogger("langwatch:workers:evaluationsWorker");
 
 export async function runEvaluationJob(
   job: Job<EvaluationJob, any, string>
@@ -66,12 +63,15 @@ export async function runEvaluationJob(
     throw `check config ${job.data.check.evaluator_id} not found`;
   }
 
+  const protections = await getProtectionsForProject(prisma, { projectId: job.data.trace.project_id });
+
   return await runEvaluationForTrace({
     projectId: job.data.trace.project_id,
     traceId: job.data.trace.trace_id,
     evaluatorType: job.data.check.type,
     settings: check.parameters,
     mappings: check.mappings as MappingState,
+    protections,
   });
 }
 
@@ -108,18 +108,7 @@ const buildDataForEvaluation = async (
   trace: Trace,
   mappings: MappingState
 ): Promise<DataForEvaluation> => {
-  const spans = await esGetSpansByTraceId({
-    traceId: trace.trace_id,
-    projectId: trace.project_id,
-  });
-
-  const traceWithSpans: TraceWithSpans = {
-    ...trace,
-    spans: spans.map(elasticSearchSpanToSpan),
-  };
-
-  const data = switchMapping(traceWithSpans, mappings);
-
+  const data = switchMapping(trace, mappings);
   if (!data) {
     throw new Error("No mapped data found to run evaluator");
   }
@@ -149,16 +138,21 @@ export const runEvaluationForTrace = async ({
   evaluatorType,
   settings,
   mappings,
+  protections,
 }: {
   projectId: string;
   traceId: string;
   evaluatorType: EvaluatorTypes;
   settings: Record<string, any> | string | number | boolean | null;
   mappings: MappingState;
-}): Promise<SingleEvaluationResult> => {
+  protections: Protections;
+  }): Promise<SingleEvaluationResult> => {
   const trace = await getTraceById({
-    projectId,
+    connConfig: { projectId },
     traceId,
+    protections,
+    includeEvaluations: true,
+    includeSpans: true,
   });
   if (!trace) {
     throw "trace not found";
@@ -306,10 +300,10 @@ export const runEvaluation = async ({
             {
               input: tryAndConvertTo(data.data.input, "string"),
               output: tryAndConvertTo(data.data.output, "string"),
-              contexts: tryAndConvertTo(data.data.contexts, "array"),
+              contexts: tryAndConvertTo(data.data.contexts, "string[]"),
               expected_contexts: tryAndConvertTo(
                 data.data.expected_contexts,
-                "array"
+                "string[]"
               ),
               expected_output: tryAndConvertTo(
                 data.data.expected_output,
@@ -370,7 +364,7 @@ export const startEvaluationsWorker = (
   ) => Promise<SingleEvaluationResult>
 ) => {
   if (!connection) {
-    debug("No redis connection, skipping trace checks worker");
+    logger.info("no redis connection, skipping trace checks worker");
     return;
   }
 
@@ -388,7 +382,7 @@ export const startEvaluationsWorker = (
       const start = Date.now();
 
       try {
-        debug(`Processing job ${job.id} with data::`, job.data);
+        logger.info({ jobId: job.id, data: job.data }, "processing job");
 
         let processed = false;
         const timeout = new Promise((resolve, reject) => {
@@ -449,7 +443,7 @@ export const startEvaluationsWorker = (
             : {}),
           details: "details" in result ? result.details ?? "" : "",
         });
-        debug("Successfully processed job:", job.id);
+        logger.info({ jobId: job.id }, "successfully processed job");
 
         const duration = Date.now() - start;
         getJobProcessingDurationHistogram("evaluation").observe(duration);
@@ -461,7 +455,7 @@ export const startEvaluationsWorker = (
           status: "error",
           error: error,
         });
-        debug("Failed to process job::", job.id, error);
+        logger.error({ jobId: job.id, error }, "failed to process job");
 
         if (
           typeof error === "object" &&
@@ -490,12 +484,12 @@ export const startEvaluationsWorker = (
   );
 
   traceChecksWorker.on("ready", () => {
-    debug("Trace worker active, waiting for jobs!");
+    logger.info("trace worker active, waiting for jobs!");
   });
 
   traceChecksWorker.on("failed", (job, err) => {
     getJobProcessingCounter("evaluation", "failed").inc();
-    debug(`Job ${job?.id} failed with error ${err.message}`);
+    logger.error({ jobId: job?.id, error: err }, "job failed");
     Sentry.withScope((scope) => {
       scope.setTag("worker", "traceChecks");
       scope.setExtra("job", job?.data);
@@ -503,7 +497,7 @@ export const startEvaluationsWorker = (
     });
   });
 
-  debug("Trace checks worker registered");
+  logger.info("trace checks worker registered");
   return traceChecksWorker;
 };
 
@@ -523,17 +517,6 @@ const customEvaluation = async (
 
   if (!project) {
     throw new Error("Project not found");
-  }
-
-  const check = await prisma.monitor.findFirst({
-    where: {
-      checkType: evaluatorType,
-      projectId: projectId,
-    },
-  });
-
-  if (!check) {
-    throw new Error("Check not found");
   }
 
   const requestBody: Record<string, any> = {

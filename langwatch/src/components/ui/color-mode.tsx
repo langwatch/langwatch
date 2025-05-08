@@ -161,6 +161,10 @@ export function useColorMode(): UseColorModeReturn {
 }
 
 export function getRawColorValue(color: string): string {
+  if (color === "white") {
+    return "white";
+  }
+
   const [colorName, number] = color.split(".");
 
   if (!colorName || !number) {

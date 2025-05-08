@@ -1,11 +1,13 @@
 import { Accordion, Heading, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
-import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { CategorySelectionAccordion } from "./evaluations/CategorySelectionAccordion";
 import { EvaluatorMappingAccordion } from "./evaluations/EvaluatorMappingAccordion";
 import { EvaluatorSelectionAccordion } from "./evaluations/EvaluatorSelectionAccordion";
 import { EvaluatorSettingsAccordion } from "./evaluations/EvaluatorSettingsAccordion";
 import { useAnimatedFocusElementById } from "../../../../hooks/useAnimatedFocusElementById";
+import type { Node } from "@xyflow/react";
+import type { Component } from "~/optimization_studio/types/dsl";
 
 export function EvaluationStep() {
   const {
@@ -19,9 +21,10 @@ export function EvaluationStep() {
       getFirstEvaluatorNode,
     })
   );
+  const firstEvaluator: Node<Component> | undefined = getFirstEvaluator();
   const [accordeonValue, setAccordeonValue] = useState<string[]>(
     wizardState.evaluatorCategory
-      ? getFirstEvaluator()
+      ? firstEvaluator
         ? ["selection"]
         : ["settings"]
       : ["category"]
@@ -66,8 +69,12 @@ export function EvaluationStep() {
         <VStack width="full" gap={3}>
           <CategorySelectionAccordion setAccordeonValue={setAccordeonValue} />
           <EvaluatorSelectionAccordion setAccordeonValue={setAccordeonValue} />
-          <EvaluatorMappingAccordion />
-          <EvaluatorSettingsAccordion />
+          {firstEvaluator && (
+            <EvaluatorMappingAccordion
+              selected={accordeonValue[0] === "mappings"}
+            />
+          )}
+          {firstEvaluator && <EvaluatorSettingsAccordion />}
         </VStack>
       </Accordion.Root>
     </VStack>

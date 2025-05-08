@@ -67,6 +67,7 @@ import {
 
 import { AddParticipants } from "../traces/AddParticipants";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
+import { RedactedField } from "../ui/RedactedField";
 
 export function MessagesTable() {
   const router = useRouter();
@@ -378,9 +379,11 @@ export function MessagesTable() {
               <Box whiteSpace="pre-wrap">{trace.input?.value ?? ""}</Box>
             }
           >
-            <Text truncate display="block">
-              {trace.input?.value ? trace.input?.value : "<empty>"}
-            </Text>
+            <RedactedField field="input">
+              <Text truncate display="block">
+                {trace.input?.value ? trace.input?.value : "<empty>"}
+              </Text>
+            </RedactedField>
           </Tooltip>
         </Table.Cell>
       ),
@@ -426,18 +429,20 @@ export function MessagesTable() {
                 </Box>
               }
             >
-              {trace.lastGuardrail ? (
-                <Tag.Root colorPalette="blue" paddingLeft={2}>
-                  <Shield size={16} />
-                  <Tag.Label>Blocked by Guardrail</Tag.Label>
-                </Tag.Root>
-              ) : trace.output?.value ? (
-                <Box lineClamp={1} maxWidth="300px">
-                  {trace.output?.value}
-                </Box>
-              ) : (
-                <Box>{"<empty>"}</Box>
-              )}
+              <RedactedField field="output">
+                {trace.lastGuardrail ? (
+                  <Tag.Root colorPalette="blue" paddingLeft={2}>
+                    <Shield size={16} />
+                    <Tag.Label>Blocked by Guardrail</Tag.Label>
+                  </Tag.Root>
+                ) : trace.output?.value ? (
+                  <Box lineClamp={1} maxWidth="300px">
+                    {trace.output?.value}
+                  </Box>
+                ) : (
+                  <Box>{"<empty>"}</Box>
+                )}
+              </RedactedField>
             </Tooltip>
           </Table.Cell>
         ),
@@ -1011,14 +1016,9 @@ export function MessagesTable() {
     }
   };
 
-  const [isExpanded] = useLocalStorage("main-menu-expanded", false);
-
   return (
     <>
-      <Container
-        maxWidth={isExpanded ? "calc(100vw - 200px)" : "calc(100vw - 50px)"}
-        padding={6}
-      >
+      <Container maxWidth="calc(100vw - 50px)" padding={6}>
         <HStack width="full" align="top" paddingBottom={6}>
           <HStack align="center" gap={6}>
             <Heading as="h1" size="lg" paddingTop={1}>
@@ -1141,13 +1141,7 @@ export function MessagesTable() {
                 <Card.Body
                   padding={0}
                   maxWidth={
-                    showFilters && isExpanded
-                      ? "calc(100vw - 580px)"
-                      : showFilters
-                      ? "calc(100vw - 450px)"
-                      : isExpanded
-                      ? "calc(100vw - 260px)"
-                      : "calc(100vw - 130px)"
+                    showFilters ? "calc(100vw - 450px)" : "calc(100vw - 130px)"
                   }
                 >
                   {downloadProgress > 0 && (

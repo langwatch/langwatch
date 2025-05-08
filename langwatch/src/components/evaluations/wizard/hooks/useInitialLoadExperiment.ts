@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../../../utils/api";
 import { useRouter } from "next/router";
 import { useShallow } from "zustand/react/shallow";
-import { useEvaluationWizardStore } from "../hooks/useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "./evaluation-wizard-store/useEvaluationWizardStore";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 
 export const useInitialLoadExperiment = () => {

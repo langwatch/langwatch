@@ -4,7 +4,7 @@ import numeral from "numeral";
 import { useEffect, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
-import type { ElasticSearchSpan } from "../../server/tracer/types";
+import type { Span } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import {
   CheckStatusIcon,
@@ -20,10 +20,10 @@ import {
   SpanTypeTag,
 } from "./SpanDetails";
 
-type SpanWithChildren = ElasticSearchSpan & { children: SpanWithChildren[] };
+type SpanWithChildren = Span & { children: SpanWithChildren[] };
 
 function buildTree(
-  spans: ElasticSearchSpan[]
+  spans: Span[]
 ): Record<string, SpanWithChildren> {
   const lookup: Record<string, SpanWithChildren> = {};
 
@@ -149,12 +149,12 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
         <VStack align="start">
           <HStack>
             <HoverableBigText
-              color={!span.name && !span.model ? "gray.400" : undefined}
+              color={!span.name && !("model" in span) ? "gray.400" : undefined}
               maxWidth="180px"
               lineClamp={1}
               expandable={false}
             >
-              {span.name ?? span.model ?? "(unnamed)"}
+              {span.name ?? ('model' in span ? span.model : "(unnamed)")}
             </HoverableBigText>
             {evaluationResult && (
               <IconWrapper
@@ -227,7 +227,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
   );
 };
 
-const TreeRenderer: React.FC<{ spans: ElasticSearchSpan[] }> = ({ spans }) => {
+const TreeRenderer: React.FC<{ spans: Span[] }> = ({ spans }) => {
   const tree = buildTree(spans);
 
   const spansById = spans.reduce(
@@ -235,7 +235,7 @@ const TreeRenderer: React.FC<{ spans: ElasticSearchSpan[] }> = ({ spans }) => {
       acc[span.span_id] = span;
       return acc;
     },
-    {} as Record<string, ElasticSearchSpan>
+    {} as Record<string, Span>
   );
   const rootSpans = spans.filter(
     (s) => !s.parent_id || !spansById[s.parent_id]
@@ -252,7 +252,7 @@ const TreeRenderer: React.FC<{ spans: ElasticSearchSpan[] }> = ({ spans }) => {
   );
 };
 
-const SpanCost = ({ span }: { span: ElasticSearchSpan }) => {
+const SpanCost = ({ span }: { span: Span }) => {
   if (span.metrics?.cost === undefined) return null;
 
   return numeral(span.metrics.cost).format("$0.00000a");

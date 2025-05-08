@@ -1,16 +1,17 @@
 import { Field, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
-import {
-  AVAILABLE_EVALUATORS,
-  type Evaluators,
-} from "~/server/evaluations/evaluators.generated";
+import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import type { Entry } from "../../../../../optimization_studio/types/dsl";
 import { EvaluatorTracesMapping } from "../../../EvaluatorTracesMapping";
 import { StepAccordion } from "../../components/StepAccordion";
+import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
 
-export const EvaluatorMappingAccordion = () => {
+export const EvaluatorMappingAccordion = ({
+  selected,
+}: {
+  selected: boolean;
+}) => {
   const {
     realTimeTraceMappings,
     task,
@@ -21,6 +22,7 @@ export const EvaluatorMappingAccordion = () => {
     getFirstEvaluatorEdges,
     setFirstEvaluatorEdges,
     datasetFields,
+    executorNode,
   } = useEvaluationWizardStore(
     useShallow(
       ({
@@ -30,6 +32,7 @@ export const EvaluatorMappingAccordion = () => {
         getFirstEvaluatorEdges,
         setFirstEvaluatorEdges,
         getDSL,
+        getFirstExecutorNode,
       }) => ({
         realTimeTraceMappings: wizardState.realTimeTraceMappings,
         task: wizardState.task,
@@ -43,6 +46,7 @@ export const EvaluatorMappingAccordion = () => {
           (
             getDSL().nodes.find((node) => node.type === "entry")?.data as Entry
           )?.outputs?.map((field) => field.identifier) ?? [],
+        executorNode: getFirstExecutorNode(),
       })
     )
   );
@@ -50,11 +54,12 @@ export const EvaluatorMappingAccordion = () => {
   const evaluator = getFirstEvaluatorNode();
   const evaluatorEdges = getFirstEvaluatorEdges();
   const evaluatorType = evaluator?.data.evaluator;
+  const availableEvaluators = useAvailableEvaluators();
   const evaluatorDefinition = useMemo(() => {
-    return evaluatorType && evaluatorType in AVAILABLE_EVALUATORS
-      ? AVAILABLE_EVALUATORS[evaluatorType as keyof Evaluators]
+    return evaluatorType && availableEvaluators && evaluatorType in availableEvaluators
+      ? availableEvaluators[evaluatorType]
       : undefined;
-  }, [evaluatorType]);
+  }, [availableEvaluators, evaluatorType]);
 
   const traceMappings = realTimeTraceMappings ?? {
     mapping: {},
@@ -66,7 +71,12 @@ export const EvaluatorMappingAccordion = () => {
       ...(evaluatorDefinition?.requiredFields ?? []),
       ...(evaluatorDefinition?.optionalFields ?? []),
     ];
-  }, [evaluatorDefinition]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evaluatorDefinition, evaluatorType]);
+
+  const executorFields = useMemo(() => {
+    return executorNode?.data.outputs?.map((field) => field.identifier) ?? [];
+  }, [executorNode]);
 
   const sourceOptions = useMemo(() => {
     return {
@@ -74,9 +84,24 @@ export const EvaluatorMappingAccordion = () => {
         label: "Dataset",
         fields: datasetFields,
       },
+      ...(executorNode?.id
+        ? {
+            [executorNode.id]: {
+              label: "Executor",
+              fields: executorFields,
+            },
+          }
+        : {}),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(datasetFields)]);
+  }, [
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    JSON.stringify(datasetFields),
+    evaluatorType,
+    executorNode?.id,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    JSON.stringify(executorFields),
+  ]);
 
   return (
     <StepAccordion
@@ -98,34 +123,48 @@ export const EvaluatorMappingAccordion = () => {
             </Text>
             <Field.Root>
               <VStack align="start" gap={4} width="full">
-                <EvaluatorTracesMapping
-                  titles={
-                    task == "real_time" && dataSource !== "from_production"
-                      ? ["Dataset", "Trace", "Evaluator"]
-                      : task == "real_time"
-                      ? ["Trace", "Evaluator"]
-                      : ["Dataset", "Evaluator"]
-                  }
-                  targetFields={targetFields}
-                  traceMapping={task == "real_time" ? traceMappings : undefined}
-                  dsl={
-                    evaluator?.id
-                      ? {
-                          sourceOptions,
-                          targetId: evaluator?.id ?? "",
-                          targetEdges: evaluatorEdges ?? [],
-                          setTargetEdges: (mapping) => {
-                            setFirstEvaluatorEdges(mapping);
-                          },
-                        }
-                      : undefined
-                  }
-                  setTraceMapping={(mapping) => {
-                    setWizardState({
-                      realTimeTraceMappings: mapping,
-                    });
-                  }}
-                />
+                {selected && (
+                  <EvaluatorTracesMapping
+                    skipSettingDefaultEdges={true}
+                    titles={
+                      task == "real_time" && dataSource !== "from_production"
+                        ? ["Dataset", "Trace", "Evaluator"]
+                        : task == "real_time"
+                        ? ["Trace", "Evaluator"]
+                        : ["Data", "Evaluator"]
+                    }
+                    targetFields={targetFields}
+                    traceMapping={
+                      task == "real_time" ? traceMappings : undefined
+                    }
+                    dsl={
+                      evaluator?.id
+                        ? {
+                            sourceOptions,
+                            targetId: evaluator?.id ?? "",
+                            targetEdges: evaluatorEdges ?? [],
+                            /**
+                             * This was confusing for me when I first saw it,
+                             * but basically it's just setting a callback to update the evaluator edges
+                             * whenever the dsl edges change.
+                             *
+                             * However, if there are no edges, it will use defaults hidden in the logic:
+                             * The defaults will come from the dataset inferred mappings,
+                             * which is what we want for realtime evals, but not for offline evals
+                             */
+                            setTargetEdges: (mapping) => {
+                              setFirstEvaluatorEdges(mapping);
+                            },
+                          }
+                        : undefined
+                    }
+                    setTraceMapping={(mapping) => {
+                      setWizardState({
+                        realTimeTraceMappings: mapping,
+                      });
+                    }}
+                  />
+                )}
               </VStack>
             </Field.Root>
           </>

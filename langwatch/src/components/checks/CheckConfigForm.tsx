@@ -22,7 +22,7 @@ import {
   useFieldArray,
   useForm,
 } from "react-hook-form";
-import slugify from "slugify";
+import { slugify } from "~/utils/slugify";
 import { z } from "zod";
 import { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -32,7 +32,7 @@ import {
 } from "../../server/evaluations/evaluationMappings";
 import {
   type Evaluators,
-  type EvaluatorTypes
+  type EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
 import {
   evaluatorsSchema,
@@ -57,6 +57,7 @@ import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
 import { EvaluatorSelection, evaluatorTempNameMap } from "./EvaluatorSelection";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 export interface CheckConfigFormData {
   name: string;
@@ -85,6 +86,7 @@ export default function CheckConfigForm({
   const { project } = useOrganizationTeamProject();
   const isNameAvailable = api.monitors.isNameAvailable.useMutation();
   const [isNameAlreadyInUse, setIsNameAlreadyInUse] = useState(false);
+  const publicEnv = usePublicEnv();
 
   const validateNameUniqueness = async (name: string) => {
     const result = await isNameAvailable.mutateAsync({
@@ -175,6 +177,7 @@ export default function CheckConfigForm({
   }, [checkType, isChoosing, router]);
 
   useEffect(() => {
+    if (!availableEvaluators) return;
     if (defaultValues?.settings && defaultValues.checkType === checkType)
       return;
 
@@ -213,7 +216,11 @@ export default function CheckConfigForm({
     };
 
     setDefaultSettings(
-      getEvaluatorDefaultSettings(availableEvaluators[checkType]),
+      getEvaluatorDefaultSettings(
+        availableEvaluators[checkType],
+        undefined,
+        publicEnv.data?.IS_ATLA_DEFAULT_JUDGE
+      ),
       "settings"
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -235,7 +242,7 @@ export default function CheckConfigForm({
   );
 
   const evaluatorDefinition = useMemo(
-    () => checkType && availableEvaluators[checkType],
+    () => checkType && availableEvaluators?.[checkType],
     [checkType, availableEvaluators]
   );
 
@@ -255,7 +262,7 @@ export default function CheckConfigForm({
         })}
         style={{ width: "100%" }}
       >
-        {!checkType || isChoosing ? (
+        {!checkType || isChoosing || !availableEvaluators ? (
           <EvaluatorSelection form={form} />
         ) : (
           <VStack gap={6} align="start" width="full">
@@ -376,7 +383,7 @@ export default function CheckConfigForm({
                   {executionMode !== EvaluationExecutionMode.ON_MESSAGE && (
                     <EvaluationManualIntegration
                       slug={slug}
-                      evaluatorDefinition={availableEvaluators[checkType]}
+                      evaluatorDefinition={availableEvaluators[checkType]!}
                       form={form}
                       checkType={checkType}
                       name={nameValue}

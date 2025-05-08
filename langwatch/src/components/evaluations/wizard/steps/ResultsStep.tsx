@@ -1,5 +1,6 @@
 import {
   Alert,
+  Box,
   Button,
   Heading,
   HStack,
@@ -7,28 +8,34 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { LuCircleAlert, LuCircleCheck, LuCirclePlay } from "react-icons/lu";
+import { LuCircleAlert, LuCircleCheck } from "react-icons/lu";
 import {
   useEvaluationWizardStore,
   type Step,
-} from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
+} from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { FullWidthFormControl } from "../../../FullWidthFormControl";
-import { useRunEvalution } from "../hooks/useRunEvalution";
-import { useStepCompletedValue } from "../hooks/useStepCompletedValue";
 import { Tooltip } from "../../../ui/tooltip";
-import { useEffect } from "react";
+import { RunEvaluationButton } from "../components/RunTrialEvaluationButton";
+import { useStepCompletedValue } from "../hooks/useStepCompletedValue";
+import { useModelProviderKeys } from "../../../../optimization_studio/hooks/useModelProviderKeys";
+import { AddModelProviderKey } from "../../../../optimization_studio/components/AddModelProviderKey";
+import { Link } from "../../../ui/link";
 
 export function ResultsStep() {
-  const { name, wizardState, setWizardState } = useEvaluationWizardStore(
-    ({ wizardState, setWizardState }) => ({
+  const { name, wizardState, setWizardState, getDSL } =
+    useEvaluationWizardStore(({ wizardState, setWizardState, getDSL }) => ({
       name: wizardState.name,
       wizardState,
       setWizardState,
-    })
-  );
+      getDSL,
+    }));
 
-  const { runEvaluation, isLoading } = useRunEvalution();
+  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
+    useModelProviderKeys({
+      workflow: getDSL(),
+    });
 
   const form = useForm<{
     name: string;
@@ -43,7 +50,6 @@ export function ResultsStep() {
   };
 
   const stepCompletedValue = useStepCompletedValue();
-  const trialDisabled = !stepCompletedValue("all");
 
   useEffect(() => {
     setWizardState({ workspaceTab: "results" });
@@ -86,37 +92,38 @@ export function ResultsStep() {
           />
           <StepStatus name="Evaluation" step="evaluation" />
         </VStack>
-        {wizardState.task === "real_time" && (
+        {hasProvidersWithoutCustomKeys && (
+          <AddModelProviderKey
+            runWhat="run evaluations"
+            nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
+          />
+        )}
+        {wizardState.executionMethod?.startsWith("realtime") && (
           <Alert.Root colorPalette="blue">
             <Alert.Content>
               <Alert.Description>
                 <VStack align="start" gap={4}>
-                  Try out your real-time evaluation with the sample before
-                  enabling monitoring.
-                  <Tooltip
-                    content={
-                      trialDisabled
-                        ? "Select a dataset and evaluation to run a trial"
-                        : ""
-                    }
-                    positioning={{
-                      placement: "top",
-                    }}
-                  >
-                    <Button
-                      colorPalette="blue"
-                      _icon={{
-                        minWidth: "18px",
-                        minHeight: "18px",
-                      }}
-                      onClick={runEvaluation}
-                      loading={isLoading}
-                      disabled={trialDisabled}
-                    >
-                      <LuCirclePlay />
-                      Run Trial Evaluation
-                    </Button>
-                  </Tooltip>
+                  {stepCompletedValue("dataset") ? (
+                    <>
+                      Try out your real-time evaluation with the sample before
+                      enabling monitoring.
+                    </>
+                  ) : (
+                    <Box>
+                      <Link
+                        href="#"
+                        textDecoration="underline"
+                        onClick={() => setWizardState({ step: "dataset" })}
+                      >
+                        Select a dataset
+                      </Link>{" "}
+                      to try out your real-time evaluation with the sample
+                      before enabling monitoring.
+                    </Box>
+                  )}
+                  <RunEvaluationButton isTrial colorPalette="blue">
+                    Run Trial Evaluation
+                  </RunEvaluationButton>
                 </VStack>
               </Alert.Description>
             </Alert.Content>
@@ -154,7 +161,9 @@ function StepStatus({
       justifyContent="start"
       _icon={{
         color: value ? "green.400" : "yellow.500",
+        minWidth: "20px",
         maxWidth: "20px",
+        minHeight: "20px",
         maxHeight: "20px",
         width: "20px",
         height: "20px",
@@ -167,7 +176,7 @@ function StepStatus({
           <Text fontWeight="medium" fontSize="14px">
             {name}
           </Text>
-          <Text fontSize="13px" fontWeight="normal">
+          <Text fontSize="13px" fontWeight="normal" lineClamp={1}>
             {value ?? `No ${action} selected`}
           </Text>
         </VStack>

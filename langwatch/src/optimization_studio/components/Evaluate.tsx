@@ -1,16 +1,15 @@
 import {
   Button,
+  createListCollection,
   HStack,
   Skeleton,
   Spacer,
   Text,
   useDisclosure,
-  VStack,
-  createListCollection,
-  Portal,
+  VStack
 } from "@chakra-ui/react";
-import { Select } from "../../components/ui/select";
 import { Dialog } from "../../components/ui/dialog";
+import { Select } from "../../components/ui/select";
 import { Tooltip } from "../../components/ui/tooltip";
 
 import type { Node } from "@xyflow/react";
@@ -20,22 +19,21 @@ import {
   Controller,
   useForm,
   type ControllerRenderProps,
-  type UseControllerProps,
-  type UseFormReturn,
+  type UseFormReturn
 } from "react-hook-form";
 import { SmallLabel } from "../../components/SmallLabel";
+import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { trackEvent } from "../../utils/tracking";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useGetDatasetData } from "../hooks/useGetDatasetData";
 import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Entry } from "../types/dsl";
+import { trainTestSplit } from "../utils/datasetUtils";
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState, VersionToBeUsed } from "./History";
-import { trainTestSplit } from "../utils/datasetUtils";
-import { trackEvent } from "../../utils/tracking";
-import { toaster } from "../../components/ui/toaster";
 
 export function Evaluate() {
   const { open, onToggle, onClose, setOpen } = useDisclosure();
@@ -98,8 +96,6 @@ export function EvaluateModalContent({
   onClose: () => void;
 }) {
   const { project } = useOrganizationTeamProject();
-  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
-    useModelProviderKeys();
   const {
     workflowId,
     getWorkflow,
@@ -122,6 +118,11 @@ export function EvaluateModalContent({
     })
   );
 
+  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
+    useModelProviderKeys({
+      workflow: getWorkflow(),
+    });
+
   const entryNode = getWorkflow().nodes.find(
     (node) => node.type === "entry"
   ) as Node<Entry> | undefined;
@@ -132,6 +133,7 @@ export function EvaluateModalContent({
   });
 
   const evaluateOn = form.watch("evaluateOn");
+  const commitMessage = form.watch("commitMessage");
 
   useEffect(() => {
     if (!evaluateOn) {
@@ -326,10 +328,14 @@ export function EvaluateModalContent({
     );
   }
 
+  const needsACommitMessage = canSaveNewVersion && !commitMessage;
+
   const isDisabled = hasProvidersWithoutCustomKeys
     ? "Set up your API keys to run evaluations"
     : !estimatedTotal || estimatedTotal < 1
     ? "You need at least 1 dataset entry to run evaluations"
+    : needsACommitMessage
+    ? "You need to provide a version description"
     : false;
 
   return (

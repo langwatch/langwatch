@@ -1,9 +1,5 @@
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
-import {
-  EvaluationExecutionMode,
-  ExperimentType,
-  type Monitor,
-} from "@prisma/client";
+import { EvaluationExecutionMode, ExperimentType } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import type { Node } from "@xyflow/react";
@@ -12,7 +8,7 @@ import { z } from "zod";
 import {
   wizardStateSchema,
   type WizardState,
-} from "../../../components/evaluations/wizard/hooks/useEvaluationWizardStore";
+} from "../../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import {
   workflowJsonSchema,
   type Entry,
@@ -440,8 +436,9 @@ export const experimentsRouter = createTRPCRouter({
         input.projectId,
         input.experimentSlug
       );
+      const client = await esClient({ projectId: input.projectId });
 
-      const dspySteps = await esClient.search<DSPyStep>({
+      const dspySteps = await client.search<DSPyStep>({
         index: DSPY_STEPS_INDEX.alias,
         size: 10_000,
         body: {
@@ -559,7 +556,8 @@ export const experimentsRouter = createTRPCRouter({
         input.experimentSlug
       );
 
-      const dspyStep = await esClient.search<DSPyStep>({
+      const client = await esClient({ projectId: input.projectId });
+      const dspyStep = await client.search<DSPyStep>({
         index: DSPY_STEPS_INDEX.alias,
         size: 10_000,
         body: {
@@ -588,12 +586,12 @@ export const experimentsRouter = createTRPCRouter({
     }),
 
   getExperimentBatchEvaluationRuns: protectedProcedure
-    .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
+    .input(z.object({ projectId: z.string(), experimentId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
     .query(async ({ input }) => {
-      const experiment = await getExperimentBySlug(
+      const experiment = await getExperimentById(
         input.projectId,
-        input.experimentSlug
+        input.experimentId
       );
 
       const runsByExperimentId = await getExperimentBatchEvaluationRuns(
@@ -608,15 +606,15 @@ export const experimentsRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        experimentSlug: z.string(),
+        experimentId: z.string(),
         runId: z.string(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
     .query(async ({ input }) => {
-      const experiment = await getExperimentBySlug(
+      const experiment = await getExperimentById(
         input.projectId,
-        input.experimentSlug
+        input.experimentId
       );
 
       const id = batchEvaluationId({
@@ -625,7 +623,8 @@ export const experimentsRouter = createTRPCRouter({
         runId: input.runId,
       });
 
-      const batchEvaluationRun = await esClient.get<ESBatchEvaluation>({
+      const client = await esClient({ projectId: input.projectId });
+      const batchEvaluationRun = await client.get<ESBatchEvaluation>({
         index: BATCH_EVALUATION_INDEX.alias,
         id: id,
       });
@@ -667,41 +666,6 @@ export const experimentsRouter = createTRPCRouter({
 
       // Perform the deletion in a transaction to ensure consistency
       await prisma.$transaction(async (tx) => {
-        // Delete experiment-related data in Elasticsearch
-        try {
-          await esClient.deleteByQuery({
-            index: BATCH_EVALUATION_INDEX.alias,
-            body: {
-              query: {
-                bool: {
-                  must: [
-                    { term: { experiment_id: input.experimentId } },
-                    { term: { project_id: input.projectId } },
-                  ] as QueryDslBoolQuery["must"],
-                } as QueryDslBoolQuery,
-              },
-            },
-          });
-
-          // Delete DSPy steps in ES if applicable
-          await esClient.deleteByQuery({
-            index: DSPY_STEPS_INDEX.alias,
-            body: {
-              query: {
-                bool: {
-                  must: [
-                    { term: { experiment_id: input.experimentId } },
-                    { term: { project_id: input.projectId } },
-                  ] as QueryDslBoolQuery["must"],
-                } as QueryDslBoolQuery,
-              },
-            },
-          });
-        } catch (error) {
-          console.error("Error deleting Elasticsearch data:", error);
-          // Continue with deletion even if ES deletion fails
-        }
-
         // Delete workflow versions if a workflow exists
         if (experiment.workflowId) {
           // First, update the workflow to null out the reference fields
@@ -713,6 +677,17 @@ export const experimentsRouter = createTRPCRouter({
             data: {
               currentVersionId: null,
               latestVersionId: null,
+            },
+          });
+
+          // Then we update all workflow versions to null out the parent field
+          await tx.workflowVersion.updateMany({
+            where: {
+              workflowId: experiment.workflowId,
+              projectId: input.projectId,
+            },
+            data: {
+              parentId: null,
             },
           });
 
@@ -757,6 +732,37 @@ export const experimentsRouter = createTRPCRouter({
             projectId: input.projectId,
           },
         });
+
+        // At last, delete experiment-related data in Elasticsearch
+        const client = await esClient({ projectId: input.projectId });
+        await client.deleteByQuery({
+          index: BATCH_EVALUATION_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { experiment_id: input.experimentId } },
+                  { term: { project_id: input.projectId } },
+                ] as QueryDslBoolQuery["must"],
+              } as QueryDslBoolQuery,
+            },
+          },
+        });
+
+        // And delete DSPy steps in ES if applicable
+        await client.deleteByQuery({
+          index: DSPY_STEPS_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { experiment_id: input.experimentId } },
+                  { term: { project_id: input.projectId } },
+                ] as QueryDslBoolQuery["must"],
+              } as QueryDslBoolQuery,
+            },
+          },
+        });
       });
 
       return { success: true };
@@ -771,6 +777,24 @@ const getExperimentBySlug = async (
     where: {
       projectId: projectId,
       slug: experimentSlug,
+    },
+  });
+
+  if (!experiment) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Experiment not found",
+    });
+  }
+
+  return experiment;
+};
+
+const getExperimentById = async (projectId: string, experimentId: string) => {
+  const experiment = await prisma.experiment.findFirst({
+    where: {
+      projectId: projectId,
+      id: experimentId,
     },
   });
 
@@ -860,7 +884,8 @@ const getExperimentBatchEvaluationRuns = async (
     | "total"
   >;
 
-  const batchEvaluationRuns = await esClient.search<ESBatchEvaluationRunInfo>({
+  const client = await esClient({ projectId });
+  const batchEvaluationRuns = await client.search<ESBatchEvaluationRunInfo>({
     index: BATCH_EVALUATION_INDEX.alias,
     size: 10_000,
     body: {

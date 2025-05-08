@@ -1,29 +1,31 @@
-import { Accordion, HStack, Text, VStack } from "@chakra-ui/react";
-import { ChevronDown } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { VStack, Text } from "@chakra-ui/react";
+import { useCallback, useEffect, useRef } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { z } from "zod";
-import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
-import {
-  AVAILABLE_EVALUATORS,
-  type Evaluators,
-} from "~/server/evaluations/evaluators.generated";
+import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { evaluatorsSchema } from "../../../../../server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "../../../../../server/evaluations/getEvaluator";
 import DynamicZodForm from "../../../../checks/DynamicZodForm";
 import type { Field } from "../../../../../optimization_studio/types/dsl";
 import { StepAccordion } from "../../components/StepAccordion";
+import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
+import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
+import type { EvaluatorTypes } from "../../../../../server/evaluations/evaluators.generated";
+import { usePublicEnv } from "../../../../../hooks/usePublicEnv";
 
 export const EvaluatorSettingsAccordion = () => {
+  const { project } = useOrganizationTeamProject();
   const { wizardState, getFirstEvaluatorNode, setFirstEvaluator } =
     useEvaluationWizardStore();
+  const publicEnv = usePublicEnv();
 
   const evaluator = getFirstEvaluatorNode();
   const evaluatorType = evaluator?.data.evaluator;
+  const availableEvaluators = useAvailableEvaluators();
 
   const schema =
-    evaluatorType && evaluatorType in AVAILABLE_EVALUATORS
-      ? evaluatorsSchema.shape[evaluatorType as keyof Evaluators].shape.settings
+    evaluatorType && availableEvaluators && evaluatorType in availableEvaluators
+      ? evaluatorsSchema.shape[evaluatorType as EvaluatorTypes]?.shape.settings
       : undefined;
 
   const hasEvaluatorFields =
@@ -44,9 +46,11 @@ export const EvaluatorSettingsAccordion = () => {
     | undefined =
     Object.keys(settingsFromParameters).length > 0
       ? (settingsFromParameters as any)
-      : evaluatorType
+      : evaluatorType && availableEvaluators
       ? getEvaluatorDefaultSettings(
-          AVAILABLE_EVALUATORS[evaluatorType as keyof Evaluators]
+          availableEvaluators[evaluatorType as EvaluatorTypes],
+          project,
+          publicEnv.data?.IS_ATLA_DEFAULT_JUDGE
         )
       : undefined;
 
@@ -60,40 +64,45 @@ export const EvaluatorSettingsAccordion = () => {
     },
   });
 
+  const onSubmit = useCallback(
+    (data: { settings?: Record<string, any> }) => {
+      if (!evaluatorType || !availableEvaluators) return;
+
+      // This updates the evaluator node with the settings
+      setFirstEvaluator(
+        {
+          evaluator: evaluatorType,
+          parameters: Object.entries(data.settings ?? {}).map(
+            ([identifier, value]) =>
+              ({
+                identifier,
+                type: "str",
+                value: value,
+              }) as Field
+          ),
+        },
+        availableEvaluators
+      );
+    },
+    [availableEvaluators, evaluatorType, setFirstEvaluator]
+  );
+
   useEffect(() => {
     if (!defaultSettings) return;
 
     form.reset({
       settings: defaultSettings,
     });
+    onSubmit({ settings: defaultSettings });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evaluatorType]);
-
-  const onSubmit = useCallback(
-    (data: { settings?: Record<string, any> }) => {
-      if (!evaluatorType) return;
-
-      setFirstEvaluator({
-        evaluator: evaluatorType,
-        parameters: Object.entries(data.settings ?? {}).map(
-          ([identifier, value]) =>
-            ({
-              identifier,
-              type: "str",
-              value: value,
-            }) as Field
-        ),
-      });
-    },
-    [evaluatorType, setFirstEvaluator]
-  );
 
   const formRenderedFor = useRef<string>(evaluatorType);
 
   useEffect(() => {
     formRenderedFor.current = undefined;
     setTimeout(() => {
-      formRenderedFor.current = evaluatorType ?? '';
+      formRenderedFor.current = evaluatorType ?? "";
     }, 300);
   }, [evaluatorType]);
 
@@ -122,14 +131,17 @@ export const EvaluatorSettingsAccordion = () => {
     >
       <FormProvider {...form}>
         <VStack width="full" gap={3}>
-          {hasEvaluatorFields && (
+          {hasEvaluatorFields && schema && (
             <DynamicZodForm
               schema={schema}
-              evaluatorType={evaluatorType as keyof Evaluators}
+              evaluatorType={evaluatorType as EvaluatorTypes}
               prefix="settings"
               errors={form.formState.errors.settings}
               variant="default"
             />
+          )}
+          {!schema && (
+            <Text>This evaluator does not have any settings to configure.</Text>
           )}
         </VStack>
       </FormProvider>

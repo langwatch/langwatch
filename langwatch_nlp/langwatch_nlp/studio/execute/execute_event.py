@@ -39,30 +39,35 @@ async def execute_event(
                     async for event_ in execute_component(event.payload):
                         yield event_
                 except Exception as e:
+                    import traceback
+
+                    traceback.print_exc()
                     yield component_error_event(
                         trace_id=event.payload.trace_id,
                         node_id=event.payload.node_id,
-                        error=repr(e),
+                        error=_error_repr(e),
                     )
             case "execute_flow":
                 try:
                     async for event_ in execute_flow(event.payload, queue):
                         yield event_
                 except Exception as e:
+                    import traceback
+
                     traceback.print_exc()
-                    yield Error(payload=ErrorPayload(message=repr(e)))
+                    yield Error(payload=ErrorPayload(message=_error_repr(e)))
             case "execute_evaluation":
                 try:
                     async for event_ in execute_evaluation(event.payload, queue):
                         yield event_
                 except Exception as e:
-                    yield Error(payload=ErrorPayload(message=repr(e)))
+                    yield Error(payload=ErrorPayload(message=_error_repr(e)))
             case "execute_optimization":
                 try:
                     async for event_ in execute_optimization(event.payload, queue):
                         yield event_
                 except Exception as e:
-                    yield Error(payload=ErrorPayload(message=repr(e)))
+                    yield Error(payload=ErrorPayload(message=_error_repr(e)))
             case _:
                 yield Error(
                     payload=ErrorPayload(
@@ -71,6 +76,16 @@ async def execute_event(
                 )
 
     except Exception as e:
+        import traceback
+
+        traceback.print_exc()
         yield Error(payload=ErrorPayload(message=repr(e)))
 
     yield Done()
+
+
+def _error_repr(e: Exception) -> str:
+    if isinstance(e, ValueError):
+        return str(e)
+    else:
+        return repr(e)

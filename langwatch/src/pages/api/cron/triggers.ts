@@ -103,7 +103,14 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
     endDate: new Date().getTime(),
   };
 
-  const traces = await getAllTracesForProject({ input });
+  const traces = await getAllTracesForProject({
+    input,
+    ctx: {
+      prisma: prisma,
+      session: null,
+      publiclyShared: false,
+    },
+  });
 
   const getTracesToSend = async (traces: TraceGroups, triggerId: string) => {
     const traceIds = traces.groups.flatMap((group) =>

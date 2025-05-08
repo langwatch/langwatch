@@ -10,10 +10,11 @@ import {
   parsePythonInsideJson,
 } from "../../utils/parsePythonInsideJson";
 import { CopyIcon } from "../icons/Copy";
+import type { SpanInputOutput } from "~/server/tracer/types";
 
 export const RenderInputOutput = React.memo(function RenderInputOutput(
   props: Partial<ReactJsonViewProps> & {
-    value: string | undefined;
+    value: SpanInputOutput['value'] | string | undefined;
     showTools?: boolean | "copy-only";
   }
 ) {
@@ -33,7 +34,7 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
         value = json_;
       }
     }
-    if (typeof value === "object") {
+    if (typeof value === "object" && value !== null) {
       json = value;
     }
   } catch (e) {}
@@ -144,7 +145,7 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
   return (
     <Box position="relative" width="full">
       {typeof document !== "undefined" &&
-      (json ?? isPythonRepr(value ?? "")) ? (
+      (json ?? (typeof value === "string" && isPythonRepr(value))) ? (
         renderJson(json ?? (value as any))
       ) : (
         <>
@@ -171,7 +172,6 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
     </Box>
   );
 });
-
 function TinyButton(props: ButtonProps) {
   return (
     <Button
@@ -190,3 +190,4 @@ function TinyButton(props: ButtonProps) {
     />
   );
 }
+

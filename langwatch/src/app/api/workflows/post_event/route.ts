@@ -12,15 +12,18 @@ import { studioBackendPostEvent } from "../../../../optimization_studio/server/s
 import { streamSSE } from "hono/streaming";
 import {
   studioClientEventSchema,
+  type StudioClientEvent,
   type StudioServerEvent,
 } from "../../../../optimization_studio/types/events";
-import { getDebugger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger";
 import type { NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { loggerMiddleware } from "../../hono-middleware/logger";
 
-const debug = getDebugger("langwatch:post_message");
+const logger = createLogger("langwatch:post_message");
 
 const app = new Hono().basePath("/api/workflows");
+app.use(loggerMiddleware());
 
 app.post(
   "/post_event",
@@ -33,7 +36,7 @@ app.post(
   ),
   async (c) => {
     const { event: eventWithoutEnvs, projectId } = await c.req.json();
-    debug("post_event", eventWithoutEnvs.type, projectId);
+    logger.info({ event: eventWithoutEnvs.type, projectId }, 'post_event');
 
     const session = await getServerSession(
       authOptions(c.req.raw as NextRequest)
@@ -57,11 +60,24 @@ app.post(
       );
     }
 
-    const message = await loadDatasets(
-      await addEnvs(eventWithoutEnvs, projectId),
-      projectId
-    );
-
+    let message: StudioClientEvent;
+    try {
+      message = await loadDatasets(
+        await addEnvs(eventWithoutEnvs, projectId),
+        projectId
+      );
+    } catch (error) {
+      logger.error({ error, projectId }, 'error');
+      Sentry.captureException(error, {
+        extra: {
+          projectId,
+        },
+      });
+      return c.json(
+        { error: (error as Error).message },
+        { status: 500 }
+      );
+    }
     // Use streamSSE to create an SSE stream response
     return streamSSE(c, async (stream) => {
       // Create a promise that will resolve when the stream should end
@@ -83,7 +99,7 @@ app.post(
             }
           },
         }).catch((error) => {
-          console.error("error", error);
+          logger.error({ error, projectId }, 'error');
           Sentry.captureException(error, {
             extra: {
               projectId,

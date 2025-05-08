@@ -19,10 +19,11 @@ import {
   TRACE_MAPPINGS,
   mapTraceToDatasetEntry,
 } from "../../server/tracer/tracesMapping";
-import type { TraceWithSpans } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { Switch } from "../ui/switch";
 import type { Workflow } from "../../optimization_studio/types/dsl";
+import { useEvaluationWizardStore } from "../evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import type { Trace } from "~/server/tracer/types";
 
 export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   string,
@@ -65,9 +66,10 @@ export const TracesMapping = ({
   setDatasetEntries,
   setTraceMapping,
   disableExpansions,
+  skipSettingDefaultEdges,
 }: {
   titles?: string[];
-  traces: TraceWithSpans[];
+  traces: Trace[];
   traceMapping?: MappingState;
   dsl?: {
     sourceOptions: Record<string, { label: string; fields: string[] }>;
@@ -79,8 +81,23 @@ export const TracesMapping = ({
   setDatasetEntries?: (entries: DatasetRecordEntry[]) => void;
   setTraceMapping?: (mapping: MappingState) => void;
   disableExpansions?: boolean;
+  /**
+   * To consider:
+   * This is a hacky way to prevent the default edges from being set.
+   * This component shouldn't be setting the default edges on mount,
+   * but because we need it to do this for the optimization studio,
+   * we need to pass this prop in so we can skip this behavior for the wizard.
+   *
+   * Please refactor asap.
+   * Date: April 10th, 2025
+   * @Author: @drewdrewthis
+   */
+  skipSettingDefaultEdges?: boolean;
 }) => {
   const { project } = useOrganizationTeamProject();
+  const { task } = useEvaluationWizardStore((state) => ({
+    task: state.wizardState.task,
+  }));
 
   const annotationScores = api.annotation.getByTraceIds.useQuery(
     {
@@ -160,9 +177,16 @@ export const TracesMapping = ({
   );
 
   const now = useMemo(() => new Date().getTime(), []);
+  const isInitializedRef = React.useRef(false);
 
-  // Try to set default for the mappings
   useEffect(() => {
+    if (
+      isInitializedRef.current &&
+      Object.keys(traceMappingState.mapping).length > 0
+    ) {
+      return;
+    }
+
     const traceMappingStateWithDefaults = {
       mapping: Object.fromEntries(
         targetFields.map((name) => [
@@ -185,6 +209,8 @@ export const TracesMapping = ({
         ...traceMappingStateWithDefaults,
         expansions: Array.from(traceMappingStateWithDefaults.expansions),
       });
+
+      isInitializedRef.current = true;
     }
 
     if (!dsl) return;
@@ -245,10 +271,13 @@ export const TracesMapping = ({
         })
         .filter((x) => x) as Workflow["edges"]),
     ];
-    dsl.setTargetEdges?.(targetEdgesWithDefaults);
+
+    if (!skipSettingDefaultEdges) {
+      dsl.setTargetEdges?.(targetEdgesWithDefaults);
+    }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetFields, dsl?.sourceOptions]);
+  }, [JSON.stringify(targetFields), dsl?.sourceOptions]);
 
   useEffect(() => {
     let index = 0;
@@ -284,10 +313,14 @@ export const TracesMapping = ({
     now,
   ]);
 
+  const isThreeColumns = task === "real_time";
+
   return (
     <Grid
       width="full"
-      templateColumns={dsl ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr"}
+      templateColumns={
+        isThreeColumns ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr"
+      }
       alignItems="center"
       gap={2}
     >

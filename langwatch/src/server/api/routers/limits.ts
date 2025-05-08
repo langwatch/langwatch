@@ -9,6 +9,19 @@ import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { prisma } from "../../db";
 import { dependencies } from "../../../injection/dependencies.server";
 
+export const getProjectIdsForOrganization = async (
+  organizationId: string
+): Promise<string[]> => {
+  return (
+    await prisma.project.findMany({
+      where: {
+        team: { organizationId },
+      },
+      select: { id: true },
+    })
+  ).map((project) => project.id);
+};
+
 export const limitsRouter = createTRPCRouter({
   getUsage: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
@@ -20,14 +33,7 @@ export const limitsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const { organizationId } = input;
 
-      const projectIds = (
-        await prisma.project.findMany({
-          where: {
-            team: { organizationId },
-          },
-          select: { id: true },
-        })
-      ).map((project) => project.id);
+      const projectIds = await getProjectIdsForOrganization(organizationId);
 
       const projectsCount = projectIds.length;
       const currentMonthMessagesCount =
@@ -61,8 +67,37 @@ export const getOrganizationProjectsCount = async (organizationId: string) => {
   });
 };
 
-export const getCurrentMonthMessagesCount = async (projectIds: string[]) => {
-  const messagesCount = await esClient.count({
+type CacheEntry = {
+  count: number;
+  lastUpdated: number;
+};
+
+const ONE_HOUR = 60 * 60 * 1000;
+const messageCountCache = new Map<string, CacheEntry>();
+
+export const getCurrentMonthMessagesCount = async (
+  projectIds: string[],
+  organizationId?: string
+) => {
+  const cacheKey = organizationId
+    ? `org:${organizationId}`
+    : `projects:${projectIds.sort().join(",")}`;
+
+  const now = Date.now();
+  const cachedResult = messageCountCache.get(cacheKey);
+
+  // Return cached result if valid
+  if (cachedResult && now - cachedResult.lastUpdated < ONE_HOUR) {
+    return cachedResult.count;
+  }
+
+  let projectIdsToUse = projectIds;
+  if (organizationId) {
+    projectIdsToUse = await getProjectIdsForOrganization(organizationId);
+  }
+
+  const client = await esClient({ projectId: projectIdsToUse[0] ?? "" });
+  const messagesCount = await client.count({
     index: TRACE_INDEX.alias,
     body: {
       query: {
@@ -84,6 +119,12 @@ export const getCurrentMonthMessagesCount = async (projectIds: string[]) => {
         } as QueryDslBoolQuery,
       },
     },
+  });
+
+  // Store result in cache
+  messageCountCache.set(cacheKey, {
+    count: messagesCount.count,
+    lastUpdated: now,
   });
 
   return messagesCount.count;

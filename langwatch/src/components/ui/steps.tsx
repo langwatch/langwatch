@@ -1,6 +1,6 @@
 import { Box, Steps as ChakraSteps, VStack } from "@chakra-ui/react";
 import * as React from "react";
-import { LuCheck, LuCircleAlert } from "react-icons/lu";
+import { LuCheck } from "react-icons/lu";
 
 interface StepInfoProps {
   title?: React.ReactNode;
@@ -18,26 +18,35 @@ export const StepsItem = React.forwardRef<
   HTMLDivElement,
   StepsItemProps & {
     isCompleted?: boolean;
+    isDisabled?: boolean;
   }
 >(function StepsItem(props, ref) {
-  const { title, description, completedIcon, icon, isCompleted, ...rest } =
-    props;
+  const {
+    title,
+    description,
+    completedIcon,
+    icon,
+    isCompleted,
+    isDisabled,
+    ...rest
+  } = props;
   return (
     <ChakraSteps.Item {...rest} ref={ref} marginBottom="28px">
-      <ChakraSteps.Trigger position="relative">
+      <ChakraSteps.Trigger position="relative" disabled={isDisabled}>
         <VStack gap={0}>
           <ChakraSteps.Indicator
-            cursor="pointer"
+            cursor={isDisabled ? "not-allowed" : "pointer"}
             _complete={
               !isCompleted
                 ? {
                     background: "transparent",
                     borderColor: "gray.200",
                     borderWidth: "2px",
-                    color: "fg"
+                    color: "fg",
                   }
                 : {}
             }
+            opacity={isDisabled ? 0.5 : 1}
           >
             <ChakraSteps.Status
               complete={
@@ -47,12 +56,16 @@ export const StepsItem = React.forwardRef<
               incomplete={icon ?? <ChakraSteps.Number />}
             />
           </ChakraSteps.Indicator>
-          <Box position="absolute" bottom="-28px">
+          <Box
+            position="absolute"
+            bottom="-28px"
+            opacity={isDisabled ? 0.5 : 1}
+          >
             <StepInfo title={title} description={description} />
           </Box>
         </VStack>
       </ChakraSteps.Trigger>
-      <ChakraSteps.Separator />
+      <ChakraSteps.Separator opacity={isDisabled ? 0.5 : 1} />
     </ChakraSteps.Item>
   );
 });

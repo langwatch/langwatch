@@ -1,19 +1,16 @@
-from typing import Optional
-import dspy
-import dspy.evaluate
-
-from langevals_core.base_evaluator import (
-    EvaluationResult,
-    EvaluationResultSkipped,
-    EvaluationResultError,
-    SingleEvaluationResult,
-    Money,
-)
+import json
+import time
 import langwatch
 
-from langwatch_nlp.studio.dspy.evaluation import Evaluator
+from langwatch_nlp.studio.dspy.evaluation import (
+    EvaluationResultWithMetadata,
+    Evaluator,
+    Money,
+)
 from langwatch.evaluations import EvaluationResultModel
-from dsp.modules.cache_utils import CacheMemory
+from dspy.clients.cache import request_cache
+
+from langwatch_nlp.studio.utils import SerializableWithPydanticAndPredictEncoder
 
 
 class LangWatchEvaluator(Evaluator):
@@ -30,14 +27,23 @@ class LangWatchEvaluator(Evaluator):
         self.name = name
         self.settings = settings
 
-    def forward(self, **kwargs) -> SingleEvaluationResult:
+    def forward(self, **kwargs) -> EvaluationResultWithMetadata:
         super().forward()
 
         if "contexts" in kwargs and type(kwargs["contexts"]) != list:
             kwargs["contexts"] = [kwargs["contexts"]]
         if "expected_contexts" in kwargs and type(kwargs["expected_contexts"]) != list:
             kwargs["expected_contexts"] = [kwargs["expected_contexts"]]
+        if "input" in kwargs and type(kwargs["input"]) != str:
+            kwargs["input"] = json.dumps(
+                kwargs["input"], cls=SerializableWithPydanticAndPredictEncoder
+            )
+        if "output" in kwargs and type(kwargs["output"]) != str:
+            kwargs["output"] = json.dumps(
+                kwargs["output"], cls=SerializableWithPydanticAndPredictEncoder
+            )
 
+        start_time = time.time()
         result = _cached_langwatch_evaluate(
             self.evaluator,
             name=self.name,
@@ -46,8 +52,11 @@ class LangWatchEvaluator(Evaluator):
             **kwargs,
         )
 
+        duration = round(time.time() - start_time)
+
         if result.status == "processed":
-            return EvaluationResult(
+            return EvaluationResultWithMetadata(
+                status="processed",
                 score=result.score or 0,
                 passed=result.passed,
                 details=result.details,
@@ -57,20 +66,27 @@ class LangWatchEvaluator(Evaluator):
                     if result.cost
                     else None
                 ),
+                inputs=kwargs,
+                duration=duration,
             )
         elif result.status == "skipped":
-            return EvaluationResultSkipped(
+            return EvaluationResultWithMetadata(
+                status="skipped",
                 details=result.details or "",
+                inputs=kwargs,
+                duration=duration,
             )
         else:
-            return EvaluationResultError(
+            print(f"Error running {self.evaluator} evaluator:", result.details)
+            return EvaluationResultWithMetadata(
+                status="error",
                 details=result.details or "",
-                error_type=result.error_type or "Error",
-                traceback=[],
+                inputs=kwargs,
+                duration=duration,
             )
 
 
-@CacheMemory.cache
+@request_cache(ignored_args_for_cache_key=["api_key"])
 def _cached_langwatch_evaluate(
     evaluator: str, name: str, settings: dict, api_key: str, **kwargs
 ) -> EvaluationResultModel:

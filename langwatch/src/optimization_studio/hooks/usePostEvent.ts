@@ -1,0 +1,183 @@
+import { useCallback, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useHandleServerMessage } from "./useSocketClient";
+import { useWorkflowStore } from "./useWorkflowStore";
+import type { StudioClientEvent, StudioServerEvent } from "../types/events";
+import { createLogger } from "../../utils/logger";
+import { toaster } from "../../components/ui/toaster";
+
+const logger = createLogger("langwatch:wizard:usePostEvent");
+
+export const usePostEvent = () => {
+  const { project } = useOrganizationTeamProject();
+  const workflowStore = useWorkflowStore();
+  const { setEvaluationState } = useWorkflowStore(
+    useShallow((state) => ({
+      setEvaluationState: state.setEvaluationState,
+    }))
+  );
+
+  const handleServerMessage = useHandleServerMessage({
+    workflowStore,
+    alertOnComponent: () => void 0,
+  });
+
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleTimeout = useCallback(
+    (event: StudioClientEvent) => {
+      console.error("Timeout");
+      toaster.create({
+        title: "Timeout",
+        type: "error",
+        duration: 5000,
+        meta: {
+          closable: true,
+        },
+      });
+      setIsLoading(false);
+      if (event.type === "execute_evaluation") {
+        setEvaluationState({
+          status: "error",
+          run_id: undefined,
+          error: "Timeout",
+          timestamps: { finished_at: Date.now() },
+        });
+      }
+    },
+    [setEvaluationState]
+  );
+
+  const postEventTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const postEvent = useCallback(
+    (event: StudioClientEvent) => {
+      if (!project) {
+        return;
+      }
+
+      void (async () => {
+        try {
+          postEventTimeoutRef.current = setTimeout(() => {
+            handleTimeout(event);
+          }, 20_000);
+
+          setIsLoading(true);
+
+          // Using post_event endpoint which returns an SSE stream
+          const response = await fetch("/api/workflows/post_event", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ projectId: project.id, event }),
+          });
+
+          if (!response.ok) {
+            let responseJson: { error: string };
+            try {
+              responseJson = await response.json();
+            } catch (error) {
+              throw new Error(response.statusText);
+            }
+            throw new Error(responseJson.error);
+          }
+
+          // Process the SSE stream
+          const reader = response.body?.getReader();
+          if (!reader) {
+            throw new Error("No reader available in response");
+          }
+
+          // For parsing SSE events
+          const decoder = new TextDecoder();
+          let buffer = "";
+
+          const processChunk = (chunk: string) => {
+            const events = chunk.split("\n\n").filter(Boolean);
+            for (const event_ of events) {
+              if (event_.startsWith("data: ")) {
+                const serverEvent: StudioServerEvent = JSON.parse(
+                  event_.slice(6)
+                );
+                logger.info({ serverEvent, event }, "received message");
+
+                if (postEventTimeoutRef.current) {
+                  clearTimeout(postEventTimeoutRef.current);
+                }
+
+                handleServerMessage(serverEvent);
+                if (serverEvent.type === "error") {
+                  setIsLoading(false);
+                  if (event.type === "execute_evaluation") {
+                    setEvaluationState({
+                      status: "error",
+                      run_id: undefined,
+                      error: serverEvent.payload.message,
+                      timestamps: { finished_at: Date.now() },
+                    });
+                  }
+                }
+              }
+            }
+          };
+
+          // Read the stream
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              console.log("SSE stream closed");
+              break;
+            }
+
+            const chunk = decoder.decode(value, { stream: true });
+            buffer += chunk;
+
+            if (buffer.includes("\n\n")) {
+              const chunks = buffer.split("\n\n");
+              const readyChunks = chunks.slice(0, -1).join("\n\n");
+              processChunk(readyChunks);
+              buffer = chunks[chunks.length - 1] ?? "";
+            }
+          }
+        } catch (error) {
+          console.error("Error processing SSE stream:", error);
+          toaster.create({
+            title: "Failed to post message",
+            description:
+              error instanceof Error ? error.message : "Unknown error",
+            type: "error",
+            duration: 5000,
+            meta: {
+              closable: true,
+            },
+          });
+          if (event.type === "execute_evaluation") {
+            setEvaluationState({
+              status: "error",
+              run_id: undefined,
+              error: error instanceof Error ? error.message : "Unknown error",
+              timestamps: { finished_at: Date.now() },
+            });
+          }
+        } finally {
+          if (postEventTimeoutRef.current) {
+            clearTimeout(postEventTimeoutRef.current);
+          }
+          setIsLoading(false);
+        }
+      })();
+    },
+    [handleServerMessage, handleTimeout, project, setEvaluationState]
+  );
+
+  const stopLoading = useCallback(() => {
+    if (postEventTimeoutRef.current) {
+      clearTimeout(postEventTimeoutRef.current);
+    }
+    setIsLoading(false);
+  }, [setIsLoading]);
+
+  return { postEvent, isLoading, stopLoading };
+};

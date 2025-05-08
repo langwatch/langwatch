@@ -1,8 +1,8 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import { prisma } from "../../../server/db";
+import { prisma } from "~/server/db";
 
-import { getDebugger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger";
 
 import {
   type Experiment,
@@ -12,9 +12,9 @@ import {
 import * as Sentry from "@sentry/nextjs";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { experimentSlugify } from "../../../server/experiments/utils";
+import { slugify } from "~/utils/slugify";
 
-export const debug = getDebugger("langwatch:dspy:init");
+const logger = createLogger("langwatch:dspy:init");
 
 const dspyInitParamsSchema = z
   .object({
@@ -63,12 +63,7 @@ export default async function handler(
   try {
     params = dspyInitParamsSchema.parse(req.body);
   } catch (error) {
-    debug(
-      "Invalid init data received",
-      error,
-      JSON.stringify(req.body, null, "  "),
-      { projectId: project.id }
-    );
+    logger.error({ error, body: req.body, projectId: project.id }, 'invalid init data received');
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
     Sentry.captureException(error, { extra: { projectId: project.id } });
 
@@ -118,7 +113,7 @@ export const findOrCreateExperiment = async ({
 
   let slug_ = null;
   if (experiment_slug) {
-    slug_ = experimentSlugify(experiment_slug);
+    slug_ = slugify(experiment_slug);
     experiment = await prisma.experiment.findUnique({
       where: { projectId_slug: { projectId: project.id, slug: slug_ } },
     });

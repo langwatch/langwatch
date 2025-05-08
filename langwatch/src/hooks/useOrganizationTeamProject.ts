@@ -137,8 +137,8 @@ export const useOrganizationTeamProject = (
     { projectId: project?.id ?? "" },
     {
       enabled: !!project?.id,
-      staleTime: keepFetching ? undefined : Infinity,
       refetchOnMount: false,
+      refetchOnWindowFocus: true,
     }
   );
 

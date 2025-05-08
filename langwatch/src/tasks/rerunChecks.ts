@@ -17,8 +17,9 @@ import { type ElasticSearchEvaluation } from "../server/tracer/types";
 
 // TODO: update this task to use single traces index now
 
-export default async function execute(evaluatorId: string) {
-  const traceChecks = await esClient.search<ElasticSearchEvaluation>({
+export default async function execute(evaluatorId: string, projectId: string) {
+  const client = await esClient({ projectId });
+  const traceChecks = await client.search<ElasticSearchEvaluation>({
     index: TRACE_INDEX.alias,
     size: 100,
     body: {

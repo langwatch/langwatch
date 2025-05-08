@@ -1,4 +1,5 @@
 import {
+  Avatar,
   Box,
   Button,
   Field,
@@ -7,26 +8,27 @@ import {
   Separator,
   Tag,
   Text,
+  useDisclosure,
   VStack,
   type BoxProps,
-  useDisclosure,
 } from "@chakra-ui/react";
-import { Avatar } from "@chakra-ui/react";
 
+import type { Project } from "@prisma/client";
 import { useCallback, useEffect, useMemo } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
+import { useDebounceCallback } from "usehooks-ts";
 import { HistoryIcon } from "../../components/icons/History";
 import { SmallLabel } from "../../components/SmallLabel";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
-import { formatTimeAgo } from "../../utils/formatTimeAgo";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import isDeepEqual from "fast-deep-equal";
-import type { Workflow } from "../types/dsl";
-import type { Project } from "@prisma/client";
+import { InputGroup } from "../../components/ui/input-group";
+import { Popover } from "../../components/ui/popover";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
-import { Popover } from "../../components/ui/popover";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
+import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import type { Workflow } from "../types/dsl";
+import { hasDSLChanged } from "../utils/dslUtils";
+import { AISparklesLoader } from "../../components/icons/AISparklesLoader";
 
 export function History() {
   const { open, onToggle, onClose, setOpen } = useDisclosure();
@@ -305,35 +307,6 @@ export const VersionBox = ({
   );
 };
 
-export const hasDSLChange = (
-  dslCurrent: Workflow,
-  dslPrevious: Workflow,
-  includeExecutionStates: boolean
-) => {
-  const clearDsl = (dsl: Workflow) => {
-    return {
-      ...dsl,
-      version: undefined,
-      edges: dsl.edges.map((edge) => {
-        const edge_ = { ...edge };
-        delete edge_.selected;
-        return edge_;
-      }),
-      nodes: dsl.nodes.map((node) => {
-        const node_ = { ...node, data: { ...node.data } };
-        delete node_.selected;
-        if (!includeExecutionStates) {
-          delete node_.data.execution_state;
-        }
-        return node_;
-      }),
-      state: includeExecutionStates ? dsl.state : undefined,
-    };
-  };
-
-  return !isDeepEqual(clearDsl(dslCurrent), clearDsl(dslPrevious));
-};
-
 export const useVersionState = ({
   project,
   form,
@@ -356,37 +329,34 @@ export const useVersionState = ({
     {
       projectId: project?.id ?? "",
       workflowId: workflowId ?? "",
+      returnDSL: "previousVersion",
     },
     { enabled: !!project?.id && !!workflowId }
   );
   const currentVersion = versions.data?.find(
     (version) => version.isCurrentVersion
   );
+  const previousVersion = versions.data?.find(
+    (version) => version.isPreviousVersion
+  );
   const latestVersion = versions.data?.find(
     (version) => version.isLatestVersion
   );
   const hasChanges = previousWorkflow
-    ? hasDSLChange(getWorkflow(), previousWorkflow, true)
+    ? hasDSLChanged(getWorkflow(), previousWorkflow, false)
     : false;
-  const canSaveNewVersion = !!(
-    !!latestVersion?.autoSaved ||
-    (allowSaveIfAutoSaveIsCurrentButNotLatest && currentVersion?.autoSaved)
-  );
 
-  const [versionMajor, versionMinor] = latestVersion?.version.split(".") ?? [
-    "0",
-    "0",
-  ];
+  const canSaveNewVersion =
+    hasChanges ||
+    !!latestVersion?.autoSaved ||
+    (allowSaveIfAutoSaveIsCurrentButNotLatest && !!currentVersion?.autoSaved);
+
+  const [versionMajor] = latestVersion?.version.split(".") ?? ["0"];
   const nextVersion = useMemo(() => {
     return latestVersion?.autoSaved
       ? latestVersion.version
-      : `${versionMajor}.${parseInt(versionMinor ?? "0") + 1}`;
-  }, [
-    latestVersion?.autoSaved,
-    latestVersion?.version,
-    versionMajor,
-    versionMinor,
-  ]);
+      : `${parseInt(versionMajor ?? "0") + 1}`;
+  }, [latestVersion?.autoSaved, latestVersion?.version, versionMajor]);
 
   const versionToBeEvaluated = useMemo(() => {
     return canSaveNewVersion
@@ -423,6 +393,7 @@ export const useVersionState = ({
   return {
     versions,
     currentVersion,
+    previousVersion,
     latestVersion,
     hasChanges,
     canSaveNewVersion,
@@ -440,6 +411,70 @@ export function NewVersionFields({
   nextVersion: string;
   canSaveNewVersion: boolean;
 }) {
+  const { project } = useOrganizationTeamProject();
+  const { previousVersion } = useVersionState({
+    project,
+    form,
+  });
+  const { getWorkflow } = useWorkflowStore(({ getWorkflow }) => ({
+    getWorkflow,
+  }));
+
+  const generateCommitMessage =
+    api.workflow.generateCommitMessage.useMutation();
+
+  const generateCommitMessageCallback = useCallback(
+    (prevDsl: Workflow, newDsl: Workflow) => {
+      generateCommitMessage.mutate(
+        {
+          projectId: project?.id ?? "",
+          prevDsl,
+          newDsl,
+        },
+        {
+          onSuccess: (data) => {
+            if (data) {
+              form.setValue("commitMessage", data);
+            }
+          },
+          onError: (e) => {
+            toaster.create({
+              title: "Error auto-generating version description",
+              description: e.message,
+              type: "error",
+              duration: 5000,
+              meta: { closable: true },
+              placement: "top-end",
+            });
+          },
+        }
+      );
+    },
+    [form, generateCommitMessage, project?.id]
+  );
+
+  const debouncedGenerateCommitMessage = useDebounceCallback(
+    (prevDsl: Workflow, newDsl: Workflow) => {
+      generateCommitMessageCallback(prevDsl, newDsl);
+    },
+    500,
+    { leading: true, trailing: false }
+  );
+
+  useEffect(() => {
+    if (canSaveNewVersion && previousVersion?.dsl) {
+      form.setValue("commitMessage", "");
+      setTimeout(() => {
+        debouncedGenerateCommitMessage(previousVersion.dsl!, getWorkflow());
+
+        // Seems like the mutation onSuccess does not work unless we send this call to the end of the callstack for some reason
+      }, 0);
+    } else if (canSaveNewVersion && !previousVersion) {
+      form.setValue("commitMessage", "First version");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canSaveNewVersion]);
+
   return (
     <HStack width="full">
       <Field.Root width="fit-content" invalid={!!form.formState.errors.version}>
@@ -450,12 +485,12 @@ export function NewVersionFields({
           <Input
             {...form.register("version", {
               required: true,
-              pattern: /^\d+\.\d+$/,
+              pattern: /^\d+(\.\d+)?$/,
             })}
             placeholder={nextVersion}
-            maxWidth="90px"
-            pattern="\d+\.\d+"
-            disabled={!canSaveNewVersion}
+            maxWidth="60px"
+            pattern="\d+(\.\d+)?"
+            readOnly
           />
         </VStack>
       </Field.Root>
@@ -464,14 +499,25 @@ export function NewVersionFields({
           <Field.Label as={SmallLabel} color="gray.600">
             Description
           </Field.Label>
-          <Input
-            {...form.register("commitMessage", {
-              required: true,
-            })}
-            placeholder="What changes have you made?"
+          <InputGroup
             width="full"
-            disabled={!canSaveNewVersion}
-          />
+            endElement={
+              generateCommitMessage.isLoading ? <AISparklesLoader /> : undefined
+            }
+          >
+            <Input
+              {...form.register("commitMessage", {
+                required: true,
+              })}
+              placeholder={
+                generateCommitMessage.isLoading
+                  ? "Generating..."
+                  : "What changes have you made?"
+              }
+              width="full"
+              disabled={!canSaveNewVersion}
+            />
+          </InputGroup>
         </VStack>
       </Field.Root>
     </HStack>

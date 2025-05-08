@@ -8,10 +8,12 @@ import {
   applyEdgeChanges,
   applyNodeChanges,
 } from "@xyflow/react";
-import { temporal } from "zundo";
-import { create } from "zustand";
 import isDeepEqual from "fast-deep-equal";
 import debounce from "lodash.debounce";
+import { temporal } from "zundo";
+import { create } from "zustand";
+
+import { snakeCaseToPascalCase } from "../../utils/stringCasing";
 import type {
   BaseComponent,
   Component,
@@ -19,9 +21,14 @@ import type {
   LLMConfig,
   Workflow,
 } from "../types/dsl";
+import { hasDSLChanged } from "../utils/dslUtils";
+import React from "react";
+import { WizardContext } from "../../components/evaluations/wizard/hooks/useWizardContext";
+import { useEvaluationWizardStore } from "../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import { useShallow } from "zustand/react/shallow";
 import { findLowestAvailableName } from "../utils/nodeUtils";
-import { snakeCaseToPascalCase } from "../../utils/stringCasing";
-import { hasDSLChange } from "../components/History";
+import { LlmConfigInputTypes } from "../../types";
+import { nanoid } from "nanoid";
 
 export type SocketStatus =
   | "disconnected"
@@ -62,9 +69,21 @@ export type WorkflowStore = State & {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onNodesDelete: () => void;
-  onConnect: (connection: Connection) => void;
+  onConnect: (connection: Connection) => { error?: string } | undefined;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
+  edgeConnectToNewHandle: (
+    source: string,
+    sourceHandle: string,
+    target: string
+  ) => string;
+  /**
+   * Update a node in the workflow.
+   * This will find the node by id and update it.
+   * If the id is not found, nothing will be updated.
+   * @param node - The new node data
+   * @param newId - Optional new id for the node once it updated
+   */
   setNode: (node: Partial<Node> & { id: string }, newId?: string) => void;
   setNodeParameter: (
     nodeId: string,
@@ -111,7 +130,7 @@ const DEFAULT_LLM_CONFIG: LLMConfig = {
 
 export const initialDSL: Workflow = {
   workflow_id: undefined,
-  spec_version: "1.3",
+  spec_version: "1.4",
   name: "Loading...",
   icon: "🧩",
   description: "",
@@ -119,6 +138,7 @@ export const initialDSL: Workflow = {
   nodes: [],
   edges: [],
   default_llm: DEFAULT_LLM_CONFIG,
+  template_adapter: "default",
   enable_tracing: true,
   state: {},
 };
@@ -147,6 +167,7 @@ export const getWorkflow = (state: State) => {
     description: state.description,
     version: state.version,
     default_llm: state.default_llm,
+    template_adapter: state.template_adapter,
     enable_tracing: state.enable_tracing,
     nodes: state.nodes,
     edges: state.edges,
@@ -181,7 +202,7 @@ export const store = (
     if (!previousWorkflow || !currentWorkflow) {
       return false;
     }
-    return hasDSLChange(previousWorkflow, currentWorkflow, true);
+    return hasDSLChanged(previousWorkflow, currentWorkflow, true);
   },
   setWorkflow: (
     workflow: Partial<Workflow> | ((current: Workflow) => Partial<Workflow>)
@@ -215,8 +236,19 @@ export const store = (
     });
   },
   onConnect: (connection: Connection) => {
+    const currentEdges = get().edges;
+    const existingConnection = currentEdges.find(
+      (edge) =>
+        edge.target === connection.target &&
+        edge.targetHandle === connection.targetHandle
+    );
+    if (existingConnection) {
+      return {
+        error: "Cannot connect two values to the same input",
+      };
+    }
     set({
-      edges: addEdge(connection, get().edges).map((edge) => ({
+      edges: addEdge(connection, currentEdges).map((edge) => ({
         ...edge,
         type: edge.type ?? "default",
       })),
@@ -227,6 +259,70 @@ export const store = (
   },
   setEdges: (edges: Edge[]) => {
     set({ edges });
+  },
+  edgeConnectToNewHandle: (
+    source: string,
+    sourceHandle: string,
+    target: string
+  ) => {
+    const nodes = get().nodes;
+    const edges = get().edges;
+    const inputs = edges
+      .filter((edge) => edge.target === target)
+      ?.map((edge) => edge.targetHandle?.split(".")[1]);
+
+    let inc = 2;
+    let newHandle = sourceHandle;
+    while (inputs?.includes(newHandle)) {
+      newHandle = `${sourceHandle}${inc}`;
+      inc++;
+    }
+
+    const sourceField = nodes
+      .find((node) => node.id === source)
+      ?.data.outputs?.find((output) => output.identifier === sourceHandle);
+    let type = sourceField?.type;
+    if (type === "json_schema") {
+      type = "dict";
+    }
+    if (!type || !(type in LlmConfigInputTypes)) {
+      type = "str";
+    }
+
+    const existingInputs = nodes
+      .find((node) => node.id === target)
+      ?.data.inputs?.map((input) => input.identifier);
+    set({
+      nodes: nodes.map((node) =>
+        node.id === target
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                inputs: existingInputs?.includes(newHandle)
+                  ? node.data.inputs
+                  : [
+                      ...(node.data.inputs ?? []),
+                      { identifier: newHandle, type },
+                    ],
+              } as Component,
+            }
+          : node
+      ),
+      edges: [
+        ...edges,
+        {
+          id: `edge-${nanoid()}`,
+          source,
+          target,
+          sourceHandle: `outputs.${sourceHandle}`,
+          targetHandle: `inputs.${newHandle}`,
+          type: "default",
+        },
+      ],
+    });
+
+    return newHandle;
   },
   setNode: (node: Partial<Node> & { id: string }, newId?: string) => {
     set(
@@ -325,7 +421,7 @@ export const store = (
     }
 
     const { name: newName, id: newId } = findLowestAvailableName(
-      get().nodes,
+      get().nodes.map((node) => node.id),
       currentNode.data.name?.replace(/ \(.*?\)$/, "") ?? "Component"
     );
 
@@ -514,7 +610,7 @@ export const store = (
   },
 });
 
-export const useWorkflowStore = create<WorkflowStore>()(
+export const _useWorkflowStore = create<WorkflowStore>()(
   temporal(store, {
     handleSet: (handleSet) => {
       return debounce<typeof handleSet>(
@@ -559,6 +655,28 @@ export const useWorkflowStore = create<WorkflowStore>()(
     },
   })
 );
+
+type UseWorkflowStoreType = typeof _useWorkflowStore;
+
+export const useWorkflowStore = ((
+  ...args: Parameters<UseWorkflowStoreType>
+) => {
+  const { isInsideWizard } = React.useContext(WizardContext);
+
+  const selector = args[0] ?? ((state) => state);
+  const equalityFn = args[1];
+
+  if (isInsideWizard) {
+    return useEvaluationWizardStore(
+      useShallow(({ workflowStore }) => {
+        return selector(workflowStore);
+      }),
+      equalityFn
+    );
+  }
+
+  return _useWorkflowStore(selector, equalityFn);
+}) as UseWorkflowStoreType;
 
 export const removeInvalidEdges = ({
   nodes,
@@ -640,6 +758,8 @@ const typesMap: Record<Field["type"], string> = {
   "list[int]": "list[int]",
   "list[bool]": "list[bool]",
   dict: "dict[str, Any]",
+  json_schema: "Any",
+  chat_messages: "list[dict[str, Any]]",
   signature: "dspy.Signature",
   llm: "Any",
   prompting_technique: "Any",

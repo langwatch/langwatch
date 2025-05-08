@@ -264,9 +264,17 @@ export type ReservedTraceMetadata = {
   labels?: string[] | null;
   topic_id?: string | null;
   subtopic_id?: string | null;
+  sdk_name?: string | null;
   sdk_version?: string | null;
   sdk_language?: string | null;
+  telemetry_sdk_language?: string | null;
+  telemetry_sdk_name?: string | null;
+  telemetry_sdk_version?: string | null;
 };
+
+export interface ReservedTraceMetadataMapping {
+  [key: string]: keyof ReservedTraceMetadata;
+}
 
 export type CustomMetadata = Record<
   string,
@@ -300,7 +308,7 @@ export type Trace = {
 
   events?: Event[];
   evaluations?: Evaluation[];
-  // TODO: add spans here too
+  spans: Span[];
 };
 
 export type LLMModeTrace = Omit<Trace, "timestamps" | "indexing_md5s"> & {
@@ -311,9 +319,6 @@ export type LLMModeTrace = Omit<Trace, "timestamps" | "indexing_md5s"> & {
   };
   ascii_tree: string;
 };
-
-// TODO: kill this after previous todo is done
-export type TraceWithSpans = Trace & { spans: Span[] };
 
 export type ElasticSearchTrace = Omit<
   Trace,

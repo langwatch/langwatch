@@ -1,31 +1,42 @@
 import type { Edge, Node } from "@xyflow/react";
-import type { DatasetColumns } from "../../server/datasets/types";
 import { z } from "zod";
+
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+
+import type { DatasetColumns } from "../../server/datasets/types";
+import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
+import type { ChatMessage } from "../../server/tracer/types";
+
+export const FIELD_TYPES = [
+  "str",
+  "image",
+  "float",
+  "int",
+  "bool",
+  "list",
+  "list[str]",
+  "list[float]",
+  "list[int]",
+  "list[bool]",
+  "dict",
+  "json_schema",
+  "chat_messages",
+  "signature",
+  "llm",
+  "prompting_technique",
+  "dataset",
+  "code",
+] as const;
 
 export type Field = {
   identifier: string;
-  type:
-    | "str"
-    | "image"
-    | "float"
-    | "int"
-    | "bool"
-    | "list"
-    | "list[str]"
-    | "list[float]"
-    | "list[int]"
-    | "list[bool]"
-    | "dict"
-    | "signature"
-    | "llm"
-    | "prompting_technique"
-    | "dataset"
-    | "code";
+  type: (typeof FIELD_TYPES)[number];
   optional?: boolean;
   value?: unknown;
   desc?: string;
   prefix?: string;
   hidden?: boolean;
+  json_schema?: object;
 };
 
 export type ExecutionStatus =
@@ -84,6 +95,68 @@ export type LLMConfig = z.infer<typeof llmConfigSchema>;
 
 export type Signature = BaseComponent;
 
+type StronglyTypedFieldBase = Omit<Field, "value" | "type" | "identifier">;
+/**
+ * Parameter specific to LLM Configs
+ */
+export type LlmConfigParameter = StronglyTypedFieldBase & {
+  type: "llm";
+  identifier: "llm";
+  value: LLMConfig;
+};
+/**
+ * Parameter specific to Prompting Techniques
+ */
+type PromptingTechniqueParameter = StronglyTypedFieldBase & {
+  type: "prompting_technique";
+  identifier: "prompting_technique";
+  value: unknown;
+};
+
+/**
+ * Parameter specific to Demonstrations
+ */
+type DemonstrationsParameter = StronglyTypedFieldBase & {
+  type: "dataset";
+  identifier: "demonstrations";
+  value: {
+    columns: DatasetColumns;
+    rows: Record<string, string>[];
+  };
+};
+
+/**
+ * Parameter specific to Instructions
+ */
+type InstructionsParameter = StronglyTypedFieldBase & {
+  type: "str";
+  identifier: "instructions";
+  value: string;
+};
+
+/**
+ * Chat Messages parameter
+ */
+type MessagesParameter = StronglyTypedFieldBase & {
+  type: "chat_messages";
+  identifier: "messages";
+  value: ChatMessage[];
+};
+
+export type LlmPromptConfigComponent = Signature & {
+  configId: string;
+  name: string;
+  inputs: (Omit<Field, "type"> & { type: LlmConfigInputType })[];
+  outputs: (Omit<Field, "type"> & { type: LlmConfigOutputType })[];
+  parameters: (
+    | LlmConfigParameter
+    | PromptingTechniqueParameter
+    | DemonstrationsParameter
+    | InstructionsParameter
+    | MessagesParameter
+  )[];
+};
+
 export type Code = BaseComponent;
 
 export type Custom = BaseComponent & {
@@ -118,7 +191,7 @@ export type Entry = BaseComponent & {
 
 export type Evaluator = Omit<BaseComponent, "cls"> & {
   cls: string;
-  evaluator?: string;
+  evaluator?: EvaluatorTypes | `custom/${string}`;
   workflowId?: string;
   data?: any;
 };
@@ -160,12 +233,13 @@ export const workflowJsonSchema = z
         "Version must be in the format 'number.number' (e.g. 1.0)"
       ),
     nodes: z.array(z.any()),
+    edges: z.array(z.any()),
     default_llm: llmConfigSchema,
   })
   .passthrough();
 
 export type Workflow = {
-  spec_version: "1.3";
+  spec_version: "1.4";
   workflow_id?: string;
   experiment_id?: string;
   name: string;
@@ -176,6 +250,7 @@ export type Workflow = {
   nodes: Node<Component>[];
   edges: Edge[];
   data?: Record<string, any>;
+  template_adapter: "default" | "dspy_chat_adapter";
   enable_tracing: boolean;
 
   state: {

@@ -2,17 +2,18 @@ import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
 import type { End, Entry, Evaluator, Retriever, Workflow } from "../types/dsl";
 
 export const simpleRagTemplate: Workflow = {
-  spec_version: "1.3",
+  spec_version: "1.4",
   name: "Simple RAG",
-  icon: "🧩",
+  icon: "🔍",
   description:
     "Query transformation, vector database search and answer generation",
   version: "1.0",
   default_llm: {
     model: "openai/gpt-4o-mini",
     temperature: 0,
-    max_tokens: 2048,
+    max_tokens: 8192,
   },
+  template_adapter: "default",
   enable_tracing: true,
   nodes: [
     {
@@ -232,7 +233,17 @@ export const simpleRagTemplate: Workflow = {
             identifier: "instructions",
             type: "str",
             value:
-              "given the question, generate a short wikipedia search query to find info about it",
+              "generate a short wikipedia search query to find info about it",
+          },
+          {
+            identifier: "messages",
+            type: "chat_messages",
+            value: [
+              {
+                role: "user",
+                content: "Question: {{question}}",
+              },
+            ],
           },
           {
             identifier: "demonstrations",
@@ -300,6 +311,16 @@ export const simpleRagTemplate: Workflow = {
             identifier: "instructions",
             type: "str",
             value: undefined,
+          },
+          {
+            identifier: "messages",
+            type: "chat_messages",
+            value: [
+              {
+                role: "user",
+                content: "Question:\n{{question}}\n\nContexts:\n{{contexts}}",
+              },
+            ],
           },
           {
             identifier: "demonstrations",

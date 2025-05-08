@@ -1,9 +1,13 @@
 import { evaluatorTempNameMap } from "../../components/checks/EvaluatorSelection";
-import { AVAILABLE_EVALUATORS } from "../../server/evaluations/evaluators.generated";
+import type { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
+import { type EvaluatorTypes } from "../../server/evaluations/evaluators.generated";
 import type { Evaluator, Field } from "../types/dsl";
 
 export const convertEvaluators = (
-  evaluators: typeof AVAILABLE_EVALUATORS
+  evaluators: Exclude<
+    ReturnType<typeof useAvailableEvaluators>,
+    undefined
+  >
 ): Evaluator[] => {
   return Object.entries(evaluators)
     .filter(([evaluator, definition]) => {
@@ -17,14 +21,30 @@ export const convertEvaluators = (
       return true;
     })
     .map(([evaluator]) =>
-      convertEvaluator(evaluator as keyof typeof AVAILABLE_EVALUATORS)
+      buildEvaluatorFromType(
+        evaluator as EvaluatorTypes | `custom/${string}`,
+        evaluators
+      )
     );
 };
 
-export const convertEvaluator = (
-  evaluator: keyof typeof AVAILABLE_EVALUATORS
+/**
+ * Builds a full evaluator object from the evaluator type
+ * @param evaluatorType - The evaluator to convert
+ * @returns The evaluator object
+ */
+export const buildEvaluatorFromType = (
+  evaluatorType: EvaluatorTypes | `custom/${string}`,
+  availableEvaluators: Exclude<
+    ReturnType<typeof useAvailableEvaluators>,
+    undefined
+  >
 ): Evaluator => {
-  const definition = AVAILABLE_EVALUATORS[evaluator];
+  const definition = availableEvaluators[evaluatorType];
+
+  if (!definition) {
+    throw new Error(`Evaluator type ${evaluatorType} not found`);
+  }
 
   let inputs: Field[] = [];
   const outputs: Field[] = [];
@@ -78,7 +98,7 @@ export const convertEvaluator = (
 
   return {
     cls: "LangWatchEvaluator",
-    evaluator,
+    evaluator: evaluatorType,
     name: (evaluatorTempNameMap[definition.name] ?? definition.name)
       .replace("Evaluator", "")
       .trim(),

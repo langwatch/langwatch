@@ -5,20 +5,28 @@ import {
   TASK_TYPES,
   useEvaluationWizardStore,
   type State,
-} from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
+} from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { ColorfulBlockIcon } from "../../../../optimization_studio/components/ColorfulBlockIcons";
 import { StepButton } from "../components/StepButton";
 
 export function TaskStep() {
-  const { wizardState, setWizardState } = useEvaluationWizardStore();
+  const { wizardState, setWizardState, setDSL } = useEvaluationWizardStore();
 
   const handleTaskSelection = (task: State["wizardState"]["task"]) => {
+    if (task !== wizardState.task) {
+      // Reset the workflow
+      // TODO: delete the executor node only
+      setDSL({
+        nodes: [],
+        edges: [],
+      });
+    }
     setWizardState({
       task,
     });
     setTimeout(() => {
       setWizardState({
-        step: "dataset",
+        step: task === "real_time" ? "execution" : "dataset",
       });
     }, 48);
   };
@@ -39,6 +47,21 @@ export function TaskStep() {
       >
         <VStack width="full" gap={3}>
           <StepButton
+            colorPalette="blue"
+            value="llm_app"
+            title={TASK_TYPES.llm_app}
+            description="Run a batch evaluation of dataset examples against your existing LLM application"
+            onClick={() => handleTaskSelection("llm_app")}
+            icon={
+              <ColorfulBlockIcon
+                color="blue.400"
+                size="md"
+                icon={<LuListChecks />}
+                marginTop="-2px"
+              />
+            }
+          />
+          <StepButton
             colorPalette="green"
             value="real_time"
             title={TASK_TYPES.real_time}
@@ -49,23 +72,6 @@ export function TaskStep() {
                 color="green.400"
                 size="md"
                 icon={<Activity />}
-                marginTop="-2px"
-              />
-            }
-          />
-          <StepButton
-            colorPalette="blue"
-            value="llm_app"
-            title={TASK_TYPES.llm_app}
-            description="Run a batch evaluation of dataset examples against your existing LLM application"
-            // Disabled for now
-            // onClick={() => handleTaskSelection("llm_app")}
-            disabled
-            icon={
-              <ColorfulBlockIcon
-                color="blue.400"
-                size="md"
-                icon={<LuListChecks />}
                 marginTop="-2px"
               />
             }

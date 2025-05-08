@@ -3,11 +3,14 @@ import {
   Button,
   Grid,
   Heading,
+  HStack,
+  Input,
   RadioCard,
+  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Database,
   FilePlus,
@@ -19,7 +22,7 @@ import {
   DATA_SOURCE_TYPES,
   useEvaluationWizardStore,
   type State,
-} from "~/components/evaluations/wizard/hooks/useEvaluationWizardStore";
+} from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { StepRadio } from "../components/StepButton";
@@ -27,10 +30,36 @@ import { OverflownTextWithTooltip } from "../../../OverflownText";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { StepAccordion } from "../components/StepAccordion";
 import { useAnimatedFocusElementById } from "../../../../hooks/useAnimatedFocusElementById";
+import { InlineUploadCSVForm } from "~/components/datasets/UploadCSVModal";
+import { toaster } from "../../../ui/toaster";
+import { useShallow } from "zustand/react/shallow";
+import { LuBot, LuSparkles } from "react-icons/lu";
+import { DatasetGeneration } from "./datasets/DatasetGeneration";
 
 export function DatasetStep() {
-  const { setWizardState, wizardState, setDatasetId, getDatasetId } =
-    useEvaluationWizardStore();
+  const {
+    experimentId,
+    setWizardState,
+    wizardState,
+    setDatasetId,
+    getDatasetId,
+  } = useEvaluationWizardStore(
+    useShallow(
+      ({
+        experimentId,
+        setWizardState,
+        wizardState,
+        setDatasetId,
+        getDatasetId,
+      }) => ({
+        experimentId,
+        setWizardState,
+        wizardState,
+        setDatasetId,
+        getDatasetId,
+      })
+    )
+  );
   const { project } = useOrganizationTeamProject();
 
   const [accordeonValue, setAccordeonValue] = useState(
@@ -43,14 +72,17 @@ export function DatasetStep() {
     { enabled: !!project }
   );
 
-  const handleDataSourceSelect = (
-    dataSource: "choose" | "from_production" | "manual" | "upload"
-  ) => {
-    setWizardState({
-      dataSource,
-    });
-    setAccordeonValue(["configuration"]);
-  };
+  const upsertDataset = api.dataset.upsert.useMutation();
+
+  const handleDataSourceSelect = useCallback(
+    (dataSource: "choose" | "from_production" | "manual" | "upload") => {
+      setWizardState({
+        dataSource,
+      });
+      setAccordeonValue(["configuration"]);
+    },
+    [setWizardState, setAccordeonValue]
+  );
 
   const focusElementById = useAnimatedFocusElementById();
 
@@ -72,6 +104,84 @@ export function DatasetStep() {
       dataSource,
     });
   };
+
+  // Handle CSV upload success
+  const handleCSVUploadSuccess = (
+    datasetId: string,
+    columnTypes: DatasetColumns
+  ) => {
+    setDatasetId(datasetId, columnTypes);
+    setTimeout(() => {
+      focusElementById("js-next-step-button");
+    }, 2000);
+  };
+
+  const createNewEmptyDataset = useCallback(async () => {
+    if (!experimentId) {
+      toaster.create({
+        title: "Error creating new dataset",
+        description:
+          "Wizard must be successfully autosaved before creating a new dataset",
+        type: "error",
+        duration: 5000,
+        meta: {
+          closeable: true,
+        },
+      });
+      return;
+    }
+
+    // If manual is already selected and there is a dataset id, then skip it
+    if (wizardState.dataSource === "manual" && getDatasetId()) {
+      handleDataSourceSelect("manual");
+      return;
+    }
+
+    const columnTypes: DatasetColumns = [
+      {
+        name: "input",
+        type: "string",
+      },
+      {
+        name: "output",
+        type: "string",
+      },
+    ];
+
+    upsertDataset.mutate(
+      {
+        projectId: project?.id ?? "",
+        columnTypes,
+        experimentId,
+        datasetRecords: [],
+      },
+      {
+        onSuccess: (dataset) => {
+          setDatasetId(dataset.id, columnTypes);
+          handleDataSourceSelect("manual");
+        },
+        onError: (error) => {
+          toaster.create({
+            title: "Error creating new dataset",
+            description: error.message,
+            type: "error",
+            duration: 5000,
+            meta: {
+              closeable: true,
+            },
+          });
+        },
+      }
+    );
+  }, [
+    experimentId,
+    wizardState.dataSource,
+    getDatasetId,
+    upsertDataset,
+    project?.id,
+    setDatasetId,
+    handleDataSourceSelect,
+  ]);
 
   return (
     <VStack width="full" align="start" gap={4}>
@@ -118,44 +228,52 @@ export function DatasetStep() {
             >
               <VStack width="full" gap={3} paddingX="1px">
                 <StepRadio
-                  value="choose"
-                  title={DATA_SOURCE_TYPES.choose}
-                  description="Select from your previously created datasets"
-                  _icon={{ color: "blue.400" }}
-                  icon={<Database />}
-                  onClick={() => handleDataSourceSelect("choose")}
-                />
-
-                <StepRadio
-                  value="from_production"
-                  title={DATA_SOURCE_TYPES.from_production}
-                  description="Import tracing data from production to test the evaluator"
-                  _icon={{ color: "blue.400" }}
-                  icon={<FileText />}
-                  disabled
-                  onClick={() => handleDataSourceSelect("from_production")}
-                />
-
-                <StepRadio
                   value="manual"
                   title={DATA_SOURCE_TYPES.manual}
                   description="Insert some initial test data manually, use AI to expand it"
                   _icon={{ color: "blue.400" }}
-                  icon={<FilePlus />}
-                  disabled
-                  onClick={() => handleDataSourceSelect("manual")}
-                />
-
-                <StepRadio
-                  value="upload"
-                  title={DATA_SOURCE_TYPES.upload}
-                  description="Upload your pre-existing dataset from Excel or CSV"
-                  _icon={{ color: "blue.400" }}
-                  icon={<UploadCloud />}
-                  disabled
-                  onClick={() => handleDataSourceSelect("upload")}
+                  icon={
+                    upsertDataset.isLoading ? (
+                      <Spinner size="sm" />
+                    ) : (
+                      <FilePlus />
+                    )
+                  }
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void createNewEmptyDataset();
+                  }}
                 />
               </VStack>
+
+              <StepRadio
+                value="choose"
+                title={DATA_SOURCE_TYPES.choose}
+                description="Select from your previously created datasets"
+                _icon={{ color: "blue.400" }}
+                icon={<Database />}
+                onClick={() => handleDataSourceSelect("choose")}
+              />
+
+              <StepRadio
+                value="upload"
+                title={DATA_SOURCE_TYPES.upload}
+                description="Upload your pre-existing dataset from Excel or CSV"
+                _icon={{ color: "blue.400" }}
+                icon={<UploadCloud />}
+                onClick={() => handleDataSourceSelect("upload")}
+              />
+
+              <StepRadio
+                value="from_production"
+                title={DATA_SOURCE_TYPES.from_production}
+                description="Import tracing data from production to test the evaluator"
+                _icon={{ color: "blue.400" }}
+                icon={<FileText />}
+                disabled
+                onClick={() => handleDataSourceSelect("from_production")}
+              />
             </RadioCard.Root>
           </StepAccordion>
 
@@ -170,8 +288,7 @@ export function DatasetStep() {
                   {wizardState.dataSource === "choose" && "Select Dataset"}
                   {wizardState.dataSource === "from_production" &&
                     "Import from Production"}
-                  {wizardState.dataSource === "manual" &&
-                    "Create Dataset Manually"}
+                  {wizardState.dataSource === "manual" && "Create Dataset"}
                   {wizardState.dataSource === "upload" && "Upload CSV"}
                 </Text>
               }
@@ -249,28 +366,14 @@ export function DatasetStep() {
                 </VStack>
               )}
 
-              {wizardState.dataSource === "manual" && (
-                <VStack width="full" align="start" gap={3}>
-                  <Text>Configure manual dataset creation</Text>
-                  <Button
-                    colorPalette="green"
-                    onClick={() => handleContinue("manual")}
-                  >
-                    Continue with Manual Creation
-                  </Button>
-                </VStack>
-              )}
+              {wizardState.dataSource === "manual" && <DatasetGeneration />}
 
               {wizardState.dataSource === "upload" && (
-                <VStack width="full" align="start" gap={3}>
-                  <Text>Configure CSV upload settings</Text>
-                  <Button
-                    colorPalette="orange"
-                    onClick={() => handleContinue("upload")}
-                  >
-                    Continue to Upload
-                  </Button>
-                </VStack>
+                <InlineUploadCSVForm
+                  onSuccess={({ datasetId, columnTypes }) => {
+                    handleCSVUploadSuccess(datasetId, columnTypes);
+                  }}
+                />
               )}
             </StepAccordion>
           )}

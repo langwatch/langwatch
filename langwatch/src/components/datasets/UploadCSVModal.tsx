@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  HStack,
   Spacer,
   Text,
   useDisclosure,
@@ -11,11 +12,17 @@ import {
   type DatasetColumns,
   type DatasetRecordEntry,
 } from "../../server/datasets/types";
-import { formatFileSize, useCSVReader } from "react-papaparse";
+import {
+  formatFileSize,
+  jsonToCSV,
+  useCSVReader,
+  usePapaParse,
+} from "react-papaparse";
 import type { InMemoryDataset } from "./DatasetTable";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
 import { useDrawer } from "../CurrentDrawer";
 import { Dialog } from "../../components/ui/dialog";
+import { toaster } from "../ui/toaster";
 
 export const MAX_ROWS_LIMIT = 10_000;
 
@@ -67,69 +74,13 @@ export function UploadCSVModal({
             <Dialog.CloseTrigger />
           </Dialog.Header>
           <Dialog.Body>
-            <CSVReaderComponent
-              onUploadAccepted={({ data, acceptedFile }) => {
-                const columns: DatasetColumns = (data[0] ?? []).map(
-                  (col: string) => ({
-                    name: col,
-                    type: "string",
-                  })
-                );
-                const now = new Date().getTime();
-                const records: DatasetRecordEntry[] = data
-                  .slice(1)
-                  .map((row: string[], index: number) => ({
-                    id: `${now}-${index}`,
-                    ...Object.fromEntries(
-                      row.map((col, i) => [columns[i]?.name, col])
-                    ),
-                  }));
-
-                setUploadedDataset({
-                  datasetRecords: records,
-                  columnTypes: columns,
-                  name: acceptedFile.name.split(".")[0],
-                });
-              }}
-              onUploadRemoved={() => {
-                setUploadedDataset(undefined);
-              }}
+            <UploadCSVForm
+              setUploadedDataset={setUploadedDataset}
+              uploadedDataset={uploadedDataset}
+              uploadCSVData={uploadCSVData}
+              onCreateFromScratch={onCreateFromScratch}
             />
-            {uploadedDataset &&
-              uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT && (
-                <Text color="red.500" paddingTop={4}>
-                  Sorry, the max number of rows accepted for datasets is
-                  currently {MAX_ROWS_LIMIT} rows. Please reduce the number of
-                  rows or contact support.
-                </Text>
-              )}
           </Dialog.Body>
-
-          <Dialog.Footer>
-            {onCreateFromScratch && (
-              <Button
-                variant="plain"
-                colorPalette="gray"
-                fontWeight="normal"
-                color="blue.700"
-                onClick={onCreateFromScratch}
-              >
-                Skip, create empty dataset
-              </Button>
-            )}
-            <Spacer />
-            <Button
-              colorPalette="blue"
-              disabled={
-                !uploadedDataset ||
-                uploadedDataset.datasetRecords.length === 0 ||
-                uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT
-              }
-              onClick={uploadCSVData}
-            >
-              Upload
-            </Button>
-          </Dialog.Footer>
         </Dialog.Content>
       </Dialog.Root>
       <AddOrEditDatasetDrawer
@@ -148,6 +99,120 @@ export function UploadCSVModal({
   );
 }
 
+export function InlineUploadCSVForm({
+  onSuccess,
+}: {
+  onSuccess: Parameters<typeof AddOrEditDatasetDrawer>[0]["onSuccess"];
+}) {
+  const addDatasetDrawer = useDisclosure();
+  const [uploadedDataset, setUploadedDataset] = useState<
+    InMemoryDataset | undefined
+  >(undefined);
+
+  return (
+    <>
+      <UploadCSVForm
+        setUploadedDataset={setUploadedDataset}
+        uploadedDataset={uploadedDataset}
+        uploadCSVData={addDatasetDrawer.onOpen}
+        disabled={addDatasetDrawer.open}
+      />
+      <AddOrEditDatasetDrawer
+        datasetToSave={uploadedDataset}
+        open={addDatasetDrawer.open}
+        onClose={() => {
+          addDatasetDrawer.onClose();
+        }}
+        onSuccess={(params) => {
+          onSuccess(params);
+        }}
+      />
+    </>
+  );
+}
+
+export function UploadCSVForm({
+  setUploadedDataset,
+  uploadedDataset,
+  onCreateFromScratch,
+  uploadCSVData,
+  disabled,
+}: {
+  setUploadedDataset: (dataset: InMemoryDataset | undefined) => void;
+  uploadedDataset: InMemoryDataset | undefined;
+  onCreateFromScratch?: () => void;
+  uploadCSVData: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <VStack width="full" align="start" gap={4}>
+      <CSVReaderComponent
+        onUploadAccepted={({ data, acceptedFile }) => {
+          const columns: DatasetColumns = (data[0] ?? []).map(
+            (col: string) => ({
+              name: col,
+              type: "string",
+            })
+          );
+          const now = new Date().getTime();
+          const records: DatasetRecordEntry[] = data
+            .slice(1)
+            .map((row: string[], index: number) => ({
+              id: `${now}-${index}`,
+              ...Object.fromEntries(
+                row.map((col, i) => [columns[i]?.name, col])
+              ),
+            }));
+
+          setUploadedDataset({
+            datasetRecords: records,
+            columnTypes: columns,
+            name: acceptedFile.name.split(".")[0],
+          });
+        }}
+        onUploadRemoved={() => {
+          setUploadedDataset(undefined);
+        }}
+      />
+      <HStack width="full" align="end">
+        {uploadedDataset &&
+          uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT && (
+            <Text color="red.500" paddingTop={4}>
+              Sorry, the max number of rows accepted for datasets is currently{" "}
+              {MAX_ROWS_LIMIT} rows. Please reduce the number of rows or contact
+              support.
+            </Text>
+          )}
+
+        {onCreateFromScratch && (
+          <Button
+            variant="plain"
+            colorPalette="gray"
+            fontWeight="normal"
+            color="blue.700"
+            onClick={onCreateFromScratch}
+          >
+            Skip, create empty dataset
+          </Button>
+        )}
+        <Spacer />
+        <Button
+          colorPalette="blue"
+          disabled={
+            !!disabled ||
+            !uploadedDataset ||
+            uploadedDataset.datasetRecords.length === 0 ||
+            uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT
+          }
+          onClick={uploadCSVData}
+        >
+          Upload
+        </Button>
+      </HStack>
+    </VStack>
+  );
+}
+
 export function CSVReaderComponent({
   onUploadAccepted,
   onUploadRemoved,
@@ -161,6 +226,7 @@ export function CSVReaderComponent({
   const [zoneHover, setZoneHover] = useState(false);
   const [acceptedFile, setAcceptedFile] = useState<File | null>(null);
   const [results, setResults] = useState<{ data: string[][] } | null>(null);
+  const { readString } = usePapaParse();
 
   useEffect(() => {
     if (acceptedFile && results) {
@@ -173,9 +239,48 @@ export function CSVReaderComponent({
 
   return (
     <CSVReader
-      onUploadAccepted={(results: { data: string[][] }) => {
-        setResults(results);
-        setZoneHover(false);
+      accept=".csv,.json,.jsonl"
+      onUploadAccepted={async (results: { data: string[][] }, file: File) => {
+        if (file.name.endsWith(".jsonl") || file.name.endsWith(".json")) {
+          try {
+            const contents = await file.text();
+            let jsonContents;
+            console.log("contents", contents);
+            try {
+              jsonContents = JSON.parse(contents);
+            } catch (error) {
+              // If the file is not a valid JSON, try to parse it as a JSONL file
+              jsonContents = JSON.parse(
+                "[" +
+                  contents
+                    .trim()
+                    .split("\n")
+                    .filter((line) => line.trim() !== "")
+                    .join(", ") +
+                  "]"
+              );
+            }
+            readString(jsonToCSV(jsonContents), {
+              complete: (results) => {
+                setResults({ data: results.data as string[][] });
+              },
+            });
+          } catch (error) {
+            console.error("error", error);
+            toaster.create({
+              title: "Error",
+              description: "Failed to parse JSON file",
+              type: "error",
+              meta: {
+                closable: true,
+              },
+              placement: "top-end",
+            });
+          }
+        } else {
+          setResults(results);
+          setZoneHover(false);
+        }
       }}
       onDragOver={(event: DragEvent) => {
         event.preventDefault();
@@ -242,6 +347,8 @@ function CSVReaderBox({
       borderStyle="dashed"
       padding={10}
       textAlign="center"
+      cursor="pointer"
+      width="full"
     >
       {acceptedFile ? (
         <>
@@ -268,7 +375,7 @@ function CSVReaderBox({
           </Box>
         </>
       ) : (
-        <Text>Drop CSV file or click here to upload</Text>
+        <Text>Drop CSV or JSONL file or click here to upload</Text>
       )}
     </Box>
   );

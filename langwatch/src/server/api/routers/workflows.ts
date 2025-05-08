@@ -1,13 +1,24 @@
+import type { Prisma, PrismaClient, WorkflowVersion } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { generateText } from "ai";
+import { createPatch } from "diff";
 import { nanoid } from "nanoid";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
-import type { PrismaClient, WorkflowVersion } from "@prisma/client";
 import { type Session } from "next-auth";
-import { workflowJsonSchema, type Workflow } from "../../../optimization_studio/types/dsl";
-import type { Unpacked } from "../../../utils/types";
+import { z } from "zod";
+
+import {
+  workflowJsonSchema,
+  type Workflow,
+} from "../../../optimization_studio/types/dsl";
 import { migrateDSLVersion } from "../../../optimization_studio/types/migrate";
+import type { Unpacked } from "../../../utils/types";
+import { getVercelAIModel } from "../../modelProviders/utils";
+import {
+  clearDsl,
+  recursiveAlphabeticallySortedKeys,
+} from "../../../optimization_studio/utils/dslUtils";
+import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const workflowRouter = createTRPCRouter({
   create: protectedProcedure
@@ -52,6 +63,7 @@ export const workflowRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       return ctx.prisma.workflow.findMany({
         where: { projectId: input.projectId, archivedAt: null },
+        orderBy: { updatedAt: "desc" },
       });
     }),
 
@@ -89,7 +101,9 @@ export const workflowRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         workflowId: z.string(),
-        returnDSL: z.boolean().optional(),
+        returnDSL: z
+          .union([z.boolean(), z.literal("previousVersion")])
+          .optional(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
@@ -122,7 +136,7 @@ export const workflowRouter = createTRPCRouter({
           autoSaved: true,
           commitMessage: true,
           updatedAt: true,
-          dsl: input.returnDSL ? true : false,
+          dsl: input.returnDSL === true ? true : false,
           parent: {
             select: {
               id: true,
@@ -147,15 +161,18 @@ export const workflowRouter = createTRPCRouter({
         isCurrentVersion?: boolean;
         isLatestVersion?: boolean;
         isPublishedVersion?: boolean;
+        isPreviousVersion?: boolean;
         parent?: {
           id: string;
           version: string;
           commitMessage: string;
         };
       })[];
+      let previousVersionId: string | undefined;
       for (const version of versionsWithTags) {
         if (version.id === workflow?.currentVersionId) {
           version.isCurrentVersion = true;
+          previousVersionId = version.parent?.id;
         } else {
           delete version.parent;
         }
@@ -166,8 +183,24 @@ export const workflowRouter = createTRPCRouter({
           version.isPublishedVersion = true;
         }
       }
+      for (const version of versionsWithTags) {
+        if (version.id === previousVersionId) {
+          version.isPreviousVersion = true;
+          if (input.returnDSL === "previousVersion") {
+            version.dsl = (
+              await ctx.prisma.workflowVersion.findFirst({
+                where: { id: version.id, projectId: input.projectId },
+                select: { dsl: true },
+              })
+            )?.dsl as Prisma.JsonValue;
+          }
+        }
+      }
 
-      return versionsWithTags;
+      return versionsWithTags.map((version) => ({
+        ...version,
+        dsl: version.dsl as unknown as Workflow | undefined,
+      }));
     }),
 
   restoreVersion: protectedProcedure
@@ -318,6 +351,91 @@ export const workflowRouter = createTRPCRouter({
         },
       });
     }),
+
+  generateCommitMessage: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        prevDsl: workflowJsonSchema,
+        newDsl: workflowJsonSchema,
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .mutation(async ({ input }) => {
+      const prevDsl_ = JSON.stringify(
+        recursiveAlphabeticallySortedKeys(clearDsl(input.prevDsl)),
+        null,
+        2
+      );
+      const newDsl_ = JSON.stringify(
+        recursiveAlphabeticallySortedKeys(clearDsl(input.newDsl)),
+        null,
+        2
+      );
+      if (prevDsl_ === newDsl_) {
+        return "no changes";
+      }
+
+      const diff = createPatch(
+        "workflow.json",
+        prevDsl_,
+        newDsl_,
+        "Previous Version",
+        "New Version"
+      );
+
+      const commitMessage = await generateText({
+        model: await getVercelAIModel(input.projectId),
+        messages: [
+          {
+            role: "system",
+            content: `
+You are a diff generator for the LLM Workflow builder from LangWatch Optimization Studio.
+Generate very short, concise commit messages for the changes in the diff. From 1 to 5 words max, all lowercase.
+If changing the model, just say the short new model name, like "gpt-4o", nothing else.
+For other changes:
+- Ignore renames and position changes unless it's the only thing that changed.
+- Explain not only the keys that changed, but the content inside them, for example do not say just "updated prompt", \
+but the actual change that was made inside the fields with as few words as possible, like "avoid word <example>".
+- By the way, always refer to the prompt as "prompt", not "instructions".
+- When changing the evaluator, it's not just the name the changes, it means the workflow is actually now using a different evaluator.
+            `,
+          },
+          {
+            role: "user",
+            content: `
+Original File:
+\`\`\`json
+${prevDsl_}
+\`\`\`
+
+Diff:
+\`\`\`diff
+${diff}
+\`\`\`
+            `,
+          },
+        ],
+        tools: {
+          commitMessage: {
+            type: "function",
+            parameters: z.object({
+              message: z.string(),
+            }),
+          },
+        },
+        toolChoice: {
+          type: "tool",
+          toolName: "commitMessage",
+        },
+      });
+
+      const result = commitMessage.toolCalls[0]?.args.message;
+
+      // TODO: save call costs to user account
+
+      return result;
+    }),
 });
 
 export const saveOrCommitWorkflowVersion = async ({
@@ -363,10 +481,8 @@ export const saveOrCommitWorkflowVersion = async ({
 
   const latestVersion = workflow.latestVersion;
 
-  const [versionMajor, versionMinor] = (latestVersion?.version ?? "1.0").split(
-    "."
-  );
-  const nextVersion = `${versionMajor}.${parseInt(versionMinor ?? "0") + 1}`;
+  const [versionMajor] = (latestVersion?.version ?? "0.0").split(".");
+  const nextVersion = `${parseInt(versionMajor ?? "0") + 1}`;
 
   const dslWithoutStates = JSON.parse(
     JSON.stringify({
