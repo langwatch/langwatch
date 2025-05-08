@@ -1,5 +1,6 @@
 import { loadEnvConfig } from "@next/env";
 import { createLogger } from "./utils/logger";
+import { WorkersRestart } from "./server/background/worker";
 
 loadEnvConfig(process.cwd());
 
@@ -11,6 +12,11 @@ logger.info("starting");
 require("./server/background/worker")
   .start(undefined, 5 * 60 * 1000)
   .catch((error: Error) => {
-    logger.error({ error }, "error starting worker");
+    if (error instanceof WorkersRestart) {
+      logger.info({ error }, "worker restart");
+      process.exit(0);
+    }
+
+    logger.error({ error }, "error running worker");
     process.exit(1);
   });
