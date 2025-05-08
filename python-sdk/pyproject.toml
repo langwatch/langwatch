@@ -20,6 +20,7 @@ classifiers = [
 ]
 
 dependencies = [
+    "nanoid>=2.0.0,<3.0.0",
     "dspy-ai>=2.5.2,<3.0.0",
     "coolname>=2.2.0",
     "httpx>=0.27.0",
