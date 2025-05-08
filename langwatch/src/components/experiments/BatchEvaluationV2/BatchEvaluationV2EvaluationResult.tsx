@@ -68,7 +68,7 @@ const evaluationResultsTableRow = (
               maxHeight="120px"
               maxWidth="100%"
             />
-          ) : datasetEntry ? (
+          ) : datasetEntry?.entry?.[column] ? (
             <HoverableBigText>
               {stringify(datasetEntry.entry[column])}
             </HoverableBigText>
@@ -98,7 +98,7 @@ const evaluationResultsTableRow = (
 
             return (
               <Table.Cell key={`predicted-${node}-${column}`} maxWidth="250px">
-                {datasetEntry ? (
+                {datasetEntry?.predicted?.[node]?.[column] ? (
                   <HoverableBigText>
                     {stringify(datasetEntry.predicted?.[node]?.[column])}
                   </HoverableBigText>

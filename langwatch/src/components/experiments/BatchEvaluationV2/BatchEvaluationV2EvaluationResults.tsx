@@ -74,7 +74,10 @@ export const useBatchEvaluationResults = ({
 
   // Retrocompatibility with old evaluations
   const isItJustEndNode = !Object.values(datasetByIndex ?? {}).every(
-    (value) => typeof value === "object" && !Array.isArray(value)
+    (value) =>
+      Object.values(value?.predicted ?? {}).every(
+        (v) => typeof v === "object" && !Array.isArray(v)
+      )
   );
   let entriesPredictions = Object.values(datasetByIndex ?? {})
     .map((value) => value.predicted!)
