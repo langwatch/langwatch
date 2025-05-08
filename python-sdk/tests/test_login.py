@@ -30,7 +30,7 @@ def test_login_already_logged_in_no_relogin(capsys):
 def test_login_successful(capsys):
     with patch("langwatch.login.get_api_key", return_value=""), \
          patch("langwatch.login.set_api_key") as mock_set_api_key, \
-         patch("langwatch.login.get_endpoint", return_value="http://fake-endpoint.com") as mock_get_endpoint, \
+         patch("langwatch.login.get_endpoint", return_value="http://fake-endpoint.internal") as mock_get_endpoint, \
          patch("langwatch.login.getpass", return_value="new_valid_key") as mock_getpass, \
          patch("langwatch.login.httpx.post") as mock_post:
 
@@ -43,20 +43,20 @@ def test_login_successful(capsys):
         assert mock_get_endpoint.call_count == 2
         mock_getpass.assert_called_once_with("Paste your API key here: ")
         mock_post.assert_called_once_with(
-            "http://fake-endpoint.com/api/auth/validate",
+            "http://fake-endpoint.internal/api/auth/validate",
             headers={"X-Auth-Token": "new_valid_key"},
             json={},
         )
         mock_response.raise_for_status.assert_called_once()
         mock_set_api_key.assert_called_once_with("new_valid_key")
         captured = capsys.readouterr()
-        assert "Please go to http://fake-endpoint.com/authorize" in captured.out
+        assert "Please go to http://fake-endpoint.internal/authorize" in captured.out
         assert "LangWatch API key set" in captured.out
 
 def test_login_successful_with_relogin(capsys):
     with patch("langwatch.login.get_api_key", return_value="old_fake_key"), \
          patch("langwatch.login.set_api_key") as mock_set_api_key, \
-         patch("langwatch.login.get_endpoint", return_value="http://fake-endpoint.com") as mock_get_endpoint, \
+         patch("langwatch.login.get_endpoint", return_value="http://fake-endpoint.internal") as mock_get_endpoint, \
          patch("langwatch.login.getpass", return_value="new_valid_key_relogin") as mock_getpass, \
          patch("langwatch.login.httpx.post") as mock_post:
 
@@ -69,20 +69,20 @@ def test_login_successful_with_relogin(capsys):
         assert mock_get_endpoint.call_count == 2
         mock_getpass.assert_called_once_with("Paste your API key here: ")
         mock_post.assert_called_once_with(
-            "http://fake-endpoint.com/api/auth/validate",
+            "http://fake-endpoint.internal/api/auth/validate",
             headers={"X-Auth-Token": "new_valid_key_relogin"},
             json={},
         )
         mock_response.raise_for_status.assert_called_once()
         mock_set_api_key.assert_called_once_with("new_valid_key_relogin")
         captured = capsys.readouterr()
-        assert "Please go to http://fake-endpoint.com/authorize" in captured.out
+        assert "Please go to http://fake-endpoint.internal/authorize" in captured.out
         assert "LangWatch API key set" in captured.out
 
 
 def test_login_empty_api_key_entered(capsys):
     with patch("langwatch.login.get_api_key", return_value=""), \
-         patch("langwatch.login.get_endpoint", return_value="http://fake-endpoint.com") as mock_get_endpoint, \
+         patch("langwatch.login.get_endpoint", return_value="http://fake-endpoint.internal") as mock_get_endpoint, \
          patch("langwatch.login.getpass", return_value="") as mock_getpass, \
          patch("langwatch.login.httpx.post") as mock_post:
 
@@ -94,13 +94,13 @@ def test_login_empty_api_key_entered(capsys):
         mock_getpass.assert_called_once_with("Paste your API key here: ")
         mock_post.assert_not_called()
         captured = capsys.readouterr()
-        assert "Please go to http://fake-endpoint.com/authorize" in captured.out
+        assert "Please go to http://fake-endpoint.internal/authorize" in captured.out
 
 
 def test_login_invalid_api_key(capsys):
     with patch("langwatch.login.get_api_key", return_value=""), \
          patch("langwatch.login.set_api_key") as mock_set_api_key, \
-         patch("langwatch.login.get_endpoint", return_value="http://fake-endpoint.com") as mock_get_endpoint, \
+         patch("langwatch.login.get_endpoint", return_value="http://fake-endpoint.internal") as mock_get_endpoint, \
          patch("langwatch.login.getpass", return_value="invalid_key") as mock_getpass, \
          patch("langwatch.login.httpx.post") as mock_post:
 
@@ -115,19 +115,19 @@ def test_login_invalid_api_key(capsys):
         assert mock_get_endpoint.call_count == 2
         mock_getpass.assert_called_once_with("Paste your API key here: ")
         mock_post.assert_called_once_with(
-            "http://fake-endpoint.com/api/auth/validate",
+            "http://fake-endpoint.internal/api/auth/validate",
             headers={"X-Auth-Token": "invalid_key"},
             json={},
         )
         mock_response.raise_for_status.assert_not_called() # raise_for_status is not called directly on 401
         mock_set_api_key.assert_not_called()
         captured = capsys.readouterr()
-        assert "Please go to http://fake-endpoint.com/authorize" in captured.out
+        assert "Please go to http://fake-endpoint.internal/authorize" in captured.out
 
 def test_login_api_call_fails_non_401(capsys):
     with patch("langwatch.login.get_api_key", return_value=""), \
          patch("langwatch.login.set_api_key") as mock_set_api_key, \
-         patch("langwatch.login.get_endpoint", return_value="http://fake-endpoint.com") as mock_get_endpoint, \
+         patch("langwatch.login.get_endpoint", return_value="http://fake-endpoint.internal") as mock_get_endpoint, \
          patch("langwatch.login.getpass", return_value="some_key") as mock_getpass, \
          patch("langwatch.login.httpx.post") as mock_post:
 
@@ -144,11 +144,11 @@ def test_login_api_call_fails_non_401(capsys):
         assert mock_get_endpoint.call_count == 2
         mock_getpass.assert_called_once_with("Paste your API key here: ")
         mock_post.assert_called_once_with(
-            "http://fake-endpoint.com/api/auth/validate",
+            "http://fake-endpoint.internal/api/auth/validate",
             headers={"X-Auth-Token": "some_key"},
             json={},
         )
         mock_response.raise_for_status.assert_called_once()
         mock_set_api_key.assert_not_called()
         captured = capsys.readouterr()
-        assert "Please go to http://fake-endpoint.com/authorize" in captured.out 
+        assert "Please go to http://fake-endpoint.internal/authorize" in captured.out 
