@@ -180,6 +180,10 @@ export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
       subtopic_id: { type: "keyword" },
       sdk_version: { type: "keyword" },
       sdk_language: { type: "keyword" },
+      sdk_name: { type: "keyword" },
+      telemetry_sdk_version: { type: "keyword" },
+      telemetry_sdk_language: { type: "keyword" },
+      telemetry_sdk_name: { type: "keyword" },
 
       custom: { type: FLATENNED_TYPE } as any,
       all_keys: { type: "keyword" },
