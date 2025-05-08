@@ -264,9 +264,17 @@ export type ReservedTraceMetadata = {
   labels?: string[] | null;
   topic_id?: string | null;
   subtopic_id?: string | null;
+  sdk_name?: string | null;
   sdk_version?: string | null;
   sdk_language?: string | null;
+  telemetry_sdk_language?: string | null;
+  telemetry_sdk_name?: string | null;
+  telemetry_sdk_version?: string | null;
 };
+
+export interface ReservedTraceMetadataMapping {
+  [key: string]: keyof ReservedTraceMetadata;
+}
 
 export type CustomMetadata = Record<
   string,
