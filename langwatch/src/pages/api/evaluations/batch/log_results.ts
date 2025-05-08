@@ -1,6 +1,6 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 
-import { getDebugger } from "../../../../utils/logger";
+import { createLogger } from "../../../../utils/logger";
 import { prisma } from "../../../../server/db";
 import type {
   ESBatchEvaluation,
@@ -23,7 +23,7 @@ import {
 import { getPayloadSizeHistogram } from "../../../../server/metrics";
 import { safeTruncate } from "../../../../utils/truncate";
 
-export const debug = getDebugger("langwatch:evaluations:batch:log_results");
+const logger = createLogger("langwatch:evaluations:batch:log_results");
 
 export const config = {
   api: {
@@ -80,12 +80,7 @@ export default async function handler(
   try {
     params = eSBatchEvaluationRESTParamsSchema.parse(req.body);
   } catch (error) {
-    debug(
-      "Invalid log_results data received",
-      error,
-      JSON.stringify(req.body, null, "  "),
-      { projectId: project.id }
-    );
+    logger.error({ error, body: req.body, projectId: project.id }, 'invalid log_results data received');
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
     Sentry.captureException(error, { extra: { projectId: project.id } });
 
@@ -93,16 +88,21 @@ export default async function handler(
     return res.status(400).json({ error: validationError.message });
   }
 
+  if (!params.experiment_id && !params.experiment_slug) {
+    return res.status(400).json({
+      error: "Either experiment_id or experiment_slug is required",
+    });
+  }
+
   if (
     params.timestamps?.created_at &&
     params.timestamps.created_at.toString().length === 10
   ) {
-    debug(
-      "Timestamps not in milliseconds for batch evaluation run",
-      params.run_id,
-      "on experiment",
-      params.experiment_slug
-    );
+    logger.error({
+      runId: params.run_id,
+      experimentSlug: params.experiment_slug,
+      experimentId: params.experiment_id,
+    }, 'timestamps not in milliseconds for batch evaluation run');
     return res.status(400).json({
       error:
         "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
@@ -113,11 +113,7 @@ export default async function handler(
     await processBatchEvaluation(project, params);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      debug(
-        "Failed to validate data for batch evaluation",
-        error,
-        JSON.stringify(params, null, "  ")
-      );
+      logger.error({ error, body: params, projectId: project.id }, 'failed to validate data for batch evaluation');
       Sentry.captureException(error, {
         extra: { projectId: project.id, param: params },
       });
@@ -125,11 +121,7 @@ export default async function handler(
       const validationError = fromZodError(error);
       return res.status(400).json({ error: validationError.message });
     } else {
-      debug(
-        "Internal server error processing batch evaluation",
-        error,
-        JSON.stringify(params, null, "  ")
-      );
+      logger.error({ error, body: params, projectId: project.id }, 'internal server error processing batch evaluation');
       Sentry.captureException(error, {
         extra: { projectId: project.id, param: params },
       });
@@ -145,15 +137,16 @@ const processBatchEvaluation = async (
   project: Project,
   param: ESBatchEvaluationRESTParams
 ) => {
-  const { run_id, experiment_slug } = param;
+  const { run_id, experiment_id, experiment_slug } = param;
 
-  const experiment = await findOrCreateExperiment(
+  const experiment = await findOrCreateExperiment({
     project,
+    experiment_id,
     experiment_slug,
-    ExperimentType.BATCH_EVALUATION_V2,
-    param.name ?? undefined,
-    param.workflow_id ?? undefined
-  );
+    experiment_type: ExperimentType.BATCH_EVALUATION_V2,
+    experiment_name: param.name ?? undefined,
+    workflowId: param.workflow_id ?? undefined,
+  });
 
   const id = batchEvaluationId({
     projectId: project.id,
@@ -254,7 +247,8 @@ const processBatchEvaluation = async (
     },
   };
 
-  await esClient.update({
+  const client = await esClient({ projectId: project.id });
+  await client.update({
     index: BATCH_EVALUATION_INDEX.alias,
     id,
     body: {

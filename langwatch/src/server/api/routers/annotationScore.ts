@@ -5,9 +5,10 @@ import { nanoid } from "nanoid";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 
 export const annotationScoreRouter = createTRPCRouter({
-  create: protectedProcedure
+  upsert: protectedProcedure
     .input(
       z.object({
+        annotationScoreId: z.string().optional().nullable(),
         projectId: z.string(),
         name: z.string(),
         dataType: z.enum([
@@ -35,18 +36,30 @@ export const annotationScoreRouter = createTRPCRouter({
         options.push({ label: option, value: option });
       });
 
-      return ctx.prisma.annotationScore.create({
-        data: {
-          id: nanoid(),
-          projectId: input.projectId,
-          name: input.name,
-          dataType: input.dataType,
-          description: input.description ?? "",
-          options: options ?? {},
-          defaultValue: {
-            value: input.defaultRadioOption ?? null,
-            options: input.defaultCheckboxOption ?? null,
-          },
+      const data = {
+        projectId: input.projectId,
+        name: input.name,
+        dataType: input.dataType,
+        description: input.description ?? "",
+        options: options ?? {},
+        defaultValue: {
+          value: input.defaultRadioOption ?? null,
+          options: input.defaultCheckboxOption ?? null,
+        },
+        deletedAt: null,
+      };
+
+      const scoreId = input.annotationScoreId || nanoid();
+
+      return ctx.prisma.annotationScore.upsert({
+        where: { 
+          id: scoreId,
+          projectId: input.projectId 
+        },
+        update: data,
+        create: {
+          id: scoreId,
+          ...data,
         },
       });
     }),
@@ -55,7 +68,10 @@ export const annotationScoreRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.findMany({
-        where: { projectId: input.projectId },
+        where: {
+          projectId: input.projectId,
+          deletedAt: null,
+        },
         orderBy: { createdAt: "desc" },
       });
     }),
@@ -64,7 +80,24 @@ export const annotationScoreRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.findMany({
-        where: { projectId: input.projectId, active: true },
+        where: { projectId: input.projectId, active: true, deletedAt: null },
+      });
+    }),
+  getById: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        scoreId: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.annotationScore.findFirstOrThrow({
+        where: { 
+          id: input.scoreId,
+          projectId: input.projectId,
+          deletedAt: null,
+        },
       });
     }),
   toggle: protectedProcedure
@@ -80,6 +113,20 @@ export const annotationScoreRouter = createTRPCRouter({
       return ctx.prisma.annotationScore.update({
         where: { id: input.scoreId, projectId: input.projectId },
         data: { active: input.active },
+      });
+    }),
+  delete: protectedProcedure
+    .input(
+      z.object({
+        scoreId: z.string(),
+        projectId: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.annotationScore.update({
+        where: { id: input.scoreId, projectId: input.projectId },
+        data: { deletedAt: new Date() },
       });
     }),
 });

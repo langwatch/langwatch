@@ -48,26 +48,28 @@ model Session {
 }
 
 model User {
-    id                 String                   @id @default(nanoid())
-    name               String?
-    email              String?                  @unique
-    emailVerified      DateTime?
-    password           String? // for email/password auth without auth0
-    image              String?                  @db.Text
-    accounts           Account[]
-    sessions           Session[]
-    teamMemberships    TeamUser[]
-    orgMemberships     OrganizationUser[]
-    createdAt          DateTime                 @default(now())
-    updatedAt          DateTime                 @default(now()) @updatedAt
-    lastLoginAt        DateTime?
-    Annotation         Annotation[]
-    publicShares       PublicShare[]
-    Workflow           Workflow[]
-    WorkflowVersion    WorkflowVersion[]
-    annotationQueues   AnnotationQueueMembers[]
-    assignedQueueItems AnnotationQueueItem[]    @relation("AssignedTo")
-    createdQueueItems  AnnotationQueueItem[]    @relation("CreatedBy")
+    id                      String                   @id @default(nanoid())
+    name                    String?
+    email                   String?                  @unique
+    emailVerified           DateTime?
+    password                String? // for email/password auth without auth0
+    image                   String?                  @db.Text
+    pendingSsoSetup         Boolean                  @default(false)
+    accounts                Account[]
+    sessions                Session[]
+    teamMemberships         TeamUser[]
+    orgMemberships          OrganizationUser[]
+    createdAt               DateTime                 @default(now())
+    updatedAt               DateTime                 @default(now()) @updatedAt
+    lastLoginAt             DateTime?
+    Annotation              Annotation[]
+    publicShares            PublicShare[]
+    Workflow                Workflow[]
+    WorkflowVersion         WorkflowVersion[]
+    annotationQueues        AnnotationQueueMembers[]
+    assignedQueueItems      AnnotationQueueItem[]    @relation("AssignedTo")
+    createdQueueItems       AnnotationQueueItem[]    @relation("CreatedBy")
+    llmPromptConfigVersions LlmPromptConfigVersion[]
 }
 
 model VerificationToken {
@@ -133,18 +135,27 @@ model Team {
 }
 
 model Organization {
-    id                    String               @id @default(nanoid())
-    name                  String
-    phoneNumber           String?
-    slug                  String               @unique
-    members               OrganizationUser[]
-    teams                 Team[]
-    createdAt             DateTime             @default(now())
-    updatedAt             DateTime             @default(now()) @updatedAt
-    OrganizationInvite    OrganizationInvite[]
-    usageSpendingMaxLimit Int?
-    signupData            Json?
-    signedDPA             Boolean              @default(false)
+    id                     String               @id @default(nanoid())
+    name                   String
+    phoneNumber            String?
+    slug                   String               @unique
+    members                OrganizationUser[]
+    teams                  Team[]
+    createdAt              DateTime             @default(now())
+    updatedAt              DateTime             @default(now()) @updatedAt
+    OrganizationInvite     OrganizationInvite[]
+    usageSpendingMaxLimit  Int?
+    signupData             Json?
+    signedDPA              Boolean              @default(false)
+    elasticsearchNodeUrl   String?
+    elasticsearchApiKey    String?
+    useCustomElasticsearch Boolean              @default(false)
+    s3Endpoint             String?
+    s3AccessKeyId          String?
+    s3SecretAccessKey      String?
+    s3Bucket               String?
+    useCustomS3            Boolean              @default(false)
+    sentPlanLimitAlert     DateTime?
 
     promoCode String?
     features  OrganizationFeature[]
@@ -156,41 +167,55 @@ enum PIIRedactionLevel {
     DISABLED
 }
 
+enum ProjectSensitiveDataVisibilityLevel {
+    REDACTED_TO_ALL
+    VISIBLE_TO_ADMIN
+    VISIBLE_TO_ALL
+}
+
 model Project {
-    id                   String                @id @default(nanoid())
-    name                 String
-    slug                 String                @unique
-    apiKey               String                @unique
-    teamId               String
-    team                 Team                  @relation(fields: [teamId], references: [id])
-    language             String
-    framework            String
-    firstMessage         Boolean               @default(false)
-    integrated           Boolean               @default(false)
-    createdAt            DateTime              @default(now())
-    updatedAt            DateTime              @default(now()) @updatedAt
-    userLinkTemplate     String?
-    checks               Check[]
-    costs                Cost[]
-    topics               Topic[]
-    datasets             Dataset[]
-    datasetRecords       DatasetRecord[]
-    customGraphs         CustomGraph[]
-    batchEvaluations     BatchEvaluation[]
-    piiRedactionLevel    PIIRedactionLevel     @default(ESSENTIAL)
-    triggers             Trigger[]
-    experiments          Experiment[]
-    annotations          Annotation[]
-    modelProviders       ModelProvider[]
-    topicClusteringModel String?
-    embeddingsModel      String?
-    TriggerSent          TriggerSent[]
-    annotationScores     AnnotationScore[]
-    publicShares         PublicShare[]
-    workflows            Workflow[]
-    WorkflowVersion      WorkflowVersion[]
-    AnnotationQueue      AnnotationQueue[]
-    AnnotationQueueItem  AnnotationQueueItem[]
+    id                       String                              @id @default(nanoid())
+    name                     String
+    slug                     String                              @unique
+    apiKey                   String                              @unique
+    teamId                   String
+    team                     Team                                @relation(fields: [teamId], references: [id])
+    language                 String
+    framework                String
+    firstMessage             Boolean                             @default(false)
+    integrated               Boolean                             @default(false)
+    createdAt                DateTime                            @default(now())
+    updatedAt                DateTime                            @default(now()) @updatedAt
+    userLinkTemplate         String?
+    checks                   Monitor[]
+    costs                    Cost[]
+    topics                   Topic[]
+    datasets                 Dataset[]
+    datasetRecords           DatasetRecord[]
+    customGraphs             CustomGraph[]
+    batchEvaluations         BatchEvaluation[]
+    piiRedactionLevel        PIIRedactionLevel                   @default(ESSENTIAL)
+    capturedInputVisibility  ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
+    capturedOutputVisibility ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
+    triggers                 Trigger[]
+    experiments              Experiment[]
+    annotations              Annotation[]
+    modelProviders           ModelProvider[]
+    defaultModel             String?
+    topicClusteringModel     String?
+    embeddingsModel          String?
+    TriggerSent              TriggerSent[]
+    annotationScores         AnnotationScore[]
+    publicShares             PublicShare[]
+    workflows                Workflow[]
+    WorkflowVersion          WorkflowVersion[]
+    AnnotationQueue          AnnotationQueue[]
+    AnnotationQueueItem      AnnotationQueueItem[]
+    s3Endpoint               String?
+    s3AccessKeyId            String?
+    s3SecretAccessKey        String?
+    s3Bucket                 String?
+    llmPromptConfigs         LlmPromptConfig[]
 
     @@index([teamId])
 }
@@ -222,10 +247,12 @@ enum EvaluationExecutionMode {
     MANUALLY
 }
 
-model Check {
+model Monitor {
     id            String                  @id @default(nanoid())
     projectId     String
     project       Project                 @relation(fields: [projectId], references: [id])
+    experimentId  String?                 @unique
+    experiment    Experiment?             @relation(fields: [experimentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
     checkType     String
     name          String
     slug          String
@@ -309,6 +336,8 @@ model Dataset {
     datasetRecords   DatasetRecord[]
     batchEvaluations BatchEvaluation[]
     mapping          Json?
+    useS3            Boolean           @default(false)
+    s3RecordCount    Int?
 
     @@unique([projectId, slug])
 }
@@ -418,6 +447,8 @@ model Experiment {
     createdAt        DateTime          @default(now())
     updatedAt        DateTime          @default(now()) @updatedAt
     batchEvaluations BatchEvaluation[]
+    wizardState      Json?
+    monitor          Monitor?
 
     @@unique([projectId, slug])
     @@index([projectId])
@@ -490,6 +521,7 @@ model AnnotationScore {
     project               Project                  @relation(fields: [projectId], references: [id])
     createdAt             DateTime                 @default(now())
     updatedAt             DateTime                 @default(now()) @updatedAt
+    deletedAt             DateTime?
     description           String?
     active                Boolean                  @default(true)
     dataType              AnnotationScoreDataType?
@@ -684,4 +716,43 @@ model AuditLog {
     @@index([organizationId])
     @@index([action])
     @@index([ipAddress])
+}
+
+model LlmPromptConfig {
+    id        String    @id @default(nanoid())
+    name      String
+    projectId String
+    project   Project   @relation(fields: [projectId], references: [id])
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @default(now()) @updatedAt
+    deletedAt DateTime?
+
+    // Relation to all versions - latest is determined by query
+    versions LlmPromptConfigVersion[] @relation("Versions")
+
+    @@index([projectId])
+}
+
+model LlmPromptConfigVersion {
+    id            String          @id @default(nanoid())
+    version       Int // The version number of the config
+    commitMessage String? // Optional: Describe changes in this version
+    authorId      String? // Optional: User who created this version
+    author        User?           @relation(fields: [authorId], references: [id])
+    configId      String // Foreign key to the parent LlmPromptConfig
+    config        LlmPromptConfig @relation("Versions", fields: [configId], references: [id], onDelete: Cascade) // Cascade delete versions if parent is deleted
+
+    // Version specific data
+    configData    Json   @map("config") // The actual config JSON for this version
+    schemaVersion String // Schema version for this specific configData
+
+    createdAt DateTime @default(now()) // Used to determine the latest version
+
+    // Required for multi-tenancy
+    projectId String
+
+    @@unique([configId, version]) // Each version number must be unique per config
+    @@index([configId])
+    @@index([authorId])
+    @@index([createdAt]) // Index important for finding the latest efficiently
 }

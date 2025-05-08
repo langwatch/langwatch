@@ -9,6 +9,7 @@ import {
   Text,
   useDisclosure,
   VStack,
+  type StackProps,
 } from "@chakra-ui/react";
 import { Field } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
@@ -24,10 +25,12 @@ import {
 } from "react-feather";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 
+import { RenderCode } from "../../../components/code/RenderCode";
 import { HoverableBigText } from "../../../components/HoverableBigText";
+import { Tooltip } from "../../../components/ui/tooltip";
 import { camelCaseToTitleCase } from "../../../utils/stringCasing";
+import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type {
   Component,
   ComponentType,
@@ -36,6 +39,7 @@ import type {
   Workflow,
 } from "../../types/dsl";
 import { nameToId } from "../../utils/nodeUtils";
+import { CodeEditorModal } from "../code/CodeEditorModal";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import {
   ComponentExecutionButton,
@@ -45,10 +49,7 @@ import {
   TypeLabel,
 } from "../nodes/Nodes";
 
-import { LLMConfigField } from "./modals/LLMConfigModal";
-import { RenderCode } from "../../../components/code/RenderCode";
-import { CodeEditorModal } from "../code/CodeEditorModal";
-import { Tooltip } from "../../../components/ui/tooltip";
+import { OptimizationStudioLLMConfigField } from "./llm-configs/OptimizationStudioLLMConfigField";
 
 export function PropertyField({
   title,
@@ -76,11 +77,13 @@ export function FieldsDefinition({
   title,
   field,
   readOnly = false,
+  onChange,
 }: {
   node: Node<Component>;
   title: string;
   field: "parameters" | "inputs" | "outputs";
   readOnly?: boolean;
+  onChange?: (data: FieldArrayForm) => void;
 }) {
   const { setNode } = useWorkflowStore(
     useShallow((state) => ({
@@ -111,6 +114,13 @@ export function FieldsDefinition({
       data: { [field]: data.fields },
     });
     updateNodeInternals(node.id);
+    onChange?.(data);
+  };
+
+  const handleOnChange = async (data: FieldArrayForm) => {
+    onChange?.(data);
+    // We are pretending to submit on every change
+    onSubmit(data);
   };
 
   useEffect(() => {
@@ -134,7 +144,7 @@ export function FieldsDefinition({
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onSubmit={handleSubmit(onSubmit)}
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
-      onChange={handleSubmit(onSubmit)}
+      onChange={handleSubmit(handleOnChange)}
     >
       <HStack width="full">
         <PropertySectionTitle>{title}</PropertySectionTitle>
@@ -279,15 +289,15 @@ export function FieldsForm({
   node: Node<Component>;
   field: "parameters" | "inputs" | "outputs";
 }) {
-  const { default_llm, setNode, parameters, setNodeParameter } =
-    useWorkflowStore(
-      useShallow((state) => ({
-        parameters: state.nodes.find((n) => n.id === node.id)?.data.parameters,
-        setNode: state.setNode,
-        default_llm: state.default_llm,
-        setNodeParameter: state.setNodeParameter,
-      }))
-    );
+  const parameters = node.data.parameters;
+  const { default_llm, setNode, setNodeParameter } = useWorkflowStore(
+    useShallow((state) => ({
+      parameters: state.nodes.find((n) => n.id === node.id)?.data.parameters,
+      setNode: state.setNode,
+      default_llm: state.default_llm,
+      setNodeParameter: state.setNodeParameter,
+    }))
+  );
 
   const {
     control,
@@ -327,7 +337,7 @@ export function FieldsForm({
       {fields.map((field, index) => {
         if (field.type === "llm") {
           return (
-            <LLMConfigField
+            <OptimizationStudioLLMConfigField
               key={field.id}
               allowDefault={true}
               defaultLLMConfig={default_llm}
@@ -388,7 +398,7 @@ export function FieldsForm({
                 </HStack>
               </Center>
               <RenderCode
-                code={stateField?.value as string}
+                code={(stateField?.value ?? "") as string}
                 language="python"
                 style={{
                   width: "100%",
@@ -467,12 +477,13 @@ export function FieldsForm({
 export function PropertySectionTitle({
   children,
   tooltip,
+  ...props
 }: {
   children: React.ReactNode;
   tooltip?: React.ReactNode;
-}) {
+} & StackProps) {
   return (
-    <HStack paddingLeft={2}>
+    <HStack paddingLeft={2} {...props}>
       <NodeSectionTitle fontSize="12px">{children}</NodeSectionTitle>
       {tooltip && (
         <Tooltip content={tooltip}>
@@ -497,6 +508,9 @@ export function BasePropertiesPanel({
   inputsReadOnly,
   outputsTitle,
   outputsReadOnly,
+  hideDescription,
+  hideHeader,
+  ...props
 }: {
   node: Node<Component> | Workflow;
   header?: React.ReactNode;
@@ -509,7 +523,10 @@ export function BasePropertiesPanel({
   inputsReadOnly?: boolean;
   outputsTitle?: string;
   outputsReadOnly?: boolean;
-}) {
+  hideDescription?: boolean;
+  hideHeader?: boolean;
+  maxWidth?: string;
+} & StackProps) {
   const {
     deselectAllNodes,
     propertiesExpanded,
@@ -545,132 +562,136 @@ export function BasePropertiesPanel({
       minWidth="350px"
       height="full"
       overflowY="auto"
+      {...props}
     >
-      <VStack gap={2} width="full" align="start">
-        <HStack
-          paddingY={1}
-          paddingLeft={2}
-          width="full"
-          justify="space-between"
-          gap={0}
-          alignItems="flex-start"
-        >
-          <HStack gap={2}>
-            {header ? (
-              header
-            ) : !isWorkflow(node) ? (
-              <>
-                <ComponentIcon
-                  type={node.type as ComponentType}
-                  cls={node.data.cls}
-                  size="lg"
-                />
-                {isEditingName ? (
-                  <Input
-                    fontSize="15px"
-                    marginLeft={1}
-                    fontWeight={500}
-                    variant="outline"
-                    background="transparent"
-                    value={name ?? getNodeDisplayName(node)}
-                    borderRadius={5}
-                    paddingLeft={1}
-                    margin={0}
-                    size="sm"
-                    onBlur={() => {
-                      setIsEditingName(false);
-                      if (name) {
-                        handleNameChange(name, node.id);
-                      }
-                    }}
-                    onChange={(e) => {
-                      setName(e.target.value);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+      {!hideHeader && (
+        <VStack gap={2} width="full" align="start">
+          <HStack
+            paddingY={1}
+            paddingLeft={2}
+            width="full"
+            justify="space-between"
+            gap={0}
+            alignItems="flex-start"
+          >
+            <HStack gap={2}>
+              {header ? (
+                header
+              ) : !isWorkflow(node) ? (
+                <>
+                  <ComponentIcon
+                    type={node.type as ComponentType}
+                    cls={node.data.cls}
+                    size="lg"
+                  />
+                  {isEditingName ? (
+                    <Input
+                      fontSize="15px"
+                      marginLeft={1}
+                      fontWeight={500}
+                      variant="outline"
+                      background="transparent"
+                      value={name ?? getNodeDisplayName(node)}
+                      borderRadius={5}
+                      paddingLeft={1}
+                      margin={0}
+                      size="sm"
+                      onBlur={() => {
                         setIsEditingName(false);
                         if (name) {
                           handleNameChange(name, node.id);
                         }
+                      }}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          setIsEditingName(false);
+                          if (name) {
+                            handleNameChange(name, node.id);
+                          }
+                        }
+                      }}
+                    />
+                  ) : (
+                    <HoverableBigText
+                      lineClamp={2}
+                      fontSize="15px"
+                      fontWeight={500}
+                      onClick={() => {
+                        if (node.type !== "prompting_technique") {
+                          setIsEditingName(true);
+                        }
+                      }}
+                      cursor={
+                        node.type === "prompting_technique"
+                          ? undefined
+                          : "pointer"
                       }
-                    }}
-                  />
-                ) : (
-                  <HoverableBigText
-                    lineClamp={2}
-                    fontSize="15px"
-                    fontWeight={500}
+                      overflow="hidden"
+                      textOverflow="ellipsis"
+                      expandable={false}
+                    >
+                      {getNodeDisplayName(node)}
+                    </HoverableBigText>
+                  )}
+                </>
+              ) : null}
+            </HStack>
+            <HStack gap={0} marginRight="-4px" hidden={isEditingName}>
+              {!isWorkflow(node) && isExecutableComponent(node) && (
+                <>
+                  <HStack
+                    gap={2}
                     onClick={() => {
-                      if (node.type !== "prompting_technique") {
-                        setIsEditingName(true);
+                      if (!propertiesExpanded) {
+                        setPropertiesExpanded(true);
                       }
                     }}
-                    cursor={
-                      node.type === "prompting_technique"
-                        ? undefined
-                        : "pointer"
-                    }
-                    overflow="hidden"
-                    textOverflow="ellipsis"
                   >
-                    {getNodeDisplayName(node)}
-                  </HoverableBigText>
-                )}
-              </>
-            ) : null}
-          </HStack>
-          <HStack gap={0} marginRight="-4px" hidden={isEditingName}>
-            {!isWorkflow(node) && isExecutableComponent(node) && (
-              <>
-                <HStack
-                  gap={2}
-                  onClick={() => {
-                    if (!propertiesExpanded) {
-                      setPropertiesExpanded(true);
-                    }
-                  }}
-                >
-                  <ComponentExecutionButton
-                    node={node}
-                    size="sm"
-                    iconSize={16}
-                  />
-                </HStack>
+                    <ComponentExecutionButton
+                      node={node}
+                      size="sm"
+                      iconSize={16}
+                    />
+                  </HStack>
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  color="gray.500"
-                  onClick={() => {
-                    setPropertiesExpanded(!propertiesExpanded);
-                  }}
-                >
-                  <Columns size={16} />
-                </Button>
-              </>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              color="gray.500"
-              onClick={() => {
-                if (propertiesExpanded) {
-                  setPropertiesExpanded(false);
-                } else {
-                  deselectAllNodes();
-                }
-              }}
-            >
-              <X size={16} />
-            </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    color="gray.500"
+                    onClick={() => {
+                      setPropertiesExpanded(!propertiesExpanded);
+                    }}
+                  >
+                    <Columns size={16} />
+                  </Button>
+                </>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                color="gray.500"
+                onClick={() => {
+                  if (propertiesExpanded) {
+                    setPropertiesExpanded(false);
+                  } else {
+                    deselectAllNodes();
+                  }
+                }}
+              >
+                <X size={16} />
+              </Button>
+            </HStack>
           </HStack>
-        </HStack>
-        {node.data?.description && (
-          <Text fontSize="12px" color="gray.500" paddingX={2}>
-            {node.data?.description}
-          </Text>
-        )}
-      </VStack>
+          {!hideDescription && node.data?.description && (
+            <Text fontSize="12px" color="gray.500" paddingX={2}>
+              {node.data?.description}
+            </Text>
+          )}
+        </VStack>
+      )}
       {children}
       {!isWorkflow(node) && (
         <>

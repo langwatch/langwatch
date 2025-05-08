@@ -140,7 +140,7 @@ export function TraceDetails(props: {
     queueItem.mutate(
       {
         projectId: project?.id ?? "",
-        traceId: props.traceId,
+        traceIds: [props.traceId],
         annotators: annotators.map((p) => p.id),
       },
       {
@@ -300,6 +300,12 @@ export function TraceDetails(props: {
             {anyGuardrails && (
               <Tabs.Trigger value="guardrails">
                 Guardrails
+                <EvaluationsCount
+                  project={project}
+                  traceId={props.traceId}
+                  evaluations={evaluations.data}
+                  countGuardrails
+                />
                 <Blocked
                   project={project}
                   traceId={props.traceId}

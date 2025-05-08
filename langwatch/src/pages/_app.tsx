@@ -84,14 +84,27 @@ export const system = createSystem(defaultConfig, {
         orange: {
           solid: { value: "#ED8926" },
           focusRing: { value: "rgb(49, 130, 206)" },
+          subtle: { value: "{colors.orange.50}" },
           fg: { value: "{colors.orange.800}" },
         },
         green: {
           solid: { value: "{colors.green.500}" },
+          subtle: { value: "{colors.green.50}" },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         blue: {
           solid: { value: "{colors.blue.500}" },
+          subtle: { value: "{colors.blue.50}" },
+          focusRing: { value: "rgb(49, 130, 206)" },
+        },
+        yellow: {
+          solid: { value: "{colors.yellow.500}" },
+          subtle: { value: "{colors.yellow.50}" },
+          focusRing: { value: "rgb(49, 130, 206)" },
+        },
+        red: {
+          solid: { value: "{colors.red.500}" },
+          subtle: { value: "{colors.red.50}" },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
       },

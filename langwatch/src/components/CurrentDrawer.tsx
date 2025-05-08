@@ -2,7 +2,7 @@ import { useRouter } from "next/router";
 import qs from "qs";
 import { ErrorBoundary } from "react-error-boundary";
 import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
-import { AddAnnotationScoreDrawer } from "./AddAnnotationScoreDrawer";
+import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { TriggerDrawer } from "./AddTriggerDrawer";
@@ -20,7 +20,7 @@ const drawers = {
   traceDetails: TraceDetailsDrawer,
   batchEvaluation: BatchEvaluationDrawer,
   trigger: TriggerDrawer,
-  addAnnotationScore: AddAnnotationScoreDrawer,
+  addOrEditAnnotationScore: AddOrEditAnnotationScoreDrawer,
   addAnnotationQueue: AddAnnotationQueueDrawer,
   addDatasetRecord: AddDatasetRecordDrawerV2,
   llmModelCost: LLMModelCostDrawer,

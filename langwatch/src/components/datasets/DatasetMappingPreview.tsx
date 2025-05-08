@@ -1,4 +1,12 @@
-import { Box, Button, Field, HStack, Spacer, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Center,
+  Field,
+  HStack,
+  Spacer,
+  VStack,
+} from "@chakra-ui/react";
 import { Edit2 } from "react-feather";
 import type {
   DatasetColumns,
@@ -12,9 +20,13 @@ import {
 
 import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import type { Dataset } from "@prisma/client";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Checkbox } from "../../components/ui/checkbox";
-import { TracesMapping, type MappingState } from "./DatasetMapping";
+import { api } from "../../utils/api";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { MappingState } from "../../server/tracer/tracesMapping";
+import { TracesMapping } from "../traces/TracesMapping";
+import { ErrorBoundary } from "react-error-boundary";
 
 interface DatasetMappingPreviewProps {
   traces: any[]; // Replace 'any' with your trace type
@@ -81,6 +93,31 @@ export function DatasetMappingPreview({
     return headers;
   }, [selectedDataset]);
 
+  const { project } = useOrganizationTeamProject();
+
+  const trpc = api.useContext();
+  const updateStoredMapping_ = api.dataset.updateMapping.useMutation();
+  const updateStoredMapping = useCallback(
+    (mappingState: MappingState) => {
+      updateStoredMapping_.mutate(
+        {
+          projectId: project?.id ?? "",
+          datasetId: selectedDataset.id,
+          mapping: {
+            mapping: mappingState.mapping,
+            expansions: Array.from(mappingState.expansions),
+          },
+        },
+        {
+          onSuccess: () => {
+            void trpc.dataset.getAll.invalidate();
+          },
+        }
+      );
+    },
+    [selectedDataset.id, project?.id, trpc.dataset.getAll, updateStoredMapping_]
+  );
+
   return (
     <Field.Root width="full" paddingY={4}>
       <HStack width="full" gap="64px" align="start">
@@ -91,11 +128,14 @@ export function DatasetMappingPreview({
           </Field.HelperText>
 
           <TracesMapping
-            dataset={selectedDataset}
+            traceMapping={selectedDataset.mapping as MappingState | undefined}
             traces={traces}
-            columnTypes={columnTypes}
+            targetFields={columnTypes.map(({ name }) => name)}
             setDatasetEntries={onRowDataChange}
-            setDatasetTriggerMapping={setDatasetTriggerMapping}
+            setTraceMapping={(newMappingState) => {
+              setDatasetTriggerMapping?.(newMappingState);
+              updateStoredMapping(newMappingState);
+            }}
           />
         </VStack>
         <VStack align="start" width="full" height="full">
@@ -119,15 +159,27 @@ export function DatasetMappingPreview({
             </Button>
           </HStack>
           <Box width="full" display="block" paddingTop={2}>
-            <DatasetGrid
-              columnDefs={columnDefs}
-              rowData={rowData}
-              onCellValueChanged={({ data }: { data: DatasetRecordEntry }) => {
-                onRowDataChange(
-                  rowData.map((row) => (row.id === data.id ? data : row))
-                );
-              }}
-            />
+            <ErrorBoundary
+              fallback={
+                <Center width="full" height="full">
+                  Error rendering the dataset, please refresh the page
+                </Center>
+              }
+            >
+              <DatasetGrid
+                columnDefs={columnDefs}
+                rowData={rowData}
+                onCellValueChanged={({
+                  data,
+                }: {
+                  data: DatasetRecordEntry;
+                }) => {
+                  onRowDataChange(
+                    rowData.map((row) => (row.id === data.id ? data : row))
+                  );
+                }}
+              />
+            </ErrorBoundary>
           </Box>
         </VStack>
       </HStack>

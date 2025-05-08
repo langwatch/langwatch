@@ -1,0 +1,70 @@
+---
+description: 
+globs: *
+alwaysApply: false
+---
+# Documentation Rules
+
+## Overview
+
+As we build and modify the LangWatch project, maintain AI-friendly documentation in the `.cursor/docs` directory. This documentation helps future interactions by providing context, architectural decisions, and system understanding without duplicating code.
+
+## Documentation Guidelines
+
+1. Create or update documentation files in `langwatch/langwatch/.cursor/docs/` (or simply .cursor/docs if you are not in langwatch-saas project) when:
+   - Implementing significant new features
+   - Making architectural decisions
+   - Changing system design
+   - Adding new patterns or conventions
+
+2. File naming:
+   - Use numbered prefixes: `01-`, `02-`, etc.
+   - Use descriptive kebab-case names
+   - Example: `02-authentication-system.md`
+
+3. Content focus:
+   - Explain WHY decisions were made
+   - Document architecture and patterns
+   - Provide navigation to relevant code
+   - Avoid code duplication
+   - Focus on context over implementation
+
+4. Documentation structure:
+   - Clear section headers
+   - Bullet points for key concepts
+   - Links to related documentation
+   - References to relevant code files
+   - Architectural diagrams when helpful
+
+## What to Document
+
+✅ DO Document:
+- System architecture decisions
+- Design patterns and their rationale
+- Component relationships
+- Important conventions
+- Integration points
+- Complex workflows
+- Business logic reasoning
+
+❌ DON'T Document:
+- Implementation details available in code
+- Temporary configurations
+- Code snippets that may get outdated
+- Information obvious from code structure
+
+## Cross-Referencing
+
+- Link between related documentation files
+- Reference specific code files when relevant
+- Maintain a clear hierarchy of information
+
+## Updates
+
+Keep documentation up-to-date by:
+- Adding new files for new features
+- Updating existing docs for changes
+- Removing outdated information
+- Maintaining consistent structure
+
+Remember: This documentation serves as a knowledge base for the AI to quickly understand the system's context and make informed decisions during future development. 

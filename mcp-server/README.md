@@ -1,18 +1,20 @@
 # LangWatch 🏰 MCP Server
 
-The LangWatch MCP Server is a tool designed to aid finding, searching, and looking up Traces from the LangWatch platform via the [Model Context Protocol](https://modelcontextprotocol.io/introduction).
+The LangWatch MCP Server is a tool designed to aid finding, searching, and looking up LLM traces from the LangWatch platform via the [Model Context Protocol](https://modelcontextprotocol.io/introduction).
 
-This server facilitates communication with LangWatch's API, allowing you to retrieve and manage LLM traces.
+This server facilitates LLM development by allowing the agent to search for traces, understand all the steps in between a problematic output and try to fix the issue.
+
+## Setup in your Codebase
+
+Check out [LangWatch integration guide](https://docs.langwatch.ai/integration/overview) to start tracking your agents so both you and Cursor/Windsurf/Claude Code or your favorite coding assistant can debug it.
 
 ## Setup in Cursor 👩‍💻
 
 1. Navigate to the Cursor Settings
 2. Navigate to the MCP item in the sidebar
-3. Set the "name" as "LangWatch MCP"
+3. Set the "name" as "LangWatch"
 4. Set the "type" to `command`
 5. Set the "command" to `npx -y @langwatch/mcp-server --apiKey=sk-lw-...`
-	- You **must** use `=` to join the command with the value!
-
 - `--apiKey`: Your LangWatch API key. This is mandatory and must be provided.
 - `--endpoint`: *Optional* The endpoint for the LangWatch API. Defaults to `https://app.langwatch.ai` if not specified.
 
@@ -54,7 +56,7 @@ To use these tools within Cursor, follow these steps:
 3. **Interact with your Agent:**
     - Ask a question like the following to test the tools are accessible: *Note: When the tool is detected, you'll need to run `Run tool` in the chat view for it to be called.
 
-> "I just ran into an issue while debugging, show me the latest traces from the last 30 days"
+> "I just ran into an issue while debugging, can you check the latest traces and fix it?"
 
 <picture>
 <source media="(prefers-color-scheme: dark)" srcset="../assets/mcp-server/cursor-example.dark.webp">

@@ -2,7 +2,7 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { prisma } from "../../../server/db";
 
-import { getDebugger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger";
 
 import { CostReferenceType, CostType } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
@@ -32,7 +32,7 @@ import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
 import type { JsonArray } from "@prisma/client/runtime/library";
 import type { Edge, Node } from "@xyflow/react";
 
-export const debug = getDebugger("langwatch:guardrail:evaluate");
+const logger = createLogger("langwatch:guardrail:evaluate");
 
 const batchEvaluationInputSchema = z.object({
   evaluation: z.string(),
@@ -102,12 +102,7 @@ export default async function handler(
   try {
     params = batchEvaluationInputSchema.parse(req.body);
   } catch (error) {
-    debug(
-      "Invalid evaluation params received",
-      error,
-      JSON.stringify(req.body, null, "  "),
-      { projectId: project.id }
-    );
+    logger.error({ error, body: req.body, projectId: project.id }, 'invalid evaluation params received');
     Sentry.captureException(error, { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);
@@ -132,7 +127,7 @@ export default async function handler(
   let settings = null;
   let checkType;
 
-  const check = await prisma.check.findFirst({
+  const check = await prisma.monitor.findFirst({
     where: {
       projectId: project.id,
       slug: evaluation,
@@ -177,12 +172,7 @@ export default async function handler(
       });
     }
   } catch (error) {
-    debug(
-      "Invalid evaluation data received",
-      error,
-      JSON.stringify(req.body, null, "  "),
-      { projectId: project.id }
-    );
+    logger.error({ error, body: req.body, projectId: project.id }, 'invalid evaluation data received');
     Sentry.captureException(error, { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);
@@ -272,62 +262,59 @@ export default async function handler(
 export const getEvaluatorDataForParams = (
   checkType: string,
   params: Record<string, any>
-) => {
-  let data: DataForEvaluation;
+): DataForEvaluation => {
   if (checkType.startsWith("custom/")) {
-    data = {
+    return {
       type: "custom",
       data: params,
     };
-  } else {
-    const data_ = defaultEvaluatorInputSchema.parse(params);
-    const {
-      input,
-      output,
-      contexts,
-      expected_output,
-      conversation,
-      expected_contexts,
-    } = data_;
-
-    const contextList = contexts
-      ?.map((context) => {
-        if (typeof context === "string") {
-          return context;
-        } else {
-          return extractChunkTextualContent(context.content);
-        }
-      })
-      .filter((x) => x);
-
-    const expectedContextList = expected_contexts
-      ?.map((context) => {
-        if (typeof context === "string") {
-          return context;
-        } else {
-          return extractChunkTextualContent(context.content);
-        }
-      })
-      .filter((x) => x);
-
-    data = {
-      type: "default",
-      data: {
-        input: input ? input : undefined,
-        output: output ? output : undefined,
-        contexts: contextList,
-        expected_output: expected_output ? expected_output : undefined,
-        expected_contexts: expectedContextList,
-        conversation:
-          conversation?.map((message) => ({
-            input: message.input ?? undefined,
-            output: message.output ?? undefined,
-          })) ?? [],
-      },
-    };
   }
+  const data_ = defaultEvaluatorInputSchema.parse(params);
+  const {
+    input,
+    output,
+    contexts,
+    expected_output,
+    conversation,
+    expected_contexts,
+  } = data_;
 
-  return data;
+  const contextList = contexts
+    ?.map((context) => {
+      if (typeof context === "string") {
+        return context;
+      } else {
+        return extractChunkTextualContent(context.content);
+      }
+    })
+    .filter((x) => x);
+
+  const expectedContextList = expected_contexts
+    ?.map((context) => {
+      if (typeof context === "string") {
+        return context;
+      } else {
+        return extractChunkTextualContent(context.content);
+      }
+    })
+    .filter((x) => x);
+
+  return {
+    type: "default",
+    data: {
+      input: input ? input : undefined,
+      output: output ? output : undefined,
+      contexts: JSON.stringify(contextList),
+      expected_output: expected_output ? expected_output : undefined,
+      expected_contexts: JSON.stringify(expectedContextList),
+      conversation: JSON.stringify(
+        conversation?.map((message) => ({
+          input: message.input ?? undefined,
+          output: message.output ?? undefined,
+        })) ?? []
+      ),
+    },
+  };
 };
 
 export const getEvaluatorIncludingCustom = async (

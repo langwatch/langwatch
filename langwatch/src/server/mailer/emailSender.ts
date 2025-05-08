@@ -1,6 +1,9 @@
 import sgMail from "@sendgrid/mail";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { env } from "../../env.mjs";
+import { createLogger } from "../../utils/logger";
+
+const logger = createLogger("langwatch:mailer:emailSender");
 
 type EmailContent = {
   to: string | string[];
@@ -18,6 +21,7 @@ const DEFAULT_FROM =
 
 export const sendEmail = async (content: EmailContent) => {
   if (!env.SENDGRID_API_KEY && !(env.USE_AWS_SES && env.AWS_REGION)) {
+    logger.error("No email sending method available. Skipping email sending.");
     throw new Error(
       "No email sending method available. Skipping email sending."
     );
@@ -31,7 +35,7 @@ export const sendEmail = async (content: EmailContent) => {
 };
 
 const sendWithSES = async (content: EmailContent) => {
-  console.log("Sending email using AWS SES");
+  logger.info("Sending email using AWS SES");
   const sesClient = new SESClient({ region: env.AWS_REGION });
 
   const params = {
@@ -56,10 +60,10 @@ const sendWithSES = async (content: EmailContent) => {
   try {
     const command = new SendEmailCommand(params);
     const data = await sesClient.send(command);
-    console.log("Email sent successfully:", data);
+    logger.info("Email sent successfully:", data);
     return data;
   } catch (error) {
-    console.error("Error sending email:", error);
+    logger.error({ error }, "Error sending email with SES");
     throw error;
   }
 };
@@ -77,7 +81,7 @@ const sendWithSendGrid = async (content: EmailContent) => {
   try {
     return await sgMail.send(msg);
   } catch (error) {
-    console.error("Error sending email:", error);
+    logger.error({ error }, "Error sending email with SendGrid");
     throw error;
   }
 };

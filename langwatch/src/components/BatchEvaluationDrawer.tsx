@@ -12,7 +12,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { EvaluationExecutionMode, type Check } from "@prisma/client";
+import { EvaluationExecutionMode, type Monitor } from "@prisma/client";
 import type { JsonObject } from "@prisma/client/runtime/library";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
@@ -47,7 +47,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
 
   const datasetId = router.query.id as string;
 
-  const checks = api.checks.getAllForProject.useQuery(
+  const checks = api.monitors.getAllForProject.useQuery(
     {
       projectId: project?.id ?? "",
     },
@@ -69,7 +69,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
 
   const evaluations = Object.entries(AVAILABLE_EVALUATORS);
 
-  type ExtendedCheck = Check & {
+  type ExtendedCheck = Omit<Monitor, "description" | "requiredFields"> & {
     description?: string;
     requiredFields?: any[];
   };

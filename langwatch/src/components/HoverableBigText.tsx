@@ -79,27 +79,17 @@ export function HoverableBigText({
   );
   const expandedVersion_ = expandedVersion ?? children;
 
-  useEffect(() => {
-    const element = ref.current;
+  const checkOverflow = () => {
+    setIsOverflown(
+      ref.current
+        ? Math.abs(ref.current.offsetWidth - ref.current.scrollWidth) > 2 ||
+            Math.abs(ref.current.offsetHeight - ref.current.scrollHeight) > 2
+        : false
+    );
+  };
 
-    if (!element) return;
-
-    const checkOverflow = () => {
-      setIsOverflown(
-        element
-          ? Math.abs(element.offsetWidth - element.scrollWidth) > 2 ||
-              Math.abs(element.offsetHeight - element.scrollHeight) > 2
-          : false
-      );
-    };
-
-    checkOverflow();
-    window.addEventListener("resize", checkOverflow);
-
-    return () => {
-      window.removeEventListener("resize", checkOverflow);
-    };
-  }, []);
+  // Check on every rerender
+  setTimeout(checkOverflow, 100);
 
   return (
     <>

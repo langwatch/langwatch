@@ -10,7 +10,7 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
-import slugify from "slugify";
+import { slugify } from "~/utils/slugify";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { sendInviteEmail } from "../../mailer/inviteEmail";
@@ -21,9 +21,11 @@ import {
   checkUserPermissionForTeam,
   skipPermissionCheck,
 } from "../permission";
-import { dependencies } from "../../../injection/dependencies.server";
-import * as Sentry from "@sentry/nextjs";
 import { env } from "~/env.mjs";
+import { decrypt, encrypt } from "~/utils/encryption";
+import { signUpDataSchema } from "./onboarding";
+import { dependencies } from "../../../injection/dependencies.server";
+import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
@@ -75,21 +77,7 @@ export const organizationRouter = createTRPCRouter({
       z.object({
         orgName: z.string().optional(),
         phoneNumber: z.string().optional(),
-        signUpData: z
-          .object({
-            usage: z.string().optional().nullable(),
-            solution: z.string().optional().nullable(),
-            terms: z.boolean().optional(),
-            companyType: z.string().optional().nullable(),
-            companySize: z.string().optional().nullable(),
-            projectType: z.string().optional().nullable(),
-            howDidYouHearAboutUs: z.string().optional().nullable(),
-            otherCompanyType: z.string().optional().nullable(),
-            otherProjectType: z.string().optional().nullable(),
-            otherHowDidYouHearAboutUs: z.string().optional().nullable(),
-            utmCampaign: z.string().optional().nullable(),
-          })
-          .optional(),
+        signUpData: signUpDataSchema.optional(),
       })
     )
     .use(skipPermissionCheck)
@@ -114,56 +102,63 @@ export const organizationRouter = createTRPCRouter({
         "-" +
         teamNanoId.substring(0, 6);
 
-      await prisma.$transaction(async (prisma) => {
-        // 1. Create the organization
-        const organization = await prisma.organization.create({
-          data: {
-            id: orgId,
-            name: orgName,
-            slug: orgSlug,
-            phoneNumber: input.phoneNumber,
-            signupData: input.signUpData,
-          },
-        });
+      const { organization, team } = await prisma.$transaction(
+        async (prisma) => {
+          // 1. Create the organization
+          const organization = await prisma.organization.create({
+            data: {
+              id: orgId,
+              name: orgName,
+              slug: orgSlug,
+              phoneNumber: input.phoneNumber,
+              signupData: input.signUpData,
+            },
+          });
 
-        // 2. Assign the user to the organization
-        await prisma.organizationUser.create({
-          data: {
-            userId: userId,
-            organizationId: organization.id,
-            role: "ADMIN", // Assuming the user becomes an admin of the created organization
-          },
-        });
+          // 2. Assign the user to the organization
+          await prisma.organizationUser.create({
+            data: {
+              userId: userId,
+              organizationId: organization.id,
+              role: "ADMIN", // Assuming the user becomes an admin of the created organization
+            },
+          });
 
-        // 3. Create the default team
-        const team = await prisma.team.create({
-          data: {
-            id: teamId,
-            name: orgName, // Same name as organization
-            slug: teamSlug, // Same as organization
-            organizationId: organization.id,
-          },
-        });
+          // 3. Create the default team
+          const team = await prisma.team.create({
+            data: {
+              id: teamId,
+              name: orgName, // Same name as organization
+              slug: teamSlug, // Same as organization
+              organizationId: organization.id,
+            },
+          });
 
-        // 4. Assign the user to the team
-        await prisma.teamUser.create({
-          data: {
-            userId: userId,
-            teamId: team.id,
-            role: "ADMIN", // Assuming the user becomes an admin of the created team
-          },
-        });
-      });
+          // 4. Assign the user to the team
+          await prisma.teamUser.create({
+            data: {
+              userId: userId,
+              teamId: team.id,
+              role: "ADMIN", // Assuming the user becomes an admin of the created team
+            },
+          });
 
-      if (dependencies.postRegistrationCallback) {
-        try {
-          await dependencies.postRegistrationCallback(ctx.session.user, input);
-        } catch (err) {
-          Sentry.captureException(err);
+          return { organization, team };
         }
-      }
-      // Return success response
-      return { success: true, teamSlug };
+      );
+
+      return {
+        success: true,
+        organization: {
+          id: organization.id,
+          name: organization.name,
+        },
+        team: {
+          id: team.id,
+          slug: team.slug,
+          name: team.name,
+        },
+      };
     }),
   deleteMember: protectedProcedure
     .input(z.object({ userId: z.string(), organizationId: z.string() }))
@@ -231,10 +226,47 @@ export const organizationRouter = createTRPCRouter({
         });
 
       for (const organization of organizations) {
+        for (const project of organization.teams.flatMap(
+          (team) => team.projects
+        )) {
+          if (project.s3AccessKeyId) {
+            project.s3AccessKeyId = decrypt(project.s3AccessKeyId);
+          }
+          if (project.s3SecretAccessKey) {
+            project.s3SecretAccessKey = decrypt(project.s3SecretAccessKey);
+          }
+          if (project.s3Endpoint) {
+            project.s3Endpoint = decrypt(project.s3Endpoint);
+          }
+        }
+      }
+      for (const organization of organizations) {
         organization.members = organization.members.filter(
           (member) =>
             member.userId === userId || member.userId === demoProjectUserId
         );
+        if (organization.s3AccessKeyId) {
+          organization.s3AccessKeyId = decrypt(organization.s3AccessKeyId);
+        }
+        if (organization.s3SecretAccessKey) {
+          organization.s3SecretAccessKey = decrypt(
+            organization.s3SecretAccessKey
+          );
+        }
+        if (organization.s3Endpoint) {
+          organization.s3Endpoint = decrypt(organization.s3Endpoint);
+        }
+        if (organization.elasticsearchNodeUrl) {
+          organization.elasticsearchNodeUrl = decrypt(
+            organization.elasticsearchNodeUrl
+          );
+        }
+        if (organization.elasticsearchApiKey) {
+          organization.elasticsearchApiKey = decrypt(
+            organization.elasticsearchApiKey
+          );
+        }
+
         const isExternal =
           organization.members[0]?.role !== "ADMIN" &&
           organization.members[0]?.role !== "MEMBER";
@@ -255,10 +287,38 @@ export const organizationRouter = createTRPCRouter({
 
   update: protectedProcedure
     .input(
-      z.object({
-        organizationId: z.string(),
-        name: z.string(),
-      })
+      z
+        .object({
+          organizationId: z.string(),
+          name: z.string(),
+          s3Endpoint: z.string().optional(),
+          s3AccessKeyId: z.string().optional(),
+          s3SecretAccessKey: z.string().optional(),
+          elasticsearchNodeUrl: z.string().optional(),
+          elasticsearchApiKey: z.string().optional(),
+          s3Bucket: z.string().optional(),
+        })
+        .refine((data) => {
+          const hasNodeUrl = !!data.elasticsearchNodeUrl?.trim();
+          const hasApiKey = !!data.elasticsearchApiKey?.trim();
+          return (hasNodeUrl && hasApiKey) || (!hasNodeUrl && !hasApiKey);
+        })
+        .refine(
+          (data) => {
+            const hasEndpoint = !!data.s3Endpoint?.trim();
+            const hasAccessKey = !!data.s3AccessKeyId?.trim();
+            const hasSecretKey = !!data.s3SecretAccessKey?.trim();
+
+            return (
+              (hasEndpoint && hasAccessKey && hasSecretKey) ||
+              (!hasEndpoint && !hasAccessKey && !hasSecretKey)
+            );
+          },
+          {
+            message:
+              "S3 Endpoint, Access Key ID, and Secret Access Key must all be provided together",
+          }
+        )
     )
     .use(
       checkUserPermissionForOrganization(
@@ -290,8 +350,26 @@ export const organizationRouter = createTRPCRouter({
         },
         data: {
           name: input.name,
+          s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null,
+          s3AccessKeyId: input.s3AccessKeyId
+            ? encrypt(input.s3AccessKeyId)
+            : null,
+          s3SecretAccessKey: input.s3SecretAccessKey
+            ? encrypt(input.s3SecretAccessKey)
+            : null,
+          elasticsearchNodeUrl: input.elasticsearchNodeUrl
+            ? encrypt(input.elasticsearchNodeUrl)
+            : null,
+          elasticsearchApiKey: input.elasticsearchApiKey
+            ? encrypt(input.elasticsearchApiKey)
+            : null,
+          s3Bucket: input.s3Bucket,
         },
       });
+
+      if (input.elasticsearchNodeUrl && input.elasticsearchApiKey) {
+        await elasticsearchMigrate(input.organizationId);
+      }
 
       return { success: true };
     }),
@@ -660,22 +738,22 @@ export const organizationRouter = createTRPCRouter({
             userId_organizationId: {
               userId: input.userId,
               organizationId: input.organizationId,
-            }
-          }
+            },
+          },
         });
 
         if (currentMember?.role === OrganizationUserRole.ADMIN) {
           const adminCount = await prisma.organizationUser.count({
             where: {
               organizationId: input.organizationId,
-              role: OrganizationUserRole.ADMIN
-            }
+              role: OrganizationUserRole.ADMIN,
+            },
           });
-          
+
           if (adminCount <= 1) {
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message: "Cannot remove the last admin from an organization"
+              message: "Cannot remove the last admin from an organization",
             });
           }
         }

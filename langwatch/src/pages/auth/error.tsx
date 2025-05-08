@@ -20,13 +20,16 @@ export default function Error({ session }: { session: Session | null }) {
   const error = query?.get("error");
   const publicEnv = usePublicEnv();
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
-
+  const isAzureAD = publicEnv.data?.NEXTAUTH_PROVIDER === "azure-ad";
   useEffect(() => {
     if (!publicEnv.data) {
       return;
     }
 
-    if (error && ["DIFFERENT_EMAIL_NOT_ALLOWED", "OAuthAccountNotLinked"].includes(error)) {
+    if (
+      error &&
+      ["DIFFERENT_EMAIL_NOT_ALLOWED", "OAuthAccountNotLinked"].includes(error)
+    ) {
       return;
     }
 
@@ -41,12 +44,14 @@ export default function Error({ session }: { session: Session | null }) {
           } else {
             window.location.href = "/";
           }
+        } else if (isAzureAD) {
+          window.location.href = "/auth/signin";
         } else {
           window.location.href = "/auth/signin";
         }
       }
     }, 5000);
-  }, [publicEnv.data, isAuth0, session, error]);
+  }, [publicEnv.data, isAuth0, isAzureAD, session, error]);
 
   if (error) {
     return <SignInError error={error} />;
@@ -91,7 +96,9 @@ export function SignInError({ error }: { error: string }) {
                       this one.
                     </Text>
                     <Button asChild marginTop={4} color="white">
-                      <Link href="/settings/authentication">Sign in with another method</Link>
+                      <Link href="/settings/authentication">
+                        Sign in with another method
+                      </Link>
                     </Button>
                   </VStack>
                 </Alert.Description>
@@ -103,7 +110,9 @@ export function SignInError({ error }: { error: string }) {
                       Please use the same email address as your current account.
                     </Text>
                     <Button asChild marginTop={4} color="white">
-                      <Link href="/settings/authentication">Back to Settings</Link>
+                      <Link href="/settings/authentication">
+                        Back to Settings
+                      </Link>
                     </Button>
                   </VStack>
                 </Alert.Description>

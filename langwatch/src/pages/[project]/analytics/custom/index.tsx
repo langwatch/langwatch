@@ -16,7 +16,7 @@ import {
   Textarea,
   VStack,
   createListCollection,
-  useDisclosure
+  useDisclosure,
 } from "@chakra-ui/react";
 
 import {
@@ -36,7 +36,7 @@ import {
   PieChart,
   Trash,
   TrendingUp,
-  Triangle
+  Triangle,
 } from "react-feather";
 import {
   Controller,
@@ -99,6 +99,7 @@ import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,
 } from "../../../../utils/stringCasing";
+import { LuChartArea } from "react-icons/lu";
 
 export interface CustomGraphFormData {
   title?: string;
@@ -199,6 +200,11 @@ const chartOptions: Required<CustomGraphFormData>["graphType"][] = [
     label: "Donut Chart",
     value: "donnut",
     icon: <PieChart />,
+  },
+  {
+    label: "Monitor Graph",
+    value: "monitor_graph",
+    icon: <LuChartArea />,
   },
 ];
 

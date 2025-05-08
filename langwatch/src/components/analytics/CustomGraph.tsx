@@ -5,6 +5,10 @@ import {
   Spinner,
   Flex,
   type SystemStyleObject,
+  Text,
+  VStack,
+  Skeleton,
+  Badge,
 } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
@@ -50,6 +54,7 @@ import { QuickwitNote } from "./QuickwitNote";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { Delayed } from "../Delayed";
 import { useColorRawValue } from "../../components/ui/color-mode";
+import { LuShield } from "react-icons/lu";
 
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
@@ -71,13 +76,18 @@ export type CustomGraphInput = {
     | "scatter"
     | "pie"
     | "donnut"
-    | "summary";
+    | "summary"
+    | "monitor_graph";
   series: Series[];
   groupBy?: z.infer<typeof timeseriesSeriesInput>["groupBy"];
   includePrevious: boolean;
   timeScale: "full" | number;
   connected?: boolean;
   height?: number;
+  monitorGraph?: {
+    disabled?: boolean;
+    isGuardrail?: boolean;
+  };
 };
 
 export const summaryGraphTypes: CustomGraphInput["graphType"][] = [
@@ -99,16 +109,19 @@ const GraphComponentMap: Partial<{
   area: [AreaChart, Area],
   stacked_area: [AreaChart, Area],
   scatter: [ScatterChart, Scatter],
+  monitor_graph: [AreaChart, Area],
 };
 
 export function CustomGraph({
   input,
   titleProps,
   hideGroupLabel = false,
+  size = "md",
 }: {
   input: CustomGraphInput;
   titleProps?: SystemStyleObject;
   hideGroupLabel?: boolean;
+  size?: "sm" | "md";
 }) {
   const publicEnv = usePublicEnv();
 
@@ -127,7 +140,7 @@ export function CustomGraph({
       input={input}
       titleProps={titleProps}
       hideGroupLabel={hideGroupLabel}
-      enabled={!!publicEnv.data}
+      load={!!publicEnv.data}
     />
   );
 }
@@ -137,7 +150,8 @@ const CustomGraph_ = React.memo(
     input,
     titleProps,
     hideGroupLabel = false,
-    enabled = true,
+    load = true,
+    size,
   }: {
     input: CustomGraphInput;
     titleProps?: {
@@ -146,7 +160,8 @@ const CustomGraph_ = React.memo(
       fontWeight?: SystemStyleObject["fontWeight"];
     };
     hideGroupLabel?: boolean;
-    enabled?: boolean;
+    load?: boolean;
+    size?: "sm" | "md";
   }) {
     const height_ = input.height ?? 300;
     const { filterParams, queryOpts } = useFilterParams();
@@ -161,7 +176,7 @@ const CustomGraph_ = React.memo(
           ? input.timeScale
           : parseInt(input.timeScale.toString(), 10),
       },
-      { ...queryOpts, enabled: queryOpts.enabled && enabled }
+      { ...queryOpts, enabled: queryOpts.enabled && load }
     );
 
     const currentAndPreviousData = shapeDataForGraph(input, timeseries);
@@ -177,7 +192,14 @@ const CustomGraph_ = React.memo(
     const currentAndPreviousDataFilled =
       input.graphType === "scatter"
         ? currentAndPreviousData
-        : fillEmptyData(currentAndPreviousData, expectedKeys);
+        : fillEmptyData(
+            currentAndPreviousData,
+            expectedKeys,
+            input.graphType === "monitor_graph" &&
+              input.series[0]?.metric.includes("pass_rate")
+              ? 1
+              : 0
+          );
     const keysToValues = Object.fromEntries(
       expectedKeys.map((key) => [
         key,
@@ -256,7 +278,8 @@ const CustomGraph_ = React.memo(
           "without error": positive,
         };
 
-        return getColor(colorSet, colorMap[groupKey] ?? neutral);
+        const color = getColor(colorSet, colorMap[groupKey] ?? neutral);
+        return color;
       }
 
       return getColor(colorSet, index);
@@ -516,6 +539,26 @@ const CustomGraph_ = React.memo(
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+      );
+    }
+
+    if (input.graphType === "monitor_graph") {
+      return container(
+        <MonitorGraph
+          input={input}
+          seriesByKey={seriesByKey}
+          currentAndPreviousData={currentAndPreviousData}
+          currentAndPreviousDataFilled={currentAndPreviousDataFilled}
+          sortedKeys={sortedKeys}
+          nameForSeries={nameForSeries}
+          getColor={getColor}
+          size={size}
+          filterParams={filterParams}
+          height_={height_}
+          formatWith={formatWith}
+          yAxisValueFormat={yAxisValueFormat}
+          formatDate={formatDate}
+        />
       );
     }
 
@@ -818,24 +861,236 @@ const flattenGroupData = (
 
 const fillEmptyData = (
   data: ReturnType<typeof shapeDataForGraph>,
-  expectedKeys: string[]
+  expectedKeys: string[],
+  fillWith = 0
 ) => {
   if (!data) return data;
   const filledData = data.map((entry) => {
     const filledEntry = { ...entry };
     expectedKeys.forEach((key) => {
       if (filledEntry[key] === null || filledEntry[key] === undefined) {
-        filledEntry[key] = 0;
+        filledEntry[key] = fillWith;
       }
       const previousKey = `previous>${key}`;
       if (
         filledEntry[previousKey] === null ||
         filledEntry[previousKey] === undefined
       ) {
-        filledEntry[previousKey] = 0;
+        filledEntry[previousKey] = fillWith;
       }
     });
     return filledEntry;
   });
   return filledData;
 };
+
+function MonitorGraph({
+  input,
+  seriesByKey,
+  sortedKeys,
+  currentAndPreviousData,
+  currentAndPreviousDataFilled,
+  nameForSeries,
+  getColor,
+  size,
+  filterParams,
+  height_,
+  formatWith,
+  yAxisValueFormat,
+  formatDate,
+}: {
+  input: CustomGraphInput;
+  seriesByKey: Record<string, Series>;
+  currentAndPreviousData: ReturnType<typeof shapeDataForGraph>;
+  currentAndPreviousDataFilled: ReturnType<typeof shapeDataForGraph>;
+  sortedKeys: string[];
+  nameForSeries: (aggKey: string) => string;
+  getColor: (
+    colorSet: RotatingColorSet,
+    index: number,
+    opacity: number
+  ) => string;
+  size?: "sm" | "md";
+  filterParams: ReturnType<typeof useFilterParams>["filterParams"];
+  height_: number;
+  formatWith: (
+    format: string | ((value: number) => string) | undefined,
+    value: number
+  ) => string | ((value: number) => string);
+  yAxisValueFormat: string | ((value: number) => string) | undefined;
+  formatDate: (date: string) => string;
+}) {
+  const firstKey = Object.keys(seriesByKey)[0] ?? "";
+  const name = nameForSeries(firstKey);
+  const isPassRate = firstKey.includes("pass_rate");
+  const allValues = isPassRate
+    ? currentAndPreviousDataFilled
+        ?.map((entry) => entry[firstKey]!)
+        .filter((x) => x !== undefined && x !== null)
+    : currentAndPreviousData
+        ?.map((entry) => entry[firstKey]!)
+        .filter((x) => x !== undefined && x !== null);
+  const total =
+    allValues?.reduce((acc, curr) => {
+      return acc + curr;
+    }, 0) ?? 0;
+  const average = total / (allValues?.length ?? 1);
+  const hasLoaded = currentAndPreviousDataFilled?.length !== undefined;
+  const gray400 = useColorRawValue("gray.400");
+
+  // TODO: allow user to define the thresholds instead of hardcoded amounts
+  const colorSet: RotatingColorSet = input.monitorGraph?.disabled
+    ? "grayTones"
+    : average > 0.8 || !hasLoaded
+    ? "greenTones"
+    : average < 0.4
+    ? "redTones"
+    : "orangeTones";
+
+  const maxValue = isPassRate
+    ? 1
+    : Math.max(...(allValues && allValues.length > 0 ? allValues : [1]));
+
+  return (
+    <Box
+      width="full"
+      height="full"
+      position="relative"
+      border="1px solid"
+      borderColor={getColor(colorSet, 0, -200)}
+      backgroundColor={getColor(colorSet, 0, -400)}
+      borderRadius="lg"
+      paddingTop={2}
+      overflow="hidden"
+    >
+      <VStack
+        position="absolute"
+        bottom={size === "md" ? 8 : 0}
+        left={size === "md" ? 20 : 0}
+        zIndex={1}
+        padding={8}
+        gap={2}
+        align="start"
+        color={getColor(colorSet, 0, 300)}
+      >
+        <HStack>
+          {input.monitorGraph?.isGuardrail && (
+            <Badge colorPalette="blue" variant="solid" size="sm" marginTop="-3px">
+              <LuShield size={16} />
+              Guardrail
+            </Badge>
+          )}
+          <Text fontSize="sm" fontWeight="medium" paddingBottom={1}>
+            {name}
+            {input.monitorGraph?.disabled && " (disabled)"}
+          </Text>
+        </HStack>
+        <HStack gap={2}>
+          <Text fontSize="2xl" fontWeight="bold">
+            {hasLoaded ? (
+              numeral(average).format(isPassRate ? "0%" : "0.[00]")
+            ) : (
+              <Skeleton
+                width="56px"
+                height="36px"
+                backgroundColor={getColor(colorSet, 0, -100)}
+              />
+            )}
+          </Text>
+          <Text fontSize="xs">
+            {isPassRate ? "Pass Rate" : "Average Score"}
+          </Text>
+        </HStack>
+        <Text fontSize="xs">
+          {filterParams.startDate &&
+            filterParams.endDate &&
+            (() => {
+              const now = new Date().getTime();
+              const daysDiff = Math.abs(
+                Math.ceil((now - filterParams.endDate) / (1000 * 60 * 60 * 24))
+              );
+              const periodDays = Math.ceil(
+                (filterParams.endDate - filterParams.startDate) /
+                  (1000 * 60 * 60 * 24)
+              );
+
+              // If end date is within one day of today, show "Last X days"
+              if (daysDiff <= 1) {
+                return `Last ${periodDays} days`;
+              }
+              // Otherwise show date range
+              else {
+                return `${format(
+                  new Date(filterParams.startDate),
+                  "MMM d"
+                )} - ${format(new Date(filterParams.endDate), "MMM d, yyyy")}`;
+              }
+            })()}
+        </Text>
+      </VStack>
+      <ResponsiveContainer
+        key={currentAndPreviousDataFilled ? input.graphId : "loading"}
+        height={height_}
+      >
+        <AreaChart
+          data={currentAndPreviousDataFilled}
+          margin={
+            size === "md"
+              ? {
+                  top: 10,
+                  left: formatWith(yAxisValueFormat, maxValue).length * 6 - 5,
+                  right: 24,
+                }
+              : {}
+          }
+        >
+          {size === "md" && (
+            <>
+              <XAxis
+                type="category"
+                dataKey="date"
+                name="Date"
+                tickFormatter={formatDate}
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: gray400 }}
+              />
+              <YAxis
+                type="number"
+                axisLine={false}
+                tickLine={false}
+                tickCount={4}
+                tickMargin={20}
+                domain={[0, maxValue]}
+                tick={{ fill: gray400 }}
+                tickFormatter={(value) => {
+                  if (typeof yAxisValueFormat === "function") {
+                    return yAxisValueFormat(value);
+                  }
+                  return numeral(value).format(yAxisValueFormat);
+                }}
+              />
+            </>
+          )}
+          {(sortedKeys ?? []).map((aggKey, index) => (
+            <Area
+              key={aggKey}
+              type="monotone"
+              dataKey={aggKey}
+              stroke={getColor(colorSet, index, -300)}
+              stackId={
+                ["stacked_bar", "stacked_area"].includes(input.graphType)
+                  ? "same"
+                  : undefined
+              }
+              fill={getColor(colorSet, index, -300)}
+              strokeWidth={2.5}
+              dot={false}
+              name={nameForSeries(aggKey)}
+            />
+          ))}
+        </AreaChart>
+      </ResponsiveContainer>
+    </Box>
+  );
+}

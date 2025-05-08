@@ -1,0 +1,18 @@
+# Service for the main LangWatch application
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-app
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-app
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  type: {{ .Values.app.service.type }}
+  ports:
+    - port: {{ .Values.app.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: {{ .Release.Name }}-app
+    app.kubernetes.io/instance: {{ .Release.Name }}

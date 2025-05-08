@@ -1,8 +1,35 @@
 import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
 import type { End, Entry, Signature, Workflow } from "../types/dsl";
 
+export const entryNode = () => ({
+  id: "entry",
+  type: "entry",
+  position: {
+    x: 0,
+    y: 0,
+  },
+  deletable: false,
+  data: {
+    name: "Entry",
+    outputs: [{ identifier: "question", type: "str" }],
+    entry_selection: "random",
+    train_size: 0.8,
+    test_size: 0.2,
+    seed: 42,
+    dataset: {
+      name: DEFAULT_DATASET_NAME,
+      inline: {
+        records: {
+          question: ["Hello world"],
+        },
+        columnTypes: [{ name: "question", type: "string" }],
+      },
+    },
+  } satisfies Entry,
+});
+
 export const blankTemplate: Workflow = {
-  spec_version: "1.3",
+  spec_version: "1.4",
   name: "Blank Template",
   icon: "🧩",
   description: "Start a new workflow from scratch",
@@ -10,36 +37,12 @@ export const blankTemplate: Workflow = {
   default_llm: {
     model: "openai/gpt-4o-mini",
     temperature: 0,
-    max_tokens: 2048,
+    max_tokens: 8192,
   },
+  template_adapter: "default",
   enable_tracing: true,
   nodes: [
-    {
-      id: "entry",
-      type: "entry",
-      position: {
-        x: 0,
-        y: 0,
-      },
-      deletable: false,
-      data: {
-        name: "Entry",
-        outputs: [{ identifier: "question", type: "str" }],
-        entry_selection: "random",
-        train_size: 0.8,
-        test_size: 0.2,
-        seed: 42,
-        dataset: {
-          name: DEFAULT_DATASET_NAME,
-          inline: {
-            records: {
-              question: ["Hello world"],
-            },
-            columnTypes: [{ name: "question", type: "string" }],
-          },
-        },
-      } satisfies Entry,
-    },
+    entryNode(),
     {
       id: "llm_call",
       type: "signature",
@@ -61,6 +64,16 @@ export const blankTemplate: Workflow = {
             identifier: "instructions",
             type: "str",
             value: undefined,
+          },
+          {
+            identifier: "messages",
+            type: "chat_messages",
+            value: [
+              {
+                role: "user",
+                content: "{{question}}",
+              },
+            ],
           },
           {
             identifier: "demonstrations",

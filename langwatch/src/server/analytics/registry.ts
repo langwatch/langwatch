@@ -558,7 +558,7 @@ export const analyticsMetrics = {
       format: "0.00a",
       increaseIs: "neutral",
       allowedAggregations: allAggregationTypes.filter(
-        (agg) => agg != "cardinality"
+        (agg) => agg != "cardinality" && agg != "terms"
       ),
       requiresKey: {
         filter: "evaluations.evaluator_id",
@@ -593,8 +593,63 @@ export const analyticsMetrics = {
       },
       quickwitSupport: false,
     },
+    evaluation_pass_rate: {
+      label: "Evaluation Pass Rate",
+      colorSet: "tealTones",
+      format: "0.00a",
+      increaseIs: "good",
+      allowedAggregations: allAggregationTypes.filter(
+        (agg) => agg != "cardinality" && agg != "terms"
+      ),
+      requiresKey: {
+        filter: "evaluations.evaluator_id",
+      },
+      aggregation: (aggregation, key) => {
+        return {
+          [`evaluation_pass_rate_${aggregation}_${key}`]: {
+            nested: {
+              path: "evaluations",
+            },
+            aggs: {
+              child: {
+                filter: {
+                  bool: {
+                    must: [{ term: { "evaluations.evaluator_id": key } }],
+                  } as any,
+                },
+                aggs: {
+                  child: {
+                    [aggregation]: {
+                      script: {
+                        source: `
+                          double result = 0.0;
+                          try {
+                            if (doc.containsKey('evaluations.passed') && doc['evaluations.passed'].size() > 0) {
+                              result = doc['evaluations.passed'].value ? 1.0 : 0.0;
+                            } else if (doc.containsKey('evaluations.score') && doc['evaluations.score'].size() > 0) {
+                              result = doc['evaluations.score'].value;
+                            }
+                          } catch (Exception e) {
+                            // Ignore exceptions and return default value
+                          }
+                          return result;
+                        `,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+      },
+      extractionPath: (aggregation: AggregationTypes, key) => {
+        return `evaluation_pass_rate_${aggregation}_${key}>child>child`;
+      },
+      quickwitSupport: false,
+    },
     evaluation_runs: {
-      label: "Evaluation Execution",
+      label: "Evaluation Runs",
       colorSet: "tealTones",
       format: "0.[00]a",
       increaseIs: "neutral",
@@ -620,8 +675,8 @@ export const analyticsMetrics = {
                 } as any,
               },
               aggs: {
-                cardinality: {
-                  cardinality: {
+                child: {
+                  [aggregation]: {
                     script: {
                       source: `return doc['evaluations.evaluation_id'].value`,
                     },
@@ -633,8 +688,59 @@ export const analyticsMetrics = {
         },
       }),
       extractionPath: (aggregation: AggregationTypes) => {
-        return `checks_${aggregation}>child>cardinality`;
+        return `checks_${aggregation}>child>child`;
       },
+      quickwitSupport: false,
+    },
+  },
+  threads: {
+    average_duration_per_thread: {
+      label: "Thread Duration",
+      colorSet: "purpleTones",
+      format: formatMilliseconds,
+      increaseIs: "neutral",
+      allowedAggregations: ["avg"],
+      aggregation: () => ({
+        thread_sessions: {
+          terms: {
+            field: "metadata.thread_id",
+            size: 10000,
+          },
+          aggs: {
+            session_duration: {
+              scripted_metric: {
+                init_script:
+                  "state.min = Long.MAX_VALUE; state.max = Long.MIN_VALUE;",
+                map_script: `
+                  if (doc.containsKey('timestamps.started_at') && !doc['timestamps.started_at'].empty) {
+                    long timestamp = doc['timestamps.started_at'].value.toInstant().toEpochMilli();
+                    if (timestamp < state.min) state.min = timestamp;
+                    if (timestamp > state.max) state.max = timestamp;
+                  }
+                `,
+                combine_script: "return ['min': state.min, 'max': state.max];",
+                reduce_script: `
+                  long min = Long.MAX_VALUE;
+                  long max = Long.MIN_VALUE;
+                  for (state in states) {
+                    if (state.min < min && state.min != Long.MAX_VALUE) min = state.min;
+                    if (state.max > max && state.max != Long.MIN_VALUE) max = state.max;
+                  }
+                  if (min == Long.MAX_VALUE || max == Long.MIN_VALUE) return 0;
+                  long duration = max - min;
+                  return duration > 10800000 ? 10800000 : duration;
+                `,
+              },
+            },
+          },
+        },
+        average_duration_per_thread_avg: {
+          avg_bucket: {
+            buckets_path: "thread_sessions>session_duration.value",
+          },
+        },
+      }),
+      extractionPath: () => "average_duration_per_thread_avg",
       quickwitSupport: false,
     },
   },

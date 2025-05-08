@@ -5,6 +5,9 @@ import path from "path";
 import type { Duplex } from "stream";
 import { register } from "prom-client";
 import promBundle from "express-prom-bundle";
+import { createLogger } from "./utils/logger";
+
+const logger = createLogger("langwatch:start");
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 let studioSocket = require("../build-websocket/socketServer");
@@ -12,7 +15,7 @@ let studioSocket = require("../build-websocket/socketServer");
 const reloadStudioSocket = () => {
   delete require.cache[require.resolve("../build-websocket/socketServer")];
   studioSocket = require("../build-websocket/socketServer");
-  console.log("Reloaded studioSocket module");
+  logger.info("reloaded studioSocket module");
 };
 
 if (process.env.NODE_ENV !== "production") {
@@ -129,7 +132,7 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
         await handle(req, res, parsedUrl);
       }
     } catch (err) {
-      console.error("Error occurred handling", req.url, err);
+      logger.error({ url: req.url, error: err }, "error occurred handling request");
       res.statusCode = 500;
       res.end("internal server error");
     }
@@ -165,16 +168,30 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
   };
 
   server.once("error", (err) => {
-    console.error(err);
+    logger.error({ error: err }, "error occurred on server");
     process.exit(1);
   });
 
   server.listen(port, () => {
-    console.log(
-      `\n🎉 LangWatch is ready on http://${hostname.replace(
-        "0.0.0.0",
-        "localhost"
-      )}:${port}\n`
-    );
+    logger.info({ hostname, port, fullUrl: `http://${hostname}:${port}` }, "LangWatch is ready 🎉");
+  });
+
+  // Global error handlers for uncaught exceptions and unhandled promise rejections
+  process.on('uncaughtException', (err) => {
+    logger.fatal({ error: err }, 'uncaught exception detected');
+    // shutdown the server gracefully
+    server.close(() => {
+      process.exit(1); // then exit
+    });
+
+    // If a graceful shutdown is not achieved after 1 second,
+    // shut down the process completely
+    setTimeout(() => {
+      process.abort(); // exit immediately and generate a core dump file
+    }, 1000).unref();
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    logger.fatal({ reason: reason instanceof Error ? reason : { value: reason }, promise }, 'unhandled rejection detected');logger.fatal({ reason: reason instanceof Error ? reason : { value: reason }, promise }, 'unhandled rejection detected');
   });
 };

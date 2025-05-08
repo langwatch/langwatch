@@ -15,6 +15,8 @@ import {
   Text,
   VStack,
   useDisclosure,
+  Portal,
+  CloseButton,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
@@ -54,12 +56,18 @@ import { Checkbox } from "../ui/checkbox";
 import { Popover } from "../ui/popover";
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
+import { Dialog } from "../ui/dialog";
+import { Link } from "../ui/link";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import type { TraceWithGuardrail } from "./MessageCard";
 import {
   MessagesNavigationFooter,
   useMessagesNavigationFooter,
 } from "./MessagesNavigationFooter";
+
+import { AddParticipants } from "../traces/AddParticipants";
+import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
+import { RedactedField } from "../ui/RedactedField";
 
 export function MessagesTable() {
   const router = useRouter();
@@ -371,9 +379,11 @@ export function MessagesTable() {
               <Box whiteSpace="pre-wrap">{trace.input?.value ?? ""}</Box>
             }
           >
-            <Text truncate display="block">
-              {trace.input?.value ? trace.input?.value : "<empty>"}
-            </Text>
+            <RedactedField field="input">
+              <Text truncate display="block">
+                {trace.input?.value ? trace.input?.value : "<empty>"}
+              </Text>
+            </RedactedField>
           </Tooltip>
         </Table.Cell>
       ),
@@ -419,18 +429,20 @@ export function MessagesTable() {
                 </Box>
               }
             >
-              {trace.lastGuardrail ? (
-                <Tag.Root colorPalette="blue" paddingLeft={2}>
-                  <Shield size={16} />
-                  <Tag.Label>Blocked by Guardrail</Tag.Label>
-                </Tag.Root>
-              ) : trace.output?.value ? (
-                <Box lineClamp={1} maxWidth="300px">
-                  {trace.output?.value}
-                </Box>
-              ) : (
-                <Box>{"<empty>"}</Box>
-              )}
+              <RedactedField field="output">
+                {trace.lastGuardrail ? (
+                  <Tag.Root colorPalette="blue" paddingLeft={2}>
+                    <Shield size={16} />
+                    <Tag.Label>Blocked by Guardrail</Tag.Label>
+                  </Tag.Root>
+                ) : trace.output?.value ? (
+                  <Box lineClamp={1} maxWidth="300px">
+                    {trace.output?.value}
+                  </Box>
+                ) : (
+                  <Box>{"<empty>"}</Box>
+                )}
+              </RedactedField>
             </Tooltip>
           </Table.Cell>
         ),
@@ -872,6 +884,46 @@ export function MessagesTable() {
       console.error(error);
     }
   };
+  const queueItem = api.annotation.createQueueItem.useMutation();
+  const [annotators, setAnnotators] = useState<{ id: string; name: string }[]>(
+    []
+  );
+
+  const dialog = useDisclosure();
+  const queueDrawerOpen = useDisclosure();
+
+  const sendToQueue = () => {
+    queueItem.mutate(
+      {
+        projectId: project?.id ?? "",
+        traceIds: selectedTraceIds,
+        annotators: annotators.map((p) => p.id),
+      },
+      {
+        onSuccess: () => {
+          dialog.onClose();
+          toaster.create({
+            title: "Trace added to annotation queue",
+            description: (
+              <>
+                <Link
+                  href={`/${project?.slug}/annotations/`}
+                  textDecoration="underline"
+                >
+                  View Queues
+                </Link>
+              </>
+            ),
+            type: "success",
+            meta: {
+              closable: true,
+            },
+            placement: "top-end",
+          });
+        },
+      }
+    );
+  };
 
   const downloadCSV_ = async (selection = false) => {
     const traceGroups_ = selection
@@ -964,14 +1016,9 @@ export function MessagesTable() {
     }
   };
 
-  const [isExpanded] = useLocalStorage("main-menu-expanded", false);
-
   return (
     <>
-      <Container
-        maxWidth={isExpanded ? "calc(100vw - 200px)" : "calc(100vw - 50px)"}
-        padding={6}
-      >
+      <Container maxWidth="calc(100vw - 50px)" padding={6}>
         <HStack width="full" align="top" paddingBottom={6}>
           <HStack align="center" gap={6}>
             <Heading as="h1" size="lg" paddingTop={1}>
@@ -1094,11 +1141,7 @@ export function MessagesTable() {
                 <Card.Body
                   padding={0}
                   maxWidth={
-                    showFilters && isExpanded
-                      ? "calc(100vw - 580px)"
-                      : showFilters
-                      ? "calc(100vw - 450px)"
-                      : "50%"
+                    showFilters ? "calc(100vw - 450px)" : "calc(100vw - 130px)"
                   }
                 >
                   {downloadProgress > 0 && (
@@ -1273,6 +1316,51 @@ export function MessagesTable() {
             >
               Add to Dataset
             </Button>
+            <Dialog.Root
+              open={dialog.open}
+              onOpenChange={(e) =>
+                e.open ? dialog.onOpen() : dialog.onClose()
+              }
+            >
+              <Dialog.Trigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => dialog.onOpen()}
+                >
+                  Add to Queue
+                </Button>
+              </Dialog.Trigger>
+              <Portal>
+                <Dialog.Backdrop />
+
+                <Dialog.Content>
+                  <Dialog.Header>
+                    <Dialog.Title>Add to Queue</Dialog.Title>
+                  </Dialog.Header>
+                  <Dialog.Body>
+                    <Dialog.Description mb="4">
+                      Add selected traces to an annotation queue
+                    </Dialog.Description>
+                    <AddParticipants
+                      annotators={annotators}
+                      setAnnotators={setAnnotators}
+                      queueDrawerOpen={queueDrawerOpen}
+                      sendToQueue={sendToQueue}
+                      isLoading={queueItem.isLoading}
+                    />
+                  </Dialog.Body>
+
+                  <Dialog.CloseTrigger asChild>
+                    <CloseButton size="sm" onClick={() => dialog.onClose()} />
+                  </Dialog.CloseTrigger>
+                </Dialog.Content>
+                <AddAnnotationQueueDrawer
+                  open={queueDrawerOpen.open}
+                  onClose={queueDrawerOpen.onClose}
+                />
+              </Portal>
+            </Dialog.Root>
           </HStack>
         </Box>
       )}

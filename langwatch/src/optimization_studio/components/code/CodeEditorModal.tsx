@@ -12,6 +12,8 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
 
 import monokaiTheme from "./Monokai.json";
 import { useCallback, useEffect, useState } from "react";
+import { registerCompletion } from "monacopilot";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
 export function CodeEditorModal({
   code,
@@ -70,7 +72,7 @@ export function CodeEditorModal({
       >
         <Dialog.Header>
           <Dialog.Title>Edit Code</Dialog.Title>
-          <Dialog.CloseTrigger />
+          <Dialog.CloseTrigger color="white" _hover={{ color: "black" }} />
         </Dialog.Header>
         <Dialog.Body padding="0">
           {open && (
@@ -78,6 +80,8 @@ export function CodeEditorModal({
               code={localCode}
               setCode={setLocalCode}
               onClose={onClose_}
+              language="python"
+              technologies={["python", "dspy"]}
             />
           )}
         </Dialog.Body>
@@ -103,15 +107,21 @@ const onKeyDown = {
   fn: () => {},
 };
 
-function CodeEditor({
+export function CodeEditor({
   code,
   setCode,
   onClose,
+  language,
+  technologies,
 }: {
   code: string;
   setCode: (code: string) => void;
   onClose: () => void;
+  language: string;
+  technologies: string[];
 }) {
+  const { project } = useOrganizationTeamProject();
+
   useEffect(() => {
     onKeyDown.fn = onClose;
   }, [onClose]);
@@ -119,14 +129,14 @@ function CodeEditor({
   return (
     <MonacoEditor
       height="100%"
-      defaultLanguage="python"
+      defaultLanguage={language}
       defaultValue={code}
       onChange={(code) => code && setCode(code)}
       theme="monokai"
       beforeMount={(monaco) => {
         monaco.editor.defineTheme("monokai", monokaiTheme as any);
       }}
-      onMount={(editor) => {
+      onMount={(editor, monaco) => {
         editor.focus();
         editor.onKeyDown((e) => {
           if (e.code === "Escape") {
@@ -134,6 +144,11 @@ function CodeEditor({
             e.preventDefault();
             e.stopPropagation();
           }
+        });
+        registerCompletion(monaco, editor, {
+          language,
+          endpoint: `/api/workflows/code-completion?projectId=${project?.id}`,
+          technologies,
         });
       }}
       options={{

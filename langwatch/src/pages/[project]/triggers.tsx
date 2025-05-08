@@ -14,7 +14,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { Check, TriggerAction } from "@prisma/client";
+import type { Monitor, TriggerAction } from "@prisma/client";
 import { type AlertType } from "@prisma/client";
 import { Bell, Edit2, Filter, MoreVertical, Trash } from "react-feather";
 import {
@@ -29,10 +29,8 @@ import { useDrawer } from "~/components/CurrentDrawer";
 import { HoverableBigText } from "~/components/HoverableBigText";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { SmallLabel } from "~/components/SmallLabel";
-import {
-  DashboardLayout,
-  ProjectSelector,
-} from "../../components/DashboardLayout";
+import { ProjectSelector } from "../../components/DashboardLayout";
+import SettingsLayout from "../../components/SettingsLayout";
 import { Drawer } from "../../components/ui/drawer";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
@@ -281,7 +279,7 @@ export default function Members() {
     return result;
   };
 
-  const applyChecks = (checks: Check[]) => {
+  const applyChecks = (checks: Monitor[]) => {
     if (!checks || checks.length === 0) {
       return null;
     }
@@ -297,7 +295,7 @@ export default function Members() {
   };
 
   return (
-    <DashboardLayout>
+    <SettingsLayout>
       <Container maxW={"calc(100vw - 200px)"} padding={6} marginTop={8}>
         <HStack width="full" align="top" gap={6} paddingBottom={6}>
           <Heading size="lg" as="h1">
@@ -369,7 +367,7 @@ export default function Members() {
                             <VStack gap={2}>
                               {applyChecks(
                                 trigger.checks?.filter(
-                                  (check): check is Check => !!check
+                                  (check): check is Monitor => !!check
                                 ) ?? []
                               )}
 
@@ -505,7 +503,7 @@ export default function Members() {
           </Drawer.Body>
         </Drawer.Content>
       </Drawer.Root>
-    </DashboardLayout>
+    </SettingsLayout>
   );
 }
 

@@ -47,16 +47,23 @@ export default function AuthenticationSettings() {
   const { data: session } = useSession();
   const publicEnv = usePublicEnv();
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
+  const isAzureAD = publicEnv.data?.NEXTAUTH_PROVIDER === "azure-ad";
   const apiContext = api.useContext();
 
-  if (!isAuth0) {
+  if (!isAuth0 && !isAzureAD) {
     return null;
   }
 
   const handleLinkProvider = () => {
-    void signIn("auth0", {
-      callbackUrl: window.location.href,
-    });
+    if (isAuth0) {
+      void signIn("auth0", {
+        callbackUrl: window.location.href,
+      });
+    } else if (isAzureAD) {
+      void signIn("azure-ad", {
+        callbackUrl: window.location.href,
+      });
+    }
   };
 
   const handleUnlink = async (accountId: string) => {

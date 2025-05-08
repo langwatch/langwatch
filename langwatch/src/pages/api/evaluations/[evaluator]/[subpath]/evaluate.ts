@@ -2,12 +2,9 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { prisma } from "../../../../../server/db"; // Adjust the import based on your setup
 
-import { getDebugger } from "../../../../../utils/logger";
+import { createLogger } from "../../../../../utils/logger";
 
-import {
-  CostReferenceType,
-  CostType,
-} from "@prisma/client";
+import { CostReferenceType, CostType } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { nanoid } from "nanoid";
 import { type z } from "zod";
@@ -33,7 +30,7 @@ import {
   getEvaluatorIncludingCustom,
 } from "../../../dataset/evaluate";
 
-export const debug = getDebugger("langwatch:evaluations:evaluate");
+const logger = createLogger("langwatch:evaluations:evaluate");
 
 export default async function handler(
   req: NextApiRequest,
@@ -76,7 +73,7 @@ export async function handleEvaluatorCall(
     .join("/");
   let checkType: string;
 
-  const storedEvaluator = await prisma.check.findUnique({
+  const storedEvaluator = await prisma.monitor.findUnique({
     where: {
       projectId_slug: {
         projectId: project.id,
@@ -102,15 +99,11 @@ export async function handleEvaluatorCall(
   }
 
   let params: EvaluationRESTParams;
+
   try {
     params = evaluationInputSchema.parse(req.body);
   } catch (error) {
-    debug(
-      "Invalid evaluation params received",
-      error,
-      JSON.stringify(req.body, null, "  "),
-      { projectId: project.id }
-    );
+    logger.error({ error, body: req.body, projectId: project.id }, 'invalid evaluation params received');
 
     const validationError = fromZodError(error as ZodError);
     Sentry.captureException(error, {
@@ -151,12 +144,7 @@ export async function handleEvaluatorCall(
       ...(params.settings ? params.settings : {}),
     });
   } catch (error) {
-    debug(
-      "Invalid settings received for the evaluator",
-      error,
-      JSON.stringify(req.body, null, "  "),
-      { projectId: project.id }
-    );
+    logger.error({ error, body: req.body, projectId: project.id }, 'invalid settings received for the evaluator');
 
     const validationError = fromZodError(error as ZodError);
     Sentry.captureException(error, {
@@ -178,12 +166,7 @@ export async function handleEvaluatorCall(
       params.data as Record<string, any>
     );
   } catch (error) {
-    debug(
-      "Invalid evaluation data received",
-      error,
-      JSON.stringify(req.body, null, "  "),
-      { projectId: project.id }
-    );
+    logger.error({ error, body: req.body, projectId: project.id }, 'invalid evaluation data received');
     Sentry.captureException(error, { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);
@@ -228,7 +211,7 @@ export async function handleEvaluatorCall(
         body: req.body,
       },
     });
-    debug("Error running evaluation", error);
+    logger.error({ error, body: req.body, projectId: project.id }, 'error running evaluation');
     result = {
       status: "error",
       error_type: "INTERNAL_ERROR",

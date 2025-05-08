@@ -11,7 +11,7 @@ import { toaster } from "../../../components/ui/toaster";
 export default function NewTraceCheckConfig() {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
-  const createCheck = api.checks.create.useMutation();
+  const createCheck = api.monitors.create.useMutation();
 
   const onSubmit = async (data: CheckConfigFormData) => {
     if (!project || !data.checkType) return;

@@ -141,13 +141,14 @@ function DocumentsMetrics() {
                   </Box>
                 </VStack>
               </Tabs.Trigger>
+              <Tabs.Indicator
+                mt="-1.5px"
+                height="4px"
+                bg="orange.400"
+                borderRadius="1px"
+                bottom={0}
+              />
             </Tabs.List>
-            <Tabs.Indicator
-              mt="-1.5px"
-              height="4px"
-              bg="orange.400"
-              borderRadius="1px"
-            />
             <Tabs.Content value="total-documents">
               <DocumentsCountsTable />
             </Tabs.Content>

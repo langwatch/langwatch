@@ -8,6 +8,8 @@ import {
   type EvaluatorTypes,
 } from "../../evaluations/evaluators.generated";
 import { prisma } from "~/server/db";
+import { mappingStateSchema } from "../../tracer/tracesMapping";
+import { getUserProtectionsForProject } from "../utils";
 
 export const evaluationsRouter = createTRPCRouter({
   availableEvaluators: protectedProcedure
@@ -46,17 +48,20 @@ export const evaluationsRouter = createTRPCRouter({
         ]),
         traceId: z.string(),
         settings: z.object({}).passthrough(),
-        mappings: z.record(z.string(), z.string()).optional(),
+        mappings: mappingStateSchema,
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+
       const result = await runEvaluationForTrace({
         projectId: input.projectId,
         traceId: input.traceId,
         evaluatorType: input.evaluatorType as EvaluatorTypes,
         settings: input.settings,
         mappings: input.mappings ?? {},
+        protections,
       });
 
       return result;
