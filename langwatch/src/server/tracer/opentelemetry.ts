@@ -597,12 +597,6 @@ const addOpenTelemetrySpanAsSpan = (
     delete attributesMap.ai.prompt.toolsChoice;
   }
 
-  params = {
-    ...params,
-    ...removeEmptyKeys(attributesMap),
-    ...(otelScope ? { scope: otelScope } : {}),
-  };
-
   // Exception
   if (
     (otelSpan.status?.code as any) === "STATUS_CODE_ERROR" ||
@@ -713,6 +707,12 @@ const addOpenTelemetrySpanAsSpan = (
       ...customMetadata,
     };
   }
+
+  params = {
+    ...params,
+    ...removeEmptyKeys(attributesMap),
+    ...(otelScope ? { scope: otelScope } : {}),
+  };
 
   const span: BaseSpan & {
     model: LLMSpan["model"];
