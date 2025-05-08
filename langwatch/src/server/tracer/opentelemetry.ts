@@ -25,6 +25,7 @@ import {
   spanTypesSchema,
   typedValueChatMessagesSchema,
 } from "./types.generated";
+import { openTelemetryToLangWatchMetadataMapping } from "./metadata";
 
 export type TraceForCollection = Pick<
   CollectorJob,
@@ -162,6 +163,7 @@ const addOpenTelemetrySpanAsSpan = (
   let input: LLMSpan["input"] = null;
   let output: LLMSpan["output"] = null;
   let params: Span["params"] = {};
+  let metadata = {};
   const started_at: Span["timestamps"]["started_at"] | undefined =
     parseTimestamp(otelSpan.startTimeUnixNano);
   const finished_at: Span["timestamps"]["finished_at"] | undefined =
@@ -358,29 +360,15 @@ const addOpenTelemetrySpanAsSpan = (
       // @ts-ignore
       !Array.isArray(json.metadata)
     ) {
-      // @ts-ignore
-      const metadata = json.metadata;
-      const { reservedTraceMetadata, customMetadata } =
-        extractReservedAndCustomMetadata(metadata);
+      metadata = {
+        ...metadata,
+        ...json.metadata,
+      };
 
-      if (Object.keys(reservedTraceMetadata).length > 0) {
-        trace.reservedTraceMetadata = {
-          ...trace.reservedTraceMetadata,
-          ...reservedTraceMetadata,
-        };
-      }
-
-      if (Object.keys(customMetadata).length > 0) {
-        trace.customMetadata = {
-          ...trace.customMetadata,
-          ...customMetadata,
-        };
-      }
-
-      // @ts-ignore
-      delete json.metadata;
+      json.metadata = void 0;
     }
-    delete attributesMap.traceloop.entity.input;
+
+    attributesMap.traceloop.entity.input = void 0;
   }
 
   // Check for vercel metadata
@@ -388,22 +376,12 @@ const addOpenTelemetrySpanAsSpan = (
     attributesMap.ai?.telemetry?.metadata &&
     typeof attributesMap.ai.telemetry.metadata === "object"
   ) {
-    const { reservedTraceMetadata, customMetadata } =
-      extractReservedAndCustomMetadata(attributesMap.ai.telemetry.metadata);
+    metadata = {
+      ...metadata,
+      ...attributesMap.ai.telemetry.metadata,
+    };
 
-    if (Object.keys(reservedTraceMetadata).length > 0) {
-      trace.reservedTraceMetadata = {
-        ...trace.reservedTraceMetadata,
-        ...reservedTraceMetadata,
-      };
-    }
-    if (Object.keys(customMetadata).length > 0) {
-      trace.customMetadata = {
-        ...trace.customMetadata,
-        ...customMetadata,
-      };
-    }
-    delete attributesMap.ai.telemetry.metadata;
+    attributesMap.ai.telemetry.metadata = void 0;
   }
 
   if (!input && attributesMap.input?.value) {
@@ -556,48 +534,17 @@ const addOpenTelemetrySpanAsSpan = (
     }
   }
 
-  // Metadata
-  if (attributesMap.user?.id) {
-    trace.reservedTraceMetadata.user_id = (attributesMap as any).user.id;
-    delete (attributesMap as any).user.id;
-  }
-
-  if (attributesMap.session?.id) {
-    trace.reservedTraceMetadata.thread_id = (attributesMap as any).session.id;
-    delete (attributesMap as any).session.id;
-  }
-
-  if (attributesMap.tag?.tags && Array.isArray(attributesMap.tag.tags)) {
-    trace.reservedTraceMetadata.labels = (attributesMap as any).tag.tags;
-    delete (attributesMap as any).tag.tags;
-  }
-
   if (
     attributesMap.metadata &&
     typeof attributesMap.metadata === "object" &&
     !Array.isArray(attributesMap.metadata)
   ) {
-    // @ts-ignore
-    const metadata = (attributesMap as any).metadata;
-    const { reservedTraceMetadata, customMetadata } =
-      extractReservedAndCustomMetadata(metadata);
+    metadata = {
+      ...metadata,
+      ...(attributesMap as any).metadata,
+    };
 
-    if (Object.keys(reservedTraceMetadata).length > 0) {
-      trace.reservedTraceMetadata = {
-        ...trace.reservedTraceMetadata,
-        ...reservedTraceMetadata,
-      };
-    }
-
-    if (Object.keys(customMetadata).length > 0) {
-      trace.customMetadata = {
-        ...trace.customMetadata,
-        ...customMetadata,
-      };
-    }
-
-    // @ts-ignore
-    delete attributesMap.metadata;
+    attributesMap.metadata = void 0;
   }
 
   // Metrics
@@ -649,12 +596,6 @@ const addOpenTelemetrySpanAsSpan = (
     };
     delete attributesMap.ai.prompt.toolsChoice;
   }
-
-  params = {
-    ...params,
-    ...removeEmptyKeys(attributesMap),
-    ...(otelScope ? { scope: otelScope } : {}),
-  };
 
   // Exception
   if (
@@ -747,6 +688,31 @@ const addOpenTelemetrySpanAsSpan = (
       (attributesMap as any).langwatch.rag_contexts = void 0;
     }
   }
+
+  // Metadata
+  const mappedMetadata = applyMappingsToMetadata(metadata);
+  const { reservedTraceMetadata, customMetadata } =
+    extractReservedAndCustomMetadata(mappedMetadata);
+
+  if (Object.keys(reservedTraceMetadata).length > 0) {
+    trace.reservedTraceMetadata = {
+      ...trace.reservedTraceMetadata,
+      ...reservedTraceMetadata,
+    };
+  }
+
+  if (Object.keys(customMetadata).length > 0) {
+    trace.customMetadata = {
+      ...trace.customMetadata,
+      ...customMetadata,
+    };
+  }
+
+  params = {
+    ...params,
+    ...removeEmptyKeys(attributesMap),
+    ...(otelScope ? { scope: otelScope } : {}),
+  };
 
   const span: BaseSpan & {
     model: LLMSpan["model"];
@@ -931,6 +897,19 @@ const removeEmptyKeys = (obj: Record<string, any>): Record<string, any> => {
 
   return Object.keys(result).length > 0 ? result : {};
 };
+
+const applyMappingsToMetadata = (metadata: any) => {
+  return Object.fromEntries(
+    Object.entries(metadata).map(([key, value]) => {
+      const langWatchKey = openTelemetryToLangWatchMetadataMapping[key];
+      if (!langWatchKey) {
+        return [key, value];
+      }
+
+      return [langWatchKey, value];
+    })
+  );
+}
 
 const extractReservedAndCustomMetadata = (metadata: any) => {
   if ("threadId" in metadata) {
