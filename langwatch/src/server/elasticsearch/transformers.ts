@@ -54,11 +54,7 @@ export const transformElasticSearchTraceToTrace = (
       ([key]) => key in reservedTraceMetadataSchema.shape
     )
   ) as ReservedTraceMetadata;
-  const customMetadata = Object.fromEntries(
-    Object.entries(metadata).filter(
-      ([key]) => !(key in reservedTraceMetadataSchema.shape)
-    )
-  );
+  const customMetadata = metadata.custom;
 
   let transformedEvents: Event[] = [];
   let transformedEvaluations: Evaluation[] = [];
