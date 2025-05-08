@@ -192,6 +192,6 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
   });
 
   process.on('unhandledRejection', (reason, promise) => {
-    logger.fatal({ reason: reason instanceof Error ? reason : { value: reason }, promise }, 'unhandled rejection detected');logger.fatal({ reason: reason instanceof Error ? reason : { value: reason }, promise }, 'unhandled rejection detected');
+    logger.fatal({ reason: reason instanceof Error ? reason : { value: reason }, promise }, 'unhandled rejection detected');
   });
 };
