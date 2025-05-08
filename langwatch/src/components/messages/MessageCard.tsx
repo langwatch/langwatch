@@ -45,6 +45,7 @@ import {
   parsePythonInsideJson,
 } from "../../utils/parsePythonInsideJson";
 import { Markdown } from "../Markdown";
+import { RedactedField } from "../ui/RedactedField";
 
 export type TraceWithGuardrail = Trace & {
   lastGuardrail: (EvaluationResult & { name?: string }) | undefined;
@@ -144,6 +145,9 @@ export function MessageCard({
   const evaluationsPopover = useDisclosure();
   const { openDrawer } = useDrawer();
 
+  const inputIsJson = isJson(trace.input?.value ?? "");
+  const inputIsPythonRepr = isPythonRepr(trace.input?.value ?? "");
+
   return (
     <VStack
       alignItems="flex-start"
@@ -170,94 +174,97 @@ export function MessageCard({
             Input
           </Box>
           <Box fontWeight="bold">
-            {isJson(trace.input?.value ?? "") ||
-            isPythonRepr(trace.input?.value ?? "") ? (
-              <MessageCardJsonOutput value={trace.input?.value ?? ""} />
-            ) : (
-              <Text lineClamp={1} wordBreak="break-all" lineHeight="2.1em">
-                <Markdown className="markdown markdown-without-margin">
-                  {getExtractedInput(trace)}
-                </Markdown>
-              </Text>
-            )}
+            <RedactedField field="input">
+              {(inputIsJson || inputIsPythonRepr) ? (
+                <MessageCardJsonOutput value={trace.input?.value ?? ""} />
+              ) : (
+                <Text lineClamp={1} wordBreak="break-all" lineHeight="2.1em">
+                  <Markdown className="markdown markdown-without-margin">
+                    {getExtractedInput(trace)}
+                  </Markdown>
+                </Text>
+              )}
+            </RedactedField>
           </Box>
         </VStack>
-        {trace.error && !trace.output?.value ? (
-          <VStack alignItems="flex-start" gap={2}>
-            <Box
-              fontSize="11px"
-              color="red.400"
-              textTransform="uppercase"
-              fontWeight="bold"
-            >
-              Exception
-            </Box>
-            <Text color="red.900">{trace.error.message}</Text>
-          </VStack>
-        ) : (
-          <VStack alignItems="flex-start" gap={2}>
-            <Box
-              fontSize="11px"
-              color="gray.400"
-              textTransform="uppercase"
-              fontWeight="bold"
-            >
-              Generated
-            </Box>
-            <Box wordBreak="break-all">
-              {trace.output?.value &&
-              (isJson(trace.output.value) ||
-                isPythonRepr(trace.output.value)) ? (
-                <MessageCardJsonOutput value={trace.output.value} />
-              ) : trace.output?.value ? (
-                <Markdown className="markdown">
-                  {getSlicedOutput(trace)}
-                </Markdown>
-              ) : trace.lastGuardrail ? (
-                <HStack
-                  align="start"
-                  border="1px solid"
-                  borderColor="gray.300"
-                  borderRadius={6}
-                  padding={4}
-                  gap={4}
-                >
-                  <HStack>
-                    <Box
-                      color="blue.700"
-                      background="blue.100"
-                      borderRadius="100%"
-                      padding="6px"
-                    >
-                      <Shield size="26px" />
-                    </Box>
+        <RedactedField field="output">
+          {trace.error && !trace.output?.value ? (
+            <VStack alignItems="flex-start" gap={2}>
+              <Box
+                fontSize="11px"
+                color="red.400"
+                textTransform="uppercase"
+                fontWeight="bold"
+              >
+                Exception
+              </Box>
+              <Text color="red.900">{trace.error.message}</Text>
+            </VStack>
+          ) : (
+            <VStack alignItems="flex-start" gap={2}>
+              <Box
+                fontSize="11px"
+                color="gray.400"
+                textTransform="uppercase"
+                fontWeight="bold"
+              >
+                Generated
+              </Box>
+              <Box wordBreak="break-all">
+                {trace.output?.value &&
+                (isJson(trace.output.value) ||
+                  isPythonRepr(trace.output.value)) ? (
+                  <MessageCardJsonOutput value={trace.output.value} />
+                ) : trace.output?.value ? (
+                  <Markdown className="markdown">
+                    {getSlicedOutput(trace)}
+                  </Markdown>
+                ) : trace.lastGuardrail ? (
+                  <HStack
+                    align="start"
+                    border="1px solid"
+                    borderColor="gray.300"
+                    borderRadius={6}
+                    padding={4}
+                    gap={4}
+                  >
+                    <HStack>
+                      <Box
+                        color="blue.700"
+                        background="blue.100"
+                        borderRadius="100%"
+                        padding="6px"
+                      >
+                        <Shield size="26px" />
+                      </Box>
+                    </HStack>
+                    <VStack align="start">
+                      <Text>Blocked by Guardrail</Text>
+                      <Text fontSize="13px">
+                        {trace.lastGuardrail.details
+                          ? trace.lastGuardrail.details
+                          : trace.lastGuardrail.name}
+                      </Text>
+                    </VStack>
                   </HStack>
-                  <VStack align="start">
-                    <Text>Blocked by Guardrail</Text>
-                    <Text fontSize="13px">
-                      {trace.lastGuardrail.details
-                        ? trace.lastGuardrail.details
-                        : trace.lastGuardrail.name}
-                    </Text>
-                  </VStack>
-                </HStack>
-              ) : (
-                <Text>{"<empty>"}</Text>
+                ) : (
+                  <Text>{"<empty>"}</Text>
+                )}
+              </Box>
+              {trace.expected_output && (
+                <Alert.Root status="warning" fontSize="13px">
+                  <Alert.Indicator>
+                    <CornerDownRight size="16" />
+                  </Alert.Indicator>
+                  <Alert.Content>
+                    <Alert.Title>Expected Output:</Alert.Title>
+                    <Text>{getSlicedExpectedOutput(trace)}</Text>
+                  </Alert.Content>
+                </Alert.Root>
               )}
-            </Box>
-            {trace.expected_output && (
-              <Alert.Root status="warning" fontSize="13px">
-                <Alert.Indicator>
-                  <CornerDownRight size="16" />
-                </Alert.Indicator>
-                <Alert.Content>
-                  <Alert.Title>Expected Output:</Alert.Title>
-                  <Text>{getSlicedExpectedOutput(trace)}</Text>
-                </Alert.Content>
-              </Alert.Root>
-            )}
-          </VStack>
-        )}
+            </VStack>
+          )}
+        </RedactedField>
       </VStack>
       <Spacer />
       <HStack width="full" alignItems="flex-end">
