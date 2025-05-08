@@ -28,3 +28,6 @@ def get_api_key() -> str:
         return os.getenv("LANGWATCH_API_KEY", "")
     return __instance.api_key
 
+def set_api_key(api_key: str) -> None:
+    """Set the current API key of the LangWatch client."""
+    get_instance().api_key = api_key
