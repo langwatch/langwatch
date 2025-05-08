@@ -1,15 +1,4 @@
-import {
-  Box,
-  Card,
-  CardBody,
-  CardHeader,
-  GridItem,
-  HStack,
-  Heading,
-  SimpleGrid,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Card, GridItem, HStack, Heading, SimpleGrid } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
 import GraphsLayout from "~/components/GraphsLayout";
 import {
@@ -17,11 +6,9 @@ import {
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
 import { SatisfactionGraphs } from "~/components/analytics/SatisfactionGraph";
-import { SessionsSummary } from "~/components/analytics/SessionsSummary";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { FeedbacksTable } from "../../../components/analytics/FeedbacksTable";
-import { api } from "../../../utils/api";
 import { QuickwitNote } from "../../../components/analytics/QuickwitNote";
 import { usePublicEnv } from "../../../hooks/usePublicEnv";
 
@@ -50,22 +37,6 @@ const messagesCount = {
       colorSet: "blueTones",
       metric: "metadata.user_id",
       aggregation: "cardinality",
-    },
-    {
-      name: "Threads count",
-      colorSet: "greenTones",
-      metric: "metadata.thread_id",
-      aggregation: "cardinality",
-    },
-    {
-      name: "Average threads per user",
-      colorSet: "greenTones",
-      metric: "metadata.thread_id",
-      aggregation: "cardinality",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
     },
   ],
   includePrevious: false,
@@ -184,6 +155,43 @@ const maxMessagePerThread = {
   height: 300,
 };
 
+const userThreads = {
+  graphId: "custom",
+  graphType: "summary",
+  series: [
+    {
+      name: "Threads count",
+      colorSet: "greenTones",
+      metric: "metadata.thread_id",
+      aggregation: "cardinality",
+    },
+
+    {
+      name: "Average threads per user",
+      colorSet: "greenTones",
+      metric: "metadata.thread_id",
+      aggregation: "cardinality",
+      pipeline: {
+        field: "user_id",
+        aggregation: "avg",
+      },
+    },
+    {
+      name: "Average thread duration",
+      colorSet: "purpleTones",
+      metric: "threads.average_duration_per_thread",
+      aggregation: "avg",
+      pipeline: {
+        field: "user_id",
+        aggregation: "avg",
+      },
+    },
+  ],
+  includePrevious: false,
+  timeScale: "1",
+  height: 300,
+};
+
 export default function Users() {
   const publicEnv = usePublicEnv();
   const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
@@ -205,7 +213,14 @@ export default function Users() {
             </Card.Root>
           </GridItem>
           <GridItem colSpan={2} display="inline-grid">
-            <SessionsSummary />
+            <Card.Root overflow="scroll">
+              <Card.Header>
+                <Heading size="sm">User Threads</Heading>
+              </Card.Header>
+              <Card.Body>
+                <CustomGraph input={userThreads as CustomGraphInput} />
+              </Card.Body>
+            </Card.Root>
           </GridItem>
 
           <GridItem colSpan={2} display="inline-grid">

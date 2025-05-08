@@ -1,6 +1,6 @@
 import { EvaluationExecutionMode } from "@prisma/client";
 import crypto from "crypto";
-import slugify from "slugify";
+import { slugify } from "../../../../utils/slugify";
 import type { EvaluatorTypes } from "../../../../server/evaluations/evaluators.generated";
 import {
   evaluatePreconditions,
@@ -13,6 +13,9 @@ import { type Span } from "../../../tracer/types";
 import { elasticSearchEvaluationSchema } from "../../../tracer/types.generated";
 import { scheduleEvaluation } from "../../queues/evaluationsQueue";
 import type { CollectorJob, EvaluationJob } from "../../types";
+import { createLogger } from "../../../../utils/logger";
+
+const logger = createLogger("langwatch:workers:collector:evaluations");
 
 export const evaluationNameAutoslug = (name: string) => {
   const autoslug = slugify(name || "unnamed", {
@@ -78,7 +81,7 @@ export const scheduleEvaluations = async (
     return;
   }
 
-  const checks = await prisma.check.findMany({
+  const checks = await prisma.monitor.findMany({
     where: {
       projectId: trace.project_id,
       enabled: true,

@@ -3,7 +3,6 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 import { nanoid } from "nanoid";
-import slugify from "slugify";
 import {
   datasetRecordEntrySchema,
   datasetRecordFormSchema,
@@ -12,22 +11,45 @@ import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import { createManyDatasetRecords } from "./datasetRecord";
 import { tryToMapPreviousColumnsToNewColumns } from "../../../optimization_studio/utils/datasetUtils";
 import type { DatasetColumns, DatasetRecordEntry } from "../../datasets/types";
+import { prisma } from "../../db";
+import { slugify } from "../../../utils/slugify";
+
+const getOrgCanUseS3FromProject = async (projectId: string) => {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: { team: { include: { organization: true } } },
+  });
+
+  return {
+    canUseS3: project?.team?.organization?.useCustomS3,
+  };
+};
 
 export const datasetRouter = createTRPCRouter({
   upsert: protectedProcedure
     .input(
       z.intersection(
         z.object({
-          datasetId: z.string().optional(),
           projectId: z.string(),
           datasetRecords: z.array(datasetRecordEntrySchema).optional(),
         }),
-        datasetRecordFormSchema
+        z.union([
+          datasetRecordFormSchema.extend({
+            datasetId: z.string().optional(),
+          }),
+          datasetRecordFormSchema
+            .omit({
+              name: true,
+            })
+            .extend({
+              experimentId: z.string(),
+            }),
+        ])
       )
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      if (input.datasetId) {
+      if ("datasetId" in input && input.datasetId) {
         const existingDataset = await ctx.prisma.dataset.findFirst({
           where: {
             id: input.datasetId,
@@ -87,7 +109,15 @@ export const datasetRouter = createTRPCRouter({
         });
       }
 
-      const slug = slugify(input.name.replace("_", "-"), {
+      const name =
+        "name" in input
+          ? input.name
+          : await findNextDatasetNameForExperiment(
+              input.projectId,
+              input.experimentId
+            );
+
+      const slug = slugify(name.replace("_", "-"), {
         lower: true,
         strict: true,
       });
@@ -106,13 +136,16 @@ export const datasetRouter = createTRPCRouter({
         });
       }
 
+      const { canUseS3 } = await getOrgCanUseS3FromProject(input.projectId);
+
       const dataset = await ctx.prisma.dataset.create({
         data: {
-          id: nanoid(),
+          id: `dataset-${nanoid()}`,
           slug,
-          name: input.name,
+          name,
           projectId: input.projectId,
           columnTypes: input.columnTypes,
+          useS3: canUseS3,
         },
       });
 
@@ -173,10 +206,7 @@ export const datasetRouter = createTRPCRouter({
           },
         })
       )?.name;
-      const slug = slugify(datasetName?.replace("_", "-") ?? "", {
-        lower: true,
-        strict: true,
-      });
+      const slug = slugify(datasetName ?? "");
 
       await ctx.prisma.dataset.update({
         where: {
@@ -211,3 +241,40 @@ export const datasetRouter = createTRPCRouter({
       });
     }),
 });
+
+const findNextDatasetNameForExperiment = async (
+  projectId: string,
+  experimentId: string
+) => {
+  const experiment = await prisma.experiment.findFirst({
+    where: { id: experimentId, projectId },
+  });
+
+  return await findNextName(projectId, experiment?.name ?? "Draft Dataset");
+};
+
+const findNextName = async (projectId: string, name: string) => {
+  const datasets = await prisma.dataset.findMany({
+    select: {
+      name: true,
+      slug: true,
+    },
+    where: {
+      projectId: projectId,
+    },
+  });
+
+  const slugs = new Set(datasets.map((dataset) => dataset.slug));
+
+  let draftName;
+  let index = 1;
+  while (true) {
+    draftName = index === 1 ? name : `${name} (${index})`;
+    if (!slugs.has(slugify(draftName))) {
+      break;
+    }
+    index++;
+  }
+
+  return draftName;
+};

@@ -15,22 +15,19 @@ async def main(message: cl.Message):
         content="",
     )
 
-    trace = langwatch.trace(
+    with langwatch.trace(
         trace_id=uuid.uuid4(),
-    )
-    span = trace.span(
-        type="span",
-        input=message.content,
-    )
-    nested_span = span.span(
-        type="llm", input=message.content, model="openai/gpt-4o-mini"
-    )
-
-    time.sleep(1)  # generating the message...
-    generated_message = "Hello there! How can I help from low level?"
-
-    nested_span.end(output=generated_message)
-    span.end()
+    ) as trace:
+        with trace.span(
+            type="span",
+            input=message.content,
+        ) as span:
+            with span.span(
+                type="llm", input=message.content, model="openai/gpt-4o-mini"
+            ) as nested_span:
+                time.sleep(1)  # generating the message...
+                generated_message = "Hello there! How can I help from low level?"
+                nested_span.update(output=generated_message)
 
     trace.deferred_send_spans()
 

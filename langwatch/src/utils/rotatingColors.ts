@@ -83,6 +83,7 @@ export const rotatingColors = {
   cyanTones: tones("cyan"),
   pinkTones: tones("pink"),
   grayTones: tones("gray"),
+  redTones: tones("red"),
 } satisfies Record<string, { background: string; color: string }[]>;
 
 const colorMap: Record<string, { background: string; color: string }> = {};

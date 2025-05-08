@@ -8,7 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
@@ -17,11 +17,137 @@ import { EmojiPickerModal } from "../properties/modals/EmojiPickerModal";
 import { trackEvent } from "../../../utils/tracking";
 import { toaster } from "../../../components/ui/toaster";
 import { Dialog } from "../../../components/ui/dialog";
+import { DEFAULT_MODEL } from "../../../utils/constants";
 
 type FormData = {
   name: string;
   icon: string;
   description: string;
+};
+
+export const getRandomWorkflowIcon = () => {
+  const randomObjectEmojis = [
+    // Productivity & Work
+    "🧩",
+    "⚙️",
+    "📊",
+    "📈",
+    "🧠",
+    "🤖",
+    "📝",
+    "📋",
+    "🔍",
+    "🛠️",
+    "🔧",
+    "🧪",
+    "📦",
+
+    // Communication & Networking
+    "💬",
+    "🔔",
+    "📨",
+    "🔗",
+    "📡",
+    "🌐",
+    "📱",
+
+    // Creative & Design
+    "🎨",
+    "✏️",
+    "🖌️",
+    "📷",
+    "🎬",
+    "🎭",
+
+    // Data & Information
+    "📊",
+    "📈",
+    "📉",
+    "🔢",
+    "📚",
+
+    // Security & Protection
+    "🔒",
+    "🛡️",
+    "🔑",
+    "👁️",
+
+    // Special Purpose
+    "🚀",
+    "⚡",
+    "💡",
+    "🧲",
+    "🧵",
+    "🔮",
+    "🎯",
+    "⏱️",
+    "🧬",
+    "🧶",
+    "🌟",
+    "🎁",
+    "🌱",
+
+    // Industry-Specific
+    "🏦",
+    "🏥",
+    "🛒",
+    "🎓",
+    "🗃️",
+    "🏭",
+
+    // Magical/Fantasy
+    "✨",
+    "🌈",
+    "🧙‍♂️",
+    "🦄",
+    "🧚",
+
+    // Animals with Personality
+    "🦊",
+    "🦉",
+    "🐙",
+    "🦁",
+    "🐢",
+    "🦅",
+    "🦋",
+
+    // Food & Drink
+    "🍕",
+    "🍦",
+    "🥤",
+    "🍪",
+    "🧁",
+    "🍯",
+
+    // Fun Objects
+    "🎮",
+    "🎲",
+    "🧸",
+    "🎪",
+    "🎡",
+    "🪄",
+
+    // Weather & Nature
+    "🌊",
+    "🔥",
+    "🍂",
+    "🌵",
+
+    // Transportation
+    "🚁",
+    "🚂",
+    "🚗",
+    "🛸",
+
+    // Sports & Activities
+    "🏄‍♂️",
+    "🧗‍♀️",
+    "🏆",
+  ];
+
+  return randomObjectEmojis[
+    Math.floor(Math.random() * randomObjectEmojis.length)
+  ]!;
 };
 
 export const NewWorkflowForm = ({
@@ -34,6 +160,13 @@ export const NewWorkflowForm = ({
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const emojiPicker = useDisclosure();
+
+  const [defaultIcon] = useState(
+    template.icon && template.icon !== "🧩"
+      ? template.icon
+      : getRandomWorkflowIcon()
+  );
+
   const {
     register,
     handleSubmit,
@@ -43,7 +176,7 @@ export const NewWorkflowForm = ({
   } = useForm<FormData>({
     defaultValues: {
       name: template.name ?? "New Workflow",
-      icon: template.icon ?? "🧩",
+      icon: defaultIcon,
       description: template.description ?? "",
     },
   });
@@ -58,7 +191,11 @@ export const NewWorkflowForm = ({
         ...template,
         name: data.name,
         description: data.description,
-        icon: data.icon ?? "🧩",
+        icon: data.icon ?? defaultIcon,
+        default_llm: {
+          ...template.default_llm,
+          model: project?.defaultModel ?? DEFAULT_MODEL,
+        },
       };
       const createdWorkflow = await createWorkflowMutation.mutateAsync(
         {
@@ -100,7 +237,7 @@ export const NewWorkflowForm = ({
       nameRef.current.focus();
     }
     setValue("name", template.name ?? "New Workflow");
-    setValue("icon", template.icon ?? "🧩");
+    setValue("icon", defaultIcon);
     setValue("description", template.description ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [template]);
@@ -121,7 +258,9 @@ export const NewWorkflowForm = ({
             />
             <Field.Label>Name and Icon</Field.Label>
             <HStack>
-              <Button onClick={emojiPicker.onOpen}>{icon}</Button>
+              <Button onClick={emojiPicker.onOpen} fontSize="18px">
+                {icon}
+              </Button>
               <Input
                 {...register("name", { required: "Name is required" })}
                 ref={nameRef}

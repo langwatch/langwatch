@@ -4,14 +4,14 @@ import { captureError } from "../../../utils/captureError";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
-import { getDebugger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger";
 import { QueueWithFallback } from "./queueWithFallback";
 import { runEvaluationJob } from "../workers/evaluationsWorker";
 import type { ConnectionOptions } from "bullmq";
 
 export const EVALUATIONS_QUEUE_NAME = "evaluations";
 
-const debug = getDebugger("langwatch:evaluations:queue");
+const logger = createLogger("langwatch:evaluations:queue");
 
 export const evaluationsQueue = new QueueWithFallback<
   EvaluationJob,
@@ -58,15 +58,11 @@ export const scheduleEvaluation = async ({
   if (currentJob) {
     const state = await currentJob.getState();
     if (state == "failed" || state == "completed") {
-      debug(
-        `retrying ${check.type} (checkId: ${check.evaluator_id}) for trace ${trace.trace_id}`
-      );
+      logger.info({ check, trace, state }, 'retrying'); 
       await currentJob.retry(state);
     }
   } else {
-    debug(
-      `scheduling ${check.type} (checkId: ${check.evaluator_id}) for trace ${trace.trace_id}`
-    );
+    logger.info({ check, trace }, 'scheduling');
     await evaluationsQueue.add(
       check.type,
       {
@@ -148,7 +144,8 @@ export const updateEvaluationStatusInES = async ({
   // Random delay to avoid elasticsearch update collisions
   await new Promise((resolve) => setTimeout(resolve, Math.random() * 1000));
 
-  await esClient.update({
+  const client = await esClient({ projectId: trace.project_id });
+  await client.update({
     index: TRACE_INDEX.alias,
     id: traceIndexId({
       traceId: trace.trace_id,

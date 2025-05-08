@@ -2,9 +2,10 @@ import { Client as ElasticClient } from "@elastic/elasticsearch";
 import { Client as OpenSearchClient } from "@opensearch-project/opensearch";
 
 import { env } from "../env.mjs";
-import { patchForOpensearchCompatibility } from "./elasticsearch/opensearchCompatibility";
-import { patchForQuickwitCompatibility } from "./elasticsearch/quickwitCompatibility";
-
+import { patchForOpensearchCompatibility } from "./elasticsearch/patchOpensearchCompatibility";
+import { patchForQuickwitCompatibility } from "./elasticsearch/patchQuickwitCompatibility";
+import { prisma } from "./db";
+import { decrypt } from "../utils/encryption";
 export type IndexSpec = {
   alias: string;
   base: string;
@@ -27,32 +28,92 @@ export const BATCH_EVALUATION_INDEX: IndexSpec = {
   alias: "search-batch-evaluations-alias",
 };
 
-export const esClient =
-  !!env.IS_OPENSEARCH || !!env.IS_QUICKWIT
-    ? (new OpenSearchClient({
-        node: env.ELASTICSEARCH_NODE_URL?.replace("quickwit://", "http://"),
-      }) as unknown as ElasticClient)
-    : new ElasticClient({
-        node: env.ELASTICSEARCH_NODE_URL ?? "http://bogus:9200",
-        ...(env.ELASTICSEARCH_API_KEY
-          ? {
-              auth: {
-                apiKey: env.ELASTICSEARCH_API_KEY,
-              },
-            }
-          : {}),
+const getOrgElasticsearchDetailsFromProject = async (projectId: string) => {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: { team: { include: { organization: true } } },
+  });
+
+  return project?.team.organization ?? null;
+};
+
+export const esClient = async (
+  args: { projectId: string } | { organizationId: string } | { test: true }
+) => {
+  let elasticsearchNodeUrl: string | null = null;
+  let elasticsearchApiKey: string | null = null;
+
+  if ("test" in args) {
+    // For tests, directly use environment variables
+    elasticsearchNodeUrl = env.ELASTICSEARCH_NODE_URL ?? null;
+    elasticsearchApiKey = env.ELASTICSEARCH_API_KEY ?? null;
+  } else {
+    // For non-test cases, check org-specific settings first
+    let orgElasticsearchNodeUrl: string | null = null;
+    let orgElasticsearchApiKey: string | null = null;
+
+    if ("organizationId" in args) {
+      const organization = await prisma.organization.findUnique({
+        where: { id: args.organizationId },
       });
+      orgElasticsearchNodeUrl = organization?.elasticsearchNodeUrl
+        ? decrypt(organization.elasticsearchNodeUrl)
+        : null;
+      orgElasticsearchApiKey = organization?.elasticsearchApiKey
+        ? decrypt(organization.elasticsearchApiKey)
+        : null;
+    } else if ("projectId" in args) {
+      const project = await getOrgElasticsearchDetailsFromProject(
+        args.projectId
+      );
+      orgElasticsearchNodeUrl = project?.elasticsearchNodeUrl
+        ? decrypt(project.elasticsearchNodeUrl)
+        : null;
+      orgElasticsearchApiKey = project?.elasticsearchApiKey
+        ? decrypt(project.elasticsearchApiKey)
+        : null;
+    }
+
+    // Use org settings if available, otherwise fall back to env vars
+    const useOrgSettings = orgElasticsearchNodeUrl && orgElasticsearchApiKey;
+    elasticsearchNodeUrl = useOrgSettings
+      ? orgElasticsearchNodeUrl
+      : env.ELASTICSEARCH_NODE_URL ?? null;
+    elasticsearchApiKey = useOrgSettings
+      ? orgElasticsearchApiKey
+      : env.ELASTICSEARCH_API_KEY ?? null;
+  }
+
+  const client =
+    !!env.IS_OPENSEARCH || !!env.IS_QUICKWIT
+      ? (new OpenSearchClient({
+          node: elasticsearchNodeUrl?.replace("quickwit://", "http://"),
+        }) as unknown as ElasticClient)
+      : new ElasticClient({
+          node: elasticsearchNodeUrl ?? "http://bogus:9200",
+          ...(elasticsearchApiKey
+            ? {
+                auth: {
+                  apiKey: elasticsearchApiKey,
+                },
+              }
+            : {}),
+        });
+
+  // Apply patches to this specific client instance
+  if (env.IS_OPENSEARCH) {
+    patchForOpensearchCompatibility(client);
+  }
+
+  if (env.IS_QUICKWIT) {
+    patchForOpensearchCompatibility(client);
+    patchForQuickwitCompatibility(client);
+  }
+
+  return client;
+};
 
 export const FLATENNED_TYPE = env.IS_OPENSEARCH ? "flat_object" : "flattened";
-
-if (env.IS_OPENSEARCH) {
-  patchForOpensearchCompatibility(esClient);
-}
-
-if (env.IS_QUICKWIT) {
-  patchForOpensearchCompatibility(esClient);
-  patchForQuickwitCompatibility(esClient);
-}
 
 export const traceIndexId = ({
   traceId,

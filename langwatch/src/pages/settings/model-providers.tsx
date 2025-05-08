@@ -44,6 +44,7 @@ import { toaster } from "../../components/ui/toaster";
 import {
   DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
+  DEFAULT_MODEL,
 } from "../../utils/constants";
 
 export default function ModelsPage() {
@@ -110,8 +111,27 @@ export default function ModelsPage() {
             </VStack>
           </Card.Body>
         </Card.Root>
-        <TopicClusteringModel />
-        <EmbeddingsModel />
+
+        <VStack width="full" align="start" gap={6}>
+          <VStack gap={2} marginTop={2} align="start" width="full">
+            <Heading size="md" as="h2">
+              Default Models
+            </Heading>
+            <Text>
+              Configure the default models used on workflows, evaluations and
+              other LangWatch features.
+            </Text>
+          </VStack>
+          <Card.Root width="full">
+            <Card.Body width="full">
+              <VStack gap={0} width="full" align="stretch">
+                <DefaultModel />
+                <TopicClusteringModel />
+                <EmbeddingsModel />
+              </VStack>
+            </Card.Body>
+          </Card.Root>
+        </VStack>
       </VStack>
     </SettingsLayout>
   );
@@ -267,7 +287,6 @@ function ModelProviderForm({
       await refetch();
     },
     [
-      enabledField,
       updateMutation,
       provider.id,
       provider.provider,
@@ -317,14 +336,7 @@ function ModelProviderForm({
         )
       );
     },
-    [
-      useCustomKeysField,
-      setValue,
-      provider,
-      deleteMutation,
-      project?.id,
-      refetch,
-    ]
+    [setValue, provider, deleteMutation, project?.id, refetch]
   );
 
   const providerKeys =
@@ -376,6 +388,7 @@ function ModelProviderForm({
               </Field.Root>
               <Field.Root>
                 <Checkbox
+                  // eslint-disable-next-line @typescript-eslint/no-misused-promises
                   onChange={onUseCustomKeysChange}
                   checked={isUseCustomKeys}
                   flexShrink={0}
@@ -502,6 +515,71 @@ function ModelProviderForm({
   );
 }
 
+type DefaultModelForm = {
+  defaultModel: string;
+};
+
+function DefaultModel() {
+  const { project } = useOrganizationTeamProject();
+  const updateDefaultModel = api.project.updateDefaultModel.useMutation();
+
+  const { register, handleSubmit, control } = useForm<DefaultModelForm>({
+    defaultValues: {
+      defaultModel: project?.defaultModel ?? DEFAULT_MODEL,
+    },
+  });
+
+  const defaultModelField = register("defaultModel");
+
+  const onUpdateSubmit = useCallback(
+    async (data: DefaultModelForm) => {
+      await updateDefaultModel.mutateAsync({
+        projectId: project?.id ?? "",
+        defaultModel: data.defaultModel,
+      });
+      toaster.create({
+        title: "Default Model Updated",
+        type: "success",
+        duration: 3000,
+        meta: {
+          closable: true,
+        },
+      });
+    },
+    [updateDefaultModel, project?.id]
+  );
+
+  return (
+    <HorizontalFormControl
+      label="Default Model"
+      helper="For general tasks within LangWatch"
+      paddingY={4}
+      borderBottomWidth="1px"
+    >
+      <HStack>
+        <Controller
+          name={defaultModelField.name}
+          control={control}
+          render={({ field }) => (
+            <ModelSelector
+              model={field.value}
+              options={modelSelectorOptions
+                .filter((option) => option.mode === "chat")
+                .map((option) => option.value)}
+              onChange={(model) => {
+                field.onChange(model);
+                void handleSubmit(onUpdateSubmit)();
+              }}
+              mode="chat"
+            />
+          )}
+        />
+        {updateDefaultModel.isLoading && <Spinner size="sm" marginRight={2} />}
+      </HStack>
+    </HorizontalFormControl>
+  );
+}
+
 type TopicClusteringModelForm = {
   topicClusteringModel: string;
 };
@@ -532,46 +610,46 @@ function TopicClusteringModel() {
         projectId: project?.id ?? "",
         topicClusteringModel: data.topicClusteringModel,
       });
+      toaster.create({
+        title: "Topic Clustering Model Updated",
+        type: "success",
+        duration: 3000,
+        meta: {
+          closable: true,
+        },
+      });
     },
     [updateTopicClusteringModel, project?.id]
   );
 
   return (
-    <>
-      <HStack width="full" marginTop={6}>
-        <Heading size="md" as="h2">
-          Topic Clustering Model
-        </Heading>
-        <Spacer />
-        {updateTopicClusteringModel.isLoading && <Spinner />}
-      </HStack>
-      <Text>
-        Select which model will be used to generate the topic names based on the
-        messages
-      </Text>
-      <Card.Root width="full">
-        <Card.Body width="full">
-          <HorizontalFormControl label="Topic Clustering Model" helper="">
-            <Controller
-              name={topicClusteringModelField.name}
-              control={control}
-              render={({ field }) => (
-                <ModelSelector
-                  model={field.value}
-                  options={allowedTopicClusteringModels}
-                  // eslint-disable-next-line @typescript-eslint/no-misused-promises
-                  onChange={(model) => {
-                    field.onChange(model);
-                    void handleSubmit(onUpdateSubmit)();
-                  }}
-                  mode="chat"
-                />
-              )}
+    <HorizontalFormControl
+      label="Topic Clustering Model"
+      helper="For generating topic names"
+      paddingY={4}
+      borderBottomWidth="1px"
+    >
+      <HStack>
+        <Controller
+          name={topicClusteringModelField.name}
+          control={control}
+          render={({ field }) => (
+            <ModelSelector
+              model={field.value}
+              options={allowedTopicClusteringModels}
+              onChange={(model) => {
+                field.onChange(model);
+                void handleSubmit(onUpdateSubmit)();
+              }}
+              mode="chat"
             />
-          </HorizontalFormControl>
-        </Card.Body>
-      </Card.Root>
-    </>
+          )}
+        />
+        {updateTopicClusteringModel.isLoading && (
+          <Spinner size="sm" marginRight={2} />
+        )}
+      </HStack>
+    </HorizontalFormControl>
   );
 }
 
@@ -593,46 +671,46 @@ function EmbeddingsModel() {
         projectId: project?.id ?? "",
         embeddingsModel: data.embeddingsModel,
       });
+      toaster.create({
+        title: "Embeddings Model Updated",
+        type: "success",
+        duration: 3000,
+        meta: {
+          closable: true,
+        },
+      });
     },
     [updateEmbeddingsModel, project?.id]
   );
 
   return (
-    <>
-      <HStack width="full" marginTop={6}>
-        <Heading size="md" as="h2">
-          Embeddings Model
-        </Heading>
-        <Spacer />
-        {updateEmbeddingsModel.isLoading && <Spinner />}
-      </HStack>
-      <Text>
-        Select which model will be used to generate embeddings for the messages
-      </Text>
-      <Card.Root width="full">
-        <Card.Body width="full">
-          <HorizontalFormControl label="Embeddings Model" helper="">
-            <Controller
-              name={embeddingsModelField.name}
-              control={control}
-              render={({ field }) => (
-                <ModelSelector
-                  model={field.value}
-                  options={modelSelectorOptions
-                    .filter((option) => option.mode === "embedding")
-                    .map((option) => option.value)}
-                  // eslint-disable-next-line @typescript-eslint/no-misused-promises
-                  onChange={(model) => {
-                    field.onChange(model);
-                    void handleSubmit(onUpdateSubmit)();
-                  }}
-                  mode="embedding"
-                />
-              )}
+    <HorizontalFormControl
+      label="Embeddings Model"
+      helper="For embeddings to be used in topic clustering and evaluations"
+      paddingY={4}
+    >
+      <HStack>
+        <Controller
+          name={embeddingsModelField.name}
+          control={control}
+          render={({ field }) => (
+            <ModelSelector
+              model={field.value}
+              options={modelSelectorOptions
+                .filter((option) => option.mode === "embedding")
+                .map((option) => option.value)}
+              onChange={(model) => {
+                field.onChange(model);
+                void handleSubmit(onUpdateSubmit)();
+              }}
+              mode="embedding"
             />
-          </HorizontalFormControl>
-        </Card.Body>
-      </Card.Root>
-    </>
+          )}
+        />
+        {updateEmbeddingsModel.isLoading && (
+          <Spinner size="sm" marginRight={2} />
+        )}
+      </HStack>
+    </HorizontalFormControl>
   );
 }

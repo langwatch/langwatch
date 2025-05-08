@@ -17,6 +17,8 @@ class FieldType(str, Enum):
     list_int = "list[int]"
     list_bool = "list[bool]"
     dict = "dict"
+    json_schema = "json_schema"
+    chat_messages = "chat_messages"
     signature = "signature"
     llm = "llm"
     prompting_technique = "prompting_technique"
@@ -32,6 +34,7 @@ class Field(BaseModel):
     desc: Optional[str] = None
     prefix: Optional[str] = None
     hidden: Optional[bool] = None
+    json_schema: Optional[Dict[str, Any]] = None
 
 
 class ExecutionStatus(str, Enum):
@@ -127,9 +130,6 @@ class Entry(BaseComponent):
 
 class Signature(BaseComponent):
     pass
-    # prompt: Optional[str] = None
-    # llm: Optional[LLMConfig] = None
-    # demonstrations: Optional[NodeDataset] = None
 
 
 class PromptingTechnique(BaseComponent):
@@ -268,12 +268,15 @@ class WorkflowState(BaseModel):
 class Workflow(BaseModel):
     api_key: str
     workflow_id: str
+    experiment_id: Optional[str] = None
     spec_version: str
     name: str
     icon: str
     description: str
     version: str
+    default_llm: Optional[LLMConfig] = None
     nodes: List[Node]
     edges: List[Edge]
     state: WorkflowState
+    template_adapter: Literal["default", "dspy_chat_adapter"]
     enable_tracing: Optional[bool] = True

@@ -29,7 +29,7 @@ import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { evaluatePreconditions } from "../../server/evaluations/preconditions";
 import type { CheckPreconditions } from "../../server/evaluations/types";
 import { type ElasticSearchSpan } from "../../server/tracer/types";
-import { elasticSearchSpanToSpan } from "../../server/tracer/utils";
+import { transformElasticSearchSpanToSpan } from "../../server/elasticsearch/transformers";
 import { api } from "../../utils/api";
 import { formatMoney } from "../../utils/formatMoney";
 import type { Money } from "../../utils/types";
@@ -43,6 +43,7 @@ import type { CheckConfigFormData } from "./CheckConfigForm";
 import { evaluationStatusColor } from "./EvaluationStatus";
 import { toaster } from "../../components/ui/toaster";
 import { InputGroup } from "../ui/input-group";
+import { RedactedField } from "../ui/RedactedField";
 
 export function TryItOut({
   form,
@@ -107,7 +108,11 @@ export function TryItOut({
           evaluatorType,
           trace,
           (trace.spans ?? []).map((span) =>
-            elasticSearchSpanToSpan(span as ElasticSearchSpan)
+            transformElasticSearchSpanToSpan(span as ElasticSearchSpan, {
+              canSeeCapturedInput: true,
+              canSeeCapturedOutput: true,
+              canSeeCosts: true,
+            })
           ),
           preconditions
         )
@@ -464,13 +469,15 @@ export function TryItOut({
                                   : undefined
                               }
                             >
-                              <Text
-                                lineClamp={1}
-                                wordBreak="break-all"
-                                display="block"
-                              >
-                                {trace.input?.value ?? "<empty>"}
-                              </Text>
+                              <RedactedField field="input">
+                                <Text
+                                  lineClamp={1}
+                                  wordBreak="break-all"
+                                  display="block"
+                                >
+                                  {trace.input?.value ?? "<empty>"}
+                                </Text>
+                              </RedactedField>
                             </Tooltip>
                           </Table.Cell>
                           {trace.error ? (
@@ -509,15 +516,17 @@ export function TryItOut({
                                     : undefined
                                 }
                               >
-                                <Text
-                                  lineClamp={1}
-                                  display="block"
-                                  maxWidth="250px"
-                                >
-                                  {(trace.output?.value ?? "").trim() !== ""
-                                    ? trace.output?.value
-                                    : "<empty>"}
-                                </Text>
+                                <RedactedField field="output">
+                                  <Text
+                                    lineClamp={1}
+                                    display="block"
+                                    maxWidth="250px"
+                                  >
+                                    {(trace.output?.value ?? "").trim() !== ""
+                                      ? trace.output?.value
+                                      : "<empty>"}
+                                  </Text>
+                                </RedactedField>
                               </Tooltip>
                             </Table.Cell>
                           )}

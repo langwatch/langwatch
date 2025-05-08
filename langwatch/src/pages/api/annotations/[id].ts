@@ -1,9 +1,9 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "../../../server/db";
 
-import { getDebugger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger";
 
-export const debug = getDebugger("langwatch:analytics");
+const logger = createLogger("langwatch:annotations:id");
 
 export default async function handler(
   req: NextApiRequest,
@@ -36,7 +36,7 @@ export default async function handler(
         .status(200)
         .json({ status: "success", message: "Annotation deleted." });
     } catch (e) {
-      debug(e);
+      logger.error({ error: e, projectId: project.id }, 'error deleting annotation');
       return res
         .status(500)
         .json({ status: "error", message: "ID not found." });
@@ -76,7 +76,7 @@ export default async function handler(
 
       return res.status(200).json({ data: patchAnnotation });
     } catch (e) {
-      debug(e);
+      logger.error({ error: e, projectId: project.id }, 'error patching annotation');
       return res.status(500).json({ status: "error", message: "Not found" });
     }
   }
@@ -94,7 +94,7 @@ export default async function handler(
       }
       return res.status(200).json({ data: annotation });
     } catch (e) {
-      debug(e);
+      logger.error({ error: e, projectId: project.id }, 'error fetching annotation');
       return res
         .status(500)
         .json({ status: "error", message: "Internal server error." });

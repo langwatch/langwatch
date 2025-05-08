@@ -6,6 +6,9 @@ import {
   matchingLLMModelCost,
   tokenizeAndEstimateCost,
 } from "./cost";
+import { createLogger } from "../../../../utils/logger";
+
+const logger = createLogger("langwatch:workers:collector:metrics");
 
 // TODO: test
 export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
@@ -152,7 +155,7 @@ export const addGuardrailCosts = (spans: Span[]) => {
       span.output.value.cost
     ) {
       if (span.output.value.cost.currency !== "USD") {
-        console.warn(
+        logger.warn(
           `Guardrail cost is in ${span.output.value.cost.currency}, not USD, which is not supported yet`
         );
       }

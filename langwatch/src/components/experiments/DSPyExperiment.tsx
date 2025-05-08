@@ -620,6 +620,7 @@ export const RunDetails = React.memo(
           display="flex"
           flexDirection="column"
           minWidth="0"
+          colorPalette="blue"
         >
           <Tabs.List
             position="relative"
@@ -1281,7 +1282,7 @@ export function DSPyRunsScoresChart({
                 value="Best"
                 position="top"
                 offset={10}
-                fill={getRawColorValue("--chakra-colors-gray-700")}
+                fill={getRawColorValue("gray.700")}
                 fontSize="12px"
               />
             </ReferenceDot>

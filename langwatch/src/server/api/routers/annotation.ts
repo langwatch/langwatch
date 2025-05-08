@@ -4,12 +4,15 @@ import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { PublicShareResourceTypes } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
-import slugify from "slugify";
+import { slugify } from "~/utils/slugify";
 import {
   TeamRoleGroup,
   checkPermissionOrPubliclyShared,
   checkUserPermissionForProject,
 } from "../permission";
+import { getTracesWithSpans } from "./traces";
+import { getUserProtectionsForProject } from "../utils";
+import { createLogger } from "../../../utils/logger";
 const scoreOptionSchema = z.object({
   value: z
     .union([z.string(), z.array(z.string())])
@@ -17,6 +20,8 @@ const scoreOptionSchema = z.object({
     .nullable(),
   reason: z.string().optional().nullable(),
 });
+
+const logger = createLogger("langwatch:api:annotation");
 
 const scoreOptions = z.record(z.string(), scoreOptionSchema);
 
@@ -34,7 +39,7 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      console.log(input);
+      logger.info({ input }, "create annotation");
       return ctx.prisma.annotation.create({
         data: {
           id: nanoid(),
@@ -268,7 +273,7 @@ export const annotationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.annotationQueue.findMany({
+      const queues = await ctx.prisma.annotationQueue.findMany({
         where: { projectId: input.projectId },
         include: {
           members: {
@@ -291,28 +296,33 @@ export const annotationRouter = createTRPCRouter({
           createdAt: "desc",
         },
       });
+
+      const traceIds = [
+        ...new Set(
+          queues.flatMap((queue) =>
+            queue.AnnotationQueueItems.map((item) => item.traceId)
+          )
+        ),
+      ];
+
+      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+      const traces = await getTracesWithSpans(input.projectId, traceIds, protections);
+      const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
+
+      return queues.map((queue) => ({
+        ...queue,
+        AnnotationQueueItems: queue.AnnotationQueueItems.map((item) => ({
+          ...item,
+          trace: traceMap.get(item.traceId) || null,
+        })),
+      }));
     }),
   getQueueItems: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.annotationQueueItem.findMany({
+      const queueItems = await ctx.prisma.annotationQueueItem.findMany({
         where: { projectId: input.projectId },
-        include: {
-          annotationQueue: true,
-          createdByUser: true,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
-    }),
-  getDoneQueueItems: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
-    .query(async ({ ctx, input }) => {
-      return ctx.prisma.annotationQueueItem.findMany({
-        where: { projectId: input.projectId, doneAt: { not: null } },
         include: {
           annotationQueue: {
             include: {
@@ -325,6 +335,16 @@ export const annotationRouter = createTRPCRouter({
           createdAt: "desc",
         },
       });
+
+      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+      const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
+      const traces = await getTracesWithSpans(input.projectId, traceIds, protections);
+      const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
+
+      return queueItems.map((item) => ({
+        ...item,
+        trace: traceMap.get(item.traceId) || null,
+      }));
     }),
   createQueueItem: protectedProcedure
     .input(

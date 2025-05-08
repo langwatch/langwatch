@@ -14,7 +14,7 @@ import { prisma } from "~/server/db";
 import { dependencies } from "../injection/dependencies.server";
 import type { NextRequest } from "next/server";
 import { getNextAuthSessionToken } from "../utils/auth";
-
+import AzureADProvider from "next-auth/providers/azure-ad";
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
  * object and keep type safety.
@@ -82,19 +82,61 @@ export const authOptions = (
         },
       };
     },
-    signIn: async ({ user }) => {
-      const sessionToken = getNextAuthSessionToken(req as any);
-      if (!sessionToken) return true;
+    signIn: async ({ user, account }) => {
+      if (!user.email) return false;
 
-      const dbSession = await prisma.session.findUnique({
-        where: { sessionToken },
-      });
-      const dbUser = await prisma.user.findUnique({
-        where: { id: dbSession?.userId },
+      const existingUser = await prisma.user.findUnique({
+        where: { email: user.email },
       });
 
-      if (dbUser?.email !== user.email) {
-        throw new Error("DIFFERENT_EMAIL_NOT_ALLOWED");
+      if (existingUser?.pendingSsoSetup && account?.provider) {
+        // Wrap operations in a transaction
+        await prisma.$transaction([
+          // Create the account link first
+          prisma.account.create({
+            data: {
+              userId: existingUser.id,
+              type: account.type ?? "oauth",
+              provider: account.provider,
+              providerAccountId: user.id,
+              access_token: account.access_token,
+              refresh_token: account.refresh_token,
+              expires_at: account.expires_at,
+              token_type: account.token_type,
+              scope: account.scope,
+              id_token: account.id_token,
+            },
+          }),
+
+          // Delete old accounts with the same provider (except the one we just created)
+          prisma.account.deleteMany({
+            where: {
+              userId: existingUser.id,
+              provider: account.provider,
+              providerAccountId: { not: user.id },
+            },
+          }),
+          prisma.user.update({
+            where: { id: existingUser.id },
+            data: { pendingSsoSetup: false },
+          }),
+        ]);
+
+        return true;
+      } else {
+        const sessionToken = getNextAuthSessionToken(req as any);
+        if (!sessionToken) return true;
+
+        const dbSession = await prisma.session.findUnique({
+          where: { sessionToken },
+        });
+        const dbUser = await prisma.user.findUnique({
+          where: { id: dbSession?.userId },
+        });
+
+        if (dbUser?.email !== user.email) {
+          throw new Error("DIFFERENT_EMAIL_NOT_ALLOWED");
+        }
       }
 
       return true;
@@ -114,6 +156,23 @@ export const authOptions = (
               name: (profile.name as string) ?? profile.nickname,
               email: profile.email,
               image: profile.picture,
+            };
+          },
+        })
+      : env.NEXTAUTH_PROVIDER === "azure-ad"
+      ? AzureADProvider({
+          clientId: env.AZURE_CLIENT_ID ?? "",
+          clientSecret: env.AZURE_CLIENT_SECRET ?? "",
+          tenantId: env.AZURE_TENANT_ID ?? "",
+          authorization: {
+            params: { prompt: "login", scope: "openid email profile" },
+          },
+          profile(profile) {
+            return {
+              id: profile.sub ?? profile.id,
+              name: profile.displayName,
+              email: profile.mail ?? profile.userPrincipalName,
+              image: null, // Microsoft Graph doesn't return image by default
             };
           },
         })

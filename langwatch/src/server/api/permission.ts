@@ -9,6 +9,7 @@ import { env } from "~/env.mjs";
 
 export const teamRolePermissionMapping = {
   SETUP_PROJECT: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  PROJECT_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
   ANALYTICS_VIEW: [
     TeamUserRole.ADMIN,
     TeamUserRole.MEMBER,
@@ -40,6 +41,7 @@ export const teamRolePermissionMapping = {
   WORKFLOWS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   TEAM_MEMBERS_MANAGE: [TeamUserRole.ADMIN],
   TEAM_CREATE_NEW_PROJECTS: [TeamUserRole.ADMIN],
+  PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY: [TeamUserRole.ADMIN],
 };
 
 export const organizationRolePermissionMapping = {
@@ -66,7 +68,10 @@ export const OrganizationRoleGroup = Object.fromEntries(
   keyof typeof organizationRolePermissionMapping
 >;
 
-const isDemoProject = (projectId: string, roleGroup: string): boolean => {
+export const isDemoProject = (
+  projectId: string,
+  roleGroup: string
+): boolean => {
   if (
     projectId === env.DEMO_PROJECT_ID &&
     (roleGroup === TeamRoleGroup.MESSAGES_VIEW ||
@@ -76,7 +81,8 @@ const isDemoProject = (projectId: string, roleGroup: string): boolean => {
       roleGroup === TeamRoleGroup.SPANS_DEBUG ||
       roleGroup === TeamRoleGroup.GUARDRAILS_VIEW ||
       roleGroup === TeamRoleGroup.ANNOTATIONS_VIEW ||
-      roleGroup === TeamRoleGroup.PLAYGROUND)
+      roleGroup === TeamRoleGroup.PLAYGROUND ||
+      roleGroup === TeamRoleGroup.PROJECT_VIEW)
   ) {
     return true;
   }

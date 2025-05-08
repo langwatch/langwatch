@@ -76,7 +76,7 @@ export function DemonstrationsModal({
   );
 
   return (
-    <Dialog.Root open={open} onOpenChange={({open}) => !open && onClose()}>
+    <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()}>
       <Dialog.Backdrop />
       <Dialog.Content
         marginX="32px"

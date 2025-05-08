@@ -187,7 +187,8 @@ describe("Data For Filter Integration Tests", () => {
   ];
 
   beforeAll(async () => {
-    await esClient.bulk({
+    const client = await esClient({ test: true });
+    await client.bulk({
       index: TRACE_INDEX.alias,
       body: traceEntries.flatMap((trace) => [
         {
@@ -205,7 +206,8 @@ describe("Data For Filter Integration Tests", () => {
   });
 
   afterAll(async () => {
-    await esClient.deleteByQuery({
+    const client = await esClient({ test: true });
+    await client.deleteByQuery({
       index: TRACES_PIVOT_INDEX,
       body: {
         query: {

@@ -2,6 +2,7 @@ import ast
 import builtins
 from contextlib import contextmanager
 import inspect
+import json
 import keyword
 import os
 import re
@@ -22,6 +23,7 @@ from langwatch_nlp.studio.types.dsl import (
     Workflow,
 )
 import dspy
+from pydantic import BaseModel
 
 
 def print_class_definition(cls):
@@ -68,8 +70,8 @@ def set_dspy_cache_dir(cache_dir: str, limit_size=1e9):  # 1 GB
 
     litellm.cache = Cache(disk_cache_dir=cache_dir, type=LiteLLMCacheType.DISK)
 
-    if litellm.cache.cache.disk_cache.size_limit != limit_size:
-        litellm.cache.cache.disk_cache.reset("size_limit", limit_size)
+    if litellm.cache.cache.disk_cache.size_limit != limit_size:  # type: ignore
+        litellm.cache.cache.disk_cache.reset("size_limit", limit_size)  # type: ignore
 
 
 def print_ast(node):
@@ -125,7 +127,7 @@ def get_input_keys(workflow: Workflow) -> List[str]:
         if (
             edge.source == entry_node.id
             and edge.sourceHandle.split(".")[-1] not in input_keys
-            and get_node_by_id(workflow, edge.target).type != "evaluator"
+            # and get_node_by_id(workflow, edge.target).type != "evaluator"
         ):
             input_keys.add(edge.sourceHandle.split(".")[-1])
 
@@ -202,3 +204,95 @@ def optional_langwatch_trace(
             metadata=metadata,
         ) as trace:
             yield trace
+
+
+def normalize_name_to_class_name(node_name: str) -> str:
+    """
+    Converts a node name like "LLM Signature (2)" to a valid Python class name like "LLMSignature2".
+
+    Args:
+        node_name: A string representing the node name
+
+    Returns:
+        A string representing a valid Python class name
+    """
+    # Keep only alphanumeric characters
+    import re
+
+    class_name = re.sub(r"[^a-zA-Z0-9]", "", node_name).capitalize()
+
+    return class_name
+
+
+reserved_keywords = [
+    "and",
+    "as",
+    "assert",
+    "async",
+    "await",
+    "break",
+    "class",
+    "continue",
+    "def",
+    "del",
+    "elif",
+    "else",
+    "except",
+    "finally",
+    "for",
+    "from",
+    "global",
+    "if",
+    "import",
+    "in",
+    "is",
+    "lambda",
+    "nonlocal",
+    "not",
+    "or",
+    "pass",
+    "raise",
+    "return",
+    "try",
+    "while",
+    "with",
+    "yield",
+    "items"
+]
+
+
+def normalize_to_variable_name(name: str) -> str:
+    """
+    Converts a name like "LLM Signature (2)" to a valid Python variable name like "llm_signature_2".
+
+    Args:
+        name: A string representing the name
+    """
+
+    name = re.sub(r"[^a-zA-Z0-9_]", "", name.strip().replace(" ", "_")).lower()
+
+    if name in reserved_keywords:
+        name = f"{name}_"
+
+    return name
+
+
+def snake_case_to_pascal_case(name: str) -> str:
+    return "".join(word.capitalize() for word in name.split("_"))
+
+
+class SerializableWithPydanticAndPredictEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, dspy.Prediction):
+            return o.toDict()
+        if isinstance(o, BaseModel):
+            return o.model_dump()
+        return super().default(o)
+
+
+class SerializableWithStringFallback(SerializableWithPydanticAndPredictEncoder):
+    def default(self, o):
+        try:
+            return super().default(o)
+        except:
+            return str(o)

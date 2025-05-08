@@ -1,14 +1,10 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { prisma } from "~/server/db";
 
-import {
-  getTraceById,
-  getEvaluationsMultiple,
-  getSpansForTraceIds,
-} from "~/server/api/routers/traces";
-import { elasticSearchEvaluationsToEvaluations } from "../../../server/tracer/utils";
 import type { LLMModeTrace, Span, Trace } from "../../../server/tracer/types";
 import { formatTimeAgo } from "../../../utils/formatTimeAgo";
+import { getTraceById } from "~/server/elasticsearch/traces";
+import { getProtectionsForProject } from "~/server/api/utils";
 
 type SpanWithChildren = Span & { children: SpanWithChildren[] };
 
@@ -108,40 +104,34 @@ export default async function handler(
   const traceId = req.query.id as string;
   const llmMode = req.query.llmMode === "true" || req.query.llmMode === "1";
 
-  const traceDetails = await getTraceById({
-    projectId: project?.id,
+  const protections = await getProtectionsForProject(prisma, { projectId: project?.id });
+  const trace = await getTraceById({
+    connConfig: { projectId: project?.id },
     traceId,
+    protections,
+    includeSpans: true,
+    includeEvaluations: true,
   });
-
-  const spans = Object.values(
-    await getSpansForTraceIds(project?.id, [traceId])
-  ).flat();
+  if (!trace) {
+    return res.status(404).json({ message: "Trace not found." });
+  }
 
   // Generate ASCII tree representation
-  const asciiTree = generateAsciiTree(spans);
-
-  const evaluations = await getEvaluationsMultiple({
-    projectId: project?.id,
-    traceIds: [traceId],
-  });
-  const evaluations_ = Object.values(evaluations ?? {}).flatMap(
-    (evaluationList) => {
-      return elasticSearchEvaluationsToEvaluations(evaluationList);
-    }
-  );
+  const asciiTree = generateAsciiTree(trace?.spans);
 
   return res.status(200).json({
     ...(llmMode
-      ? toLLMModeTrace(traceDetails as Trace & { spans: Span[] }, asciiTree)
+      ? toLLMModeTrace(trace, asciiTree)
       : {}),
-    spans,
-    evaluations: evaluations_,
+    spans: trace.spans,
+    evaluations: trace.evaluations,
     ascii_tree: asciiTree,
+    metadata: trace.metadata,
   });
 }
 
 export const toLLMModeTrace = (
-  trace: Trace & { spans: Span[] },
+  trace: Trace,
   asciiTree?: string
 ): LLMModeTrace => {
   return {

@@ -281,7 +281,7 @@ export const dspyStepsMapping: ElasticSearchMappingFrom<DSPyStep> = {
       example: { type: FLATENNED_TYPE } as any,
       pred: { type: FLATENNED_TYPE } as any,
       score: { type: "float" },
-      trace: { type: "nested" } as any,
+      trace: { type: FLATENNED_TYPE } as any,
     },
   },
   llm_calls: {

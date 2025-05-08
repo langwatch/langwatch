@@ -1,9 +1,13 @@
 import { evaluatorTempNameMap } from "../../components/checks/EvaluatorSelection";
-import type { AVAILABLE_EVALUATORS } from "../../server/evaluations/evaluators.generated";
+import type { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
+import { type EvaluatorTypes } from "../../server/evaluations/evaluators.generated";
 import type { Evaluator, Field } from "../types/dsl";
 
 export const convertEvaluators = (
-  evaluators: typeof AVAILABLE_EVALUATORS
+  evaluators: Exclude<
+    ReturnType<typeof useAvailableEvaluators>,
+    undefined
+  >
 ): Evaluator[] => {
   return Object.entries(evaluators)
     .filter(([evaluator, definition]) => {
@@ -16,60 +20,90 @@ export const convertEvaluators = (
       }
       return true;
     })
-    .map(([evaluator, definition]) => {
-      let inputs: Field[] = [];
-      const outputs: Field[] = [];
+    .map(([evaluator]) =>
+      buildEvaluatorFromType(
+        evaluator as EvaluatorTypes | `custom/${string}`,
+        evaluators
+      )
+    );
+};
 
-      // Add required fields
-      definition.requiredFields.forEach((field) => {
-        inputs.push({
-          identifier: field,
-          type: field === "contexts" || field === "expected_contexts" ? "list[str]" : "str",
-        });
-      });
+/**
+ * Builds a full evaluator object from the evaluator type
+ * @param evaluatorType - The evaluator to convert
+ * @returns The evaluator object
+ */
+export const buildEvaluatorFromType = (
+  evaluatorType: EvaluatorTypes | `custom/${string}`,
+  availableEvaluators: Exclude<
+    ReturnType<typeof useAvailableEvaluators>,
+    undefined
+  >
+): Evaluator => {
+  const definition = availableEvaluators[evaluatorType];
 
-      // Add optional fields
-      definition.optionalFields.forEach((field) => {
-        inputs.push({
-          identifier: field,
-          type: field === "contexts" || field === "expected_contexts" ? "list[str]" : "str",
-          optional: true,
-        });
-      });
+  if (!definition) {
+    throw new Error(`Evaluator type ${evaluatorType} not found`);
+  }
 
-      const fieldsOrder = [
-        "conversation",
-        "input",
-        "contexts",
-        "output",
-        "expected_output",
-        "expected_contexts",
-      ];
-      inputs = inputs.sort(
-        (a, b) =>
-          fieldsOrder.indexOf(a.identifier) - fieldsOrder.indexOf(b.identifier)
-      );
+  let inputs: Field[] = [];
+  const outputs: Field[] = [];
 
-      // Add outputs based on the result object
-      if (definition.result.score) {
-        outputs.push({ identifier: "score", type: "float" });
-      }
-      if (definition.result.passed) {
-        outputs.push({ identifier: "passed", type: "bool" });
-      }
-      if (definition.result.label) {
-        outputs.push({ identifier: "label", type: "str" });
-      }
-
-      return {
-        cls: "LangWatchEvaluator",
-        evaluator,
-        name: (evaluatorTempNameMap[definition.name] ?? definition.name)
-          .replace("Evaluator", "")
-          .trim(),
-        description: definition.description,
-        inputs,
-        outputs,
-      } satisfies Evaluator;
+  // Add required fields
+  definition.requiredFields.forEach((field) => {
+    inputs.push({
+      identifier: field,
+      type:
+        field === "contexts" || field === "expected_contexts"
+          ? "list[str]"
+          : "str",
     });
+  });
+
+  // Add optional fields
+  definition.optionalFields.forEach((field) => {
+    inputs.push({
+      identifier: field,
+      type:
+        field === "contexts" || field === "expected_contexts"
+          ? "list[str]"
+          : "str",
+      optional: true,
+    });
+  });
+
+  const fieldsOrder = [
+    "conversation",
+    "input",
+    "contexts",
+    "output",
+    "expected_output",
+    "expected_contexts",
+  ];
+  inputs = inputs.sort(
+    (a, b) =>
+      fieldsOrder.indexOf(a.identifier) - fieldsOrder.indexOf(b.identifier)
+  );
+
+  // Add outputs based on the result object
+  if (definition.result.score) {
+    outputs.push({ identifier: "score", type: "float" });
+  }
+  if (definition.result.passed) {
+    outputs.push({ identifier: "passed", type: "bool" });
+  }
+  if (definition.result.label) {
+    outputs.push({ identifier: "label", type: "str" });
+  }
+
+  return {
+    cls: "LangWatchEvaluator",
+    evaluator: evaluatorType,
+    name: (evaluatorTempNameMap[definition.name] ?? definition.name)
+      .replace("Evaluator", "")
+      .trim(),
+    description: definition.description,
+    inputs,
+    outputs,
+  } satisfies Evaluator;
 };

@@ -13,8 +13,6 @@ import {
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EvaluationExecutionMode } from "@prisma/client";
-import type { JsonArray } from "@prisma/client/runtime/library";
-import type { Edge, Node } from "@xyflow/react";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Edit2, HelpCircle } from "react-feather";
@@ -24,13 +22,15 @@ import {
   useFieldArray,
   useForm,
 } from "react-hook-form";
-import slugify from "slugify";
+import { slugify } from "~/utils/slugify";
 import { z } from "zod";
-import { useFilterParams } from "../../hooks/useFilterParams";
+import { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { getInputsOutputs } from "../../optimization_studio/utils/nodeUtils";
 import {
-  AVAILABLE_EVALUATORS,
+  DEFAULT_MAPPINGS,
+  migrateLegacyMappings,
+} from "../../server/evaluations/evaluationMappings";
+import {
   type Evaluators,
   type EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
@@ -42,10 +42,6 @@ import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
 } from "../../server/evaluations/getEvaluator";
-import {
-  DEFAULT_MAPPINGS,
-  migrateLegacyMappings,
-} from "../../server/evaluations/evaluationMappings";
 import type { CheckPreconditions } from "../../server/evaluations/types";
 import { checkPreconditionsSchema } from "../../server/evaluations/types.generated";
 import {
@@ -53,14 +49,15 @@ import {
   type MappingState,
 } from "../../server/tracer/tracesMapping";
 import { api } from "../../utils/api";
+import { EvaluatorTracesMapping } from "../evaluations/EvaluatorTracesMapping";
 import { HorizontalFormControl } from "../HorizontalFormControl";
-import { TracesMapping } from "../traces/TracesMapping";
 import { Tooltip } from "../ui/tooltip";
 import DynamicZodForm from "./DynamicZodForm";
 import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
 import { EvaluatorSelection, evaluatorTempNameMap } from "./EvaluatorSelection";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 export interface CheckConfigFormData {
   name: string;
@@ -87,8 +84,9 @@ export default function CheckConfigForm({
   loading,
 }: CheckConfigFormProps) {
   const { project } = useOrganizationTeamProject();
-  const isNameAvailable = api.checks.isNameAvailable.useMutation();
+  const isNameAvailable = api.monitors.isNameAvailable.useMutation();
   const [isNameAlreadyInUse, setIsNameAlreadyInUse] = useState(false);
+  const publicEnv = usePublicEnv();
 
   const validateNameUniqueness = async (name: string) => {
     const result = await isNameAvailable.mutateAsync({
@@ -143,6 +141,7 @@ export default function CheckConfigForm({
   const executionMode = watch("executionMode");
   const storeSettingsOnCode = watch("storeSettingsOnCode");
   const mappings = watch("mappings") ?? DEFAULT_MAPPINGS;
+  const settings = watch("settings");
 
   useEffect(() => {
     if (mappings && !mappings.mapping) {
@@ -166,44 +165,7 @@ export default function CheckConfigForm({
   const router = useRouter();
   const isChoosing = router.pathname.endsWith("/choose");
 
-  const availableCustomEvaluators =
-    api.evaluations.availableCustomEvaluators.useQuery(
-      { projectId: project?.id ?? "" },
-      { enabled: !!project }
-    );
-
-  const availableEvaluators = useMemo(
-    () => ({
-      ...AVAILABLE_EVALUATORS,
-      ...Object.fromEntries(
-        (availableCustomEvaluators.data ?? []).map((evaluator) => {
-          const { inputs } = getInputsOutputs(
-            JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-              ?.edges as Edge[],
-            JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-              ?.nodes as JsonArray as unknown[] as Node[]
-          );
-          const requiredFields = inputs.map((input) => input.identifier);
-
-          return [
-            `custom/${evaluator.id}`,
-            {
-              name: evaluator.name,
-              description: evaluator.description,
-              category: "custom",
-              isGuardrail: false,
-              requiredFields: requiredFields,
-              optionalFields: [],
-              settings: {},
-              result: {},
-              envVars: [],
-            },
-          ];
-        })
-      ),
-    }),
-    [availableCustomEvaluators.data]
-  );
+  const availableEvaluators = useAvailableEvaluators();
 
   useEffect(() => {
     if (!checkType && !isChoosing) {
@@ -215,6 +177,7 @@ export default function CheckConfigForm({
   }, [checkType, isChoosing, router]);
 
   useEffect(() => {
+    if (!availableEvaluators) return;
     if (defaultValues?.settings && defaultValues.checkType === checkType)
       return;
 
@@ -253,7 +216,11 @@ export default function CheckConfigForm({
     };
 
     setDefaultSettings(
-      getEvaluatorDefaultSettings(availableEvaluators[checkType]),
+      getEvaluatorDefaultSettings(
+        availableEvaluators[checkType],
+        undefined,
+        publicEnv.data?.IS_ATLA_DEFAULT_JUDGE
+      ),
       "settings"
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -274,25 +241,16 @@ export default function CheckConfigForm({
     </Text>
   );
 
-  const { filterParams, queryOpts } = useFilterParams();
-  const recentTraces = api.traces.getSampleTracesDataset.useQuery(
-    filterParams,
-    queryOpts
-  );
-
   const evaluatorDefinition = useMemo(
-    () => checkType && availableEvaluators[checkType],
+    () => checkType && availableEvaluators?.[checkType],
     [checkType, availableEvaluators]
   );
 
-  const mappingColumns = useMemo(() => {
+  const fields = useMemo(() => {
     return [
       ...(evaluatorDefinition?.requiredFields ?? []),
       ...(evaluatorDefinition?.optionalFields ?? []),
-    ].map((field) => ({
-      name: field,
-      type: "string" as const,
-    }));
+    ];
   }, [evaluatorDefinition]);
 
   return (
@@ -304,7 +262,7 @@ export default function CheckConfigForm({
         })}
         style={{ width: "100%" }}
       >
-        {!checkType || isChoosing ? (
+        {!checkType || isChoosing || !availableEvaluators ? (
           <EvaluatorSelection form={form} />
         ) : (
           <VStack gap={6} align="start" width="full">
@@ -425,8 +383,13 @@ export default function CheckConfigForm({
                   {executionMode !== EvaluationExecutionMode.ON_MESSAGE && (
                     <EvaluationManualIntegration
                       slug={slug}
-                      evaluatorDefinition={availableEvaluators[checkType]}
+                      evaluatorDefinition={availableEvaluators[checkType]!}
                       form={form}
+                      checkType={checkType}
+                      name={nameValue}
+                      executionMode={executionMode}
+                      settings={settings}
+                      storeSettingsOnCode={storeSettingsOnCode}
                     />
                   )}
                 </VStack>
@@ -461,19 +424,13 @@ export default function CheckConfigForm({
                           label="Mappings"
                           helper="Map which fields from the trace will be used to run the evaluation"
                         >
-                          {mappings?.mapping && (
-                            <TracesMapping
-                              dataset={{
-                                mapping: mappings,
-                              }}
-                              traces={recentTraces.data ?? []}
-                              // TODO: specify optional/required fields
-                              columnTypes={mappingColumns}
-                              setDatasetMapping={(mapping) => {
-                                form.setValue("mappings", mapping);
-                              }}
-                            />
-                          )}
+                          <EvaluatorTracesMapping
+                            targetFields={fields}
+                            traceMapping={mappings}
+                            setTraceMapping={(mapping) => {
+                              form.setValue("mappings", mapping);
+                            }}
+                          />
                         </HorizontalFormControl>
                         <PreconditionsField
                           runOn={

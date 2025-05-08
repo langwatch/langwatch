@@ -1,11 +1,4 @@
-import {
-  Box,
-  Separator,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Separator, HStack, Spacer, Text, VStack, Button } from "@chakra-ui/react";
 import { Tooltip } from "../../../components/ui/tooltip";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
@@ -19,10 +12,12 @@ import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
 import { EvaluationProgressBar } from "./EvaluationProgressBar";
 import { HoverableBigText } from "../../HoverableBigText";
+import React from "react";
 
 export function BatchEvaluationV2EvaluationSummary({
   run,
   showProgress = false,
+  onStop,
 }: {
   run: NonNullable<
     UseTRPCQueryResult<
@@ -31,6 +26,7 @@ export function BatchEvaluationV2EvaluationSummary({
     >["data"]
   >["runs"][number];
   showProgress?: boolean;
+  onStop?: () => void;
 }) {
   const [currentTimestamp, setCurrentTimestamp] = useState(0);
   const finishedAt = useMemo(() => {
@@ -68,11 +64,12 @@ export function BatchEvaluationV2EvaluationSummary({
       borderColor="gray.200"
       overflowX="auto"
       overflowY="hidden"
+      flexShrink={0}
     >
       <HStack width="100%" paddingY={4} paddingX={6} gap={5}>
         {Object.entries(run.summary.evaluations).map(([_, evaluation]) => {
           return (
-            <>
+            <React.Fragment key={evaluation.name}>
               <VStack align="start" gap={1}>
                 <HoverableBigText
                   fontWeight="500"
@@ -86,14 +83,14 @@ export function BatchEvaluationV2EvaluationSummary({
                 </HoverableBigText>
               </VStack>
               <Separator orientation="vertical" height="48px" />
-            </>
+            </React.Fragment>
           );
         })}
         <VStack align="start" gap={1}>
           <HoverableBigText fontWeight="500" lineClamp={2} expandable={false}>
             Mean Cost
           </HoverableBigText>
-          <Text lineClamp={1} whiteSpace="nowrap">
+          <Box lineClamp={1} whiteSpace="nowrap">
             <FormatMoney
               amount={
                 (run.summary.dataset_average_cost ?? 0) +
@@ -130,7 +127,7 @@ export function BatchEvaluationV2EvaluationSummary({
                 </VStack>
               }
             />
-          </Text>
+          </Box>
         </VStack>
         <Separator orientation="vertical" height="48px" />
         <VStack align="start" gap={1}>
@@ -171,7 +168,7 @@ export function BatchEvaluationV2EvaluationSummary({
           <HoverableBigText fontWeight="500" lineClamp={1} expandable={false}>
             Total Cost
           </HoverableBigText>
-          <Text lineClamp={1} whiteSpace="nowrap">
+          <Box lineClamp={1} whiteSpace="nowrap">
             <FormatMoney
               amount={
                 (run.summary.dataset_cost ?? 0) +
@@ -208,7 +205,7 @@ export function BatchEvaluationV2EvaluationSummary({
                 </VStack>
               }
             />
-          </Text>
+          </Box>
         </VStack>
         <Separator orientation="vertical" height="48px" />
         <VStack align="start" gap={1}>
@@ -252,6 +249,18 @@ export function BatchEvaluationV2EvaluationSummary({
             }}
             size="lg"
           />
+          {onStop && (
+            <Button
+              colorPalette="red"
+              onClick={onStop}
+              minHeight="28px"
+              minWidth="0"
+              paddingY="6px"
+              marginLeft="8px"
+            >
+              <Box paddingX="6px">Stop</Box>
+            </Button>
+          )}
         </HStack>
       )}
     </VStack>

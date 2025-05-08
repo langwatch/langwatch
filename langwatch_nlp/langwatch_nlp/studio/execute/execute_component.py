@@ -1,5 +1,12 @@
+import dspy
+import asyncer
 import sentry_sdk
-from langwatch_nlp.studio.parser import autoparse_fields, parse_component
+from langwatch_nlp.studio.field_parser import autoparse_fields
+from langwatch_nlp.studio.parser import (
+    materialized_component_class,
+    normalized_node,
+    parse_component,
+)
 from langwatch_nlp.studio.utils import disable_dsp_caching, optional_langwatch_trace
 from langwatch_nlp.studio.types.events import (
     Debug,
@@ -8,7 +15,6 @@ from langwatch_nlp.studio.types.events import (
     end_component_event,
     start_component_event,
 )
-from dspy.utils.asyncify import asyncify
 
 
 async def execute_component(event: ExecuteComponentPayload):
@@ -34,14 +40,20 @@ async def execute_component(event: ExecuteComponentPayload):
         ) as trace:
             if trace:
                 trace.autotrack_dspy()
-            module = parse_component(node, event.workflow)
-            result = await asyncify(module)(
-                **autoparse_fields(node.data.inputs or [], event.inputs)
+            code, class_name, kwargs = parse_component(
+                normalized_node(node), event.workflow, standalone=True
             )
+            with materialized_component_class(
+                component_code=code, class_name=class_name
+            ) as Module:
+                instance = Module(**kwargs)
+                result = await dspy.asyncify(instance)(
+                    **autoparse_fields(node.data.inputs or [], event.inputs)  # type: ignore
+                )
 
-        cost = result.get_cost() if hasattr(result, "get_cost") else None
+        cost = result.cost if hasattr(result, "cost") else None
 
-        yield end_component_event(node, event.trace_id, dict(result), cost)
+        yield end_component_event(node, event.trace_id, result, cost)
     except Exception as e:
         import traceback
 
@@ -56,4 +68,4 @@ async def execute_component(event: ExecuteComponentPayload):
         raise e
     finally:
         if trace:
-            await asyncify(trace.send_spans)()
+            await asyncer.asyncify(trace.send_spans)()
