@@ -5,7 +5,7 @@ from getpass import getpass
 
 
 def login(relogin=False):
-    if not relogin and get_api_key() is not "":
+    if not relogin and get_api_key() != "":
         print(
             "LangWatch API key is already set, if you want to login again, please call as langwatch.login(relogin=True)"
         )
