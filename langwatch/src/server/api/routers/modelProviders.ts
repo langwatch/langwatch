@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import {
+  TeamRoleGroup,
+  checkUserPermissionForProject,
+  backendHasTeamProjectPermission,
+} from "../permission";
 import {
   getProviderModelOptions,
   modelProviders,
@@ -11,11 +15,17 @@ import { prisma } from "../../db";
 export const modelProviderRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
-    .query(async ({ input }) => {
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROJECT_VIEW))
+    .query(async ({ input, ctx }) => {
       const { projectId } = input;
 
-      return await getProjectModelProviders(projectId);
+      const hasSetupPermission = await backendHasTeamProjectPermission(
+        ctx,
+        { projectId },
+        TeamRoleGroup.SETUP_PROJECT
+      );
+
+      return await getProjectModelProviders(projectId, hasSetupPermission);
     }),
 
   update: protectedProcedure
@@ -118,7 +128,10 @@ export const modelProviderRouter = createTRPCRouter({
     }),
 });
 
-export const getProjectModelProviders = async (projectId: string) => {
+export const getProjectModelProviders = async (
+  projectId: string,
+  includeKeys = true
+) => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
@@ -177,6 +190,10 @@ export const getProjectModelProviders = async (projectId: string) => {
           disabledByDefault:
             defaultModelProviders[modelProvider.provider]?.disabledByDefault,
         };
+
+        if (!includeKeys) {
+          modelProvider_.customKeys = null;
+        }
 
         return {
           ...acc,
@@ -292,7 +309,7 @@ export const prepareLitellmParams = (
 
   if (modelProvider.provider === "atla") {
     params.model = model.replace("atla/", "openai/");
-    params.api_base = "https://api.atla-ai.com/v1"
+    params.api_base = "https://api.atla-ai.com/v1";
   }
 
   // TODO: add azure deployment as params.model as azure/<deployment-name>
