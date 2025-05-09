@@ -1,9 +1,9 @@
 import { loadEnvConfig } from "@next/env";
 import { createLogger } from "./utils/logger";
-import { WorkersRestart } from "./server/background/worker";
 
 loadEnvConfig(process.cwd());
 
+const { WorkersRestart } = require("./server/background/worker");
 const logger = createLogger("langwatch:workers");
 
 logger.info("starting");
