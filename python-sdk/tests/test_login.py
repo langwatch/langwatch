@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 import httpx
 
 from langwatch.login import login
-from langwatch.state import get_api_key, set_api_key, get_endpoint # Assuming these are directly importable for patching
+from langwatch.state import get_api_key, set_api_key, get_endpoint # noqa: F401 # Assuming these are directly importable for patching
 
 # Test cases
 # 1. Already logged in, no relogin
