@@ -9,7 +9,7 @@ import { QueueWithFallback } from "./queueWithFallback";
 import { runEvaluationJob } from "../workers/evaluationsWorker";
 import type { ConnectionOptions } from "bullmq";
 
-export const EVALUATIONS_QUEUE_NAME = "evaluations";
+export const EVALUATIONS_QUEUE_NAME = "{evaluations}";
 
 const logger = createLogger("langwatch:evaluations:queue");
 
