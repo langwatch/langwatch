@@ -317,7 +317,7 @@ ${
           <Tabs.Trigger value="python">Python</Tabs.Trigger>
           <Tabs.Trigger value="python-async">Python (Async)</Tabs.Trigger>
           <Tabs.Trigger value="typescript">TypeScript</Tabs.Trigger>
-          <Tabs.Trigger value="curl">Curl</Tabs.Trigger>
+          <Tabs.Trigger value="curl">cURL</Tabs.Trigger>
         </Tabs.List>
 
         <Tabs.Content value="python" padding={0}>
