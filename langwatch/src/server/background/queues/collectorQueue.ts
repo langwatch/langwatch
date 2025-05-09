@@ -7,7 +7,7 @@ import { QueueWithFallback } from "./queueWithFallback";
 import { processCollectorJob } from "../workers/collectorWorker";
 import type { ConnectionOptions } from "bullmq";
 
-export const COLLECTOR_QUEUE = "collector";
+export const COLLECTOR_QUEUE = "{collector}";
 
 export const collectorQueue = new QueueWithFallback<
   CollectorJob | CollectorCheckAndAdjustJob,
