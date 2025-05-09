@@ -13,6 +13,7 @@ import {
 import { getTracesWithSpans } from "./traces";
 import { getUserProtectionsForProject } from "../utils";
 import { createLogger } from "../../../utils/logger";
+import { TRACE_INDEX, esClient, traceIndexId } from "~/server/elasticsearch";
 const scoreOptionSchema = z.object({
   value: z
     .union([z.string(), z.array(z.string())])
@@ -40,6 +41,8 @@ export const annotationRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       logger.info({ input }, "create annotation");
+      await updateTraceWithAnnotation(input.traceId, input.projectId);
+
       return ctx.prisma.annotation.create({
         data: {
           id: nanoid(),
@@ -150,6 +153,22 @@ export const annotationRouter = createTRPCRouter({
     .input(z.object({ annotationId: z.string(), projectId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
+      const annotation = await ctx.prisma.annotation.findUnique({
+        where: {
+          id: input.annotationId,
+          projectId: input.projectId,
+        },
+      });
+
+      if (!annotation) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Annotation not found",
+        });
+      }
+
+      await updateTraceRemoveAnnotation(annotation.traceId, input.projectId);
+
       return ctx.prisma.annotation.delete({
         where: {
           id: input.annotationId,
@@ -305,8 +324,14 @@ export const annotationRouter = createTRPCRouter({
         ),
       ];
 
-      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
-      const traces = await getTracesWithSpans(input.projectId, traceIds, protections);
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+      const traces = await getTracesWithSpans(
+        input.projectId,
+        traceIds,
+        protections
+      );
       const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
 
       return queues.map((queue) => ({
@@ -336,9 +361,15 @@ export const annotationRouter = createTRPCRouter({
         },
       });
 
-      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
       const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
-      const traces = await getTracesWithSpans(input.projectId, traceIds, protections);
+      const traces = await getTracesWithSpans(
+        input.projectId,
+        traceIds,
+        protections
+      );
       const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
 
       return queueItems.map((item) => ({
@@ -406,6 +437,82 @@ export const annotationRouter = createTRPCRouter({
       });
     }),
 });
+
+const updateTraceWithAnnotation = async (
+  traceId: string,
+  projectId: string
+) => {
+  const client = await esClient({ projectId });
+  await client.update({
+    index: TRACE_INDEX.alias,
+    id: traceIndexId({
+      traceId: traceId,
+      projectId: projectId,
+    }),
+    retry_on_conflict: 10,
+    body: {
+      script: {
+        source: `
+          try {
+            if (!ctx._source.containsKey('annotations')) {
+              ctx._source.annotations = [
+                'count': 1,
+                'hasAnnotation': true
+              ];
+            } else if (ctx._source.annotations.containsKey('count')) {
+              ctx._source.annotations.count += 1;
+            } else {
+              ctx._source.annotations.count = 1;
+            }
+            ctx._source.annotations.hasAnnotation = true;
+          } catch (Exception e) {
+            // If anything goes wrong, ensure we have a valid annotations object
+            ctx._source.annotations = [
+              'count': 1,
+              'hasAnnotation': true
+            ];
+          }
+        `,
+        lang: "painless",
+      },
+    },
+  });
+};
+
+const updateTraceRemoveAnnotation = async (
+  traceId: string,
+  projectId: string
+) => {
+  const client = await esClient({ projectId });
+  await client.update({
+    index: TRACE_INDEX.alias,
+    id: traceIndexId({
+      traceId: traceId,
+      projectId: projectId,
+    }),
+    retry_on_conflict: 10,
+    body: {
+      script: {
+        source: `
+          try {
+            if (ctx._source.containsKey('annotations') && ctx._source.annotations.containsKey('count')) {
+              ctx._source.annotations.count -= 1;
+              if (ctx._source.annotations.count <= 0) {
+                ctx._source.remove('annotations');
+              } else {
+                ctx._source.annotations.hasAnnotation = true;
+              }
+            }
+          } catch (Exception e) {
+            // If anything goes wrong, remove the annotations object
+            ctx._source.remove('annotations');
+          }
+        `,
+        lang: "painless",
+      },
+    },
+  });
+};
 
 export async function createOrUpdateQueueItems({
   traceIds,

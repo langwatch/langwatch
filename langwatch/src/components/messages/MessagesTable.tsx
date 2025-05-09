@@ -112,19 +112,6 @@ export function MessagesTable() {
 
   const downloadTraces = api.traces.getAllForDownload.useMutation();
 
-  const traceIds =
-    traceGroups.data?.groups.flatMap((group) =>
-      group.map((trace) => trace.trace_id)
-    ) ?? [];
-
-  const getAnnotations = api.annotation.getByTraceIds.useQuery(
-    { projectId: project?.id ?? "", traceIds },
-    {
-      enabled: project?.id !== undefined,
-      refetchOnWindowFocus: false,
-    }
-  );
-
   const [previousTraceChecks, setPreviousTraceChecks] = useState<
     Record<string, ElasticSearchEvaluation[]>
   >(traceGroups.data?.traceChecks ?? {});
@@ -148,29 +135,18 @@ export function MessagesTable() {
   const [scrollXPosition, setScrollXPosition] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const annotationCount = (traceId: string) => {
-    if (getAnnotations.isLoading) {
-      return;
-    }
-    const annotations = getAnnotations.data?.filter(
-      (annotation) => annotation.traceId === traceId
-    );
-    if (annotations?.length === 0) {
-      return null;
-    }
+  const annotationCount = (count: number, traceId: string) => {
     return (
       <Box position="relative">
         <Tooltip
-          content={`${annotations?.length} ${
-            annotations?.length === 1 ? "annotation" : "annotations"
-          }`}
+          content={`${count} ${count === 1 ? "annotation" : "annotations"}`}
         >
           <HStack
             paddingLeft={2}
             marginRight={1}
             onClick={() =>
               openDrawer("traceDetails", {
-                traceId: traceId,
+                traceId,
                 selectedTab: "messages",
               })
             }
@@ -190,7 +166,7 @@ export function MessagesTable() {
               lineHeight="12px"
               textAlign="center"
             >
-              {annotations?.length}
+              {count}
             </Box>
           </HStack>
         </Tooltip>
@@ -315,7 +291,9 @@ export function MessagesTable() {
                 checked={selectedTraceIds.includes(trace.trace_id)}
                 onCheckedChange={() => traceSelection(trace.trace_id)}
               />
-              {annotationCount(trace.trace_id)}
+              {trace.annotations?.hasAnnotation
+                ? annotationCount(trace.annotations.count, trace.trace_id)
+                : null}
             </HStack>
           </Table.Cell>
         );

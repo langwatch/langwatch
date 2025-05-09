@@ -49,6 +49,10 @@ import { RedactedField } from "../ui/RedactedField";
 
 export type TraceWithGuardrail = Trace & {
   lastGuardrail: (EvaluationResult & { name?: string }) | undefined;
+  annotations?: {
+    hasAnnotation: boolean;
+    count: number;
+  };
 };
 
 export function MessageCard({
@@ -175,7 +179,7 @@ export function MessageCard({
           </Box>
           <Box fontWeight="bold">
             <RedactedField field="input">
-              {(inputIsJson || inputIsPythonRepr) ? (
+              {inputIsJson || inputIsPythonRepr ? (
                 <MessageCardJsonOutput value={trace.input?.value ?? ""} />
               ) : (
                 <Text lineClamp={1} wordBreak="break-all" lineHeight="2.1em">
