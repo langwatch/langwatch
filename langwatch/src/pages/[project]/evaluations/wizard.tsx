@@ -19,6 +19,7 @@ export default function EvaluationWizard() {
   const { open, setOpen } = useDisclosure();
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
+  const isCopilot = router.pathname.includes("/evaluations/copilot");
 
   useEffect(() => {
     setOpen(true);
@@ -67,6 +68,7 @@ export default function EvaluationWizard() {
         size="full"
       >
         <EvaluationWizardComponent
+          isCopilot={isCopilot}
           isLoading={
             !!initialLoadExperimentSlug && initialLoadExperiment.isLoading
           }
