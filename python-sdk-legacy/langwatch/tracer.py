@@ -395,6 +395,7 @@ class ContextSpan:
         self,
         slug: str,
         name: Optional[str] = None,
+        evaluator: Optional[str] = None,
         input: Optional[str] = None,
         output: Optional[str] = None,
         expected_output: Optional[str] = None,
@@ -403,10 +404,12 @@ class ContextSpan:
         settings: Optional[dict] = None,
         as_guardrail: bool = False,
     ):
+        print("asdadsasd")
         return langwatch.evaluations.evaluate(
             span=self,
             slug=slug,
             name=name,
+            evaluator=evaluator,
             input=input,
             output=output,
             expected_output=expected_output,
@@ -420,6 +423,7 @@ class ContextSpan:
         self,
         slug: str,
         name: Optional[str] = None,
+        evaluator: Optional[str] = None,
         input: Optional[str] = None,
         output: Optional[str] = None,
         expected_output: Optional[str] = None,
@@ -432,6 +436,7 @@ class ContextSpan:
             span=self,
             slug=slug,
             name=name,
+            evaluator=evaluator,
             input=input,
             output=output,
             expected_output=expected_output,
@@ -1193,9 +1198,7 @@ def send_spans(
 
     json_data = json.dumps(data, cls=SerializableWithStringFallback, indent=2)
 
-    get_logger().debug(
-        f"Sending trace: {json_data}"
-    )
+    get_logger().debug(f"Sending trace: {json_data}")
 
     api_key = api_key or langwatch.api_key
     if not api_key:

@@ -102,15 +102,19 @@ class BatchEvaluationRun(BaseModel):
 class BatchEvaluation:
     def __init__(
         self,
-        dataset: str,
         evaluations: list[str],
         callback: Callable[[DatasetEntry], Union[str, dict[str, Any]]],
         experiment: Optional[str] = None,
         run_id: Optional[str] = None,
+        dataset: Optional[str] = None,
+        dataset2: Optional[pd.DataFrame] = None,
+        evaluations2: Optional[list[dict[str, Any]]] = None,
         max_workers=4,
     ):
         self.dataset = dataset
+        self.dataset2 = dataset2
         self.evaluations = evaluations
+        self.evaluations2 = evaluations2
         self.callback = callback
         self.max_workers = max_workers
         self.experiment = experiment or generate_slug(3)
@@ -131,7 +135,12 @@ class BatchEvaluation:
             print("API key was not detected, calling langwatch.login()...")
             langwatch.login()
 
-        dataset = get_dataset(self.dataset)
+        if self.dataset2 is not None and not self.dataset2.empty:
+            dataset = convert_dataset_to_records(self.dataset2)
+        elif self.dataset:
+            dataset = get_dataset(self.dataset)
+        else:
+            raise ValueError("Either dataset or dataset2 must be provided")
 
         print("Starting batch evaluation...")
         with httpx.Client(timeout=60) as client:
@@ -243,8 +252,21 @@ class BatchEvaluation:
             )
 
         coroutines: list[Coroutine[Tuple[str, SingleEvaluationResult], Any, Any]] = []
-        for evaluation in self.evaluations:
-            coroutines.append(run_evaluation(entry_with_output, evaluation, error))
+        if self.evaluations2:
+            for evaluation in self.evaluations2:
+                name = evaluation.get("name", "unnamed")
+
+                async def eval_wrapper(eval_dict=evaluation, eval_name=name):
+
+                    return langwatch.get_current_span().evaluate(
+                        eval_dict["evaluator"],
+                        settings=eval_dict.get("settings"),
+                    )
+
+                coroutines.append(eval_wrapper())
+        else:
+            for evaluation in self.evaluations:
+                coroutines.append(run_evaluation(entry_with_output, evaluation, error))
 
         async def gather_results(futures):
             evaluation_results = await asyncio.gather(*futures)
@@ -441,6 +463,21 @@ async def run_evaluation(
             details=str(e),
             traceback=[],
         )
+
+
+def convert_dataset_to_records(
+    dataset: pd.DataFrame,
+) -> list[DatasetRecord]:
+    records = []
+    for index, row in dataset.iterrows():
+        records.append(
+            DatasetRecord(
+                id=generate_slug(3),
+                index=index if isinstance(index, int) else None,
+                entry=DatasetEntry(**row.to_dict()),
+            )
+        )
+    return records
 
 
 def get_dataset(
