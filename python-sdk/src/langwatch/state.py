@@ -30,4 +30,7 @@ def get_api_key() -> str:
 
 def set_api_key(api_key: str) -> None:
     """Set the current API key of the LangWatch client."""
-    get_instance().api_key = api_key
+    instance = get_instance()
+    if instance is None:
+        raise RuntimeError("LangWatch client has not been initialized. Call setup() first.")
+    instance.api_key = api_key

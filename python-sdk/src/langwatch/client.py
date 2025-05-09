@@ -108,6 +108,9 @@ class Client(LangWatchClientProtocol):
 	@api_key.setter
 	def api_key(self, value: str) -> None:
 		"""Set the API key for the client."""
+		if value == self._api_key:
+			return
+
 		self._api_key = value
 
 		# Shut down any existing tracer provider, as API key change requires re-initialization.

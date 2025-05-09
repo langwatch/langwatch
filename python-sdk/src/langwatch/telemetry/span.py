@@ -306,16 +306,6 @@ class LangWatchSpan:
         except Exception as e:
             warn(f"Failed to add link to span: {str(e)}")
 
-    def set_status(self, status: Status, description: Optional[str] = None) -> None:
-        """Set the status of this span."""
-        if self._span is None:
-            warn("Cannot set status - no span available")
-            return
-        try:
-            self._span.set_status(status, description)
-        except Exception as e:
-            warn(f"Failed to set status on span: {str(e)}")
-
     def update(
         self,
         span_id: Optional[Union[str, UUID]] = None,

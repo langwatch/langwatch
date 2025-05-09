@@ -12,7 +12,7 @@ def login(relogin=False):
         return
 
     print(f"Please go to {get_endpoint()}/authorize to get your API key")
-    api_key = getpass(f"Paste your API key here: ")
+    api_key = getpass("Paste your API key here: ")
     if not api_key:
         raise ValueError("API key was not set")
 
