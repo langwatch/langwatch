@@ -26,6 +26,12 @@ import {
 import { buildEntryToTargetEdges } from "./slices/utils/edge.util";
 import { EXECUTOR_NODE_TYPES } from "./slices/executorSlice";
 import type { Node } from "@xyflow/react";
+import {
+  createCopilotStore,
+  initialCopilotStore,
+  type CopilotStore,
+  type CopilotStoreState,
+} from "./copilotState";
 
 export const EVALUATOR_CATEGORIES = [
   "expected_answer",
@@ -114,17 +120,21 @@ export const wizardStateSchema = z.object({
 export type WizardState = z.infer<typeof wizardStateSchema>;
 
 export type State = {
+  isCopilot: boolean;
   experimentId?: string;
   experimentSlug?: string;
   wizardState: z.infer<typeof wizardStateSchema>;
   isAutosaving: boolean;
   autosaveDisabled: boolean;
-  workflowStore: WorkflowStoreState;
   datasetGridRef?: RefObject<AgGridReact<any> | null>;
+
+  workflowStore: WorkflowStoreState;
+  copilotStore: CopilotStoreState;
 };
 
 export type EvaluationWizardStore = State & {
   reset: () => void;
+  setIsCopilot: (value: boolean) => void;
   setExperimentId: (experimentId: string) => void;
   setExperimentSlug: (experimentSlug: string) => void;
   setWizardState: (
@@ -150,9 +160,11 @@ export type EvaluationWizardStore = State & {
   setDatasetGridRef: (gridRef: RefObject<AgGridReact<any> | null>) => void;
 
   workflowStore: WorkflowStore;
+  copilotStore: CopilotStore;
 };
 
 export const initialState: State = {
+  isCopilot: false,
   experimentSlug: undefined,
   wizardState: {
     step: "task",
@@ -161,6 +173,7 @@ export const initialState: State = {
   isAutosaving: false,
   autosaveDisabled: false,
   workflowStore: initialWorkflowStore,
+  copilotStore: initialCopilotStore,
 };
 
 const store = (
@@ -182,7 +195,15 @@ const store = (
         ...current,
         ...initialState,
         workflowStore: createWorkflowStore(set, get),
+        copilotStore: createCopilotStore(
+          (state: CopilotStoreState) =>
+            set({ copilotStore: { ...current.copilotStore, ...state } }),
+          () => get().copilotStore
+        ),
       }));
+    },
+    setIsCopilot(value) {
+      set((current) => ({ ...current, isCopilot: value }));
     },
     setExperimentId(experimentId) {
       set((current) => ({ ...current, experimentId }));
@@ -308,9 +329,9 @@ const store = (
         );
 
         // And then connecting it again using defaults with the other existing components
-        const newEntryNode = newNodes.find(
-          (node) => node.type === "entry"
-        ) as Node<Entry> | undefined;
+        const newEntryNode = newNodes.find((node) => node.type === "entry") as
+          | Node<Entry>
+          | undefined;
         const otherNodes = newNodes.filter((node) => node.type !== "entry");
 
         const newEdgesTargetHandles = newEdges.map(
@@ -349,6 +370,11 @@ const store = (
       set((current) => ({ ...current, datasetGridRef: gridRef }));
     },
     workflowStore: createWorkflowStore(set, get),
+    copilotStore: createCopilotStore(
+      (state: CopilotStoreState) =>
+        set({ copilotStore: { ...get().copilotStore, ...state } }),
+      () => get().copilotStore
+    ),
   };
 
   return store;
