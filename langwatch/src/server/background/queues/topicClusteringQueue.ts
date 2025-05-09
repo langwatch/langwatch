@@ -6,7 +6,7 @@ import { QueueWithFallback } from "./queueWithFallback";
 import { runTopicClusteringJob } from "../workers/topicClusteringWorker";
 import type { ConnectionOptions } from "bullmq";
 
-export const TOPIC_CLUSTERING_QUEUE_NAME = "topic_clustering";
+export const TOPIC_CLUSTERING_QUEUE_NAME = "{topic_clustering}";
 
 const topicClusteringQueue = new QueueWithFallback<
   TopicClusteringJob,
