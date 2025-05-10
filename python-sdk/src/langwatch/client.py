@@ -105,6 +105,21 @@ class Client(LangWatchClientProtocol):
 		"""Get the API key for the client."""
 		return self._api_key
 
+	@api_key.setter
+	def api_key(self, value: str) -> None:
+		"""Set the API key for the client."""
+		if value == self._api_key:
+			return
+
+		self._api_key = value
+
+		# Shut down any existing tracer provider, as API key change requires re-initialization.
+		self.__shutdown_tracer_provider()
+
+		# If a new API key is provided and sending is not disabled, set up a new tracer provider.
+		if self._api_key and not self._disable_sending:
+			self.__setup_tracer_provider()
+
 	@property
 	def disable_sending(self) -> bool:
 		"""Get whether sending is disabled."""
@@ -118,16 +133,43 @@ class Client(LangWatchClientProtocol):
 
 		self._disable_sending = value
 
-		if value:
-			if self.tracer_provider:
-				if self._flush_on_exit:
-					try:
-						atexit.unregister(self.tracer_provider.force_flush)
-					except ValueError:
-						pass # Handler was never registered – nothing to do.
-				self.tracer_provider.shutdown()
-		else:
+		# Use the new helper methods to manage the tracer provider
+		if value: # if disable_sending is True
+			self.__shutdown_tracer_provider()
+		else: # if disable_sending is False
+			self.__setup_tracer_provider()
+
+	def __shutdown_tracer_provider(self) -> None:
+		"""Shuts down the current tracer provider, including flushing."""
+		if self.tracer_provider:
+			if self._flush_on_exit:
+				try:
+					# Unregister the atexit hook if it was registered.
+					atexit.unregister(self.tracer_provider.force_flush)
+				except ValueError:
+					pass # Handler was never registered or already unregistered.
+
+			if hasattr(self.tracer_provider, "force_flush") and callable(getattr(self.tracer_provider, "force_flush")):
+				if self._debug:
+					logger.debug("Forcing flush of tracer provider before shutdown.")
+				self.tracer_provider.force_flush()
+			
+			if self._debug:
+				logger.debug("Shutting down tracer provider.")
+			self.tracer_provider.shutdown()
+			self.tracer_provider = None
+
+	def __setup_tracer_provider(self) -> None:
+		"""Sets up the tracer provider if not already active."""
+		if not self.tracer_provider:
+			if self._debug:
+				logger.debug("Setting up new tracer provider.")
 			self.tracer_provider = self.__ensure_otel_setup()
+
+			return
+		
+		if self._debug:
+			logger.debug("Tracer provider already active, not setting up again.")
 
 	def __ensure_otel_setup(self, tracer_provider: Optional[TracerProvider] = None) -> TracerProvider:
 		settable_tracer_provider = tracer_provider or self.__create_new_tracer_provider()
