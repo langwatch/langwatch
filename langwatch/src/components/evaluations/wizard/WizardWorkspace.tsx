@@ -26,6 +26,7 @@ import { toaster } from "../../ui/toaster";
 import { Link } from "../../ui/link";
 import { LuArrowUpRight } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { CopilotWorkspace } from "./components/copilot/CopilotWorkspace";
 
 export const WizardWorkspace = memo(function WizardWorkspace() {
   const {
@@ -39,6 +40,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
     hasWorkflow,
     hasCodeImplementation,
     setDatasetGridRef,
+    isCopilot,
   } = useEvaluationWizardStore(
     useShallow((state) => ({
       getDatasetId: state.getDatasetId,
@@ -55,6 +57,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
         (state.wizardState.executionMethod === "realtime_guardrail" ||
           state.wizardState.executionMethod === "realtime_manually"),
       setDatasetGridRef: state.setDatasetGridRef,
+      isCopilot: state.isCopilot,
     }))
   );
 
@@ -82,7 +85,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
     workspaceTab_ && !availableTabs[workspaceTab_]
       ? firstAvailableTab
       : workspaceTab_;
-
+  
   return (
     <VStack
       background="url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjRjJGNEY4Ii8+CjxyZWN0IHg9IjE0IiB5PSIxNCIgd2lkdGg9IjIiIGhlaWdodD0iMiIgZmlsbD0iI0U1RTdFQiIvPgo8L3N2Zz4K)"
@@ -98,7 +101,8 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
       gap={0}
       borderRadius="8px 0 0 0"
     >
-      {(hasDataset || hasWorkflow || hasResults) && (
+      {isCopilot && <CopilotWorkspace />}
+      {!isCopilot && (hasDataset || hasWorkflow || hasResults) && (
         <Tabs.Root
           width="full"
           height="full"
