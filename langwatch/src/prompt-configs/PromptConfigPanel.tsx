@@ -1,5 +1,5 @@
-import { Box, Text, Spinner } from "@chakra-ui/react";
-import { useEffect, useMemo } from "react";
+import { Text, Spinner, VStack } from "@chakra-ui/react";
+import { useEffect, useMemo, useState } from "react";
 
 import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
 import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
@@ -8,7 +8,7 @@ import { PanelHeader } from "./components/ui/PanelHeader";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { llmConfigToPromptConfigFormValues } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-
+import { InputOutputExecutablePanel } from "~/components/InputOutputExecutablePanel";
 interface PromptConfigPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -38,6 +38,8 @@ export function PromptConfigPanel({
     initialConfigValues,
   });
 
+  const [isExternalOpen, setIsExternalOpen] = useState(false);
+
   useEffect(() => {
     formProps.methods.reset(initialConfigValues);
   }, [configId, formProps.methods, initialConfigValues]);
@@ -47,27 +49,34 @@ export function PromptConfigPanel({
   }
 
   return (
-    <Box
-      position="absolute"
-      top={0}
-      right={0}
-      height="full"
-      background="white"
-      border="1px solid"
-      borderColor="var(--chakra-colors-gray-350)"
-      borderTopWidth={0}
-      borderBottomWidth={0}
-      borderRightWidth={0}
-      zIndex={100}
-      overflowY="auto"
-      padding={6}
-      minWidth="600px"
+    <InputOutputExecutablePanel
+      isExpanded={isExternalOpen}
+      onCloseExpanded={() => setIsExternalOpen(false)}
     >
-      <PanelHeader
-        title={<Text>Prompt Configuration</Text>}
-        onClose={onClose}
-      />
-      {llmConfig ? <PromptConfigForm {...formProps} /> : <Spinner />}
-    </Box>
+      <InputOutputExecutablePanel.LeftDrawer>
+        Left drawer
+      </InputOutputExecutablePanel.LeftDrawer>
+      <InputOutputExecutablePanel.CenterContent>
+        <VStack width="full">
+          <PanelHeader
+            title={<Text>Prompt Configuration</Text>}
+            onClose={onClose}
+          />
+          <button
+            style={{ cursor: "pointer" }}
+            onClick={() => {
+              setIsExternalOpen((prev) => !prev);
+              console.log("clicked");
+            }}
+          >
+            CLICK
+          </button>
+          {llmConfig ? <PromptConfigForm {...formProps} /> : <Spinner />}
+        </VStack>
+      </InputOutputExecutablePanel.CenterContent>
+      <InputOutputExecutablePanel.RightDrawer>
+        Right drawer
+      </InputOutputExecutablePanel.RightDrawer>
+    </InputOutputExecutablePanel>
   );
 }
