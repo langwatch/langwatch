@@ -13,7 +13,7 @@ import { BasePropertiesPanel, PropertyField } from "./BasePropertiesPanel";
 import { OptimizationStudioLLMConfigField } from "./llm-configs/OptimizationStudioLLMConfigField";
 import { WorkflowIcon } from "../ColorfulBlockIcons";
 import { EmojiPickerModal } from "./modals/EmojiPickerModal";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { evaluatorInputs } from "./EndPropertiesPanel";
 import type { End, WorkflowTypes } from "../../types/dsl";
@@ -48,8 +48,13 @@ export const WorkflowPropertiesPanel = () => {
 
   const setWorkflowType = (workflowType: WorkflowTypes) => {
     setWorkflow({ workflow_type: workflowType });
-    updateNode(workflowType);
   };
+
+  useEffect(() => {
+    if (workflow.workflow_type) {
+      updateNode(workflow.workflow_type);
+    }
+  }, [workflow.workflow_type]);
 
   const updateNode = (workflowType: WorkflowTypes) => {
     if (!endNode) return;
