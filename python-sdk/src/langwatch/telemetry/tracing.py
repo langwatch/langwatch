@@ -351,6 +351,9 @@ class LangWatchTrace:
 
         self.root_span.update(**update_kwargs)
 
+    @deprecated(
+        reason="Evaluations should be actioned on the span object directly, not a trace. This method will be removed in a future version.",
+    )
     def add_evaluation(
         self,
         *,
@@ -386,6 +389,9 @@ class LangWatchTrace:
             timestamps=timestamps,
         )
 
+    @deprecated(
+        reason="Evaluations should be actioned on the span object directly, not a trace. This method will be removed in a future version.",
+    )
     def evaluate(
         self,
         slug: str,
@@ -415,6 +421,9 @@ class LangWatchTrace:
             data=data,
         )
 
+    @deprecated(
+        reason="Evaluations should be actioned on the span object directly, not a trace. This method will be removed in a future version.",
+    )
     async def async_evaluate(
         self,
         slug: str,
@@ -511,15 +520,7 @@ class LangWatchTrace:
         """Makes the trace usable as a context manager."""
         try:
             # Store the old token and set the new one
-            old_token = self._context_token
             self._context_token = stored_langwatch_trace.set(self)
-
-            # Try to clean up the old token if it exists
-            if old_token is not None:
-                try:
-                    stored_langwatch_trace.reset(old_token)
-                except Exception:
-                    pass
         except Exception as e:
             warn(f"Failed to set LangWatch trace context: {e}")
 
@@ -548,15 +549,7 @@ class LangWatchTrace:
         """Makes the trace usable as an async context manager."""
         try:
             # Store the old token and set the new one
-            old_token = self._context_token
             self._context_token = stored_langwatch_trace.set(self)
-
-            # Try to clean up the old token if it exists
-            if old_token is not None:
-                try:
-                    stored_langwatch_trace.reset(old_token)
-                except Exception:
-                    pass
         except Exception as e:
             warn(f"Failed to set LangWatch trace context: {e}")
 
