@@ -1,6 +1,6 @@
 import { Text, Spinner, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
-
+import { InputPanel } from "~/components/executable-panel/InputPanel";
 import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
 import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
 import { PanelHeader } from "./components/ui/PanelHeader";
@@ -8,7 +8,7 @@ import { PanelHeader } from "./components/ui/PanelHeader";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { llmConfigToPromptConfigFormValues } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-import { InputOutputExecutablePanel } from "~/components/InputOutputExecutablePanel";
+import { InputOutputExecutablePanel } from "~/components/executable-panel/InputOutputExecutablePanel";
 interface PromptConfigPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -49,6 +49,8 @@ export function PromptConfigPanel({
     onClose();
   };
 
+  const inputFields = formProps.methods.getValues("version.configData.inputs");
+
   if (!isOpen) {
     return null;
   }
@@ -59,7 +61,7 @@ export function PromptConfigPanel({
       onCloseExpanded={() => setIsExpanded(false)}
     >
       <InputOutputExecutablePanel.LeftDrawer>
-        Left drawer
+        <InputPanel fields={inputFields} onExecute={() => {}} />
       </InputOutputExecutablePanel.LeftDrawer>
       <InputOutputExecutablePanel.CenterContent>
         <VStack width="full">
