@@ -8,15 +8,14 @@ const logger = createLogger("langwatch:redis");
 const isBuild =
   process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD ||
   !!process.env.BUILD_TIME ||
-  !env.REDIS_URL;
+  (!env.REDIS_URL && env.REDIS_CLUSTER !== "true");
 
 const useCluster = env.REDIS_CLUSTER === "true";
 
 function parseClusterEndpoints(endpointsStr: string) {
-  // e.g. "redis1:6379,redis2:6379,redis3:6379"
-  return endpointsStr.split(",").map((endpoint) => {
-    const [host, port] = endpoint.split(":");
-    return { host, port: Number(port) };
+  return endpointsStr.split(",").map((raw) => {
+    const url = raw.includes("://") ? new URL(raw) : new URL(`redis://${raw}`);
+    return { host: url.hostname, port: Number(url.port || 6379) };
   });
 }
 
