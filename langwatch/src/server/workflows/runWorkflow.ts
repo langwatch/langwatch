@@ -26,6 +26,7 @@ const getWorkFlow = (state: Workflow) => {
     nodes: state.nodes,
     edges: state.edges,
     state: state.state,
+    template_adapter: state.template_adapter,
   };
 };
 

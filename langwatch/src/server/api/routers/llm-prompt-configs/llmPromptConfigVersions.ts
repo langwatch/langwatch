@@ -35,7 +35,7 @@ export const llmConfigVersionsRouter = createTRPCRouter({
         })
       )
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
     .query(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
 
@@ -62,7 +62,7 @@ export const llmConfigVersionsRouter = createTRPCRouter({
         })
       )
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
     .query(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
 
@@ -84,7 +84,7 @@ export const llmConfigVersionsRouter = createTRPCRouter({
     .input(
       getLatestConfigVersionSchema().omit({ version: true, authorId: true })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
       const authorId = ctx.session?.user?.id;
@@ -112,7 +112,7 @@ export const llmConfigVersionsRouter = createTRPCRouter({
    */
   getLatest: protectedProcedure
     .input(configIdSchema.merge(projectIdSchema))
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
     .query(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
 
@@ -135,7 +135,7 @@ export const llmConfigVersionsRouter = createTRPCRouter({
    */
   restore: protectedProcedure
     .input(idSchema.merge(projectIdSchema))
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       const { id, projectId } = input;
       const repository = new LlmConfigRepository(ctx.prisma);
