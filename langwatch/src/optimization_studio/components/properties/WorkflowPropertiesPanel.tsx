@@ -16,7 +16,7 @@ import { EmojiPickerModal } from "./modals/EmojiPickerModal";
 import { useState } from "react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { evaluatorInputs } from "./EndPropertiesPanel";
-import type { End, WorkflowType } from "../../types/dsl";
+import type { End, WorkflowTypes } from "../../types/dsl";
 import { Switch } from "../../../components/ui/switch";
 import { NativeSelect } from "@chakra-ui/react";
 import { useDisclosure } from "@chakra-ui/react";
@@ -46,12 +46,12 @@ export const WorkflowPropertiesPanel = () => {
     () => endNode?.data.behave_as === "evaluator"
   );
 
-  const setWorkflowType = (workflowType: WorkflowType) => {
+  const setWorkflowType = (workflowType: WorkflowTypes) => {
     setWorkflow({ workflow_type: workflowType });
     updateNode(workflowType);
   };
 
-  const updateNode = (workflowType: WorkflowType) => {
+  const updateNode = (workflowType: WorkflowTypes) => {
     if (!endNode) return;
 
     if (workflowType === "evaluator") {
@@ -205,7 +205,7 @@ export const WorkflowPropertiesPanel = () => {
             value={
               workflow.workflow_type ?? (isEvaluator ? "evaluator" : "workflow")
             }
-            onChange={(e) => setWorkflowType(e.target.value as WorkflowType)}
+            onChange={(e) => setWorkflowType(e.target.value as WorkflowTypes)}
           >
             <option value="workflow">Workflow</option>
             <option value="evaluator">Evaluator</option>

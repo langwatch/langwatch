@@ -610,6 +610,9 @@ function PublishModalContent({
       versionToBeEvaluated.id,
       versions,
       workflowId,
+      workflow_type,
+      toggleSaveAsComponent,
+      toggleSaveAsEvaluator,
     ]
   );
 
