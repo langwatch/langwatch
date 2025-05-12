@@ -4,5 +4,5 @@ export default function handler(
   _req: NextApiRequest,
   res: NextApiResponse
 ) {
-  res.status(204).json({ status: 'ok' });
+  res.status(204);
 }
