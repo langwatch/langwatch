@@ -42,6 +42,7 @@ import {
   useMessagesNavigationFooter,
 } from "./MessagesNavigationFooter";
 import { useDrawer } from "../CurrentDrawer";
+import { formatMilliseconds } from "~/utils/formatMilliseconds";
 
 export function MessagesList() {
   const { project } = useOrganizationTeamProject();
@@ -228,17 +229,6 @@ const ExpandableMessages = React.memo(
 
     const { openDrawer } = useDrawer();
 
-    const formatThreadDuration = (start: number, end: number): string => {
-      const durationMs = end - start;
-      if (durationMs < 1000) {
-        return `${durationMs} ms`;
-      } else if (durationMs < 60000) {
-        return `${(durationMs / 1000).toFixed(2)} s`;
-      } else {
-        return `${(durationMs / 60000).toFixed(2)} min`;
-      }
-    };
-
     return traceGroups.map((traceGroup, groupIndex) => {
       const isExpanded = !!expandedGroups[groupIndex];
       const zIndex = 1000 + traceGroups.length - groupIndex;
@@ -331,9 +321,7 @@ const ExpandableMessages = React.memo(
               <Flex justify="space-between" align="center">
                 <HStack gap={1}>
                   <Text>Thread ID:</Text>
-                  <Text>
-                    {traceGroup[0]?.metadata.thread_id ?? "null"}
-                  </Text>
+                  <Text>{traceGroup[0]?.metadata.thread_id ?? "null"}</Text>
                 </HStack>
 
                 <HStack gap={1}>
@@ -347,7 +335,7 @@ const ExpandableMessages = React.memo(
 
                       const [start, end] = t1 < t2 ? [t1, t2] : [t2, t1];
 
-                      return formatThreadDuration(start, end);
+                      return formatMilliseconds(end - start);
                     })()}
                   </Text>
                 </HStack>
