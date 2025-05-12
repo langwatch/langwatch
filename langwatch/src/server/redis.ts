@@ -32,10 +32,10 @@ if (!isBuild) {
 
     // Cluster events
     (connection).on("cluster:connect", () => {
-      logger.info("Redis cluster connected");
+      logger.info("cluster connected");
     });
     (connection).on("cluster:ready", () => {
-      logger.info("Redis cluster is ready to accept commands");
+      logger.info("cluster is ready to accept commands");
     });
   } else {
     connection = new IORedis(env.REDIS_URL ?? "", {
@@ -48,22 +48,22 @@ if (!isBuild) {
 
     // Single-node events
     connection.on("connect", () => {
-      logger.info("Redis connected");
+      logger.info("connected");
     });
     connection.on("ready", () => {
-      logger.info("Redis is ready to accept commands");
+      logger.info("ready to accept commands");
     });
   }
 
   // Common events for both single-node and cluster
   connection?.on("error", (error: Error) => {
-    logger.error({ error} , "redis error");
+    logger.error({ error} , "error");
   });
   connection?.on("close", () => {
-    logger.info("Redis connection closed");
+    logger.info("connection closed");
   });
   connection?.on("reconnecting", () => {
-    logger.info("Redis reconnecting...");
+    logger.info("reconnecting...");
   });
 } else {
   // During build time or missing env, disable connection
