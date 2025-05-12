@@ -1,0 +1,34 @@
+name: go
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - 'go-sdk/**'
+
+jobs:
+  build:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Install dependencies
+        working-directory: ./go-sdk
+        run: go mod download
+
+      - name: Run tests
+        working-directory: ./go-sdk
+        run: go test -v ./...
+
+      - name: Build
+        working-directory: ./go-sdk
+        run: go build -v ./...
