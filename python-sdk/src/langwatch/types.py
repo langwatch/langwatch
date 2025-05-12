@@ -45,6 +45,17 @@ class LangWatchClientProtocol(Protocol):
         """Get the API key for the client."""
         ...
 
+    @api_key.setter
+    def api_key(self, value: str) -> None:
+        """
+        Set a new API key for the client. This will:
+        - override the current API key
+        - flush any existing spans
+        - create a new span processor
+        - potentially create a new tracer provider
+        """
+        ...
+
     @property
     def debug(self) -> bool:
         """Get the debug flag for the client."""
