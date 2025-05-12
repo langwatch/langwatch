@@ -1,6 +1,6 @@
 [project]
 name = "langwatch"
-version = "0.2.0rc5"
+version = "0.2.0rc6"
 description = "LangWatch Python SDK, for monitoring your LLMs"
 authors = [{ name = "Langwatch Engineers", email = "engineering@langwatch.ai" }]
 requires-python = ">=3.9,<3.13,!=3.9.7"
@@ -20,6 +20,7 @@ classifiers = [
 ]
 
 dependencies = [
+    "nanoid>=2.0.0,<3.0.0",
     "dspy-ai>=2.5.2,<3.0.0",
     "coolname>=2.2.0",
     "httpx>=0.27.0",

@@ -31,14 +31,25 @@ export const teamRolePermissionMapping = {
     TeamUserRole.VIEWER,
   ],
   GUARDRAILS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  EXPERIMENTS_VIEW: [
+    TeamUserRole.ADMIN,
+    TeamUserRole.MEMBER,
+    TeamUserRole.VIEWER,
+  ],
   EXPERIMENTS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  DATASETS_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  DATASETS_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
   DATASETS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   ANNOTATIONS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   TRIGGERS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   PLAYGROUND: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  WORKFLOWS_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  WORKFLOWS_VIEW: [
+    TeamUserRole.ADMIN,
+    TeamUserRole.MEMBER,
+    TeamUserRole.VIEWER,
+  ],
   WORKFLOWS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  PROMPTS_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
+  PROMPTS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   TEAM_MEMBERS_MANAGE: [TeamUserRole.ADMIN],
   TEAM_CREATE_NEW_PROJECTS: [TeamUserRole.ADMIN],
   PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY: [TeamUserRole.ADMIN],
@@ -82,7 +93,10 @@ export const isDemoProject = (
       roleGroup === TeamRoleGroup.GUARDRAILS_VIEW ||
       roleGroup === TeamRoleGroup.ANNOTATIONS_VIEW ||
       roleGroup === TeamRoleGroup.PLAYGROUND ||
-      roleGroup === TeamRoleGroup.PROJECT_VIEW)
+      roleGroup === TeamRoleGroup.PROJECT_VIEW ||
+      roleGroup === TeamRoleGroup.EXPERIMENTS_VIEW ||
+      roleGroup === TeamRoleGroup.WORKFLOWS_VIEW ||
+      roleGroup === TeamRoleGroup.PROMPTS_VIEW)
   ) {
     return true;
   }
@@ -169,7 +183,7 @@ export const backendHasTeamProjectPermission = async (
   ctx: { prisma: PrismaClient; session: Session | null },
   input: { projectId: string },
   roleGroup: keyof typeof TeamRoleGroup
-) => {
+): Promise<boolean> => {
   if (!ctx.session?.user) {
     return false;
   }
@@ -192,9 +206,9 @@ export const backendHasTeamProjectPermission = async (
   );
 
   return (
-    projectTeam &&
+    !!projectTeam &&
     projectTeam.team.members.length > 0 &&
-    teamMember &&
+    !!teamMember &&
     (teamRolePermissionMapping[roleGroup] as TeamUserRole[]).includes(
       teamMember.role
     )

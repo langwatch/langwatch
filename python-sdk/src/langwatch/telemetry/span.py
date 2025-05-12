@@ -271,6 +271,13 @@ class LangWatchSpan:
         except Exception as e:
             warn(f"Failed to set attributes on span: {str(e)}")
 
+    def is_recording(self) -> bool:
+        """Check if the span is recording."""
+        if self._span is None:
+            warn("Cannot check recording status - no span available")
+            return False
+        return self._span.is_recording()
+
     def update_name(self, name: str) -> None:
         """Update the name of the span."""
         if self._span is None:
@@ -288,6 +295,16 @@ class LangWatchSpan:
             warn("Cannot get span context - no span available")
             return None
         return self._span.get_span_context()
+
+    def add_link(self, attributes: Optional[Dict[str, Any]] = None) -> None:
+        """Add a link to this span."""
+        if self._span is None:
+            warn("Cannot add link - no span available")
+            return
+        try:
+            self._span.add_link(attributes)
+        except Exception as e:
+            warn(f"Failed to add link to span: {str(e)}")
 
     def update(
         self,

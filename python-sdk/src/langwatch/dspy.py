@@ -6,6 +6,7 @@ import warnings
 import dspy
 from typing import Callable, List, Optional, Any, Type, Union
 from langwatch.utils.transformation import truncate_object_recursively
+from langwatch.telemetry.tracing import LangWatchTrace
 from typing_extensions import TypedDict
 import langwatch
 import httpx
@@ -26,8 +27,6 @@ from pydantic.fields import FieldInfo
 from coolname import generate_slug
 from retry import retry
 from dspy.evaluate.evaluate import Evaluate
-
-from langwatch.tracer import ContextTrace
 
 
 class SerializableAndPydanticEncoder(json.JSONEncoder):
@@ -369,7 +368,7 @@ class LangWatchDSPy:
         response.raise_for_status()
         self.steps_buffer = []
 
-    def tracer(self, trace: ContextTrace):
+    def tracer(self, trace: LangWatchTrace):
         return DSPyTracer(trace=trace)
 
 
@@ -642,7 +641,7 @@ class LangWatchTrackedMIPROv2(MIPROv2):
 
 
 class DSPyTracer:
-    def __init__(self, trace: ContextTrace):
+    def __init__(self, trace: LangWatchTrace):
         self.trace = trace
 
         if not hasattr(dspy.Module, "__original_call__"):

@@ -266,7 +266,7 @@ export const experimentsRouter = createTRPCRouter({
         experimentSlug: z.string().optional(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
     .query(async ({ input }) => {
       if (input.experimentId) {
         const experiment = await prisma.experiment.findFirst({
@@ -307,7 +307,7 @@ export const experimentsRouter = createTRPCRouter({
         randomSeed: z.number().optional(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
     .query(async ({ input }) => {
       const experiment = await getExperimentBySlug(
         input.projectId,
@@ -334,7 +334,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getAllByProjectId: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
     .query(async ({ input }) => {
       const experiments = await prisma.experiment.findMany({
         where: {
@@ -347,7 +347,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getAllForEvaluationsList: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
     .query(async ({ input }) => {
       const experiments = await prisma.experiment.findMany({
         where: { projectId: input.projectId },
@@ -430,7 +430,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getExperimentDSPyRuns: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
     .query(async ({ input }) => {
       const experiment = await getExperimentBySlug(
         input.projectId,
@@ -549,7 +549,7 @@ export const experimentsRouter = createTRPCRouter({
         index: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
     .query(async ({ input }) => {
       const experiment = await getExperimentBySlug(
         input.projectId,
@@ -587,7 +587,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getExperimentBatchEvaluationRuns: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
     .query(async ({ input }) => {
       const experiment = await getExperimentById(
         input.projectId,
@@ -610,7 +610,7 @@ export const experimentsRouter = createTRPCRouter({
         runId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
     .query(async ({ input }) => {
       const experiment = await getExperimentById(
         input.projectId,

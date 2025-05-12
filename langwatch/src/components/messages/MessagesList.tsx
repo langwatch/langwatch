@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   Container,
+  Flex,
   HStack,
   Heading,
   LinkBox,
@@ -41,6 +42,7 @@ import {
   useMessagesNavigationFooter,
 } from "./MessagesNavigationFooter";
 import { useDrawer } from "../CurrentDrawer";
+import { formatMilliseconds } from "~/utils/formatMilliseconds";
 
 export function MessagesList() {
   const { project } = useOrganizationTeamProject();
@@ -309,17 +311,35 @@ const ExpandableMessages = React.memo(
               className="group-title"
               position="absolute"
               left="64px"
+              right="64px"
               marginTop="-22px"
               fontSize="13px"
               fontWeight={600}
               color="gray.500"
               cursor="default"
             >
-              <HStack gap={1}>
-                <Text>Thread ID: </Text>
-                <Text>{traceGroup[0]?.metadata.thread_id ?? "null"}</Text>
-                <Separator orientation="vertical" height="20px" />
-              </HStack>
+              <Flex justify="space-between" align="center">
+                <HStack gap={1}>
+                  <Text>Thread ID:</Text>
+                  <Text>{traceGroup[0]?.metadata.thread_id ?? "null"}</Text>
+                </HStack>
+
+                <HStack gap={1}>
+                  <Text>Thread duration:</Text>
+                  <Text>
+                    {(() => {
+                      const t1 = traceGroup[0]?.timestamps.updated_at;
+                      const t2 = traceGroup.at(-1)?.timestamps.updated_at;
+
+                      if (!t1 || !t2) return "N/A";
+
+                      const [start, end] = t1 < t2 ? [t1, t2] : [t2, t1];
+
+                      return formatMilliseconds(end - start);
+                    })()}
+                  </Text>
+                </HStack>
+              </Flex>
             </Box>
           )}
           <VStack width="full" gap={6}>

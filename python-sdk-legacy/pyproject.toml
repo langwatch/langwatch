@@ -33,7 +33,7 @@ dependencies = [
 openai = ["openai>=1.42.0,<2.0.0"]
 langchain = ["langchain>=0.3.0,<1.0.0"]
 dspy = ["dspy-ai>=2.5.2,<3.0.0"]
-litellm = ["litellm>=1.40.15,<2.0.0"]
+litellm = ["litellm>=1.68.1,<2.0.0"]
 dev = [
     # uv pip install crewai==0.60.0 openinference-instrumentation-crewai duckduckgo_search
     "pytest>=7.4.2,<8.0.0",
