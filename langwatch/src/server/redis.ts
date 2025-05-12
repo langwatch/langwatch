@@ -8,9 +8,9 @@ const logger = createLogger("langwatch:redis");
 const isBuild =
   process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD ||
   !!process.env.BUILD_TIME ||
-  (!env.REDIS_URL && env.REDIS_CLUSTER !== "true");
+  (!env.REDIS_URL && !env.REDIS_CLUSTER_ENDPOINTS);
 
-const useCluster = env.REDIS_CLUSTER === "true";
+const useCluster = env.REDIS_CLUSTER_ENDPOINTS;
 
 function parseClusterEndpoints(endpointsStr: string) {
   return endpointsStr.split(",").map((raw) => {
