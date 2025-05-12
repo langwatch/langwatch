@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box, VStack } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import React, { useEffect, useRef, type PropsWithChildren } from "react";
 
@@ -121,11 +121,23 @@ export function InputOutputExecutablePanel({
         }}
       >
         <Box ref={ref} width="full" height="full">
-          {centerContent}
+          <VStack
+            align="start"
+            gap={6}
+            padding={3}
+            maxWidth="550px"
+            width="25vw"
+            minWidth="350px"
+            height="full"
+            overflowY="auto"
+          >
+            {centerContent}
+          </VStack>
         </Box>
       </MotionDiv>
       {isExpanded && (
         <>
+          {/* Background */}
           <Box
             className="fade-in"
             position="absolute"
@@ -137,6 +149,7 @@ export function InputOutputExecutablePanel({
             zIndex={98}
             onClick={onCloseExpanded}
           />
+          {/* Left Panel */}
           <Panel
             width={`calc(50% - ${halfPanelWidth}px)`}
             isExpanded={isExpanded}
@@ -145,6 +158,7 @@ export function InputOutputExecutablePanel({
           >
             {leftDrawer}
           </Panel>
+          {/* Right Panel */}
           <Panel
             width={`calc(50% - ${halfPanelWidth}px)`}
             isExpanded={isExpanded}

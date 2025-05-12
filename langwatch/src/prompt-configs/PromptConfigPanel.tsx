@@ -38,11 +38,16 @@ export function PromptConfigPanel({
     initialConfigValues,
   });
 
-  const [isExternalOpen, setIsExternalOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     formProps.methods.reset(initialConfigValues);
   }, [configId, formProps.methods, initialConfigValues]);
+
+  const handleClose = () => {
+    setIsExpanded(false);
+    onClose();
+  };
 
   if (!isOpen) {
     return null;
@@ -50,8 +55,8 @@ export function PromptConfigPanel({
 
   return (
     <InputOutputExecutablePanel
-      isExpanded={isExternalOpen}
-      onCloseExpanded={() => setIsExternalOpen(false)}
+      isExpanded={isExpanded}
+      onCloseExpanded={() => setIsExpanded(false)}
     >
       <InputOutputExecutablePanel.LeftDrawer>
         Left drawer
@@ -60,17 +65,9 @@ export function PromptConfigPanel({
         <VStack width="full">
           <PanelHeader
             title={<Text>Prompt Configuration</Text>}
-            onClose={onClose}
+            onClose={handleClose}
+            onExpand={() => setIsExpanded((prev) => !prev)}
           />
-          <button
-            style={{ cursor: "pointer" }}
-            onClick={() => {
-              setIsExternalOpen((prev) => !prev);
-              console.log("clicked");
-            }}
-          >
-            CLICK
-          </button>
           {llmConfig ? <PromptConfigForm {...formProps} /> : <Spinner />}
         </VStack>
       </InputOutputExecutablePanel.CenterContent>
