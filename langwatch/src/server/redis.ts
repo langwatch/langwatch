@@ -27,6 +27,7 @@ if (!isBuild) {
     connection = new Cluster(clusterEndpoints, {
       redisOptions: {
         maxRetriesPerRequest: null,
+        enableOfflineQueue: false,
       },
     });
 
