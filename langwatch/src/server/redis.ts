@@ -56,8 +56,8 @@ if (!isBuild) {
   }
 
   // Common events for both single-node and cluster
-  connection?.on("error", (error) => {
-    logger.error("Redis error:", error);
+  connection?.on("error", (error: Error) => {
+    logger.error({ error} , "redis error");
   });
   connection?.on("close", () => {
     logger.info("Redis connection closed");
