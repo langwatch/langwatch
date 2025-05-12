@@ -351,6 +351,9 @@ class LangWatchTrace:
 
         self.root_span.update(**update_kwargs)
 
+    @deprecated(
+        reason="Evaluations should be actioned on the span object directly, not a trace. This method will be removed in a future version.",
+    )
     def add_evaluation(
         self,
         *,
@@ -386,6 +389,9 @@ class LangWatchTrace:
             timestamps=timestamps,
         )
 
+    @deprecated(
+        reason="Evaluations should be actioned on the span object directly, not a trace. This method will be removed in a future version.",
+    )
     def evaluate(
         self,
         slug: str,
@@ -415,6 +421,9 @@ class LangWatchTrace:
             data=data,
         )
 
+    @deprecated(
+        reason="Evaluations should be actioned on the span object directly, not a trace. This method will be removed in a future version.",
+    )
     async def async_evaluate(
         self,
         slug: str,
