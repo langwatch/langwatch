@@ -39,6 +39,8 @@ export type Field = {
   json_schema?: object;
 };
 
+export type WorkflowType = "component" | "evaluator" | "workflow";
+
 export type ExecutionStatus =
   | "idle"
   | "waiting"
@@ -235,6 +237,7 @@ export const workflowJsonSchema = z
     nodes: z.array(z.any()),
     edges: z.array(z.any()),
     default_llm: llmConfigSchema,
+    workflow_type: z.enum(["component", "evaluator", "workflow"]).optional(),
   })
   .passthrough();
 
@@ -252,6 +255,7 @@ export type Workflow = {
   data?: Record<string, any>;
   template_adapter: "default" | "dspy_chat_adapter";
   enable_tracing: boolean;
+  workflow_type?: WorkflowType;
 
   state: {
     execution?: {

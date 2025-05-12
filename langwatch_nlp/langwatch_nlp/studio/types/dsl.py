@@ -280,3 +280,4 @@ class Workflow(BaseModel):
     state: WorkflowState
     template_adapter: Literal["default", "dspy_chat_adapter"]
     enable_tracing: Optional[bool] = True
+    workflow_type: Optional[Literal["component", "evaluator", "workflow"]] = None

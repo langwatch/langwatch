@@ -140,6 +140,7 @@ export const customEvaluatorTemplate: Workflow = {
     max_tokens: 8192,
   },
   template_adapter: "default",
+  workflow_type: "evaluator",
   enable_tracing: true,
   nodes: [
     entryNode(),

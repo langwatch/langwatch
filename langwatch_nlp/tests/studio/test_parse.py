@@ -31,6 +31,8 @@ basic_workflow = Workflow(
     nodes=[],
     edges=[],
     state=WorkflowState(execution=None, evaluation=None),
+    template_adapter="default",
+    workflow_type="workflow",
 )
 
 llm_field = Field(

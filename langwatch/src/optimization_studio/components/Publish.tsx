@@ -22,6 +22,7 @@ import {
   Lock,
   Play,
   Share2,
+  XCircle,
 } from "react-feather";
 import { RenderCode } from "~/components/code/RenderCode";
 import { SmallLabel } from "../../components/SmallLabel";
@@ -61,6 +62,58 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
   const publishModal = useDisclosure();
   const apiModal = useDisclosure();
   const { project } = useOrganizationTeamProject();
+  const { workflowId } = useWorkflowStore(({ workflow_id: workflowId }) => ({
+    workflowId,
+  }));
+  const trpc = api.useContext();
+
+  const toggleSaveAsComponentMutation =
+    api.optimization.toggleSaveAsComponent.useMutation({
+      onSuccess: () => {
+        void trpc.optimization.getComponents.invalidate();
+        toaster.create({
+          title: "Component status updated",
+          type: "success",
+          duration: 5000,
+          meta: { closable: true },
+          placement: "top-end",
+        });
+      },
+    });
+
+  const toggleSaveAsEvaluatorMutation =
+    api.optimization.toggleSaveAsEvaluator.useMutation({
+      onSuccess: () => {
+        void trpc.optimization.getComponents.invalidate();
+        toaster.create({
+          title: "Evaluator status updated",
+          type: "success",
+          duration: 5000,
+          meta: { closable: true },
+          placement: "top-end",
+        });
+      },
+    });
+
+  const toggleSaveAsComponent = () => {
+    if (!workflowId || !project?.id) return;
+    toggleSaveAsComponentMutation.mutate({
+      workflowId,
+      projectId: project.id,
+      isComponent: true,
+      isEvaluator: false,
+    });
+  };
+
+  const toggleSaveAsEvaluator = () => {
+    if (!workflowId || !project?.id) return;
+    toggleSaveAsEvaluatorMutation.mutate({
+      workflowId,
+      projectId: project.id,
+      isEvaluator: true,
+      isComponent: false,
+    });
+  };
 
   return (
     <>
@@ -91,6 +144,8 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
           <PublishModalContent
             onClose={publishModal.onClose}
             onApiToggle={apiModal.onToggle}
+            toggleSaveAsComponent={toggleSaveAsComponent}
+            toggleSaveAsEvaluator={toggleSaveAsEvaluator}
           />
         )}
       </Dialog.Root>
@@ -164,15 +219,13 @@ function PublishMenu({
   onTogglePublish: () => void;
   onToggleApi: () => void;
 }) {
-  const { workflowId } = useWorkflowStore(({ workflow_id: workflowId }) => ({
-    workflowId,
-  }));
+  const { workflowId, workflow_type } = useWorkflowStore(
+    ({ workflow_id: workflowId, workflow_type }) => ({
+      workflowId,
+      workflow_type,
+    })
+  );
 
-  const nodes = useWorkflowStore((state) => state.nodes);
-
-  const endNodes = nodes.filter((node) => node.type === "end");
-
-  const isEvaluator = endNodes.some(checkIsEvaluator);
   const { canSaveNewVersion, versionToBeEvaluated } = useVersionState({
     project,
     allowSaveIfAutoSaveIsCurrentButNotLatest: false,
@@ -208,63 +261,29 @@ function PublishMenu({
     }
   );
 
-  const toggleSaveAsComponentMutation =
-    api.optimization.toggleSaveAsComponent.useMutation({
+  const disableAsComponentMutation =
+    api.optimization.disableAsComponent.useMutation({
       onSuccess: () => {
         void trpc.optimization.getComponents.invalidate();
-
         toaster.create({
-          title: `Workflow ${
-            !publishedWorkflow.data?.isComponent ? "saved" : "deleted"
-          } as component`,
+          title: "Component status updated",
           type: "success",
           duration: 5000,
-          meta: {
-            closable: true,
-          },
-          placement: "top-end",
-        });
-      },
-      onError: (error) => {
-        toaster.create({
-          title: "Error saving component",
-          description: error.message,
-          type: "error",
-          duration: 5000,
-          meta: {
-            closable: true,
-          },
+          meta: { closable: true },
           placement: "top-end",
         });
       },
     });
 
-  const toggleSaveAsEvaluatorMutation =
-    api.optimization.toggleSaveAsEvaluator.useMutation({
+  const disableAsEvaluatorMutation =
+    api.optimization.disableAsEvaluator.useMutation({
       onSuccess: () => {
         void trpc.optimization.getComponents.invalidate();
-
         toaster.create({
-          title: `Workflow ${
-            !publishedWorkflow.data?.isEvaluator ? "saved" : "deleted"
-          } as evaluator`,
+          title: "Evaluator status updated",
           type: "success",
           duration: 5000,
-          meta: {
-            closable: true,
-          },
-          placement: "top-end",
-        });
-      },
-      onError: (error) => {
-        toaster.create({
-          title: "Error saving evaluator",
-          description: error.message,
-          type: "error",
-          duration: 5000,
-          meta: {
-            closable: true,
-          },
+          meta: { closable: true },
           placement: "top-end",
         });
       },
@@ -276,29 +295,25 @@ function PublishMenu({
       ? "Current version is already published"
       : undefined;
 
-  const toggleSaveAsComponent = () => {
+  const disableAsComponent = () => {
     if (!workflowId || !project?.id) {
       return;
     }
 
-    toggleSaveAsComponentMutation.mutate({
+    disableAsComponentMutation.mutate({
       workflowId,
       projectId: project.id,
-      isComponent: !publishedWorkflow.data?.isComponent,
-      isEvaluator: publishedWorkflow.data?.isEvaluator ?? false,
     });
   };
 
-  const toggleSaveAsEvaluator = () => {
+  const disableAsEvaluator = () => {
     if (!workflowId || !project?.id) {
       return;
     }
 
-    toggleSaveAsEvaluatorMutation.mutate({
+    disableAsEvaluatorMutation.mutate({
       workflowId,
       projectId: project.id,
-      isEvaluator: !publishedWorkflow.data?.isEvaluator,
-      isComponent: publishedWorkflow.data?.isComponent ?? false,
     });
   };
 
@@ -316,7 +331,9 @@ function PublishMenu({
     : undefined;
 
   const SubscriptionMenuItem = (
-    props: MenuItemProps & { tooltip?: string }
+    props: MenuItemProps & {
+      tooltip?: string;
+    }
   ) => {
     if (!planAllowsToPublish) {
       return (
@@ -377,35 +394,26 @@ function PublishMenu({
         value="publish"
       >
         <ArrowUp size={16} />{" "}
-        {canSaveNewVersion || canPublish
-          ? "Publish New Version"
-          : "Publish Current Version"}
+        <Text textTransform="capitalize">{`Publish ${workflow_type}`}</Text>
       </SubscriptionMenuItem>
-
       <SubscriptionMenuItem
-        tooltip={publishDisabledLabel}
-        disabled={!!canPublish}
-        hidden={!isEvaluator}
-        onClick={toggleSaveAsEvaluator}
+        hidden={
+          workflow_type === "workflow" || !publishedWorkflow.data?.isEvaluator
+        }
+        onClick={disableAsEvaluator}
         value="evaluator"
       >
-        <CheckCircle size={16} />{" "}
-        {publishedWorkflow.data?.isEvaluator
-          ? "Delete Evaluator"
-          : "Save as Evaluator"}
+        <XCircle size={16} /> Unpublish Evaluator
       </SubscriptionMenuItem>
 
       <SubscriptionMenuItem
-        tooltip={publishDisabledLabel}
-        disabled={!!publishDisabledLabel}
-        hidden={isEvaluator}
+        hidden={
+          workflow_type === "workflow" || !publishedWorkflow.data?.isComponent
+        }
         value="component"
-        onClick={toggleSaveAsComponent}
+        onClick={disableAsComponent}
       >
-        <BoxIcon size={16} />{" "}
-        {publishedWorkflow.data?.isComponent
-          ? "Delete Component"
-          : "Save as Component"}
+        <XCircle size={16} /> Unpublish Component
       </SubscriptionMenuItem>
 
       <Link
@@ -451,17 +459,22 @@ function PublishMenu({
 function PublishModalContent({
   onClose,
   onApiToggle,
+  toggleSaveAsComponent,
+  toggleSaveAsEvaluator,
 }: {
   onClose: () => void;
   onApiToggle: () => void;
+  toggleSaveAsComponent: () => void;
+  toggleSaveAsEvaluator: () => void;
 }) {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
 
-  const { workflowId, getWorkflow } = useWorkflowStore(
-    ({ workflow_id: workflowId, getWorkflow }) => ({
+  const { workflowId, getWorkflow, workflow_type } = useWorkflowStore(
+    ({ workflow_id: workflowId, getWorkflow, workflow_type }) => ({
       workflowId,
       getWorkflow,
+      workflow_type,
     })
   );
 
@@ -567,6 +580,11 @@ function PublishModalContent({
         {
           onSuccess: () => {
             setIsPublished(true);
+            if (workflow_type === "evaluator") {
+              toggleSaveAsEvaluator();
+            } else if (workflow_type === "component") {
+              toggleSaveAsComponent();
+            }
           },
           onError: () => {
             toaster.create({
