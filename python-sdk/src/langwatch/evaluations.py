@@ -1,3 +1,4 @@
+import json
 from typing import Any, Dict, List, Literal, Optional, Union, cast, TYPE_CHECKING
 from typing_extensions import TypedDict
 from uuid import UUID
@@ -26,6 +27,11 @@ from langwatch.types import (
     TypedValueJson,
 )
 from langwatch.utils.exceptions import capture_exception
+from langwatch.utils.transformation import (
+    SerializableWithStringFallback,
+    convert_typed_values,
+    truncate_object_recursively,
+)
 
 if TYPE_CHECKING:
     from langwatch.telemetry.tracing import LangWatchTrace
@@ -352,6 +358,7 @@ def _add_evaluation(  # type: ignore
 
     if not span or span.type != "evaluation":
         eval_span = langwatch.span(type="evaluation")
+        eval_span_created = True
 
     try:
         eval_span.update(
@@ -405,7 +412,12 @@ def _add_evaluation(  # type: ignore
 
         span.add_event(
             AttributeKey.LangWatchEventEvaluationCustom,
-            cast(Dict[str, Any], evaluation),
+            {
+                "json_encoded_event": json.dumps(
+                    evaluation,
+                    cls=SerializableWithStringFallback,
+                ),
+            },
         )
 
     finally:
