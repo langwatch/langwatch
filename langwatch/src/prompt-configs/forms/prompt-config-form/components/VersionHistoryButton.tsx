@@ -17,7 +17,7 @@ export function VersionHistoryButton({
       openDelay={0}
       showArrow
     >
-      <Button variant="outline">
+      <Button variant="outline" asChild>
         <VersionHistoryListPopover configId={configId} onRestore={onRestore} />
       </Button>
     </Tooltip>
