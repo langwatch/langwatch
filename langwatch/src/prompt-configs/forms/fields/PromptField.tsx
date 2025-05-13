@@ -148,6 +148,13 @@ export function PromptTextArea({
         mention.classList.remove("invalid");
       }
     });
+
+    // Sync heights
+    const textarea = textareaRef.current;
+    const box = boxRef.current;
+    if (textarea && box) {
+      box.style.height = textarea.scrollHeight + "px";
+    }
   }, [availableIds]);
 
   useEffect(() => {
@@ -235,6 +242,7 @@ export function PromptTextArea({
               outline: "none",
               background: "transparent",
               overflow: "auto",
+              resize: "vertical",
             },
           }}
           inputRef={textareaRef}
