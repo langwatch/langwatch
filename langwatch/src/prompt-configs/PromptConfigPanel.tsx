@@ -6,9 +6,15 @@ import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
 import { PanelHeader } from "./components/ui/PanelHeader";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { llmConfigToPromptConfigFormValues } from "~/prompt-configs/llmPromptConfigUtils";
+import {
+  llmConfigToPromptConfigFormValues,
+  promptConfigFormValuesToOptimizationStudioNodeData,
+} from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 import { InputOutputExecutablePanel } from "~/components/executable-panel/InputOutputExecutablePanel";
+import { executePrompt, useExecutePrompt } from "./hooks/useExecutePrompt";
+import isEqual from "lodash.isequal";
+
 interface PromptConfigPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -51,6 +57,13 @@ export function PromptConfigPanel({
 
   const inputFields = formProps.methods.getValues("version.configData.inputs");
 
+  // const { executePrompt, result, isLoading } = useExecutePrompt(projectId);
+
+  // console.log({
+  //   result,
+  //   isLoading,
+  // });
+
   if (!isOpen) {
     return null;
   }
@@ -61,7 +74,49 @@ export function PromptConfigPanel({
       onCloseExpanded={() => setIsExpanded(false)}
     >
       <InputOutputExecutablePanel.LeftDrawer>
-        <InputPanel fields={inputFields} onExecute={() => {}} />
+        <InputPanel
+          fields={inputFields}
+          // onChange={(inputs) => {
+          //   const formInputs = formProps.methods.getValues(
+          //     "version.configData.inputs"
+          //   );
+          //   const updatedInputs = formInputs.map((input) => {
+          //     return {
+          //       ...input,
+          //       value: inputs[input.identifier],
+          //     };
+          //   });
+
+          //   if (!isEqual(updatedInputs, formInputs)) {
+          //     // formProps.methods.setValue(
+          //     //   "version.configData.inputs",
+          //     //   updatedInputs
+          //     // );
+          //   }
+          // }}
+          onExecute={(data) => {
+            console.log("Executing prompt");
+            const formData = formProps.methods.getValues();
+            // Set the inputs to the form data
+            formData.version.configData.inputs = inputFields?.map((input) => ({
+              ...input,
+              value: data[input.identifier],
+            }));
+            executePrompt({
+              projectId,
+              data: promptConfigFormValuesToOptimizationStudioNodeData(
+                configId,
+                formData
+              ),
+            })
+              .then((res: any) => {
+                console.log("Result", res);
+              })
+              .catch((err: any) => {
+                console.error("Error", err);
+              });
+          }}
+        />
       </InputOutputExecutablePanel.LeftDrawer>
       <InputOutputExecutablePanel.CenterContent>
         <VStack width="full">

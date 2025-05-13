@@ -26,6 +26,7 @@ type InputPanelProps = {
   title?: string;
   buttonText?: string;
   initialValues?: Record<string, any>;
+  onChange?: (inputs: Record<string, any>) => void;
 };
 
 export const InputPanel = ({
@@ -34,6 +35,7 @@ export const InputPanel = ({
   title = "Inputs",
   buttonText = "Execute",
   initialValues = {},
+  onChange,
 }: InputPanelProps) => {
   const inputs = useMemo(() => {
     return Object.fromEntries(
@@ -58,6 +60,7 @@ export const InputPanel = ({
     handleSubmit,
     formState: { errors },
     reset,
+    watch,
   } = useForm<Record<string, string>>({
     defaultValues,
     resolver: (values) => {
@@ -90,7 +93,7 @@ export const InputPanel = ({
 
   useEffect(() => {
     reset(defaultValues);
-  }, [defaultValues, reset]);
+  }, [JSON.stringify(defaultValues)]);
 
   const onSubmit = useCallback(
     (data: Record<string, string>) => {
@@ -98,6 +101,12 @@ export const InputPanel = ({
     },
     [onExecute]
   );
+
+  const values = watch();
+
+  useEffect(() => {
+    onChange?.(values);
+  }, [values]);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
