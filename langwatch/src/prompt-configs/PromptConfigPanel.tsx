@@ -14,7 +14,7 @@ import {
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 import { InputOutputExecutablePanel } from "~/components/executable-panel/InputOutputExecutablePanel";
-import { useExecutePrompt } from "./hooks/useExecutePrompt";
+import { useExecutePrompt } from "./hooks/useInvokePrompt";
 import { ExecutionOutputPanel } from "~/components/executable-panel/ExecutionOutputPanel";
 
 /**

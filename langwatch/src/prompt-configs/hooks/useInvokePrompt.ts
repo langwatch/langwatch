@@ -4,7 +4,7 @@ import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 import {
   executePrompt,
   type PromptExecutionResult,
-} from "../utils/executePrompt";
+} from "../utils/invokePrompt";
 
 /**
  * Hook for executing a prompt using TanStack Query
