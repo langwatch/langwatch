@@ -53,6 +53,7 @@ quickwit-*
 !elastic/quickwit
 
 saas-src
+.vscode/
 
 # local config
 .eslintrc.local.cjs
