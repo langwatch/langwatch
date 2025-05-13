@@ -1,0 +1,30 @@
+name: python-sdk-cd
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - 'python-sdk/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "python-sdk/uv.lock"
+
+      - name: Setup Python UV
+        working-directory: python-sdk
+        run: uv sync --all-groups --all-extras
+
+      - name: Run tests
+        working-directory: python-sdk
+        run: uv run pytest
