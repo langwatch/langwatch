@@ -29,7 +29,5 @@ async def main(message: cl.Message):
                 generated_message = "Hello there! How can I help from low level?"
                 nested_span.update(output=generated_message)
 
-    trace.deferred_send_spans()
-
     await msg.stream_token(generated_message)
     await msg.update()
