@@ -12,8 +12,9 @@ import {
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 import { InputOutputExecutablePanel } from "~/components/executable-panel/InputOutputExecutablePanel";
-import { executePrompt, useExecutePrompt } from "./hooks/useExecutePrompt";
+import { useExecutePrompt } from "./hooks/useExecutePrompt";
 import isEqual from "lodash.isequal";
+import { ExecutionOutputPanel } from "~/components/executable-panel/ExecutionOutputPanel";
 
 interface PromptConfigPanelProps {
   isOpen: boolean;
@@ -27,6 +28,11 @@ export function PromptConfigPanel({
   configId,
 }: PromptConfigPanelProps) {
   const { project } = useOrganizationTeamProject();
+  const {
+    mutate: executePrompt,
+    isLoading: isExecuting,
+    data: promptExecutionResult,
+  } = useExecutePrompt();
   const projectId = project?.id ?? "";
   const { data: llmConfig } = api.llmConfigs.getByIdWithLatestVersion.useQuery(
     {
@@ -82,13 +88,7 @@ export function PromptConfigPanel({
                 configId,
                 formData
               ),
-            })
-              .then((res: any) => {
-                console.log("Result", res);
-              })
-              .catch((err: any) => {
-                console.error("Error", err);
-              });
+            });
           }}
         />
       </InputOutputExecutablePanel.LeftDrawer>
@@ -103,7 +103,10 @@ export function PromptConfigPanel({
         </VStack>
       </InputOutputExecutablePanel.CenterContent>
       <InputOutputExecutablePanel.RightDrawer>
-        Right drawer
+        <ExecutionOutputPanel
+          executionState={promptExecutionResult?.executionState}
+          isTracingEnabled={false}
+        />
       </InputOutputExecutablePanel.RightDrawer>
     </InputOutputExecutablePanel>
   );
