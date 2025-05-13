@@ -271,7 +271,6 @@ export function DatasetStep() {
                 description="Import tracing data from production to test the evaluator"
                 _icon={{ color: "blue.400" }}
                 icon={<FileText />}
-                disabled
                 onClick={() => handleDataSourceSelect("from_production")}
               />
             </RadioCard.Root>
