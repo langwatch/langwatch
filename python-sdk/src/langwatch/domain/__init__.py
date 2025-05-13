@@ -6,6 +6,7 @@ from pydantic import BaseModel
 AttributeValue = Union[str, int, float, bool, Sequence[str]]
 BaseAttributes = Dict[str, AttributeValue]
 
+
 class SpanProcessingExcludeRule(BaseModel):
     field_name: Literal["span_name"]
     match_value: str

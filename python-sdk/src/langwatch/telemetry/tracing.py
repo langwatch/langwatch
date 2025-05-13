@@ -5,7 +5,7 @@ from uuid import UUID
 import httpx
 import threading
 from deprecated import deprecated
-from langwatch.attributes import AttributeName
+from langwatch.attributes import AttributeKey
 from langwatch.utils.transformation import (
     SerializableWithStringFallback,
     convert_typed_values,
@@ -319,7 +319,7 @@ class LangWatchTrace:
         if metadata is None:
             metadata = {}
         if trace_id is not None:
-            metadata[AttributeName.DeprecatedTraceId] = str(trace_id)
+            metadata[AttributeKey.DeprecatedTraceId] = str(trace_id)
         if expected_output is not None:
             self._expected_output = expected_output
         if disable_sending is not None and client is not None:

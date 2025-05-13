@@ -19,7 +19,7 @@ from uuid import UUID
 import threading
 import inspect
 
-from langwatch.attributes import AttributeName
+from langwatch.attributes import AttributeKey
 from langwatch.utils.transformation import (
     SerializableWithStringFallback,
     rag_contexts,
@@ -114,7 +114,7 @@ class LangWatchSpan:
             warn(
                 "span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the spans's metadata."
             )
-            attributes[AttributeName.DeprecatedSpanId] = str(span_id)
+            attributes[AttributeKey.DeprecatedSpanId] = str(span_id)
 
         # Initialize critical instance attributes first
         self._lock = threading.Lock()
@@ -336,13 +336,13 @@ class LangWatchSpan:
             warn(
                 "span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the spans's metadata."
             )
-            attributes[AttributeName.DeprecatedSpanId] = str(span_id)
+            attributes[AttributeKey.DeprecatedSpanId] = str(span_id)
         if type is not None:
             self.type = type
-            attributes[AttributeName.LangWatchSpanType] = str(type)
+            attributes[AttributeKey.LangWatchSpanType] = str(type)
         if self.capture_input and input is not None:
             self.input = input
-            attributes[AttributeName.LangWatchInput] = json.dumps(
+            attributes[AttributeKey.LangWatchInput] = json.dumps(
                 truncate_object_recursively(
                     convert_typed_values(deepcopy(input)),
                     max_string_length=(
@@ -353,7 +353,7 @@ class LangWatchSpan:
             )
         if self.capture_output and output is not None:
             self.output = output
-            attributes[AttributeName.LangWatchOutput] = json.dumps(
+            attributes[AttributeKey.LangWatchOutput] = json.dumps(
                 truncate_object_recursively(
                     convert_typed_values(deepcopy(output)),
                     max_string_length=(
@@ -367,12 +367,12 @@ class LangWatchSpan:
             self.record_error(error)
         if timestamps is not None:
             self.timestamps = timestamps
-            attributes[AttributeName.LangWatchTimestamps] = json.dumps(
+            attributes[AttributeKey.LangWatchTimestamps] = json.dumps(
                 timestamps, cls=SerializableWithStringFallback
             )
         if contexts is not None:
             self.contexts = contexts
-            attributes[AttributeName.LangWatchRAGContexts] = json.dumps(
+            attributes[AttributeKey.LangWatchRAGContexts] = json.dumps(
                 truncate_object_recursively(
                     rag_contexts(contexts),
                     max_string_length=(
@@ -383,17 +383,17 @@ class LangWatchSpan:
             )
         if model is not None:
             self.model = model
-            attributes[AttributeName.GenAIRequestModel] = model
+            attributes[AttributeKey.GenAIRequestModel] = model
         if params is not None:
             params = deepcopy(params)
             self.params = {**(self.params or {}), **params}
-            attributes[AttributeName.LangWatchParams] = json.dumps(
+            attributes[AttributeKey.LangWatchParams] = json.dumps(
                 self.params, cls=SerializableWithStringFallback
             )
         if metrics is not None:
             metrics = deepcopy(metrics)
             self.metrics = {**(self.metrics or {}), **metrics}
-            attributes[AttributeName.LangWatchMetrics] = json.dumps(
+            attributes[AttributeKey.LangWatchMetrics] = json.dumps(
                 self.metrics, cls=SerializableWithStringFallback
             )
 
@@ -418,7 +418,7 @@ class LangWatchSpan:
 
         from langwatch import evaluations
 
-        return evaluations.add_evaluation(
+        return evaluations._add_evaluation( # type: ignore
             span=self,
             evaluation_id=evaluation_id,
             name=name,
