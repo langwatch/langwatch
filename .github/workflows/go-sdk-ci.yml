@@ -1,4 +1,4 @@
-name: go
+name: sdk-go-ci
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
   pull_request:
     paths:
-      - 'go-sdk/**'
+      - 'sdk-go/**'
 
 jobs:
   build:
@@ -22,13 +22,13 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        working-directory: ./go-sdk
+        working-directory: ./sdk-go
         run: go mod download
 
       - name: Run tests
-        working-directory: ./go-sdk
+        working-directory: ./sdk-go
         run: go test -v ./...
 
       - name: Build
-        working-directory: ./go-sdk
+        working-directory: ./sdk-go
         run: go build -v ./...
