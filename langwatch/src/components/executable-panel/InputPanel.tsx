@@ -20,9 +20,11 @@ export type InputField = {
   value?: unknown;
 };
 
+export type ExecuteData = Record<string, string>;
+
 type InputPanelProps = {
   fields: InputField[];
-  onExecute: (inputs: Record<string, string>) => void;
+  onExecute: (inputs: ExecuteData) => void;
   title?: string;
   buttonText?: string;
   initialValues?: Record<string, any>;
@@ -56,9 +58,8 @@ export const InputPanel = ({
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
     reset,
-    watch,
   } = useForm<Record<string, string>>({
     defaultValues,
     resolver: (values) => {
@@ -141,7 +142,12 @@ export const InputPanel = ({
           );
         })}
         <HStack width="full" justify="end">
-          <Button type="submit" colorPalette="green">
+          <Button
+            type="submit"
+            colorPalette="green"
+            loading={isSubmitting}
+            loadingText={buttonText}
+          >
             {buttonText} <Play size={16} />
           </Button>
         </HStack>
