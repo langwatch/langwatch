@@ -183,10 +183,11 @@ const addOpenTelemetrySpanAsSpan = (
 
     switch (event.name) {
       case "First Token Stream Event":
-      case "llm.content.completion.chunk":
+      case "llm.content.completion.chunk": {
         first_token_at = parseTimestamp(event?.timeUnixNano);
         break;
-      case "langwatch.evaluation.custom":
+      }
+      case "langwatch.evaluation.custom": {
         const jsonPayload = event.attributes?.find((attr) => attr?.key === "json_encoded_event")?.value?.stringValue;
         if (!jsonPayload) {
           logger.warn({ event }, "event for `langwatch.evaluation.custom` has no json_encoded_event");
@@ -202,6 +203,8 @@ const addOpenTelemetrySpanAsSpan = (
           logger.error({ error, jsonPayload }, "error parsing json_encoded_event from `langwatch.evaluation.custom`");
         }
         break;
+      }
+
       default:
         break;
     }
