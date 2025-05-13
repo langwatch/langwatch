@@ -1,9 +1,9 @@
 import { Text, Spinner, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
 import {
-  InputPanel,
+  ExecutionInputPanel,
   type ExecuteData,
-} from "~/components/executable-panel/InputPanel";
+} from "~/components/executable-panel/ExecuptionInputPanel";
 import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
 import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
 import { PanelHeader } from "./components/ui/PanelHeader";
@@ -116,7 +116,7 @@ export function PromptConfigPanel({
       onCloseExpanded={() => setIsExpanded(false)}
     >
       <InputOutputExecutablePanel.LeftDrawer>
-        <InputPanel fields={inputFields} onExecute={handleExecute} />
+        <ExecutionInputPanel fields={inputFields} onExecute={handleExecute} />
       </InputOutputExecutablePanel.LeftDrawer>
 
       <InputOutputExecutablePanel.CenterContent>

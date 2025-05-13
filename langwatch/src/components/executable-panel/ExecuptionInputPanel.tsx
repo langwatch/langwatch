@@ -30,7 +30,7 @@ type InputPanelProps = {
   initialValues?: Record<string, any>;
 };
 
-export const InputPanel = ({
+export const ExecutionInputPanel = ({
   fields,
   onExecute,
   title = "Inputs",
