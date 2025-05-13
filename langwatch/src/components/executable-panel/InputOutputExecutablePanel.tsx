@@ -86,7 +86,7 @@ export function InputOutputExecutablePanel({
       <MotionDiv
         initial={{
           right: 0,
-          height: `${fullPanelHeight}px`,
+          height: containerHeight ? `${fullPanelHeight}px` : "100%",
           marginTop: 0,
           borderRadius: 0,
           borderTopWidth: 0,

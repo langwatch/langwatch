@@ -120,7 +120,7 @@ export function PromptConfigPanel({
       </InputOutputExecutablePanel.LeftDrawer>
 
       <InputOutputExecutablePanel.CenterContent>
-        <VStack width="full" gap={4}>
+        <VStack width="full" gap={4} height="full" background="white">
           <PanelHeader
             title={<Text>Prompt Configuration</Text>}
             onClose={handleClose}

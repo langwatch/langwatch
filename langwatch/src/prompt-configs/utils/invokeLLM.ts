@@ -130,7 +130,6 @@ function createEventPayload(
     },
   };
 
-  logger.info({ event }, "Event");
   return event;
 }
 
