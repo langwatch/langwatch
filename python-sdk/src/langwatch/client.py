@@ -5,16 +5,16 @@ from typing import List, Optional, Sequence
 
 from langwatch.__version__ import __version__
 from langwatch.attributes import AttributeName
-from langwatch.domain import SpanProcessingExcludeRule
+from langwatch.domain import BaseAttributes, SpanProcessingExcludeRule
 from opentelemetry import trace
+from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.trace.sampling import TraceIdRatioBased, ALWAYS_OFF
 
 from .exporters.filterable_batch_span_exporter import FilterableBatchSpanProcessor
-from .typings import Instrumentor
-from .types import LangWatchClientProtocol, BaseAttributes
+from .types import LangWatchClientProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class Client(LangWatchClientProtocol):
 	_debug: bool = False
 	_api_key: str
 	_endpoint_url: str
-	instrumentors: Sequence[Instrumentor] = []
+	instrumentors: Sequence[BaseInstrumentor] = []
 	base_attributes: BaseAttributes = {}
 	_disable_sending: bool = False
 	_flush_on_exit: bool = True
@@ -39,7 +39,7 @@ class Client(LangWatchClientProtocol):
 		api_key: Optional[str] = None,
 		endpoint_url: Optional[str] = None,
 		base_attributes: Optional[BaseAttributes] = None,
-		instrumentors: Optional[Sequence[Instrumentor]] = None,
+		instrumentors: Optional[Sequence[BaseInstrumentor]] = None,
 		tracer_provider: Optional[TracerProvider] = None,
 		debug: bool = False,
 		disable_sending: bool = False,
