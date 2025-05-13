@@ -8,18 +8,10 @@ load_dotenv()
 
 import chainlit as cl
 
-from opentelemetry import trace
-from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
-
 from openinference.instrumentation.dspy import DSPyInstrumentor
 
 langwatch.setup(
     instrumentors=[DSPyInstrumentor()],
-)
-
-# Optionally, you can also print the spans to the console.
-trace.get_tracer_provider().add_span_processor(
-    SimpleSpanProcessor(ConsoleSpanExporter())
 )
 
 llm = dspy.OpenAI(

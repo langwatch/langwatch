@@ -2,35 +2,19 @@
 
 from dotenv import load_dotenv
 
+import langwatch
+
 load_dotenv()
 
 import chainlit as cl
-
-import os
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk import trace as trace_sdk
-from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
 
 from opentelemetry.instrumentation.anthropic import AnthropicInstrumentor
 import anthropic
 
 client = anthropic.Anthropic()
-
-
-# Set up OpenTelemetry trace provider with LangWatch as the endpoint
-tracer_provider = trace_sdk.TracerProvider()
-tracer_provider.add_span_processor(
-    SimpleSpanProcessor(
-        OTLPSpanExporter(
-            endpoint=f"{os.environ.get('LANGWATCH_ENDPOINT', 'https://app.langwatch.ai')}/api/otel/v1/traces",
-            headers={"Authorization": "Bearer " + os.environ["LANGWATCH_API_KEY"]},
-        )
-    )
+langwatch.setup(
+    instrumentors=[AnthropicInstrumentor()],
 )
-# Optionally, you can also print the spans to the console.
-tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
-
-AnthropicInstrumentor().instrument(tracer_provider=tracer_provider)
 
 
 @cl.on_message

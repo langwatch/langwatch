@@ -8,7 +8,7 @@ import chainlit as cl
 
 import langwatch
 from chainlit.context import init_http_context
-from langwatch.telemetry.tracing import LangWatchTrace
+from opentelemetry.sdk import trace as trace_sdk
 from opentelemetry.sdk.trace.export import (
     SpanExportResult,
     SpanExporter,
@@ -62,9 +62,7 @@ async def test_example(example_file: str):
             "langchain_rag_bot_vertex_ai.py is broken due to a bug in current langchain version of global state mutation when running together with other langchain"
         )
 
-    module_name = (
-        f"examples.{example_file[:-3].replace('/', '.')}"
-    )
+    module_name = f"examples.{example_file[:-3].replace('/', '.')}"
     module = importlib.import_module(module_name)
     init_http_context()
 
@@ -75,11 +73,7 @@ async def test_example(example_file: str):
         pytest.skip(f"No main function found in {example_file}")
 
     if "opentelemetry" in example_file:
-        tracer_provider = getattr(module, "tracer_provider")
-        # Remove console printing exporter
-        tracer_provider._active_span_processor._span_processors = (
-            tracer_provider._active_span_processor._span_processors[0],
-        )
+        tracer_provider = trace_sdk.TracerProvider()
         # Capture trace id
         tracer_provider.add_span_processor(
             SimpleSpanProcessor(TraceIdCapturerExporter())
