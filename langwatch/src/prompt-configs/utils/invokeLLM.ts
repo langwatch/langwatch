@@ -62,6 +62,10 @@ export async function invokeLLM({
 
 /**
  * Creates a workflow object for prompt execution
+ *
+ * Note: Most of this is boilerplate for the workflow just so we can
+ * use the endpoint, but the workflow info is not actually used in
+ * the execution.
  */
 function createWorkflow(
   workflowId: string,
@@ -141,13 +145,29 @@ async function sendRequest(projectId: string, event: any): Promise<Response> {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Accept: "text/event-stream",
     },
     body: JSON.stringify({ projectId, event }),
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || response.statusText);
+    let errorMessage: string;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.error || response.statusText;
+    } catch (parseError) {
+      // If we can't parse the response as JSON, use the status text
+      errorMessage = response.statusText;
+      logger.error(
+        {
+          error: parseError,
+          status: response.status,
+          statusText: response.statusText,
+        },
+        "Failed to parse error response as JSON"
+      );
+    }
+    throw new Error(errorMessage);
   }
 
   return response;

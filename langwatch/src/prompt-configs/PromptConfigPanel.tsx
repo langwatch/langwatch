@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ExecutionInputPanel,
   type ExecuteData,
-} from "~/components/executable-panel/ExecuptionInputPanel";
+} from "~/components/executable-panel/ExecutionInputPanel";
 import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
 import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
 import { PanelHeader } from "./components/ui/PanelHeader";

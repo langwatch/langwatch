@@ -5,7 +5,7 @@ import {
   ExecutionInputPanel,
   type InputField,
   type ExecuteData,
-} from "../../../components/executable-panel/ExecuptionInputPanel";
+} from "~/components/executable-panel/ExecutionInputPanel";
 import {
   getInputsForExecution,
   useComponentExecution,
