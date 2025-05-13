@@ -38,7 +38,7 @@ export function PromptConfigPanel({
 
   // ---- API calls and data fetching ----
   const {
-    mutate: executePrompt,
+    mutate: invokeLLM,
     isLoading: isExecuting,
     data: promptExecutionResult,
   } = useExecutePrompt();
@@ -95,7 +95,7 @@ export function PromptConfigPanel({
       value: inputData[input.identifier],
     }));
 
-    executePrompt({
+    invokeLLM({
       projectId,
       data: promptConfigFormValuesToOptimizationStudioNodeData(
         configId,
