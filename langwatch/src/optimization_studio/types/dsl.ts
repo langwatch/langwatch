@@ -38,6 +38,8 @@ export type Field = {
   hidden?: boolean;
   json_schema?: object;
 };
+export const WORKFLOW_TYPES = ["component", "evaluator", "workflow"] as const;
+export type WorkflowTypes = (typeof WORKFLOW_TYPES)[number];
 
 export type ExecutionStatus =
   | "idle"
@@ -235,6 +237,7 @@ export const workflowJsonSchema = z
     nodes: z.array(z.any()),
     edges: z.array(z.any()),
     default_llm: llmConfigSchema,
+    workflow_type: z.enum(WORKFLOW_TYPES).optional(),
   })
   .passthrough();
 
@@ -252,6 +255,7 @@ export type Workflow = {
   data?: Record<string, any>;
   template_adapter: "default" | "dspy_chat_adapter";
   enable_tracing: boolean;
+  workflow_type?: WorkflowTypes;
 
   state: {
     execution?: {

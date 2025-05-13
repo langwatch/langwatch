@@ -305,6 +305,8 @@ simple_workflow = Workflow(
         ),
     ],
     state=WorkflowState(execution=None, evaluation=None),
+    template_adapter="default",
+    workflow_type="workflow",
 )
 
 
@@ -594,6 +596,8 @@ def test_parse_parallel_execution_workflow():
             ),
         ],
         state=WorkflowState(execution=None, evaluation=None),
+        template_adapter="default",
+        workflow_type="workflow",
     )
 
     class_name, code, _ = parse_workflow(workflow, format=True, debug_level=1)

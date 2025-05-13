@@ -60,6 +60,40 @@ export const optimizationRouter = createTRPCRouter({
 
       return { ...publishedWorkflow, isComponent, isEvaluator };
     }),
+  disableAsComponent: protectedProcedure
+    .input(z.object({ workflowId: z.string(), projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      const { workflowId, projectId } = input;
+
+      try {
+        await ctx.prisma.workflow.update({
+          where: { id: workflowId, projectId: projectId },
+          data: { isComponent: false },
+        });
+      } catch (error) {
+        throw error;
+      }
+
+      return { success: true };
+    }),
+  disableAsEvaluator: protectedProcedure
+    .input(z.object({ workflowId: z.string(), projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      const { workflowId, projectId } = input;
+
+      try {
+        await ctx.prisma.workflow.update({
+          where: { id: workflowId, projectId: projectId },
+          data: { isEvaluator: false },
+        });
+      } catch (error) {
+        throw error;
+      }
+
+      return { success: true };
+    }),
   toggleSaveAsComponent: protectedProcedure
     .input(
       z.object({
@@ -88,6 +122,7 @@ export const optimizationRouter = createTRPCRouter({
         throw error;
       }
     }),
+
   toggleSaveAsEvaluator: protectedProcedure
     .input(
       z.object({

@@ -40,6 +40,7 @@ export const blankTemplate: Workflow = {
     max_tokens: 8192,
   },
   template_adapter: "default",
+  workflow_type: "workflow",
   enable_tracing: true,
   nodes: [
     entryNode(),
