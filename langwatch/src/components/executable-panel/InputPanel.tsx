@@ -113,33 +113,33 @@ export const InputPanel = ({
         >
           {title}
         </Heading>
-        {fields.map((input) => (
-          <HorizontalFormControl
-            key={input.identifier}
-            label={input.identifier}
-            helper={""}
-            invalid={!!errors[input.identifier]}
-          >
-            {
-              // Handles case where the input identifier is deleted
-              input.identifier && (
-                <Textarea
-                  {...register(input.identifier)}
-                  placeholder={
-                    input.type === "image"
-                      ? "image url"
-                      : input.type === "str"
-                      ? undefined
-                      : input.type
-                  }
-                />
-              )
-            }
-            <Field.ErrorText>
-              {errors[input.identifier]?.message}
-            </Field.ErrorText>
-          </HorizontalFormControl>
-        ))}
+        {fields.map((input) => {
+          if (!input.identifier) return null;
+
+          // Handle different input types better than this
+          return (
+            <HorizontalFormControl
+              key={input.identifier}
+              label={input.identifier}
+              helper={""}
+              invalid={!!errors[input.identifier]}
+            >
+              <Textarea
+                {...register(input.identifier)}
+                placeholder={
+                  input.type === "image"
+                    ? "image url"
+                    : input.type === "str"
+                    ? undefined
+                    : input.type
+                }
+              />
+              <Field.ErrorText>
+                {errors[input.identifier]?.message}
+              </Field.ErrorText>
+            </HorizontalFormControl>
+          );
+        })}
         <HStack width="full" justify="end">
           <Button type="submit" colorPalette="green">
             {buttonText} <Play size={16} />
