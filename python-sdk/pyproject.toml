@@ -72,12 +72,13 @@ examples = [
     "langgraph>=0.2.35,<0.3.0",
     "nanoid>=2.0.0",
     "openai>=1.68.2",
-    "pydantic>=1,<2.10.2",                               # v2.10.2 is broken for chainlit
+    "pydantic>=1,<2.10.2", # v2.10.2 is broken for chainlit
     "pytest>=7.4.2,<8.0.0",
     "python-dotenv==1.0.1",
     "streamlit>=1.37.1,<2.0.0",
     "uvicorn>=0.25.0,<0.26.0",
     "json-repair>=0.42.0",
+    "openinference-instrumentation-openai>=0.1.25",
 ]
 tests = [
     "pytest-asyncio>=0.21.2",
