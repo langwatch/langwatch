@@ -2,6 +2,9 @@ import { useMutation } from "@tanstack/react-query";
 import type { Node } from "@xyflow/react";
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 import { invokeLLM, type PromptExecutionResult } from "../utils/invokeLLM";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("useInvokePrompt");
 
 /**
  * Hook for executing a prompt using TanStack Query
@@ -28,7 +31,7 @@ export function useExecutePrompt() {
       return invokeLLM({ projectId, data });
     },
     onError: (error) => {
-      console.error("Error in prompt execution mutation:", error);
+      logger.error({ error }, "Error in prompt execution");
     },
   });
 }

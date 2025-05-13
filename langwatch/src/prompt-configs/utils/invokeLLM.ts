@@ -6,6 +6,9 @@ import type {
   Workflow,
   ExecutionState,
 } from "~/optimization_studio/types/dsl";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("invokeLLM");
 
 export interface PromptExecutionResult {
   status: string;
@@ -49,7 +52,7 @@ export async function invokeLLM({
     // Process the SSE stream
     return await processSSEStream(response, nodeId);
   } catch (error) {
-    console.error("Error executing prompt:", error);
+    logger.error({ error, projectId, data }, "Error executing prompt");
     return {
       status: "error",
       error: error instanceof Error ? error.message : String(error),
@@ -127,7 +130,7 @@ function createEventPayload(
     },
   };
 
-  console.log("Event:", event);
+  logger.info({ event }, "Event");
   return event;
 }
 
@@ -239,7 +242,10 @@ function processEvents(
           result.error = serverEvent.payload.message;
         }
       } catch (error) {
-        console.error("Error parsing SSE event:", error);
+        logger.error(
+          { error, chunk, result, nodeId },
+          "Error parsing SSE event"
+        );
       }
     }
   }
