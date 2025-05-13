@@ -763,7 +763,6 @@ const addOpenTelemetrySpanAsSpan = (
     } as Span["timestamps"],
   };
 
-  trace.
   trace.spans.push(span);
 };
 
