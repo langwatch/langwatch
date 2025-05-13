@@ -26,7 +26,6 @@ type InputPanelProps = {
   title?: string;
   buttonText?: string;
   initialValues?: Record<string, any>;
-  onChange?: (inputs: Record<string, any>) => void;
 };
 
 export const InputPanel = ({
@@ -35,7 +34,6 @@ export const InputPanel = ({
   title = "Inputs",
   buttonText = "Execute",
   initialValues = {},
-  onChange,
 }: InputPanelProps) => {
   const inputs = useMemo(() => {
     return Object.fromEntries(
@@ -102,12 +100,6 @@ export const InputPanel = ({
     [onExecute]
   );
 
-  const values = watch();
-
-  useEffect(() => {
-    onChange?.(values);
-  }, [values]);
-
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
       <VStack align="start" gap={3} width="full">
@@ -128,16 +120,21 @@ export const InputPanel = ({
             helper={""}
             invalid={!!errors[input.identifier]}
           >
-            <Textarea
-              {...register(input.identifier)}
-              placeholder={
-                input.type === "image"
-                  ? "image url"
-                  : input.type === "str"
-                  ? undefined
-                  : input.type
-              }
-            />
+            {
+              // Handles case where the input identifier is deleted
+              input.identifier && (
+                <Textarea
+                  {...register(input.identifier)}
+                  placeholder={
+                    input.type === "image"
+                      ? "image url"
+                      : input.type === "str"
+                      ? undefined
+                      : input.type
+                  }
+                />
+              )
+            }
             <Field.ErrorText>
               {errors[input.identifier]?.message}
             </Field.ErrorText>

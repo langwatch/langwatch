@@ -57,13 +57,6 @@ export function PromptConfigPanel({
 
   const inputFields = formProps.methods.getValues("version.configData.inputs");
 
-  // const { executePrompt, result, isLoading } = useExecutePrompt(projectId);
-
-  // console.log({
-  //   result,
-  //   isLoading,
-  // });
-
   if (!isOpen) {
     return null;
   }
@@ -76,26 +69,7 @@ export function PromptConfigPanel({
       <InputOutputExecutablePanel.LeftDrawer>
         <InputPanel
           fields={inputFields}
-          // onChange={(inputs) => {
-          //   const formInputs = formProps.methods.getValues(
-          //     "version.configData.inputs"
-          //   );
-          //   const updatedInputs = formInputs.map((input) => {
-          //     return {
-          //       ...input,
-          //       value: inputs[input.identifier],
-          //     };
-          //   });
-
-          //   if (!isEqual(updatedInputs, formInputs)) {
-          //     // formProps.methods.setValue(
-          //     //   "version.configData.inputs",
-          //     //   updatedInputs
-          //     // );
-          //   }
-          // }}
           onExecute={(data) => {
-            console.log("Executing prompt");
             const formData = formProps.methods.getValues();
             // Set the inputs to the form data
             formData.version.configData.inputs = inputFields?.map((input) => ({
