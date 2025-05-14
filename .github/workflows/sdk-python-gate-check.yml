@@ -25,7 +25,7 @@ jobs:
               - 'python-sdk/**'
 
       - name: Log path changes decision
-        run: echo "Python SDK files changed: ${{ steps.filter.outputs.python_sdk }}"
+        run: 'echo "Python SDK files changed: ${{ steps.filter.outputs.python_sdk }}"'
 
       - name: Wait for python-sdk-ci if changes detected
         if: steps.filter.outputs.python_sdk == 'true'
