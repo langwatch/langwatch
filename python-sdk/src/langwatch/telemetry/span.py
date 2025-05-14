@@ -1,7 +1,6 @@
 from copy import deepcopy
 import functools
 import json
-import traceback
 from warnings import warn
 from typing import (
     List,
@@ -27,7 +26,8 @@ from langwatch.utils.transformation import (
     convert_typed_values,
     truncate_object_recursively,
 )
-from opentelemetry import trace as trace_api, context as context_api
+from opentelemetry import trace as trace_api
+from opentelemetry.util.types import Attributes as OtelAttributes
 from opentelemetry.trace import (
     SpanKind,
     NonRecordingSpan,
@@ -217,14 +217,8 @@ class LangWatchSpan:
                     )
                     self._span = self._span_context_manager.__enter__()
                 except Exception as e:
-                    warn(
-                        f"Failed to create span: {str(e)}. Span operations will be no-ops."
-                    )
+                    warn(f"Failed to set span on context: {str(e)}.")
                     return
-
-            if not self._span:
-                warn("Failed to create span - got None from tracer")
-                return
 
             try:
                 self.update(
@@ -245,14 +239,11 @@ class LangWatchSpan:
 
         except Exception as e:
             warn(
-                f"Unexpected error creating span: {str(e)}. Span operations will be no-ops."
+                f"Unexpected error creating span: {str(e)}. Span operations may be no-ops."
             )
 
     def record_error(self, error: Exception) -> None:
         """Record an error in this span."""
-        if self._span is None:
-            warn("Cannot record error - no span available")
-            return
         try:
             self._span.set_status(Status(StatusCode.ERROR))
             self._span.record_exception(error)
@@ -261,9 +252,6 @@ class LangWatchSpan:
 
     def add_event(self, name: str, attributes: Optional[Dict[str, Any]] = None) -> None:
         """Add an event to this span."""
-        if self._span is None:
-            warn("Cannot add event - no span available")
-            return
         try:
             self._span.add_event(name, attributes)
         except Exception as e:
@@ -271,9 +259,6 @@ class LangWatchSpan:
 
     def set_status(self, status: Status, description: Optional[str] = None) -> None:
         """Set the status of this span."""
-        if self._span is None:
-            warn("Cannot set status - no span available")
-            return
         try:
             self._span.set_status(status, description)
         except Exception as e:
@@ -281,9 +266,6 @@ class LangWatchSpan:
 
     def set_attributes(self, attributes: Dict[str, Any]) -> None:
         """Set attributes on this span."""
-        if self._span is None:
-            warn("Cannot set attributes - no span available")
-            return
         try:
             self._span.set_attributes(attributes)
         except Exception as e:
@@ -291,16 +273,10 @@ class LangWatchSpan:
 
     def is_recording(self) -> bool:
         """Check if the span is recording."""
-        if self._span is None:
-            warn("Cannot check recording status - no span available")
-            return False
         return self._span.is_recording()
 
     def update_name(self, name: str) -> None:
         """Update the name of the span."""
-        if self._span is None:
-            warn("Cannot update name - no span available")
-            return
         try:
             self.name = name
             self._span.update_name(name)
@@ -309,18 +285,16 @@ class LangWatchSpan:
 
     def get_span_context(self) -> Optional[SpanContext]:
         """Get the span context of this span."""
-        if self._span is None:
-            warn("Cannot get span context - no span available")
-            return None
         return self._span.get_span_context()
 
-    def add_link(self, attributes: Optional[Dict[str, Any]] = None) -> None:
+    def add_link(
+        self,
+        context: "SpanContext",
+        attributes: OtelAttributes = None,
+    ) -> None:
         """Add a link to this span."""
-        if self._span is None:
-            warn("Cannot add link - no span available")
-            return
         try:
-            self._span.add_link(attributes)
+            self._span.add_link(context, attributes)
         except Exception as e:
             warn(f"Failed to add link to span: {str(e)}")
 
@@ -340,10 +314,6 @@ class LangWatchSpan:
         **kwargs: Any,
     ) -> None:
         ensure_setup()
-
-        if self._span is None:
-            warn("Cannot set attributes - no span available")
-            return
 
         attributes = dict(kwargs)
 
@@ -545,7 +515,7 @@ class LangWatchSpan:
             and self._span_context_manager is not None
         ):
             self._span_context_manager.__exit__(None, error, None)
-        elif hasattr(self, "_span") and self._span is not None:
+        elif hasattr(self, "_span"):
             self._span.end(end_time)
 
     def __call__(self, func: T) -> T:
@@ -631,16 +601,13 @@ class LangWatchSpan:
                 finally:
                     self._span_context_manager = None
 
-            if hasattr(self, "_span") and self._span is not None:
-                self._span = None
-
             self._cleaned_up = True
 
     def __enter__(self) -> "LangWatchSpan":
         """Makes the span usable as a context manager."""
         self.trace = self.trace or stored_langwatch_trace.get(None)
         if not self.ignore_missing_trace_warning and not self.trace and not self.parent:
-            warn("No current trace found, some spans will may not be sent to LangWatch")
+            warn("No current trace found, some spans may not be sent to LangWatch")
 
         self._create_span()
         self.span = cast(
@@ -827,7 +794,7 @@ def span(
         type: Type of operation this span represents
         trace: Optional trace this span belongs to
         parent: Optional parent span
-        span_id: Deprecated.Optional span identifier (will be generated if not provided)
+        span_id: Deprecated. Optional span identifier
         capture_input: Whether to capture inputs
         capture_output: Whether to capture outputs
         input: Optional input data

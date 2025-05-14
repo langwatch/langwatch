@@ -121,16 +121,10 @@ class LangWatchTrace:
             if client:
                 client.disable_sending = True
 
-        # Determine which tracer provider to use
-        if tracer_provider is not None:
-            # Use the explicitly provided tracer provider
-            trace_api.set_tracer_provider(tracer_provider)
-
         # Use the global tracer provider
-        self.tracer = trace_api.get_tracer(
+        self.tracer = (tracer_provider or trace_api).get_tracer(
             instrumenting_module_name="langwatch",
             instrumenting_library_version=__version__,
-            attributes=self.metadata,
         )
 
         # Store root span parameters for later creation
@@ -154,10 +148,6 @@ class LangWatchTrace:
             if not skip_root_span
             else None
         )
-
-        # TODO
-        # if skip_root_span is False:
-        #     self._create_root_span()
 
     @property
     def trace_id(self) -> Optional[str]:
@@ -218,7 +208,7 @@ class LangWatchTrace:
 
             try:
                 if self.root_span is not None:
-                    self.root_span._cleanup(exc_type, exc_value, traceback)
+                    self.root_span._cleanup(exc_type, exc_value, traceback)  # type: ignore
             except Exception as e:
                 warn(f"Failed to cleanup root span: {e}")
 
@@ -326,11 +316,14 @@ class LangWatchTrace:
             client.disable_sending = disable_sending
 
         # Serialize metadata before setting as attribute
-        self.root_span.set_attributes(
-            {
-                "metadata": json.dumps(metadata, cls=SerializableWithStringFallback),
-            }
-        )
+        if self.root_span is not None:
+            self.root_span.set_attributes(
+                {
+                    "metadata": json.dumps(
+                        metadata, cls=SerializableWithStringFallback
+                    ),
+                }
+            )
 
         # Pre-serialize timestamps if present
         update_kwargs = {
@@ -349,7 +342,8 @@ class LangWatchTrace:
                 timestamps, cls=SerializableWithStringFallback
             )
 
-        self.root_span.update(**update_kwargs)
+        if self.root_span is not None:
+            self.root_span.update(**update_kwargs)
 
     @deprecated(
         reason="Evaluations should be actioned on the span object directly, not a trace. This method will be removed in a future version.",
@@ -373,7 +367,7 @@ class LangWatchTrace:
     ):
         from langwatch import evaluations
 
-        evaluations._add_evaluation(
+        evaluations._add_evaluation(  # type: ignore
             span=span,
             evaluation_id=evaluation_id,
             name=name,
@@ -590,6 +584,12 @@ class LangWatchTrace:
     ):
         """Set the name and input of the trace based on the callee function and arguments."""
 
+        if self.root_span is None:
+            warn(
+                "Setting input information on a trace that has not been created yet is not possible. This is a bug, please report it."
+            )
+            return
+
         sig = inspect.signature(func)
         parameters = list(sig.parameters.values())
 
@@ -628,6 +628,12 @@ class LangWatchTrace:
     def _set_callee_output_information(self, func: Callable[..., Any], output: Any):
         """Set the output of the trace based on the callee function and output."""
 
+        if self.root_span is None:
+            warn(
+                "Setting output information on a trace that has not been created yet is not possible. This is a bug, please report it."
+            )
+            return
+
         if self._root_span_params is not None:
             if self.root_span.name is None:
                 self.root_span.update_name(func.__name__)
@@ -645,6 +651,8 @@ class LangWatchTrace:
         """Get whether sending is disabled."""
         ensure_setup()
         client = get_instance()
+        if client is None:
+            return True
         return client.disable_sending
 
     @disable_sending.setter

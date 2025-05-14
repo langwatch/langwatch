@@ -248,8 +248,16 @@ def _prepare_data(
     return {
         "url": get_endpoint() + f"/api/evaluations/{slug}/evaluate",
         "json": {
-            "trace_id": format(span_ctx.trace_id, "x"),
-            "span_id": format(span_ctx.span_id, "x"),
+            "trace_id": (
+                format(span_ctx.trace_id, "x")
+                if span_ctx and span_ctx.is_valid
+                else None
+            ),
+            "span_id": (
+                format(span_ctx.span_id, "x")
+                if span_ctx and span_ctx.is_valid
+                else None
+            ),
             "name": name,
             "data": dataDict,
             "settings": settings,
