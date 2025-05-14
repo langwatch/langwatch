@@ -1028,13 +1028,13 @@ export function MessagesTable({
 
   return (
     <>
-      <Container maxWidth="calc(100vw - 50px)" padding={6} overflow="scroll">
+      <Container maxWidth="calc(100vw - 50px)" padding={6}>
         <HStack width="full" align="top" paddingBottom={6}>
           <HStack align="center" gap={6}>
             <Heading as="h1" size="lg" paddingTop={1}>
               Messages
             </Heading>
-            <ToggleAnalytics />
+            {showAnalytics && <ToggleAnalytics />}
             <Tooltip content="Refresh">
               <Button
                 variant="outline"
@@ -1057,24 +1057,28 @@ export function MessagesTable({
           </HStack>
           <Spacer />
           <HStack gap={1} marginBottom="-8px">
-            <ToggleTableView />
-            <Tooltip
-              disabled={navigationFooter.totalHits < 10_000}
-              content={
-                navigationFooter.totalHits >= 10_000 ? "Up to 10.000 items" : ""
-              }
-            >
-              <Button
-                colorPalette="black"
-                variant={downloadTraces.isLoading ? "outline" : "ghost"}
-                onClick={() => void downloadCSV()}
-                loading={downloadTraces.isLoading}
-                loadingText="Downloading..."
+            {showTableToggle && <ToggleTableView />}
+            {showExport && (
+              <Tooltip
+                disabled={navigationFooter.totalHits < 10_000}
+                content={
+                  navigationFooter.totalHits >= 10_000
+                    ? "Up to 10.000 items"
+                    : ""
+                }
               >
-                <Download size={16} />
-                Export all
-              </Button>
-            </Tooltip>
+                <Button
+                  colorPalette="black"
+                  variant={downloadTraces.isLoading ? "outline" : "ghost"}
+                  onClick={() => void downloadCSV()}
+                  loading={downloadTraces.isLoading}
+                  loadingText="Downloading..."
+                >
+                  <Download size={16} />
+                  Export all
+                </Button>
+              </Tooltip>
+            )}
 
             {/** Column selector - start */}
             <Popover.Root
@@ -1150,9 +1154,10 @@ export function MessagesTable({
         <HStack align="top" gap={8}>
           <Box flex="1" minWidth="0">
             <VStack gap={0} align="start">
-              <Card.Root height="fit-content">
+              <Card.Root height="fit-content" width="full">
                 <Card.Body
                   padding={0}
+                  width="full"
                   maxWidth={
                     showFilters ? "calc(100vw - 450px)" : "calc(100vw - 130px)"
                   }
@@ -1174,7 +1179,6 @@ export function MessagesTable({
                     <Text>No columns selected</Text>
                   )}
                   <Table.ScrollArea
-                    width="full"
                     ref={scrollRef}
                     onScroll={() => {
                       if (scrollRef.current) {
