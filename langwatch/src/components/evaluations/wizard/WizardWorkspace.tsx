@@ -85,6 +85,8 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
    */
   const showImportFromProduction =
     !hasDataset && dataSource === "from_production";
+  const showWorkspace =
+    (hasDataset || hasWorkflow || hasResults) && !showImportFromProduction;
 
   return (
     <VStack
@@ -102,145 +104,129 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
       borderRadius="8px 0 0 0"
     >
       {showImportFromProduction && <ImportFromProduction />}
-      {
-        // start - This shouldn't be necessary, but it's a sanity check
-        (!showImportFromProduction &&
-          // end
-          hasDataset) ||
-          ((hasWorkflow || hasResults) && (
-            <Tabs.Root
-              width="full"
-              height="full"
-              display="flex"
-              flexDirection="column"
-              variant="enclosed"
-              value={workspaceTab}
-              onValueChange={(e) => {
-                setWizardState({
-                  workspaceTab: e.value as State["wizardState"]["workspaceTab"],
-                });
-              }}
+      {showWorkspace && (
+        <Tabs.Root
+          width="full"
+          height="full"
+          display="flex"
+          flexDirection="column"
+          variant="enclosed"
+          value={workspaceTab}
+          onValueChange={(e) => {
+            setWizardState({
+              workspaceTab: e.value as State["wizardState"]["workspaceTab"],
+            });
+          }}
+        >
+          <HStack width="full" alignItems="center">
+            <HStack width="full" />
+            <Tabs.List
+              width="fit"
+              background="gray.200"
+              colorPalette="blue"
+              alignSelf="center"
+              position="sticky"
+              top="0px"
+              flexShrink={0}
             >
-              <HStack width="full" alignItems="center">
-                <HStack width="full" />
-                <Tabs.List
-                  width="fit"
-                  background="gray.200"
-                  colorPalette="blue"
-                  alignSelf="center"
-                  position="sticky"
-                  top="0px"
-                  flexShrink={0}
-                >
-                  {hasDataset && (
-                    <Tabs.Trigger value="dataset">Dataset</Tabs.Trigger>
-                  )}
-                  {hasWorkflow && (
-                    <Tabs.Trigger value="workflow">Workflow</Tabs.Trigger>
-                  )}
-                  {hasResults && (
-                    <Tabs.Trigger value="results">
-                      {task === "real_time" ? "Trial Results" : "Results"}
-                    </Tabs.Trigger>
-                  )}
-                  {hasCodeImplementation && (
-                    <Tabs.Trigger value="code-implementation">
-                      Code
-                    </Tabs.Trigger>
-                  )}
-                </Tabs.List>
-                <HStack width="full" justifyContent="end">
-                  {workflowId && workspaceTab === "workflow" && (
-                    <Link
-                      href={`/${project?.slug}/studio/${workflowId}`}
-                      asChild
-                    >
-                      <Button variant="outline" size="sm">
-                        <LuArrowUpRight />
-                        Open Full Workflow
-                      </Button>
-                    </Link>
-                  )}
-                </HStack>
-              </HStack>
               {hasDataset && (
-                <Tabs.Content
-                  value="dataset"
-                  width="full"
-                  maxHeight="calc(100vh - 150px)"
-                  position="sticky"
-                  top="58px"
-                >
-                  <Card.Root width="full" position="sticky" top={6}>
-                    <Card.Body width="full" paddingBottom={6}>
-                      <Box width="full" position="relative">
-                        <DatasetTable
-                          datasetId={getDatasetId()}
-                          insideWizard
-                          gridRef={datasetGridRef}
-                        />
-                      </Box>
-                    </Card.Body>
-                  </Card.Root>
-                </Tabs.Content>
+                <Tabs.Trigger value="dataset">Dataset</Tabs.Trigger>
               )}
               {hasWorkflow && (
-                <Tabs.Content
-                  value="workflow"
-                  width="full"
-                  height="full"
-                  maxHeight="calc(100vh - 150px)"
-                  position="sticky"
-                  top="58px"
-                >
-                  <DndProvider backend={HTML5Backend}>
-                    {workspaceTab === "workflow" && (
-                      <WizardOptimizationStudioCanvas />
-                    )}
-                  </DndProvider>
-                </Tabs.Content>
+                <Tabs.Trigger value="workflow">Workflow</Tabs.Trigger>
               )}
               {hasResults && (
-                <Tabs.Content
-                  value="results"
-                  width="full"
-                  height="fit-content"
-                  minHeight="calc(100vh - 150px)"
-                  position="sticky"
-                  top="58px"
-                >
-                  <Card.Root
-                    width="full"
-                    height="full"
-                    position="sticky"
-                    top={6}
-                  >
-                    <Card.Body width="full" height="full" padding={0}>
-                      <EvaluationResults
-                        workflowId={workflowId}
-                        experimentId={experimentId}
-                        evaluationState={evaluationState}
-                        sidebarProps={{
-                          padding: 2,
-                          borderRadius: "6px 0 0 6px",
-                        }}
-                      />
-                    </Card.Body>
-                  </Card.Root>
-                </Tabs.Content>
+                <Tabs.Trigger value="results">
+                  {task === "real_time" ? "Trial Results" : "Results"}
+                </Tabs.Trigger>
               )}
               {hasCodeImplementation && (
-                <Tabs.Content
-                  value="code-implementation"
-                  width="full"
-                  height="full"
-                >
-                  <CodeImplementation />
-                </Tabs.Content>
+                <Tabs.Trigger value="code-implementation">Code</Tabs.Trigger>
               )}
-            </Tabs.Root>
-          ))
-      }
+            </Tabs.List>
+            <HStack width="full" justifyContent="end">
+              {workflowId && workspaceTab === "workflow" && (
+                <Link href={`/${project?.slug}/studio/${workflowId}`} asChild>
+                  <Button variant="outline" size="sm">
+                    <LuArrowUpRight />
+                    Open Full Workflow
+                  </Button>
+                </Link>
+              )}
+            </HStack>
+          </HStack>
+          {hasDataset && (
+            <Tabs.Content
+              value="dataset"
+              width="full"
+              maxHeight="calc(100vh - 150px)"
+              position="sticky"
+              top="58px"
+            >
+              <Card.Root width="full" position="sticky" top={6}>
+                <Card.Body width="full" paddingBottom={6}>
+                  <Box width="full" position="relative">
+                    <DatasetTable
+                      datasetId={getDatasetId()}
+                      insideWizard
+                      gridRef={datasetGridRef}
+                    />
+                  </Box>
+                </Card.Body>
+              </Card.Root>
+            </Tabs.Content>
+          )}
+          {hasWorkflow && (
+            <Tabs.Content
+              value="workflow"
+              width="full"
+              height="full"
+              maxHeight="calc(100vh - 150px)"
+              position="sticky"
+              top="58px"
+            >
+              <DndProvider backend={HTML5Backend}>
+                {workspaceTab === "workflow" && (
+                  <WizardOptimizationStudioCanvas />
+                )}
+              </DndProvider>
+            </Tabs.Content>
+          )}
+          {hasResults && (
+            <Tabs.Content
+              value="results"
+              width="full"
+              height="fit-content"
+              minHeight="calc(100vh - 150px)"
+              position="sticky"
+              top="58px"
+            >
+              <Card.Root width="full" height="full" position="sticky" top={6}>
+                <Card.Body width="full" height="full" padding={0}>
+                  <EvaluationResults
+                    workflowId={workflowId}
+                    experimentId={experimentId}
+                    evaluationState={evaluationState}
+                    sidebarProps={{
+                      padding: 2,
+                      borderRadius: "6px 0 0 6px",
+                    }}
+                  />
+                </Card.Body>
+              </Card.Root>
+            </Tabs.Content>
+          )}
+          {hasCodeImplementation && (
+            <Tabs.Content
+              value="code-implementation"
+              width="full"
+              height="full"
+            >
+              <CodeImplementation />
+            </Tabs.Content>
+          )}
+        </Tabs.Root>
+      )}
     </VStack>
   );
 });
