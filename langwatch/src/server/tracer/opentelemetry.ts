@@ -23,6 +23,7 @@ import type {
 import {
   customMetadataSchema,
   reservedTraceMetadataSchema,
+  rESTEvaluationSchema,
   spanTypesSchema,
   typedValueChatMessagesSchema,
 } from "./types.generated";
@@ -195,12 +196,13 @@ const addOpenTelemetrySpanAsSpan = (
         }
 
         try {
-          const evaluation = JSON.parse(jsonPayload) as Evaluation;
+          const parsedJsonPayload = JSON.parse(jsonPayload);
+          const evaluation = rESTEvaluationSchema.parse(parsedJsonPayload);
 
           if (!trace.evaluations) trace.evaluations = [];
           trace.evaluations.push(evaluation);
         } catch (error) {
-          logger.error({ error, jsonPayload }, "error parsing json_encoded_event from `langwatch.evaluation.custom`");
+          logger.error({ error, jsonPayload }, "error parsing json_encoded_event from `langwatch.evaluation.custom`, event discarded");
         }
         break;
       }
