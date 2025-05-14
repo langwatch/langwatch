@@ -58,6 +58,22 @@ export type ComponentType =
   | "custom"
   | "evaluator";
 
+// Define the execution state type
+export interface ExecutionState {
+  status: ExecutionStatus;
+  trace_id?: string;
+  span_id?: string;
+  error?: string;
+  parameters?: Record<string, any>;
+  inputs?: Record<string, any>;
+  outputs?: Record<string, any>;
+  cost?: number;
+  timestamps?: {
+    started_at?: number;
+    finished_at?: number;
+  };
+}
+
 export type BaseComponent = {
   _library_ref?: string;
   id?: string;
@@ -70,20 +86,7 @@ export type BaseComponent = {
   isCustom?: boolean;
   behave_as?: "evaluator";
 
-  execution_state?: {
-    status: ExecutionStatus;
-    trace_id?: string;
-    span_id?: string;
-    error?: string;
-    parameters?: Record<string, any>;
-    inputs?: Record<string, any>;
-    outputs?: Record<string, any>;
-    cost?: number;
-    timestamps?: {
-      started_at?: number;
-      finished_at?: number;
-    };
-  };
+  execution_state?: ExecutionState;
 };
 
 export const llmConfigSchema = z.object({

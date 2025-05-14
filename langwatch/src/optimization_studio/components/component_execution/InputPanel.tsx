@@ -1,17 +1,11 @@
-import {
-  Box,
-  Button,
-  Field,
-  Heading,
-  HStack,
-  Textarea,
-  VStack,
-} from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Play } from "react-feather";
-import { useForm, type FieldError } from "react-hook-form";
-import { HorizontalFormControl } from "../../../components/HorizontalFormControl";
+import { useCallback, useEffect, useState } from "react";
+import {
+  ExecutionInputPanel,
+  type InputField,
+  type ExecuteData,
+} from "~/components/executable-panel/ExecutionInputPanel";
 import {
   getInputsForExecution,
   useComponentExecution,
@@ -19,50 +13,17 @@ import {
 import type { Component } from "../../types/dsl";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 
+/**
+ * InputPanel component that handles the display and execution of component inputs
+ *
+ * @param node - The workflow node containing component data
+ */
 export const InputPanel = ({ node }: { node: Node<Component> }) => {
-  const inputs = getInputsForExecution({ node }).inputs;
-  const defaultValues = useMemo(() => {
-    return Object.fromEntries(
-      Object.entries(inputs).map(([key, value]) => [
-        key,
-        typeof value === "object" ? JSON.stringify(value) : value ?? "",
-      ])
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(inputs)]);
+  // Get input values and identify required fields
+  const { inputs, missingFields } = getInputsForExecution({ node });
+  const [animationFinished, setAnimationFinished] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-  } = useForm<Record<string, string>>({
-    defaultValues,
-    resolver: (values) => {
-      const { missingFields } = getInputsForExecution({ node, inputs: values });
-
-      const response: {
-        values: Record<string, string>;
-        errors: Record<string, FieldError>;
-      } = {
-        values,
-        errors: {},
-      };
-      for (const missingField of missingFields) {
-        response.errors[missingField.identifier] = {
-          type: "required",
-          message: "This field is required",
-        };
-      }
-
-      return response;
-    },
-  });
-
-  useEffect(() => {
-    reset(defaultValues);
-  }, [defaultValues, reset]);
-
+  // Access workflow store state for validation triggering
   const { triggerValidation, setTriggerValidation } = useWorkflowStore(
     (state) => ({
       triggerValidation: state.triggerValidation,
@@ -70,38 +31,66 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
     })
   );
 
+  // Hook to execute the component
   const { startComponentExecution } = useComponentExecution();
 
-  const onSubmit = useCallback(
-    (data: Record<string, string>) => {
+  // Convert node inputs to the format expected by ExecutionInputPanel
+  const inputFields: InputField[] =
+    node.data.inputs?.map((input) => ({
+      identifier: input.identifier,
+      type: input.type,
+      optional: !missingFields.some(
+        (field) => field.identifier === input.identifier
+      ),
+      value: inputs[input.identifier],
+    })) || [];
+
+  // Handle execution when the user submits the form
+  const onExecute = useCallback(
+    (data: ExecuteData) => {
       startComponentExecution({ node, inputs: data });
     },
     [node, startComponentExecution]
   );
 
-  const [animationFinished, setAnimationFinished] = useState(false);
-
+  // Set animation finished after initial delay
   useEffect(() => {
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setAnimationFinished(true);
     }, 700);
+
+    return () => clearTimeout(timer);
   }, []);
 
+  // Handle programmatic execution when triggered from elsewhere
   useEffect(() => {
-    if (triggerValidation) {
-      setTimeout(
-        () => {
-          void handleSubmit(onSubmit)();
-        },
-        animationFinished ? 0 : 700
-      );
-      setTriggerValidation(false);
-    }
+    if (!triggerValidation) return;
+
+    const timer = setTimeout(
+      () => {
+        // Only execute if we have inputs to process
+        if (inputFields.length > 0) {
+          // Convert input values to appropriate string format
+          const formData = Object.fromEntries(
+            inputFields.map((field) => [
+              field.identifier,
+              typeof field.value === "object"
+                ? JSON.stringify(field.value)
+                : field.value?.toString() || "",
+            ])
+          );
+          onExecute(formData);
+        }
+      },
+      animationFinished ? 0 : 700
+    );
+
+    setTriggerValidation(false);
+    return () => clearTimeout(timer);
   }, [
     animationFinished,
-    handleSubmit,
-    node,
-    onSubmit,
+    inputFields,
+    onExecute,
     setTriggerValidation,
     triggerValidation,
   ]);
@@ -118,48 +107,13 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
       boxShadow="0 0 10px rgba(0,0,0,0.05)"
       overflowY="auto"
     >
-      {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <VStack align="start" gap={3} width="full">
-          <Heading
-            as="h3"
-            fontSize="16px"
-            fontWeight="bold"
-            textTransform="uppercase"
-            color="gray.600"
-            paddingBottom={4}
-          >
-            Inputs
-          </Heading>
-          {node.data.inputs?.map((input) => (
-            <HorizontalFormControl
-              key={input.identifier}
-              label={input.identifier}
-              helper={""}
-              invalid={!!errors[input.identifier]}
-            >
-              <Textarea
-                {...register(input.identifier)}
-                placeholder={
-                  input.type === "image"
-                    ? "image url"
-                    : input.type === "str"
-                    ? undefined
-                    : input.type
-                }
-              />
-              <Field.ErrorText>
-                {errors[input.identifier]?.message}
-              </Field.ErrorText>
-            </HorizontalFormControl>
-          ))}
-          <HStack width="full" justify="end">
-            <Button type="submit" colorPalette="green">
-              Execute <Play size={16} />
-            </Button>
-          </HStack>
-        </VStack>
-      </form>
+      <ExecutionInputPanel
+        fields={inputFields}
+        onExecute={onExecute}
+        title="Inputs"
+        buttonText="Execute"
+        initialValues={inputs}
+      />
     </Box>
   );
 };

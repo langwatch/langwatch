@@ -142,6 +142,7 @@ export function PromptConfigTable({
         <Table.Body>
           {configs.map((config) => (
             <GeneratePromptApiSnippetDialog
+              key={config.id}
               configId={config.id}
               apiKey={project?.apiKey}
             >
