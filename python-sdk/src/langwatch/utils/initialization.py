@@ -5,12 +5,11 @@ import sys
 from typing import List, Optional, Sequence
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry import trace
+from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
 
 from langwatch.state import get_instance, set_instance
 from langwatch.client import Client
-from langwatch.domain import SpanProcessingExcludeRule
-from langwatch.types import BaseAttributes
-from langwatch.typings import Instrumentor
+from langwatch.domain import BaseAttributes, SpanProcessingExcludeRule
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,7 @@ def setup(
     endpoint_url: Optional[str] = None,
     base_attributes: Optional[BaseAttributes] = None,
     tracer_provider: Optional[TracerProvider] = None,
-    instrumentors: Optional[Sequence[Instrumentor]] = None,
+    instrumentors: Optional[Sequence[BaseInstrumentor]] = None,
     span_exclude_rules: Optional[List[SpanProcessingExcludeRule]] = [],
     debug: bool = False,
 ) -> Client:

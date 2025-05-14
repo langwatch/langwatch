@@ -28,11 +28,6 @@ async def main(message: cl.Message):
             expected_output="Hello there! How can I be helpful?"
         )
 
-        # Send the trace in the background
-        trace.deferred_send_spans()
-        # OR send the trace synchonously to be sure before generating the url, maybe a better option
-        # trace.send_spans()
-
         public_url = trace.share() # it works even before the trace was fully synced, but users might take a second to see on the UI
         print("See the trace at:", public_url)
 
