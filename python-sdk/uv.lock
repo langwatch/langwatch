@@ -2156,7 +2156,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.2.0rc6"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "coolname" },
