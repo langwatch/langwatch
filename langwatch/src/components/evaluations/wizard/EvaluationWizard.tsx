@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import { useRouter } from "next/router";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   LuActivity,
   LuArrowUpRight,
@@ -175,6 +175,7 @@ const WizardSidebar = memo(function WizardSidebar({
     isAutosaving,
     experimentId,
     evaluatorNode,
+    getDatasetId,
   } = useEvaluationWizardStore(
     useShallow((state) => {
       return {
@@ -187,6 +188,7 @@ const WizardSidebar = memo(function WizardSidebar({
         isAutosaving: state.isAutosaving,
         experimentId: state.experimentId,
         evaluatorNode: state.getFirstEvaluatorNode(),
+        getDatasetId: state.getDatasetId,
       };
     })
   );
@@ -247,6 +249,26 @@ const WizardSidebar = memo(function WizardSidebar({
   const saveAsMonitor = api.experiments.saveAsMonitor.useMutation();
   const router = useRouter();
   const reactFlow = useReactFlow();
+
+  const canProceed = useMemo(() => {
+    if (step === "task") {
+      return !!task;
+    }
+
+    if (step === "dataset") {
+      return !!getDatasetId();
+    }
+
+    if (step === "execution") {
+      return !!executionMethod;
+    }
+
+    if (step === "evaluation") {
+      return !!evaluatorNode;
+    }
+
+    return true;
+  }, [step, task, getDatasetId, executionMethod, evaluatorNode]);
 
   // When state changes, update the view to show the tab user
   // should be paying attention to at the moment
@@ -373,6 +395,7 @@ const WizardSidebar = memo(function WizardSidebar({
                 id="js-next-step-button"
                 variant="outline"
                 onClick={() => nextStep()}
+                disabled={!canProceed}
               >
                 Next
                 <LuChevronRight />
