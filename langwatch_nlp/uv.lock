@@ -1552,7 +1552,7 @@ wheels = [
 [[package]]
 name = "langwatch"
 version = "0.1.44"
-source = { editable = "../python-sdk-legacy" }
+source = { editable = "../sdk-python" }
 dependencies = [
     { name = "coolname" },
     { name = "deprecated" },
@@ -1668,7 +1668,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.4" },
     { name = "langchain-community", specifier = ">=0.0.28,<0.1" },
     { name = "langevals-core", specifier = ">=0.1.14,<0.2" },
-    { name = "langwatch", editable = "../python-sdk-legacy" },
+    { name = "langwatch", editable = "../sdk-python" },
     { name = "litellm", extras = ["proxy"], specifier = ">=1.67.6,<2" },
     { name = "mangum", specifier = ">=0.17.0,<0.18" },
     { name = "nanoid", specifier = ">=2.0.0,<3" },

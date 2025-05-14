@@ -18,6 +18,6 @@ start: install
 	@echo "Starting the server..."
 	@uv run watchmedo auto-restart -p 'none' --signal SIGTERM -- \
 		uvicorn langwatch_nlp.main:app --host 0.0.0.0 --port 5561 --timeout-keep-alive 70 \
-		--reload --reload-dir . --reload-dir ../python-sdk $(filter-out $@,$(MAKECMDGOALS))
+		--reload --reload-dir . --reload-dir ../sdk-python $(filter-out $@,$(MAKECMDGOALS))
 
 
