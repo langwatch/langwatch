@@ -35,6 +35,12 @@ export interface DatasetSlice {
   setDatasetGridRef: (gridRef: RefObject<AgGridReact<any> | null>) => void;
 }
 
+/**
+ * Create a dataset slice
+ * @param set The set function from the store
+ * @param get The get function from the store
+ * @returns The dataset slice
+ */
 export const createDatasetSlice: StateCreator<
   {
     workflowStore: WorkflowStore;
@@ -54,13 +60,15 @@ export const createDatasetSlice: StateCreator<
         // Upsert the entry node into the workflow
         let newNodes = current.nodes;
         const outputs = datasetColumnsToFields(columnTypes);
+        let updatedEntryNode: Node<Entry> | undefined;
+
         if (previousEntryNode) {
           newNodes = current.nodes.map((node) => {
             if (node.type !== "entry") {
               return node;
             }
 
-            return {
+            const updated = {
               ...node,
               data: {
                 ...node.data,
@@ -68,21 +76,22 @@ export const createDatasetSlice: StateCreator<
                 outputs,
               },
             };
+
+            updatedEntryNode = updated as Node<Entry>;
+            return updated;
           });
         } else {
-          const newEntryNode = entryNode();
-
-          newNodes = [
-            ...current.nodes,
-            {
-              ...newEntryNode,
-              data: {
-                ...newEntryNode.data,
-                dataset: { id: datasetId },
-                outputs,
-              },
+          const baseEntryNode = entryNode();
+          updatedEntryNode = {
+            ...baseEntryNode,
+            data: {
+              ...baseEntryNode.data,
+              dataset: { id: datasetId },
+              outputs,
             },
-          ];
+          } as Node<Entry>;
+
+          newNodes = [...current.nodes, updatedEntryNode];
         }
 
         // Logic to disconnect the current no longer existing edges from the entry node
@@ -96,25 +105,26 @@ export const createDatasetSlice: StateCreator<
         );
 
         // And then connecting it again using defaults with the other existing components
-        const newEntryNode = newNodes.find((node) => node.type === "entry") as
-          | Node<Entry>
-          | undefined;
         const otherNodes = newNodes.filter((node) => node.type !== "entry");
 
-        const newEdgesTargetHandles = newEdges.map(
-          (edge) => `${edge.target}-${edge.targetHandle}`
-        );
-        for (const node of otherNodes) {
-          const otherNodeEdges = buildEntryToTargetEdges(
-            newEntryNode,
-            node
-          ).filter(
-            (edge) =>
-              !newEdgesTargetHandles.includes(
-                `${edge.target}-${edge.targetHandle}`
-              )
+        // Only proceed with edge creation if we have a valid entry node
+        if (updatedEntryNode) {
+          const newEdgesTargetHandles = newEdges.map(
+            (edge) => `${edge.target}-${edge.targetHandle}`
           );
-          newEdges = [...newEdges, ...otherNodeEdges];
+
+          for (const node of otherNodes) {
+            const otherNodeEdges = buildEntryToTargetEdges(
+              updatedEntryNode,
+              node
+            ).filter(
+              (edge) =>
+                !newEdgesTargetHandles.includes(
+                  `${edge.target}-${edge.targetHandle}`
+                )
+            );
+            newEdges = [...newEdges, ...otherNodeEdges];
+          }
         }
 
         return {
@@ -137,6 +147,7 @@ export const createDatasetSlice: StateCreator<
 
     clearDatasetId: () => {
       get().workflowStore.setWorkflow((current) => {
+        // Update entry node to remove dataset and outputs
         const nodes = current.nodes.map((node) => {
           if (node.type !== "entry") {
             return node;
@@ -146,13 +157,22 @@ export const createDatasetSlice: StateCreator<
             data: {
               ...node.data,
               dataset: undefined,
+              outputs: [], // Clear outputs as they're no longer valid
             },
           };
         });
 
+        // Remove any edges connected to entry node outputs
+        const edges = current.edges.filter(
+          (edge) =>
+            edge.source !== "entry" ||
+            !edge.sourceHandle?.startsWith("outputs.")
+        );
+
         return {
           ...current,
           nodes,
+          edges,
         };
       });
     },
