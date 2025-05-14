@@ -126,6 +126,10 @@ export async function handleEvaluatorCall(
     });
   }
 
+  if (req.body.settings?.trace_id) {
+    params.trace_id = req.body.settings.trace_id;
+  }
+
   const evaluatorSettingSchema = checkType.startsWith("custom/")
     ? undefined
     : evaluatorsSchema.shape[checkType as EvaluatorTypes]?.shape.settings;
