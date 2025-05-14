@@ -4,7 +4,7 @@ import logging
 from typing import List, Optional, Sequence
 
 from langwatch.__version__ import __version__
-from langwatch.attributes import AttributeName
+from langwatch.attributes import AttributeKey
 from langwatch.domain import BaseAttributes, SpanProcessingExcludeRule
 from opentelemetry import trace
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
@@ -76,11 +76,11 @@ class Client(LangWatchClientProtocol):
             ignore_global_tracer_provider_override_warning
         )
         self.base_attributes = base_attributes or {}
-        self.base_attributes[AttributeName.LangWatchSDKName] = (
+        self.base_attributes[AttributeKey.LangWatchSDKName] = (
             "langwatch-observability-sdk"
         )
-        self.base_attributes[AttributeName.LangWatchSDKVersion] = str(__version__)
-        self.base_attributes[AttributeName.LangWatchSDKLanguage] = "python"
+        self.base_attributes[AttributeKey.LangWatchSDKVersion] = str(__version__)
+        self.base_attributes[AttributeKey.LangWatchSDKLanguage] = "python"
 
         self.tracer_provider = self.__ensure_otel_setup(tracer_provider)
 

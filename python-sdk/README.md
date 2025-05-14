@@ -140,7 +140,7 @@ Here's an example of a more comprehensive setup:
 ```python
 import os
 import langwatch
-from langwatch.attributes import AttributeName # Ensure this is the correct import path
+from langwatch.attributes import AttributeKey # Ensure this is the correct import path
 from langwatch.domain import SpanProcessingExcludeRule # Ensure this is the correct import path
 
 # Example: Define your instrumentor if it's custom, or import from a community/library path
@@ -168,8 +168,8 @@ langwatch.setup(
     api_key=os.getenv("LANGWATCH_API_KEY"),
     endpoint_url=os.getenv("LANGWATCH_ENDPOINT_URL", "https://app.langwatch.ai"), # Optional: Defaults to env var or cloud
     base_attributes={
-      AttributeName.ServiceName: "my-awesome-service",
-      AttributeName.ServiceVersion: "1.2.3",
+      AttributeKey.ServiceName: "my-awesome-service",
+      AttributeKey.ServiceVersion: "1.2.3",
       # Add other custom attributes here
     },
     # instrumentors=[OpenAIInstrumentor()], # Optional: List of instrumentors.
