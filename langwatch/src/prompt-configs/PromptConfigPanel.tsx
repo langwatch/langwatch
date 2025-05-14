@@ -52,7 +52,6 @@ export function PromptConfigPanel({
       },
       {
         enabled: !!projectId && !!configId,
-        staleTime: 30000, // Reduce refetches for better performance
       }
     );
 
