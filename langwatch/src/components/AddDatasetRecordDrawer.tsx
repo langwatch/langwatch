@@ -118,6 +118,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     | DatasetColumns
     | undefined;
 
+  const trpc = api.useContext();
   const onSubmit: SubmitHandler<FormValues> = (_data) => {
     if (!selectedDataset || !project) return;
 
@@ -148,6 +149,8 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       },
       {
         onSuccess: () => {
+          trpc.dataset.getAll.invalidate();
+          trpc.datasetRecord.getAll.invalidate();
           closeDrawer();
           toaster.create({
             title: "Succesfully added to dataset",
