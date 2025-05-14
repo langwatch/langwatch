@@ -4,6 +4,10 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import { TRPCError } from "@trpc/server";
 
+import { createLogger } from "../../../utils/logger";
+
+const logger = createLogger("batchRecordRouter");
+
 export const batchRecordRouter = createTRPCRouter({
   getAllByexperimentIdGroup: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -45,10 +49,17 @@ export const batchRecordRouter = createTRPCRouter({
       });
 
       if (!experiment) {
-        throw new TRPCError({
+        const error = new TRPCError({
           code: "NOT_FOUND",
           message: "Experiment not found",
         });
+
+        logger.error(
+          { projectId, experimentSlug, error },
+          "Experiment not found"
+        );
+
+        throw error;
       }
 
       const batchRecords = await prisma.batchEvaluation.findMany({

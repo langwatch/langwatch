@@ -32,6 +32,9 @@ import type {
 import { checkUserPermissionForProject, TeamRoleGroup } from "../permission";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { saveOrCommitWorkflowVersion } from "./workflows";
+import { createLogger } from "../../../utils/logger";
+
+const logger = createLogger("experimentsRouter");
 
 export const experimentsRouter = createTRPCRouter({
   saveExperiment: protectedProcedure
@@ -60,10 +63,21 @@ export const experimentsRouter = createTRPCRouter({
         });
 
         if (!currentExperiment) {
-          throw new TRPCError({
+          const error = new TRPCError({
             code: "NOT_FOUND",
             message: "Experiment not found",
           });
+
+          logger.error(
+            {
+              projectId: input.projectId,
+              experimentId: input.experimentId,
+              error,
+            },
+            "Experiment not found"
+          );
+
+          throw error;
         }
 
         if (currentExperiment.workflowId) {
@@ -170,10 +184,17 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       if (!updatedExperiment) {
-        throw new TRPCError({
+        const error = new TRPCError({
           code: "NOT_FOUND",
           message: "Experiment not found",
         });
+
+        logger.error(
+          { projectId: input.projectId, experimentId: experimentId, error },
+          "Upserted experiment not found"
+        );
+
+        throw error;
       }
 
       return updatedExperiment;
@@ -203,10 +224,21 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       if (!experiment) {
-        throw new TRPCError({
+        const error = new TRPCError({
           code: "NOT_FOUND",
           message: "Experiment not found",
         });
+
+        logger.error(
+          {
+            projectId: input.projectId,
+            experimentId: input.experimentId,
+            error,
+          },
+          "Experiment not found"
+        );
+
+        throw error;
       }
 
       const wizardState = experiment.wizardState as WizardState | undefined;
@@ -277,12 +309,22 @@ export const experimentsRouter = createTRPCRouter({
         });
 
         if (!experiment) {
-          throw new TRPCError({
+          const error = new TRPCError({
             code: "NOT_FOUND",
             message: "Experiment not found",
           });
-        }
 
+          logger.error(
+            {
+              projectId: input.projectId,
+              experimentId: input.experimentId,
+              error,
+            },
+            "Experiment not found"
+          );
+
+          throw error;
+        }
         return experiment;
       } else if (input.experimentSlug) {
         const experiment = await getExperimentBySlug(

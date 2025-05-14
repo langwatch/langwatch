@@ -63,7 +63,10 @@ export default async function handler(
   try {
     params = dspyInitParamsSchema.parse(req.body);
   } catch (error) {
-    logger.error({ error, body: req.body, projectId: project.id }, 'invalid init data received');
+    logger.error(
+      { error, body: req.body, projectId: project.id },
+      "invalid init data received"
+    );
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
     Sentry.captureException(error, { extra: { projectId: project.id } });
 
@@ -107,7 +110,12 @@ export const findOrCreateExperiment = async ({
       where: { projectId: project.id, id: experiment_id },
     });
     if (!experiment) {
-      throw new Error("Experiment not found");
+      const error = new Error("Experiment not found");
+      logger.error(
+        { projectId: project.id, experimentId: experiment_id, error },
+        "Experiment not found"
+      );
+      throw error;
     }
   }
 
@@ -142,7 +150,12 @@ export const findOrCreateExperiment = async ({
       });
     }
   } else {
-    throw new Error("Experiment not found");
+    const error = new Error("Experiment not found");
+    logger.error(
+      { projectId: project.id, experimentId: experiment_id, error },
+      "Experiment not found"
+    );
+    throw error;
   }
   return experiment;
 };

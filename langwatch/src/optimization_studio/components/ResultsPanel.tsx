@@ -25,7 +25,6 @@ import {
 } from "../../components/experiments/BatchEvaluationV2";
 import { BatchEvaluationV2EvaluationSummary } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationSummary";
 import { BatchEvaluationV2EvaluationResults } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationV2EvaluationResults";
-import { EvaluationProgressBar } from "../../components/experiments/BatchEvaluationV2/EvaluationProgressBar";
 import {
   DSPyExperimentRunList,
   DSPyExperimentSummary,
@@ -37,7 +36,6 @@ import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppliedOptimization } from "../../server/experiments/types";
 import { api } from "../../utils/api";
-import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Field, Signature, Workflow } from "../types/dsl";
@@ -45,6 +43,9 @@ import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
 import { OptimizationProgressBar } from "./ProgressToast";
 import { slugify } from "../../utils/slugify";
 import { useRunEvalution } from "../hooks/useRunEvalution";
+import { createLogger } from "../../utils/logger";
+
+const logger = createLogger("ResultsPanel");
 
 export function ResultsPanel({
   isCollapsed,
@@ -160,6 +161,17 @@ export function EvaluationResults({
       enabled: !!project && !!workflowId,
       refetchOnWindowFocus: false,
       refetchInterval: keepFetching ? 1 : undefined,
+      onError: (error) => {
+        logger.error(
+          { projectId: project?.id, experimentId: experimentId, error },
+          "Error loading evaluation results"
+        );
+        toaster.create({
+          title: "Error loading evaluation results",
+          description: error.message,
+          type: "error",
+        });
+      },
     }
   );
 
