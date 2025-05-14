@@ -1,6 +1,5 @@
 import json
 from typing import Any, Dict, List, Literal, Optional, Union, cast, TYPE_CHECKING
-from typing_extensions import TypedDict
 from uuid import UUID
 from warnings import warn
 
@@ -29,8 +28,6 @@ from langwatch.types import (
 from langwatch.utils.exceptions import capture_exception
 from langwatch.utils.transformation import (
     SerializableWithStringFallback,
-    convert_typed_values,
-    truncate_object_recursively,
 )
 
 if TYPE_CHECKING:
@@ -194,37 +191,37 @@ def _prepare_data(
     }
     if input is not None:
         warn(
-            "For the `evaluate` or `async_evaluate` function, the `input` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.",
+            "For the `evaluate` or `async_evaluate` function, the `input` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, you can use the `input` key in the `data` argument, or use the helper class `BasicEvaluateData`.",
             stacklevel=2,
         )
         dataDict["input"] = input
     if output is not None:
         warn(
-            "For the `evaluate` or `async_evaluate` function, the `output` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.",
+            "For the `evaluate` or `async_evaluate` function, the `output` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, you can use the `output` key in the `data` argument, or use the helper class `BasicEvaluateData`.",
             stacklevel=2,
         )
         dataDict["output"] = output
     if expected_output is not None:
         warn(
-            "For the `evaluate` or `async_evaluate` function, the `expected_output` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.",
+            "For the `evaluate` or `async_evaluate` function, the `expected_output` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, you can use the `expected_output` key in the `data` argument, or use the helper class `BasicEvaluateData`.",
             stacklevel=2,
         )
         dataDict["expected_output"] = expected_output
     if contexts is not None:
         warn(
-            "For the `evaluate` or `async_evaluate` function, the `contexts` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.",
+            "For the `evaluate` or `async_evaluate` function, the `contexts` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, you can use the `contexts` key in the `data` argument, or use the helper class `BasicEvaluateData`.",
             stacklevel=2,
         )
         dataDict["contexts"] = contexts
     if expected_contexts is not None:
         warn(
-            "For the `evaluate` or `async_evaluate` function, the `expected_contexts` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.",
+            "For the `evaluate` or `async_evaluate` function, the `expected_contexts` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, you can use the `expected_contexts` key in the `data` argument, or use the helper class `BasicEvaluateData`.",
             stacklevel=2,
         )
         dataDict["expected_contexts"] = expected_contexts
     if conversation is not None:
         warn(
-            "For the `evaluate` or `async_evaluate` function, the `conversation` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, to have complete control over the data structure.",
+            "For the `evaluate` or `async_evaluate` function, the `conversation` argument is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Please use the `data` argument instead, you can use the `conversation` key in the `data` argument, or use the helper class `BasicEvaluateData`.",
             stacklevel=2,
         )
         dataDict["conversation"] = conversation
@@ -357,7 +354,9 @@ def _add_evaluation(  # type: ignore
     eval_span = span
 
     if not span or span.type != "evaluation":
-        eval_span = langwatch.span(type="evaluation")
+        eval_span = langwatch.span(
+            type="evaluation", span_context=span.get_span_context() if span else None
+        )
         eval_span_created = True
 
     try:
