@@ -1,4 +1,4 @@
-name: python-sdk-cd
+name: python-sdk-ci
 
 on:
   push:
