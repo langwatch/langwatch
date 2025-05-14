@@ -1,4 +1,4 @@
-name: python-sdk-ci
+name: sdk-python-ci
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
   pull_request:
     paths:
-      - 'python-sdk/**'
+      - 'sdk-python/**'
 
 jobs:
   test:
@@ -19,14 +19,14 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-          cache-dependency-glob: "python-sdk/uv.lock"
+          cache-dependency-glob: "sdk-python/uv.lock"
 
       - name: Setup Python UV
-        working-directory: python-sdk
+        working-directory: sdk-python
         run: uv sync --all-groups --all-extras
 
       - name: Run tests
-        working-directory: python-sdk
+        working-directory: sdk-python
         env:
           LANGWATCH_DEBUG: "true"
           LANGWATCH_API_KEY: ${{ secrets.PYTHON_SDK_LANGWATCH_API_KEY }}
