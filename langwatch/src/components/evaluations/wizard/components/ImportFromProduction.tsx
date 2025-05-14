@@ -6,11 +6,7 @@ function ImportFromProductionComponent() {
     <Card.Root width="full" position="sticky" top={6}>
       <Card.Body width="full" paddingBottom={6}>
         <Box width="full" position="relative">
-          <MessagesTable
-            showTableToggle={false}
-            showExport={false}
-            showAnalytics={false}
-          />
+          <MessagesTable hideTableToggle hideExport />
         </Box>
       </Card.Body>
     </Card.Root>

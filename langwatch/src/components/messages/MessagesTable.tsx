@@ -70,15 +70,13 @@ import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
 import { RedactedField } from "../ui/RedactedField";
 
 export interface MessagesTableProps {
-  showAnalytics?: boolean;
-  showExport?: boolean;
-  showTableToggle?: boolean;
+  hideExport?: boolean;
+  hideTableToggle?: boolean;
 }
 
 export function MessagesTable({
-  showAnalytics = true,
-  showExport = true,
-  showTableToggle = true,
+  hideExport = false,
+  hideTableToggle = false,
 }: MessagesTableProps) {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
@@ -1034,7 +1032,7 @@ export function MessagesTable({
             <Heading as="h1" size="lg" paddingTop={1}>
               Messages
             </Heading>
-            {showAnalytics && <ToggleAnalytics />}
+            <ToggleAnalytics />
             <Tooltip content="Refresh">
               <Button
                 variant="outline"
@@ -1057,8 +1055,8 @@ export function MessagesTable({
           </HStack>
           <Spacer />
           <HStack gap={1} marginBottom="-8px">
-            {showTableToggle && <ToggleTableView />}
-            {showExport && (
+            {!hideTableToggle && <ToggleTableView />}
+            {!hideExport && (
               <Tooltip
                 disabled={navigationFooter.totalHits < 10_000}
                 content={
@@ -1295,8 +1293,8 @@ export function MessagesTable({
       </Container>
       {selectedTraceIds.length > 0 && (
         <Box
-          position="fixed"
-          bottom={6}
+          position="absolute"
+          bottom={10}
           left="50%"
           transform="translateX(-50%)"
           backgroundColor="#ffffff"
@@ -1311,16 +1309,20 @@ export function MessagesTable({
               {selectedTraceIds.length}{" "}
               {selectedTraceIds.length === 1 ? "trace" : "traces"} selected
             </Text>
-            <Button
-              colorPalette="black"
-              minWidth="fit-content"
-              variant="outline"
-              onClick={() => void downloadCSV(true)}
-            >
-              Export <Download size={16} style={{ marginLeft: 8 }} />
-            </Button>
+            {!hideExport && (
+              <>
+                <Button
+                  colorPalette="black"
+                  minWidth="fit-content"
+                  variant="outline"
+                  onClick={() => void downloadCSV(true)}
+                >
+                  Export <Download size={16} style={{ marginLeft: 8 }} />
+                </Button>
+                <Text>or</Text>
+              </>
+            )}
 
-            <Text>or</Text>
             <Button
               colorPalette="black"
               type="submit"
