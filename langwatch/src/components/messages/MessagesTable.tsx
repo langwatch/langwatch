@@ -69,7 +69,17 @@ import { AddParticipants } from "../traces/AddParticipants";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
 import { RedactedField } from "../ui/RedactedField";
 
-export function MessagesTable() {
+export interface MessagesTableProps {
+  showAnalytics?: boolean;
+  showExport?: boolean;
+  showTableToggle?: boolean;
+}
+
+export function MessagesTable({
+  showAnalytics = true,
+  showExport = true,
+  showTableToggle = true,
+}: MessagesTableProps) {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
@@ -1018,7 +1028,7 @@ export function MessagesTable() {
 
   return (
     <>
-      <Container maxWidth="calc(100vw - 50px)" padding={6}>
+      <Container maxWidth="calc(100vw - 50px)" padding={6} overflow="scroll">
         <HStack width="full" align="top" paddingBottom={6}>
           <HStack align="center" gap={6}>
             <Heading as="h1" size="lg" paddingTop={1}>
@@ -1065,6 +1075,8 @@ export function MessagesTable() {
                 Export all
               </Button>
             </Tooltip>
+
+            {/** Column selector - start */}
             <Popover.Root
               open={open}
               onOpenChange={({ open }) => (open ? onOpen() : onClose())}
@@ -1125,6 +1137,7 @@ export function MessagesTable() {
                 </Popover.Body>
               </Popover.Content>
             </Popover.Root>
+            {/** Column selector - end */}
 
             <PeriodSelector
               period={{ startDate, endDate }}
@@ -1161,6 +1174,7 @@ export function MessagesTable() {
                     <Text>No columns selected</Text>
                   )}
                   <Table.ScrollArea
+                    width="full"
                     ref={scrollRef}
                     onScroll={() => {
                       if (scrollRef.current) {

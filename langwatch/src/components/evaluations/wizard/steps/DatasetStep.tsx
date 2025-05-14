@@ -1,6 +1,7 @@
 import {
   Accordion,
   Button,
+  Dialog,
   Grid,
   Heading,
   HStack,
