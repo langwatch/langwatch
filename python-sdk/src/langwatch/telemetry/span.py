@@ -1,6 +1,7 @@
 from copy import deepcopy
 import functools
 import json
+import traceback
 from warnings import warn
 from typing import (
     List,
@@ -29,6 +30,7 @@ from langwatch.utils.transformation import (
 from opentelemetry import trace as trace_api, context as context_api
 from opentelemetry.trace import (
     SpanKind,
+    NonRecordingSpan,
     Link,
     Span as OtelSpan,
     Status,
@@ -99,7 +101,7 @@ class LangWatchSpan:
         ignore_missing_trace_warning: bool = False,
         # OpenTelemetry parameters
         kind: SpanKind = SpanKind.INTERNAL,
-        span_context: Optional[context_api.Context] = None,
+        span_context: Optional[SpanContext] = None,
         attributes: Optional[Dict[str, Any]] = None,
         links: Optional[List[Link]] = None,
         start_time: Optional[int] = None,
@@ -118,7 +120,6 @@ class LangWatchSpan:
 
         # Initialize critical instance attributes first
         self._lock = threading.Lock()
-        self._span = None
         self._cleaned_up = False
 
         # Initialize other attributes
@@ -140,7 +141,7 @@ class LangWatchSpan:
         self.evaluations = evaluations
 
         # Store OpenTelemetry-specific parameters
-        self._span = None
+        self._span: OtelSpan
         self._span_context_manager = None
         self.kind = kind
         self.span_context = span_context
@@ -157,16 +158,14 @@ class LangWatchSpan:
             ),
         )
 
-    def _create_span(self):
+        self._create_span(do_not_set_context=True)
+
+    def _create_span(self, do_not_set_context: bool = False):
         """Internal method to create and start the OpenTelemetry span."""
         try:
             if self.trace:
                 tracer = self.trace.tracer
             else:
-                if not self.ignore_missing_trace_warning and not self.parent:
-                    warn(
-                        "No current trace found, some spans may not be sent to LangWatch"
-                    )
                 tracer = trace_api.get_tracer("langwatch", __version__)
 
             # Handle parent span
@@ -174,38 +173,57 @@ class LangWatchSpan:
             if parent is None:
                 # If no explicit parent, try to get from context
                 current_span = stored_langwatch_span.get(None)
-                if current_span is not None and current_span._span is not None:
+                if current_span is not None:
                     parent = current_span._span
                 else:
                     # If still no parent, use the current span from OpenTelemetry context
                     parent = get_current_span()
             parent_span_context: Optional[Context] = None
-            if isinstance(parent, LangWatchSpan) and parent._span is not None:
+            if isinstance(parent, LangWatchSpan):
                 parent_span_context = set_span_in_context(parent._span)
 
-            # Create the underlying OpenTelemetry span
-            try:
-                self._span_context_manager = tracer.start_as_current_span(
+            span_ctx = None
+            if self.span_context is not None:
+                span_ctx = trace_api.set_span_in_context(
+                    NonRecordingSpan(self.span_context)
+                )
+            elif parent_span_context is not None:
+                span_ctx = parent_span_context
+
+            if do_not_set_context:
+                self._span = tracer.start_span(
                     name=self.name or self.type,
-                    context=self.span_context or parent_span_context,
+                    context=span_ctx,
                     kind=self.kind,
                     links=self.links,
                     start_time=self.start_time,
                     record_exception=self.record_exception,
                     set_status_on_exception=self.set_status_on_exception,
                     attributes=self.attributes,
-                    end_on_exit=True,
                 )
-                self._span = self._span_context_manager.__enter__()
-
-                if not self._span:
-                    warn("Failed to create span - got None from tracer")
+            else:
+                # Create the underlying OpenTelemetry span
+                try:
+                    self._span_context_manager = tracer.start_as_current_span(
+                        name=self.name or self.type,
+                        context=span_ctx,
+                        kind=self.kind,
+                        links=self.links,
+                        start_time=self.start_time,
+                        record_exception=self.record_exception,
+                        set_status_on_exception=self.set_status_on_exception,
+                        attributes=self.attributes,
+                        end_on_exit=True,
+                    )
+                    self._span = self._span_context_manager.__enter__()
+                except Exception as e:
+                    warn(
+                        f"Failed to create span: {str(e)}. Span operations will be no-ops."
+                    )
                     return
 
-            except Exception as e:
-                warn(
-                    f"Failed to create span: {str(e)}. Span operations will be no-ops."
-                )
+            if not self._span:
+                warn("Failed to create span - got None from tracer")
                 return
 
             try:
@@ -418,7 +436,7 @@ class LangWatchSpan:
 
         from langwatch import evaluations
 
-        return evaluations._add_evaluation( # type: ignore
+        return evaluations._add_evaluation(  # type: ignore
             span=self,
             evaluation_id=evaluation_id,
             name=name,
@@ -791,7 +809,7 @@ def span(
     ignore_missing_trace_warning: bool = False,
     # OpenTelemetry parameters
     kind: SpanKind = SpanKind.INTERNAL,
-    span_context: Optional[Context] = None,
+    span_context: Optional[SpanContext] = None,
     attributes: Optional[Dict[str, Any]] = None,
     links: Optional[List[Link]] = None,
     start_time: Optional[int] = None,
