@@ -1,39 +1,72 @@
-import IORedis from "ioredis";
+import IORedis, { Cluster } from "ioredis";
 import { env } from "../env.mjs";
 import { createLogger } from "../utils/logger";
 import { PHASE_PRODUCTION_BUILD } from "next/constants";
 
 const logger = createLogger("langwatch:redis");
 
-export const connection =
+const isBuild =
   process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD ||
   !!process.env.BUILD_TIME ||
-  !env.REDIS_URL
-    ? undefined
-    : new IORedis(env.REDIS_URL ?? "", {
+  (!env.REDIS_URL && !env.REDIS_CLUSTER_ENDPOINTS);
+
+const useCluster = env.REDIS_CLUSTER_ENDPOINTS;
+
+function parseClusterEndpoints(endpointsStr: string) {
+  return endpointsStr.split(",").map((raw) => {
+    const url = raw.includes("://") ? new URL(raw) : new URL(`redis://${raw}`);
+    return { host: url.hostname, port: Number(url.port || 6379) };
+  });
+}
+
+export let connection: IORedis | Cluster | undefined;
+
+if (!isBuild) {
+  if (useCluster) {
+    const clusterEndpoints = parseClusterEndpoints(env.REDIS_CLUSTER_ENDPOINTS ?? "");
+    connection = new Cluster(clusterEndpoints, {
+      redisOptions: {
         maxRetriesPerRequest: null,
         enableOfflineQueue: false,
+      },
+    });
+
+    // Cluster events
+    (connection).on("cluster:connect", () => {
+      logger.info("cluster connected");
+    });
+    (connection).on("cluster:ready", () => {
+      logger.info("cluster is ready to accept commands");
+    });
+  } else {
+    connection = new IORedis(env.REDIS_URL ?? "", {
+      maxRetriesPerRequest: null,
+      enableOfflineQueue: false,
         tls: env.REDIS_URL?.includes("tls.rejectUnauthorized=false")
           ? { rejectUnauthorized: false }
           : (env.REDIS_URL?.includes("rediss://") as any),
       });
 
-connection?.on("connect", () => {
-  logger.info("connected to redis");
-});
+    // Single-node events
+    connection.on("connect", () => {
+      logger.info("connected");
+    });
+    connection.on("ready", () => {
+      logger.info("ready to accept commands");
+    });
+  }
 
-connection?.on("error", (error) => {
-  logger.error({ error }, "redis error");
-});
-
-connection?.on("ready", () => {
-  logger.info("ready to accept commands");
-});
-
-connection?.on("close", () => {
-  logger.info("connection closed");
-});
-
-connection?.on("reconnecting", () => {
-  logger.info("reconnecting...");
-});
+  // Common events for both single-node and cluster
+  connection?.on("error", (error: Error) => {
+    logger.error({ error} , "error");
+  });
+  connection?.on("close", () => {
+    logger.info("connection closed");
+  });
+  connection?.on("reconnecting", () => {
+    logger.info("reconnecting...");
+  });
+} else {
+  // During build time or missing env, disable connection
+  connection = undefined;
+}
