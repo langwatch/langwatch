@@ -1,24 +1,14 @@
 import {
   Accordion,
-  Button,
-  Dialog,
   Grid,
   Heading,
-  HStack,
-  Input,
   RadioCard,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect, useState } from "react";
-import {
-  Database,
-  FilePlus,
-  FileText,
-  Folder,
-  UploadCloud,
-} from "react-feather";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Database, FilePlus, FileText, UploadCloud } from "react-feather";
 import {
   DATA_SOURCE_TYPES,
   useEvaluationWizardStore,
@@ -27,7 +17,6 @@ import {
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { StepRadio } from "../components/StepButton";
-import { OverflownTextWithTooltip } from "../../../OverflownText";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { StepAccordion } from "../components/StepAccordion";
 import { useAnimatedFocusElementById } from "../../../../hooks/useAnimatedFocusElementById";
@@ -37,6 +26,7 @@ import { useShallow } from "zustand/react/shallow";
 import { DatasetGeneration } from "./datasets/DatasetGeneration";
 import { useSelectedDataSetId } from "~/hooks/useSelectedDataSetId";
 import { DatasetFromProductionConfiguration } from "./datasets/DatasetFromProductionConfiguration";
+import { DatasetRadioCard } from "../components/DatasetRadioCard";
 
 export function DatasetStep() {
   const { clear: clearSelectedDataSetId, selectedDataSetId } =
@@ -78,6 +68,10 @@ export function DatasetStep() {
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project }
+  );
+  const selectedDataset = useMemo(
+    () => datasets.data?.find((d) => d.id === selectedDataSetId),
+    [datasets.data, selectedDataSetId]
   );
 
   const upsertDataset = api.dataset.upsert.useMutation();
@@ -335,41 +329,11 @@ export function DatasetStep() {
                   >
                     <Grid width="full" templateColumns="repeat(2, 1fr)" gap={3}>
                       {datasets.data?.map((dataset) => (
-                        <RadioCard.Item
+                        <DatasetRadioCard
                           key={dataset.id}
-                          value={dataset.id}
-                          width="full"
-                          minWidth={0}
-                          onClick={() => handleDatasetSelect(dataset.id)}
-                          _active={{ background: "blue.50" }}
-                        >
-                          <RadioCard.ItemHiddenInput />
-                          <RadioCard.ItemControl cursor="pointer" width="full">
-                            <RadioCard.ItemContent width="full">
-                              <VStack
-                                align="start"
-                                gap={3}
-                                _icon={{ color: "blue.300" }}
-                                width="full"
-                              >
-                                <Folder size={18} />
-                                <VStack align="start" gap={0} width="full">
-                                  <OverflownTextWithTooltip wordBreak="break-all">
-                                    {dataset.name}
-                                  </OverflownTextWithTooltip>
-                                  <Text
-                                    fontSize="xs"
-                                    color="gray.500"
-                                    fontWeight="normal"
-                                  >
-                                    {dataset._count.datasetRecords} entries
-                                  </Text>
-                                </VStack>
-                              </VStack>
-                            </RadioCard.ItemContent>
-                            <RadioCard.ItemIndicator />
-                          </RadioCard.ItemControl>
-                        </RadioCard.Item>
+                          dataset={dataset}
+                          handleDatasetSelect={handleDatasetSelect}
+                        />
                       ))}
                     </Grid>
                   </RadioCard.Root>
@@ -377,9 +341,7 @@ export function DatasetStep() {
               )}
 
               {wizardState.dataSource === "from_production" && (
-                <DatasetFromProductionConfiguration
-                  selectedDataSetId={selectedDataSetId}
-                />
+                <DatasetFromProductionConfiguration dataset={selectedDataset} />
               )}
 
               {wizardState.dataSource === "manual" && <DatasetGeneration />}

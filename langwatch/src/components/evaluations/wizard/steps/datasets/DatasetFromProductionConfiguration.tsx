@@ -1,30 +1,43 @@
 import { DatasetGenerationTemplate } from "./DatasetGenerationTemplate";
 import { Download } from "react-feather";
-import { Text } from "@chakra-ui/react";
-
+import { Text, RadioCard } from "@chakra-ui/react";
+import type { Dataset } from "@prisma/client";
+import { DatasetRadioCard } from "../../components/DatasetRadioCard";
 interface DatasetFromProductionConfigurationProps {
-  selectedDataSetId: string;
+  dataset?: Dataset & { _count: { datasetRecords: number } };
 }
 
 export function DatasetFromProductionConfiguration({
-  selectedDataSetId,
+  dataset,
 }: DatasetFromProductionConfigurationProps) {
   return (
     <DatasetGenerationTemplate>
       <DatasetGenerationTemplate.Header icon={<Download size={16} />}>
-        Import from Production
+        Select Production Data
       </DatasetGenerationTemplate.Header>
       <DatasetGenerationTemplate.Description>
-        Import tracing data from production to test the evaluator
+        {!dataset &&
+          "Import tracing data from production to test the evaluator"}
       </DatasetGenerationTemplate.Description>
       <DatasetGenerationTemplate.Content>
-        {selectedDataSetId ? (
-          <Text>Current dataset: {selectedDataSetId}</Text>
+        {dataset ? (
+          // It's weird to use the radio card here, but this keeps consistent styling
+          <RadioCard.Root
+            variant="outline"
+            colorPalette="blue"
+            value={dataset.id}
+            width="full"
+          >
+            <DatasetRadioCard
+              dataset={dataset}
+              handleDatasetSelect={() => {}}
+            />
+          </RadioCard.Root>
         ) : (
           <>
             <Text>
               Please create a new dataset from the production data table to
-              continue
+              continue.
             </Text>
           </>
         )}

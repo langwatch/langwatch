@@ -30,8 +30,7 @@ const Header = ({ children, icon }: HeaderProps) => (
 
 const Description = ({ children }: DescriptionProps) => (
   <Text fontSize="13px" color="gray.500">
-    {children ||
-      "Describe the sample data you need for running the evaluation or ask for modifications to the dataset."}
+    {children}
   </Text>
 );
 
