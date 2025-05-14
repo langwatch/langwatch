@@ -373,7 +373,7 @@ class LangWatchTrace:
     ):
         from langwatch import evaluations
 
-        evaluations.add_evaluation(
+        evaluations._add_evaluation(
             span=span,
             evaluation_id=evaluation_id,
             name=name,
