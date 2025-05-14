@@ -13,6 +13,7 @@ import type { CollectorJob } from "../background/types";
 import type {
   BaseSpan,
   ChatMessage,
+  Evaluation,
   LLMSpan,
   RAGChunk,
   Span,
@@ -22,14 +23,18 @@ import type {
 import {
   customMetadataSchema,
   reservedTraceMetadataSchema,
+  rESTEvaluationSchema,
   spanTypesSchema,
   typedValueChatMessagesSchema,
 } from "./types.generated";
 import { openTelemetryToLangWatchMetadataMapping } from "./metadata";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("langwatch.tracer.opentelemetry");
 
 export type TraceForCollection = Pick<
   CollectorJob,
-  "traceId" | "spans" | "reservedTraceMetadata" | "customMetadata"
+  "traceId" | "spans" | "reservedTraceMetadata" | "customMetadata" | "evaluations"
 >;
 
 export const openTelemetryTraceRequestToTracesForCollection = (
@@ -121,6 +126,7 @@ const openTelemetryTraceRequestToTraceForCollection = (
   const trace: TraceForCollection = {
     traceId,
     spans: [],
+    evaluations: [],
     reservedTraceMetadata: {},
     customMetadata,
   };
@@ -174,12 +180,35 @@ const addOpenTelemetrySpanAsSpan = (
   // First token at
   let first_token_at: Span["timestamps"]["first_token_at"] = null;
   for (const event of otelSpan?.events ?? []) {
-    if (
-      event?.name === "First Token Stream Event" ||
-      event?.name === "llm.content.completion.chunk"
-    ) {
-      first_token_at = parseTimestamp(event?.timeUnixNano);
-      break;
+    if (!event) continue;
+
+    switch (event.name) {
+      case "First Token Stream Event":
+      case "llm.content.completion.chunk": {
+        first_token_at = parseTimestamp(event?.timeUnixNano);
+        break;
+      }
+      case "langwatch.evaluation.custom": {
+        const jsonPayload = event.attributes?.find((attr) => attr?.key === "json_encoded_event")?.value?.stringValue;
+        if (!jsonPayload) {
+          logger.warn({ event }, "event for `langwatch.evaluation.custom` has no json_encoded_event");
+          break;
+        }
+
+        try {
+          const parsedJsonPayload = JSON.parse(jsonPayload);
+          const evaluation = rESTEvaluationSchema.parse(parsedJsonPayload);
+
+          if (!trace.evaluations) trace.evaluations = [];
+          trace.evaluations.push(evaluation);
+        } catch (error) {
+          logger.error({ error, jsonPayload }, "error parsing json_encoded_event from `langwatch.evaluation.custom`, event discarded");
+        }
+        break;
+      }
+
+      default:
+        break;
     }
   }
   if (started_at && attributesMap.ai?.response?.msToFirstChunk) {
