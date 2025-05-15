@@ -1,8 +1,9 @@
 import { DatasetGenerationTemplate } from "./DatasetGenerationTemplate";
-import { Download } from "react-feather";
-import { Text, RadioCard } from "@chakra-ui/react";
+import { Download, ArrowLeft } from "react-feather";
+import { Text, RadioCard, VStack, Box } from "@chakra-ui/react";
 import type { Dataset } from "@prisma/client";
 import { DatasetRadioCard } from "../../components/DatasetRadioCard";
+
 interface DatasetFromProductionConfigurationProps {
   dataset?: Dataset & { _count: { datasetRecords: number } };
 }
@@ -34,12 +35,13 @@ export function DatasetFromProductionConfiguration({
             />
           </RadioCard.Root>
         ) : (
-          <>
+          <VStack alignItems="flex-start">
+            <Text fontWeight="bold">Instructions:</Text>
             <Text>
-              Please create a new dataset from the production data table to
-              continue.
+              Click on the checkboxes on the left side of the table to select
+              which traces you want to include in the dataset.
             </Text>
-          </>
+          </VStack>
         )}
       </DatasetGenerationTemplate.Content>
     </DatasetGenerationTemplate>
