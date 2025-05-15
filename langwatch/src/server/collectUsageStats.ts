@@ -3,29 +3,23 @@ import { TRACE_INDEX } from "./elasticsearch";
 import { esClient } from "./elasticsearch";
 
 export async function collectUsageStats(instanceId: string) {
-  const organizationId = instanceId.split("-")[0];
+  const organizationId = instanceId.split("__")[1];
+
+  const projectIds = await prisma.project
+    .findMany({
+      where: {
+        team: { organizationId },
+      },
+      select: { id: true },
+    })
+    .then((projects) => projects.map((project) => project.id));
 
   if (!organizationId) {
     throw new Error("Invalid instance ID");
   }
 
-  const userCount = await prisma.user.count();
-  const annotationCount = await prisma.annotation.count();
-  const annotationQueueCount = await prisma.annotationQueue.count();
-  const annotationQueueItemCount = await prisma.annotationQueueItem.count();
-  const annotationScoreCount = await prisma.annotationScore.count();
-  const batchEvaluationCount = await prisma.batchEvaluation.count();
-  const customGraphCount = await prisma.customGraph.count();
-  const datasetCount = await prisma.dataset.count();
-  const datasetRecordCount = await prisma.datasetRecord.count();
-  const experimentCount = await prisma.experiment.count();
-  const triggerCount = await prisma.trigger.count();
-
-  const { totalTraces } = await getTraceCount(organizationId);
-
-  return {
-    totalTraces,
-    userCount,
+  // Get total counts for each table that has projectId
+  const [
     annotationCount,
     annotationQueueCount,
     annotationQueueItemCount,
@@ -36,6 +30,58 @@ export async function collectUsageStats(instanceId: string) {
     datasetRecordCount,
     experimentCount,
     triggerCount,
+    workflowCount,
+  ] = await Promise.all([
+    prisma.annotation.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.annotationQueue.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.annotationQueueItem.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.annotationScore.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.batchEvaluation.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.customGraph.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.dataset.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.datasetRecord.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.experiment.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.trigger.count({
+      where: { projectId: { in: projectIds } },
+    }),
+    prisma.workflow.count({
+      where: { projectId: { in: projectIds } },
+    }),
+  ]);
+
+  const { totalTraces } = await getTraceCount(organizationId);
+
+  return {
+    totalTraces,
+    annotations: annotationCount,
+    annotationQueues: annotationQueueCount,
+    annotationQueueItems: annotationQueueItemCount,
+    annotationScores: annotationScoreCount,
+    batchEvaluations: batchEvaluationCount,
+    customGraphs: customGraphCount,
+    datasets: datasetCount,
+    datasetRecords: datasetRecordCount,
+    experiments: experimentCount,
+    triggers: triggerCount,
+    workflows: workflowCount,
     timestamp: new Date().toISOString(),
   };
 }

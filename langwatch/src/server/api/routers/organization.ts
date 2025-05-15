@@ -26,6 +26,7 @@ import { decrypt, encrypt } from "~/utils/encryption";
 import { signUpDataSchema } from "./onboarding";
 import { dependencies } from "../../../injection/dependencies.server";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
+import { usageStatsQueue } from "~/server/background/queues/usageStatsQueue";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
@@ -144,6 +145,21 @@ export const organizationRouter = createTRPCRouter({
           });
 
           return { organization, team };
+        }
+      );
+
+      // Add usage stats job for the new organization
+      const instanceId = `${organization.name}__${organization.id}`;
+      await usageStatsQueue.add(
+        "usage_stats",
+        {
+          instance_id: instanceId,
+          timestamp: Date.now(),
+        },
+        {
+          jobId: `usage_stats_${instanceId}_${
+            new Date().toISOString().split("T")[0]
+          }`,
         }
       );
 

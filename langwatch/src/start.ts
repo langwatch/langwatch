@@ -183,7 +183,10 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
     );
 
     // Schedule usage stats collection
-    if (process.env.IS_SAAS != "true") {
+    if (
+      process.env.IS_SAAS != "true" &&
+      process.env.DISABLE_USAGE_STATS != "true"
+    ) {
       logger.info("Scheduling usage stats collection");
       void scheduleUsageStats().catch((error) => {
         logger.error({ error }, "Failed to schedule usage stats collection");

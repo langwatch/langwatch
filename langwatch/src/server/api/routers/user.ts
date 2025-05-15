@@ -5,6 +5,7 @@ import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 import { skipPermissionCheck } from "../permission";
 import { env } from "../../../env.mjs";
+import { usageStatsQueue } from "~/server/background/queues/usageStatsQueue";
 
 export const userRouter = createTRPCRouter({
   register: publicProcedure
@@ -49,6 +50,21 @@ export const userRouter = createTRPCRouter({
           password: hashedPassword,
         },
       });
+
+      // Add usage stats job for the new user
+      const instanceId = `${newUser.name}__${newUser.id}`;
+      await usageStatsQueue.add(
+        "usage_stats",
+        {
+          instance_id: instanceId,
+          timestamp: Date.now(),
+        },
+        {
+          jobId: `usage_stats_${instanceId}_${
+            new Date().toISOString().split("T")[0]
+          }`,
+        }
+      );
 
       return { id: newUser.id };
     }),

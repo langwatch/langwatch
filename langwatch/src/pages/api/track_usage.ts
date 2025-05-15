@@ -10,13 +10,13 @@ export default async function handler(
   const { event, instance_id, ...properties } = req.body;
 
   try {
-    posthog.capture({
-      distinctId: instance_id, // Use organization ID as the distinct ID
-      event,
-      properties,
-    });
-
-    // Optional: await posthog.flush(); (only if blocking needed)
+    if (posthog) {
+      posthog.capture({
+        distinctId: instance_id, // Use organization ID as the distinct ID
+        event,
+        properties,
+      });
+    }
   } catch (error) {
     console.error("PostHog capture failed:", error);
   }

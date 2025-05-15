@@ -13,7 +13,7 @@ import { collectUsageStats } from "~/server/collectUsageStats";
 const logger = createLogger("langwatch:workers:usageStatsWorker");
 
 export async function runUsageStatsJob(job: Job<UsageStatsJob, void, string>) {
-  if (process.env.DISABLE_USAGE_STATS || process.env.IS_SAAS !== "true") {
+  if (process.env.DISABLE_USAGE_STATS || process.env.IS_SAAS === "true") {
     logger.info("usage stats disabled, skipping job");
     return;
   }
@@ -24,10 +24,12 @@ export async function runUsageStatsJob(job: Job<UsageStatsJob, void, string>) {
 
   const stats = await collectUsageStats(job.data.instance_id);
 
+  logger.info({ stats }, "usage stats collected");
+
   try {
     const installMethod = process.env.INSTALL_METHOD || "self-hosted"; // Default to self-hosted if not specified
 
-    fetch("http://localhost:5560/api/track_usage", {
+    fetch("https://app.langwatch.ai/api/track_usage", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

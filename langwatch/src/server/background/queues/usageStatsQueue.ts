@@ -33,31 +33,41 @@ export const usageStatsQueue = new QueueWithFallback<
 
 export const scheduleUsageStats = async () => {
   const yyyymmdd = new Date().toISOString().split("T")[0];
-  const organization = await prisma.organization.findFirst({
+
+  // Get all organizations
+  const organizations = await prisma.organization.findMany({
     select: {
       id: true,
       name: true,
     },
   });
 
-  if (!organization) {
-    logger.error("No organization found");
+  if (organizations.length === 0) {
+    logger.error("No organizations found");
     return;
   }
 
-  const instanceId = `${organization.name}__${organization.id}`;
+  console.log({ organizations });
 
-  await usageStatsQueue.add(
-    "usage_stats",
-    {
-      instance_id: instanceId,
-      timestamp: Date.now(),
-    },
-    {
-      jobId: `usage_stats_${instanceId}_${yyyymmdd}`,
-      repeat: {
-        pattern: "* * * * *", // Run every minute for testing
-      },
-    }
+  // Create a job for each organization
+  await Promise.all(
+    organizations.map(async (organization) => {
+      const instanceId = `${organization.name}__${organization.id}`;
+      console.log({ instanceId });
+
+      await usageStatsQueue.add(
+        "usage_stats",
+        {
+          instance_id: instanceId,
+          timestamp: Date.now(),
+        },
+        {
+          jobId: `usage_stats_${instanceId}_${yyyymmdd}`,
+          repeat: {
+            pattern: "* * * * *", // Run every minute for testing
+          },
+        }
+      );
+    })
   );
 };

@@ -12,10 +12,6 @@ const _guardOrganizationId = ({
   const action = params.action;
   const model = params.model;
 
-  if (action === "count") {
-    return;
-  }
-
   if (action === "create" || action === "createMany") {
     const data =
       action === "create"
