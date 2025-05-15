@@ -51,21 +51,6 @@ export const userRouter = createTRPCRouter({
         },
       });
 
-      // Add usage stats job for the new user
-      const instanceId = `${newUser.name}__${newUser.id}`;
-      await usageStatsQueue.add(
-        "usage_stats",
-        {
-          instance_id: instanceId,
-          timestamp: Date.now(),
-        },
-        {
-          jobId: `usage_stats_${instanceId}_${
-            new Date().toISOString().split("T")[0]
-          }`,
-        }
-      );
-
       return { id: newUser.id };
     }),
   updateLastLogin: protectedProcedure

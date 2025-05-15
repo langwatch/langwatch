@@ -149,19 +149,24 @@ export const organizationRouter = createTRPCRouter({
       );
 
       // Add usage stats job for the new organization
-      const instanceId = `${organization.name}__${organization.id}`;
-      await usageStatsQueue.add(
-        "usage_stats",
-        {
-          instance_id: instanceId,
-          timestamp: Date.now(),
-        },
-        {
-          jobId: `usage_stats_${instanceId}_${
-            new Date().toISOString().split("T")[0]
-          }`,
-        }
-      );
+      if (
+        process.env.DISABLE_USAGE_STATS !== "true" &&
+        process.env.IS_SAAS !== "true"
+      ) {
+        const instanceId = `${organization.name}__${organization.id}`;
+        await usageStatsQueue.add(
+          "usage_stats",
+          {
+            instance_id: instanceId,
+            timestamp: Date.now(),
+          },
+          {
+            jobId: `usage_stats_${instanceId}_${
+              new Date().toISOString().split("T")[0]
+            }`,
+          }
+        );
+      }
 
       return {
         success: true,

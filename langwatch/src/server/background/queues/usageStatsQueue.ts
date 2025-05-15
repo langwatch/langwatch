@@ -48,12 +48,12 @@ export const scheduleUsageStats = async () => {
   }
 
   // Create a job for each organization
-  await Promise.all(
+  const results = await Promise.allSettled(
     organizations.map(async (organization) => {
       const instanceId = `${organization.name}__${organization.id}`;
-      console.log({ instanceId });
+      logger.info({ instanceId }, "Scheduling usage stats for organization");
 
-      await usageStatsQueue.add(
+      return await usageStatsQueue.add(
         "usage_stats",
         {
           instance_id: instanceId,
@@ -68,4 +68,13 @@ export const scheduleUsageStats = async () => {
       );
     })
   );
+
+  // Log any failures
+  const failures = results.filter((r) => r.status === "rejected");
+  if (failures.length > 0) {
+    logger.error(
+      { count: failures.length, total: organizations.length },
+      "Failed to schedule some usage stats jobs"
+    );
+  }
 };
