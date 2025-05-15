@@ -29,7 +29,7 @@ type InputPanelProps = {
 };
 
 export const ExecutionInputPanel = ({
-  fields,
+  fields = [],
   onExecute,
   title = "Inputs",
   buttonText = "Execute",
