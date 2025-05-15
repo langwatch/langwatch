@@ -1293,7 +1293,7 @@ export function MessagesTable({
       </Container>
       {selectedTraceIds.length > 0 && (
         <Box
-          position="absolute"
+          position="fixed"
           bottom={10}
           left="50%"
           transform="translateX(-50%)"
