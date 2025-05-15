@@ -26,6 +26,7 @@ import { colorSystem } from "../components/ui/color-mode";
 import posthog from "posthog-js";
 import { Router } from "next/router";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { PostHogProvider } from "posthog-js/react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -625,7 +626,7 @@ const LangWatch: AppType<{
         <Head>
           <title>LangWatch</title>
         </Head>
-        {publicEnv.data?.PUBLIC_POSTHOG_KEY ? (
+        {publicEnv.data?.POSTHOG_KEY ? (
           <PostHogProvider client={posthog}>
             <Component {...pageProps} />
           </PostHogProvider>
