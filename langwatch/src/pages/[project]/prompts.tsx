@@ -1,6 +1,6 @@
-import { Flex, Spacer } from "@chakra-ui/react";
+import { Flex, Spacer, VStack } from "@chakra-ui/react";
 import { type LlmPromptConfig } from "@prisma/client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Plus } from "react-feather";
 
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
@@ -20,6 +20,7 @@ export default function PromptConfigsPage() {
   const { project } = useOrganizationTeamProject();
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isPaneExpanded, setIsPaneExpanded] = useState(true); // Start open
   const [configToDelete, setConfigToDelete] = useState<LlmPromptConfig | null>(
     null
   );
@@ -35,18 +36,18 @@ export default function PromptConfigsPage() {
   } = api.llmConfigs.getPromptConfigs.useQuery(
     {
       projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project?.id,
+      onError: (error) => {
+        toaster.create({
+          title: "Error loading prompt configs from here",
+          description: error.message,
+          type: "error",
+        });
       },
-      {
-        enabled: !!project?.id,
-        onError: (error) => {
-          toaster.create({
-            title: "Error loading prompt configs from here",
-            description: error.message,
-            type: "error",
-          });
-        },
-      }
-    );
+    }
+  );
 
   const createConfigWithInitialVersionMutation =
     api.llmConfigs.createConfigWithInitialVersion.useMutation();
@@ -140,53 +141,89 @@ export default function PromptConfigsPage() {
     });
   }, []);
 
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  console.log(panelRef.current?.firstChild?.offsetWidth);
+
   return (
     <DashboardLayout position="relative">
-      <Flex
-        flexDirection="column"
-        height="100%"
-        width="100%"
-        position="relative"
+      <div
+        data-testid="prompt-configs-page"
+        style={{
+          position: "relative",
+          width: "100%",
+          height: "100%",
+          flex: 1,
+          overflow: "scroll",
+        }}
       >
-        <PageLayout.Container
-          maxW={"calc(100vw - 200px)"}
-          padding={6}
-          marginTop={8}
+        <div
+          style={{
+            position: "absolute",
+            height: "100%",
+            width: "100%",
+            overflow: "scroll",
+          }}
         >
-          <PageLayout.Header>
-            <PageLayout.Heading>Prompts</PageLayout.Heading>
-            <Spacer />
-            <PageLayout.HeaderButton
-              onClick={() => void handleCreateButtonClick()}
+          <Flex flexDirection="column" height="100%">
+            <PageLayout.Container
+              maxW={"calc(100vw - 200px)"}
+              padding={6}
+              marginTop={8}
             >
-              <Plus height={16} /> Create New
-            </PageLayout.HeaderButton>
-          </PageLayout.Header>
-          <PageLayout.Content>
-            <PromptConfigTable
-              configs={promptConfigs ?? []}
-              isLoading={isLoading}
-              onRowClick={(config) => setSelectedConfigId(config.id)}
-              columns={defaultColumns}
-            />
-          </PageLayout.Content>
+              <PageLayout.Header>
+                <PageLayout.Heading>Prompts</PageLayout.Heading>
+                <Spacer />
+                <PageLayout.HeaderButton
+                  onClick={() => void handleCreateButtonClick()}
+                >
+                  <Plus height={16} /> Create New
+                </PageLayout.HeaderButton>
+              </PageLayout.Header>
+              <PageLayout.Content>
+                <PromptConfigTable
+                  configs={promptConfigs ?? []}
+                  isLoading={isLoading}
+                  onRowClick={(config) => setSelectedConfigId(config.id)}
+                  columns={defaultColumns}
+                />
+              </PageLayout.Content>
 
-          <DeleteConfirmationDialog
-            title="Are you really sure?"
-            description="There is no going back, and you will lose all versions of this prompt. If you're sure you want to delete this prompt, type 'delete' below:"
-            open={isDeleteDialogOpen}
-            onClose={() => setIsDeleteDialogOpen(false)}
-            onConfirm={() => {
-              void confirmDeleteConfig();
-            }}
+              <DeleteConfirmationDialog
+                title="Are you really sure?"
+                description="There is no going back, and you will lose all versions of this prompt. If you're sure you want to delete this prompt, type 'delete' below:"
+                open={isDeleteDialogOpen}
+                onClose={() => setIsDeleteDialogOpen(false)}
+                onConfirm={() => {
+                  void confirmDeleteConfig();
+                }}
+              />
+            </PageLayout.Container>
+          </Flex>
+        </div>
+        <VStack
+          height="100%"
+          maxHeight="100vh"
+          position="absolute"
+          top={0}
+          width={
+            isPaneExpanded && selectedConfigId
+              ? "100%"
+              : panelRef.current?.firstChild?.offsetWidth
+          }
+          right={0}
+          bottom={0}
+        >
+          <PromptConfigPanel
+            ref={panelRef}
+            isOpen={!!selectedConfigId}
+            onClose={closePanel}
+            configId={selectedConfigId ?? ""}
+            isPaneExpanded={isPaneExpanded}
+            setIsPaneExpanded={setIsPaneExpanded}
           />
-        </PageLayout.Container>
-        <PromptConfigPanel
-          isOpen={!!selectedConfigId}
-          onClose={closePanel}
-          configId={selectedConfigId ?? ""}
-        />
-      </Flex>
+        </VStack>
+      </div>
     </DashboardLayout>
   );
 }

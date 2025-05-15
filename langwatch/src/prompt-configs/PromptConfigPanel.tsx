@@ -1,5 +1,11 @@
 import { Text, Spinner, VStack } from "@chakra-ui/react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  forwardRef,
+  type ForwardedRef,
+} from "react";
 import {
   ExecutionInputPanel,
   type ExecuteData,
@@ -24,17 +30,23 @@ interface PromptConfigPanelProps {
   isOpen: boolean;
   onClose: () => void;
   configId: string;
+  isPaneExpanded: boolean;
+  setIsPaneExpanded: (isExpanded: boolean) => void;
 }
 
-export function PromptConfigPanel({
-  isOpen,
-  onClose,
-  configId,
-}: PromptConfigPanelProps) {
+export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
+  {
+    isOpen,
+    onClose,
+    configId,
+    isPaneExpanded: isExpanded,
+    setIsPaneExpanded: setIsExpanded,
+  }: PromptConfigPanelProps,
+  ref: ForwardedRef<HTMLDivElement>
+) {
   // ---- State and hooks ----
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
-  const [isExpanded, setIsExpanded] = useState(true); // Start open
 
   // ---- API calls and data fetching ----
   const {
@@ -117,6 +129,7 @@ export function PromptConfigPanel({
     <InputOutputExecutablePanel
       isExpanded={isExpanded}
       onCloseExpanded={() => setIsExpanded(false)}
+      ref={ref}
     >
       <InputOutputExecutablePanel.LeftDrawer>
         <ExecutionInputPanel fields={inputFields} onExecute={handleExecute} />
@@ -149,4 +162,4 @@ export function PromptConfigPanel({
       </InputOutputExecutablePanel.RightDrawer>
     </InputOutputExecutablePanel>
   );
-}
+});
