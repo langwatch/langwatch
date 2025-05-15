@@ -47,8 +47,6 @@ export const scheduleUsageStats = async () => {
     return;
   }
 
-  console.log({ organizations });
-
   // Create a job for each organization
   await Promise.all(
     organizations.map(async (organization) => {
@@ -64,7 +62,7 @@ export const scheduleUsageStats = async () => {
         {
           jobId: `usage_stats_${instanceId}_${yyyymmdd}`,
           repeat: {
-            pattern: "* * * * *", // Run every minute for testing
+            pattern: "0 0 * * *", // Run at midnight every day
           },
         }
       );

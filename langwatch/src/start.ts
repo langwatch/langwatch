@@ -6,7 +6,7 @@ import type { Duplex } from "stream";
 import { register } from "prom-client";
 import promBundle from "express-prom-bundle";
 import { createLogger } from "./utils/logger";
-import { scheduleUsageStats } from "./server/background/queues/usageStatsQueue";
+import { initializeBackgroundWorkers } from "./server/background/init";
 
 const logger = createLogger("langwatch:start");
 
@@ -176,21 +176,17 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
     process.exit(1);
   });
 
-  server.listen(port, () => {
+  server.listen(port, async () => {
     logger.info(
       { hostname, port, fullUrl: `http://${hostname}:${port}` },
       "LangWatch is ready 🎉"
     );
 
-    // Schedule usage stats collection
-    if (
-      process.env.IS_SAAS != "true" &&
-      process.env.DISABLE_USAGE_STATS != "true"
-    ) {
-      logger.info("Scheduling usage stats collection");
-      void scheduleUsageStats().catch((error) => {
-        logger.error({ error }, "Failed to schedule usage stats collection");
-      });
+    // Initialize background workers
+    try {
+      await initializeBackgroundWorkers();
+    } catch (error) {
+      logger.error({ error }, "Failed to initialize background workers");
     }
   });
 
