@@ -4,11 +4,13 @@ import React, {
   forwardRef,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ForwardedRef,
   type PropsWithChildren,
 } from "react";
+import debounce from "lodash/debounce";
 
 /**
  * Constants
@@ -25,6 +27,16 @@ interface InputOutputExecutablePanelProps {
   children: React.ReactNode;
   isExpanded: boolean;
   onCloseExpanded: () => void;
+}
+
+// Add interface for dimensions
+interface PanelDimensions {
+  containerWidth: number;
+  containerHeight: number;
+  panelWidth: number;
+  halfPanelWidth: number;
+  middlePoint: number;
+  fullPanelHeight: number;
 }
 
 const InputOutputExecutablePanelComponent = forwardRef(
@@ -89,13 +101,59 @@ const InputOutputExecutablePanelComponent = forwardRef(
     const boxRef = useRef<HTMLDivElement>(null);
 
     const MotionDiv = motion.div;
-    const panelWidth = boxRef.current?.offsetWidth ?? 350;
-    const halfPanelWidth = Math.round(panelWidth / 2);
-    const containerWidth = containerRef.current?.offsetWidth ?? 0;
-    const containerHeight = containerRef.current?.offsetHeight ?? 0;
-    const middlePoint = Math.round(containerWidth / 2 - halfPanelWidth);
-    const topPanelHeight = 0;
-    const fullPanelHeight = containerHeight - topPanelHeight - 1; // don't know why -1 is needed but if we don't take it creates a body scrollbar
+
+    // Update initial state to match our minimum values
+    const [dimensions, setDimensions] = useState<PanelDimensions>({
+      containerWidth: window.innerWidth, // Better initial value than 0
+      containerHeight: window.innerHeight,
+      panelWidth: 350,
+      halfPanelWidth: 175,
+      middlePoint: Math.round(window.innerWidth / 2 - 175), // Pre-calculate initial middle point
+      fullPanelHeight: window.innerHeight - 1,
+    });
+
+    useLayoutEffect(() => {
+      const calculateDimensions = () => {
+        if (!containerRef.current || !boxRef.current) return;
+
+        const panelWidth = Math.max(boxRef.current.offsetWidth, 350); // Ensure minimum width
+        const halfPanelWidth = Math.round(panelWidth / 2);
+        const containerWidth = containerRef.current.offsetWidth;
+        const containerHeight = containerRef.current.offsetHeight;
+        const middlePoint = Math.round(containerWidth / 2 - halfPanelWidth);
+        const fullPanelHeight = containerHeight - 1;
+
+        setDimensions({
+          containerWidth,
+          containerHeight,
+          panelWidth,
+          halfPanelWidth,
+          middlePoint,
+          fullPanelHeight,
+        });
+      };
+
+      // Debounced version for resize events
+      const debouncedCalculate = debounce(calculateDimensions, 100);
+
+      // Calculate initial dimensions immediately
+      calculateDimensions();
+
+      // Set up ResizeObserver with debounced calculations
+      const resizeObserver = new ResizeObserver(debouncedCalculate);
+
+      if (containerRef.current) {
+        resizeObserver.observe(containerRef.current);
+      }
+      if (boxRef.current) {
+        resizeObserver.observe(boxRef.current);
+      }
+
+      return () => {
+        resizeObserver.disconnect();
+        debouncedCalculate.cancel(); // Clean up debounce
+      };
+    }, [isExpanded]); // Add isExpanded to deps since it affects layout
 
     return (
       <Box
@@ -111,7 +169,7 @@ const InputOutputExecutablePanelComponent = forwardRef(
           key={motionKey}
           initial={{
             right: 0,
-            height: containerHeight ? `${fullPanelHeight}px` : "100%",
+            height: `${dimensions.fullPanelHeight}px`, // No more ternary needed
             marginTop: 0,
             borderRadius: 0,
             borderTopWidth: 0,
@@ -120,10 +178,8 @@ const InputOutputExecutablePanelComponent = forwardRef(
             boxShadow: "0 0 0 rgba(0,0,0,0)",
           }}
           animate={{
-            right: isExpanded ? `${middlePoint}px` : 0,
-            height: isExpanded
-              ? `${fullPanelHeight - 40}px`
-              : `${fullPanelHeight}px`,
+            right: isExpanded ? `${dimensions.middlePoint}px` : 0,
+            height: `${dimensions.fullPanelHeight - (isExpanded ? 40 : 0)}px`, // Simplified calculation
             marginTop: isExpanded ? "20px" : 0,
             borderRadius: isExpanded ? "8px" : 0,
             borderTopWidth: isExpanded ? "1px" : 0,
@@ -187,7 +243,7 @@ const InputOutputExecutablePanelComponent = forwardRef(
             />
             {/* Left Panel */}
             <Panel
-              width={`calc(50% - ${halfPanelWidth}px)`}
+              width={`calc(50% - ${dimensions.halfPanelWidth}px)`}
               isExpanded={isExpanded}
               onCloseExpanded={onCloseExpanded}
               isLeft={true}
@@ -196,7 +252,7 @@ const InputOutputExecutablePanelComponent = forwardRef(
             </Panel>
             {/* Right Panel */}
             <Panel
-              width={`calc(50% - ${halfPanelWidth}px)`}
+              width={`calc(50% - ${dimensions.halfPanelWidth}px)`}
               isExpanded={isExpanded}
               onCloseExpanded={onCloseExpanded}
               isLeft={false}

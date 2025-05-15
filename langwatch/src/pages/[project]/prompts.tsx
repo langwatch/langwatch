@@ -148,6 +148,12 @@ export default function PromptConfigsPage() {
    * absolutely to the page contents as well as allow for the table to
    * be able to scroll correctly. Please feel free to refactor this
    * if you can come up with a better way!
+   *
+   * Also, there's a chance that this won't work exactly as expected if the
+   * panel changes size independently, but that's an edge case that can be
+   * addressed if it comes up.
+   *
+   * @see https://github.com/langwatch/langwatch/pull/352#discussion_r2091220922
    */
   const panelRef = useRef<HTMLDivElement>(null);
   const centerContentElementRef: HTMLDivElement | null =

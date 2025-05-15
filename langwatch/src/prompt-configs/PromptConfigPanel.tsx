@@ -126,9 +126,16 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
 
   // Debounce the expand/collapse state change to prevent weird animation glitches
   // when changing state mid-animation.
-  const handleExpand = useDebouncedCallback(() => {
-    setIsExpanded((prev) => !prev);
-  }, PANEL_ANIMATION_DURATION * 1000);
+  const handleExpand = useDebouncedCallback(
+    () => {
+      setIsExpanded((prev) => !prev);
+    },
+    PANEL_ANIMATION_DURATION * 1000,
+    {
+      leading: true,
+      trailing: false,
+    }
+  );
 
   // Early return if panel is closed
   if (!isOpen) {
