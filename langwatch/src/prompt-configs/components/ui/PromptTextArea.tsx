@@ -66,18 +66,38 @@ export function PromptTextArea({
         mention.classList.remove("invalid");
       }
     });
-
-    // Sync heights
-    const textarea = textareaRef.current;
-    const box = boxRef.current;
-    if (textarea && box) {
-      box.style.height = textarea.scrollHeight + "px";
-    }
   }, [availableIds]);
 
   useEffect(() => {
     updateInvalidMentions();
   }, [value, availableIds]);
+
+  /**
+   * The MentionsInput doesn't not handle resizing well,
+   * and for some reason, there is no event listener for the resize event
+   * on the textarea it provides.
+   *
+   * This is a hack to force the box to be the same height as the textarea while
+   * the user is resizing the textarea.
+   */
+  useEffect(() => {
+    const resizeHandler = () => {
+      const textarea = textareaRef.current;
+      const box = boxRef.current;
+      if (textarea && box) {
+        box.style.height = textarea.scrollHeight + "px";
+      }
+    };
+
+    const resizeObserver = new ResizeObserver(resizeHandler);
+    if (textareaRef.current) {
+      resizeObserver.observe(textareaRef.current);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
 
   return (
     <>
