@@ -1,8 +1,9 @@
 import { Text, Spinner, VStack } from "@chakra-ui/react";
 import {
+  type Dispatch,
+  type SetStateAction,
   useEffect,
   useMemo,
-  useState,
   forwardRef,
   type ForwardedRef,
 } from "react";
@@ -19,9 +20,13 @@ import {
   promptConfigFormValuesToOptimizationStudioNodeData,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-import { InputOutputExecutablePanel } from "~/components/executable-panel/InputOutputExecutablePanel";
+import {
+  InputOutputExecutablePanel,
+  PANEL_ANIMATION_DURATION,
+} from "~/components/executable-panel/InputOutputExecutablePanel";
 import { useExecutePrompt } from "./hooks/useInvokePrompt";
 import { ExecutionOutputPanel } from "~/components/executable-panel/ExecutionOutputPanel";
+import { useDebouncedCallback } from "use-debounce";
 
 /**
  * Panel for configuring and testing LLM prompts
@@ -31,7 +36,7 @@ interface PromptConfigPanelProps {
   onClose: () => void;
   configId: string;
   isPaneExpanded: boolean;
-  setIsPaneExpanded: (isExpanded: boolean) => void;
+  setIsPaneExpanded: Dispatch<SetStateAction<boolean>>;
 }
 
 export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
@@ -119,6 +124,12 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
     });
   };
 
+  // Debounce the expand/collapse state change to prevent weird animation glitches
+  // when changing state mid-animation.
+  const handleExpand = useDebouncedCallback(() => {
+    setIsExpanded((prev) => !prev);
+  }, PANEL_ANIMATION_DURATION * 1000);
+
   // Early return if panel is closed
   if (!isOpen) {
     return null;
@@ -140,7 +151,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
           <PanelHeader
             title={<Text>Prompt Configuration</Text>}
             onClose={handleClose}
-            onExpand={() => setIsExpanded((prev) => !prev)}
+            onExpand={handleExpand}
           />
           {isLoadingConfig ? (
             <Spinner size="md" />

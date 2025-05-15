@@ -2,6 +2,7 @@ import { Box, VStack, mergeRefs } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import React, {
   forwardRef,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -9,48 +10,46 @@ import React, {
   type PropsWithChildren,
 } from "react";
 
+/**
+ * Constants
+ *
+ * We use these constants so that the parent components know how
+ * to interact with this component
+ */
+export const PANEL_ANIMATION_DURATION = 0.4;
+export const PANEL_ANIMATION_DELAY = 0.1;
+export const CENTER_CONTENT_BOX_ID =
+  "InputOutputExecutablePanel.CenterContent.Box";
+
 interface InputOutputExecutablePanelProps {
   children: React.ReactNode;
   isExpanded: boolean;
   onCloseExpanded: () => void;
 }
 
-export const InputOutputExecutablePanel = forwardRef(
+const InputOutputExecutablePanelComponent = forwardRef(
   function InputOutputExecutablePanel(
     { children, isExpanded, onCloseExpanded }: InputOutputExecutablePanelProps,
     ref: ForwardedRef<HTMLDivElement>
   ) {
-    const { leftDrawer, centerContent, rightDrawer } = React.Children.toArray(
-      children
-    ).reduce(
-      (acc, child) => {
-        if (React.isValidElement(child)) {
-          if (
-            (child.type as React.ComponentType<any>)?.displayName ===
-            "InputOutputExecutablePanel.LeftDrawer"
-          ) {
-            acc.leftDrawer = child;
-          } else if (
-            (child.type as React.ComponentType<any>)?.displayName ===
-            "InputOutputExecutablePanel.CenterContent"
-          ) {
-            acc.centerContent = child;
-          } else if (
-            (child.type as React.ComponentType<any>)?.displayName ===
-            "InputOutputExecutablePanel.RightDrawer"
-          ) {
-            acc.rightDrawer = child;
-          }
-        }
+    let leftDrawer: React.ReactNode | null = null;
+    let centerContent: React.ReactNode | null = null;
+    let rightDrawer: React.ReactNode | null = null;
 
-        return acc;
-      },
-      { leftDrawer: null, centerContent: null, rightDrawer: null } as {
-        leftDrawer: React.ReactNode | null;
-        centerContent: React.ReactNode | null;
-        rightDrawer: React.ReactNode | null;
+    React.Children.forEach(children, (child) => {
+      if (React.isValidElement(child)) {
+        const type = child.type as React.ComponentType<any>;
+        const displayName = type.displayName;
+
+        if (displayName === "InputOutputExecutablePanel.LeftDrawer") {
+          leftDrawer = child;
+        } else if (displayName === "InputOutputExecutablePanel.CenterContent") {
+          centerContent = child;
+        } else if (displayName === "InputOutputExecutablePanel.RightDrawer") {
+          rightDrawer = child;
+        }
       }
-    );
+    });
 
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
@@ -69,8 +68,26 @@ export const InputOutputExecutablePanel = forwardRef(
       };
     }, [isExpanded, onCloseExpanded]);
 
+    /**
+     * This provides a way to cleanly reset the div to its initial state
+     * at the end of the animation. This prevents weird animation glitches
+     * when the panel is closed and reopened with the expanded state.
+     */
+    const [motionKey, setMotionKey] = useState<null | number>(null);
+    const handleAnimationStart = useCallback(() => {
+      if (isExpanded) {
+        setMotionKey(1);
+      }
+    }, [isExpanded, setMotionKey]);
+    const handleAnimationComplete = useCallback(() => {
+      if (!isExpanded) {
+        setMotionKey(null);
+      }
+    }, [isExpanded, setMotionKey]);
+
     const containerRef = useRef<HTMLDivElement>(null);
     const boxRef = useRef<HTMLDivElement>(null);
+
     const MotionDiv = motion.div;
     const panelWidth = boxRef.current?.offsetWidth ?? 350;
     const halfPanelWidth = Math.round(panelWidth / 2);
@@ -79,7 +96,6 @@ export const InputOutputExecutablePanel = forwardRef(
     const middlePoint = Math.round(containerWidth / 2 - halfPanelWidth);
     const topPanelHeight = 0;
     const fullPanelHeight = containerHeight - topPanelHeight - 1; // don't know why -1 is needed but if we don't take it creates a body scrollbar
-    const [key, setKey] = useState<string | null>(null);
 
     return (
       <Box
@@ -92,7 +108,7 @@ export const InputOutputExecutablePanel = forwardRef(
         ref={mergeRefs(ref, containerRef)}
       >
         <MotionDiv
-          key={key}
+          key={motionKey}
           initial={{
             right: 0,
             height: containerHeight ? `${fullPanelHeight}px` : "100%",
@@ -117,7 +133,11 @@ export const InputOutputExecutablePanel = forwardRef(
               ? "0 0 10px rgba(0,0,0,0.1)"
               : "0 0 0 rgba(0,0,0,0)",
           }}
-          transition={{ duration: 0.4, ease: "easeInOut", delay: 0.1 }}
+          transition={{
+            duration: PANEL_ANIMATION_DURATION,
+            ease: "easeInOut",
+            delay: PANEL_ANIMATION_DELAY,
+          }}
           style={{
             position: "absolute",
             top: 0,
@@ -128,18 +148,15 @@ export const InputOutputExecutablePanel = forwardRef(
             zIndex: 100,
             overflowY: "auto",
           }}
-          onAnimationStart={() => {
-            if (isExpanded) {
-              setKey("expanded");
-            }
-          }}
-          onAnimationComplete={() => {
-            if (!isExpanded) {
-              setKey(null);
-            }
-          }}
+          onAnimationStart={handleAnimationStart}
+          onAnimationComplete={handleAnimationComplete}
         >
-          <Box ref={boxRef} width="full" height="full">
+          <Box
+            id="InputOutputExecutablePanel.CenterContent.Box"
+            ref={boxRef}
+            width="full"
+            height="full"
+          >
             <VStack
               align="start"
               gap={6}
@@ -255,31 +272,27 @@ const Panel = ({
   );
 };
 
-type InputOutputExecutablePanelComponent = typeof InputOutputExecutablePanel & {
-  LeftDrawer: React.FC<Required<PropsWithChildren>>;
-  CenterContent: React.FC<Required<PropsWithChildren>>;
-  RightDrawer: React.FC<Required<PropsWithChildren>>;
-};
+type InputOutputExecutablePanelComponent =
+  typeof InputOutputExecutablePanelComponent & {
+    LeftDrawer: React.FC<Required<PropsWithChildren>>;
+    CenterContent: React.FC<Required<PropsWithChildren>>;
+    RightDrawer: React.FC<Required<PropsWithChildren>>;
+  };
 
-(InputOutputExecutablePanel as InputOutputExecutablePanelComponent).LeftDrawer =
-  ({ children }: { children: React.ReactNode }) => children;
+const LeftDrawer = ({ children }: { children: React.ReactNode }) => children;
+LeftDrawer.displayName = "InputOutputExecutablePanel.LeftDrawer";
 
-(
-  InputOutputExecutablePanel as InputOutputExecutablePanelComponent
-).LeftDrawer.displayName = "InputOutputExecutablePanel.LeftDrawer";
+const CenterContent = ({ children }: { children: React.ReactNode }) => children;
+CenterContent.displayName = "InputOutputExecutablePanel.CenterContent";
 
-(
-  InputOutputExecutablePanel as InputOutputExecutablePanelComponent
-).CenterContent = ({ children }: { children: React.ReactNode }) => children;
+const RightDrawer = ({ children }: { children: React.ReactNode }) => children;
+RightDrawer.displayName = "InputOutputExecutablePanel.RightDrawer";
 
-(
-  InputOutputExecutablePanel as InputOutputExecutablePanelComponent
-).CenterContent.displayName = "InputOutputExecutablePanel.CenterContent";
-
-(
-  InputOutputExecutablePanel as InputOutputExecutablePanelComponent
-).RightDrawer = ({ children }: { children: React.ReactNode }) => children;
-
-(
-  InputOutputExecutablePanel as InputOutputExecutablePanelComponent
-).RightDrawer.displayName = "InputOutputExecutablePanel.RightDrawer";
+export const InputOutputExecutablePanel = Object.assign(
+  InputOutputExecutablePanelComponent,
+  {
+    LeftDrawer,
+    CenterContent,
+    RightDrawer,
+  }
+);

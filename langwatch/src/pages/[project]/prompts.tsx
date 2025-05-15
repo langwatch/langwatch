@@ -14,6 +14,7 @@ import {
 } from "~/prompt-configs/PromptConfigTable";
 import { api } from "~/utils/api";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { CENTER_CONTENT_BOX_ID } from "~/components/executable-panel/InputOutputExecutablePanel";
 
 export default function PromptConfigsPage() {
   const utils = api.useContext();
@@ -141,22 +142,30 @@ export default function PromptConfigsPage() {
     });
   }, []);
 
+  /**
+   * NB: The styling and markup of this page is a bit hacky
+   * and complicated because we need to both position the panel
+   * absolutely to the page contents as well as allow for the table to
+   * be able to scroll correctly. Please feel free to refactor this
+   * if you can come up with a better way!
+   */
   const panelRef = useRef<HTMLDivElement>(null);
-
-  console.log(panelRef.current?.firstChild?.offsetWidth);
+  const centerContentElementRef: HTMLDivElement | null =
+    panelRef.current?.querySelector(
+      `#${CENTER_CONTENT_BOX_ID}`
+    ) as HTMLDivElement | null;
 
   return (
     <DashboardLayout position="relative">
+      {/* Main content outer wrapper */}
       <div
-        data-testid="prompt-configs-page"
         style={{
           position: "relative",
           width: "100%",
           height: "100%",
-          flex: 1,
-          overflow: "scroll",
         }}
       >
+        {/* Main content inner wrapper for the table -- allows for scrolling */}
         <div
           style={{
             position: "absolute",
@@ -201,6 +210,8 @@ export default function PromptConfigsPage() {
             </PageLayout.Container>
           </Flex>
         </div>
+
+        {/* Prompt config panel with absolute position wrapper */}
         <VStack
           height="100%"
           maxHeight="100vh"
@@ -209,7 +220,7 @@ export default function PromptConfigsPage() {
           width={
             isPaneExpanded && selectedConfigId
               ? "100%"
-              : panelRef.current?.firstChild?.offsetWidth
+              : centerContentElementRef?.offsetWidth
           }
           right={0}
           bottom={0}
