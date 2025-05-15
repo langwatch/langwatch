@@ -72,11 +72,13 @@ import { RedactedField } from "../ui/RedactedField";
 export interface MessagesTableProps {
   hideExport?: boolean;
   hideTableToggle?: boolean;
+  hideAddToQueue?: boolean;
 }
 
 export function MessagesTable({
   hideExport = false,
   hideTableToggle = false,
+  hideAddToQueue = false,
 }: MessagesTableProps) {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
@@ -1336,51 +1338,53 @@ export function MessagesTable({
             >
               Add to Dataset
             </Button>
-            <Dialog.Root
-              open={dialog.open}
-              onOpenChange={(e) =>
-                e.open ? dialog.onOpen() : dialog.onClose()
-              }
-            >
-              <Dialog.Trigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => dialog.onOpen()}
-                >
-                  Add to Queue
-                </Button>
-              </Dialog.Trigger>
-              <Portal>
-                <Dialog.Backdrop />
+            {!hideAddToQueue && (
+              <Dialog.Root
+                open={dialog.open}
+                onOpenChange={(e) =>
+                  e.open ? dialog.onOpen() : dialog.onClose()
+                }
+              >
+                <Dialog.Trigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => dialog.onOpen()}
+                  >
+                    Add to Queue
+                  </Button>
+                </Dialog.Trigger>
+                <Portal>
+                  <Dialog.Backdrop />
 
-                <Dialog.Content>
-                  <Dialog.Header>
-                    <Dialog.Title>Add to Queue</Dialog.Title>
-                  </Dialog.Header>
-                  <Dialog.Body>
-                    <Dialog.Description mb="4">
-                      Add selected traces to an annotation queue
-                    </Dialog.Description>
-                    <AddParticipants
-                      annotators={annotators}
-                      setAnnotators={setAnnotators}
-                      queueDrawerOpen={queueDrawerOpen}
-                      sendToQueue={sendToQueue}
-                      isLoading={queueItem.isLoading}
-                    />
-                  </Dialog.Body>
+                  <Dialog.Content>
+                    <Dialog.Header>
+                      <Dialog.Title>Add to Queue</Dialog.Title>
+                    </Dialog.Header>
+                    <Dialog.Body>
+                      <Dialog.Description mb="4">
+                        Add selected traces to an annotation queue
+                      </Dialog.Description>
+                      <AddParticipants
+                        annotators={annotators}
+                        setAnnotators={setAnnotators}
+                        queueDrawerOpen={queueDrawerOpen}
+                        sendToQueue={sendToQueue}
+                        isLoading={queueItem.isLoading}
+                      />
+                    </Dialog.Body>
 
-                  <Dialog.CloseTrigger asChild>
-                    <CloseButton size="sm" onClick={() => dialog.onClose()} />
-                  </Dialog.CloseTrigger>
-                </Dialog.Content>
-                <AddAnnotationQueueDrawer
-                  open={queueDrawerOpen.open}
-                  onClose={queueDrawerOpen.onClose}
-                />
-              </Portal>
-            </Dialog.Root>
+                    <Dialog.CloseTrigger asChild>
+                      <CloseButton size="sm" onClick={() => dialog.onClose()} />
+                    </Dialog.CloseTrigger>
+                  </Dialog.Content>
+                  <AddAnnotationQueueDrawer
+                    open={queueDrawerOpen.open}
+                    onClose={queueDrawerOpen.onClose}
+                  />
+                </Portal>
+              </Dialog.Root>
+            )}
           </HStack>
         </Box>
       )}

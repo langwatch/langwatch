@@ -7,7 +7,7 @@ function ImportFromProductionComponent() {
       <Card.Root width="full">
         <Card.Body width="full" paddingBottom={6}>
           <Box width="full" position="relative">
-            <MessagesTable hideTableToggle hideExport />
+            <MessagesTable hideTableToggle hideExport hideAddToQueue />
           </Box>
         </Card.Body>
       </Card.Root>
