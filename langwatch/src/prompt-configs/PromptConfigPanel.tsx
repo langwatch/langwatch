@@ -34,7 +34,7 @@ export function PromptConfigPanel({
   // ---- State and hooks ----
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true); // Start open
 
   // ---- API calls and data fetching ----
   const {
@@ -81,8 +81,12 @@ export function PromptConfigPanel({
   }, [configId, formProps.methods, initialConfigValues]);
 
   const handleClose = () => {
-    setIsExpanded(false);
-    onClose();
+    if (isExpanded) {
+      setIsExpanded(false);
+    } else {
+      onClose();
+      setIsExpanded(true); // Reset to open state for next time
+    }
   };
 
   // Handle prompt execution with current form data and inputs
