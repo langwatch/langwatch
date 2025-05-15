@@ -112,7 +112,6 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
         onExecute={onExecute}
         title="Inputs"
         buttonText="Execute"
-        initialValues={inputs}
       />
     </Box>
   );
