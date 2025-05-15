@@ -62,6 +62,8 @@ export const env = createEnv({
     AZURE_CLIENT_ID: z.string().optional(),
     AZURE_CLIENT_SECRET: z.string().optional(),
     AZURE_TENANT_ID: z.string().optional(),
+    POSTHOG_KEY: z.string().optional(),
+    POSTHOG_HOST: z.string().optional(),
   },
 
   /**
@@ -134,6 +136,8 @@ export const env = createEnv({
     AZURE_CLIENT_ID: process.env.AZURE_CLIENT_ID,
     AZURE_CLIENT_SECRET: process.env.AZURE_CLIENT_SECRET,
     AZURE_TENANT_ID: process.env.AZURE_TENANT_ID,
+    POSTHOG_KEY: process.env.POSTHOG_KEY,
+    POSTHOG_HOST: process.env.POSTHOG_HOST,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

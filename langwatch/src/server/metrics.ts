@@ -69,7 +69,9 @@ type JobType =
   | "collector_check_and_adjust"
   | "evaluation"
   | "track_event"
-  | "topic_clustering";
+  | "topic_clustering"
+  | "usage_stats";
+
 type JobStatus = "processing" | "completed" | "failed";
 
 // Create a namespace for job processing counters

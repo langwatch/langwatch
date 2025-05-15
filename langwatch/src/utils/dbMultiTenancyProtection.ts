@@ -22,6 +22,10 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   const action = params.action;
   const model = params.model;
 
+  if (action === "count") {
+    return;
+  }
+
   if (
     (action === "findFirst" || action === "findUnique") &&
     model === "PublicShare" &&

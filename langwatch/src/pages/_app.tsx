@@ -23,6 +23,10 @@ import { dependencies } from "../injection/dependencies.client";
 import { Toaster } from "../components/ui/toaster";
 import { colorSystem } from "../components/ui/color-mode";
 
+import posthog from "posthog-js";
+import { Router } from "next/router";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const system = createSystem(defaultConfig, {
@@ -520,6 +524,7 @@ const LangWatch: AppType<{
   injected?: string | undefined;
 }> = ({ Component, pageProps: { session, ...pageProps } }) => {
   const router = useRouter();
+  const publicEnv = usePublicEnv();
 
   const [previousFeatureFlagQueryParams, setPreviousFeatureFlagQueryParams] =
     useState<{ key: string; value: string }[]>([]);
@@ -585,6 +590,31 @@ const LangWatch: AppType<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
+  useEffect(() => {
+    if (!publicEnv.data) return;
+
+    const posthogKey = publicEnv.data?.POSTHOG_KEY;
+    const posthogHost = publicEnv.data?.POSTHOG_HOST;
+
+    if (posthogKey) {
+      posthog.init(posthogKey, {
+        api_host: posthogHost ?? "https://eu.i.posthog.com",
+        person_profiles: "always",
+        loaded: (posthog) => {
+          if (publicEnv.data?.NODE_ENV === "development") posthog.debug();
+        },
+      });
+
+      const handleRouteChange = () => posthog?.capture("$pageview");
+
+      Router.events.on("routeChangeComplete", handleRouteChange);
+
+      return () => {
+        Router.events.off("routeChangeComplete", handleRouteChange);
+      };
+    }
+  }, [publicEnv.data]);
+
   return (
     <SessionProvider
       session={session}
@@ -595,7 +625,13 @@ const LangWatch: AppType<{
         <Head>
           <title>LangWatch</title>
         </Head>
-        <Component {...pageProps} />
+        {publicEnv.data?.PUBLIC_POSTHOG_KEY ? (
+          <PostHogProvider client={posthog}>
+            <Component {...pageProps} />
+          </PostHogProvider>
+        ) : (
+          <Component {...pageProps} />
+        )}
         <Toaster />
 
         {dependencies.ExtraFooterComponents && (

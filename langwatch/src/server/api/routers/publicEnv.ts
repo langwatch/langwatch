@@ -19,6 +19,8 @@ export const publicEnvRouter = publicProcedure
         !!env.SENDGRID_API_KEY || !!(env.USE_AWS_SES && env.AWS_REGION),
       IS_SAAS: env.IS_SAAS,
       IS_ATLA_DEFAULT_JUDGE: shouldUseAtlaModelForJudges(),
+      POSTHOG_KEY: env.POSTHOG_KEY,
+      POSTHOG_HOST: env.POSTHOG_HOST,
     };
 
     return publicEnvVars;
