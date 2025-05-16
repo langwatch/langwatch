@@ -92,7 +92,9 @@ export function EvaluationStatusItem({
                   {check.details && (
                     <HStack align="start">
                       <Text>Details:</Text>
-                      <Text color={color}>{check.details}</Text>
+                      <Text color={color}>
+                        <pre>{check.details}</pre>
+                      </Text>
                     </HStack>
                   )}
                 </VStack>
