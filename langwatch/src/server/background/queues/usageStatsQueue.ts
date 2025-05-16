@@ -62,7 +62,7 @@ export const scheduleUsageStats = async () => {
         {
           jobId: `usage_stats_${instanceId}_${yyyymmdd}`,
           repeat: {
-            pattern: "0 0 * * *", // Run at midnight every day
+            pattern: "0 12 * * *", // Run at noon every day
           },
         }
       );
