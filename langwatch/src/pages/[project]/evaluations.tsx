@@ -1,7 +1,6 @@
 import {
   Badge,
   Box,
-  Button,
   Card,
   Container,
   EmptyState,
@@ -16,7 +15,7 @@ import {
 } from "@chakra-ui/react";
 import type { ExperimentType } from "@prisma/client";
 import { useRouter } from "next/router";
-import { MoreVertical, Plus } from "react-feather";
+import { MoreVertical } from "react-feather";
 import {
   LuCircleCheckBig,
   LuCircleX,
@@ -39,6 +38,7 @@ import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
+import { NewEvaluationButton } from "~/components/evaluations/NewEvaluationsButton";
 
 export default function EvaluationsV2() {
   const { project, hasTeamPermission } = useOrganizationTeamProject();
@@ -133,13 +133,7 @@ export default function EvaluationsV2() {
             </VStack>
             <Spacer />
             <HStack gap={2}>
-              {hasTeamPermission(TeamRoleGroup.GUARDRAILS_MANAGE) && (
-                <Link asChild href={`/${project.slug}/evaluations/wizard`}>
-                  <Button colorPalette="orange">
-                    <Plus size={16} /> New Evaluation
-                  </Button>
-                </Link>
-              )}
+              <NewEvaluationButton />
             </HStack>
           </HStack>
 
