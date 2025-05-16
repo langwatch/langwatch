@@ -620,11 +620,14 @@ function CustomGraphForm({
               <NativeSelect.Root>
                 <NativeSelect.Field {...field}>
                   <option value="full">Full Period</option>
-                  <option value="1">Daily</option>
-                  <option value="7">7 days</option>
-                  <option value="30">30 days</option>
-                  <option value="90">90 days</option>
-                  <option value="365">365 days</option>
+                  <option value="10">10 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="60">1 hour</option>
+                  <option value="1440">Daily</option>
+                  <option value="10080">7 days</option>
+                  <option value="43200">30 days</option>
+                  <option value="129600">90 days</option>
+                  <option value="525600">365 days</option>
                 </NativeSelect.Field>
                 <NativeSelect.Indicator />
               </NativeSelect.Root>

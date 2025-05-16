@@ -17,8 +17,15 @@ export const currentVsPreviousDates = (
 ) => {
   const startDate = new Date(input.startDate);
   const endDate = new Date(input.endDate);
+
+  // Convert period from minutes to days if it's a number
+  const periodInDays =
+    typeof period === "number"
+      ? period / (24 * 60) // Convert minutes to days
+      : 1;
+
   const daysDifference = Math.max(
-    typeof period === "number" ? period : 1,
+    periodInDays,
     getDaysDifference(startDate, endDate)
   );
   const previousPeriodStartDate = addDays(startDate, -daysDifference);
