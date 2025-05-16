@@ -240,6 +240,16 @@ export const datasetRouter = createTRPCRouter({
         data: { mapping },
       });
     }),
+  /**
+   * Find next available name for a dataset, given proposed name
+   */
+  findNextName: protectedProcedure
+    .input(z.object({ projectId: z.string(), proposedName: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
+    .query(async ({ input }) => {
+      const { projectId, proposedName } = input;
+      return await findNextName(projectId, proposedName);
+    }),
 });
 
 const findNextDatasetNameForExperiment = async (
