@@ -44,10 +44,15 @@ export async function fetchSSE<T>({
   // Create abort controller for manual termination
   const controller = new AbortController();
 
-  // Set timeout to prevent hanging connections
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, timeout);
+  // Set resetable timeout to prevent hanging connections
+  // between messages
+  let timeoutId: NodeJS.Timeout | undefined;
+  const setResetableTimeout = () => {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      controller.abort();
+    }, timeout);
+  };
 
   try {
     await fetchEventSource(endpoint, {
@@ -62,7 +67,8 @@ export async function fetchSSE<T>({
 
       // Validate the response when the connection is established
       async onopen(response) {
-        clearTimeout(timeoutId);
+        setResetableTimeout();
+        let error: FatalError | RetriableError | undefined;
 
         if (
           response.ok &&
@@ -92,12 +98,19 @@ export async function fetchSSE<T>({
               "Failed to parse error response as JSON"
             );
           }
-          throw new FatalError(errorMessage);
+
+          error = new FatalError(errorMessage);
         } else {
           // Server errors might be temporary, mark as retriable
-          throw new RetriableError(
+          error = new RetriableError(
             `Server error: ${response.status} ${response.statusText}`
           );
+        }
+
+        if (onError) {
+          onError(error);
+        } else {
+          throw error;
         }
       },
 
@@ -105,7 +118,7 @@ export async function fetchSSE<T>({
       onmessage(ev) {
         try {
           // Reset the timeout on each message
-          clearTimeout(timeoutId);
+          setResetableTimeout();
 
           const event = JSON.parse(ev.data) as T;
           logger.debug({ event }, "Received server event");
@@ -114,7 +127,8 @@ export async function fetchSSE<T>({
           onEvent(event);
 
           // Check if we should stop processing
-          if (shouldStopProcessing && shouldStopProcessing(event)) {
+          if (shouldStopProcessing?.(event)) {
+            console.log("Stopping processing", controller);
             controller.abort();
           }
         } catch (error) {
@@ -149,7 +163,7 @@ export async function fetchSSE<T>({
     });
   } catch (error) {
     // Handle errors from the fetchEventSource
-    clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
 
     if (onError) {
       onError(error instanceof Error ? error : new Error(String(error)));
