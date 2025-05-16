@@ -73,12 +73,14 @@ export interface MessagesTableProps {
   hideExport?: boolean;
   hideTableToggle?: boolean;
   hideAddToQueue?: boolean;
+  hideAnalyticsToggle?: boolean;
 }
 
 export function MessagesTable({
   hideExport = false,
   hideTableToggle = false,
   hideAddToQueue = false,
+  hideAnalyticsToggle = false,
 }: MessagesTableProps) {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
@@ -1034,7 +1036,7 @@ export function MessagesTable({
             <Heading as="h1" size="lg" paddingTop={1}>
               Messages
             </Heading>
-            <ToggleAnalytics />
+            {!hideAnalyticsToggle && <ToggleAnalytics />}
             <Tooltip content="Refresh">
               <Button
                 variant="outline"
