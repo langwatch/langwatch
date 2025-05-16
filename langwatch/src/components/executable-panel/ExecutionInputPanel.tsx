@@ -1,5 +1,4 @@
 import {
-  Box,
   Button,
   Field,
   Heading,
@@ -7,7 +6,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback } from "react";
 import { Play } from "react-feather";
 import { useForm, type FieldError } from "react-hook-form";
 import { HorizontalFormControl } from "../HorizontalFormControl";
@@ -27,41 +26,19 @@ type InputPanelProps = {
   onExecute: (inputs: ExecuteData) => void;
   title?: string;
   buttonText?: string;
-  initialValues?: Record<string, any>;
 };
 
 export const ExecutionInputPanel = ({
-  fields,
+  fields = [],
   onExecute,
   title = "Inputs",
   buttonText = "Execute",
-  initialValues = {},
 }: InputPanelProps) => {
-  const inputs = useMemo(() => {
-    return Object.fromEntries(
-      fields.map((field) => [
-        field.identifier,
-        field.value ?? initialValues[field.identifier] ?? "",
-      ])
-    );
-  }, [fields, initialValues]);
-
-  const defaultValues = useMemo(() => {
-    return Object.fromEntries(
-      Object.entries(inputs).map(([key, value]) => [
-        key,
-        typeof value === "object" ? JSON.stringify(value) : value ?? "",
-      ])
-    );
-  }, [inputs]);
-
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-    reset,
   } = useForm<Record<string, string>>({
-    defaultValues,
     resolver: (values) => {
       const response: {
         values: Record<string, string>;
@@ -89,10 +66,6 @@ export const ExecutionInputPanel = ({
       return response;
     },
   });
-
-  useEffect(() => {
-    reset(defaultValues);
-  }, [JSON.stringify(defaultValues)]);
 
   const onSubmit = useCallback(
     (data: Record<string, string>) => {

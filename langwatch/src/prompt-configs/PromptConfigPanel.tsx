@@ -1,5 +1,12 @@
 import { Text, Spinner, VStack } from "@chakra-ui/react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  type Dispatch,
+  type SetStateAction,
+  useEffect,
+  useMemo,
+  forwardRef,
+  type ForwardedRef,
+} from "react";
 import {
   ExecutionInputPanel,
   type ExecuteData,
@@ -13,9 +20,13 @@ import {
   promptConfigFormValuesToOptimizationStudioNodeData,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-import { InputOutputExecutablePanel } from "~/components/executable-panel/InputOutputExecutablePanel";
+import {
+  InputOutputExecutablePanel,
+  PANEL_ANIMATION_DURATION,
+} from "~/components/executable-panel/InputOutputExecutablePanel";
 import { useExecutePrompt } from "./hooks/useInvokePrompt";
 import { ExecutionOutputPanel } from "~/components/executable-panel/ExecutionOutputPanel";
+import { useDebouncedCallback } from "use-debounce";
 
 /**
  * Panel for configuring and testing LLM prompts
@@ -24,17 +35,23 @@ interface PromptConfigPanelProps {
   isOpen: boolean;
   onClose: () => void;
   configId: string;
+  isPaneExpanded: boolean;
+  setIsPaneExpanded: Dispatch<SetStateAction<boolean>>;
 }
 
-export function PromptConfigPanel({
-  isOpen,
-  onClose,
-  configId,
-}: PromptConfigPanelProps) {
+export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
+  {
+    isOpen,
+    onClose,
+    configId,
+    isPaneExpanded: isExpanded,
+    setIsPaneExpanded: setIsExpanded,
+  }: PromptConfigPanelProps,
+  ref: ForwardedRef<HTMLDivElement>
+) {
   // ---- State and hooks ----
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
-  const [isExpanded, setIsExpanded] = useState(false);
 
   // ---- API calls and data fetching ----
   const {
@@ -81,8 +98,12 @@ export function PromptConfigPanel({
   }, [configId, formProps.methods, initialConfigValues]);
 
   const handleClose = () => {
-    setIsExpanded(false);
-    onClose();
+    if (isExpanded) {
+      setIsExpanded(false);
+    } else {
+      onClose();
+      setIsExpanded(true); // Reset to open state for next time
+    }
   };
 
   // Handle prompt execution with current form data and inputs
@@ -103,6 +124,19 @@ export function PromptConfigPanel({
     });
   };
 
+  // Debounce the expand/collapse state change to prevent weird animation glitches
+  // when changing state mid-animation.
+  const handleExpand = useDebouncedCallback(
+    () => {
+      setIsExpanded((prev) => !prev);
+    },
+    PANEL_ANIMATION_DURATION * 1000,
+    {
+      leading: true,
+      trailing: false,
+    }
+  );
+
   // Early return if panel is closed
   if (!isOpen) {
     return null;
@@ -113,6 +147,7 @@ export function PromptConfigPanel({
     <InputOutputExecutablePanel
       isExpanded={isExpanded}
       onCloseExpanded={() => setIsExpanded(false)}
+      ref={ref}
     >
       <InputOutputExecutablePanel.LeftDrawer>
         <ExecutionInputPanel fields={inputFields} onExecute={handleExecute} />
@@ -123,7 +158,7 @@ export function PromptConfigPanel({
           <PanelHeader
             title={<Text>Prompt Configuration</Text>}
             onClose={handleClose}
-            onExpand={() => setIsExpanded((prev) => !prev)}
+            onExpand={handleExpand}
           />
           {isLoadingConfig ? (
             <Spinner size="md" />
@@ -145,4 +180,4 @@ export function PromptConfigPanel({
       </InputOutputExecutablePanel.RightDrawer>
     </InputOutputExecutablePanel>
   );
-}
+});

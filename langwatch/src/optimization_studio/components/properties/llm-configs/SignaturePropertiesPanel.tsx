@@ -25,10 +25,7 @@ import {
   InputsFieldGroup,
   OutputsFieldGroup,
 } from "~/prompt-configs/forms/fields/PromptConfigVersionFieldGroup";
-import {
-  PromptField,
-  type PromptTextAreaOnAddMention,
-} from "~/prompt-configs/forms/fields/PromptField";
+import { PromptField } from "~/prompt-configs/forms/fields/PromptField";
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import {
   usePromptConfigForm,
@@ -46,6 +43,7 @@ import { api } from "~/utils/api";
 import { PromptMessagesField } from "../../../../prompt-configs/forms/fields/PromptMessagesField";
 import { useShallow } from "zustand/react/shallow";
 import { useWizardContext } from "../../../../components/evaluations/wizard/hooks/useWizardContext";
+import type { PromptTextAreaOnAddMention } from "~/prompt-configs/components/ui/PromptTextArea";
 
 /**
  * Properties panel for the Signature node in the optimization studio.
