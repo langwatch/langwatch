@@ -35,7 +35,8 @@ export function NewEvaluationButton() {
 
   const handleOnClick = () => {
     // If there's a draft, ask if the user wants to continue with it
-    if (isLastExperimentADraft) {
+    // If there's no slug, we can't continue anyway, so just open the new evaluation
+    if (isLastExperimentADraft && !!lastExperiment?.slug) {
       openDialog();
     } else {
       openNewEvaluation();
