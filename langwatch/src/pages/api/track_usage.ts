@@ -1,5 +1,6 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { posthog } from "~/server/posthog";
+import * as Sentry from "@sentry/node";
 
 export default async function handler(
   req: NextApiRequest,
@@ -18,7 +19,7 @@ export default async function handler(
       });
     }
   } catch (error) {
-    console.error("PostHog capture failed:", error);
+    Sentry.captureException(error);
   }
 
   res.status(200).json({ message: "Event captured" });
