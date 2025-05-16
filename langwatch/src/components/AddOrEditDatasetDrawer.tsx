@@ -142,6 +142,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!props.open]);
 
+  const trpc = api.useContext();
   const onSubmit = (data: DatasetRecordForm) => {
     upsertDataset.mutate(
       {
@@ -186,6 +187,8 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
           });
           reset();
           onClose();
+          // Refetch the datasets to get the latest data
+          trpc.dataset.getAll.invalidate();
         },
         onError: (error) => {
           toaster.create({

@@ -1,23 +1,14 @@
 import {
   Accordion,
-  Button,
   Grid,
   Heading,
-  HStack,
-  Input,
   RadioCard,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useState } from "react";
-import {
-  Database,
-  FilePlus,
-  FileText,
-  Folder,
-  UploadCloud,
-} from "react-feather";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Database, FilePlus, FileText, UploadCloud } from "react-feather";
 import {
   DATA_SOURCE_TYPES,
   useEvaluationWizardStore,
@@ -26,23 +17,28 @@ import {
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { StepRadio } from "../components/StepButton";
-import { OverflownTextWithTooltip } from "../../../OverflownText";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { StepAccordion } from "../components/StepAccordion";
 import { useAnimatedFocusElementById } from "../../../../hooks/useAnimatedFocusElementById";
 import { InlineUploadCSVForm } from "~/components/datasets/UploadCSVModal";
 import { toaster } from "../../../ui/toaster";
 import { useShallow } from "zustand/react/shallow";
-import { LuBot, LuSparkles } from "react-icons/lu";
 import { DatasetGeneration } from "./datasets/DatasetGeneration";
+import { useSelectedDataSetId } from "~/hooks/useSelectedDataSetId";
+import { DatasetFromProductionConfiguration } from "./datasets/DatasetFromProductionConfiguration";
+import { DatasetRadioCard } from "../components/DatasetRadioCard";
 
 export function DatasetStep() {
+  const { clear: clearSelectedDataSetId, selectedDataSetId } =
+    useSelectedDataSetId();
+
   const {
     experimentId,
     setWizardState,
     wizardState,
     setDatasetId,
     getDatasetId,
+    clearDatasetId,
   } = useEvaluationWizardStore(
     useShallow(
       ({
@@ -51,12 +47,14 @@ export function DatasetStep() {
         wizardState,
         setDatasetId,
         getDatasetId,
+        clearDatasetId,
       }) => ({
         experimentId,
         setWizardState,
         wizardState,
         setDatasetId,
         getDatasetId,
+        clearDatasetId,
       })
     )
   );
@@ -70,6 +68,10 @@ export function DatasetStep() {
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project }
+  );
+  const selectedDataset = useMemo(
+    () => datasets.data?.find((d) => d.id === selectedDataSetId),
+    [datasets.data, selectedDataSetId]
   );
 
   const upsertDataset = api.dataset.upsert.useMutation();
@@ -86,15 +88,18 @@ export function DatasetStep() {
 
   const focusElementById = useAnimatedFocusElementById();
 
-  const handleDatasetSelect = (datasetId: string) => {
-    const dataset = datasets.data?.find((d) => d.id === datasetId);
-    if (!dataset) {
-      return;
-    }
-    setDatasetId(datasetId, dataset.columnTypes as DatasetColumns);
+  const handleDatasetSelect = useCallback(
+    (datasetId: string) => {
+      const dataset = datasets.data?.find((d) => d.id === datasetId);
+      if (!dataset) {
+        return;
+      }
+      setDatasetId(datasetId, dataset.columnTypes as DatasetColumns);
 
-    focusElementById("js-next-step-button");
-  };
+      focusElementById("js-next-step-button");
+    },
+    [datasets.data, focusElementById, setDatasetId]
+  );
 
   const handleContinue = (
     dataSource: "from_production" | "manual" | "upload"
@@ -182,6 +187,12 @@ export function DatasetStep() {
     setDatasetId,
     handleDataSourceSelect,
   ]);
+
+  useEffect(() => {
+    if (selectedDataSetId) {
+      handleDatasetSelect(selectedDataSetId);
+    }
+  }, [selectedDataSetId, handleDatasetSelect]);
 
   return (
     <VStack width="full" align="start" gap={4}>
@@ -271,8 +282,13 @@ export function DatasetStep() {
                 description="Import tracing data from production to test the evaluator"
                 _icon={{ color: "blue.400" }}
                 icon={<FileText />}
-                disabled
-                onClick={() => handleDataSourceSelect("from_production")}
+                onClick={() => {
+                  // Makes sure the dataset id is not selected
+                  // so we can create a new one from the production data
+                  clearSelectedDataSetId();
+                  clearDatasetId();
+                  handleDataSourceSelect("from_production");
+                }}
               />
             </RadioCard.Root>
           </StepAccordion>
@@ -313,41 +329,11 @@ export function DatasetStep() {
                   >
                     <Grid width="full" templateColumns="repeat(2, 1fr)" gap={3}>
                       {datasets.data?.map((dataset) => (
-                        <RadioCard.Item
+                        <DatasetRadioCard
                           key={dataset.id}
-                          value={dataset.id}
-                          width="full"
-                          minWidth={0}
-                          onClick={() => handleDatasetSelect(dataset.id)}
-                          _active={{ background: "blue.50" }}
-                        >
-                          <RadioCard.ItemHiddenInput />
-                          <RadioCard.ItemControl cursor="pointer" width="full">
-                            <RadioCard.ItemContent width="full">
-                              <VStack
-                                align="start"
-                                gap={3}
-                                _icon={{ color: "blue.300" }}
-                                width="full"
-                              >
-                                <Folder size={18} />
-                                <VStack align="start" gap={0} width="full">
-                                  <OverflownTextWithTooltip wordBreak="break-all">
-                                    {dataset.name}
-                                  </OverflownTextWithTooltip>
-                                  <Text
-                                    fontSize="xs"
-                                    color="gray.500"
-                                    fontWeight="normal"
-                                  >
-                                    {dataset._count.datasetRecords} entries
-                                  </Text>
-                                </VStack>
-                              </VStack>
-                            </RadioCard.ItemContent>
-                            <RadioCard.ItemIndicator />
-                          </RadioCard.ItemControl>
-                        </RadioCard.Item>
+                          dataset={dataset}
+                          handleDatasetSelect={handleDatasetSelect}
+                        />
                       ))}
                     </Grid>
                   </RadioCard.Root>
@@ -355,15 +341,7 @@ export function DatasetStep() {
               )}
 
               {wizardState.dataSource === "from_production" && (
-                <VStack width="full" align="start" gap={3}>
-                  <Text>Configure import from production settings</Text>
-                  <Button
-                    colorPalette="blue"
-                    onClick={() => handleContinue("from_production")}
-                  >
-                    Continue with Production Data
-                  </Button>
-                </VStack>
+                <DatasetFromProductionConfiguration dataset={selectedDataset} />
               )}
 
               {wizardState.dataSource === "manual" && <DatasetGeneration />}

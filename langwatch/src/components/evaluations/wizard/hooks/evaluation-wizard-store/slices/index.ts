@@ -14,12 +14,14 @@ import {
   createCodeExecutionSlice,
   type CodeExecutionSlice,
 } from "./codeExecutionSlice";
+import { createDatasetSlice, type DatasetSlice } from "./datasetSlice";
 
 export type EvaluationWizardSlicesUnion = BaseNodeSlice &
   LlmSignatureNodeSlice &
   EvaluatorNodeSlice &
   ExecutorSlice &
-  CodeExecutionSlice;
+  CodeExecutionSlice &
+  DatasetSlice;
 
 export const createEvaluationWizardSlicesStore: StateCreator<
   EvaluationWizardStore & EvaluationWizardSlicesUnion,
@@ -32,4 +34,5 @@ export const createEvaluationWizardSlicesStore: StateCreator<
   ...createEvaluatorNodeSlice(...args),
   ...createExecutorSlice(...args),
   ...createCodeExecutionSlice(...args),
+  ...createDatasetSlice(...args),
 });

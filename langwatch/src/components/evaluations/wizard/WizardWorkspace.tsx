@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Card,
-  HStack,
-  Spacer,
-  Tabs,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Card, HStack, Tabs, VStack } from "@chakra-ui/react";
 import { DatasetTable } from "../../datasets/DatasetTable";
 import {
   useEvaluationWizardStore,
@@ -26,6 +18,7 @@ import { toaster } from "../../ui/toaster";
 import { Link } from "../../ui/link";
 import { LuArrowUpRight } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { ImportFromProduction } from "./components/ImportFromProduction";
 
 export const WizardWorkspace = memo(function WizardWorkspace() {
   const {
@@ -39,8 +32,10 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
     hasWorkflow,
     hasCodeImplementation,
     setDatasetGridRef,
+    dataSource,
   } = useEvaluationWizardStore(
     useShallow((state) => ({
+      dataSource: state.wizardState.dataSource,
       getDatasetId: state.getDatasetId,
       workspaceTab: state.wizardState.workspaceTab,
       setWizardState: state.setWizardState,
@@ -83,6 +78,16 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
       ? firstAvailableTab
       : workspaceTab_;
 
+  /* This is a special case where we show the import
+   * from production window without any tabs => once they've created
+   * a dataset, we show the dataset tab and switch the source to
+   * "from_dataset"
+   */
+  const showImportFromProduction =
+    !hasDataset && dataSource === "from_production";
+  const showWorkspace =
+    (hasDataset || hasWorkflow || hasResults) && !showImportFromProduction;
+
   return (
     <VStack
       background="url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiBmaWxsPSIjRjJGNEY4Ii8+CjxyZWN0IHg9IjE0IiB5PSIxNCIgd2lkdGg9IjIiIGhlaWdodD0iMiIgZmlsbD0iI0U1RTdFQiIvPgo8L3N2Zz4K)"
@@ -98,7 +103,8 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
       gap={0}
       borderRadius="8px 0 0 0"
     >
-      {(hasDataset || hasWorkflow || hasResults) && (
+      {showImportFromProduction && <ImportFromProduction />}
+      {showWorkspace && (
         <Tabs.Root
           width="full"
           height="full"
