@@ -18,7 +18,7 @@ import type { ExecutionState } from "~/optimization_studio/types/dsl";
 
 interface OutputPanelProps {
   executionState?: ExecutionState;
-  isTracingEnabled: boolean;
+  isTracingEnabled?: boolean;
   nodeType?: string;
 }
 
@@ -28,7 +28,7 @@ interface OutputPanelProps {
  */
 export const ExecutionOutputPanel = ({
   executionState,
-  isTracingEnabled,
+  isTracingEnabled = false,
   nodeType,
 }: OutputPanelProps) => {
   const [isWaitingLong] = useDebounceValue(
