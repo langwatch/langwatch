@@ -12,7 +12,7 @@ const logger = createLogger("useInvokePrompt");
  * This hook wraps the invokeLLM utility function in a mutation,
  * providing loading states, error handling, and cache management.
  */
-export function useExecutePrompt() {
+export function useInvokePrompt() {
   return useMutation<
     PromptExecutionResult,
     Error,

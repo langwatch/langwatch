@@ -25,6 +25,8 @@ import {
   PANEL_ANIMATION_DURATION,
 } from "~/components/executable-panel/InputOutputExecutablePanel";
 import { useExecutePrompt } from "./hooks/useInvokePrompt";
+import { InputOutputExecutablePanel } from "~/components/executable-panel/InputOutputExecutablePanel";
+import { useInvokePrompt } from "./hooks/useInvokePrompt";
 import { ExecutionOutputPanel } from "~/components/executable-panel/ExecutionOutputPanel";
 import { useDebouncedCallback } from "use-debounce";
 
@@ -58,7 +60,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
     mutate: invokeLLM,
     isLoading: isExecuting,
     data: promptExecutionResult,
-  } = useExecutePrompt();
+  } = useInvokePrompt();
 
   // Fetch the LLM configuration
   const { data: llmConfig, isLoading: isLoadingConfig } =
