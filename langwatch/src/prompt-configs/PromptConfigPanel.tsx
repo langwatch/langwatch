@@ -24,8 +24,6 @@ import {
   InputOutputExecutablePanel,
   PANEL_ANIMATION_DURATION,
 } from "~/components/executable-panel/InputOutputExecutablePanel";
-import { useExecutePrompt } from "./hooks/useInvokePrompt";
-import { InputOutputExecutablePanel } from "~/components/executable-panel/InputOutputExecutablePanel";
 import { useInvokePrompt } from "./hooks/useInvokePrompt";
 import { ExecutionOutputPanel } from "~/components/executable-panel/ExecutionOutputPanel";
 import { useDebouncedCallback } from "use-debounce";
@@ -172,12 +170,12 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
 
       <InputOutputExecutablePanel.RightDrawer>
         <ExecutionOutputPanel
+          isTracingEnabled={true}
           executionState={
             isExecuting
               ? { status: "running" }
               : promptExecutionResult?.executionState
           }
-          isTracingEnabled={false}
         />
       </InputOutputExecutablePanel.RightDrawer>
     </InputOutputExecutablePanel>
