@@ -773,7 +773,7 @@ export const experimentsRouter = createTRPCRouter({
    */
   getLastExperiment: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
     .query(async ({ input }) => {
       const experiment = await prisma.experiment.findFirst({
         where: { projectId: input.projectId },
