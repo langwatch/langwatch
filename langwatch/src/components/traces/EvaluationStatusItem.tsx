@@ -9,7 +9,7 @@ import {
   evaluationStatusColor,
 } from "../checks/EvaluationStatus";
 import { Tooltip } from "../ui/tooltip";
-
+import { HoverableBigText } from "../HoverableBigText";
 export function formatEvaluationSingleValue(evaluation: {
   score?: number | null;
   passed?: boolean | null;
@@ -93,7 +93,19 @@ export function EvaluationStatusItem({
                     <HStack align="start">
                       <Text>Details:</Text>
                       <Text color={color}>
-                        <pre>{check.details}</pre>
+                        <HoverableBigText
+                          expandedVersion={check.details}
+                          cursor="pointer"
+                        >
+                          <pre
+                            style={{
+                              whiteSpace: "pre-wrap",
+                              wordWrap: "break-word",
+                            }}
+                          >
+                            {check.details}
+                          </pre>
+                        </HoverableBigText>
                       </Text>
                     </HStack>
                   )}
