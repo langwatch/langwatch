@@ -6,6 +6,7 @@ import type { Duplex } from "stream";
 import { register } from "prom-client";
 import promBundle from "express-prom-bundle";
 import { createLogger } from "./utils/logger";
+import { initializeBackgroundWorkers } from "./server/background/init";
 
 const logger = createLogger("langwatch:start");
 
@@ -132,7 +133,10 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
         await handle(req, res, parsedUrl);
       }
     } catch (err) {
-      logger.error({ url: req.url, error: err }, "error occurred handling request");
+      logger.error(
+        { url: req.url, error: err },
+        "error occurred handling request"
+      );
       res.statusCode = 500;
       res.end("internal server error");
     }
@@ -172,13 +176,23 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
     process.exit(1);
   });
 
-  server.listen(port, () => {
-    logger.info({ hostname, port, fullUrl: `http://${hostname}:${port}` }, "LangWatch is ready 🎉");
+  server.listen(port, async () => {
+    logger.info(
+      { hostname, port, fullUrl: `http://${hostname}:${port}` },
+      "LangWatch is ready 🎉"
+    );
+
+    // Initialize background workers
+    try {
+      await initializeBackgroundWorkers();
+    } catch (error) {
+      logger.error({ error }, "Failed to initialize background workers");
+    }
   });
 
   // Global error handlers for uncaught exceptions and unhandled promise rejections
-  process.on('uncaughtException', (err) => {
-    logger.fatal({ error: err }, 'uncaught exception detected');
+  process.on("uncaughtException", (err) => {
+    logger.fatal({ error: err }, "uncaught exception detected");
     // shutdown the server gracefully
     server.close(() => {
       process.exit(1); // then exit
@@ -191,7 +205,10 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
     }, 1000).unref();
   });
 
-  process.on('unhandledRejection', (reason, promise) => {
-    logger.fatal({ reason: reason instanceof Error ? reason : { value: reason }, promise }, 'unhandled rejection detected');
+  process.on("unhandledRejection", (reason, promise) => {
+    logger.fatal(
+      { reason: reason instanceof Error ? reason : { value: reason }, promise },
+      "unhandled rejection detected"
+    );
   });
 };

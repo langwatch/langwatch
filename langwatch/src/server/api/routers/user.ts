@@ -5,6 +5,7 @@ import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 import { skipPermissionCheck } from "../permission";
 import { env } from "../../../env.mjs";
+import { usageStatsQueue } from "~/server/background/queues/usageStatsQueue";
 
 export const userRouter = createTRPCRouter({
   register: publicProcedure

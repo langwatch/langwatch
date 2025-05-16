@@ -62,3 +62,8 @@ export type CollectorCheckAndAdjustJob = {
   traceId: string;
   projectId: string;
 };
+
+export type UsageStatsJob = {
+  instance_id: string;
+  timestamp: number;
+};

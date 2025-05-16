@@ -4,6 +4,7 @@ import type {
   TopicClusteringJob,
   EvaluationJob,
   TrackEventJob,
+  UsageStatsJob,
 } from "~/server/background/types";
 import type {
   EvaluatorTypes,
@@ -24,6 +25,7 @@ import { register } from "prom-client";
 import path from "path";
 import fs from "fs";
 import { workerRestartsCounter } from "../metrics";
+import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 
 export class WorkersRestart extends Error {
   constructor(message: string) {
@@ -39,6 +41,7 @@ type Workers = {
   evaluationsWorker: Worker<EvaluationJob, any, EvaluatorTypes> | undefined;
   topicClusteringWorker: Worker<TopicClusteringJob, void, string> | undefined;
   trackEventsWorker: Worker<TrackEventJob, void, string> | undefined;
+  usageStatsWorker: Worker<UsageStatsJob, void, string> | undefined;
 };
 
 export const start = (
@@ -56,7 +59,7 @@ export const start = (
     );
     const topicClusteringWorker = startTopicClusteringWorker();
     const trackEventsWorker = startTrackEventsWorker();
-
+    const usageStatsWorker = startUsageStatsWorker();
     startMetricsServer();
     incrementWorkerRestartCount();
 
@@ -69,6 +72,7 @@ export const start = (
     evaluationsWorker?.on("closing", closingListener);
     topicClusteringWorker?.on("closing", closingListener);
     trackEventsWorker?.on("closing", closingListener);
+    usageStatsWorker?.on("closing", closingListener);
 
     if (maxRuntimeMs) {
       setTimeout(() => {
@@ -79,12 +83,13 @@ export const start = (
           evaluationsWorker?.off("closing", closingListener);
           topicClusteringWorker?.off("closing", closingListener);
           trackEventsWorker?.off("closing", closingListener);
-
+          usageStatsWorker?.off("closing", closingListener);
           await Promise.all([
             collectorWorker?.close(),
             evaluationsWorker?.close(),
             topicClusteringWorker?.close(),
             trackEventsWorker?.close(),
+            usageStatsWorker?.close(),
           ]);
 
           setTimeout(() => {
@@ -100,6 +105,7 @@ export const start = (
         evaluationsWorker,
         topicClusteringWorker,
         trackEventsWorker,
+        usageStatsWorker,
       });
     }
   });
