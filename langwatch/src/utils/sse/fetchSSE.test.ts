@@ -1,49 +1,64 @@
 import { fetchSSE } from "./fetchSSE";
-import { RetriableError, FatalError } from "./errors";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import { FetchSSETimeoutError } from "./errors";
 
-// Mock fetchEventSource
+vi.mock("~/utils/logger", () => ({
+  createLogger: (name: string) => ({
+    error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    trace: vi.fn(),
+  }),
+}));
+
 vi.mock("@microsoft/fetch-event-source");
 
-type FetchEventSourceOptions = {
-  onopen: (response: any) => void;
+type FetchEventSourceMockOptions = {
+  onopen: (response: any) => Promise<void> | void;
   onmessage: (event: { data: string }) => void;
   onclose: () => void;
   onerror: (err: any) => void;
   method: string;
   headers: Record<string, string>;
   body: string;
-  signal: any;
+  signal: AbortSignal;
 };
 
 describe("fetchSSE", () => {
+  let mockFetchEventSource: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  it("should call fetchEventSource with correct parameters", async () => {
-    const mockFetchEventSource = fetchEventSource as unknown as ReturnType<
+    mockFetchEventSource = fetchEventSource as unknown as ReturnType<
       typeof vi.fn
     >;
-    (mockFetchEventSource as any).mockImplementation(
-      (url: string, options: FetchEventSourceOptions) => {
-        // Simulate successful connection
-        options.onopen({
-          ok: true,
-          headers: { get: () => "text/event-stream" },
+
+    // Default successful connection
+    mockFetchEventSource.mockImplementation(
+      (url: string, options: FetchEventSourceMockOptions) => {
+        Promise.resolve().then(() => {
+          if (options.signal.aborted) {
+            options.onerror(new Error("Aborted"));
+            return;
+          }
+          options.onopen({
+            ok: true,
+            headers: { get: () => "text/event-stream" },
+          });
         });
         return Promise.resolve();
       }
     );
+  });
 
+  it("should make request with correct parameters", async () => {
     const onEvent = vi.fn();
-
     await fetchSSE({
       endpoint: "/api/test",
       payload: { test: "data" },
       onEvent,
-      timeout: 5000,
     });
 
     expect(mockFetchEventSource).toHaveBeenCalledWith(
@@ -55,195 +70,149 @@ describe("fetchSSE", () => {
           Accept: "text/event-stream",
         }),
         body: JSON.stringify({ test: "data" }),
-        signal: expect.any(Object),
       })
     );
   });
 
-  it("should process events correctly", async () => {
-    const mockFetchEventSource = fetchEventSource as unknown as ReturnType<
-      typeof vi.fn
-    >;
-    (mockFetchEventSource as any).mockImplementation(
-      (url: string, options: FetchEventSourceOptions) => {
-        // Simulate successful connection
-        options.onopen({
-          ok: true,
-          headers: { get: () => "text/event-stream" },
-        });
-
-        // Simulate events
-        options.onmessage({ data: JSON.stringify({ type: "test", value: 1 }) });
-        options.onmessage({ data: JSON.stringify({ type: "test", value: 2 }) });
-
-        return Promise.resolve();
-      }
-    );
-
-    const onEvent = vi.fn();
-
-    await fetchSSE({
-      endpoint: "/api/test",
-      payload: { test: "data" },
-      onEvent,
-    });
-
-    expect(onEvent).toHaveBeenCalledTimes(2);
-    expect(onEvent).toHaveBeenNthCalledWith(1, { type: "test", value: 1 });
-    expect(onEvent).toHaveBeenNthCalledWith(2, { type: "test", value: 2 });
-  });
-
-  it("should stop processing when shouldStopProcessing returns true", async () => {
-    const mockAbort = vi.fn();
-    const mockFetchEventSource = fetchEventSource as unknown as ReturnType<
-      typeof vi.fn
-    >;
-    vi.spyOn(AbortController.prototype, "abort").mockImplementation(mockAbort);
-
-    (mockFetchEventSource as any).mockImplementation(
-      (url: string, options: FetchEventSourceOptions) => {
-        // Save abort function to call later
-        const controller = { abort: mockAbort };
-        options.signal = controller;
-
-        // Simulate successful connection
-        options.onopen({
-          ok: true,
-          headers: { get: () => "text/event-stream" },
-        });
-
-        // Simulate events
-        options.onmessage({ data: JSON.stringify({ type: "test", value: 1 }) });
-        options.onmessage({ data: JSON.stringify({ type: "stop", value: 2 }) });
-        options.onmessage({ data: JSON.stringify({ type: "test", value: 3 }) });
-
-        return Promise.resolve();
-      }
-    );
-
+  it("should process events and handle stop condition", async () => {
     const onEvent = vi.fn();
     const shouldStopProcessing = vi.fn((event) => event.type === "stop");
 
+    mockFetchEventSource.mockImplementation(
+      (url: string, options: FetchEventSourceMockOptions) => {
+        options.onopen({
+          ok: true,
+          headers: { get: () => "text/event-stream" },
+        });
+        options.onmessage({ data: JSON.stringify({ type: "test", value: 1 }) });
+        options.onmessage({ data: JSON.stringify({ type: "stop", value: 2 }) });
+        return Promise.resolve();
+      }
+    );
+
     await fetchSSE({
       endpoint: "/api/test",
-      payload: { test: "data" },
+      payload: {},
       onEvent,
       shouldStopProcessing,
     });
 
-    // We can only assert about the abort being called, not that it was "aborted"
-    expect(mockAbort).toHaveBeenCalledTimes(1);
+    expect(onEvent).toHaveBeenCalledTimes(2);
+    expect(shouldStopProcessing).toHaveBeenCalledWith({
+      type: "stop",
+      value: 2,
+    });
   });
 
-  it("should handle client errors as FatalError", async () => {
-    const mockFetchEventSource = fetchEventSource as unknown as ReturnType<
-      typeof vi.fn
-    >;
-    (mockFetchEventSource as any).mockImplementation(
-      (url: string, options: FetchEventSourceOptions) => {
-        // Simulate client error (400)
-        options.onopen({
-          ok: false,
-          status: 400,
-          statusText: "Bad Request",
-          headers: { get: () => "application/json" },
-          json: () => Promise.resolve({ error: "Invalid input" }),
+  describe("error handling", () => {
+    describe("with onError callback", () => {
+      it("should handle HTTP errors", async () => {
+        const onError = vi.fn();
+
+        mockFetchEventSource.mockImplementation(
+          async (url: string, options: FetchEventSourceMockOptions) => {
+            await options.onopen({
+              ok: false,
+              status: 500,
+              statusText: "Server Error",
+              headers: { get: () => "application/json" },
+            });
+            return Promise.resolve();
+          }
+        );
+
+        await fetchSSE({
+          endpoint: "/api/test",
+          payload: {},
+          onEvent: vi.fn(),
+          onError,
         });
 
-        return Promise.resolve();
-      }
-    );
+        expect(onError).toHaveBeenCalledWith(expect.any(Error));
+      });
 
-    const onError = vi.fn();
+      it("should handle JSON parsing errors", async () => {
+        const onError = vi.fn();
 
-    await fetchSSE({
-      endpoint: "/api/test",
-      payload: { test: "data" },
-      onEvent: vi.fn(),
-      onError,
-    });
+        mockFetchEventSource.mockImplementation(
+          (url: string, options: FetchEventSourceMockOptions) => {
+            options.onopen({
+              ok: true,
+              headers: { get: () => "text/event-stream" },
+            });
+            options.onmessage({ data: "invalid json" });
+            return Promise.resolve();
+          }
+        );
 
-    expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError.mock.calls[0]?.[0].message).toBe("Invalid input");
-    expect(onError.mock.calls[0]?.[0].name).toBe("FatalError");
-  });
-
-  it("should handle server errors as RetriableError", async () => {
-    const mockFetchEventSource = fetchEventSource as unknown as ReturnType<
-      typeof vi.fn
-    >;
-    (mockFetchEventSource as any).mockImplementation(
-      (url: string, options: FetchEventSourceOptions) => {
-        // Simulate server error (500)
-        options.onopen({
-          ok: false,
-          status: 500,
-          statusText: "Internal Server Error",
-          headers: { get: () => "application/json" },
+        await fetchSSE({
+          endpoint: "/api/test",
+          payload: {},
+          onEvent: vi.fn(),
+          onError,
         });
 
-        return Promise.resolve();
-      }
-    );
+        expect(onError).toHaveBeenCalledWith(expect.any(Error));
+      });
 
-    const onError = vi.fn();
+      it("should handle timeouts", async () => {
+        vi.useFakeTimers();
+        const onError = vi.fn();
 
-    await fetchSSE({
-      endpoint: "/api/test",
-      payload: { test: "data" },
-      onEvent: vi.fn(),
-      onError,
-    });
-
-    expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError.mock.calls[0]?.[0].message).toContain(
-      "Internal Server Error"
-    );
-    expect(onError.mock.calls[0]?.[0].name).toBe("RetriableError");
-  });
-
-  it("should handle timeout correctly", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-
-    const mockAbort = vi.fn();
-    const mockFetchEventSource = fetchEventSource as unknown as ReturnType<
-      typeof vi.fn
-    >;
-    vi.spyOn(AbortController.prototype, "abort").mockImplementation(mockAbort);
-
-    (mockFetchEventSource as any).mockImplementation(
-      (url: string, options: FetchEventSourceOptions) => {
-        // Save abort function to call later
-        const controller = { abort: mockAbort };
-        options.signal = controller;
-
-        // Simulate successful connection
-        options.onopen({
-          ok: true,
-          headers: { get: () => "text/event-stream" },
+        const ssePromise = fetchSSE({
+          endpoint: "/api/test",
+          payload: {},
+          onEvent: vi.fn(),
+          onError,
+          timeout: 100,
         });
 
-        // Return a promise that never resolves
-        return new Promise(() => {});
-      }
-    );
+        await vi.advanceTimersByTimeAsync(101);
+        await ssePromise;
 
-    // Start the SSE connection
-    fetchSSE({
-      endpoint: "/api/test",
-      payload: { test: "data" },
-      onEvent: vi.fn(),
-      timeout: 5000,
+        expect(onError).toHaveBeenCalledWith(expect.any(FetchSSETimeoutError));
+        vi.useRealTimers();
+      });
     });
 
-    // Run all timers to trigger the timeout
-    await vi.runAllTimersAsync();
+    describe("without onError callback", () => {
+      it("should throw errors when no onError callback is provided", async () => {
+        mockFetchEventSource.mockImplementation(
+          (url: string, options: FetchEventSourceMockOptions) => {
+            options.onopen({
+              ok: true,
+              headers: { get: () => "text/event-stream" },
+            });
+            options.onmessage({ data: "invalid json" });
+            return Promise.resolve();
+          }
+        );
 
-    // Wait for the next tick to ensure the promise is created
-    await vi.advanceTimersByTimeAsync(5001);
+        await expect(
+          fetchSSE({
+            endpoint: "/api/test",
+            payload: {},
+            onEvent: vi.fn(),
+          })
+        ).rejects.toThrow();
+      });
 
-    expect(mockAbort).toHaveBeenCalledTimes(1);
+      it("should throw timeout errors when no onError callback is provided", async () => {
+        vi.useFakeTimers();
 
-    vi.useRealTimers();
+        await expect(async () => {
+          fetchSSE({
+            endpoint: "/api/test",
+            payload: {},
+            onEvent: vi.fn(),
+            timeout: 100,
+          });
+
+          await vi.advanceTimersByTimeAsync(101);
+        }).rejects.toThrow(FetchSSETimeoutError);
+
+        vi.useRealTimers();
+      });
+    });
   });
 });

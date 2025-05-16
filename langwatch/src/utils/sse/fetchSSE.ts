@@ -1,6 +1,6 @@
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { RetriableError, FatalError } from "./errors";
 import { createLogger } from "~/utils/logger";
+import { FetchSSETimeoutError, Timeout } from "./errors";
 
 const logger = createLogger("sseClient");
 const EVENT_STREAM_CONTENT_TYPE = "text/event-stream";
@@ -41,16 +41,27 @@ export async function fetchSSE<T>({
   headers = {},
   onError,
 }: FetchSSEOptions<T>): Promise<void> {
-  // Create abort controller for manual termination
   const controller = new AbortController();
-
-  // Set resetable timeout to prevent hanging connections
-  // between messages
   let timeoutId: NodeJS.Timeout | undefined;
+
+  const cleanup = () => {
+    controller.abort();
+    if (timeoutId) clearTimeout(timeoutId);
+  };
+
   const setResetableTimeout = () => {
     if (timeoutId) clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
-      controller.abort();
+      cleanup();
+      const error = new FetchSSETimeoutError(
+        `fetchSSE timed out with timeout ${timeout}ms`
+      );
+      logger.error(error);
+      if (onError) {
+        onError(error);
+      } else {
+        throw error;
+      }
     }, timeout);
   };
 
@@ -65,10 +76,8 @@ export async function fetchSSE<T>({
       body: JSON.stringify(payload),
       signal: controller.signal,
 
-      // Validate the response when the connection is established
       async onopen(response) {
         setResetableTimeout();
-        let error: FatalError | RetriableError | undefined;
 
         if (
           response.ok &&
@@ -76,99 +85,46 @@ export async function fetchSSE<T>({
             .get("content-type")
             ?.includes(EVENT_STREAM_CONTENT_TYPE)
         ) {
-          return; // Connection established successfully
-        } else if (
-          response.status >= 400 &&
-          response.status < 500 &&
-          response.status !== 429
-        ) {
-          // Client-side errors are usually non-retriable
-          let errorMessage: string;
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.error || response.statusText;
-          } catch (parseError) {
-            errorMessage = response.statusText;
-            logger.error(
-              {
-                error: parseError,
-                status: response.status,
-                statusText: response.statusText,
-              },
-              "Failed to parse error response as JSON"
-            );
-          }
-
-          error = new FatalError(errorMessage);
-        } else {
-          // Server errors might be temporary, mark as retriable
-          error = new RetriableError(
-            `Server error: ${response.status} ${response.statusText}`
-          );
+          return;
         }
 
-        if (onError) {
-          onError(error);
-        } else {
-          throw error;
-        }
+        // All errors are treated the same - they'll be caught by the main try-catch
+        throw new Error(
+          response.status >= 500
+            ? `Server error: ${response.status} ${response.statusText}`
+            : response.statusText
+        );
       },
 
-      // Process incoming messages
       onmessage(ev) {
-        try {
-          // Reset the timeout on each message
-          setResetableTimeout();
+        setResetableTimeout();
+        const event = JSON.parse(ev.data) as T;
+        onEvent(event);
 
-          const event = JSON.parse(ev.data) as T;
-          logger.debug({ event }, "Received server event");
-
-          // Pass the event to the handler
-          onEvent(event);
-
-          // Check if we should stop processing
-          if (shouldStopProcessing?.(event)) {
-            console.log("Stopping processing", controller);
-            controller.abort();
-          }
-        } catch (error) {
-          if (error instanceof FatalError) {
-            throw error; // Rethrow fatal errors
-          }
-          // Log parsing errors but continue processing
-          logger.error({ error, data: ev.data }, "Error parsing SSE event");
+        if (shouldStopProcessing?.(event)) {
+          cleanup();
         }
       },
 
-      // Handle unexpected connection closure
       onclose() {
-        clearTimeout(timeoutId);
+        cleanup();
       },
 
-      // Handle errors during the connection
-      onerror(err) {
-        clearTimeout(timeoutId);
-
-        if (err instanceof FatalError) {
-          throw err; // Rethrow fatal errors to stop the operation
-        } else if (err instanceof RetriableError) {
-          logger.warn({ error: err }, "Retriable error occurred");
-          // Log and propagate
-          throw err;
-        } else {
-          logger.error({ error: err }, "Unknown error during SSE processing");
-          throw err; // Rethrow unknown errors
-        }
+      onerror(error) {
+        cleanup();
+        throw error; // Propagate to main try-catch
       },
     });
   } catch (error) {
-    // Handle errors from the fetchEventSource
-    if (timeoutId) clearTimeout(timeoutId);
+    const processedError =
+      error instanceof Error ? error : new Error(String(error));
+
+    cleanup();
 
     if (onError) {
-      onError(error instanceof Error ? error : new Error(String(error)));
+      onError(processedError);
     } else {
-      throw error;
+      throw processedError;
     }
   }
 }
