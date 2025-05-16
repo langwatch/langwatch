@@ -25,7 +25,7 @@ exclude = [
   "langwatch/node_modules/**/*",
   "langwatch/.next/cache",
   "langwatch/.next-saas",
-  "python-sdk/**/*",
+  "sdk-python/**/*",
   "typescript-sdk/**/*",
   "langwatch_nlp/.venv/**/*",
   "langwatch_nlp/notebooks/**/*",

@@ -3,9 +3,9 @@ COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.8.4 /lambda-adapter /opt
 
 RUN pip install uv
 
-WORKDIR /usr/src/app/python-sdk-legacy
+WORKDIR /usr/src/app/sdk-python
 
-COPY python-sdk-legacy .
+COPY sdk-python .
 RUN uv build
 
 WORKDIR /usr/src/app/langwatch_nlp
