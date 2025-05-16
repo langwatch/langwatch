@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import { useRouter } from "next/router";
-import { memo, useEffect, useRef, useState } from "react";
+import React, { memo, useEffect, useRef, useState } from "react";
 import {
   LuActivity,
   LuArrowUpRight,
@@ -43,22 +43,26 @@ import { ExecutionStep } from "./steps/ExecutionStep";
 import { ResultsStep } from "./steps/ResultsStep";
 import { TaskStep } from "./steps/TaskStep";
 import { WizardProvider } from "./hooks/useWizardContext";
-import { Link } from "../../ui/link";
-import { PuzzleIcon } from "../../icons/PuzzleIcon";
+import CopilotSidebar from "./components/copilot/CopilotSidebar";
 
-export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
+export function EvaluationWizard({
+  isLoading,
+  isCopilot,
+}: {
+  isLoading: boolean;
+  isCopilot: boolean;
+}) {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
-
   const [sidebarVisible, setSidebarVisible] = useState(true);
 
-  const { name, workflowId } = useEvaluationWizardStore(
+  const { name, setIsCopilot } = useEvaluationWizardStore(
     useShallow((state) => {
       return {
         name: state.wizardState.name,
-        workflowId: state.getDSL().workflow_id,
+        setIsCopilot: state.setIsCopilot,
       };
-    })
+    }),
   );
 
   const { isAutosaving } = useEvaluationWizardStore(
@@ -74,6 +78,10 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
       };
     })
   );
+
+  useEffect(() => {
+    setIsCopilot(isCopilot);
+  }, [isCopilot, setIsCopilot]);
 
   return (
     <ReactFlowProvider>
@@ -133,7 +141,7 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
             </HStack>
             <HStack width="full" justifyContent="center" paddingLeft={8}>
               <Heading as="h1" size="sm" fontWeight="normal">
-                Evaluation Wizard
+                Evaluation {isCopilot ? "Copilot ✨" : "Wizard"}
               </Heading>
             </HStack>
             <HStack justifyContent="end" paddingRight={5} />
@@ -145,7 +153,12 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
             width="full"
             padding={0}
           >
-            {sidebarVisible && <WizardSidebar isLoading={isLoading} />}
+            {sidebarVisible && (
+              <React.Fragment>
+                {isCopilot && <CopilotSidebar />}
+                {!isCopilot && <WizardSidebar isLoading={isLoading} />}
+              </React.Fragment>
+            )}
             <WizardWorkspace />
           </Dialog.Body>
         </Dialog.Content>
