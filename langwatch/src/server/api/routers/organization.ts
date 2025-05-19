@@ -26,6 +26,10 @@ import { decrypt, encrypt } from "~/utils/encryption";
 import { signUpDataSchema } from "./onboarding";
 import { dependencies } from "../../../injection/dependencies.server";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
+import {
+  usageStatsQueue,
+  scheduleUsageStatsForOrganization,
+} from "~/server/background/queues/usageStatsQueue";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
@@ -146,6 +150,9 @@ export const organizationRouter = createTRPCRouter({
           return { organization, team };
         }
       );
+
+      // Add usage stats job for the new organization
+      await scheduleUsageStatsForOrganization(organization);
 
       return {
         success: true,

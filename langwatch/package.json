@@ -132,6 +132,8 @@
     "path-to-regexp": "^6.3.0",
     "pino": "^9.6.0",
     "pino-pretty": "^13.0.0",
+    "posthog-js": "^1.241.1",
+    "posthog-node": "^4.17.1",
     "prism-react-renderer": "^2.1.0",
     "prismjs": "^1.29.0",
     "prom-client": "^15.1.3",

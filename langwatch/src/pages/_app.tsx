@@ -6,8 +6,8 @@ import { api } from "~/utils/api";
 
 import {
   ChakraProvider,
-  defaultConfig,
   createSystem,
+  defaultConfig,
   defineRecipe,
   defineSlotRecipe,
 } from "@chakra-ui/react";
@@ -19,9 +19,12 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import NProgress from "nprogress";
 import { useEffect, useState } from "react";
-import { dependencies } from "../injection/dependencies.client";
-import { Toaster } from "../components/ui/toaster";
 import { colorSystem } from "../components/ui/color-mode";
+import { Toaster } from "../components/ui/toaster";
+import { dependencies } from "../injection/dependencies.client";
+
+import { PostHogProvider } from "posthog-js/react";
+import { usePostHog } from "../hooks/usePostHog";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -520,6 +523,7 @@ const LangWatch: AppType<{
   injected?: string | undefined;
 }> = ({ Component, pageProps: { session, ...pageProps } }) => {
   const router = useRouter();
+  const postHog = usePostHog();
 
   const [previousFeatureFlagQueryParams, setPreviousFeatureFlagQueryParams] =
     useState<{ key: string; value: string }[]>([]);
@@ -595,7 +599,13 @@ const LangWatch: AppType<{
         <Head>
           <title>LangWatch</title>
         </Head>
-        <Component {...pageProps} />
+        {postHog ? (
+          <PostHogProvider client={postHog}>
+            <Component {...pageProps} />
+          </PostHogProvider>
+        ) : (
+          <Component {...pageProps} />
+        )}
         <Toaster />
 
         {dependencies.ExtraFooterComponents && (
