@@ -1,20 +1,29 @@
 import { PostHog } from "posthog-node";
 import { env } from "../env.mjs";
 
-export const posthog = env.POSTHOG_KEY
+// Create a private singleton instance
+const _posthogInstance = env.POSTHOG_KEY
   ? new PostHog(env.POSTHOG_KEY, {
       host: env.POSTHOG_HOST,
     })
   : null;
 
+/**
+ * Returns the PostHog instance if it exists, null otherwise.
+ * The instance is immutable and should not be modified.
+ */
+export function getPostHogInstance(): PostHog | null {
+  return _posthogInstance;
+}
+
 // Ensure events are flushed on application shutdown
 function handleShutdown() {
-  if (posthog) {
+  if (_posthogInstance) {
     console.log("Shutting down PostHog client...");
-    posthog.shutdown();
+    _posthogInstance.shutdown();
   }
 }
 
-// Register shutdown handlers
+// Register shutdown handler
 process.on("SIGTERM", handleShutdown);
 process.on("SIGINT", handleShutdown);

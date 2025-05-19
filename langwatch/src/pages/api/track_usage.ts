@@ -1,5 +1,5 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
-import { posthog } from "~/server/posthog";
+import { getPostHogInstance } from "../../server/posthog";
 import * as Sentry from "@sentry/node";
 
 export default async function handler(
@@ -10,16 +10,17 @@ export default async function handler(
 
   const { event, instance_id, ...properties } = req.body;
 
-  try {
-    if (posthog) {
+  const posthog = getPostHogInstance();
+  if (posthog) {
+    try {
       posthog.capture({
         distinctId: instance_id, // Use organization ID as the distinct ID
         event,
         properties,
       });
+    } catch (error) {
+      Sentry.captureException(error);
     }
-  } catch (error) {
-    Sentry.captureException(error);
   }
 
   res.status(200).json({ message: "Event captured" });
