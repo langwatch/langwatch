@@ -23,6 +23,9 @@ example:
 		uv run chainlit run -w --port 9000 $$args; \
 	fi
 
+run/example:
+	uv run python examples/openai_bot_prompt.py
+
 batch-evaluation-example:
 	uv run python $(filter-out $@,$(MAKECMDGOALS))
 
