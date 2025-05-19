@@ -9,13 +9,7 @@ import {
   store as workflowStore,
   type State as WorkflowStoreState,
 } from "../../../../../optimization_studio/hooks/useWorkflowStore";
-import { entryNode } from "../../../../../optimization_studio/templates/blank";
-import type {
-  Entry,
-  Workflow,
-} from "../../../../../optimization_studio/types/dsl";
-import { datasetColumnsToFields } from "../../../../../optimization_studio/utils/datasetUtils";
-import type { DatasetColumns } from "../../../../../server/datasets/types";
+import type { Workflow } from "../../../../../optimization_studio/types/dsl";
 import { checkPreconditionsSchema } from "../../../../../server/evaluations/types.generated";
 import { mappingStateSchema } from "../../../../../server/tracer/tracesMapping";
 
@@ -23,9 +17,6 @@ import {
   createEvaluationWizardSlicesStore,
   type EvaluationWizardSlicesUnion,
 } from "./slices";
-import { buildEntryToTargetEdges } from "./slices/utils/edge.util";
-import { EXECUTOR_NODE_TYPES } from "./slices/executorSlice";
-import type { Node } from "@xyflow/react";
 
 export const EVALUATOR_CATEGORIES = [
   "expected_answer",
@@ -145,10 +136,6 @@ export type EvaluationWizardStore = State & {
   skipNextAutosave: () => void;
   nextStep: () => void;
   previousStep: () => void;
-  setDatasetId: (datasetId: string, columnTypes: DatasetColumns) => void;
-  getDatasetId: () => string | undefined;
-  setDatasetGridRef: (gridRef: RefObject<AgGridReact<any> | null>) => void;
-
   workflowStore: WorkflowStore;
 };
 
@@ -256,97 +243,6 @@ const store = (
         }
         return current;
       });
-    },
-    setDatasetId(datasetId, columnTypes) {
-      get().workflowStore.setWorkflow((current) => {
-        const previousEntryNode = current.nodes.find(
-          (node) => node.type === "entry"
-        );
-
-        // Upsert the entry node into the workflow
-        let newNodes = current.nodes;
-        const outputs = datasetColumnsToFields(columnTypes);
-        if (previousEntryNode) {
-          newNodes = current.nodes.map((node) => {
-            if (node.type !== "entry") {
-              return node;
-            }
-
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                dataset: { id: datasetId },
-                outputs,
-              },
-            };
-          });
-        } else {
-          const newEntryNode = entryNode();
-
-          newNodes = [
-            ...current.nodes,
-            {
-              ...newEntryNode,
-              data: {
-                ...newEntryNode.data,
-                dataset: { id: datasetId },
-                outputs,
-              },
-            },
-          ];
-        }
-
-        // Logic to disconnect the current no longer existing edges from the entry node
-        const entryFields = outputs.map(
-          (output) => `outputs.${output.identifier}`
-        );
-        let newEdges = current.edges.filter(
-          (edge) =>
-            edge.source !== "entry" ||
-            entryFields.includes(edge.sourceHandle ?? "")
-        );
-
-        // And then connecting it again using defaults with the other existing components
-        const newEntryNode = newNodes.find(
-          (node) => node.type === "entry"
-        ) as Node<Entry> | undefined;
-        const otherNodes = newNodes.filter((node) => node.type !== "entry");
-
-        const newEdgesTargetHandles = newEdges.map(
-          (edge) => `${edge.target}-${edge.targetHandle}`
-        );
-        for (const node of otherNodes) {
-          const otherNodeEdges = buildEntryToTargetEdges(
-            newEntryNode,
-            node
-          ).filter(
-            (edge) =>
-              !newEdgesTargetHandles.includes(
-                `${edge.target}-${edge.targetHandle}`
-              )
-          );
-          newEdges = [...newEdges, ...otherNodeEdges];
-        }
-
-        return {
-          ...current,
-          nodes: newNodes,
-          edges: newEdges,
-        };
-      });
-    },
-    getDatasetId() {
-      const entryNodeData = get()
-        .workflowStore.getWorkflow()
-        .nodes.find((node) => node.type === "entry")?.data;
-      if (entryNodeData && "dataset" in entryNodeData) {
-        return entryNodeData.dataset?.id;
-      }
-      return undefined;
-    },
-    setDatasetGridRef(gridRef) {
-      set((current) => ({ ...current, datasetGridRef: gridRef }));
     },
     workflowStore: createWorkflowStore(set, get),
   };

@@ -4,7 +4,6 @@ import { Drawer } from "./ui/drawer";
 import { toaster } from "./ui/toaster";
 import { useEffect, useRef, useState } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
-import { useLocalStorage } from "usehooks-ts";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import type {
@@ -15,6 +14,7 @@ import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { useDrawer } from "./CurrentDrawer";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 import { DatasetSelector } from "./datasets/DatasetSelector";
+import { useSelectedDataSetId } from "~/hooks/useSelectedDataSetId";
 
 type FormValues = {
   datasetId: string;
@@ -32,8 +32,11 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   const editDataset = useDisclosure();
   const { closeDrawer } = useDrawer();
 
-  const [localStorageDatasetId, setLocalStorageDatasetId] =
-    useLocalStorage<string>("selectedDatasetId", "");
+  const {
+    selectedDataSetId: localStorageDatasetId,
+    setSelectedDataSetId: setLocalStorageDatasetId,
+  } = useSelectedDataSetId();
+
   const {
     register,
     handleSubmit,
@@ -115,6 +118,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     | DatasetColumns
     | undefined;
 
+  const trpc = api.useContext();
   const onSubmit: SubmitHandler<FormValues> = (_data) => {
     if (!selectedDataset || !project) return;
 
@@ -145,6 +149,8 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       },
       {
         onSuccess: () => {
+          trpc.dataset.getAll.invalidate();
+          trpc.datasetRecord.getAll.invalidate();
           closeDrawer();
           toaster.create({
             title: "Succesfully added to dataset",
