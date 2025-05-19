@@ -1,14 +1,13 @@
 import type {
   QueryDslBoolQuery,
   QueryDslQueryContainer,
-  QueryDslMatchAllQuery,
 } from "@elastic/elasticsearch/lib/api/types";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
-import type { FilterDefinition, FilterField } from "./types";
 import { reservedTraceMetadataSchema } from "../tracer/types.generated";
+import type { FilterDefinition, FilterField } from "./types";
 
 export const availableFilters: { [K in FilterField]: FilterDefinition } = {
   "topics.topics": {
@@ -1366,15 +1365,49 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
   "annotations.hasAnnotation": {
     name: "Annotations",
     urlKey: "annotations",
-    query: () => ({
-      match_all: {} as QueryDslMatchAllQuery,
-    }),
+    query: (values) => {
+      if (values.includes("true") && !values.includes("false")) {
+        return {
+          exists: {
+            field: "annotations",
+          },
+        };
+      } else if (values.includes("false") && !values.includes("true")) {
+        return {
+          bool: {
+            must_not: {
+              exists: {
+                field: "annotations",
+              },
+            },
+          } as QueryDslBoolQuery,
+        };
+      } else {
+        return {
+          match_all: {},
+        };
+      }
+    },
     listMatch: {
       aggregation: (_query) => ({
         unique_values: {
-          terms: {
-            script: "1",
-            size: 1,
+          filters: {
+            filters: {
+              has_annotations: {
+                exists: {
+                  field: "annotations",
+                },
+              },
+              no_annotations: {
+                bool: {
+                  must_not: {
+                    exists: {
+                      field: "annotations",
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       }),
@@ -1383,12 +1416,14 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           {
             field: "true",
             label: "Has Annotation",
-            count: _result.unique_values?.buckets?.[0]?.doc_count ?? 0,
+            count:
+              _result.unique_values?.buckets?.has_annotations?.doc_count ?? 0,
           },
           {
             field: "false",
             label: "No Annotation",
-            count: _result.unique_values?.buckets?.[1]?.doc_count ?? 0,
+            count:
+              _result.unique_values?.buckets?.no_annotations?.doc_count ?? 0,
           },
         ];
       },
