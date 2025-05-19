@@ -26,7 +26,7 @@ async def main():
     prompt = langwatch.prompt.get_prompt(prompt_id)
     print(prompt.raw_config())
     messages = prompt.format_messages(input="I like to eat pizza")
-    completion = client.chat.completions.create(model=prompt.model, messages=messages)
+    completion = client.chat.completions.create(model=prompt.model.split("openai/")[1], messages=messages)
     print(completion)
 
 if __name__ == "__main__":
