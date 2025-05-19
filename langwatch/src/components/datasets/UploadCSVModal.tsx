@@ -23,8 +23,12 @@ import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
 import { useDrawer } from "../CurrentDrawer";
 import { Dialog } from "../../components/ui/dialog";
 import { toaster } from "../ui/toaster";
-
+import { api } from "~/utils/api";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { createLogger } from "~/utils/logger";
 export const MAX_ROWS_LIMIT = 10_000;
+
+const logger = createLogger("UploadCSVModal");
 
 export function UploadCSVModal({
   isOpen: isOpen_,
@@ -144,32 +148,59 @@ export function UploadCSVForm({
   uploadCSVData: () => void;
   disabled?: boolean;
 }) {
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id;
+  const trpcUtils = api.useContext();
+
+  const getValidName = async (proposedName: string): Promise<string> => {
+    if (!projectId) return proposedName;
+    const validName = await trpcUtils.dataset.findNextName.fetch({
+      projectId: projectId,
+      proposedName: proposedName,
+    });
+    return validName;
+  };
+
+  const handleUploadAccepted = async (results: {
+    data: string[][];
+    acceptedFile: File;
+  }) => {
+    const { data, acceptedFile } = results;
+    const columns: DatasetColumns = (data[0] ?? []).map((col: string) => ({
+      name: col,
+      type: "string",
+    }));
+    const now = new Date().getTime();
+    const records: DatasetRecordEntry[] = data
+      .slice(1)
+      .map((row: string[], index: number) => ({
+        id: `${now}-${index}`,
+        ...Object.fromEntries(row.map((col, i) => [columns[i]?.name, col])),
+      }));
+
+    let validName = "New Dataset";
+    try {
+      // Propose new name based on the file name
+      const proposedName = acceptedFile.name.split(".")[0];
+      // If the proposed name is undefined, use the default name
+      validName = proposedName ?? validName;
+      // Try to get a valid name from the DB, in case it's already taken
+      validName = await getValidName(validName);
+    } catch (error) {
+      logger.error({ error }, "Failed to get valid name");
+    }
+
+    setUploadedDataset({
+      datasetRecords: records,
+      columnTypes: columns,
+      name: validName,
+    });
+  };
+
   return (
     <VStack width="full" align="start" gap={4}>
       <CSVReaderComponent
-        onUploadAccepted={({ data, acceptedFile }) => {
-          const columns: DatasetColumns = (data[0] ?? []).map(
-            (col: string) => ({
-              name: col,
-              type: "string",
-            })
-          );
-          const now = new Date().getTime();
-          const records: DatasetRecordEntry[] = data
-            .slice(1)
-            .map((row: string[], index: number) => ({
-              id: `${now}-${index}`,
-              ...Object.fromEntries(
-                row.map((col, i) => [columns[i]?.name, col])
-              ),
-            }));
-
-          setUploadedDataset({
-            datasetRecords: records,
-            columnTypes: columns,
-            name: acceptedFile.name.split(".")[0],
-          });
-        }}
+        onUploadAccepted={handleUploadAccepted}
         onUploadRemoved={() => {
           setUploadedDataset(undefined);
         }}

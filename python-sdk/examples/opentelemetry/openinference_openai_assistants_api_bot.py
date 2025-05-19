@@ -4,14 +4,11 @@ from datetime import datetime
 from typing import Optional, cast
 from dotenv import load_dotenv
 
+import langwatch
+
 load_dotenv()
 
 import chainlit as cl
-
-import os
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk import trace as trace_sdk
-from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
 
 from openinference.instrumentation.openai import OpenAIInstrumentor
 from openai import AsyncOpenAI, AsyncAssistantEventHandler
@@ -19,21 +16,9 @@ from openai import AsyncOpenAI, AsyncAssistantEventHandler
 
 client = AsyncOpenAI()
 
-
-# Set up OpenTelemetry trace provider with LangWatch as the endpoint
-tracer_provider = trace_sdk.TracerProvider()
-tracer_provider.add_span_processor(
-    SimpleSpanProcessor(
-        OTLPSpanExporter(
-            endpoint=f"{os.environ.get('LANGWATCH_ENDPOINT', 'https://app.langwatch.ai')}/api/otel/v1/traces",
-            headers={"Authorization": "Bearer " + os.environ["LANGWATCH_API_KEY"]},
-        )
-    )
+langwatch.setup(
+    instrumentors=[OpenAIInstrumentor()],
 )
-# Optionally, you can also print the spans to the console.
-tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
-
-OpenAIInstrumentor().instrument(tracer_provider=tracer_provider)
 
 
 @cl.on_chat_start
@@ -50,6 +35,7 @@ async def on_chat_start():
     cl.user_session.set("thread_id", thread.id)
     cl.user_session.set("assistant_id", assistant.id)
     cl.user_session.set("assistant_name", assistant.name)
+
 
 class EventHandler(AsyncAssistantEventHandler):
     def __init__(self, assistant_name: str) -> None:
@@ -87,13 +73,14 @@ class EventHandler(AsyncAssistantEventHandler):
             await self.current_step.send()
 
         if delta.type == "code_interpreter":
-            if self.current_step and delta.code_interpreter and delta.code_interpreter.outputs:
+            if (
+                self.current_step
+                and delta.code_interpreter
+                and delta.code_interpreter.outputs
+            ):
                 for output in delta.code_interpreter.outputs:
                     if output.type == "logs":
-                        error_step = cl.Step(
-                            name=delta.type,
-                            type="tool"
-                        )
+                        error_step = cl.Step(name=delta.type, type="tool")
                         error_step.is_error = True
                         error_step.output = output.logs
                         error_step.language = "markdown"
@@ -101,14 +88,18 @@ class EventHandler(AsyncAssistantEventHandler):
                         error_step.end = datetime.now()
                         await error_step.send()
             else:
-                if self.current_step and delta.code_interpreter and delta.code_interpreter.input:
+                if (
+                    self.current_step
+                    and delta.code_interpreter
+                    and delta.code_interpreter.input
+                ):
                     await self.current_step.stream_token(delta.code_interpreter.input)
-
 
     async def on_tool_call_done(self, tool_call):
         if self.current_step:
             self.current_step.end = datetime.now()
             await self.current_step.update()
+
 
 @cl.on_message
 async def main(message: cl.Message):

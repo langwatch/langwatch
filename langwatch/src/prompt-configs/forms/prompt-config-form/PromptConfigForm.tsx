@@ -1,4 +1,4 @@
-import { VStack } from "@chakra-ui/react";
+import { HStack, VStack } from "@chakra-ui/react";
 import {
   FormProvider,
   useFieldArray,
@@ -25,6 +25,9 @@ import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import { PromptMessagesField } from "../fields/PromptMessagesField";
+import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
+import { GeneratePromptApiSnippetDialog } from "~/prompt-configs/components/GeneratePromptApiSnippetDialog";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 interface PromptConfigFormProps {
   configId: string;
@@ -36,6 +39,7 @@ interface PromptConfigFormProps {
  * Handles rendering the form fields and save dialog
  */
 function InnerPromptConfigForm(props: PromptConfigFormProps) {
+  const { project } = useOrganizationTeamProject();
   const { methods, configId } = props;
   const { isLoading } = usePromptConfig();
   const { triggerSaveVersion } = usePromptConfigContext();
@@ -74,7 +78,17 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
               }
             />
           </VerticalFormControl>
-          <PromptNameField />
+          <HStack width="full" alignItems="end">
+            <PromptNameField />
+            <GeneratePromptApiSnippetDialog
+              configId={configId}
+              apiKey={project?.apiKey}
+            >
+              <GeneratePromptApiSnippetDialog.Trigger>
+                <GenerateApiSnippetButton />
+              </GeneratePromptApiSnippetDialog.Trigger>
+            </GeneratePromptApiSnippetDialog>
+          </HStack>
           <ModelSelectField />
           <PromptField
             templateAdapter="default"

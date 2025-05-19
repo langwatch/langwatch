@@ -1,6 +1,6 @@
 """OpenTelemetry metadata key name constants."""
 
-class AttributeName:
+class AttributeKey:
     """Attribute names organized by category. They come from the OpenTelemetry Spec https://opentelemetry.io/docs/specs/semconv/, version 1.32.0"""
 
     # Service attributes (OpenTelemetry Spec) - https://opentelemetry.io/docs/specs/semconv/attributes-registry/service/
@@ -68,6 +68,7 @@ class AttributeName:
     LangWatchCustomerId = "langwatch.customer.id"
     LangWatchThreadId = "langwatch.thread.id"
     LangWatchSessionId = "langwatch.session.id" # We use thread_id for session_id
+    LangWatchEventEvaluationCustom = "langwatch.evaluation.custom"
 
     # Deprecated attributes
     DeprecatedTraceId = "deprecated.trace.id"

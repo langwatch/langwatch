@@ -2,6 +2,8 @@
 
 from dotenv import load_dotenv
 
+import langwatch
+
 load_dotenv()
 
 import chainlit as cl
@@ -15,30 +17,12 @@ from haystack.components.builders.answer_builder import AnswerBuilder
 from haystack.components.builders.prompt_builder import PromptBuilder
 
 import os
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk import trace as trace_sdk
-from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
-
 from openinference.instrumentation.haystack import HaystackInstrumentor
 from openinference.instrumentation import using_attributes
 
-# Set up OpenTelemetry trace provider with LangWatch as the endpoint
-tracer_provider = trace_sdk.TracerProvider()
-tracer_provider.add_span_processor(
-    SimpleSpanProcessor(
-        OTLPSpanExporter(
-            endpoint=f"{os.environ.get('LANGWATCH_ENDPOINT', 'https://app.langwatch.ai')}/api/otel/v1/traces",
-            headers={"Authorization": "Bearer " + os.environ["LANGWATCH_API_KEY"]},
-        )
-    )
+langwatch.setup(
+    instrumentors=[HaystackInstrumentor()],
 )
-# Optionally, you can also print the spans to the console.
-tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
-
-HaystackInstrumentor().instrument(tracer_provider=tracer_provider)
-
-
-# Haystack pipeline
 
 # Write documents to InMemoryDocumentStore
 document_store = InMemoryDocumentStore()

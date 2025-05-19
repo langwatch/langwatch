@@ -8,7 +8,7 @@ import {
 } from "@chakra-ui/react";
 import { Popover } from "../../../../components/ui/popover";
 import { useState, useEffect } from "react";
-import { Box, X } from "react-feather";
+import { X } from "react-feather";
 
 export function ConfigModal({
   open,
@@ -41,7 +41,6 @@ export function ConfigModal({
         // To fix issue of popover reopening immediately on the trigger button
         setTimeout(onClose, 300);
       }}
-      positioning={{ placement: "bottom-start" }}
     >
       <PopoverTrigger
         position="absolute"
