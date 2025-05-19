@@ -1,8 +1,13 @@
+/**
+ * Component for adding records to a dataset through a drawer interface.
+ * Allows users to select a dataset and map trace data to dataset columns.
+ */
+
 import { Link } from "./ui/link";
 import { Button, useDisclosure, VStack, HStack, Text } from "@chakra-ui/react";
 import { Drawer } from "./ui/drawer";
 import { toaster } from "./ui/toaster";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -15,28 +20,43 @@ import { useDrawer } from "./CurrentDrawer";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 import { DatasetSelector } from "./datasets/DatasetSelector";
 import { useSelectedDataSetId } from "~/hooks/useSelectedDataSetId";
+import { createLogger } from "~/utils/logger";
 
+const logger = createLogger("AddDatasetRecordDrawer");
+
+/** Form values for dataset selection */
 type FormValues = {
   datasetId: string;
 };
 
+/** Props for the AddDatasetRecordDrawer component */
 interface AddDatasetDrawerProps {
+  /** Callback function called on successful record addition */
   onSuccess?: () => void;
+  /** ID of the trace to add */
   traceId?: string;
+  /** Array of trace IDs to add */
   selectedTraceIds?: string[];
 }
 
+/**
+ * Drawer component for adding records to a dataset
+ * @param props - Component props
+ */
 export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
+  const trpc = api.useContext();
   const { project } = useOrganizationTeamProject();
   const createDatasetRecord = api.datasetRecord.create.useMutation();
   const editDataset = useDisclosure();
   const { closeDrawer } = useDrawer();
 
+  // Selected Dataset ID - Local Storage
   const {
     selectedDataSetId: localStorageDatasetId,
     setSelectedDataSetId: setLocalStorageDatasetId,
   } = useSelectedDataSetId();
 
+  // Form Hook
   const {
     register,
     handleSubmit,
@@ -50,13 +70,21 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     },
   });
 
-  const traceIds = [
-    ...(Array.isArray(props.selectedTraceIds)
-      ? props.selectedTraceIds
-      : [props.selectedTraceIds]),
-    props?.traceId ?? "",
-  ].filter(Boolean) as string[];
+  const datasetId = watch("datasetId");
 
+  // Combine trace IDs from props into a single array
+  const traceIds = useMemo(
+    () =>
+      [
+        ...(Array.isArray(props.selectedTraceIds)
+          ? props.selectedTraceIds
+          : [props.selectedTraceIds]),
+        props?.traceId ?? "",
+      ].filter(Boolean) as string[],
+    [props.selectedTraceIds, props.traceId]
+  );
+
+  // Fetch traces with spans data
   const tracesWithSpans = api.traces.getTracesWithSpans.useQuery(
     {
       projectId: project?.id ?? "",
@@ -68,48 +96,51 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     }
   );
 
+  // Fetch all datasets for the project
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project, refetchOnWindowFocus: false }
   );
 
-  const datasetId = watch("datasetId");
   const selectedDataset = datasets.data?.find(
     (dataset) => dataset.id === datasetId
   );
 
+  // Reset dataset ID if selected dataset no longer exists
   useEffect(() => {
-    if (datasetId) {
-      setLocalStorageDatasetId(datasetId);
+    if (!selectedDataset) {
+      // setValue("datasetId", "");
     }
-  }, [datasetId, setLocalStorageDatasetId]);
+  }, [selectedDataset, setValue]);
 
-  useEffect(() => {
-    if (
-      datasetId &&
-      datasets.data &&
-      !datasets.data.find((dataset) => dataset.id === datasetId)
-    ) {
-      setValue("datasetId", "");
-    }
-  }, [datasetId, datasets.data, setValue]);
-
+  /**
+   * Handle successful dataset creation
+   * @param datasetId - ID of the newly created dataset
+   */
   const onCreateDatasetSuccess = ({ datasetId }: { datasetId: string }) => {
-    editDataset.onClose();
-    void datasets.refetch().then(() => {
-      setTimeout(() => {
-        setValue("datasetId", datasetId);
-      }, 100);
-    });
+    // editDataset.onClose(); // not needed since it will automatically close
+    void datasets
+      .refetch()
+      .then(() => {
+        console.log("refetched");
+        setTimeout(() => {
+          setValue("datasetId", datasetId);
+        }, 100);
+      })
+      .catch((error) => {
+        logger.error(error);
+      });
   };
 
+  /**
+   * Handle drawer close
+   */
   const handleOnClose = () => {
     closeDrawer();
-    reset({
-      datasetId,
-    });
+    reset();
   };
 
+  // State for editable row data
   const [editableRowData, setEditableRowData] = useState<DatasetRecordEntry[]>(
     []
   );
@@ -118,10 +149,15 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     | DatasetColumns
     | undefined;
 
-  const trpc = api.useContext();
-  const onSubmit: SubmitHandler<FormValues> = (_data) => {
+  /**
+   * Handle form submission
+   * @param _data - Form data
+   */
+  const onSubmit: SubmitHandler<FormValues> = async (_data) => {
+    console.log("onSubmit", _data);
     if (!selectedDataset || !project) return;
 
+    // Transform row data into dataset entries
     const entries: DatasetRecordEntry[] = rowsToAdd.map(
       (row) =>
         Object.fromEntries(
@@ -141,7 +177,10 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
         ) as DatasetRecordEntry
     );
 
-    createDatasetRecord.mutate(
+    console.log("creating dataset records");
+
+    // Create dataset records
+    await createDatasetRecord.mutateAsync(
       {
         projectId: project.id ?? "",
         datasetId: datasetId,
@@ -149,8 +188,10 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       },
       {
         onSuccess: () => {
+          console.log("invalidating dataset and dataset records");
           trpc.dataset.getAll.invalidate();
           trpc.datasetRecord.getAll.invalidate();
+          console.log("closing drawer");
           closeDrawer();
           toaster.create({
             title: "Succesfully added to dataset",
@@ -172,6 +213,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           });
         },
         onError: () => {
+          console.log("failed to add to the dataset");
           toaster.create({
             title: "Failed to add to the dataset",
             description:
@@ -185,21 +227,32 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
         },
       }
     );
+
+    console.log("created dataset records");
+    console.log("setting localStorageDatasetId", _data.datasetId);
+
+    // We do this here since if we do it before, or attempt to do keep the
+    // datasetId in sync, it will force a re-render and the drawers will close.
+    setLocalStorageDatasetId(_data.datasetId);
   };
 
+  // State for row data from dataset
   const [rowDataFromDataset, setRowDataFromDataset] = useState<
     DatasetRecordEntry[]
   >([]);
 
+  // Update editable row data when dataset row data changes
   useEffect(() => {
     if (!rowDataFromDataset) return;
 
     setEditableRowData(rowDataFromDataset);
   }, [rowDataFromDataset]);
 
+  // Scroll position tracking
   const scrollRef = useRef<HTMLDivElement>(null);
   const [atBottom, setAtBottom] = useState(false);
 
+  // Update scroll position state
   useEffect(() => {
     if (!scrollRef.current) return;
 
@@ -250,7 +303,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             <VStack paddingX={6}>
               <DatasetSelector
                 datasets={datasets.data}
-                localStorageDatasetId={localStorageDatasetId}
+                localStorageDatasetId={datasetId}
                 register={register}
                 errors={errors}
                 setValue={setValue}
