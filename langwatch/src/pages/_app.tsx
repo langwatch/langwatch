@@ -27,6 +27,7 @@ import posthog from "posthog-js";
 import { Router } from "next/router";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { PostHogProvider } from "posthog-js/react";
+import { usePostHog } from "../hooks/usePostHog";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -526,6 +527,7 @@ const LangWatch: AppType<{
 }> = ({ Component, pageProps: { session, ...pageProps } }) => {
   const router = useRouter();
   const publicEnv = usePublicEnv();
+  const postHog = usePostHog();
 
   const [previousFeatureFlagQueryParams, setPreviousFeatureFlagQueryParams] =
     useState<{ key: string; value: string }[]>([]);
@@ -626,8 +628,8 @@ const LangWatch: AppType<{
         <Head>
           <title>LangWatch</title>
         </Head>
-        {publicEnv.data?.POSTHOG_KEY ? (
-          <PostHogProvider client={posthog}>
+        {postHog ? (
+          <PostHogProvider client={postHog}>
             <Component {...pageProps} />
           </PostHogProvider>
         ) : (
