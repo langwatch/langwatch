@@ -74,11 +74,6 @@ export function DatasetStep() {
     [datasets.data, selectedDataSetId]
   );
 
-  // Refetch datasets when the selected dataset id changes
-  useEffect(() => {
-    datasets.refetch();
-  }, [selectedDataSetId]);
-
   const upsertDataset = api.dataset.upsert.useMutation();
 
   const handleDataSourceSelect = useCallback(
