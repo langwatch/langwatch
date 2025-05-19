@@ -64,6 +64,26 @@ export const timeseries = async (input: TimeseriesInputType) => {
       typeof input.timeScale === "number" ? input.timeScale : undefined
     );
 
+  // Calculate total time span in minutes
+  const totalMinutes =
+    (endDate.getTime() - previousPeriodStartDate.getTime()) / (1000 * 60);
+
+  // Adjust timeScale to avoid too many buckets (max 1000 buckets)
+  let adjustedTimeScale = input.timeScale;
+  if (typeof input.timeScale === "number") {
+    const estimatedBuckets = totalMinutes / input.timeScale;
+    if (estimatedBuckets > 1000) {
+      // Round up to nearest minute that would give us less than 1000 buckets
+      adjustedTimeScale = Math.ceil(totalMinutes / 1000);
+    }
+  }
+
+  // Convert timeScale from minutes to days for the slicing calculation
+  const timeScaleInDays =
+    typeof adjustedTimeScale === "number"
+      ? adjustedTimeScale / (24 * 60) // Convert minutes to days
+      : 1;
+
   let aggs = Object.fromEntries(
     input.series.flatMap(
       ({ metric, aggregation, pipeline, key, subkey }: SeriesInputType) => {
@@ -184,7 +204,9 @@ export const timeseries = async (input: TimeseriesInputType) => {
             traces_per_day: {
               date_histogram: {
                 field: "timestamps.started_at",
-                fixed_interval: input.timeScale ? `${input.timeScale}d` : "1d",
+                fixed_interval: adjustedTimeScale
+                  ? `${adjustedTimeScale}m`
+                  : "1d",
                 min_doc_count: 0,
                 extended_bounds: {
                   min: previousPeriodStartDate.getTime(),
@@ -284,7 +306,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
   const aggregations = parseAggregations(
     result.aggregations.traces_per_day.buckets
   );
-  const toSlice = Math.ceil(daysDifference / (input.timeScale ?? 1));
+  const toSlice = Math.ceil(daysDifference / timeScaleInDays);
   let previousPeriod = aggregations.slice(0, toSlice);
   const currentPeriod = aggregations.slice(toSlice);
   previousPeriod = previousPeriod.slice(
