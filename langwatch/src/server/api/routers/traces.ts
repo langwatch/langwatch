@@ -35,7 +35,12 @@ import {
   checkUserPermissionForProject,
 } from "../permission";
 import { generateTracesPivotQueryConditions } from "./analytics/common";
-import { aggregateTraces, getTraceById, getTracesGroupedByThreadId, searchTraces,  } from "~/server/elasticsearch/traces";
+import {
+  aggregateTraces,
+  getTraceById,
+  getTracesGroupedByThreadId,
+  searchTraces,
+} from "~/server/elasticsearch/traces";
 import { getUserProtectionsForProject } from "../utils";
 import { transformElasticSearchTraceToTrace } from "~/server/elasticsearch/transformers";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
@@ -76,7 +81,9 @@ export const tracesRouter = createTRPCRouter({
         traceId: input.traceId,
         includeEvaluations: false,
         includeSpans: false,
-        protections: await getUserProtectionsForProject(ctx, { projectId: input.projectId }),
+        protections: await getUserProtectionsForProject(ctx, {
+          projectId: input.projectId,
+        }),
       });
       if (!trace) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Trace not found." });
@@ -96,7 +103,9 @@ export const tracesRouter = createTRPCRouter({
       )
     )
     .query(async ({ input, ctx }) => {
-      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
       return (
         await getEvaluationsMultiple({
           projectId: input.projectId,
@@ -114,7 +123,9 @@ export const tracesRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input, ctx }) => {
-      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
       return getEvaluationsMultiple({
         projectId: input.projectId,
         traceIds: input.traceIds,
@@ -186,7 +197,12 @@ export const tracesRouter = createTRPCRouter({
               },
             ];
           },
-          [] as { id: string; name: string; count: number; parentId?: string | null }[]
+          [] as {
+            id: string;
+            name: string;
+            count: number;
+            parentId?: string | null;
+          }[]
         );
       };
 
@@ -203,7 +219,9 @@ export const tracesRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input, ctx }) => {
-      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
       const result = await aggregateTraces({
         connConfig: { projectId: input.projectId },
         search: {
@@ -240,7 +258,9 @@ export const tracesRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input, ctx }) => {
       const { projectId, threadId } = input;
-      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
 
       return getTracesGroupedByThreadId({
         connConfig: { projectId },
@@ -254,7 +274,9 @@ export const tracesRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input, ctx }) => {
       const { projectId, traceIds } = input;
-      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
 
       return getTracesWithSpans(projectId, traceIds, protections);
     }),
@@ -286,8 +308,14 @@ export const tracesRouter = createTRPCRouter({
       }
 
       const { projectId } = input;
-      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
-      const traceWithSpans = await getTracesWithSpans(projectId, traceIds, protections);
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+      const traceWithSpans = await getTracesWithSpans(
+        projectId,
+        traceIds,
+        protections
+      );
 
       return traceWithSpans;
     }),
@@ -325,8 +353,14 @@ export const tracesRouter = createTRPCRouter({
       const { projectId, evaluatorType, preconditions, expectedResults } =
         input;
 
-      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
-      const traceWithSpans = await getTracesWithSpans(projectId, traceIds, protections);
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+      const traceWithSpans = await getTracesWithSpans(
+        projectId,
+        traceIds,
+        protections
+      );
 
       const passedPreconditions = traceWithSpans.filter(
         (trace) =>
@@ -400,38 +434,8 @@ export const getAllTracesForProject = async ({
   includeContexts?: boolean;
   scrollId?: string;
 }) => {
-  let traceIds: string[] = [];
-  let shouldExcludeTraceIds = false;
-
-  if (
-    Array.isArray(input.filters["annotations.hasAnnotation"]) &&
-    input.filters["annotations.hasAnnotation"].includes("true")
-  ) {
-    traceIds = await getAnnotatedTraceIds({
-      projectId: input.projectId,
-      startDate: new Date(input.startDate),
-      endDate: new Date(input.endDate),
-    });
-
-    shouldExcludeTraceIds =
-      input.filters["annotations.hasAnnotation"].includes("false");
-  } else if (
-    Array.isArray(input.filters["annotations.hasAnnotation"]) &&
-    input.filters["annotations.hasAnnotation"].includes("false") &&
-    !input.filters["annotations.hasAnnotation"].includes("true")
-  ) {
-    traceIds = await getAnnotatedTraceIds({
-      projectId: input.projectId,
-      startDate: new Date(input.startDate),
-      endDate: new Date(input.endDate),
-    });
-    shouldExcludeTraceIds = true;
-  }
-
   const { pivotIndexConditions } = generateTracesPivotQueryConditions({
     ...input,
-    traceIds,
-    filterForAnnotatedTraces: !shouldExcludeTraceIds,
   });
 
   let pageSize = input.pageSize ? input.pageSize : 25;
@@ -442,11 +446,14 @@ export const getAllTracesForProject = async ({
     pageSize = 10_000;
   }
 
-  const protections = await getUserProtectionsForProject({
-    prisma: ctx.prisma,
-    session: ctx.session,
-    publiclyShared: ctx.publiclyShared,
-  }, { projectId: input.projectId });
+  const protections = await getUserProtectionsForProject(
+    {
+      prisma: ctx.prisma,
+      session: ctx.session,
+      publiclyShared: ctx.publiclyShared,
+    },
+    { projectId: input.projectId }
+  );
 
   let tracesResult: SearchResponse<ElasticSearchTrace>;
   if (scrollId) {
@@ -546,9 +553,9 @@ export const getAllTracesForProject = async ({
     });
   }
 
-  const traces = tracesResult.hits.hits.map((hit) => hit._source!).map(
-    t => transformElasticSearchTraceToTrace(t, protections)
-  );
+  const traces = tracesResult.hits.hits
+    .map((hit) => hit._source!)
+    .map((t) => transformElasticSearchTraceToTrace(t, protections));
 
   const guardrailsSlugToName = Object.fromEntries(
     (
@@ -641,11 +648,10 @@ export const getAllTracesForProject = async ({
   totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
 
   const evaluations = Object.fromEntries(
-    traces
-      .map((trace) => [trace.trace_id, trace.evaluations ?? []])
+    traces.map((trace) => [trace.trace_id, trace.evaluations ?? []])
   );
 
-  const groups = groupTraces(input.groupBy, tracesWithGuardrails)
+  const groups = groupTraces(input.groupBy, tracesWithGuardrails);
 
   return {
     groups,

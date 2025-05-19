@@ -60,30 +60,6 @@ export const dataForFilter = protectedProcedure
       },
     });
 
-    if (field === "annotations.hasAnnotation") {
-      const annotatedTraceIds = await getAnnotatedTraceIds({
-        projectId: input.projectId,
-        startDate: new Date(input.startDate),
-        endDate: new Date(input.endDate),
-      });
-      response.aggregations = {
-        unique_values: {
-          buckets: [
-            {
-              key: "true",
-              doc_count: annotatedTraceIds.length,
-            },
-            {
-              key: "false",
-              doc_count:
-                ((response.hits.total as any)?.value ?? 0) -
-                annotatedTraceIds.length,
-            },
-          ],
-        },
-      };
-    }
-
     const results = availableFilters[field].listMatch.extract(
       (response.aggregations ?? {}) as any
     );
