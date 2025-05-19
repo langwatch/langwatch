@@ -24,28 +24,33 @@ export const useLocalStorageSelectedDataSetId = () => {
   };
 
   const handleSetSelectedDataSetId = useCallback(
-    (datasetId: string) => {
+    async (datasetId: string) => {
       // If the dataset id is an empty string, clear the local storage and return early.
       if (datasetId === "") {
         clear();
         return;
       }
 
-      const dataset = trpc.dataset.getById.fetch({
-        projectId: project?.id ?? "",
-        datasetId,
-      });
+      try {
+        const dataset = await trpc.dataset.getById.fetch({
+          projectId: project?.id ?? "",
+          datasetId,
+        });
 
-      const doesDatasetExist = !!dataset;
+        const doesDatasetExist = !!dataset;
 
-      if (doesDatasetExist) {
-        setSelectedDataSetId(datasetId);
-      } else {
-        logger.warn(
-          { datasetId },
-          "Tried to set selected dataset to local storage, but it does not exist"
-        );
+        if (doesDatasetExist) {
+          setSelectedDataSetId(datasetId);
+        } else {
+          logger.warn(
+            { datasetId },
+            "Tried to set selected dataset to local storage, but it does not exist"
+          );
 
+          clear();
+        }
+      } catch (error) {
+        logger.error({ error }, "Error fetching dataset");
         clear();
       }
     },
