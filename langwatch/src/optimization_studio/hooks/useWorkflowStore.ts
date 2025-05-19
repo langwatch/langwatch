@@ -140,6 +140,7 @@ export const initialDSL: Workflow = {
   default_llm: DEFAULT_LLM_CONFIG,
   template_adapter: "default",
   enable_tracing: true,
+  workflow_type: "workflow",
   state: {},
 };
 
@@ -172,6 +173,7 @@ export const getWorkflow = (state: State) => {
     nodes: state.nodes,
     edges: state.edges,
     state: state.state,
+    workflow_type: state.workflow_type,
   };
 };
 

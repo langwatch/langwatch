@@ -1,4 +1,4 @@
-name: Publish Python SDK to PyPI
+name: python-sdk-cd
 
 on:
   release:

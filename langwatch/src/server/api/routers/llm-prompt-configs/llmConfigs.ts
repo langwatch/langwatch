@@ -33,7 +33,7 @@ export const llmConfigsRouter = createTRPCRouter({
    */
   getPromptConfigs: protectedProcedure
     .input(projectIdSchema)
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
     .query(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
       return await repository.getAllWithLatestVersion(input.projectId);
@@ -44,7 +44,7 @@ export const llmConfigsRouter = createTRPCRouter({
    */
   getByIdWithLatestVersion: protectedProcedure
     .input(idSchema.merge(projectIdSchema))
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
     .query(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
 
@@ -67,7 +67,7 @@ export const llmConfigsRouter = createTRPCRouter({
    */
   createConfigWithInitialVersion: protectedProcedure
     .input(configDataSchema)
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
       const authorId = ctx.session?.user?.id;
@@ -99,7 +99,7 @@ export const llmConfigsRouter = createTRPCRouter({
         })
       )
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
 
@@ -124,7 +124,7 @@ export const llmConfigsRouter = createTRPCRouter({
    */
   deletePromptConfig: protectedProcedure
     .input(idSchema.merge(projectIdSchema))
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
 

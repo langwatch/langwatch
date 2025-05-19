@@ -25,7 +25,7 @@ import path from "path";
 import fs from "fs";
 import { workerRestartsCounter } from "../metrics";
 
-class WorkersRestart extends Error {
+export class WorkersRestart extends Error {
   constructor(message: string) {
     super(message);
     this.name = "WorkersRestart";

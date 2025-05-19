@@ -1,6 +1,6 @@
-import { Flex, Spacer } from "@chakra-ui/react";
+import { Flex, Spacer, VStack } from "@chakra-ui/react";
 import { type LlmPromptConfig } from "@prisma/client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Plus } from "react-feather";
 
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
@@ -14,12 +14,14 @@ import {
 } from "~/prompt-configs/PromptConfigTable";
 import { api } from "~/utils/api";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { CENTER_CONTENT_BOX_ID } from "~/components/executable-panel/InputOutputExecutablePanel";
 
 export default function PromptConfigsPage() {
   const utils = api.useContext();
   const { project } = useOrganizationTeamProject();
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isPaneExpanded, setIsPaneExpanded] = useState(true); // Start open
   const [configToDelete, setConfigToDelete] = useState<LlmPromptConfig | null>(
     null
   );
@@ -35,18 +37,18 @@ export default function PromptConfigsPage() {
   } = api.llmConfigs.getPromptConfigs.useQuery(
     {
       projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project?.id,
+      onError: (error) => {
+        toaster.create({
+          title: "Error loading prompt configs from here",
+          description: error.message,
+          type: "error",
+        });
       },
-      {
-        enabled: !!project?.id,
-        onError: (error) => {
-          toaster.create({
-            title: "Error loading prompt configs from here",
-            description: error.message,
-            type: "error",
-          });
-        },
-      }
-    );
+    }
+  );
 
   const createConfigWithInitialVersionMutation =
     api.llmConfigs.createConfigWithInitialVersion.useMutation();
@@ -140,53 +142,105 @@ export default function PromptConfigsPage() {
     });
   }, []);
 
+  /**
+   * NB: The styling and markup of this page is a bit hacky
+   * and complicated because we need to both position the panel
+   * absolutely to the page contents as well as allow for the table to
+   * be able to scroll correctly. Please feel free to refactor this
+   * if you can come up with a better way!
+   *
+   * Also, there's a chance that this won't work exactly as expected if the
+   * panel changes size independently, but that's an edge case that can be
+   * addressed if it comes up.
+   *
+   * @see https://github.com/langwatch/langwatch/pull/352#discussion_r2091220922
+   */
+  const panelRef = useRef<HTMLDivElement>(null);
+  const centerContentElementRef: HTMLDivElement | null =
+    panelRef.current?.querySelector(
+      `#${CENTER_CONTENT_BOX_ID}`
+    ) as HTMLDivElement | null;
+
   return (
     <DashboardLayout position="relative">
-      <Flex
-        flexDirection="column"
-        height="100%"
-        width="100%"
-        position="relative"
+      {/* Main content outer wrapper */}
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          height: "100%",
+        }}
       >
-        <PageLayout.Container
-          maxW={"calc(100vw - 200px)"}
-          padding={6}
-          marginTop={8}
+        {/* Main content inner wrapper for the table -- allows for scrolling */}
+        <div
+          style={{
+            position: "absolute",
+            height: "100%",
+            width: "100%",
+            overflow: "scroll",
+          }}
         >
-          <PageLayout.Header>
-            <PageLayout.Heading>Prompts</PageLayout.Heading>
-            <Spacer />
-            <PageLayout.HeaderButton
-              onClick={() => void handleCreateButtonClick()}
+          <Flex flexDirection="column" height="100%">
+            <PageLayout.Container
+              maxW={"calc(100vw - 200px)"}
+              padding={6}
+              marginTop={8}
             >
-              <Plus height={16} /> Create New
-            </PageLayout.HeaderButton>
-          </PageLayout.Header>
-          <PageLayout.Content>
-            <PromptConfigTable
-              configs={promptConfigs ?? []}
-              isLoading={isLoading}
-              onRowClick={(config) => setSelectedConfigId(config.id)}
-              columns={defaultColumns}
-            />
-          </PageLayout.Content>
+              <PageLayout.Header>
+                <PageLayout.Heading>Prompts</PageLayout.Heading>
+                <Spacer />
+                <PageLayout.HeaderButton
+                  onClick={() => void handleCreateButtonClick()}
+                >
+                  <Plus height={16} /> Create New
+                </PageLayout.HeaderButton>
+              </PageLayout.Header>
+              <PageLayout.Content>
+                <PromptConfigTable
+                  configs={promptConfigs ?? []}
+                  isLoading={isLoading}
+                  onRowClick={(config) => setSelectedConfigId(config.id)}
+                  columns={defaultColumns}
+                />
+              </PageLayout.Content>
 
-          <DeleteConfirmationDialog
-            title="Are you really sure?"
-            description="There is no going back, and you will lose all versions of this prompt. If you're sure you want to delete this prompt, type 'delete' below:"
-            open={isDeleteDialogOpen}
-            onClose={() => setIsDeleteDialogOpen(false)}
-            onConfirm={() => {
-              void confirmDeleteConfig();
-            }}
+              <DeleteConfirmationDialog
+                title="Are you really sure?"
+                description="There is no going back, and you will lose all versions of this prompt. If you're sure you want to delete this prompt, type 'delete' below:"
+                open={isDeleteDialogOpen}
+                onClose={() => setIsDeleteDialogOpen(false)}
+                onConfirm={() => {
+                  void confirmDeleteConfig();
+                }}
+              />
+            </PageLayout.Container>
+          </Flex>
+        </div>
+
+        {/* Prompt config panel with absolute position wrapper */}
+        <VStack
+          height="100%"
+          maxHeight="100vh"
+          position="absolute"
+          top={0}
+          width={
+            isPaneExpanded && selectedConfigId
+              ? "100%"
+              : centerContentElementRef?.offsetWidth
+          }
+          right={0}
+          bottom={0}
+        >
+          <PromptConfigPanel
+            ref={panelRef}
+            isOpen={!!selectedConfigId}
+            onClose={closePanel}
+            configId={selectedConfigId ?? ""}
+            isPaneExpanded={isPaneExpanded}
+            setIsPaneExpanded={setIsPaneExpanded}
           />
-        </PageLayout.Container>
-        <PromptConfigPanel
-          isOpen={!!selectedConfigId}
-          onClose={closePanel}
-          configId={selectedConfigId ?? ""}
-        />
-      </Flex>
+        </VStack>
+      </div>
     </DashboardLayout>
   );
 }

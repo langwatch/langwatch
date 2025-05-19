@@ -19,16 +19,18 @@ from uuid import UUID
 import threading
 import inspect
 
-from langwatch.attributes import AttributeName
+from langwatch.attributes import AttributeKey
 from langwatch.utils.transformation import (
     SerializableWithStringFallback,
     rag_contexts,
     convert_typed_values,
     truncate_object_recursively,
 )
-from opentelemetry import trace as trace_api, context as context_api
+from opentelemetry import trace as trace_api
+from opentelemetry.util.types import Attributes as OtelAttributes
 from opentelemetry.trace import (
     SpanKind,
+    NonRecordingSpan,
     Link,
     Span as OtelSpan,
     Status,
@@ -99,7 +101,7 @@ class LangWatchSpan:
         ignore_missing_trace_warning: bool = False,
         # OpenTelemetry parameters
         kind: SpanKind = SpanKind.INTERNAL,
-        span_context: Optional[context_api.Context] = None,
+        span_context: Optional[SpanContext] = None,
         attributes: Optional[Dict[str, Any]] = None,
         links: Optional[List[Link]] = None,
         start_time: Optional[int] = None,
@@ -114,11 +116,10 @@ class LangWatchSpan:
             warn(
                 "span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the spans's metadata."
             )
-            attributes[AttributeName.DeprecatedSpanId] = str(span_id)
+            attributes[AttributeKey.DeprecatedSpanId] = str(span_id)
 
         # Initialize critical instance attributes first
         self._lock = threading.Lock()
-        self._span = None
         self._cleaned_up = False
 
         # Initialize other attributes
@@ -140,7 +141,7 @@ class LangWatchSpan:
         self.evaluations = evaluations
 
         # Store OpenTelemetry-specific parameters
-        self._span = None
+        self._span: OtelSpan
         self._span_context_manager = None
         self.kind = kind
         self.span_context = span_context
@@ -157,16 +158,14 @@ class LangWatchSpan:
             ),
         )
 
-    def _create_span(self):
+        self._create_span(do_not_set_context=True)
+
+    def _create_span(self, do_not_set_context: bool = False):
         """Internal method to create and start the OpenTelemetry span."""
         try:
             if self.trace:
                 tracer = self.trace.tracer
             else:
-                if not self.ignore_missing_trace_warning and not self.parent:
-                    warn(
-                        "No current trace found, some spans may not be sent to LangWatch"
-                    )
                 tracer = trace_api.get_tracer("langwatch", __version__)
 
             # Handle parent span
@@ -174,39 +173,52 @@ class LangWatchSpan:
             if parent is None:
                 # If no explicit parent, try to get from context
                 current_span = stored_langwatch_span.get(None)
-                if current_span is not None and current_span._span is not None:
+                if current_span is not None:
                     parent = current_span._span
                 else:
                     # If still no parent, use the current span from OpenTelemetry context
                     parent = get_current_span()
             parent_span_context: Optional[Context] = None
-            if isinstance(parent, LangWatchSpan) and parent._span is not None:
+            if isinstance(parent, LangWatchSpan):
                 parent_span_context = set_span_in_context(parent._span)
 
-            # Create the underlying OpenTelemetry span
-            try:
-                self._span_context_manager = tracer.start_as_current_span(
+            span_ctx = None
+            if self.span_context is not None:
+                span_ctx = trace_api.set_span_in_context(
+                    NonRecordingSpan(self.span_context)
+                )
+            elif parent_span_context is not None:
+                span_ctx = parent_span_context
+
+            if do_not_set_context:
+                self._span = tracer.start_span(
                     name=self.name or self.type,
-                    context=self.span_context or parent_span_context,
+                    context=span_ctx,
                     kind=self.kind,
                     links=self.links,
                     start_time=self.start_time,
                     record_exception=self.record_exception,
                     set_status_on_exception=self.set_status_on_exception,
                     attributes=self.attributes,
-                    end_on_exit=True,
                 )
-                self._span = self._span_context_manager.__enter__()
-
-                if not self._span:
-                    warn("Failed to create span - got None from tracer")
+            else:
+                # Create the underlying OpenTelemetry span
+                try:
+                    self._span_context_manager = tracer.start_as_current_span(
+                        name=self.name or self.type,
+                        context=span_ctx,
+                        kind=self.kind,
+                        links=self.links,
+                        start_time=self.start_time,
+                        record_exception=self.record_exception,
+                        set_status_on_exception=self.set_status_on_exception,
+                        attributes=self.attributes,
+                        end_on_exit=True,
+                    )
+                    self._span = self._span_context_manager.__enter__()
+                except Exception as e:
+                    warn(f"Failed to set span on context: {str(e)}.")
                     return
-
-            except Exception as e:
-                warn(
-                    f"Failed to create span: {str(e)}. Span operations will be no-ops."
-                )
-                return
 
             try:
                 self.update(
@@ -227,14 +239,11 @@ class LangWatchSpan:
 
         except Exception as e:
             warn(
-                f"Unexpected error creating span: {str(e)}. Span operations will be no-ops."
+                f"Unexpected error creating span: {str(e)}. Span operations may be no-ops."
             )
 
     def record_error(self, error: Exception) -> None:
         """Record an error in this span."""
-        if self._span is None:
-            warn("Cannot record error - no span available")
-            return
         try:
             self._span.set_status(Status(StatusCode.ERROR))
             self._span.record_exception(error)
@@ -243,9 +252,6 @@ class LangWatchSpan:
 
     def add_event(self, name: str, attributes: Optional[Dict[str, Any]] = None) -> None:
         """Add an event to this span."""
-        if self._span is None:
-            warn("Cannot add event - no span available")
-            return
         try:
             self._span.add_event(name, attributes)
         except Exception as e:
@@ -253,9 +259,6 @@ class LangWatchSpan:
 
     def set_status(self, status: Status, description: Optional[str] = None) -> None:
         """Set the status of this span."""
-        if self._span is None:
-            warn("Cannot set status - no span available")
-            return
         try:
             self._span.set_status(status, description)
         except Exception as e:
@@ -263,19 +266,17 @@ class LangWatchSpan:
 
     def set_attributes(self, attributes: Dict[str, Any]) -> None:
         """Set attributes on this span."""
-        if self._span is None:
-            warn("Cannot set attributes - no span available")
-            return
         try:
             self._span.set_attributes(attributes)
         except Exception as e:
             warn(f"Failed to set attributes on span: {str(e)}")
 
+    def is_recording(self) -> bool:
+        """Check if the span is recording."""
+        return self._span.is_recording()
+
     def update_name(self, name: str) -> None:
         """Update the name of the span."""
-        if self._span is None:
-            warn("Cannot update name - no span available")
-            return
         try:
             self.name = name
             self._span.update_name(name)
@@ -284,10 +285,18 @@ class LangWatchSpan:
 
     def get_span_context(self) -> Optional[SpanContext]:
         """Get the span context of this span."""
-        if self._span is None:
-            warn("Cannot get span context - no span available")
-            return None
         return self._span.get_span_context()
+
+    def add_link(
+        self,
+        context: "SpanContext",
+        attributes: OtelAttributes = None,
+    ) -> None:
+        """Add a link to this span."""
+        try:
+            self._span.add_link(context, attributes)
+        except Exception as e:
+            warn(f"Failed to add link to span: {str(e)}")
 
     def update(
         self,
@@ -306,10 +315,6 @@ class LangWatchSpan:
     ) -> None:
         ensure_setup()
 
-        if self._span is None:
-            warn("Cannot set attributes - no span available")
-            return
-
         attributes = dict(kwargs)
 
         if name is not None:
@@ -319,13 +324,13 @@ class LangWatchSpan:
             warn(
                 "span_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `span_id` will be mapped to `deprecated.span_id` in the spans's metadata."
             )
-            attributes[AttributeName.DeprecatedSpanId] = str(span_id)
+            attributes[AttributeKey.DeprecatedSpanId] = str(span_id)
         if type is not None:
             self.type = type
-            attributes[AttributeName.LangWatchSpanType] = str(type)
+            attributes[AttributeKey.LangWatchSpanType] = str(type)
         if self.capture_input and input is not None:
             self.input = input
-            attributes[AttributeName.LangWatchInput] = json.dumps(
+            attributes[AttributeKey.LangWatchInput] = json.dumps(
                 truncate_object_recursively(
                     convert_typed_values(deepcopy(input)),
                     max_string_length=(
@@ -336,7 +341,7 @@ class LangWatchSpan:
             )
         if self.capture_output and output is not None:
             self.output = output
-            attributes[AttributeName.LangWatchOutput] = json.dumps(
+            attributes[AttributeKey.LangWatchOutput] = json.dumps(
                 truncate_object_recursively(
                     convert_typed_values(deepcopy(output)),
                     max_string_length=(
@@ -350,12 +355,12 @@ class LangWatchSpan:
             self.record_error(error)
         if timestamps is not None:
             self.timestamps = timestamps
-            attributes[AttributeName.LangWatchTimestamps] = json.dumps(
+            attributes[AttributeKey.LangWatchTimestamps] = json.dumps(
                 timestamps, cls=SerializableWithStringFallback
             )
         if contexts is not None:
             self.contexts = contexts
-            attributes[AttributeName.LangWatchRAGContexts] = json.dumps(
+            attributes[AttributeKey.LangWatchRAGContexts] = json.dumps(
                 truncate_object_recursively(
                     rag_contexts(contexts),
                     max_string_length=(
@@ -366,17 +371,17 @@ class LangWatchSpan:
             )
         if model is not None:
             self.model = model
-            attributes[AttributeName.GenAIRequestModel] = model
+            attributes[AttributeKey.GenAIRequestModel] = model
         if params is not None:
             params = deepcopy(params)
             self.params = {**(self.params or {}), **params}
-            attributes[AttributeName.LangWatchParams] = json.dumps(
+            attributes[AttributeKey.LangWatchParams] = json.dumps(
                 self.params, cls=SerializableWithStringFallback
             )
         if metrics is not None:
             metrics = deepcopy(metrics)
             self.metrics = {**(self.metrics or {}), **metrics}
-            attributes[AttributeName.LangWatchMetrics] = json.dumps(
+            attributes[AttributeKey.LangWatchMetrics] = json.dumps(
                 self.metrics, cls=SerializableWithStringFallback
             )
 
@@ -401,7 +406,7 @@ class LangWatchSpan:
 
         from langwatch import evaluations
 
-        return evaluations.add_evaluation(
+        return evaluations._add_evaluation(  # type: ignore
             span=self,
             evaluation_id=evaluation_id,
             name=name,
@@ -510,7 +515,7 @@ class LangWatchSpan:
             and self._span_context_manager is not None
         ):
             self._span_context_manager.__exit__(None, error, None)
-        elif hasattr(self, "_span") and self._span is not None:
+        elif hasattr(self, "_span"):
             self._span.end(end_time)
 
     def __call__(self, func: T) -> T:
@@ -596,16 +601,13 @@ class LangWatchSpan:
                 finally:
                     self._span_context_manager = None
 
-            if hasattr(self, "_span") and self._span is not None:
-                self._span = None
-
             self._cleaned_up = True
 
     def __enter__(self) -> "LangWatchSpan":
         """Makes the span usable as a context manager."""
         self.trace = self.trace or stored_langwatch_trace.get(None)
         if not self.ignore_missing_trace_warning and not self.trace and not self.parent:
-            warn("No current trace found, some spans will may not be sent to LangWatch")
+            warn("No current trace found, some spans may not be sent to LangWatch")
 
         self._create_span()
         self.span = cast(
@@ -774,7 +776,7 @@ def span(
     ignore_missing_trace_warning: bool = False,
     # OpenTelemetry parameters
     kind: SpanKind = SpanKind.INTERNAL,
-    span_context: Optional[Context] = None,
+    span_context: Optional[SpanContext] = None,
     attributes: Optional[Dict[str, Any]] = None,
     links: Optional[List[Link]] = None,
     start_time: Optional[int] = None,
@@ -792,7 +794,7 @@ def span(
         type: Type of operation this span represents
         trace: Optional trace this span belongs to
         parent: Optional parent span
-        span_id: Deprecated.Optional span identifier (will be generated if not provided)
+        span_id: Deprecated. Optional span identifier
         capture_input: Whether to capture inputs
         capture_output: Whether to capture outputs
         input: Optional input data

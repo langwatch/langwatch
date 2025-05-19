@@ -1,6 +1,10 @@
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Sequence, Union
 from typing_extensions import TypedDict
 from pydantic import BaseModel
+
+# Type aliases for common types
+AttributeValue = Union[str, int, float, bool, Sequence[str]]
+BaseAttributes = Dict[str, AttributeValue]
 
 
 class SpanProcessingExcludeRule(BaseModel):

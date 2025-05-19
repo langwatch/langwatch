@@ -1,7 +1,9 @@
 """Common types and protocols for LangWatch."""
 
-from typing import Protocol, Dict, Union, Sequence
+from typing import Protocol
 from langwatch.domain import (
+    BaseAttributes,
+    AttributeValue,
     Conversation,
     Evaluation,
     EvaluationResult,
@@ -28,21 +30,27 @@ from langwatch.domain import (
     TraceMetadata,
 )
 
-# Type aliases for common types
-AttributeValue = Union[str, int, float, bool, Sequence[str]]
-BaseAttributes = Dict[str, AttributeValue]
-
-
 class LangWatchClientProtocol(Protocol):
     """Protocol defining the required interface for LangWatch client instances."""
     @property
     def endpoint_url(self) -> str:
         """Get the endpoint URL for the client."""
-        ... 
+        ...
 
     @property
     def api_key(self) -> str:
         """Get the API key for the client."""
+        ...
+
+    @api_key.setter
+    def api_key(self, value: str) -> None:
+        """
+        Set a new API key for the client. This will:
+        - override the current API key
+        - flush any existing spans
+        - create a new span processor
+        - potentially create a new tracer provider
+        """
         ...
 
     @property
@@ -67,6 +75,8 @@ class LangWatchClientProtocol(Protocol):
 
 
 __all__ = [
+    "BaseAttributes",
+    "AttributeValue",
     "Conversation",
     "Evaluation",
     "EvaluationResult",

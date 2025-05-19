@@ -1,5 +1,6 @@
 import { Button, Heading, HStack } from "@chakra-ui/react";
 import { X } from "lucide-react";
+import { Columns } from "lucide-react";
 
 // Component for the panel header
 interface PanelHeaderProps {
@@ -70,9 +71,9 @@ interface PanelActionsProps {
 function PanelActions({ onExpand, onClose }: PanelActionsProps) {
   return (
     <HStack gap={0}>
-      {/* <Button variant="ghost" size="sm" color="gray.500" onClick={onExpand}>
+      <Button variant="ghost" size="sm" color="gray.500" onClick={onExpand}>
         <Columns size={16} />
-      </Button> */}
+      </Button>
       <Button variant="ghost" size="sm" color="gray.500" onClick={onClose}>
         <X size={16} />
       </Button>

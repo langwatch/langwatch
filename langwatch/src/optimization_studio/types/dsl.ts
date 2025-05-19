@@ -38,6 +38,8 @@ export type Field = {
   hidden?: boolean;
   json_schema?: object;
 };
+export const WORKFLOW_TYPES = ["component", "evaluator", "workflow"] as const;
+export type WorkflowTypes = (typeof WORKFLOW_TYPES)[number];
 
 export type ExecutionStatus =
   | "idle"
@@ -56,6 +58,22 @@ export type ComponentType =
   | "custom"
   | "evaluator";
 
+// Define the execution state type
+export interface ExecutionState {
+  status: ExecutionStatus;
+  trace_id?: string;
+  span_id?: string;
+  error?: string;
+  parameters?: Record<string, any>;
+  inputs?: Record<string, any>;
+  outputs?: Record<string, any>;
+  cost?: number;
+  timestamps?: {
+    started_at?: number;
+    finished_at?: number;
+  };
+}
+
 export type BaseComponent = {
   _library_ref?: string;
   id?: string;
@@ -68,20 +86,7 @@ export type BaseComponent = {
   isCustom?: boolean;
   behave_as?: "evaluator";
 
-  execution_state?: {
-    status: ExecutionStatus;
-    trace_id?: string;
-    span_id?: string;
-    error?: string;
-    parameters?: Record<string, any>;
-    inputs?: Record<string, any>;
-    outputs?: Record<string, any>;
-    cost?: number;
-    timestamps?: {
-      started_at?: number;
-      finished_at?: number;
-    };
-  };
+  execution_state?: ExecutionState;
 };
 
 export const llmConfigSchema = z.object({
@@ -235,6 +240,7 @@ export const workflowJsonSchema = z
     nodes: z.array(z.any()),
     edges: z.array(z.any()),
     default_llm: llmConfigSchema,
+    workflow_type: z.enum(WORKFLOW_TYPES).optional(),
   })
   .passthrough();
 
@@ -252,6 +258,7 @@ export type Workflow = {
   data?: Record<string, any>;
   template_adapter: "default" | "dspy_chat_adapter";
   enable_tracing: boolean;
+  workflow_type?: WorkflowTypes;
 
   state: {
     execution?: {

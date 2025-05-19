@@ -4,6 +4,7 @@ from .telemetry.tracing import trace
 from .telemetry.sampling import sampling_rate
 from .telemetry.context import get_current_trace, get_current_span
 from .telemetry.span import span
+from .login import login
 from .state import get_api_key, get_endpoint
 from .__version__ import __version__
 from .utils.initialization import ensure_setup, setup
@@ -66,9 +67,9 @@ __all__ = [
     "setup",
     "trace",
     "span",
+    "login",
     "endpoint",
     "api_key",
-    "login",
     "__version__",
     "sampling_rate",
     "ensure_setup",

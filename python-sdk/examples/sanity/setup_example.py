@@ -5,7 +5,7 @@ import nanoid
 from openai import OpenAI
 from dotenv import load_dotenv
 from langwatch.observability.span import SpanType
-from langwatch.attributes import AttributeName, MetadataName
+from langwatch.attributes import AttributeKey, MetadataName
 from opentelemetry.trace import get_current_span
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from openinference.instrumentation.openai import OpenAIInstrumentor
@@ -25,8 +25,8 @@ langwatch.setup(
     api_key=os.getenv("LANGWATCH_API_KEY"),
     endpoint_url=os.getenv("LANGWATCH_ENDPOINT_URL"),
     base_attributes={
-        AttributeName.ServiceName: "langwatch-examples-sanity-setup-example",
-        AttributeName.ServiceVersion: "1.0.0",
+        AttributeKey.ServiceName: "langwatch-examples-sanity-setup-example",
+        AttributeKey.ServiceVersion: "1.0.0",
     },
     instrumentors=[
         OpenAIInstrumentor(),

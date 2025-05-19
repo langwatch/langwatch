@@ -172,6 +172,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                         lineClamp={1}
                         wordBreak="break-all"
                         fontSize="15px"
+                        maxWidth="300px"
                       >
                         {topic.name}
                       </OverflownTextWithTooltip>
@@ -210,6 +211,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                             <OverflownTextWithTooltip
                               lineClamp={1}
                               wordBreak="break-all"
+                              maxWidth="300px"
                             >
                               {subtopic.name}
                             </OverflownTextWithTooltip>

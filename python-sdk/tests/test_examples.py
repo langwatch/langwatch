@@ -1,36 +1,34 @@
 import json
 import os
 import importlib
-import sys
-from typing import Optional, cast
+from typing import Optional, Sequence
 import pytest
 import asyncio
 import chainlit as cl
 
 import langwatch
 from chainlit.context import init_http_context
-from langwatch.tracer import ContextTrace
+from opentelemetry.sdk import trace as trace_sdk
 from opentelemetry.sdk.trace.export import (
     SpanExportResult,
     SpanExporter,
     SimpleSpanProcessor,
 )
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk import trace as trace_sdk
-from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+from opentelemetry.sdk.trace import ReadableSpan
 
-last_trace: Optional[ContextTrace] = None
 trace_urls: dict[str, str] = {}
 
 
 class TraceIdCapturerExporter(SpanExporter):
-    def export(self, spans):
-        global last_trace
+    def __init__(self):
+        self.captured_trace_id: Optional[str] = None
 
-        context = spans[0].get_span_context()
-        if context is not None:
-            last_trace = ContextTrace()
-            last_trace._trace_id = context.trace_id
+    def export(self, spans: Sequence[ReadableSpan]):
+        if self.captured_trace_id is None and spans:
+            span = spans[0]
+            context = span.get_span_context()
+            if context and context.is_valid:
+                self.captured_trace_id = f"{context.trace_id:032x}"
         return SpanExportResult.SUCCESS
 
 
@@ -48,7 +46,7 @@ def get_example_files():
 
 @pytest.mark.parametrize("example_file", get_example_files())
 @pytest.mark.asyncio
-async def test_example(example_file):
+async def test_example(example_file: str):
     if example_file == "batch_evalutation.py":
         pytest.skip("batch_evalutation.py is not a runnable example")
     if example_file == "opentelemetry/openllmetry_anthropic_bot.py":
@@ -64,17 +62,10 @@ async def test_example(example_file):
             "langchain_rag_bot_vertex_ai.py is broken due to a bug in current langchain version of global state mutation when running together with other langchain"
         )
 
-    global last_trace
-    last_trace = None
-
-    # Dynamically import the main function from the example file
-    module_name = (
-        f"examples.{example_file[:-3].replace('/', '.')}"  # Remove .py extension
-    )
+    module_name = f"examples.{example_file[:-3].replace('/', '.')}"
     module = importlib.import_module(module_name)
     init_http_context()
 
-    # Skip if there's no main function
     main_func = getattr(module, "main", None)
     if "fastapi" in example_file:
         main_func = getattr(module, "call_fastapi_sample_endpoint", None)
@@ -82,11 +73,7 @@ async def test_example(example_file):
         pytest.skip(f"No main function found in {example_file}")
 
     if "opentelemetry" in example_file:
-        tracer_provider = getattr(module, "tracer_provider")
-        # Remove console printing exporter
-        tracer_provider._active_span_processor._span_processors = (
-            tracer_provider._active_span_processor._span_processors[0],
-        )
+        tracer_provider = trace_sdk.TracerProvider()
         # Capture trace id
         tracer_provider.add_span_processor(
             SimpleSpanProcessor(TraceIdCapturerExporter())
@@ -107,10 +94,16 @@ async def test_example(example_file):
     # Call the main function
     with langwatch.trace() as trace:
         try:
-            if asyncio.iscoroutinefunction(main_func):
-                await main_func(mock_message)
+            if "documentation" in example_file:
+                if asyncio.iscoroutinefunction(main_func):
+                    await main_func()
+                else:
+                    main_func()
             else:
-                main_func(mock_message)
+                if asyncio.iscoroutinefunction(main_func):
+                    await main_func(mock_message)
+                else:
+                    main_func(mock_message)
         except Exception as e:
             if str(e) != "This exception will be captured by LangWatch automatically":
                 pytest.fail(f"Error running main function in {example_file}: {str(e)}")
@@ -118,21 +111,3 @@ async def test_example(example_file):
         trace.send_spans()
         trace_urls[example_file] = trace.share()
         print(json.dumps(trace_urls, indent=2))
-
-
-@pytest.mark.asyncio
-async def test_example_legacy_langchain_pydantic_bot():
-    import subprocess
-
-    result = subprocess.run(
-        ["poetry", "run", ".venv/bin/python", "legacy_langchain_pydantic_bot.py"],
-        cwd="examples/legacy",
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    print(result.stdout)
-
-    if result.returncode != 0:
-        pytest.fail(f"Failed to run legacy_langchain_pydantic_bot.py: {result.stderr}")

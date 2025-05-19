@@ -5,7 +5,7 @@ test:
 
 test-examples:
 	uv pip install crewai==0.60.0 openinference-instrumentation-crewai duckduckgo_search; \
-	uv run pytest tests/test_examples.py -p no:warnings -s -x $(filter-out $@,$(MAKECMDGOALS))
+	uv run pytest tests/test_examples.py -p no:warnings -s $(filter-out $@,$(MAKECMDGOALS))
 
 install:
 	@if ! command -v uv &> /dev/null; then \

@@ -1,8 +1,10 @@
 import json
 import os
 import importlib
+import random
 import sys
 from typing import Optional, cast
+import litellm
 import pytest
 import asyncio
 import chainlit as cl
@@ -14,6 +16,7 @@ from opentelemetry.sdk.trace.export import (
     SpanExporter,
     SimpleSpanProcessor,
 )
+from litellm.files.main import ModelResponse
 
 
 last_trace: Optional[ContextTrace] = None
@@ -108,11 +111,38 @@ async def test_example(example_file):
         await on_chat_start()
 
     # Create a mock cl.Message
-    content = (
-        "who is the oldest person?"
-        if "span_evaluation" in example_file
-        else "what is LangWatch?" if "rag" in example_file else "hello"
-    )
+    if "span_evaluation" in example_file:
+        content = "who is the oldest person?"
+    elif "rag" in example_file:
+        content = "what is LangWatch?"
+    else:
+        starters = [
+            "when",
+            "who",
+            "what",
+            "where",
+            "why",
+            "how",
+            "if",
+            "how much",
+        ]
+        starter = random.choice(starters)
+        message = cast(
+            ModelResponse,
+            litellm.completion(
+                model="gpt-4.1-nano",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"Pretend to be a user, you are asking a question to a chatbot, any question, mundane, one short line, all lowercase, be creative. Start the question with \"{starter}\".",
+                    }
+                ],
+                temperature=1.0,
+                caching=False,
+            ),
+        )
+        content = message["choices"][0]["message"]["content"]
+
     mock_message = content if "fastapi" in example_file else cl.Message(content=content)
 
     # Call the main function

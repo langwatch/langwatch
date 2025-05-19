@@ -13,10 +13,10 @@ import { BasePropertiesPanel, PropertyField } from "./BasePropertiesPanel";
 import { OptimizationStudioLLMConfigField } from "./llm-configs/OptimizationStudioLLMConfigField";
 import { WorkflowIcon } from "../ColorfulBlockIcons";
 import { EmojiPickerModal } from "./modals/EmojiPickerModal";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { evaluatorInputs } from "./EndPropertiesPanel";
-import type { End } from "../../types/dsl";
+import type { End, WorkflowTypes } from "../../types/dsl";
 import { Switch } from "../../../components/ui/switch";
 import { NativeSelect } from "@chakra-ui/react";
 import { useDisclosure } from "@chakra-ui/react";
@@ -46,10 +46,20 @@ export const WorkflowPropertiesPanel = () => {
     () => endNode?.data.behave_as === "evaluator"
   );
 
-  const setAsEvaluator = () => {
+  const setWorkflowType = (workflowType: WorkflowTypes) => {
+    setWorkflow({ workflow_type: workflowType });
+  };
+
+  useEffect(() => {
+    if (workflow.workflow_type) {
+      updateNode(workflow.workflow_type);
+    }
+  }, [workflow.workflow_type]);
+
+  const updateNode = (workflowType: WorkflowTypes) => {
     if (!endNode) return;
 
-    if (!isEvaluator) {
+    if (workflowType === "evaluator") {
       setNode({
         id: endNode.id,
         data: {
@@ -193,15 +203,18 @@ export const WorkflowPropertiesPanel = () => {
     >
       <PropertyField
         title="Workflow Type"
-        tooltip="Select Evaluator if you want to publish this workflow as an evaluator to be used for other workflows and on monitoring messages, this will change the End node for expected properties of an evaluator."
+        tooltip="Select Evaluator if you want to publish this workflow as an evaluator to be used for other workflows and on monitoring messages, this will change the End node for expected properties of an evaluator. Select Component if you want to publish this workflow as a component to be used in other workflows."
       >
         <NativeSelect.Root size="sm">
           <NativeSelect.Field
-            value={isEvaluator ? "evaluator" : "workflow"}
-            onChange={() => setAsEvaluator()}
+            value={
+              workflow.workflow_type ?? (isEvaluator ? "evaluator" : "workflow")
+            }
+            onChange={(e) => setWorkflowType(e.target.value as WorkflowTypes)}
           >
             <option value="workflow">Workflow</option>
             <option value="evaluator">Evaluator</option>
+            <option value="component">Component</option>
           </NativeSelect.Field>
           <NativeSelect.Indicator />
         </NativeSelect.Root>

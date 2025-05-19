@@ -472,7 +472,7 @@ export const DashboardLayout = ({
             <HStack gap={4}>
               {integrationsLeft ? (
                 <Popover.Root positioning={{ placement: "bottom-end" }}>
-                  <Popover.Trigger>
+                  <Popover.Trigger asChild>
                     <Button position="relative" variant="ghost">
                       <ChecklistIcon
                         style={{ maxWidth: "24px", maxHeight: "24px" }}
