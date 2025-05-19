@@ -32,15 +32,13 @@ export const generateTracesPivotQueryConditions = ({
   endDate,
   filters,
   query,
-  traceIds,
-  filterForAnnotatedTraces = true,
-}: z.infer<typeof sharedFiltersInputSchema> & {
-  filterForAnnotatedTraces?: boolean;
-}): {
-  pivotIndexConditions: QueryDslQueryContainer;
-  isAnyFilterPresent: boolean;
-  endDateUsedForQuery: number;
-} => {
+}: {
+  projectId: string;
+  startDate: Date;
+  endDate: Date;
+  filters: Record<string, string[]>;
+  query: string;
+}) => {
   // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
   const now = new Date().getTime();
   const endDate_ =
@@ -62,17 +60,6 @@ export const generateTracesPivotQueryConditions = ({
       bool: {
         must: [
           { term: { project_id: projectId } },
-          ...(traceIds?.length
-            ? filterForAnnotatedTraces
-              ? [{ terms: { trace_id: traceIds } }]
-              : [
-                  {
-                    bool: {
-                      must_not: [{ terms: { trace_id: traceIds } }],
-                    },
-                  },
-                ]
-            : []),
           ...(query ? [{ query_string: { query } }] : []),
           {
             range: {

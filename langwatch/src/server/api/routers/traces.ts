@@ -434,38 +434,8 @@ export const getAllTracesForProject = async ({
   includeContexts?: boolean;
   scrollId?: string;
 }) => {
-  let traceIds: string[] = [];
-  let shouldExcludeTraceIds = false;
-
-  if (
-    Array.isArray(input.filters["annotations.hasAnnotation"]) &&
-    input.filters["annotations.hasAnnotation"].includes("true")
-  ) {
-    traceIds = await getAnnotatedTraceIds({
-      projectId: input.projectId,
-      startDate: new Date(input.startDate),
-      endDate: new Date(input.endDate),
-    });
-
-    shouldExcludeTraceIds =
-      input.filters["annotations.hasAnnotation"].includes("false");
-  } else if (
-    Array.isArray(input.filters["annotations.hasAnnotation"]) &&
-    input.filters["annotations.hasAnnotation"].includes("false") &&
-    !input.filters["annotations.hasAnnotation"].includes("true")
-  ) {
-    traceIds = await getAnnotatedTraceIds({
-      projectId: input.projectId,
-      startDate: new Date(input.startDate),
-      endDate: new Date(input.endDate),
-    });
-    shouldExcludeTraceIds = true;
-  }
-
   const { pivotIndexConditions } = generateTracesPivotQueryConditions({
     ...input,
-    traceIds,
-    filterForAnnotatedTraces: !shouldExcludeTraceIds,
   });
 
   let pageSize = input.pageSize ? input.pageSize : 25;
