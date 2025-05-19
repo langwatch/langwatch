@@ -41,20 +41,39 @@ export const annotationRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       logger.info({ input }, "create annotation");
-      await updateTraceWithAnnotation(input.traceId, input.projectId);
 
-      return ctx.prisma.annotation.create({
-        data: {
-          id: nanoid(),
-          projectId: input.projectId,
-          comment: input.comment ?? "",
-          isThumbsUp: input.isThumbsUp ?? null,
-          traceId: input.traceId,
-          userId: ctx.session.user.id,
-          scoreOptions: input.scoreOptions ?? {},
-          expectedOutput: input.expectedOutput ?? null,
-        },
+      const createdAnnotation = await ctx.prisma.$transaction(async (tx) => {
+        const annotation = await tx.annotation.create({
+          data: {
+            id: nanoid(),
+            projectId: input.projectId,
+            comment: input.comment ?? "",
+            isThumbsUp: input.isThumbsUp ?? null,
+            traceId: input.traceId,
+            userId: ctx.session.user.id,
+            scoreOptions: input.scoreOptions ?? {},
+            expectedOutput: input.expectedOutput ?? null,
+          },
+        });
+
+        try {
+          await updateTraceWithAnnotation(input.traceId, input.projectId);
+        } catch (error) {
+          logger.error(
+            { error, traceId: input.traceId, projectId: input.projectId },
+            "Failed to update Elasticsearch after annotation creation"
+          );
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to add annotation to trace.",
+            cause: error,
+          });
+        }
+
+        return annotation;
       });
+
+      return createdAnnotation;
     }),
   updateByTraceId: protectedProcedure
     .input(
@@ -153,28 +172,37 @@ export const annotationRouter = createTRPCRouter({
     .input(z.object({ annotationId: z.string(), projectId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      const annotation = await ctx.prisma.annotation.findUnique({
-        where: {
-          id: input.annotationId,
-          projectId: input.projectId,
-        },
-      });
-
-      if (!annotation) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Annotation not found",
+      const deletedAnnotation = await ctx.prisma.$transaction(async (tx) => {
+        const annotation = await tx.annotation.delete({
+          where: {
+            id: input.annotationId,
+            projectId: input.projectId,
+          },
         });
-      }
 
-      await updateTraceRemoveAnnotation(annotation.traceId, input.projectId);
+        try {
+          await updateTraceRemoveAnnotation(
+            annotation.traceId,
+            input.projectId
+          );
+        } catch (error) {
+          // If Elasticsearch update fails, we should fail the transaction
+          // to maintain consistency between database and Elasticsearch
+          logger.error(
+            { error, traceId: annotation.traceId, projectId: input.projectId },
+            "Failed to update Elasticsearch after annotation deletion"
+          );
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to delete annotation from trace.",
+            cause: error,
+          });
+        }
 
-      return ctx.prisma.annotation.delete({
-        where: {
-          id: input.annotationId,
-          projectId: input.projectId,
-        },
+        return annotation;
       });
+
+      return deletedAnnotation;
     }),
   getAll: protectedProcedure
     .input(
