@@ -32,6 +32,7 @@ import {
   Check,
   ChevronDown,
   GitBranch,
+  Info,
   MoreVertical,
   PieChart,
   Trash,
@@ -54,6 +55,7 @@ import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import {
   CustomGraph,
@@ -612,7 +614,16 @@ function CustomGraphForm({
       </Field.Root>
       {(!graphType || !summaryGraphTypes.includes(graphType.value)) && (
         <Field.Root>
-          <Field.Label>Time Scale</Field.Label>
+          <Tooltip
+            content="If minutes are chosen when the duration is long, it will automatically adjust to the appropriate time scale."
+            portalled
+          >
+            <Field.Label>
+              Time Scale
+              <Info size={16} />
+            </Field.Label>
+          </Tooltip>
+
           <Controller
             control={form.control}
             name="timeScale"
