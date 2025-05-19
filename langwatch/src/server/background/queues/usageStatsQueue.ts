@@ -78,3 +78,29 @@ export const scheduleUsageStats = async () => {
     );
   }
 };
+
+export const scheduleUsageStatsForOrganization = async (organization: {
+  id: string;
+  name: string;
+}) => {
+  if (
+    process.env.DISABLE_USAGE_STATS === "true" ||
+    process.env.IS_SAAS === "true"
+  ) {
+    return;
+  }
+
+  const instanceId = `${organization.name}__${organization.id}`;
+  const yyyymmdd = new Date().toISOString().split("T")[0];
+
+  return await usageStatsQueue.add(
+    "usage_stats",
+    {
+      instance_id: instanceId,
+      timestamp: Date.now(),
+    },
+    {
+      jobId: `usage_stats_${instanceId}_${yyyymmdd}`,
+    }
+  );
+};
