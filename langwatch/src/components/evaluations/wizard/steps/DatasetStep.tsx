@@ -24,13 +24,13 @@ import { InlineUploadCSVForm } from "~/components/datasets/UploadCSVModal";
 import { toaster } from "../../../ui/toaster";
 import { useShallow } from "zustand/react/shallow";
 import { DatasetGeneration } from "./datasets/DatasetGeneration";
-import { useSelectedDataSetId } from "~/hooks/useSelectedDataSetId";
+import { useLocalStorageSelectedDataSetId } from "~/hooks/useLocalStorageSelectedDataSetId";
 import { DatasetFromProductionConfiguration } from "./datasets/DatasetFromProductionConfiguration";
 import { DatasetRadioCard } from "../components/DatasetRadioCard";
 
 export function DatasetStep() {
   const { clear: clearSelectedDataSetId, selectedDataSetId } =
-    useSelectedDataSetId();
+    useLocalStorageSelectedDataSetId();
 
   const {
     experimentId,

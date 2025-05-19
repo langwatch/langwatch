@@ -1,6 +1,6 @@
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 import { createLogger } from "~/utils/logger";
-import { FetchSSETimeoutError, Timeout } from "./errors";
+import { FetchSSETimeoutError } from "./errors";
 
 const logger = createLogger("sseClient");
 const EVENT_STREAM_CONTENT_TYPE = "text/event-stream";

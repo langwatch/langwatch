@@ -49,6 +49,10 @@ type FormValues = {
   columnTypes: DatasetColumns;
 };
 
+/**
+ * This is a component that allows you to create a new dataset
+ * or edit an existing one's columns.
+ */
 export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const upsertDataset = api.dataset.upsert.useMutation();
