@@ -39,12 +39,8 @@ export const generateTracesPivotQueryConditions = ({
   endDate,
   filters,
   query,
-}: {
-  projectId: string;
-  startDate: Date;
-  endDate: Date;
-  filters: Record<string, string[]>;
-  query: string;
+}: z.infer<typeof sharedFiltersInputSchema> & {
+  filterForAnnotatedTraces?: boolean;
 }): {
   pivotIndexConditions: QueryDslQueryContainer;
   isAnyFilterPresent: boolean;
