@@ -6,8 +6,8 @@ import { api } from "~/utils/api";
 
 import {
   ChakraProvider,
-  defaultConfig,
   createSystem,
+  defaultConfig,
   defineRecipe,
   defineSlotRecipe,
 } from "@chakra-ui/react";
@@ -19,13 +19,10 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import NProgress from "nprogress";
 import { useEffect, useState } from "react";
-import { dependencies } from "../injection/dependencies.client";
-import { Toaster } from "../components/ui/toaster";
 import { colorSystem } from "../components/ui/color-mode";
+import { Toaster } from "../components/ui/toaster";
+import { dependencies } from "../injection/dependencies.client";
 
-import posthog from "posthog-js";
-import { Router } from "next/router";
-import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { PostHogProvider } from "posthog-js/react";
 import { usePostHog } from "../hooks/usePostHog";
 
@@ -526,7 +523,6 @@ const LangWatch: AppType<{
   injected?: string | undefined;
 }> = ({ Component, pageProps: { session, ...pageProps } }) => {
   const router = useRouter();
-  const publicEnv = usePublicEnv();
   const postHog = usePostHog();
 
   const [previousFeatureFlagQueryParams, setPreviousFeatureFlagQueryParams] =
@@ -592,31 +588,6 @@ const LangWatch: AppType<{
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
-
-  useEffect(() => {
-    if (!publicEnv.data) return;
-
-    const posthogKey = publicEnv.data?.POSTHOG_KEY;
-    const posthogHost = publicEnv.data?.POSTHOG_HOST;
-
-    if (posthogKey) {
-      posthog.init(posthogKey, {
-        api_host: posthogHost ?? "https://eu.i.posthog.com",
-        person_profiles: "always",
-        loaded: (posthog) => {
-          if (publicEnv.data?.NODE_ENV === "development") posthog.debug();
-        },
-      });
-
-      const handleRouteChange = () => posthog?.capture("$pageview");
-
-      Router.events.on("routeChangeComplete", handleRouteChange);
-
-      return () => {
-        Router.events.off("routeChangeComplete", handleRouteChange);
-      };
-    }
-  }, [publicEnv.data]);
 
   return (
     <SessionProvider
