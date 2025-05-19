@@ -122,13 +122,12 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     void datasets
       .refetch()
       .then(() => {
-        console.log("refetched");
         setTimeout(() => {
           setValue("datasetId", datasetId);
         }, 100);
       })
       .catch((error) => {
-        logger.error(error);
+        logger.error({ error });
       });
   };
 
@@ -154,7 +153,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
    * @param _data - Form data
    */
   const onSubmit: SubmitHandler<FormValues> = async (_data) => {
-    console.log("onSubmit", _data);
     if (!selectedDataset || !project) return;
 
     // Transform row data into dataset entries
@@ -177,8 +175,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
         ) as DatasetRecordEntry
     );
 
-    console.log("creating dataset records");
-
     // Create dataset records
     await createDatasetRecord.mutateAsync(
       {
@@ -188,10 +184,8 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       },
       {
         onSuccess: () => {
-          console.log("invalidating dataset and dataset records");
           trpc.dataset.getAll.invalidate();
           trpc.datasetRecord.getAll.invalidate();
-          console.log("closing drawer");
           closeDrawer();
           toaster.create({
             title: "Succesfully added to dataset",
@@ -213,7 +207,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           });
         },
         onError: () => {
-          console.log("failed to add to the dataset");
           toaster.create({
             title: "Failed to add to the dataset",
             description:
@@ -227,9 +220,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
         },
       }
     );
-
-    console.log("created dataset records");
-    console.log("setting localStorageDatasetId", _data.datasetId);
 
     // We do this here since if we do it before, or attempt to do keep the
     // datasetId in sync, it will force a re-render and the drawers will close.

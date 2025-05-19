@@ -117,7 +117,6 @@ export function DatasetTable({
       },
     }
   );
-  console.log("databaseDataset", databaseDataset.data);
 
   const dataset = useMemo(
     () =>

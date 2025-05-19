@@ -74,7 +74,6 @@ export function DatasetStep() {
     [datasets.data, selectedDataSetId]
   );
 
-  console.log("selectedDataset", selectedDataset);
   // Refetch datasets when the selected dataset id changes
   useEffect(() => {
     datasets.refetch();
