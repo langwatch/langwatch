@@ -45,7 +45,11 @@ export const generateTracesPivotQueryConditions = ({
   endDate: Date;
   filters: Record<string, string[]>;
   query: string;
-}) => {
+}): {
+  pivotIndexConditions: QueryDslQueryContainer;
+  isAnyFilterPresent: boolean;
+  endDateUsedForQuery: number;
+} => {
   // If end date is very close to now, force it to be now, to allow frontend to keep refetching for new messages
   const now = new Date().getTime();
   const endDate_ =
