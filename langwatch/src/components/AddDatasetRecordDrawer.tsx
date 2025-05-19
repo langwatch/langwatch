@@ -7,7 +7,7 @@ import { Link } from "./ui/link";
 import { Button, useDisclosure, VStack, HStack, Text } from "@chakra-ui/react";
 import { Drawer } from "./ui/drawer";
 import { toaster } from "./ui/toaster";
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, useLayoutEffect } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -19,7 +19,7 @@ import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { useDrawer } from "./CurrentDrawer";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 import { DatasetSelector } from "./datasets/DatasetSelector";
-import { useSelectedDataSetId } from "~/hooks/useSelectedDataSetId";
+import { useLocalStorageSelectedDataSetId } from "~/hooks/useLocalStorageSelectedDataSetId";
 import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("AddDatasetRecordDrawer");
@@ -54,7 +54,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   const {
     selectedDataSetId: localStorageDatasetId,
     setSelectedDataSetId: setLocalStorageDatasetId,
-  } = useSelectedDataSetId();
+  } = useLocalStorageSelectedDataSetId();
 
   // Form Hook
   const {
@@ -71,6 +71,15 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   });
 
   const datasetId = watch("datasetId");
+  // Fetch all datasets for the project
+  const datasets = api.dataset.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project, refetchOnWindowFocus: false }
+  );
+
+  const selectedDataset = datasets.data?.find(
+    (dataset) => dataset.id === datasetId
+  );
 
   // Combine trace IDs from props into a single array
   const traceIds = useMemo(
@@ -95,23 +104,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
       refetchOnWindowFocus: false,
     }
   );
-
-  // Fetch all datasets for the project
-  const datasets = api.dataset.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project, refetchOnWindowFocus: false }
-  );
-
-  const selectedDataset = datasets.data?.find(
-    (dataset) => dataset.id === datasetId
-  );
-
-  // Reset dataset ID if selected dataset no longer exists
-  useEffect(() => {
-    if (!selectedDataset) {
-      // setValue("datasetId", "");
-    }
-  }, [selectedDataset, setValue]);
 
   /**
    * Handle successful dataset creation
