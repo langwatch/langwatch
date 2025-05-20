@@ -1,49 +1,46 @@
 from .formatter import PromptFormatter, MissingPromptVariableError
 from .prompt import Prompt
 from typing import Any, Dict, Optional
+from opentelemetry import trace
 from ..langwatch_api_client import Client
 from ..langwatch_api_client.api.default import get_api_prompts_by_id
 from langwatch.telemetry.context import get_current_span
 from langwatch.attributes import AttributeKey
 
 
+tracer = trace.get_tracer(__name__)
+
 client = Client(
     base_url="https://app.langwatch.ai",
     # httpx_args={"event_hooks": {"request": [log_request], "response": [log_response]}},
     headers={"X-Auth-Token": "sk-lw-nWN8d7mRUPVZ9kuPqOGjKlpdWEmjReGA41DKkDYO0zLJNPOe"}
 )
-def get_prompt(prompt_id: str, version_id: Optional[str] = None, **variables: Any) -> Dict[str, Any]:
+def get_prompt(prompt_id: str, version_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Fetches a prompt config and formats it with the provided variables.
     Returns a dict ready for OpenAI's client.
     Raises MissingPromptVariableError if required variables are missing.
     """
-    prompt_config = get_api_prompts_by_id.sync(client=client, id=prompt_id)
-    prompt = Prompt(prompt_config)
-    _track_prompt_event(prompt_id=prompt.id, version_id=prompt.version_number)
-    return prompt
+    with tracer.start_as_current_span("get_prompt") as span:
+        span.set_attribute("inputs.prompt_id", prompt_id)
+        span.set_attribute("inputs.version_id", version_id) if version_id else None
 
+        try:
+            prompt_config = get_api_prompts_by_id.sync(client=client, id=prompt_id)
+            print(prompt_config)
+            prompt = Prompt(prompt_config)
 
-def _track_prompt_event(prompt_id: str, version_id: int) -> None:
-    """
-    Private method to track prompt events in the current span.
-    
-    Args:
-        prompt_id: The ID of the prompt being tracked
-        version_id: Optional version ID of the prompt
-    """
-    try:
-        span = get_current_span()
-        if span:
-            span.add_event(
-                AttributeKey.LangWatchEventFetchPrompt,
+            span.set_attributes(
                 {
-                    "prompt_id": prompt_id,
-                    "version_number": version_id,
+                    AttributeKey.LangWatchPromptId: prompt.id,
+                    AttributeKey.LangWatchPromptVersionId: prompt.version_id,
+                    AttributeKey.LangWatchPromptVersionNumber: prompt.version_number,
                 }
             )
-    except:
-        # Silently fail if we can't track the prompt
-        pass
+        except Exception as ex:
+            span.record_exception(ex)
+            raise ex
+
+        return prompt
 
 __all__ = ["get_prompt", "MissingPromptVariableError"] 

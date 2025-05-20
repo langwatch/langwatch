@@ -53,6 +53,13 @@ class Prompt:
         """Returns the version number of the prompt."""
         return self._config.version
     
+    @property
+    def version_id(self) -> str:
+        """Returns the version ID of the prompt."""
+        return self._config.version_id
+    
+    
+    
     
     
     
