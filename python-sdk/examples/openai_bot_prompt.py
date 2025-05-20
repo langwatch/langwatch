@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+import os
 
 load_dotenv()
 
@@ -8,6 +9,11 @@ client = OpenAI()
 
 import langwatch.prompts
 import asyncio
+
+langwatch.setup(
+    api_key=os.getenv("LANGWATCH_API_KEY"),
+    endpoint_url=os.getenv("LANGWATCH_ENDPOINT"),
+)
 
 @langwatch.trace()
 async def main():
@@ -20,7 +26,8 @@ async def main():
     ## directly: 
     # Raw prompt {model: 'gpt-4o-mini', messages: [{ role: 'system', content: 'The user is {user_name} and their email is {user_email}' }]}
     # Autobuilt prompt { model: 'gpt-4o-mini', messages: [{ role: 'system', content: 'The user is John Doe and their email is john.doe@example.com' }]}
-    prompt = langwatch.prompts.get_prompt('prompt_GjrWUJ7TIpJ71QGXd-B5M')
+    prompt_id = "prompt_sNaxvV8ZrrdjNA_6b1WHw"
+    prompt = langwatch.prompts.get_prompt(prompt_id)
     messages = prompt.format_messages(input="I like to eat pizza")
 
     print(prompt)

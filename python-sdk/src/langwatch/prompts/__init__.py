@@ -6,15 +6,11 @@ from ..langwatch_api_client import Client
 from ..langwatch_api_client.api.default import get_api_prompts_by_id
 from langwatch.telemetry.context import get_current_span
 from langwatch.attributes import AttributeKey
+from langwatch.state import get_instance
 
 
 tracer = trace.get_tracer(__name__)
 
-client = Client(
-    base_url="https://app.langwatch.ai",
-    # httpx_args={"event_hooks": {"request": [log_request], "response": [log_response]}},
-    headers={"X-Auth-Token": "sk-lw-nWN8d7mRUPVZ9kuPqOGjKlpdWEmjReGA41DKkDYO0zLJNPOe"}
-)
 def get_prompt(prompt_id: str, version_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Fetches a prompt config and formats it with the provided variables.
@@ -26,6 +22,7 @@ def get_prompt(prompt_id: str, version_id: Optional[str] = None) -> Dict[str, An
         span.set_attribute("inputs.version_id", version_id) if version_id else None
 
         try:
+            client = get_instance()
             prompt_config = get_api_prompts_by_id.sync(client=client, id=prompt_id)
             print(prompt_config)
             prompt = Prompt(prompt_config)
