@@ -16,7 +16,11 @@ from opentelemetry.sdk.trace.sampling import TraceIdRatioBased, ALWAYS_OFF
 from .exporters.filterable_batch_span_exporter import FilterableBatchSpanProcessor
 from .types import LangWatchClientProtocol
 
+<<<<<<< HEAD
 from .generated.langwatch_rest_api_client import Client as LangWatchApiClient
+=======
+from .langwatch_api_client import Client as LangWatchApiClient
+>>>>>>> fb1819ce (WIP: Creating instances with client)
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +95,11 @@ class Client(LangWatchClientProtocol):
         for instrumentor in self.instrumentors:
             instrumentor.instrument(tracer_provider=self.tracer_provider)
 
+<<<<<<< HEAD
         self._setup_rest_api_client()
+=======
+        self._setup_api_client()
+>>>>>>> fb1819ce (WIP: Creating instances with client)
 
     @property
     def debug(self) -> bool:
@@ -132,6 +140,9 @@ class Client(LangWatchClientProtocol):
         # If a new API key is provided and sending is not disabled, set up a new tracer provider.
         if self._api_key and not self._disable_sending:
             self.__setup_tracer_provider()
+        
+        if self._api_key:
+            self._setup_api_client()
 
         if self._api_key:
             self._setup_rest_api_client()
@@ -274,6 +285,7 @@ class Client(LangWatchClientProtocol):
             export_timeout_millis=float(os.getenv("OTEL_BSP_EXPORT_TIMEOUT", 10000)),
         )
         provider.add_span_processor(processor)
+<<<<<<< HEAD
 
     def _setup_rest_api_client(self) -> LangWatchApiClient:
         """
@@ -285,3 +297,12 @@ class Client(LangWatchClientProtocol):
         )
 
         return self._rest_api_client
+=======
+    
+    def _setup_api_client(self) -> None:
+        self.api_client = LangWatchApiClient(
+            base_url=self._endpoint_url,
+            api_key=self._api_key,
+            debug=self._debug,
+        )
+>>>>>>> fb1819ce (WIP: Creating instances with client)
