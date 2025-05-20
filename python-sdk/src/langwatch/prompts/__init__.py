@@ -1,4 +1,5 @@
 from .formatter import PromptFormatter, MissingPromptVariableError
+from .prompt import Prompt
 from typing import Any, Dict, Optional
 from ..langwatch_api_client import Client
 from ..langwatch_api_client.api.default import get_api_prompts_by_id
@@ -15,23 +16,9 @@ def get_prompt(prompt_id: str, version_id: Optional[str] = None, **variables: An
     Returns a dict ready for OpenAI's client.
     Raises MissingPromptVariableError if required variables are missing.
     """
-    formatter = PromptFormatter()
     prompt_config = get_api_prompts_by_id.sync(client=client, id=prompt_id)
+    prompt = Prompt(prompt_config)
     
-    # Convert the response object to a dict
-    prompt_dict = {
-        "id": prompt_config.id,
-        "name": prompt_config.name,
-        "model": prompt_config.model,
-        "messages": [
-            {
-                "role": msg.role,
-                "content": formatter.format(msg.content, variables)
-            }
-            for msg in prompt_config.messages
-        ]
-    }
-    
-    return prompt_dict
+    return prompt
 
 __all__ = ["get_prompt", "MissingPromptVariableError"] 
