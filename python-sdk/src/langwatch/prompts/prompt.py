@@ -57,6 +57,12 @@ class Prompt:
     def version_id(self) -> str:
         """Returns the version ID of the prompt."""
         return self._config.version_id
+
+    def raw_config(self) -> Any:
+        """Returns the raw prompt configuration."""
+        return self._config
+    
+    
     
     
     
