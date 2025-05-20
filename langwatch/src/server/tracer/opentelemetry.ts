@@ -34,7 +34,11 @@ const logger = createLogger("langwatch.tracer.opentelemetry");
 
 export type TraceForCollection = Pick<
   CollectorJob,
-  "traceId" | "spans" | "reservedTraceMetadata" | "customMetadata" | "evaluations"
+  | "traceId"
+  | "spans"
+  | "reservedTraceMetadata"
+  | "customMetadata"
+  | "evaluations"
 >;
 
 export const openTelemetryTraceRequestToTracesForCollection = (
@@ -189,9 +193,14 @@ const addOpenTelemetrySpanAsSpan = (
         break;
       }
       case "langwatch.evaluation.custom": {
-        const jsonPayload = event.attributes?.find((attr) => attr?.key === "json_encoded_event")?.value?.stringValue;
+        const jsonPayload = event.attributes?.find(
+          (attr) => attr?.key === "json_encoded_event"
+        )?.value?.stringValue;
         if (!jsonPayload) {
-          logger.warn({ event }, "event for `langwatch.evaluation.custom` has no json_encoded_event");
+          logger.warn(
+            { event },
+            "event for `langwatch.evaluation.custom` has no json_encoded_event"
+          );
           break;
         }
 
@@ -202,7 +211,10 @@ const addOpenTelemetrySpanAsSpan = (
           if (!trace.evaluations) trace.evaluations = [];
           trace.evaluations.push(evaluation);
         } catch (error) {
-          logger.error({ error, jsonPayload }, "error parsing json_encoded_event from `langwatch.evaluation.custom`, event discarded");
+          logger.error(
+            { error, jsonPayload },
+            "error parsing json_encoded_event from `langwatch.evaluation.custom`, event discarded"
+          );
         }
         break;
       }
@@ -213,7 +225,8 @@ const addOpenTelemetrySpanAsSpan = (
   }
   if (started_at && attributesMap.ai?.response?.msToFirstChunk) {
     first_token_at =
-      started_at + parseInt((attributesMap as any).ai.response.msToFirstChunk, 10);
+      started_at +
+      parseInt((attributesMap as any).ai.response.msToFirstChunk, 10);
   }
 
   // Type
@@ -556,9 +569,7 @@ const addOpenTelemetrySpanAsSpan = (
     if (genAIChoice?.message) {
       output = {
         type: "chat_messages",
-        value: [
-          genAIChoice.message
-        ],
+        value: [genAIChoice.message],
       };
     }
   }
@@ -695,7 +706,10 @@ const addOpenTelemetrySpanAsSpan = (
       (attributesMap as any).langwatch.span.type = void 0;
     }
     if (attributesMap.langwatch.input) {
-      if (Array.isArray(attributesMap.langwatch.input) && attributesMap.langwatch.input.length === 1) {
+      if (
+        Array.isArray(attributesMap.langwatch.input) &&
+        attributesMap.langwatch.input.length === 1
+      ) {
         input = (attributesMap as any).langwatch.input[0];
       } else {
         input = (attributesMap as any).langwatch.input;
@@ -703,7 +717,10 @@ const addOpenTelemetrySpanAsSpan = (
       (attributesMap as any).langwatch.input = void 0;
     }
     if (attributesMap.langwatch.output) {
-      if (Array.isArray(attributesMap.langwatch.output) && attributesMap.langwatch.output.length === 1) {
+      if (
+        Array.isArray(attributesMap.langwatch.output) &&
+        attributesMap.langwatch.output.length === 1
+      ) {
         output = (attributesMap as any).langwatch.output[0];
       } else {
         output = (attributesMap as any).langwatch.output;
@@ -715,6 +732,20 @@ const addOpenTelemetrySpanAsSpan = (
         contexts.push(ragContext);
       }
       (attributesMap as any).langwatch.rag_contexts = void 0;
+    }
+    const prompt = attributesMap.langwatch.prompt;
+    if (prompt) {
+      if (typeof prompt?.id === "string") {
+        trace.reservedTraceMetadata.prompt_ids ??= [];
+        trace.reservedTraceMetadata.prompt_ids.push(prompt.id);
+      }
+      if (prompt?.version) {
+        const version = prompt.version;
+        if (typeof version?.id === "string") {
+          trace.reservedTraceMetadata.prompt_version_ids ??= [];
+          trace.reservedTraceMetadata.prompt_version_ids.push(version.id);
+        }
+      }
     }
   }
 
@@ -938,7 +969,7 @@ const applyMappingsToMetadata = (metadata: any) => {
       return [langWatchKey, value];
     })
   );
-}
+};
 
 const extractReservedAndCustomMetadata = (metadata: any) => {
   if ("threadId" in metadata) {
