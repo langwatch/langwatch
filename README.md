@@ -27,7 +27,6 @@ Get up and running in under 30 seconds. The example below uses Docker, but if yo
 
 ```bash
 git clone https://github.com/langwatch/langwatch.git
-cp langwatch/.env.example langwatch/.env
 docker compose up -d --wait --build
 open http://localhost:5560
 ```
