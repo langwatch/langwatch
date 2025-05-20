@@ -187,6 +187,9 @@ export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
       prompt_ids: { type: "keyword" },
       prompt_version_ids: { type: "keyword" },
 
+      prompt_ids: { type: "keyword" },
+      prompt_version_ids: { type: "keyword" },
+
       custom: { type: FLATENNED_TYPE } as any,
       all_keys: { type: "keyword" },
     },

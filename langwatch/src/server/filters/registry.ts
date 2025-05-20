@@ -366,6 +366,12 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     }),
     listMatch: {
       aggregation: (query, key) => {
+        console.log("metadata.value registry", {
+          query,
+          key,
+          isOpensearch: process.env.IS_OPENSEARCH,
+          metadataKey: metadataKey(key),
+        });
         // TODO: for opensearch, handle the case where the key is "foo.bar" but not in {"foo": {"bar": "baz"}}, but rather in {"foo.bar": "baz"}
         const nullChecksList = [];
         let keySoFar = "";
@@ -426,6 +432,9 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
         };
       },
       extract: (result: Record<string, any>) => {
+        console.log("metadata.value extract", {
+          result,
+        });
         return (
           result.unique_values?.child?.child?.buckets?.map((bucket: any) => ({
             field: bucket.key,
