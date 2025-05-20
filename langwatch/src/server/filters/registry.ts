@@ -432,9 +432,6 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
         };
       },
       extract: (result: Record<string, any>) => {
-        console.log("metadata.value extract", {
-          result,
-        });
         return (
           result.unique_values?.child?.child?.buckets?.map((bucket: any) => ({
             field: bucket.key,
