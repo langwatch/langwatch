@@ -1,7 +1,7 @@
 from .formatter import PromptFormatter, MissingPromptVariableError
 from typing import Any, Dict, Optional
-from lang_watch_api_client import Client
-from lang_watch_api_client.api.default import get_api_prompts_by_id
+from ..langwatch_api_client import Client
+from ..langwatch_api_client.api.default import get_api_prompts_by_id
 
 
 client = Client(
