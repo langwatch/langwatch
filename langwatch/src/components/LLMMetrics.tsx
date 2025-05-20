@@ -6,6 +6,10 @@ import { CustomGraph, type CustomGraphInput } from "./analytics/CustomGraph";
 import { LLMSummary } from "./analytics/LLMSummary";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 
+// Time unit conversion constants
+const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
+const ONE_DAY = MINUTES_IN_DAY;
+
 export function LLMMetrics() {
   const publicEnv = usePublicEnv();
   const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
@@ -26,7 +30,7 @@ export function LLMMetrics() {
     ],
     groupBy: "metadata.model",
     includePrevious: false,
-    timeScale: 1,
+    timeScale: ONE_DAY,
   };
 
   const totalCostGraph: CustomGraphInput = {
@@ -42,7 +46,7 @@ export function LLMMetrics() {
     ],
     groupBy: undefined,
     includePrevious: true,
-    timeScale: 1,
+    timeScale: ONE_DAY,
   };
 
   const totalTokensSummary: CustomGraphInput = {
@@ -102,7 +106,7 @@ export function LLMMetrics() {
     ],
     groupBy: undefined,
     includePrevious: false,
-    timeScale: 1,
+    timeScale: ONE_DAY,
   };
 
   const evaluationsSummary: CustomGraphInput = {
