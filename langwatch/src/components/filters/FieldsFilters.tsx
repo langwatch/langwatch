@@ -56,6 +56,8 @@ export function FieldsFilters() {
     "evaluations.state",
     "traces.error",
     "annotations.hasAnnotation",
+    "metadata.prompt_ids",
+    "metadata.prompt_version_ids",
   ];
 
   const filters: [FilterField, FilterDefinition][] = filterKeys.map((id) => [

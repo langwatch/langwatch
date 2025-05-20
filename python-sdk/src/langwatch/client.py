@@ -270,8 +270,11 @@ class Client(LangWatchClientProtocol):
         provider.add_span_processor(processor)
     
     def _setup_api_client(self) -> None:
+        print("Setting up API client")
+        print(self._api_key)
+        print(self._endpoint_url)
+
         self.api_client = LangWatchApiClient(
             base_url=self._endpoint_url,
-            api_key=self._api_key,
-            debug=self._debug,
+            headers={"X-Auth-Token": self._api_key},
         )
