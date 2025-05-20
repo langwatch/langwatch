@@ -29,6 +29,7 @@ from langwatch.domain import (
     SpanTimestamps,
     TraceMetadata,
 )
+from .generated.langwatch_rest_api_client import Client as LangWatchRestApiClient
 
 class LangWatchClientProtocol(Protocol):
     """Protocol defining the required interface for LangWatch client instances."""
@@ -71,6 +72,11 @@ class LangWatchClientProtocol(Protocol):
     @disable_sending.setter
     def disable_sending(self, value: bool) -> None:
         """Set the disable_sending flag for the client."""
+        ...
+
+    @property
+    def rest_api_client(self) -> LangWatchRestApiClient:
+        """Get the REST API client for the client."""
         ...
 
 
