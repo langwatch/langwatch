@@ -296,8 +296,6 @@ export function EvaluateModalContent({
 
       void versions.refetch();
 
-      console.log("asdasddevaluateOn.value", evaluateOn);
-
       startEvaluationExecution({
         workflow_version_id: versionId,
         evaluate_on: evaluateOn.value as "full" | "test" | "train" | "specific",
