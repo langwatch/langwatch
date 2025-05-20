@@ -184,6 +184,7 @@ export const useRunEvalution = () => {
           // TODO: autosave and generate a new commit message and version id automatically
           workflow_version_id: versionId ?? "",
           evaluate_on: evaluate_on ?? "full",
+          dataset_entry,
         },
       };
       postEvent(payload);

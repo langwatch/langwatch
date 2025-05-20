@@ -47,7 +47,9 @@ export const loadDatasets = async (
         );
         const selectedRecords = (
           typeof entrySelection === "number"
-            ? [records[entrySelection]!]
+            ? entrySelection >= 0 && entrySelection < records.length
+              ? [records[entrySelection]!]
+              : [records[0]!]
             : entrySelection == "random"
             ? [records[Math.floor(Math.random() * records.length)]!]
             : entrySelection === "last"

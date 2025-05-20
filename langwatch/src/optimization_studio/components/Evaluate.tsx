@@ -385,7 +385,11 @@ export function EvaluateModalContent({
               name="evaluateOn"
               rules={{ required: "Evaluate on is required" }}
               render={({ field }) => (
-                <DatasetSplitSelect field={field} options={splitOptions} />
+                <DatasetSplitSelect
+                  field={field}
+                  options={splitOptions}
+                  total={total}
+                />
               )}
             />
           </VStack>
@@ -426,9 +430,11 @@ export function EvaluateModalContent({
 const DatasetSplitSelect = ({
   field,
   options,
+  total,
 }: {
   field: ControllerRenderProps<EvaluateForm, "evaluateOn">;
   options: DatasetSplitOption[];
+  total?: number;
 }) => {
   const datasetSplitCollection = createListCollection({
     items: options,
@@ -473,7 +479,7 @@ const DatasetSplitSelect = ({
       {field.value?.value === "specific" && (
         <Input
           type="text"
-          placeholder="Enter row index"
+          placeholder={`Enter row index (0-${(total ?? 0) - 1})`}
           value={
             field.value?.datasetEntry !== undefined
               ? String(field.value.datasetEntry)
