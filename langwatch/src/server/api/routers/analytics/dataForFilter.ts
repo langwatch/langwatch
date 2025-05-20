@@ -50,7 +50,7 @@ export const dataForFilter = protectedProcedure
 
     // Very hacky, but works for now
     // TODO: Make this better
-    if (key === "prompt_ids" || field === "metadata.value") {
+    if (key === "prompt_ids") {
       const testDocs = await client.search({
         index: TRACE_INDEX.alias,
         body: {
