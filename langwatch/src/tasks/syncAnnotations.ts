@@ -7,12 +7,15 @@ const logger = createLogger("langwatch:tasks:syncAnnotations");
 
 type ProjectAnnotations = Record<string, Record<string, Annotation[]>>;
 
+/**
+ * This task syncs the annotations from the database to the Elasticsearch index.
+ * This is used to update older traces that don't have annotations in the index for version older than May 20th 2025.
+ *
+ * In this file dbMultiTenancyProtection.ts you will need to allow Annotation model to be accessed by all projects.
+ */
+
 export default async function execute() {
-  // Get all annotations
-  // const projectId = "EEisP6epvj-no_veGiHTQ";
-  const annotations = await prisma.annotation.findMany({
-    // where: projectId ? { projectId } : undefined,
-  });
+  const annotations = await prisma.annotation.findMany({});
 
   logger.info({ count: annotations.length }, "Found annotations to sync");
 
