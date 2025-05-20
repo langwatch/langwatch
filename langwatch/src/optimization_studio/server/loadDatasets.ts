@@ -46,7 +46,9 @@ export const loadDatasets = async (
           node.data.dataset.inline.records
         );
         const selectedRecords = (
-          entrySelection == "random"
+          typeof entrySelection === "number"
+            ? [records[entrySelection]!]
+            : entrySelection == "random"
             ? [records[Math.floor(Math.random() * records.length)]!]
             : entrySelection === "last"
             ? [records[records.length - 1]!]

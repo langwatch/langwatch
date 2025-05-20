@@ -85,10 +85,12 @@ export const useRunEvalution = () => {
       onStart,
       workflow_version_id,
       evaluate_on,
+      dataset_entry,
     }: {
       onStart?: () => void;
       workflow_version_id?: string;
-      evaluate_on?: "full" | "test" | "train";
+      evaluate_on?: "full" | "test" | "train" | "specific";
+      dataset_entry?: number;
     } = {}) => {
       if (!project) return;
 

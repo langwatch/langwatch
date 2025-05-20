@@ -6,7 +6,8 @@ import {
   Spacer,
   Text,
   useDisclosure,
-  VStack
+  VStack,
+  Input,
 } from "@chakra-ui/react";
 import { Dialog } from "../../components/ui/dialog";
 import { Select } from "../../components/ui/select";
@@ -19,7 +20,7 @@ import {
   Controller,
   useForm,
   type ControllerRenderProps,
-  type UseFormReturn
+  type UseFormReturn,
 } from "react-hook-form";
 import { SmallLabel } from "../../components/SmallLabel";
 import { toaster } from "../../components/ui/toaster";
@@ -84,8 +85,9 @@ type EvaluateForm = {
 
 type DatasetSplitOption = {
   label: string;
-  value: "full" | "test" | "train";
+  value: "full" | "test" | "train" | "specific";
   description: string;
+  datasetEntry?: number;
 };
 
 export function EvaluateModalContent({
@@ -176,9 +178,15 @@ export function EvaluateModalContent({
         ? `${Math.round(trainSize * 100)}% of ${datasetName} dataset`
         : `${train.length} entries`,
     },
+    {
+      label: "Specific entry",
+      value: "specific",
+      description: `Specific entry from ${datasetName} dataset`,
+    },
   ];
 
   const estimatedTotal = useMemo(() => {
+    console.log(evaluateOn);
     if (evaluateOn?.value === "full") {
       return total;
     }
@@ -187,6 +195,9 @@ export function EvaluateModalContent({
     }
     if (evaluateOn?.value === "train") {
       return train.length;
+    }
+    if (evaluateOn?.value === "specific") {
+      return 1;
     }
     return 0;
   }, [evaluateOn, total, train.length, test.length]);
@@ -285,9 +296,13 @@ export function EvaluateModalContent({
 
       void versions.refetch();
 
+      console.log("asdasddevaluateOn.value", evaluateOn);
+
       startEvaluationExecution({
         workflow_version_id: versionId,
-        evaluate_on: evaluateOn.value,
+        evaluate_on: evaluateOn.value as "full" | "test" | "train" | "specific",
+        dataset_entry:
+          evaluateOn.value === "specific" ? evaluateOn.datasetEntry : undefined,
       });
       setHasStarted(true);
     },
@@ -422,39 +437,69 @@ const DatasetSplitSelect = ({
   });
 
   return (
-    <Select.Root
-      {...field}
-      collection={datasetSplitCollection}
-      value={field.value?.value ? [field.value.value] : []}
-      onChange={undefined}
-      onValueChange={(change) => {
-        const selectedOption = options.find(
-          (option) => option.value === change.value[0]
-        );
-        field.onChange({
-          target: {
-            name: field.name,
-            value: selectedOption,
-          },
-        });
-      }}
-      width="100%"
-    >
-      <Select.Trigger>
-        <Select.ValueText placeholder="Select dataset split" />
-      </Select.Trigger>
-      <Select.Content zIndex="popover">
-        {options.map((option) => (
-          <Select.Item item={option} key={option.value}>
-            <VStack align="start" width="full">
-              <Text>{option.label}</Text>
-              <Text fontSize="13px" color="gray.500">
-                {option.description}
-              </Text>
-            </VStack>
-          </Select.Item>
-        ))}
-      </Select.Content>
-    </Select.Root>
+    <VStack width="100%" gap={2}>
+      <Select.Root
+        {...field}
+        collection={datasetSplitCollection}
+        value={field.value?.value ? [field.value.value] : []}
+        onChange={undefined}
+        onValueChange={(change) => {
+          const selectedOption = options.find(
+            (option) => option.value === change.value[0]
+          );
+          field.onChange({
+            target: {
+              name: field.name,
+              value: selectedOption,
+            },
+          });
+        }}
+        width="100%"
+      >
+        <Select.Trigger>
+          <Select.ValueText placeholder="Select dataset split" />
+        </Select.Trigger>
+        <Select.Content zIndex="popover">
+          {options.map((option) => (
+            <Select.Item item={option} key={option.value}>
+              <VStack align="start" width="full">
+                <Text>{option.label}</Text>
+                <Text fontSize="13px" color="gray.500">
+                  {option.description}
+                </Text>
+              </VStack>
+            </Select.Item>
+          ))}
+        </Select.Content>
+      </Select.Root>
+      {field.value?.value === "specific" && (
+        <Input
+          type="text"
+          placeholder="Enter row index"
+          value={
+            field.value?.datasetEntry !== undefined
+              ? String(field.value.datasetEntry)
+              : ""
+          }
+          onChange={(e) => {
+            const input = e.target.value;
+            if (input === "" || /^[0-9]*$/.test(input)) {
+              const value = input === "" ? undefined : parseInt(input);
+              field.onChange({
+                target: {
+                  name: field.name,
+                  value: {
+                    ...field.value,
+                    datasetEntry: value,
+                    label:
+                      value !== undefined ? `Entry ${value}` : "Specific entry",
+                  },
+                },
+              });
+            }
+          }}
+        />
+      )}
+    </VStack>
   );
 };
