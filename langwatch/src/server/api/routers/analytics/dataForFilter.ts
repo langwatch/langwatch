@@ -23,6 +23,12 @@ export const dataForFilter = protectedProcedure
   .query(async ({ input }) => {
     const { field, key, subkey } = input;
 
+    console.log({
+      field,
+      key,
+      subkey,
+    });
+
     if (availableFilters[field].requiresKey && !key) {
       throw new TRPCError({
         code: "BAD_REQUEST",
@@ -47,6 +53,29 @@ export const dataForFilter = protectedProcedure
     });
 
     const client = await esClient({ projectId: input.projectId });
+
+    // Test: Fetch a few docs with metadata.prompt_ids to inspect their structure
+    console.log("maybe running this", {
+      key,
+      field,
+    });
+    if (key === "prompt_ids" || field === "metadata.value") {
+      const testDocs = await client.search({
+        index: TRACE_INDEX.alias,
+        body: {
+          size: 3,
+          _source: ["metadata.prompt_ids"],
+          query: {
+            exists: { field: "metadata.prompt_ids" },
+          },
+        },
+      });
+      console.log(
+        "Sample docs with metadata.prompt_ids:",
+        JSON.stringify(testDocs.hits.hits, null, 2)
+      );
+    }
+
     const response = await client.search({
       index: TRACE_INDEX.alias,
       body: {

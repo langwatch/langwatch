@@ -26,7 +26,7 @@ async def main():
     ## directly: 
     # Raw prompt {model: 'gpt-4o-mini', messages: [{ role: 'system', content: 'The user is {user_name} and their email is {user_email}' }]}
     # Autobuilt prompt { model: 'gpt-4o-mini', messages: [{ role: 'system', content: 'The user is John Doe and their email is john.doe@example.com' }]}
-    prompt_id = "prompt_sNaxvV8ZrrdjNA_6b1WHw"
+    prompt_id = "prompt_jTJP5ob_8zlTp7Jw0kNac"
     prompt = langwatch.prompts.get_prompt(prompt_id)
     print(prompt.raw_config())
     messages = prompt.format_messages(input="I like to eat pizza")
