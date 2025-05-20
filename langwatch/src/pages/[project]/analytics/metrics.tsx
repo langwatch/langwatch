@@ -4,7 +4,7 @@ import {
   GridItem,
   HStack,
   Heading,
-  SimpleGrid
+  SimpleGrid,
 } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
 import GraphsLayout from "~/components/GraphsLayout";
@@ -14,6 +14,10 @@ import {
 } from "~/components/analytics/CustomGraph";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
+
+// Time unit conversion constants
+const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
+const ONE_DAY = MINUTES_IN_DAY; // 1440
 
 const userCount = {
   graphId: "custom",
@@ -27,7 +31,7 @@ const userCount = {
     },
   ],
   includePrevious: true,
-  timeScale: 1,
+  timeScale: ONE_DAY,
   height: 550,
 };
 
@@ -56,7 +60,7 @@ const LLMMetrics = {
     },
   ],
   includePrevious: false,
-  timeScale: 1,
+  timeScale: ONE_DAY,
   height: 300,
 };
 
@@ -90,7 +94,7 @@ const LLMSummary = {
     },
   ],
   includePrevious: false,
-  timeScale: 1,
+  timeScale: ONE_DAY,
   height: 300,
 };
 
@@ -107,7 +111,7 @@ const LLMs = {
   ],
   groupBy: "metadata.model",
   includePrevious: false,
-  timeScale: 1,
+  timeScale: ONE_DAY,
   height: 300,
 };
 
@@ -125,7 +129,7 @@ const llmUsage = {
   ],
   groupBy: "metadata.model",
   includePrevious: false,
-  timeScale: 1,
+  timeScale: ONE_DAY,
   height: 300,
 };
 
@@ -193,11 +197,7 @@ export default function Users() {
     <GraphsLayout>
       <AnalyticsHeader title="LLM Metrics" />
       <HStack alignItems="start" gap={4}>
-        <SimpleGrid
-          templateColumns="repeat(4, 1fr)"
-          gap={5}
-          width={"100%"}
-        >
+        <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width={"100%"}>
           <GridItem colSpan={2} display="inline-grid">
             <Card.Root overflow="scroll">
               <Card.Header>

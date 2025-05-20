@@ -12,6 +12,10 @@ import { FeedbacksTable } from "../../../components/analytics/FeedbacksTable";
 import { QuickwitNote } from "../../../components/analytics/QuickwitNote";
 import { usePublicEnv } from "../../../hooks/usePublicEnv";
 
+// Time unit conversion constants
+const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
+const ONE_DAY = MINUTES_IN_DAY;
+
 const messagesCount = {
   graphId: "custom",
   graphType: "summary",
@@ -40,7 +44,7 @@ const messagesCount = {
     },
   ],
   includePrevious: false,
-  timeScale: 1,
+  timeScale: ONE_DAY,
   height: 300,
 };
 
@@ -56,7 +60,7 @@ const userCountGrapgh = {
     },
   ],
   includePrevious: true,
-  timeScale: "1",
+  timeScale: ONE_DAY,
   height: 300,
 };
 
@@ -72,7 +76,7 @@ const dailyActiveThreads = {
     },
   ],
   includePrevious: true,
-  timeScale: 1,
+  timeScale: ONE_DAY,
   height: 300,
 };
 
@@ -92,7 +96,7 @@ const averageDailyThreadsPerUser = {
     },
   ],
   includePrevious: false,
-  timeScale: "1",
+  timeScale: ONE_DAY,
   height: 300,
 };
 
@@ -113,7 +117,7 @@ const messageSentiment = {
   ],
   groupBy: "sentiment.input_sentiment",
   includePrevious: false,
-  timeScale: 1,
+  timeScale: ONE_DAY,
   height: 300,
 };
 
@@ -150,7 +154,7 @@ const maxMessagePerThread = {
     },
   ],
   includePrevious: true,
-  timeScale: "1",
+  timeScale: ONE_DAY,
   connected: false,
   height: 300,
 };
@@ -188,7 +192,7 @@ const userThreads = {
     },
   ],
   includePrevious: false,
-  timeScale: "1",
+  timeScale: ONE_DAY,
   height: 300,
 };
 
