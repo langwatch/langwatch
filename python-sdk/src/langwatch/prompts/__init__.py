@@ -23,8 +23,8 @@ def get_prompt(prompt_id: str, version_id: Optional[str] = None) -> Dict[str, An
 
         try:
             client = get_instance()
-            prompt_config = get_api_prompts_by_id.sync(client=client, id=prompt_id)
-            print(prompt_config)
+            api_client = client.api_client
+            prompt_config = get_api_prompts_by_id.sync(client=api_client, id=prompt_id)
             prompt = Prompt(prompt_config)
 
             span.set_attributes(
