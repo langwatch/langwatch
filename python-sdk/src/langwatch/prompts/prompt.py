@@ -1,4 +1,5 @@
 from .formatter import PromptFormatter
+import langwatch
 from typing import List, Any, Dict
 
 class Prompt:
@@ -41,3 +42,18 @@ class Prompt:
     def name(self) -> str:
         """Returns the name of the prompt."""
         return self._config.name
+    
+    @property
+    def id(self) -> str:
+        """Returns the ID of the prompt."""
+        return self._config.id
+    
+    @property
+    def version_number(self) -> int:
+        """Returns the version number of the prompt."""
+        return self._config.version
+    
+    
+    
+    
+    
