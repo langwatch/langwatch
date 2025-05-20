@@ -29,7 +29,7 @@ run/example:
 batch-evaluation-example:
 	uv run python $(filter-out $@,$(MAKECMDGOALS))
 
-build/api-client:
+generate/api-client:
 	@echo "Building API client..."
 	@mkdir -p .tmp/api-client
 	openapi-python-client generate \
