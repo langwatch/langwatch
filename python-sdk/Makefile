@@ -37,8 +37,8 @@ generate/api-client:
 		--output-path .tmp/api-client \
 		--overwrite
 	@echo "Copying necessary files to SDK..."
-	@mkdir -p src/langwatch/langwatch_api_client
-	@cp -r .tmp/api-client/lang_watch_api_client/ src/langwatch/langwatch_api_client/
+	@mkdir -p src/langwatch/generated/langwatch_rest_api_client
+	@cp -r .tmp/api-client/lang_watch_api_client/ src/langwatch/generated/langwatch_rest_api_client/
 	@echo "Cleaning up..."
 	@rm -rf .tmp/api-client
 	@echo "Done! API client has been integrated into the SDK."
