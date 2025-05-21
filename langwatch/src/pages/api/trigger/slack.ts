@@ -5,7 +5,7 @@ import { createLogger } from "../../../utils/logger";
 import { TriggerAction, AlertType } from "@prisma/client";
 import { z } from "zod";
 
-const logger = createLogger("langwatch:dataset:slug");
+const logger = createLogger("langwatch:trigger:slack");
 
 export default async function handler(
   req: NextApiRequest,
@@ -90,7 +90,9 @@ export default async function handler(
       },
     });
 
-    return res.status(200).json({ trigger });
+    return res.status(200).json({
+      message: "Slack trigger created successfully",
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
