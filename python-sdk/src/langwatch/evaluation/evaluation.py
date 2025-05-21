@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import json
 import threading
 import time
+import traceback
 from typing_extensions import TypedDict
 import httpx
 import pandas as pd
@@ -260,6 +261,8 @@ class Evaluation:
         except Exception as e:
             if iteration is not None:
                 iteration["error"] = e
+            print(f"\n[Evaluation Error] index={index}")
+            traceback.print_exc()
 
         if iteration is not None:
             iteration["duration"] = int((time.time() - start_time) * 1000)
