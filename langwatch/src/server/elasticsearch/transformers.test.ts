@@ -180,4 +180,104 @@ describe("transformElasticSearchTraceToTrace", () => {
       });
     }
   });
+
+  it("does not redact when both input and output are visible", () => {
+    const now = Date.now();
+    const trace: ElasticSearchTrace = {
+      trace_id: "trace3",
+      project_id: "proj1",
+      metadata: {},
+      timestamps: { started_at: now, inserted_at: now, updated_at: now },
+      input: {
+        value: JSON.stringify({ somekey: "secret", another: "visible" }),
+      },
+      output: {
+        value: JSON.stringify({ somekey: "secret", another: "visible" }),
+      },
+      metrics: { total_cost: 1 },
+      spans: [
+        {
+          span_id: "span1",
+          trace_id: "trace3",
+          project_id: "proj1",
+          type: "span",
+          name: "span1",
+          input: {
+            type: "json",
+            value: JSON.stringify({ somekey: "secret", spanonly: "spanvalue" }),
+          },
+          output: {
+            type: "json",
+            value: JSON.stringify({ somekey: "secret", spanonly: "spanvalue" }),
+          },
+          timestamps: {
+            started_at: now,
+            finished_at: now,
+            inserted_at: now,
+            updated_at: now,
+          },
+          metrics: { cost: 1 },
+        },
+        {
+          span_id: "span2",
+          trace_id: "trace3",
+          project_id: "proj1",
+          type: "span",
+          name: "span2",
+          input: {
+            type: "json",
+            value: JSON.stringify({ another: "visible" }),
+          },
+          output: {
+            type: "json",
+            value: JSON.stringify({ another: "visible" }),
+          },
+          timestamps: {
+            started_at: now,
+            finished_at: now,
+            inserted_at: now,
+            updated_at: now,
+          },
+          metrics: { cost: 2 },
+        },
+      ],
+    };
+
+    const protections: Protections = {
+      canSeeCapturedInput: true,
+      canSeeCapturedOutput: true,
+      canSeeCosts: true,
+    };
+
+    const result = transformElasticSearchTraceToTrace(trace, protections);
+
+    // Top-level input and output should be present and unredacted
+    expect(result.input).toEqual({
+      value: { somekey: "secret", another: "visible" },
+    });
+    expect(result.output).toEqual({
+      value: { somekey: "secret", another: "visible" },
+    });
+
+    // Spans: input and output should be present and unredacted
+    expect(result.spans).toBeDefined();
+    if (result.spans) {
+      expect(result.spans[0]?.input).toEqual({
+        type: "json",
+        value: { somekey: "secret", spanonly: "spanvalue" },
+      });
+      expect(result.spans[0]?.output).toEqual({
+        type: "json",
+        value: { somekey: "secret", spanonly: "spanvalue" },
+      });
+      expect(result.spans[1]?.input).toEqual({
+        type: "json",
+        value: { another: "visible" },
+      });
+      expect(result.spans[1]?.output).toEqual({
+        type: "json",
+        value: { another: "visible" },
+      });
+    }
+  });
 });
