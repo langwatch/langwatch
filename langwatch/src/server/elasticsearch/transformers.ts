@@ -65,28 +65,31 @@ export const transformElasticSearchTraceToTrace = (
   let transformedOutput: TraceOutput | undefined = void 0;
   let transformedMetrics: Trace["metrics"] | undefined = void 0;
 
-  let redactions: string[] = [];
+  let redactions: string[] = [
+    ...(!protections.canSeeCapturedInput ? extractRedactionsForObject(input) : []),
+    ...(!protections.canSeeCapturedOutput ? extractRedactionsForObject(output) : []),
+  ];
+
+  if (input && protections.canSeeCapturedInput === true) {
+    transformedInput = redactObject(input, redactions);
+  }
+  if (output && protections.canSeeCapturedOutput === true) {
+    transformedOutput = redactObject(output, redactions);
+  }
+
   if (!protections.canSeeCapturedInput) {
     redactions = [
       ...redactions,
-      ...extractRedactionsForObject(input),
       ...extractRedactionsFromAllSpanInputs(spans),
     ];
   }
   if (!protections.canSeeCapturedOutput) {
     redactions = [
       ...redactions,
-      ...extractRedactionsForObject(output),
       ...extractRedactionsFromAllSpanOutputs(spans),
     ];
   }
 
-  if (input && protections.canSeeCapturedInput === true) {
-    transformedInput = input;
-  }
-  if (output && protections.canSeeCapturedOutput === true) {
-    transformedOutput = output;
-  }
   if (metrics) {
     const { total_cost, ...otherMetrics } = metrics;
     transformedMetrics = otherMetrics;
@@ -174,13 +177,13 @@ export const transformElasticSearchSpanToSpan = (
 
 const extractRedactionsFromAllSpanInputs = (spans: Span[]): string[] => {
   return (spans || []).flatMap((span) =>
-    extractRedactionsForObject(span.input)
+    extractRedactionsForObject(span.input?.value)
   );
 };
 
 const extractRedactionsFromAllSpanOutputs = (spans: Span[]): string[] => {
   return (spans || []).flatMap((span) =>
-    extractRedactionsForObject(span.output)
+    extractRedactionsForObject(span.output?.value)
   );
 };
 
