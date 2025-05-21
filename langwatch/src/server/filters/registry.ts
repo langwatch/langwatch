@@ -361,9 +361,19 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     requiresKey: {
       filter: "metadata.key",
     },
-    query: (values, key) => ({
-      terms: { [metadataKey(key)]: values },
-    }),
+    query: (values, key) => {
+      if (key === "prompt_ids") {
+        return {
+          match: {
+            "metadata.prompt_ids": values[0],
+          },
+        };
+      }
+
+      return {
+        terms: { [metadataKey(key)]: values },
+      };
+    },
     listMatch: {
       aggregation: (query, key) => {
         console.log("metadata.value registry", {
