@@ -64,7 +64,8 @@ class ExecuteEvaluationPayload(BaseModel):
     run_id: str
     workflow: Workflow
     workflow_version_id: str
-    evaluate_on: Literal["full", "test", "train"]
+    evaluate_on: Literal["full", "test", "train", "specific"]
+    dataset_entry: Optional[int] = None
 
 
 class ExecuteEvaluation(BaseModel):

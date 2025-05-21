@@ -91,6 +91,20 @@ async def execute_evaluation(
                     random_state=(seed if seed >= 0 else None),
                     shuffle=(seed >= 0),
                 )
+            elif event.evaluate_on == "specific":
+                if event.dataset_entry is None:
+                    raise ValueError(
+                        "dataset_entry is required for specific evaluation"
+                    )
+                if (
+                    not isinstance(event.dataset_entry, int)
+                    or event.dataset_entry < 0
+                    or event.dataset_entry >= len(entries)
+                ):
+                    raise ValueError(
+                        f"Invalid dataset_entry index: {event.dataset_entry}"
+                    )
+                entries = [entries[event.dataset_entry]]
             else:
                 raise ValueError(f"Invalid evaluate_on value: {event.evaluate_on}")
 
@@ -118,7 +132,7 @@ async def execute_evaluation(
             )
             # Send initial empty batch to create the experiment in LangWatch
             reporting.send_batch()
-            await asyncify(evaluator)(module, metric=reporting.evaluate_and_report) # type: ignore
+            await asyncify(evaluator)(module, metric=reporting.evaluate_and_report)  # type: ignore
             await reporting.wait_for_completion()
     except Exception as e:
         yield error_evaluation_event(run_id, str(e), stopped_at=int(time.time() * 1000))
