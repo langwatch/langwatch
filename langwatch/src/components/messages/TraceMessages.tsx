@@ -91,6 +91,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
   }, [annotations.data]);
 
   const commentState = useAnnotationCommentStore();
+
   return (
     <VStack ref={ref as any} align="start" width="full" gap={0}>
       <Grid
@@ -203,29 +204,27 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                   paddingY={2}
                   width="80%"
                 >
-                  {(commentState.action !== "new" ||
-                    trace.trace_id !== commentState.traceId) && (
-                    <Box
-                      onDoubleClick={() => {
-                        setCommentState?.({
-                          traceId: trace.trace_id,
-                          action: "new",
-                          annotationId: undefined,
-                          expectedOutput: trace.output?.value,
-                          expectedOutputAction: "new",
-                        });
-                      }}
-                    >
-                      <RedactedField field="output">
-                        <Markdown className="markdown">
-                          {translationState.translatedTextOutput &&
-                          translationState.translationActive
-                            ? translationState.translatedTextOutput
-                            : trace.output.value}
-                        </Markdown>
-                      </RedactedField>
-                    </Box>
-                  )}
+                  <Box
+                    onDoubleClick={() => {
+                      setCommentState?.({
+                        traceId: trace.trace_id,
+                        action: "new",
+                        annotationId: undefined,
+                        expectedOutput: trace.output?.value,
+                        expectedOutputAction: "new",
+                      });
+                    }}
+                  >
+                    <RedactedField field="output">
+                      <Markdown className="markdown">
+                        {translationState.translatedTextOutput &&
+                        translationState.translationActive
+                          ? translationState.translatedTextOutput
+                          : trace.output.value}
+                      </Markdown>
+                    </RedactedField>
+                  </Box>
+
                   <AnnotationExpectedOutputs
                     traceId={trace.trace_id}
                     setHover={setHover}
