@@ -37,8 +37,10 @@ export default async function execute() {
   });
 
   for (const org of organizations) {
+    console.log("Checking for org:", org.name);
     await elasticsearchMigrate(org.id);
   }
+  console.log("Checking for default elasticsearch");
   await elasticsearchMigrate();
 }
 

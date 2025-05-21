@@ -325,6 +325,7 @@ export const batchEvaluationMapping: ElasticSearchMappingFrom<ESBatchEvaluation>
     dataset: {
       properties: {
         index: { type: "integer" },
+        trace_id: { type: "keyword" },
         entry: { type: FLATENNED_TYPE } as any,
         predicted: { type: FLATENNED_TYPE } as any,
         cost: { type: "float" },

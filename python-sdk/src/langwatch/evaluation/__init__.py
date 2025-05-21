@@ -3,4 +3,6 @@ from .evaluation import Evaluation
 
 
 def init(name: str) -> Evaluation:
-    return Evaluation(name)
+    evaluation = Evaluation(name)
+    evaluation.init()
+    return evaluation
