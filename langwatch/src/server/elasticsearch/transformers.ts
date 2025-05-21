@@ -65,10 +65,10 @@ export const transformElasticSearchTraceToTrace = (
   let transformedOutput: TraceOutput | undefined = void 0;
   let transformedMetrics: Trace["metrics"] | undefined = void 0;
 
-  let redactions: string[] = [
+  let redactions: Set<string> = new Set([
     ...(!protections.canSeeCapturedInput ? extractRedactionsForObject(input) : []),
     ...(!protections.canSeeCapturedOutput ? extractRedactionsForObject(output) : []),
-  ];
+  ]);
 
   if (input && protections.canSeeCapturedInput === true) {
     transformedInput = redactObject(input, redactions);
@@ -78,16 +78,16 @@ export const transformElasticSearchTraceToTrace = (
   }
 
   if (!protections.canSeeCapturedInput) {
-    redactions = [
+    redactions = new Set([
       ...redactions,
       ...extractRedactionsFromAllSpanInputs(spans),
-    ];
+    ]);
   }
   if (!protections.canSeeCapturedOutput) {
-    redactions = [
+    redactions = new Set([
       ...redactions,
       ...extractRedactionsFromAllSpanOutputs(spans),
-    ];
+    ]);
   }
 
   if (metrics) {
@@ -130,7 +130,7 @@ export const transformElasticSearchTraceToTrace = (
 export const transformElasticSearchSpanToSpan = (
   esSpan: ElasticSearchSpan,
   protections: Protections,
-  redactions: string[]
+  redactions: Set<string>
 ): Span => {
   const { input, output, metrics, ...spanFields } = esSpan;
 
@@ -175,13 +175,13 @@ export const transformElasticSearchSpanToSpan = (
   };
 };
 
-const extractRedactionsFromAllSpanInputs = (spans: Span[]): string[] => {
+const extractRedactionsFromAllSpanInputs = (spans: ElasticSearchTrace["spans"]): string[] => {
   return (spans || []).flatMap((span) =>
     extractRedactionsForObject(span.input?.value)
   );
 };
 
-const extractRedactionsFromAllSpanOutputs = (spans: Span[]): string[] => {
+const extractRedactionsFromAllSpanOutputs = (spans: ElasticSearchTrace["spans"]): string[] => {
   return (spans || []).flatMap((span) =>
     extractRedactionsForObject(span.output?.value)
   );
@@ -212,7 +212,7 @@ const extractRedactionsForObject = (object: any): string[] => {
   return [];
 };
 
-const redactObject = <T>(object: T, redactions: string[]): T => {
+const redactObject = <T>(object: T, redactions: Set<string>): T => {
   if (typeof object === "string") {
     try {
       const json = JSON.parse(object);
@@ -222,7 +222,7 @@ const redactObject = <T>(object: T, redactions: string[]): T => {
       if (typeof json_ === "object") {
         return redactObject(json_, redactions);
       }
-      return redactions.filter((redaction) => object.includes(redaction))
+      return Array.from(redactions).filter((redaction) => object.includes(redaction))
         .length > 0
         ? ("[REDACTED]" as T)
         : object;
