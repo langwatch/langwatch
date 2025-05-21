@@ -96,3 +96,42 @@ app.post(
     return c.json({ success: true });
   }
 );
+
+app.get(
+  "/:slugOrId",
+  describeRoute({
+    description: "Get a dataset by it's slug or id.",
+  }),
+  async (c) => {
+    const { slugOrId } = c.req.param();
+    if (!slugOrId) {
+      return c.json({ error: "Dataset slug or id is required" }, 422);
+    }
+
+    const apiKey =
+      c.req.header("X-Auth-Token") ??
+      c.req.header("Authorization")?.split(" ")[1];
+    if (!apiKey) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    const project = await prisma.project.findUnique({
+      where: { apiKey },
+    });
+    if (!project) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    const dataset = await prisma.dataset.findFirst({
+      where: {
+        projectId: project.id,
+        OR: [{ slug: slugOrId }, { id: slugOrId }],
+      },
+    });
+    if (!dataset) {
+      return c.json({ error: "Dataset not found" }, 404);
+    }
+
+    return c.json(dataset);
+  }
+);
