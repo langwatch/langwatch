@@ -84,15 +84,99 @@ describe("transformElasticSearchTraceToTrace", () => {
     // Spans: input should be [REDACTED], output should redact keys present in input
     expect(result.spans).toBeDefined();
     if (result.spans) {
-      expect(result.spans[0]?.input).toEqual({ type: 'text', value: '[REDACTED]' });
-      expect(result.spans[0]?.output).toEqual({
-        type: 'json',
-        value: { somekey: '[REDACTED]', spanonly: 'spanvalue' },
+      expect(result.spans[0]?.input).toEqual({
+        type: "text",
+        value: "[REDACTED]",
       });
-      expect(result.spans[1]?.input).toEqual({ type: 'text', value: '[REDACTED]' });
+      expect(result.spans[0]?.output).toEqual({
+        type: "json",
+        value: { somekey: "[REDACTED]", spanonly: "spanvalue" },
+      });
+      expect(result.spans[1]?.input).toEqual({
+        type: "text",
+        value: "[REDACTED]",
+      });
       expect(result.spans[1]?.output).toEqual({
-        type: 'json',
-        value: { another: 'visible' },
+        type: "json",
+        value: { another: "visible" },
+      });
+    }
+  });
+
+  it("redacts values inside python-parsable structures", () => {
+    const now = Date.now();
+
+    const trace: ElasticSearchTrace = {
+      trace_id: "trace2",
+      project_id: "proj1",
+      metadata: {},
+      timestamps: { started_at: now, inserted_at: now, updated_at: now },
+      input: {
+        value: 'MyPythonClass(some_attribute="secret")',
+      },
+      output: {
+        value: 'MyPythonClass(some_attribute="secret", another="visible")',
+      },
+      metrics: { total_cost: 1 },
+      spans: [
+        {
+          span_id: "span1",
+          trace_id: "trace2",
+          project_id: "proj1",
+          type: "span",
+          name: "span1",
+          input: {
+            type: "text",
+            value: 'MyPythonClass(some_attribute="secret")',
+          },
+          output: {
+            type: "text",
+            value: 'MyPythonClass(some_attribute="secret", another="visible")',
+          },
+          timestamps: {
+            started_at: now,
+            finished_at: now,
+            inserted_at: now,
+            updated_at: now,
+          },
+          metrics: { cost: 1 },
+        },
+      ],
+    };
+
+    const protections: Protections = {
+      canSeeCapturedInput: false,
+      canSeeCapturedOutput: true,
+      canSeeCosts: true,
+    };
+
+    const result = transformElasticSearchTraceToTrace(trace, protections);
+
+    expect(result.input).toBeUndefined();
+    // Output should redact 'secret' in the python-like structure (as parsed JSON)
+    expect(result.output).toEqual({
+      value: {
+        MyPythonClass: {
+          some_attribute: "[REDACTED]",
+          another: "visible",
+        },
+      },
+    });
+
+    expect(result.spans).toBeDefined();
+    if (result.spans) {
+      expect(result.spans[0]?.input).toEqual({
+        type: "text",
+        value: "[REDACTED]",
+      });
+      expect(result.spans[0]?.output).toEqual({
+        type: "raw",
+        value: {
+          MyPythonClass: {
+            some_attribute: "[REDACTED]",
+            another: "visible",
+          },
+        },
       });
     }
   });
