@@ -2847,6 +2847,23 @@
           }
         }
       }
+    },
+    "/api/dataset/{slugOrId}": {
+      "get": {
+        "responses": {},
+        "operationId": "getApiDatasetBySlugOrId",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slugOrId",
+            "required": true
+          }
+        ],
+        "description": "Get a dataset by it's slug or id."
+      }
     }
   },
   "components": {
