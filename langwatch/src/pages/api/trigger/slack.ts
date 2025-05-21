@@ -55,7 +55,7 @@ export default async function handler(
   });
 
   const schema = z.object({
-    slack_webhook: z.string(),
+    slack_webhook: z.string().url("The Slack webhook must be a valid URL"),
     name: z.string(),
     message: z.string().optional(),
     filters: filterSchema,
