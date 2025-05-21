@@ -186,7 +186,6 @@ export function EvaluateModalContent({
   ];
 
   const estimatedTotal = useMemo(() => {
-    console.log(evaluateOn);
     if (evaluateOn?.value === "full") {
       return total;
     }
@@ -298,7 +297,7 @@ export function EvaluateModalContent({
 
       startEvaluationExecution({
         workflow_version_id: versionId,
-        evaluate_on: evaluateOn.value as "full" | "test" | "train" | "specific",
+        evaluate_on: evaluateOn.value,
         dataset_entry:
           evaluateOn.value === "specific" ? evaluateOn.datasetEntry : undefined,
       });
@@ -480,11 +479,7 @@ const DatasetSplitSelect = ({
         <Input
           type="text"
           placeholder={`Enter row index (0-${(total ?? 0) - 1})`}
-          value={
-            field.value?.datasetEntry !== undefined
-              ? String(field.value.datasetEntry)
-              : ""
-          }
+          value={String(field.value.datasetEntry ?? "")}
           onChange={(e) => {
             const input = e.target.value;
             if (input === "" || /^[0-9]*$/.test(input)) {
