@@ -24,10 +24,10 @@ def test_multiple_variables(formatter):
 def test_missing_variable(formatter):
     template = "Hello {{ name }}!"
     variables = {}
-    
+
     with pytest.raises(MissingPromptVariableError) as exc_info:
         formatter.format(template, variables)
-    
+
     assert "name" in exc_info.value.missing_vars
 
 def test_whitespace_handling(formatter):
@@ -44,4 +44,4 @@ def test_special_characters(formatter):
         "punctuation": "!!!"
     }
     result = formatter.format(template, variables)
-    assert result == "Hello World! !!!" 
+    assert result == "Hello World! !!!"

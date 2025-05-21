@@ -77,4 +77,3 @@ class AttributeKey:
     # Deprecated attributes
     DeprecatedTraceId = "deprecated.trace.id"
     DeprecatedSpanId = "deprecated.span.id"
-
