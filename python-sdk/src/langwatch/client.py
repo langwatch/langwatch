@@ -137,9 +137,6 @@ class Client(LangWatchClientProtocol):
         if self._api_key:
             self._setup_rest_api_client()
 
-        if self._api_key:
-            self._setup_rest_api_client()
-
     @property
     def disable_sending(self) -> bool:
         """Get whether sending is disabled."""
@@ -286,6 +283,7 @@ class Client(LangWatchClientProtocol):
         self._rest_api_client = LangWatchApiClient(
             base_url=self._endpoint_url,
             headers={"X-Auth-Token": self._api_key},
+            raise_on_unexpected_status=True,
         )
 
         return self._rest_api_client
