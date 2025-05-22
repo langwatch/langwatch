@@ -27,6 +27,8 @@ Get up and running in under 30 seconds. The example below uses Docker, but if yo
 
 ```bash
 git clone https://github.com/langwatch/langwatch.git
+cd langwatch
+cp langwatch/.env.example langwatch/.env
 docker compose up -d --wait --build
 open http://localhost:5560
 ```
@@ -73,7 +75,7 @@ make start
 
 Get observing in minutes. Now you have an account and have created a project inside LangWatch, lets get your messages flowing through LangWatch.
 
-> [!NOTE]  
+> [!NOTE]
 > Not using Python or OpenAI? Don't worry, we have your back . [Visit our docs](https://docs.langwatch.ai/integration/overview) for full guides for other popular languages, LLM providers, and frameworks.
 
 ### Install and configure SDK
