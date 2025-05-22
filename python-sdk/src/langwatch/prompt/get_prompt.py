@@ -15,7 +15,7 @@ from langwatch.state import get_instance
 tracer = trace.get_tracer(__name__)
 
 
-def get_prompt(prompt_id: str, version_id: Optional[str] = None) -> Prompt:
+def get_prompt(prompt_id: str) -> Prompt:
     """
     Fetches and returns a Prompt object for the given prompt ID and version ID.
 
@@ -34,15 +34,15 @@ def get_prompt(prompt_id: str, version_id: Optional[str] = None) -> Prompt:
 
     with tracer.start_as_current_span("get_prompt") as span:
         span.set_attribute("inputs.prompt_id", prompt_id)
-        if version_id:
-            span.set_attribute("inputs.version_id", version_id)
 
         try:
             client = get_instance()
+
             response = get_api_prompts_by_id.sync(
                 id=prompt_id,
                 client=client.rest_api_client,
             )
+
             prompt = _handle_response(response, prompt_id)
             _set_prompt_attributes(span, prompt)
             return prompt
