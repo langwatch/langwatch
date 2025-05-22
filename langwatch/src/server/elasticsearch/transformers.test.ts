@@ -78,7 +78,7 @@ describe("transformElasticSearchTraceToTrace", () => {
     expect(result.input).toBeUndefined();
     // Output should redact keys that were present in input
     expect(result.output).toEqual({
-      value: { somekey: "[REDACTED]", another: "visible" },
+      value: JSON.stringify({ somekey: "[REDACTED]", another: "visible" }),
     });
 
     // Spans: input should be [REDACTED], output should redact keys present in input
@@ -155,12 +155,12 @@ describe("transformElasticSearchTraceToTrace", () => {
     expect(result.input).toBeUndefined();
     // Output should redact 'secret' in the python-like structure (as parsed JSON)
     expect(result.output).toEqual({
-      value: {
+      value: JSON.stringify({
         MyPythonClass: {
           some_attribute: "[REDACTED]",
           another: "visible",
         },
-      },
+      }),
     });
 
     expect(result.spans).toBeDefined();
@@ -171,12 +171,12 @@ describe("transformElasticSearchTraceToTrace", () => {
       });
       expect(result.spans[0]?.output).toEqual({
         type: "raw",
-        value: {
+        value: JSON.stringify({
           MyPythonClass: {
             some_attribute: "[REDACTED]",
             another: "visible",
           },
-        },
+        }),
       });
     }
   });
@@ -253,10 +253,10 @@ describe("transformElasticSearchTraceToTrace", () => {
 
     // Top-level input and output should be present and unredacted
     expect(result.input).toEqual({
-      value: { somekey: "secret", another: "visible" },
+      value: JSON.stringify({ somekey: "secret", another: "visible" }),
     });
     expect(result.output).toEqual({
-      value: { somekey: "secret", another: "visible" },
+      value: JSON.stringify({ somekey: "secret", another: "visible" }),
     });
 
     // Spans: input and output should be present and unredacted
