@@ -4,8 +4,31 @@ import { prisma } from "../../../server/db";
 import { createLogger } from "../../../utils/logger";
 import { TriggerAction, AlertType } from "@prisma/client";
 import { z } from "zod";
+import { filterFieldsEnum } from "../../../server/filters/types";
 
 const logger = createLogger("langwatch:trigger:slack");
+
+/**
+ * Filter schema for trigger creation
+ *
+ * Example request body:
+ * {
+ *   "filters": {
+ *     "metadata.user_id": ["user123"],  // Note: keys must include the full path
+ *     "metadata.customer_id": ["cust456"]
+ *   }
+ * }
+ */
+const filterSchema = z
+  .record(
+    filterFieldsEnum,
+    z.union([
+      z.array(z.string()),
+      z.record(z.string(), z.array(z.string())),
+      z.record(z.string(), z.record(z.string(), z.array(z.string()))),
+    ])
+  )
+  .default({});
 
 export default async function handler(
   req: NextApiRequest,
@@ -31,29 +54,6 @@ export default async function handler(
     return res.status(401).json({ message: "Invalid auth token." });
   }
 
-  const filterSchema = z.object({
-    metadata: z
-      .object({
-        user_id: z.array(z.string()).optional(),
-        thread_id: z.array(z.string()).optional(),
-        customer_id: z.array(z.string()).optional(),
-        labels: z.array(z.string()).optional(),
-        custom_value: z.record(z.any()).optional(),
-      })
-      .refine(
-        (data) =>
-          (data.user_id && data.user_id.length > 0) ||
-          (data.thread_id && data.thread_id.length > 0) ||
-          (data.customer_id && data.customer_id.length > 0) ||
-          (data.labels && data.labels.length > 0) ||
-          (data.custom_value && Object.keys(data.custom_value).length > 0),
-        {
-          message:
-            "At least one metadata field must be provided (user_id, thread_id, customer_id, labels, custom_value)",
-        }
-      ),
-  });
-
   const schema = z.object({
     slack_webhook: z.string().url("The Slack webhook must be a valid URL"),
     name: z.string(),
@@ -65,24 +65,13 @@ export default async function handler(
   try {
     const validatedData = schema.parse(req.body);
 
-    // Transform to dot notation format
-    const flattenedFilters = Object.entries(
-      validatedData.filters.metadata
-    ).reduce(
-      (acc, [key, value]) => ({
-        ...acc,
-        [`metadata.${key === "custom_value" ? "value" : key}`]: value,
-      }),
-      {}
-    );
-
     const trigger = await prisma.trigger.create({
       data: {
         projectId: project.id,
         action: TriggerAction.SEND_SLACK_MESSAGE,
         name: validatedData.name,
         message: validatedData.message,
-        filters: JSON.stringify(flattenedFilters),
+        filters: JSON.stringify(validatedData.filters),
         actionParams: {
           slackWebhook: validatedData.slack_webhook,
         },
