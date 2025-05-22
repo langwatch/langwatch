@@ -242,6 +242,13 @@ function NestedListSelection({
     currentValues = Object.keys(currentValues);
   }
 
+  console.log({
+    filterId,
+    currentValues,
+    keysBefore,
+    keysAhead,
+  });
+
   return (
     <ListSelection
       filterId={filterId}
@@ -342,6 +349,13 @@ function ListSelection({
       enabled: queryOpts.enabled,
     }
   );
+
+  console.log({
+    filterId,
+    currentValues,
+    filterData,
+    filter,
+  });
 
   if (
     filter.type === "numeric" &&

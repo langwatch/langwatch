@@ -23,8 +23,25 @@ example:
 		uv run chainlit run -w --port 9000 $$args; \
 	fi
 
+run/example:
+	uv run python examples/openai_bot_prompt.py
+
 batch-evaluation-example:
 	uv run python $(filter-out $@,$(MAKECMDGOALS))
+
+generate/api-client:
+	@echo "Building API client..."
+	@mkdir -p .tmp/api-client
+	openapi-python-client generate \
+		--path ../langwatch/src/app/api/openapiLangWatch.json \
+		--output-path .tmp/api-client \
+		--overwrite
+	@echo "Copying necessary files to SDK..."
+	@mkdir -p src/langwatch/generated/langwatch_rest_api_client
+	@cp -r .tmp/api-client/lang_watch_api_client/ src/langwatch/generated/langwatch_rest_api_client/
+	@echo "Cleaning up..."
+	@rm -rf .tmp/api-client
+	@echo "Done! API client has been integrated into the SDK."
 
 %:
 	@:
