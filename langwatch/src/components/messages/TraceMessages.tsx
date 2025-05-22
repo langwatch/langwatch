@@ -39,6 +39,7 @@ import {
 
 import { AnnotationExpectedOutputs } from "../../components/AnnotationExpectedOutputs";
 import { RedactedField } from "../ui/RedactedField";
+import { stringifyIfObject } from "~/utils/stringifyIfObject";
 
 export const TraceMessages = React.forwardRef(function TraceMessages(
   {
@@ -194,9 +195,11 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                   <Text color="red.900">{trace.error.message}</Text>
                 </VStack>
               ) : trace.output?.value &&
-                (isJson(trace.output.value) ||
-                  isPythonRepr(trace.output.value)) ? (
-                <MessageCardJsonOutput value={trace.output.value} />
+                (isJson(stringifyIfObject(trace.output.value)) ||
+                  isPythonRepr(stringifyIfObject(trace.output.value))) ? (
+                <MessageCardJsonOutput
+                  value={stringifyIfObject(trace.output.value)}
+                />
               ) : trace.output?.value ? (
                 <VStack
                   alignItems="flex-start"
@@ -210,7 +213,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                         traceId: trace.trace_id,
                         action: "new",
                         annotationId: undefined,
-                        expectedOutput: trace.output?.value,
+                        expectedOutput: stringifyIfObject(trace.output?.value),
                         expectedOutputAction: "new",
                       });
                     }}
@@ -220,7 +223,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                         {translationState.translatedTextOutput &&
                         translationState.translationActive
                           ? translationState.translatedTextOutput
-                          : trace.output.value}
+                          : stringifyIfObject(trace.output.value)}
                       </Markdown>
                     </RedactedField>
                   </Box>
@@ -228,7 +231,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                   <AnnotationExpectedOutputs
                     traceId={trace.trace_id}
                     setHover={setHover}
-                    output={trace.output.value}
+                    output={stringifyIfObject(trace.output.value)}
                   />
                 </VStack>
               ) : (

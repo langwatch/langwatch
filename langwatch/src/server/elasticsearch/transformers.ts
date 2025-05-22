@@ -66,8 +66,12 @@ export const transformElasticSearchTraceToTrace = (
   let transformedMetrics: Trace["metrics"] | undefined = void 0;
 
   let redactions: Set<string> = new Set([
-    ...(!protections.canSeeCapturedInput ? extractRedactionsForObject(input) : []),
-    ...(!protections.canSeeCapturedOutput ? extractRedactionsForObject(output) : []),
+    ...(!protections.canSeeCapturedInput
+      ? extractRedactionsForObject(input)
+      : []),
+    ...(!protections.canSeeCapturedOutput
+      ? extractRedactionsForObject(output)
+      : []),
   ]);
 
   if (input && protections.canSeeCapturedInput === true) {
@@ -175,13 +179,17 @@ export const transformElasticSearchSpanToSpan = (
   };
 };
 
-const extractRedactionsFromAllSpanInputs = (spans: ElasticSearchTrace["spans"]): string[] => {
+const extractRedactionsFromAllSpanInputs = (
+  spans: ElasticSearchTrace["spans"]
+): string[] => {
   return (spans || []).flatMap((span) =>
     extractRedactionsForObject(span.input?.value)
   );
 };
 
-const extractRedactionsFromAllSpanOutputs = (spans: ElasticSearchTrace["spans"]): string[] => {
+const extractRedactionsFromAllSpanOutputs = (
+  spans: ElasticSearchTrace["spans"]
+): string[] => {
   return (spans || []).flatMap((span) =>
     extractRedactionsForObject(span.output?.value)
   );
@@ -213,17 +221,21 @@ const extractRedactionsForObject = (object: any): string[] => {
 };
 
 const redactObject = <T>(object: T, redactions: Set<string>): T => {
+  if (redactions.size === 0) {
+    return object;
+  }
   if (typeof object === "string") {
     try {
       const json = JSON.parse(object);
-      return redactObject(json, redactions);
+      return JSON.stringify(redactObject(json, redactions)) as T;
     } catch (e) {
       const json_ = parsePythonInsideJson(object as any);
       if (typeof json_ === "object") {
-        return redactObject(json_, redactions);
+        return JSON.stringify(redactObject(json_, redactions)) as T;
       }
-      return Array.from(redactions).filter((redaction) => object.includes(redaction))
-        .length > 0
+      return Array.from(redactions).filter((redaction) =>
+        object.includes(redaction)
+      ).length > 0
         ? ("[REDACTED]" as T)
         : object;
     }

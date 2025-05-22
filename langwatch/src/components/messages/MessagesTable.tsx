@@ -68,6 +68,7 @@ import {
 import { AddParticipants } from "../traces/AddParticipants";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
 import { RedactedField } from "../ui/RedactedField";
+import { stringifyIfObject } from "~/utils/stringifyIfObject";
 
 export interface MessagesTableProps {
   hideExport?: boolean;
@@ -354,37 +355,41 @@ export function MessagesTable({
       name: "Input",
       sortable: false,
       width: 300,
-      render: (trace, index) => (
-        <Table.Cell
-          key={index}
-          maxWidth="300px"
-          onClick={() =>
-            openDrawer("traceDetails", {
-              traceId: trace.trace_id,
-            })
-          }
-        >
-          <Tooltip
-            content={
-              <Box whiteSpace="pre-wrap">{trace.input?.value ?? ""}</Box>
+      render: (trace, index) => {
+        const safeInputValue = getSafeRenderInputValueFromTrace(trace);
+
+        return (
+          <Table.Cell
+            key={index}
+            maxWidth="300px"
+            onClick={() =>
+              openDrawer("traceDetails", {
+                traceId: trace.trace_id,
+              })
             }
           >
-            <RedactedField field="input">
-              <Text truncate display="block">
-                {trace.input?.value ? trace.input?.value : "<empty>"}
-              </Text>
-            </RedactedField>
-          </Tooltip>
-        </Table.Cell>
-      ),
-      value: (trace: Trace) => trace.input?.value ?? "",
+            <Tooltip
+              content={<Box whiteSpace="pre-wrap">{safeInputValue}</Box>}
+            >
+              <RedactedField field="input">
+                <Text truncate display="block">
+                  {safeInputValue}
+                </Text>
+              </RedactedField>
+            </Tooltip>
+          </Table.Cell>
+        );
+      },
+      value: (trace: Trace) => getSafeRenderInputValueFromTrace(trace),
     },
     "output.value": {
       name: "Output",
       sortable: false,
       width: 300,
-      render: (trace, index) =>
-        trace.error && !trace.output?.value ? (
+      render: (trace, index) => {
+        const safeOutputValue = getSafeRenderOutputValueFromTrace(trace);
+
+        return trace.error && !trace.output?.value ? (
           <Table.Cell
             key={index}
             onClick={() =>
@@ -409,8 +414,8 @@ export function MessagesTable({
             <Tooltip
               content={
                 <Box whiteSpace="pre-wrap">
-                  {trace.output?.value
-                    ? trace.output?.value
+                  {safeOutputValue
+                    ? safeOutputValue
                     : trace.lastGuardrail
                     ? [trace.lastGuardrail.name, trace.lastGuardrail.details]
                         .filter((x) => x)
@@ -427,7 +432,7 @@ export function MessagesTable({
                   </Tag.Root>
                 ) : trace.output?.value ? (
                   <Box lineClamp={1} maxWidth="300px">
-                    {trace.output?.value}
+                    {safeOutputValue}
                   </Box>
                 ) : (
                   <Box>{"<empty>"}</Box>
@@ -435,8 +440,10 @@ export function MessagesTable({
               </RedactedField>
             </Tooltip>
           </Table.Cell>
-        ),
-      value: (trace: Trace) => trace.output?.value ?? "",
+        );
+      },
+
+      value: (trace: Trace) => getSafeRenderOutputValueFromTrace(trace),
     },
     "metadata.labels": {
       name: "Labels",
@@ -1370,4 +1377,12 @@ export function MessagesTable({
       )}
     </>
   );
+}
+
+function getSafeRenderInputValueFromTrace(trace: Trace): string {
+  return stringifyIfObject(trace.input?.value);
+}
+
+function getSafeRenderOutputValueFromTrace(trace: Trace): string {
+  return stringifyIfObject(trace.output?.value);
 }
