@@ -10,6 +10,7 @@ from typing_extensions import TypedDict
 import httpx
 import pandas as pd
 from opentelemetry import trace
+from opentelemetry.context import Context
 from typing import (
     Any,
     Callable,
@@ -159,10 +160,9 @@ class Evaluation:
                     self._executor = executor
 
                     for index, item in enumerate(iterable):
-                        ctx = trace.set_span_in_context(trace.INVALID_SPAN)
                         with _tracer.start_as_current_span(
                             "evaluation.iteration",
-                            context=ctx,  # This ensures the iteration span is not a child of the parent, so each iteration is independent
+                            context=Context(),  # This ensures the iteration span is not a child of the parent, so each iteration is independent
                             attributes={
                                 AttributeKey.LangWatchThreadId: thread_id,
                                 AttributeKey.LangWatchInput: json.dumps(
