@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from typing import (
     Any,
     Dict,
+    Hashable,
     Iterable,
     Iterator,
     List,
@@ -42,10 +43,12 @@ _tracer = trace.get_tracer(__name__)
 ItemT = TypeVar("ItemT")
 
 
-class EvaluationResultProcessed(BaseModel):
+class EvaluationResult(BaseModel):
+    name: str
     evaluator: str
     trace_id: str
-    status: Literal["processed"] = "processed"
+    status: Literal["processed", "error", "skipped"]
+    data: Optional[Dict[str, Any]] = None
     score: Optional[float] = Field(default=None, description="No description provided")
     passed: Optional[bool] = None
     details: Optional[str] = Field(
@@ -55,38 +58,23 @@ class EvaluationResultProcessed(BaseModel):
     label: Optional[str] = None
     cost: Optional[Money] = None
     duration: Optional[int] = None
-    data: Optional[Dict[str, Any]] = None
-
-
-class EvaluationResultError(BaseModel):
-    evaluator: str
-    trace_id: str
-    status: Literal["error"] = "error"
-    error_type: str = Field(description="The type of the exception")
-    details: str = Field(description="Error message")
-    traceback: List[str] = Field(description="Traceback information for debugging")
-    duration: Optional[int] = None
-    index: Optional[int] = None
-    data: Optional[Dict[str, Any]] = None
-
-
-class EvaluationResultSkipped(BaseModel):
-    status: Literal["skipped"] = "skipped"
-    details: Optional[str] = None
-    duration: Optional[int] = None
-    index: Optional[int] = None
-
-
-EvaluationResult = Union[
-    EvaluationResultProcessed,
-    EvaluationResultSkipped,
-    EvaluationResultError,
-]
+    error_type: Optional[str] = None
+    traceback: Optional[List[str]] = Field(
+        description="Traceback information for debugging", default=None
+    )
 
 
 class Batch(TypedDict):
-    dataset: List[Any]
+    dataset: List[BatchEntry]
     evaluations: List[EvaluationResult]
+
+
+class BatchEntry(BaseModel):
+    index: int
+    entry: Any
+    duration: int
+    error: Optional[str] = None
+    trace_id: str
 
 
 class IterationInfo(TypedDict):
@@ -121,7 +109,7 @@ class Evaluation:
         self.initialized = False
 
     def init(self):
-        if langwatch.get_api_key() is "":
+        if not langwatch.get_api_key():
             raise ValueError(
                 "API key was not detected, please set LANGWATCH_API_KEY or call langwatch.login() to login"
             )
@@ -275,12 +263,6 @@ class Evaluation:
                     iteration["span"].set_attributes(
                         {
                             "inputs.index": str(index),
-                            "inputs.item": json.dumps(
-                                TypedValueJson(
-                                    type="json",
-                                    value=json.dumps(item),
-                                ),
-                            ),
                         }
                     )
                     self._add_to_batch(iteration)
@@ -317,15 +299,13 @@ class Evaluation:
         )
         with self.lock:
             self.batch["dataset"].append(
-                {
-                    "index": iteration["index"],
-                    "entry": entry,
-                    "duration": iteration["duration"],
-                    "error": iteration["error"],
-                    "trace_id": format(
-                        iteration["span"].get_span_context().trace_id, "x"
-                    ),
-                }
+                BatchEntry(
+                    index=iteration["index"],
+                    entry=entry,
+                    duration=iteration["duration"],
+                    error=str(iteration["error"]) if iteration["error"] else None,
+                    trace_id=format(iteration["span"].get_span_context().trace_id, "x"),
+                )
             )
 
         if time.time() - self.last_sent >= self.debounce_interval:
@@ -340,12 +320,24 @@ class Evaluation:
             ):
                 return
 
+            # TODO: it is called `inputs` on the api still, unfortunately, so we need to map data back to inputs
+            evaluations = []
+            for eval in self.batch["evaluations"]:
+                eval_ = eval.model_dump(exclude_none=True, exclude_unset=True)
+                eval_["inputs"] = eval_["data"]
+                if "data" in eval_:
+                    del eval_["data"]
+                evaluations.append(eval_)
+
             body = {
                 "experiment_slug": self.experiment_slug,
                 "name": f"{self.name}",
                 "run_id": self.run_id,
-                "dataset": self.batch["dataset"],
-                "evaluations": self.batch["evaluations"],
+                "dataset": [
+                    entry.model_dump(exclude_none=True, exclude_unset=True)
+                    for entry in self.batch["dataset"]
+                ],
+                "evaluations": evaluations,
                 "progress": self.progress,
                 "total": self.total,
                 "timestamps": {
@@ -401,56 +393,43 @@ class Evaluation:
 
     def log(
         self,
-        evaluator_name: str,
-        index: int,
-        data: Dict[str, Any],
+        metric: str,
+        index: Union[int, Hashable],
+        data: Dict[str, Any] = {},
         score: Optional[float] = None,
         passed: Optional[bool] = None,
         duration: Optional[int] = None,
         label: Optional[str] = None,
         details: Optional[str] = None,
+        status: Literal["processed", "error", "skipped"] = "processed",
+        error: Optional[Exception] = None,
     ):
-        eval = EvaluationResultProcessed(
+        try:
+            index_ = int(cast(Any, index))
+        except Exception:
+            raise ValueError(f"Index must be an integer, got {index}")
+
+        eval = EvaluationResult(
             trace_id=format(
                 trace.get_current_span().get_span_context().trace_id,
                 "x",
             ),
-            evaluator=evaluator_name,
-            status="processed",
+            name=metric,
+            evaluator=metric,
+            status=status if status else "error" if error else "processed",
+            data=data,
             score=score,
             passed=passed,
             duration=duration,
-            index=index,
-            data=data,
+            index=index_,
             label=label,
-            details=details,
-        )
-
-        with self.lock:
-            self.batch["evaluations"].append(eval)
-
-    def log_error(
-        self,
-        evaluator_name: str,
-        index: int,
-        data: Dict[str, Any],
-        error: Exception,
-        duration: Optional[int] = None,
-    ):
-        # tracebacks can be slow, so we should do this outside of the lock
-        eval = EvaluationResultError(
-            trace_id=format(
-                trace.get_current_span().get_span_context().trace_id,
-                "x",
+            details=details if details else str(error) if error else None,
+            error_type=type(error).__name__ if error else None,
+            traceback=(
+                list(traceback.TracebackException.from_exception(error).format())
+                if error
+                else None
             ),
-            evaluator=evaluator_name,
-            status="error",
-            error_type=type(error).__name__,
-            details=str(error),
-            traceback=list(traceback.TracebackException.from_exception(error).format()),
-            duration=duration,
-            index=index,
-            data=data,
         )
 
         with self.lock:
@@ -492,62 +471,40 @@ class Evaluation:
             result = response.json()
             duration = int((time.time() - start_time) * 1000)
 
-            evaluation_result: EvaluationResult
-            if result["status"] == "processed":
-                evaluation_result = EvaluationResultProcessed.model_validate(result)
-            elif result["status"] == "skipped":
-                evaluation_result = EvaluationResultSkipped.model_validate(result)
-            else:
-                evaluation_result = EvaluationResultError.model_validate(
-                    {"traceback": [], **(result or {})}
-                )
+            evaluation_result = EvaluationResult.model_validate(result)
 
             evaluation_result.duration = duration
 
-            if evaluation_result.status == "processed":
-                self.log(
-                    evaluator_name=evaluator_name,
-                    index=index,
-                    details=evaluation_result.details,
-                    data=data,
-                    score=evaluation_result.score,
-                    passed=evaluation_result.passed,
-                    duration=duration,
-                    label=evaluation_result.label,
-                )
-            elif evaluation_result.status == "skipped":
-                self.log(
-                    evaluator_name=evaluator_name,
-                    index=index,
-                    details=evaluation_result.details,
-                    data=data,
-                )
-            else:
-                self.log_error(
-                    evaluator_name=evaluator_name,
-                    index=index,
-                    data=data,
-                    error=evaluation_result.error_type,
-                    duration=duration,
-                )
+            self.log(
+                metric=evaluator_name,
+                index=index,
+                details=evaluation_result.details,
+                data=data,
+                score=evaluation_result.score,
+                passed=evaluation_result.passed,
+                duration=duration,
+                label=evaluation_result.label,
+            )
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code // 100 == 4:
                 raise Exception(f"HTTP error: {e.response.text}")
 
-            self.log_error(
-                evaluator_name=evaluator_name,
+            self.log(
+                metric=evaluator_name,
                 index=index,
                 data=data,
+                status="error",
                 error=e,
                 duration=duration,
             )
 
         except Exception as e:
-            self.log_error(
-                evaluator_name=evaluator_name,
+            self.log(
+                metric=evaluator_name,
                 index=index,
                 data=data,
+                status="error",
                 error=e,
                 duration=duration,
             )

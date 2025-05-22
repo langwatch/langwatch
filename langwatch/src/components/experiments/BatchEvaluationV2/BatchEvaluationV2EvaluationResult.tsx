@@ -540,7 +540,7 @@ export function BatchEvaluationV2EvaluationResult({
                   paddingY={2}
                   borderTop="none"
                 >
-                  <Box>Evaluation Entry</Box>
+                  <Box>Evaluation Data</Box>
                 </Table.ColumnHeader>
               )}
 
