@@ -69,6 +69,9 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
       },
       {
         enabled: !!projectId && !!configId,
+        refetchOnWindowFocus: false,
+        refetchOnMount: true,
+        refetchOnReconnect: false,
       }
     );
 
@@ -77,7 +80,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
   const initialConfigValues = useMemo(
     () =>
       llmConfig ? llmConfigToPromptConfigFormValues(llmConfig) : undefined,
-    [llmConfig]
+    [configId, projectId, !!llmConfig]
   );
 
   // Setup form with the config values
@@ -95,7 +98,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
     if (initialConfigValues) {
       formProps.methods.reset(initialConfigValues);
     }
-  }, [configId, formProps.methods, initialConfigValues]);
+  }, [formProps.methods, initialConfigValues]);
 
   const handleClose = () => {
     if (isExpanded) {
