@@ -110,6 +110,10 @@ app.get(
       project.id
     );
 
+    if (!config) {
+      return c.json({ error: "Prompt not found" }, 404);
+    }
+
     const response = {
       id,
       name: config.name,

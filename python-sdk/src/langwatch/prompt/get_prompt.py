@@ -6,6 +6,7 @@ from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_
 from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_401 import GetApiPromptsByIdResponse401
 from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_404 import GetApiPromptsByIdResponse404
 from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_500 import GetApiPromptsByIdResponse500
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import GetApiPromptsByIdResponse200
 
 from langwatch.attributes import AttributeKey
 from langwatch.utils.initialization import ensure_setup
@@ -26,7 +27,8 @@ def get_prompt(prompt_id: str, version_id: Optional[str] = None) -> Prompt:
         Prompt: A configured Prompt object
 
     Raises:
-        Exception: If there's an error fetching or configuring the prompt
+        ValueError: If the prompt is not found (404) or invalid request (400)
+        RuntimeError: If there's an authentication error (401) or server error (500)
     """
     _setup()
 
@@ -37,29 +39,18 @@ def get_prompt(prompt_id: str, version_id: Optional[str] = None) -> Prompt:
 
         try:
             client = get_instance()
-            response = get_api_prompts_by_id.sync_detailed(
+            response = get_api_prompts_by_id.sync(
                 id=prompt_id,
                 client=client.rest_api_client,
             )
-
-            if isinstance(response.parsed, GetApiPromptsByIdResponse404):
-                raise Exception(response.parsed.error)
-            elif isinstance(response.parsed, GetApiPromptsByIdResponse400):
-                raise Exception(response.parsed.error)
-            elif isinstance(response.parsed, GetApiPromptsByIdResponse401):
-                raise Exception(response.parsed.error)
-            elif isinstance(response.parsed, GetApiPromptsByIdResponse500):
-                raise Exception(response.parsed.error)
-            elif isinstance(response.parsed, GetApiPromptsByIdResponse200):
-                prompt = Prompt(response.parsed)
-                _set_prompt_attributes(span, prompt)
-                return prompt
-            else:
-                raise Exception(f"Unknown response type: {type(response.parsed)}")
+            prompt = _handle_response(response, prompt_id)
+            _set_prompt_attributes(span, prompt)
+            return prompt
 
         except Exception as ex:
             span.record_exception(ex)
             raise
+
 
 async def async_get_prompt(prompt_id: str, version_id: Optional[str] = None) -> Prompt:
     """
@@ -73,7 +64,6 @@ async def async_get_prompt(prompt_id: str, version_id: Optional[str] = None) -> 
         Prompt: A configured Prompt object
 
     Raises:
-        Exception: If there's an error fetching or configuring the prompt
         ValueError: If the prompt is not found (404) or invalid request (400)
         RuntimeError: If there's an authentication error (401) or server error (500)
     """
@@ -98,6 +88,7 @@ async def async_get_prompt(prompt_id: str, version_id: Optional[str] = None) -> 
             span.record_exception(ex)
             raise
 
+
 def _setup():
     """
     Ensure LangWatch client is setup.
@@ -106,6 +97,7 @@ def _setup():
     Validates that we have a working tracer provider to prevent silent failures.
     """
     ensure_setup()
+
 
 def _handle_response(response, prompt_id: str) -> Prompt:
     """
@@ -122,18 +114,19 @@ def _handle_response(response, prompt_id: str) -> Prompt:
         ValueError: For 404 or 400 status codes
         RuntimeError: For 401, 500 or other non-200 status codes
     """
-    if response.status_code == 404:
-        raise ValueError(f"Prompt with ID {prompt_id} not found. Response: {response.parsed}")
-    elif response.status_code == 400:
-        raise ValueError(f"Invalid request for prompt ID {prompt_id}. Response: {response.parsed}")
-    elif response.status_code == 401:
-        raise RuntimeError(f"Authentication error - please check your API key. Response: {response.parsed}")
-    elif response.status_code == 500:
-        raise RuntimeError(f"Server error occurred while fetching prompt. Response: {response.parsed}")
-    elif response.status_code != 200:
-        raise RuntimeError(f"Unexpected status code: {response.status_code}. Response: {response.parsed}")
+    if isinstance(response, GetApiPromptsByIdResponse404):
+        raise ValueError(f"Prompt with ID {prompt_id} not found: {response.error}")
+    elif isinstance(response, GetApiPromptsByIdResponse400):
+        raise ValueError(f"Invalid request for prompt ID {prompt_id}: {response.error}")
+    elif isinstance(response, GetApiPromptsByIdResponse401):
+        raise RuntimeError(f"Authentication error - please check your API key: {response.error}")
+    elif isinstance(response, GetApiPromptsByIdResponse500):
+        raise RuntimeError(f"Server error occurred while fetching prompt: {response.error}")
+    elif isinstance(response, GetApiPromptsByIdResponse200):
+        return Prompt(response)
+    else:
+        raise RuntimeError(f"Unexpected response type: {type(response)}")
 
-    return Prompt(response.parsed)
 
 def _set_prompt_attributes(span, prompt: Prompt):
     """Set prompt attributes on span."""
