@@ -12,6 +12,7 @@ from opentelemetry.trace import Span
 from pydantic import BaseModel, Field
 from typing import (
     Any,
+    Callable,
     Dict,
     Hashable,
     Iterable,
@@ -212,6 +213,25 @@ class Evaluation:
                     },
                 )
                 raise e
+
+    def submit(self, func: Callable[..., Any], /, *args: Any, **kwargs: Any):
+        _current_index = self._current_index
+        _current_item = self._current_item
+
+        def wrapper():
+            with self._execute_item_iteration(
+                _current_index, _current_item, in_thread=True
+            ):
+                if asyncio.iscoroutinefunction(func):
+                    func_result = asyncio.run(func(*args, **kwargs))
+                else:
+                    func_result = func(*args, **kwargs)
+
+            return func_result
+
+        future = self._executor.submit(wrapper)
+        self._futures.append(future)
+        return future
 
     @contextmanager
     def _execute_item_iteration(
