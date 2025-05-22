@@ -108,7 +108,7 @@ app.get(
       ...baseResponses,
       200: buildStandardSuccessResponse(datasetOutputSchema),
       404: {
-        description: "Prompt not found",
+        description: "Dataset not found",
         content: {
           "application/json": { schema: resolver(errorSchema) },
         },
