@@ -5,22 +5,19 @@ import json
 import threading
 import time
 import traceback
+import nanoid
 from typing_extensions import TypedDict
 import httpx
 import pandas as pd
 from opentelemetry import trace
 from typing import (
     Any,
-    AsyncGenerator,
-    AsyncIterator,
     Callable,
     Dict,
-    Generator,
     Iterable,
     Iterator,
     List,
     Optional,
-    Tuple,
     TypeVar,
     Sized,
     Union,
@@ -44,8 +41,14 @@ from coolname import generate_slug
 import urllib.parse
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 
+_tracer = trace.get_tracer(__name__)
 
 ItemT = TypeVar("ItemT")
+
+
+class Batch(TypedDict):
+    dataset: List[Any]
+    evaluations: List[Any]
 
 
 class IterationInfo(TypedDict):
@@ -58,7 +61,7 @@ class IterationInfo(TypedDict):
 
 class Evaluation:
     _executor: ThreadPoolExecutor
-    _futures: List[Future]
+    _futures: List[Future[Any]]
     _current_index: int
     _current_item: Any
 
@@ -69,18 +72,18 @@ class Evaluation:
         self.total = 0
         self.progress = 0
         self.created_at = int(time.time() * 1000)
-        self._futures: List[Future] = []
+        self._futures: List[Future[Any]] = []
 
         # Sending results
         self.lock = threading.Lock()
-        self.batch = {"dataset": [], "evaluations": []}
+        self.batch: Batch = {"dataset": [], "evaluations": []}
         self.last_sent = 0
         self.debounce_interval = 1  # 1 second
         self.threads: List[threading.Thread] = []
         self.initialized = False
 
     def init(self):
-        if langwatch.get_api_key() is None:
+        if langwatch.get_api_key() is "":
             raise ValueError(
                 "API key was not detected, please set LANGWATCH_API_KEY or call langwatch.login() to login"
             )
@@ -117,61 +120,90 @@ class Evaluation:
         threads: int = 4,
         total: Optional[int] = None,
     ) -> Iterable[ItemT]:
+        thread_id = "thread" + nanoid.generate(size=10)
+
         if not self.initialized:
             self.init()
 
-        try:
-            total_ = (
-                total
-                if total
-                else (
-                    len(cast(Sized, iterable)) if hasattr(iterable, "__len__") else None
+        with _tracer.start_as_current_span(
+            "evaluation.loop",
+            attributes={
+                AttributeKey.LangWatchThreadId: thread_id,
+                "inputs.threads": str(threads),
+                "inputs.total": str(total),
+            },
+        ):
+            try:
+                total_ = (
+                    total
+                    if total
+                    else (
+                        len(cast(Sized, iterable))
+                        if hasattr(iterable, "__len__")
+                        else None
+                    )
                 )
-            )
-            if total_ is None and "DataFrame.iterrows" in str(iterable):
-                iterable = cast(Iterable[ItemT], list(iterable))
-                total_ = len(cast(Sized, iterable))
-            progress_bar = tqdm(total=total_, desc="Evaluating")
+                if total_ is None and "DataFrame.iterrows" in str(iterable):
+                    iterable = cast(Iterable[ItemT], list(iterable))
+                    total_ = len(cast(Sized, iterable))
+                progress_bar = tqdm(total=total_, desc="Evaluating")
 
-            # Supports direct pandas df being passed in
-            iterable = (
-                cast(Iterable[ItemT], iterable.iterrows())
-                if isinstance(iterable, pd.DataFrame)
-                else cast(Iterable[ItemT], iterable)
-            )
+                # Supports direct pandas df being passed in
+                iterable = (
+                    cast(Iterable[ItemT], iterable.iterrows())
+                    if isinstance(iterable, pd.DataFrame)
+                    else cast(Iterable[ItemT], iterable)
+                )
 
-            with ThreadPoolExecutor(max_workers=threads) as executor:
-                self._executor = executor
+                with ThreadPoolExecutor(max_workers=threads) as executor:
+                    self._executor = executor
 
-                for index, item in enumerate(iterable):
-                    self._current_index = index
-                    self._current_item = item
+                    for index, item in enumerate(iterable):
+                        ctx = trace.set_span_in_context(trace.INVALID_SPAN)
+                        with _tracer.start_as_current_span(
+                            "evaluation.iteration",
+                            context=ctx,  # This ensures the iteration span is not a child of the parent, so each iteration is independent
+                            attributes={
+                                AttributeKey.LangWatchThreadId: thread_id,
+                                AttributeKey.LangWatchInput: json.dumps(
+                                    TypedValueJson(
+                                        type="json",
+                                        value=json.dumps(item),
+                                    ),
+                                    cls=SerializableWithStringFallback,
+                                ),
+                                "inputs.index": str(index),
+                            },
+                        ):
 
-                    with self._run_item(index, item, in_thread=False):
-                        yield item
-                    if len(self._futures) == 0:
-                        progress_bar.update(1)
+                            self._current_index = index
+                            self._current_item = item
 
-                if len(self._futures) > 0:
-                    for _ in as_completed(self._futures):
-                        progress_bar.update(1)
+                            with self._run_item(index, item, in_thread=False):
+                                yield item
+                            if len(self._futures) == 0:
+                                progress_bar.update(1)
 
-                executor.submit(self._wait_for_completion).result()
-                progress_bar.close()
+                    if len(self._futures) > 0:
+                        for _ in as_completed(self._futures):
+                            progress_bar.update(1)
 
-        except Exception as e:
-            Evaluation._post_results(
-                langwatch.get_api_key() or "",
-                {
-                    "experiment_slug": self.experiment_slug,
-                    "run_id": self.run_id,
-                    "timestamps": {
-                        "finished_at": int(time.time() * 1000),
-                        "stopped_at": int(time.time() * 1000),
+                    executor.submit(self._wait_for_completion).result()
+                    progress_bar.close()
+
+            except Exception as e:
+                Evaluation._post_results(
+                    langwatch.get_api_key() or "",
+                    {
+                        "experiment_slug": self.experiment_slug,
+                        "run_id": self.run_id,
+                        "timestamps": {
+                            "finished_at": int(time.time() * 1000),
+                            "stopped_at": int(time.time() * 1000),
+                        },
                     },
-                },
-            )
-            raise e
+                )
+                raise e
 
     def submit(self, func: Callable[..., Any], /, *args: Any, **kwargs: Any):
         _current_index = self._current_index
@@ -364,7 +396,7 @@ class Evaluation:
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True,
     )
-    def _post_results(cls, api_key: str, body: dict):
+    def _post_results(cls, api_key: str, body: Dict[str, Any]):
         response = httpx.post(
             f"{langwatch.get_endpoint()}/api/evaluations/batch/log_results",
             headers={
