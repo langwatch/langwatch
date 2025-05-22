@@ -4,7 +4,7 @@ import { QueueWithFallback } from "./queueWithFallback";
 import { runTrackEventJob } from "../workers/trackEventsWorker";
 import type { ConnectionOptions } from "bullmq";
 
-export const TRACK_EVENTS_QUEUE_NAME = "track_events";
+export const TRACK_EVENTS_QUEUE_NAME = "{track_events}";
 
 export const trackEventsQueue = new QueueWithFallback<
   TrackEventJob,
