@@ -23,29 +23,31 @@ export let connection: IORedis | Cluster | undefined;
 
 if (!isBuild) {
   if (useCluster) {
-    const clusterEndpoints = parseClusterEndpoints(env.REDIS_CLUSTER_ENDPOINTS ?? "");
+    const clusterEndpoints = parseClusterEndpoints(
+      env.REDIS_CLUSTER_ENDPOINTS ?? ""
+    );
     connection = new Cluster(clusterEndpoints, {
       redisOptions: {
         maxRetriesPerRequest: null,
-        enableOfflineQueue: false,
+        offlineQueue: false,
       },
     });
 
     // Cluster events
-    (connection).on("cluster:connect", () => {
+    connection.on("cluster:connect", () => {
       logger.info("cluster connected");
     });
-    (connection).on("cluster:ready", () => {
+    connection.on("cluster:ready", () => {
       logger.info("cluster is ready to accept commands");
     });
   } else {
     connection = new IORedis(env.REDIS_URL ?? "", {
       maxRetriesPerRequest: null,
-      enableOfflineQueue: false,
-        tls: env.REDIS_URL?.includes("tls.rejectUnauthorized=false")
-          ? { rejectUnauthorized: false }
-          : (env.REDIS_URL?.includes("rediss://") as any),
-      });
+      offlineQueue: false,
+      tls: env.REDIS_URL?.includes("tls.rejectUnauthorized=false")
+        ? { rejectUnauthorized: false }
+        : (env.REDIS_URL?.includes("rediss://") as any),
+    });
 
     // Single-node events
     connection.on("connect", () => {
@@ -58,7 +60,7 @@ if (!isBuild) {
 
   // Common events for both single-node and cluster
   connection?.on("error", (error: Error) => {
-    logger.error({ error} , "error");
+    logger.error({ error }, "error");
   });
   connection?.on("close", () => {
     logger.info("connection closed");
