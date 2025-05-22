@@ -41,6 +41,30 @@ export const config = {
   },
 };
 
+function parseMetadata(metadata: Record<string, any> | undefined): {
+  reservedTraceMetadata: ReservedTraceMetadata;
+  customMetadata: CustomMetadata;
+} {
+  let reservedTraceMetadata: ReservedTraceMetadata = {};
+  let customMetadata: CustomMetadata = {};
+
+  if (metadata) {
+    reservedTraceMetadata = Object.fromEntries(
+      Object.entries(reservedTraceMetadataSchema.parse(metadata)).filter(
+        ([_key, value]) => value !== null && value !== undefined
+      )
+    );
+    const remainingMetadata = Object.fromEntries(
+      Object.entries(metadata).filter(
+        ([key]) => !(key in reservedTraceMetadataSchema.shape)
+      )
+    );
+    customMetadata = customMetadataSchema.parse(remainingMetadata);
+  }
+
+  return { reservedTraceMetadata, customMetadata };
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -81,8 +105,9 @@ export default async function handler(
   } catch (error) {
     logger.error({ error }, "PostgreSQL error while finding project");
     // Queue the request for later processing
-    const { reservedTraceMetadata, customMetadata } =
-      extractReservedAndCustomMetadata(req.body.metadata ?? {});
+    const { reservedTraceMetadata, customMetadata } = parseMetadata(
+      req.body.metadata
+    );
     await postgresFallbackQueue.add(
       "postgres-fallback",
       {
@@ -156,8 +181,9 @@ export default async function handler(
       "Error getting current month messages count"
     );
     // Queue the request for later processing
-    const { reservedTraceMetadata, customMetadata } =
-      extractReservedAndCustomMetadata(req.body.metadata ?? {});
+    const { reservedTraceMetadata, customMetadata } = parseMetadata(
+      req.body.metadata
+    );
     await postgresFallbackQueue.add(
       "postgres-fallback",
       {
@@ -287,29 +313,12 @@ export default async function handler(
     });
   }
 
-  // const { reservedTraceMetadata } = extractReservedAndCustomMetadata(
-  //   req.body.metadata ?? {}
-  // );
-  // let { customMetadata } = extractReservedAndCustomMetadata(
-  //   req.body.metadata ?? {}
-  // );
-
   let reservedTraceMetadata: ReservedTraceMetadata = {};
   let customMetadata: CustomMetadata = {};
   try {
-    if (params.metadata) {
-      reservedTraceMetadata = Object.fromEntries(
-        Object.entries(
-          reservedTraceMetadataSchema.parse(params.metadata)
-        ).filter(([_key, value]) => value !== null && value !== undefined)
-      );
-      const remainingMetadata = Object.fromEntries(
-        Object.entries(params.metadata).filter(
-          ([key]) => !(key in reservedTraceMetadataSchema.shape)
-        )
-      );
-      customMetadata = customMetadataSchema.parse(remainingMetadata);
-    }
+    const parsed = parseMetadata(params.metadata);
+    reservedTraceMetadata = parsed.reservedTraceMetadata;
+    customMetadata = parsed.customMetadata;
   } catch (error) {
     const validationError = fromZodError(error as ZodError);
     Sentry.captureException(new Error("ZodError on parsing metadata"), {
@@ -482,25 +491,4 @@ export default async function handler(
   );
 
   return res.status(200).json({ message: "Trace received successfully." });
-}
-
-function extractReservedAndCustomMetadata(metadata: Record<string, any>): {
-  reservedTraceMetadata: ReservedTraceMetadata;
-  customMetadata: CustomMetadata;
-} {
-  const reservedTraceMetadata: ReservedTraceMetadata = {};
-  const customMetadataObj: Record<string, any> = {};
-
-  for (const [key, value] of Object.entries(metadata)) {
-    if (key in reservedTraceMetadataSchema.shape) {
-      (reservedTraceMetadata as Record<string, any>)[key] = value;
-    } else {
-      customMetadataObj[key] = value;
-    }
-  }
-
-  return {
-    reservedTraceMetadata,
-    customMetadata: customMetadataSchema.parse(customMetadataObj),
-  };
 }
