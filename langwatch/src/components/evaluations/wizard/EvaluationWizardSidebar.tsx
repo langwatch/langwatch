@@ -54,7 +54,7 @@ export const WizardSidebar = memo(function WizardSidebar({
     isAutosaving,
     experimentId,
     evaluatorNode,
-    getDatasetId,
+    entryNodeDatasetId,
   } = useEvaluationWizardStore(
     useShallow((state) => {
       return {
@@ -67,7 +67,7 @@ export const WizardSidebar = memo(function WizardSidebar({
         isAutosaving: state.isAutosaving,
         experimentId: state.experimentId,
         evaluatorNode: state.getFirstEvaluatorNode(),
-        getDatasetId: state.getDatasetId,
+        entryNodeDatasetId: state.entryNodeDatasetId,
       };
     })
   );
@@ -135,7 +135,7 @@ export const WizardSidebar = memo(function WizardSidebar({
     }
 
     if (step === "dataset") {
-      return !!getDatasetId();
+      return !!entryNodeDatasetId;
     }
 
     if (step === "execution") {
@@ -147,7 +147,7 @@ export const WizardSidebar = memo(function WizardSidebar({
     }
 
     return true;
-  }, [step, task, getDatasetId, executionMethod, evaluatorNode]);
+  }, [step, task, entryNodeDatasetId, executionMethod, evaluatorNode]);
 
   // When state changes, update the view to show the tab user
   // should be paying attention to at the moment
