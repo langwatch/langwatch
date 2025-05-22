@@ -247,7 +247,8 @@ export type ElasticSearchSpan = Omit<
 };
 
 export type TraceInput = {
-  value: string;
+  // We hope this is a string, but it could be anything!
+  value: string | object;
   satisfaction_score?: number;
 };
 
