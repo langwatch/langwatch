@@ -49,7 +49,10 @@ export const startPostgresFallbackWorker = () => {
         logger.info({ jobId: job.id, projectId: project.id }, "Project found");
 
         //update the job data with the project id
-        job.data.projectId = project.id;
+        job.updateData({
+          ...job.data,
+          projectId: project.id,
+        });
 
         // Check plan limits
         const currentMonthMessagesCount = await getCurrentMonthMessagesCount(
