@@ -361,27 +361,11 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
     requiresKey: {
       filter: "metadata.key",
     },
-    query: (values, key) => {
-      if (key === "prompt_ids") {
-        return {
-          match: {
-            "metadata.prompt_ids": values[0],
-          },
-        };
-      }
-
-      return {
-        terms: { [metadataKey(key)]: values },
-      };
-    },
+    query: (values, key) => ({
+      terms: { [metadataKey(key)]: values },
+    }),
     listMatch: {
       aggregation: (query, key) => {
-        console.log("metadata.value registry", {
-          query,
-          key,
-          isOpensearch: process.env.IS_OPENSEARCH,
-          metadataKey: metadataKey(key),
-        });
         // TODO: for opensearch, handle the case where the key is "foo.bar" but not in {"foo": {"bar": "baz"}}, but rather in {"foo.bar": "baz"}
         const nullChecksList = [];
         let keySoFar = "";

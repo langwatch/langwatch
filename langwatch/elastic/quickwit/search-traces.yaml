@@ -62,11 +62,6 @@ doc_mapping:
           type: json
           stored: true
           fast: true
-        - name: prompt_ids
-          type: array<text>
-          tokenizer: raw
-          stored: true
-          fast: true
         - name: all_keys
           type: array<text>
           tokenizer: raw
