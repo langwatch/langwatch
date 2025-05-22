@@ -36,7 +36,8 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
       run_id: z.string(),
       workflow: workflowJsonSchema,
       workflow_version_id: z.string(),
-      evaluate_on: z.enum(["full", "test", "train"]),
+      evaluate_on: z.enum(["full", "test", "train", "specific"]),
+      dataset_entry: z.number().optional(),
     }),
   }),
   z.object({

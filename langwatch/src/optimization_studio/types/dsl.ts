@@ -187,7 +187,7 @@ export type NodeDataset = {
 
 export type Entry = BaseComponent & {
   inputs?: never;
-  entry_selection: "first" | "last" | "random";
+  entry_selection: "first" | "last" | "random" | number;
   train_size: number;
   test_size: number;
   seed: number;

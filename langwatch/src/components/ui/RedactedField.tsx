@@ -36,4 +36,4 @@ export const RedactedField: React.FC<RedactedFieldProps> = ({ field, children, l
   }
 
   return <>{children}</>;
-}; 
+};

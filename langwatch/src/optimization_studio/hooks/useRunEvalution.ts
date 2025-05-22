@@ -85,10 +85,12 @@ export const useRunEvalution = () => {
       onStart,
       workflow_version_id,
       evaluate_on,
+      dataset_entry,
     }: {
       onStart?: () => void;
       workflow_version_id?: string;
-      evaluate_on?: "full" | "test" | "train";
+      evaluate_on?: "full" | "test" | "train" | "specific";
+      dataset_entry?: number;
     } = {}) => {
       if (!project) return;
 
@@ -182,6 +184,7 @@ export const useRunEvalution = () => {
           // TODO: autosave and generate a new commit message and version id automatically
           workflow_version_id: versionId ?? "",
           evaluate_on: evaluate_on ?? "full",
+          dataset_entry,
         },
       };
       postEvent(payload);
