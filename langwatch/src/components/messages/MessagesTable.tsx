@@ -68,6 +68,7 @@ import {
 import { AddParticipants } from "../traces/AddParticipants";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
 import { RedactedField } from "../ui/RedactedField";
+import { stringifyIfObject } from "~/utils/stringifyIfObject";
 
 export interface MessagesTableProps {
   hideExport?: boolean;
@@ -1379,20 +1380,9 @@ export function MessagesTable({
 }
 
 function getSafeRenderInputValueFromTrace(trace: Trace): string {
-  switch (typeof trace.input?.value) {
-    case "object":
-      if (trace.input?.value instanceof Date) {
-        return trace.input?.value.toISOString();
-      }
-
-      return JSON.stringify(trace.input?.value);
-    case "undefined":
-      return "<empty>";
-    default:
-      return trace.input?.value as string;
-  }
+  return stringifyIfObject(trace.input?.value);
 }
 
 function getSafeRenderOutputValueFromTrace(trace: Trace): string {
-  return getSafeRenderInputValueFromTrace(trace);
+  return stringifyIfObject(trace.output?.value);
 }

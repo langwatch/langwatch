@@ -253,7 +253,8 @@ export type TraceInput = {
 };
 
 export type TraceOutput = {
-  value: string;
+  // We hope this is a string, but it could be anything!
+  value: string | object;
 };
 
 type PrimitiveType = string | number | boolean | null | undefined;
