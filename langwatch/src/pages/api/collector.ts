@@ -10,7 +10,8 @@ import {
   fetchExistingMD5s,
   scheduleTraceCollectionWithFallback,
 } from "../../server/background/workers/collectorWorker";
-import { prisma } from "../../server/db"; // Adjust the import based on your setup
+import { prisma } from "../../server/db";
+import { postgresFallbackQueue } from "../../server/background/queues/postgresFallbackQueue";
 import {
   type CollectorRESTParamsValidator,
   type CustomMetadata,
@@ -69,15 +70,52 @@ export default async function handler(
     return res.status(400).json({ message: "Invalid body, expecting json" });
   }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken as string },
-    include: {
-      team: true,
-    },
-  });
+  let project: { id: string; team: { organizationId: string } } | null = null;
+  try {
+    project = await prisma.project.findUnique({
+      where: { apiKey: authToken as string },
+      include: {
+        team: true,
+      },
+    });
+  } catch (error) {
+    logger.error({ error }, "PostgreSQL error while finding project");
+    // Queue the request for later processing
+    const { reservedTraceMetadata, customMetadata } =
+      extractReservedAndCustomMetadata(req.body.metadata ?? {});
+    await postgresFallbackQueue.add(
+      "postgres-fallback",
+      {
+        projectId: "unknown",
+        authToken: authToken as string,
+        traceId: req.body.trace_id,
+        spans: req.body.spans ?? [],
+        evaluations: req.body.evaluations,
+        reservedTraceMetadata,
+        customMetadata,
+        expectedOutput: req.body.expected_output ?? null,
+        paramsMD5: crypto
+          .createHash("md5")
+          .update(JSON.stringify(req.body))
+          .digest("hex"),
+        collectedAt: Date.now(),
+      },
+      {
+        attempts: 3,
+        backoff: {
+          type: "exponential",
+          delay: 1000,
+        },
+      }
+    );
+    return res.status(202).json({
+      message:
+        "Request accepted but PostgreSQL is currently unavailable. Will be processed when available.",
+    });
+  }
 
   if (!project) {
-    return res.status(401).json({ message: "Invalid auth token." });
+    return res.status(404).json({ error: "Project not found" });
   }
 
   try {
@@ -98,22 +136,57 @@ export default async function handler(
             activePlan.name ?? "free"
           );
         } catch (error) {
-          logger.error({ error, projectId: project.id }, "Error sending plan limit notification");
+          logger.error(
+            { error, projectId: project.id },
+            "Error sending plan limit notification"
+          );
         }
       }
-      logger.info({ projectId: project.id, currentMonthMessagesCount }, "[429] Reached plan limit");
+      logger.info(
+        { projectId: project.id, currentMonthMessagesCount },
+        "[429] Reached plan limit"
+      );
       return res.status(429).json({
         message: `ERR_PLAN_LIMIT: You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
       });
     }
   } catch (error) {
-    logger.error({ error, projectId: project.id }, "Error getting current month messages count");
-    Sentry.captureException(
-      new Error("Error getting current month messages count"),
+    logger.error(
+      { error, projectId: project.id },
+      "Error getting current month messages count"
+    );
+    // Queue the request for later processing
+    const { reservedTraceMetadata, customMetadata } =
+      extractReservedAndCustomMetadata(req.body.metadata ?? {});
+    await postgresFallbackQueue.add(
+      "postgres-fallback",
       {
-        extra: { projectId: project.id, zodError: error },
+        projectId: project.id,
+        authToken: authToken as string,
+        traceId: req.body.trace_id,
+        spans: req.body.spans ?? [],
+        evaluations: req.body.evaluations,
+        reservedTraceMetadata,
+        customMetadata,
+        expectedOutput: req.body.expected_output ?? null,
+        paramsMD5: crypto
+          .createHash("md5")
+          .update(JSON.stringify(req.body))
+          .digest("hex"),
+        collectedAt: Date.now(),
+      },
+      {
+        attempts: 3,
+        backoff: {
+          type: "exponential",
+          delay: 1000,
+        },
       }
     );
+    return res.status(202).json({
+      message:
+        "Request accepted but PostgreSQL is currently unavailable. Will be processed when available.",
+    });
   }
 
   getPayloadSizeHistogram("collector").observe(JSON.stringify(req.body).length);
@@ -182,7 +255,10 @@ export default async function handler(
   try {
     params = collectorRESTParamsValidatorSchema.parse(req.body);
   } catch (error) {
-    logger.error({ error, body: req.body, projectId: project.id }, 'invalid trace received');
+    logger.error(
+      { error, body: req.body, projectId: project.id },
+      "invalid trace received"
+    );
     Sentry.captureException(new Error("ZodError on parsing body"), {
       extra: { projectId: project.id, body: req.body, zodError: error },
     });
@@ -202,11 +278,21 @@ export default async function handler(
   traceSpanCountHistogram.observe(req.body.spans?.length ?? 0);
 
   if (req.body.spans?.length > 200) {
-    logger.info({ projectId: project.id, spansCount: req.body.spans?.length }, "[429] Too many spans");
+    logger.info(
+      { projectId: project.id, spansCount: req.body.spans?.length },
+      "[429] Too many spans"
+    );
     return res.status(429).json({
       message: "Too many spans, maximum of 200 per trace",
     });
   }
+
+  // const { reservedTraceMetadata } = extractReservedAndCustomMetadata(
+  //   req.body.metadata ?? {}
+  // );
+  // let { customMetadata } = extractReservedAndCustomMetadata(
+  //   req.body.metadata ?? {}
+  // );
 
   let reservedTraceMetadata: ReservedTraceMetadata = {};
   let customMetadata: CustomMetadata = {};
@@ -323,7 +409,10 @@ export default async function handler(
     try {
       spanValidatorSchema.parse(span);
     } catch (error) {
-      logger.error({ error, span, projectId: project.id }, 'invalid span received');
+      logger.error(
+        { error, span, projectId: project.id },
+        "invalid span received"
+      );
       Sentry.captureException(new Error("ZodError on parsing spans"), {
         extra: { projectId: project.id, span, zodError: error },
       });
@@ -342,7 +431,10 @@ export default async function handler(
       (span.timestamps.first_token_at &&
         span.timestamps.first_token_at.toString().length !== 13)
     ) {
-      logger.error({ traceId, projectId: project.id }, 'timestamps not in milliseconds for span');
+      logger.error(
+        { traceId, projectId: project.id },
+        "timestamps not in milliseconds for span"
+      );
       return res.status(400).json({
         error:
           "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
@@ -352,7 +444,7 @@ export default async function handler(
 
   const paramsMD5 = crypto
     .createHash("md5")
-    .update(JSON.stringify({ ...params, spans }))
+    .update(JSON.stringify(req.body))
     .digest("hex");
   const existingTrace = await fetchExistingMD5s(traceId, project.id);
   if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
@@ -390,4 +482,25 @@ export default async function handler(
   );
 
   return res.status(200).json({ message: "Trace received successfully." });
+}
+
+function extractReservedAndCustomMetadata(metadata: Record<string, any>): {
+  reservedTraceMetadata: ReservedTraceMetadata;
+  customMetadata: CustomMetadata;
+} {
+  const reservedTraceMetadata: ReservedTraceMetadata = {};
+  const customMetadataObj: Record<string, any> = {};
+
+  for (const [key, value] of Object.entries(metadata)) {
+    if (key in reservedTraceMetadataSchema.shape) {
+      (reservedTraceMetadata as Record<string, any>)[key] = value;
+    } else {
+      customMetadataObj[key] = value;
+    }
+  }
+
+  return {
+    reservedTraceMetadata,
+    customMetadata: customMetadataSchema.parse(customMetadataObj),
+  };
 }
