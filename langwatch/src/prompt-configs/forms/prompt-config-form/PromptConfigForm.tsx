@@ -17,7 +17,7 @@ import {
 import { PromptField } from "../fields/PromptField";
 import { PromptNameField } from "../fields/PromptNameField";
 
-import { PromptConfigInfoBox } from "./components/PromptConfigInfoBox";
+import { PromptConfigInfoAndSavePartial } from "./components/PromptConfigInfoAndSavePartial";
 
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
@@ -69,7 +69,7 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
       <form style={{ width: "100%" }}>
         <VStack width="full" gap={6}>
           <VerticalFormControl label="Current Version" size="sm">
-            <PromptConfigInfoBox
+            <PromptConfigInfoAndSavePartial
               isSaving={isLoading}
               config={savedConfig}
               saveEnabled={saveEnabled}
