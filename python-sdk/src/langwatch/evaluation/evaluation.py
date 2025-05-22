@@ -5,21 +5,21 @@ import json
 import threading
 import time
 import traceback
-import nanoid
-from typing_extensions import TypedDict
 import httpx
 import pandas as pd
 from opentelemetry import trace
-from opentelemetry.context import Context
+from opentelemetry.trace import Span
+from pydantic import BaseModel, Field
 from typing import (
     Any,
-    Callable,
     Dict,
     Iterable,
     Iterator,
     List,
+    Literal,
     Optional,
     TypeVar,
+    TypedDict,
     Sized,
     Union,
     cast,
@@ -30,15 +30,10 @@ from tqdm.auto import tqdm
 
 import langwatch
 from langwatch.attributes import AttributeKey
-from langwatch.domain import TypedValueJson
-from langwatch.telemetry.tracing import LangWatchTrace
-from langwatch.utils.transformation import (
-    SerializableWithStringFallback,
-    truncate_object_recursively,
-    convert_typed_values,
-)
+from langwatch.domain import Money, TypedValueJson
+from langwatch.utils.transformation import SerializableWithStringFallback
 
-from coolname import generate_slug
+from coolname import generate_slug  # type: ignore
 import urllib.parse
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 
@@ -47,14 +42,56 @@ _tracer = trace.get_tracer(__name__)
 ItemT = TypeVar("ItemT")
 
 
+class EvaluationResultProcessed(BaseModel):
+    evaluator: str
+    trace_id: str
+    status: Literal["processed"] = "processed"
+    score: Optional[float] = Field(default=None, description="No description provided")
+    passed: Optional[bool] = None
+    details: Optional[str] = Field(
+        default=None, description="Short human-readable description of the result"
+    )
+    index: Optional[int] = None
+    label: Optional[str] = None
+    cost: Optional[Money] = None
+    duration: Optional[int] = None
+    data: Optional[Dict[str, Any]] = None
+
+
+class EvaluationResultError(BaseModel):
+    evaluator: str
+    trace_id: str
+    status: Literal["error"] = "error"
+    error_type: str = Field(description="The type of the exception")
+    details: str = Field(description="Error message")
+    traceback: List[str] = Field(description="Traceback information for debugging")
+    duration: Optional[int] = None
+    index: Optional[int] = None
+    data: Optional[Dict[str, Any]] = None
+
+
+class EvaluationResultSkipped(BaseModel):
+    status: Literal["skipped"] = "skipped"
+    details: Optional[str] = None
+    duration: Optional[int] = None
+    index: Optional[int] = None
+
+
+EvaluationResult = Union[
+    EvaluationResultProcessed,
+    EvaluationResultSkipped,
+    EvaluationResultError,
+]
+
+
 class Batch(TypedDict):
     dataset: List[Any]
-    evaluations: List[Any]
+    evaluations: List[EvaluationResult]
 
 
 class IterationInfo(TypedDict):
     index: int
-    trace: LangWatchTrace
+    span: Span
     item: Any
     duration: int
     error: Optional[Exception]
@@ -68,11 +105,11 @@ class Evaluation:
 
     def __init__(self, name: str):
         self.name: str = name or generate_slug(3)
-        self.experiment_slug = self.name
-        self.run_id = generate_slug(3)
-        self.total = 0
-        self.progress = 0
-        self.created_at = int(time.time() * 1000)
+        self.experiment_slug: str = self.name
+        self.run_id: str = generate_slug(3)
+        self.total: int = 0
+        self.progress: int = 0
+        self.created_at_nano: int = int(time.time() * 1000)
         self._futures: List[Future[Any]] = []
 
         # Sending results
@@ -105,8 +142,9 @@ class Evaluation:
                 "API key is not valid, please try to login again with langwatch.login()"
             )
         response.raise_for_status()
-        experiment_path = response.json()["path"]
-        self.experiment_slug = response.json()["slug"]
+        response_json = response.json()
+        experiment_path = response_json["path"]
+        self.experiment_slug = response_json["slug"]
 
         url_encoded_run_id = urllib.parse.quote(self.run_id)
         print(
@@ -121,15 +159,13 @@ class Evaluation:
         threads: int = 4,
         total: Optional[int] = None,
     ) -> Iterable[ItemT]:
-        thread_id = "thread" + nanoid.generate(size=10)
-
         if not self.initialized:
             self.init()
 
         with _tracer.start_as_current_span(
             "evaluation.loop",
             attributes={
-                AttributeKey.LangWatchThreadId: thread_id,
+                AttributeKey.LangWatchThreadId: self.run_id,
                 "inputs.threads": str(threads),
                 "inputs.total": str(total),
             },
@@ -150,39 +186,23 @@ class Evaluation:
                 progress_bar = tqdm(total=total_, desc="Evaluating")
 
                 # Supports direct pandas df being passed in
-                iterable = (
-                    cast(Iterable[ItemT], iterable.iterrows())
-                    if isinstance(iterable, pd.DataFrame)
-                    else cast(Iterable[ItemT], iterable)
-                )
+                if isinstance(iterable, pd.DataFrame):
+                    iterable = cast(Iterable[ItemT], iterable.iterrows())  # type: ignore
 
                 with ThreadPoolExecutor(max_workers=threads) as executor:
                     self._executor = executor
-
                     for index, item in enumerate(iterable):
-                        with _tracer.start_as_current_span(
-                            "evaluation.iteration",
-                            context=Context(),  # This ensures the iteration span is not a child of the parent, so each iteration is independent
-                            attributes={
-                                AttributeKey.LangWatchThreadId: thread_id,
-                                AttributeKey.LangWatchInput: json.dumps(
-                                    TypedValueJson(
-                                        type="json",
-                                        value=json.dumps(item),
-                                    ),
-                                    cls=SerializableWithStringFallback,
-                                ),
-                                "inputs.index": str(index),
-                            },
+                        self._current_index = index
+                        self._current_item = item
+
+                        with self._execute_item_iteration(
+                            index,
+                            item,
+                            in_thread=False,
                         ):
-
-                            self._current_index = index
-                            self._current_item = item
-
-                            with self._run_item(index, item, in_thread=False):
-                                yield item
-                            if len(self._futures) == 0:
-                                progress_bar.update(1)
+                            yield item
+                        if len(self._futures) == 0:
+                            progress_bar.update(1)
 
                     if len(self._futures) > 0:
                         for _ in as_completed(self._futures):
@@ -192,7 +212,7 @@ class Evaluation:
                     progress_bar.close()
 
             except Exception as e:
-                Evaluation._post_results(
+                Evaluation._log_results(
                     langwatch.get_api_key() or "",
                     {
                         "experiment_slug": self.experiment_slug,
@@ -205,77 +225,26 @@ class Evaluation:
                 )
                 raise e
 
-    def submit(self, func: Callable[..., Any], /, *args: Any, **kwargs: Any):
-        _current_index = self._current_index
-        _current_item = self._current_item
-
-        def wrapper():
-            with self._run_item(_current_index, _current_item, in_thread=True):
-                if asyncio.iscoroutinefunction(func):
-                    func_result = asyncio.run(func(*args, **kwargs))
-                else:
-                    func_result = func(*args, **kwargs)
-
-            return func_result
-
-        future = self._executor.submit(wrapper)
-        self._futures.append(future)
-        return future
-
-    def log(
-        self,
-        evaluator_name: str,
-        index: int,
-        data: Dict[str, Any],
-        score: float,
-        passed: bool,
-        cost_cents: int,
-        error: Optional[Exception] = None,
-    ):
-        span = trace.get_current_span()
-        span.add_event(
-            AttributeKey.LangWatchEventEvaluationLog,
-            attributes={
-                "evaluator_name": evaluator_name,
-                "index": index,
-                "data": json.dumps(
-                    truncate_object_recursively(convert_typed_values(data)),
-                    cls=SerializableWithStringFallback,
-                ),
-                "score": score,
-                "passed": passed,
-                "cost_cents": cost_cents,
-                "error": json.dumps(
-                    truncate_object_recursively(
-                        TypedValueJson(
-                            type="json",
-                            value={
-                                "status": "error",
-                                "error": error,
-                            },
-                        ),
-                    ),
-                    cls=SerializableWithStringFallback,
-                ),
-            },
-        )
-
-    def run(
-        self,
-        evaluator_name: str,
-        data: Dict[str, Any],
-        settings: Dict[str, Any],
-    ):
-        pass
-
     @contextmanager
-    def _run_item(self, index: int, item: Any, in_thread: bool = False) -> Iterator:
+    def _execute_item_iteration(
+        self,
+        index: int,
+        item: Any,
+        in_thread: bool = False,
+    ) -> Iterator[Any]:
         # Iteration will be None if we find ourselves in a parallel loop, but still
         # in the phase of collecting the evaluation.submit() processes. When in_thread,
         # then it's when we actually collect the iteration info.
         iteration = (
             IterationInfo(
-                trace=langwatch.trace(name="evaluation.loop.iteration"),
+                span=_tracer.start_span(
+                    "evaluation.loop_iteration",
+                    # This ensures the iteration span is not a child of the parent
+                    # so that each iteration is it's own root span
+                    attributes={
+                        AttributeKey.LangWatchThreadId: self.run_id,
+                    },
+                ),
                 index=index,
                 item=item,
                 duration=0,
@@ -284,39 +253,46 @@ class Evaluation:
             if in_thread or len(self._futures) == 0
             else None
         )
-        if iteration is not None:
-            iteration["trace"].__enter__()
 
-        start_time = time.time()
         try:
-            yield
-        except Exception as e:
+            start_time = time.time()
+            try:
+                yield
+            except Exception as e:
+                if iteration is not None:
+                    iteration["error"] = e
+                print(f"\n[Evaluation Error] index={index}")
+                traceback.print_exc()
+
             if iteration is not None:
-                iteration["error"] = e
-            print(f"\n[Evaluation Error] index={index}")
-            traceback.print_exc()
+                iteration["duration"] = int((time.time() - start_time) * 1000)
 
-        if iteration is not None:
-            iteration["duration"] = int((time.time() - start_time) * 1000)
+                # If we just started the parallel loop, we need to skip the first iteration
+                # from being added to the batch and change the trace name
+                if not in_thread and len(self._futures) > 0:
+                    iteration["span"].update_name("evaluation.loop")
+                else:
+                    iteration["span"].set_attributes(
+                        {
+                            "inputs.index": str(index),
+                            "inputs.item": json.dumps(
+                                TypedValueJson(
+                                    type="json",
+                                    value=json.dumps(item),
+                                ),
+                            ),
+                        }
+                    )
+                    self._add_to_batch(iteration)
 
-            # If we just started the parallel loop, we need to skip the first iteration
-            # from being added to the batch and change the trace name
-            if not in_thread and len(self._futures) > 0:
-                iteration["trace"].update(name="evaluation.loop")
-            else:
-                self._add_to_batch(iteration)
-
-            if iteration["error"] is not None:
-                iteration["trace"].__exit__(
-                    type(iteration["error"]),
-                    iteration["error"],
-                    iteration["error"].__traceback__,
-                )
-            else:
-                iteration["trace"].__exit__(None, None, None)
+                if iteration["error"] is not None:
+                    iteration["span"].record_exception(iteration["error"])
+        finally:
+            if iteration is not None:
+                iteration["span"].end()
 
     def _add_to_batch(self, iteration: IterationInfo):
-        entry = (
+        entry: Any = (
             iteration["item"].to_dict()
             if hasattr(iteration["item"], "to_dict")
             else (
@@ -346,7 +322,9 @@ class Evaluation:
                     "entry": entry,
                     "duration": iteration["duration"],
                     "error": iteration["error"],
-                    "trace_id": iteration["trace"].trace_id,
+                    "trace_id": format(
+                        iteration["span"].get_span_context().trace_id, "x"
+                    ),
                 }
             )
 
@@ -371,16 +349,18 @@ class Evaluation:
                 "progress": self.progress,
                 "total": self.total,
                 "timestamps": {
-                    "created_at": self.created_at,
+                    "created_at": self.created_at_nano,
                 },
             }
 
             if finished:
+                if not isinstance(body["timestamps"], dict):
+                    body["timestamps"] = {}
                 body["timestamps"]["finished_at"] = int(time.time() * 1000)
 
             # Start a new thread to send the batch
             thread = threading.Thread(
-                target=Evaluation._post_results,
+                target=Evaluation._log_results,
                 args=(langwatch.get_api_key(), body),
             )
             thread.start()
@@ -396,7 +376,7 @@ class Evaluation:
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True,
     )
-    def _post_results(cls, api_key: str, body: Dict[str, Any]):
+    def _log_results(cls, api_key: str, body: Dict[str, Any]):
         response = httpx.post(
             f"{langwatch.get_endpoint()}/api/evaluations/batch/log_results",
             headers={
@@ -418,3 +398,156 @@ class Evaluation:
                 thread.join()
 
         asyncio.run(wait_for_completion(self))
+
+    def log(
+        self,
+        evaluator_name: str,
+        index: int,
+        data: Dict[str, Any],
+        score: Optional[float] = None,
+        passed: Optional[bool] = None,
+        duration: Optional[int] = None,
+        label: Optional[str] = None,
+        details: Optional[str] = None,
+    ):
+        eval = EvaluationResultProcessed(
+            trace_id=format(
+                trace.get_current_span().get_span_context().trace_id,
+                "x",
+            ),
+            evaluator=evaluator_name,
+            status="processed",
+            score=score,
+            passed=passed,
+            duration=duration,
+            index=index,
+            data=data,
+            label=label,
+            details=details,
+        )
+
+        with self.lock:
+            self.batch["evaluations"].append(eval)
+
+    def log_error(
+        self,
+        evaluator_name: str,
+        index: int,
+        data: Dict[str, Any],
+        error: Exception,
+        duration: Optional[int] = None,
+    ):
+        # tracebacks can be slow, so we should do this outside of the lock
+        eval = EvaluationResultError(
+            trace_id=format(
+                trace.get_current_span().get_span_context().trace_id,
+                "x",
+            ),
+            evaluator=evaluator_name,
+            status="error",
+            error_type=type(error).__name__,
+            details=str(error),
+            traceback=list(traceback.TracebackException.from_exception(error).format()),
+            duration=duration,
+            index=index,
+            data=data,
+        )
+
+        with self.lock:
+            self.batch["evaluations"].append(eval)
+
+    async def run(
+        self,
+        evaluator_name: str,
+        index: int,
+        data: Dict[str, Any],
+        settings: Dict[str, Any],
+    ):
+        # export const evaluationInputSchema = z.object({
+        # trace_id: z.string().optional().nullable(),
+        # evaluation_id: z.string().optional().nullable(),
+        # evaluator_id: z.string().optional().nullable(),
+        # name: z.string().optional().nullable(),
+        # data: z.object({}).passthrough().optional().nullable(),
+        # settings: z.object({}).passthrough().optional().nullable(),
+        # as_guardrail: z.boolean().optional().nullable().default(false),
+        # });
+
+        duration: Optional[int] = None
+
+        try:
+            json_body = {}
+            request_params = {
+                "url": f"{langwatch.get_endpoint()}/api/evaluations/{evaluator_name}/evaluate",
+                "headers": {"X-Auth-Token": langwatch.get_api_key()},
+                "json": json_body,
+            }
+
+            start_time = time.time()
+
+            async with httpx.AsyncClient(timeout=900) as client:
+                response = await client.post(**request_params)
+                response.raise_for_status()
+
+            result = response.json()
+            duration = int((time.time() - start_time) * 1000)
+
+            evaluation_result: EvaluationResult
+            if result["status"] == "processed":
+                evaluation_result = EvaluationResultProcessed.model_validate(result)
+            elif result["status"] == "skipped":
+                evaluation_result = EvaluationResultSkipped.model_validate(result)
+            else:
+                evaluation_result = EvaluationResultError.model_validate(
+                    {"traceback": [], **(result or {})}
+                )
+
+            evaluation_result.duration = duration
+
+            if evaluation_result.status == "processed":
+                self.log(
+                    evaluator_name=evaluator_name,
+                    index=index,
+                    details=evaluation_result.details,
+                    data=data,
+                    score=evaluation_result.score,
+                    passed=evaluation_result.passed,
+                    duration=duration,
+                    label=evaluation_result.label,
+                )
+            elif evaluation_result.status == "skipped":
+                self.log(
+                    evaluator_name=evaluator_name,
+                    index=index,
+                    details=evaluation_result.details,
+                    data=data,
+                )
+            else:
+                self.log_error(
+                    evaluator_name=evaluator_name,
+                    index=index,
+                    data=data,
+                    error=evaluation_result.error_type,
+                    duration=duration,
+                )
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code // 100 == 4:
+                raise Exception(f"HTTP error: {e.response.text}")
+
+            self.log_error(
+                evaluator_name=evaluator_name,
+                index=index,
+                data=data,
+                error=e,
+                duration=duration,
+            )
+
+        except Exception as e:
+            self.log_error(
+                evaluator_name=evaluator_name,
+                index=index,
+                data=data,
+                error=e,
+                duration=duration,
+            )
