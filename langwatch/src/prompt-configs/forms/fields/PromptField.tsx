@@ -1,5 +1,9 @@
 import { Field, HStack, Spacer } from "@chakra-ui/react";
-import { useFormContext, type UseFieldArrayReturn } from "react-hook-form";
+import {
+  Controller,
+  useFormContext,
+  type UseFieldArrayReturn,
+} from "react-hook-form";
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { PropertySectionTitle } from "../../../optimization_studio/components/properties/BasePropertiesPanel";
@@ -35,7 +39,6 @@ export function PromptField({
   const form = useFormContext<PromptConfigFormValues>();
   const { formState } = form;
   const { errors } = formState;
-  const value = form.watch("version.configData.prompt");
 
   return (
     <VerticalFormControl
@@ -59,19 +62,18 @@ export function PromptField({
       error={errors.version?.configData?.prompt}
       size="sm"
     >
-      <PromptTextArea
-        value={typeof value === "string" ? value : ""}
-        onChange={(event) => {
-          if (typeof event.target.value === "string") {
-            form.setValue("version.configData.prompt", event.target.value, {
-              shouldValidate: true,
-            });
-          }
-        }}
-        availableFields={availableFields}
-        otherNodesFields={otherNodesFields}
-        onAddEdge={onAddEdge}
-        isTemplateSupported={isTemplateSupported}
+      <Controller
+        control={form.control}
+        name="version.configData.prompt"
+        render={({ field }) => (
+          <PromptTextArea
+            {...field}
+            availableFields={availableFields}
+            otherNodesFields={otherNodesFields}
+            onAddEdge={onAddEdge}
+            isTemplateSupported={isTemplateSupported}
+          />
+        )}
       />
     </VerticalFormControl>
   );

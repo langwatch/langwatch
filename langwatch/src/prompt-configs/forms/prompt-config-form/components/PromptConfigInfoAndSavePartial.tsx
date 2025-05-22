@@ -12,7 +12,7 @@ interface ConfigHeaderProps {
   isSaving?: boolean;
 }
 
-export function PromptConfigInfoBox({
+export function PromptConfigInfoAndSavePartial({
   config,
   saveEnabled,
   onSaveClick,
