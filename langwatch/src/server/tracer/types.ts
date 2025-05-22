@@ -270,8 +270,6 @@ export type ReservedTraceMetadata = {
   telemetry_sdk_language?: string | null;
   telemetry_sdk_name?: string | null;
   telemetry_sdk_version?: string | null;
-  prompt_ids?: string[] | null;
-  prompt_version_ids?: string[] | null;
 };
 
 export interface ReservedTraceMetadataMapping {
