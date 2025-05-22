@@ -132,7 +132,7 @@ class Client(LangWatchClientProtocol):
         # If a new API key is provided and sending is not disabled, set up a new tracer provider.
         if self._api_key and not self._disable_sending:
             self.__setup_tracer_provider()
-        
+
         if self._api_key:
             self._setup_rest_api_client()
 
@@ -274,10 +274,11 @@ class Client(LangWatchClientProtocol):
             export_timeout_millis=float(os.getenv("OTEL_BSP_EXPORT_TIMEOUT", 10000)),
         )
         provider.add_span_processor(processor)
-    
-    def _setup_rest_api_client(self) -> LangWatchApiClient:
-        print("Setting up REST API client")
 
+    def _setup_rest_api_client(self) -> LangWatchApiClient:
+        """
+        Sets up the REST API client for the client.
+        """
         self._rest_api_client = LangWatchApiClient(
             base_url=self._endpoint_url,
             headers={"X-Auth-Token": self._api_key},

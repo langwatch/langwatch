@@ -1,5 +1,5 @@
 import pytest
-from langwatch.prompts.formatter import PromptFormatter, MissingPromptVariableError
+from langwatch.prompt.formatter import PromptFormatter, MissingPromptVariableError
 
 @pytest.fixture
 def formatter():

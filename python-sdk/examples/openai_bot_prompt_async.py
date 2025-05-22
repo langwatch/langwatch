@@ -6,7 +6,7 @@ from openai import AsyncOpenAI
 
 client = AsyncOpenAI()
 
-import langwatch.prompts
+import langwatch.prompt
 import asyncio
 
 langwatch.setup()
@@ -19,11 +19,11 @@ async def main():
 
     ## Gets the prompt and autobuilds it with the provided variables
     ## Returns an object that can be passed into the OpenAI client
-    ## directly: 
+    ## directly:
     # Raw prompt {model: 'gpt-4o-mini', messages: [{ role: 'system', content: 'The user is {user_name} and their email is {user_email}' }]}
     # Autobuilt prompt { model: 'gpt-4o-mini', messages: [{ role: 'system', content: 'The user is John Doe and their email is john.doe@example.com' }]}
     prompt_id = "prompt_jTJP5ob_8zlTp7Jw0kNac"
-    prompt = await langwatch.prompts.async_get_prompt(prompt_id)
+    prompt = await langwatch.prompt.async_get_prompt(prompt_id)
     print(prompt.raw_config())
     messages = prompt.format_messages(input="I like to eat pizza")
     completion = await client.chat.completions.create(model=prompt.model, messages=messages)
