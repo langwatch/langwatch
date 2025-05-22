@@ -213,6 +213,9 @@ const extractRedactionsForObject = (object: any): string[] => {
 };
 
 const redactObject = <T>(object: T, redactions: Set<string>): T => {
+  if (redactions.size === 0) {
+    return object;
+  }
   if (typeof object === "string") {
     try {
       const json = JSON.parse(object);
