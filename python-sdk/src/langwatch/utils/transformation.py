@@ -65,10 +65,10 @@ class SerializableWithStringFallback(SerializableAndPydanticEncoder):
 
 
 def validate_safe(
-    type_, item: Dict[str, Any], min_required_keys_for_pydantic_1: List[str]
+    type_: Any, item: Dict[str, Any], min_required_keys_for_pydantic_1: List[str]
 ):
     """Safely validate a dictionary against a type, handling both TypedDict and BaseModel."""
-    if not isinstance(item, dict) or not all(
+    if not isinstance(item, dict) or not all(  # type: ignore
         key in item for key in min_required_keys_for_pydantic_1
     ):
         return False
