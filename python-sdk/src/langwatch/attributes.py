@@ -70,7 +70,10 @@ class AttributeKey:
     LangWatchSessionId = "langwatch.session.id" # We use thread_id for session_id
     LangWatchEventEvaluationCustom = "langwatch.evaluation.custom"
 
+    LangWatchPromptId = "langwatch.prompt.id"
+    LangWatchPromptVersionId = "langwatch.prompt.version.id"
+    LangWatchPromptVersionNumber = "langwatch.prompt.version.number"
+
     # Deprecated attributes
     DeprecatedTraceId = "deprecated.trace.id"
     DeprecatedSpanId = "deprecated.span.id"
-

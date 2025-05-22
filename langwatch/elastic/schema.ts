@@ -184,6 +184,8 @@ export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
       telemetry_sdk_version: { type: "keyword" },
       telemetry_sdk_language: { type: "keyword" },
       telemetry_sdk_name: { type: "keyword" },
+      prompt_ids: { type: "keyword" },
+      prompt_version_ids: { type: "keyword" },
 
       custom: { type: FLATENNED_TYPE } as any,
       all_keys: { type: "keyword" },

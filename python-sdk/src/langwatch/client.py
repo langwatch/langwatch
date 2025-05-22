@@ -16,6 +16,8 @@ from opentelemetry.sdk.trace.sampling import TraceIdRatioBased, ALWAYS_OFF
 from .exporters.filterable_batch_span_exporter import FilterableBatchSpanProcessor
 from .types import LangWatchClientProtocol
 
+from .generated.langwatch_rest_api_client import Client as LangWatchApiClient
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,6 +35,7 @@ class Client(LangWatchClientProtocol):
     _flush_on_exit: bool = True
     _span_exclude_rules: List[SpanProcessingExcludeRule] = []
     _ignore_global_tracer_provider_override_warning: bool = False
+    _rest_api_client: LangWatchApiClient
 
     def __init__(
         self,
@@ -88,6 +91,8 @@ class Client(LangWatchClientProtocol):
         for instrumentor in self.instrumentors:
             instrumentor.instrument(tracer_provider=self.tracer_provider)
 
+        self._setup_rest_api_client()
+
     @property
     def debug(self) -> bool:
         """Get the debug flag for the client."""
@@ -128,10 +133,18 @@ class Client(LangWatchClientProtocol):
         if self._api_key and not self._disable_sending:
             self.__setup_tracer_provider()
 
+        if self._api_key:
+            self._setup_rest_api_client()
+
     @property
     def disable_sending(self) -> bool:
         """Get whether sending is disabled."""
         return self._disable_sending
+
+    @property
+    def rest_api_client(self) -> LangWatchApiClient:
+        """Get the REST API client for the client."""
+        return self._rest_api_client
 
     @disable_sending.setter
     def disable_sending(self, value: bool) -> None:
@@ -261,3 +274,14 @@ class Client(LangWatchClientProtocol):
             export_timeout_millis=float(os.getenv("OTEL_BSP_EXPORT_TIMEOUT", 10000)),
         )
         provider.add_span_processor(processor)
+
+    def _setup_rest_api_client(self) -> LangWatchApiClient:
+        """
+        Sets up the REST API client for the client.
+        """
+        self._rest_api_client = LangWatchApiClient(
+            base_url=self._endpoint_url,
+            headers={"X-Auth-Token": self._api_key},
+        )
+
+        return self._rest_api_client
