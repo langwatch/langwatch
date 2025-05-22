@@ -11,6 +11,12 @@ import type { AgGridReact } from "@ag-grid-community/react";
 
 export interface DatasetSlice {
   /**
+   * The ID of the dataset that is currently being used in the workflow
+   * for the first entry node.
+   */
+  entryNodeDatasetId: string | undefined;
+
+  /**
    * Set the dataset ID and column types for the workflow
    * @param datasetId The ID of the dataset
    * @param columnTypes The column types of the dataset
@@ -19,6 +25,7 @@ export interface DatasetSlice {
 
   /**
    * Get the current dataset ID from the workflow
+   * @deprecated Use `getEntryNodeDatasetId` instead
    * @returns The dataset ID or undefined if not set
    */
   getDatasetId: () => string | undefined;
@@ -45,12 +52,27 @@ export const createDatasetSlice: StateCreator<
   {
     workflowStore: WorkflowStore;
     datasetGridRef?: RefObject<AgGridReact<any> | null>;
-  },
+  } & DatasetSlice,
   [],
   [],
   DatasetSlice
-> = (set, get) => {
+> = (set, get, store) => {
+  // Add a listener for state changes to make sure that the
+  // entry node dataset id is always up to date
+  store.subscribe((state) => {
+    const { nodes } = state.workflowStore;
+    const entryNode = nodes.find((node) => node.type === "entry") as
+      | Node<Entry>
+      | undefined;
+
+    const entryNodeDatasetId = entryNode?.data?.dataset?.id;
+    if (get().entryNodeDatasetId !== entryNodeDatasetId) {
+      set({ entryNodeDatasetId });
+    }
+  });
+
   return {
+    entryNodeDatasetId: undefined,
     setDatasetId: (datasetId, columnTypes) => {
       get().workflowStore.setWorkflow((current) => {
         const previousEntryNode = current.nodes.find(
@@ -136,13 +158,7 @@ export const createDatasetSlice: StateCreator<
     },
 
     getDatasetId: () => {
-      const entryNodeData = get()
-        .workflowStore.getWorkflow()
-        .nodes.find((node) => node.type === "entry")?.data;
-      if (entryNodeData && "dataset" in entryNodeData) {
-        return entryNodeData.dataset?.id;
-      }
-      return undefined;
+      return get().entryNodeDatasetId;
     },
 
     clearDatasetId: () => {
