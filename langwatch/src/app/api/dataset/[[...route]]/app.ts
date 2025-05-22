@@ -1,4 +1,4 @@
-import { validator as zValidator } from "hono-openapi/zod";
+import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { Hono } from "hono";
 import { z } from "zod";
 import { createManyDatasetRecords } from "../../../../server/api/routers/datasetRecord";
@@ -7,6 +7,9 @@ import { prisma } from "../../../../server/db";
 import { describeRoute } from "hono-openapi";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import { loggerMiddleware } from "../../hono-middleware/logger";
+import { baseResponses } from "./constants";
+import { buildStandardSuccessResponse } from "./utils";
+import { datasetOutputSchema, errorSchema } from "./schemas";
 patchZodOpenapi();
 
 export const app = new Hono().basePath("/api/dataset");
@@ -100,7 +103,17 @@ app.post(
 app.get(
   "/:slugOrId",
   describeRoute({
-    description: "Get a dataset by it's slug or id.",
+    description: "Get a dataset by its slug or id.",
+    responses: {
+      ...baseResponses,
+      200: buildStandardSuccessResponse(datasetOutputSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(errorSchema) },
+        },
+      },
+    },
   }),
   async (c) => {
     const { slugOrId } = c.req.param();
