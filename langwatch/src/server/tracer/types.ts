@@ -247,14 +247,12 @@ export type ElasticSearchSpan = Omit<
 };
 
 export type TraceInput = {
-  // We hope this is a string, but it could be anything!
-  value: string | object;
+  value: string;
   satisfaction_score?: number;
 };
 
 export type TraceOutput = {
-  // We hope this is a string, but it could be anything!
-  value: string | object;
+  value: string;
 };
 
 type PrimitiveType = string | number | boolean | null | undefined;
