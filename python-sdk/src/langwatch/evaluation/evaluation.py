@@ -151,68 +151,58 @@ class Evaluation:
         if not self.initialized:
             self.init()
 
-        with _tracer.start_as_current_span(
-            "evaluation.loop",
-            attributes={
-                AttributeKey.LangWatchThreadId: self.run_id,
-                "inputs.threads": str(threads),
-                "inputs.total": str(total),
-            },
-        ):
-            try:
-                total_ = (
-                    total
-                    if total
-                    else (
-                        len(cast(Sized, iterable))
-                        if hasattr(iterable, "__len__")
-                        else None
-                    )
+        try:
+            total_ = (
+                total
+                if total
+                else (
+                    len(cast(Sized, iterable)) if hasattr(iterable, "__len__") else None
                 )
-                if total_ is None and "DataFrame.iterrows" in str(iterable):
-                    iterable = cast(Iterable[ItemT], list(iterable))
-                    total_ = len(cast(Sized, iterable))
-                progress_bar = tqdm(total=total_, desc="Evaluating")
+            )
+            if total_ is None and "DataFrame.iterrows" in str(iterable):
+                iterable = cast(Iterable[ItemT], list(iterable))
+                total_ = len(cast(Sized, iterable))
+            progress_bar = tqdm(total=total_, desc="Evaluating")
 
-                # Supports direct pandas df being passed in
-                if isinstance(iterable, pd.DataFrame):
-                    iterable = cast(Iterable[ItemT], iterable.iterrows())  # type: ignore
+            # Supports direct pandas df being passed in
+            if isinstance(iterable, pd.DataFrame):
+                iterable = cast(Iterable[ItemT], iterable.iterrows())  # type: ignore
 
-                with ThreadPoolExecutor(max_workers=threads) as executor:
-                    self._executor = executor
-                    for index, item in enumerate(iterable):
-                        self._current_index = index
-                        self._current_item = item
+            with ThreadPoolExecutor(max_workers=threads) as executor:
+                self._executor = executor
+                for index, item in enumerate(iterable):
+                    self._current_index = index
+                    self._current_item = item
 
-                        with self._execute_item_iteration(
-                            index,
-                            item,
-                            in_thread=False,
-                        ):
-                            yield item
-                        if len(self._futures) == 0:
-                            progress_bar.update(1)
+                    with self._execute_item_iteration(
+                        index,
+                        item,
+                        in_thread=False,
+                    ):
+                        yield item
+                    if len(self._futures) == 0:
+                        progress_bar.update(1)
 
-                    if len(self._futures) > 0:
-                        for _ in as_completed(self._futures):
-                            progress_bar.update(1)
+                if len(self._futures) > 0:
+                    for _ in as_completed(self._futures):
+                        progress_bar.update(1)
 
-                    executor.submit(self._wait_for_completion).result()
-                    progress_bar.close()
+                executor.submit(self._wait_for_completion).result()
+                progress_bar.close()
 
-            except Exception as e:
-                Evaluation._log_results(
-                    langwatch.get_api_key() or "",
-                    {
-                        "experiment_slug": self.experiment_slug,
-                        "run_id": self.run_id,
-                        "timestamps": {
-                            "finished_at": int(time.time() * 1000),
-                            "stopped_at": int(time.time() * 1000),
-                        },
+        except Exception as e:
+            Evaluation._log_results(
+                langwatch.get_api_key() or "",
+                {
+                    "experiment_slug": self.experiment_slug,
+                    "run_id": self.run_id,
+                    "timestamps": {
+                        "finished_at": int(time.time() * 1000),
+                        "stopped_at": int(time.time() * 1000),
                     },
-                )
-                raise e
+                },
+            )
+            raise e
 
     def submit(self, func: Callable[..., Any], /, *args: Any, **kwargs: Any):
         _current_index = self._current_index
@@ -251,6 +241,15 @@ class Evaluation:
                     # so that each iteration is it's own root span
                     attributes={
                         AttributeKey.LangWatchThreadId: self.run_id,
+                        "inputs.index": str(index),
+                        "inputs.item": json.dumps(
+                            TypedValueJson(
+                                type="json",
+                                value=json.dumps(
+                                    item, cls=SerializableWithStringFallback
+                                ),
+                            )
+                        ),
                     },
                 ),
                 index=index,
@@ -457,27 +456,29 @@ class Evaluation:
 
     async def run(
         self,
-        evaluator_name: str,
+        evaluator_id: str,
         index: int,
         data: Dict[str, Any],
         settings: Dict[str, Any],
+        as_guardrail: bool = False,
     ):
-        # export const evaluationInputSchema = z.object({
-        # trace_id: z.string().optional().nullable(),
-        # evaluation_id: z.string().optional().nullable(),
-        # evaluator_id: z.string().optional().nullable(),
-        # name: z.string().optional().nullable(),
-        # data: z.object({}).passthrough().optional().nullable(),
-        # settings: z.object({}).passthrough().optional().nullable(),
-        # as_guardrail: z.boolean().optional().nullable().default(false),
-        # });
-
         duration: Optional[int] = None
 
         try:
-            json_body = {}
+            json_body = {
+                "trace_id": format(
+                    trace.get_current_span().get_span_context().trace_id,
+                    "x",
+                ),
+                "evaluator_id": evaluator_id,
+                "evaluation_id": self.run_id,
+                "name": self.name,
+                "data": data,
+                "settings": settings,
+                "as_guardrail": as_guardrail,
+            }
             request_params = {
-                "url": f"{langwatch.get_endpoint()}/api/evaluations/{evaluator_name}/evaluate",
+                "url": f"{langwatch.get_endpoint()}/api/evaluations/{evaluator_id}/evaluate",
                 "headers": {"X-Auth-Token": langwatch.get_api_key()},
                 "json": json_body,
             }
@@ -496,7 +497,7 @@ class Evaluation:
             evaluation_result.duration = duration
 
             self.log(
-                metric=evaluator_name,
+                metric=evaluator_id,
                 index=index,
                 details=evaluation_result.details,
                 data=data,
@@ -511,7 +512,7 @@ class Evaluation:
                 raise Exception(f"HTTP error: {e.response.text}")
 
             self.log(
-                metric=evaluator_name,
+                metric=evaluator_id,
                 index=index,
                 data=data,
                 status="error",
@@ -521,7 +522,7 @@ class Evaluation:
 
         except Exception as e:
             self.log(
-                metric=evaluator_name,
+                metric=evaluator_id,
                 index=index,
                 data=data,
                 status="error",
