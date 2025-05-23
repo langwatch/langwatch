@@ -6,11 +6,14 @@ metadata:
     app.kubernetes.io/name: {{ .Release.Name }}-app
     app.kubernetes.io/instance: {{ .Release.Name }}
     {{- include "langwatch.labels" . | nindent 4 }}
-  {{- if .Values.global.monitoring.enabled }}
   annotations:
+    {{- if .Values.global.monitoring.enabled }}
     prometheus.io/scrape: "true"
     prometheus.io/port: "{{ .Values.app.service.port }}"
-  {{- end }}
+    {{- end }}
+    {{- with .Values.app.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   replicas: {{ .Values.app.replicaCount }}
   selector:

@@ -49,6 +49,7 @@ images:
 # Service configurations
 app:
   replicaCount: 1
+  annotations: {}  # Custom annotations for the deployment
   service:
     type: ClusterIP
     port: 5560
