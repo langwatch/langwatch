@@ -187,9 +187,6 @@ export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
       prompt_ids: { type: "keyword" },
       prompt_version_ids: { type: "keyword" },
 
-      prompt_ids: { type: "keyword" },
-      prompt_version_ids: { type: "keyword" },
-
       custom: { type: FLATENNED_TYPE } as any,
       all_keys: { type: "keyword" },
     },
@@ -325,7 +322,6 @@ export const batchEvaluationMapping: ElasticSearchMappingFrom<ESBatchEvaluation>
     dataset: {
       properties: {
         index: { type: "integer" },
-        trace_id: { type: "keyword" },
         entry: { type: FLATENNED_TYPE } as any,
         predicted: { type: FLATENNED_TYPE } as any,
         cost: { type: "float" },

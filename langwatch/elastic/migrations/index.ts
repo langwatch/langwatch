@@ -15,7 +15,6 @@ import * as add_evaluation_id_migrate_check_id_evaluations from "./202408240457_
 import * as flatten_span_params from "./202408041216_flatten_span_params";
 import * as flatten_examples_trace from "./202504241534_flatten_examples_trace";
 import * as set_type_for_prompt_metadata from "./202505220000_set_type_for_prompt_metadata";
-import * as add_trace_id_to_batch_evaluations from "./202505212051_add_trace_id_to_batch_evaluations";
 
 // Create a mapping object with the original filenames as keys
 export const migrations = {
@@ -33,8 +32,6 @@ export const migrations = {
   "202408041216_flatten_span_params": flatten_span_params,
   "202504241534_flatten_examples_trace": flatten_examples_trace,
   "202505220000_set_type_for_prompt_metadata": set_type_for_prompt_metadata,
-  "202505212051_add_trace_id_to_batch_evaluations":
-    add_trace_id_to_batch_evaluations,
 };
 
 // Export the migrations object for use in other modules

@@ -46,39 +46,6 @@ export const dataForFilter = protectedProcedure
     });
 
     const client = await esClient({ projectId: input.projectId });
-
-    // Very hacky, but works for now
-    // TODO: Make this better
-    if (key === "prompt_ids") {
-      const testDocs = await client.search({
-        index: TRACE_INDEX.alias,
-        body: {
-          size: 3,
-          _source: ["metadata.prompt_ids"],
-          query: {
-            exists: { field: "metadata.prompt_ids" },
-          },
-        },
-      });
-
-      const ids = new Set<string>();
-
-      for (const doc of testDocs.hits.hits) {
-        const promptIds = (doc._source as any)?.metadata?.prompt_ids ?? [];
-        for (const id of promptIds) {
-          ids.add(id);
-        }
-      }
-
-      return {
-        options: Array.from(ids).map((id) => ({
-          field: id,
-          label: id,
-          count: 1,
-        })),
-      };
-    }
-
     const response = await client.search({
       index: TRACE_INDEX.alias,
       body: {
