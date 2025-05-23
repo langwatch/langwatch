@@ -18,6 +18,9 @@ spec:
         app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
         app.kubernetes.io/instance: {{ .Release.Name }}
       annotations:
+        {{- with .Values.global.annotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- with .Values.langwatch_nlp.annotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

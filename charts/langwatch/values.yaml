@@ -18,6 +18,7 @@ global:
   monitoring:
     enabled: false
     prometheusAnnotations: true
+  annotations: {}  # Global annotations to apply to all deployments/statefulsets
 
 # Image configurations
 images:

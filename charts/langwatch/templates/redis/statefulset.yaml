@@ -19,6 +19,9 @@ spec:
         app.kubernetes.io/name: {{ .Release.Name }}-redis
         app.kubernetes.io/instance: {{ .Release.Name }}
       annotations:
+        {{- with .Values.global.annotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- with .Values.redis.annotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

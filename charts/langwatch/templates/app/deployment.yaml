@@ -27,6 +27,9 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: "{{ .Values.app.service.port }}"
         {{- end }}
+        {{- with .Values.global.annotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- with .Values.app.annotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
