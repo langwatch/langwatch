@@ -70,7 +70,8 @@ type JobType =
   | "evaluation"
   | "track_event"
   | "topic_clustering"
-  | "usage_stats";
+  | "usage_stats"
+  | "postgres_fallback";
 
 type JobStatus = "processing" | "completed" | "failed";
 
