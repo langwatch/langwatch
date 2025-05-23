@@ -33,6 +33,7 @@ from tqdm.auto import tqdm
 import langwatch
 from langwatch.attributes import AttributeKey
 from langwatch.domain import Money, TypedValueJson
+from langwatch.telemetry.tracing import LangWatchTrace
 from langwatch.utils.transformation import SerializableWithStringFallback
 
 from coolname import generate_slug  # type: ignore
@@ -80,7 +81,7 @@ class BatchEntry(BaseModel):
 
 class IterationInfo(TypedDict):
     index: int
-    span: Span
+    trace: LangWatchTrace
     item: Any
     duration: int
     error: Optional[Exception]
@@ -114,6 +115,7 @@ class Evaluation:
             raise ValueError(
                 "API key was not detected, please set LANGWATCH_API_KEY or call langwatch.login() to login"
             )
+        langwatch.ensure_setup()
 
         with httpx.Client(timeout=60) as client:
             response = client.post(
@@ -235,21 +237,11 @@ class Evaluation:
         # then it's when we actually collect the iteration info.
         iteration = (
             IterationInfo(
-                span=_tracer.start_span(
-                    "evaluation.loop_iteration",
-                    # This ensures the iteration span is not a child of the parent
-                    # so that each iteration is it's own root span
-                    attributes={
-                        AttributeKey.LangWatchThreadId: self.run_id,
-                        "inputs.index": str(index),
-                        "inputs.item": json.dumps(
-                            TypedValueJson(
-                                type="json",
-                                value=json.dumps(
-                                    item, cls=SerializableWithStringFallback
-                                ),
-                            )
-                        ),
+                trace=langwatch.trace(
+                    name="evaluation.loop_iteration",
+                    metadata={
+                        "thread_id": self.run_id,
+                        "loop.index": str(index),
                     },
                 ),
                 index=index,
@@ -261,36 +253,35 @@ class Evaluation:
             else None
         )
 
-        try:
-            start_time = time.time()
-            try:
-                yield
-            except Exception as e:
-                if iteration is not None:
-                    iteration["error"] = e
-                print(f"\n[Evaluation Error] index={index}")
-                traceback.print_exc()
+        if iteration is not None:
+            iteration["trace"].__enter__()
 
+        start_time = time.time()
+        try:
+            yield
+        except Exception as e:
             if iteration is not None:
+                iteration["error"] = e
+            print(f"\n[Evaluation Error] index={index}")
+            traceback.print_exc()
+
+        if iteration is not None:
+            try:
                 iteration["duration"] = int((time.time() - start_time) * 1000)
 
                 # If we just started the parallel loop, we need to skip the first iteration
                 # from being added to the batch and change the trace name
                 if not in_thread and len(self._futures) > 0:
-                    iteration["span"].update_name("evaluation.loop")
+                    iteration["trace"].update(name="evaluation.loop")
                 else:
-                    iteration["span"].set_attributes(
-                        {
-                            "inputs.index": str(index),
-                        }
-                    )
                     self._add_to_batch(iteration)
 
                 if iteration["error"] is not None:
-                    iteration["span"].record_exception(iteration["error"])
-        finally:
-            if iteration is not None:
-                iteration["span"].end()
+                    iteration["trace"].update(error=iteration["error"])
+            except Exception as e:
+                raise e
+            finally:
+                iteration["trace"].__exit__(None, None, None)
 
     def _add_to_batch(self, iteration: IterationInfo):
         entry: Any = (
@@ -323,7 +314,7 @@ class Evaluation:
                     entry=entry,
                     duration=iteration["duration"],
                     error=str(iteration["error"]) if iteration["error"] else None,
-                    trace_id=format(iteration["span"].get_span_context().trace_id, "x"),
+                    trace_id=iteration["trace"].trace_id or "",
                 )
             )
 
