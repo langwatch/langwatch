@@ -475,7 +475,8 @@ export const getAllTracesForProject = async ({
           "input.embeddings.embeddings",
           "output.embeddings",
           "output.embeddings.embeddings",
-          ...(downloadMode ? ["spans"] : []),
+          "spans",
+          ...(downloadMode ? [] : []),
         ],
       },
       ...(downloadMode && includeContexts
@@ -632,12 +633,6 @@ export const getAllTracesForProject = async ({
     )[0];
 
     let contexts: RAGChunk[] = [];
-    for (const span of spans ?? []) {
-      if ("contexts" in span && Array.isArray(span.contexts)) {
-        contexts = [...contexts, ...span.contexts];
-      }
-    }
-
     return {
       ...trace,
       lastGuardrail: lastFailedGuardrailResult,
