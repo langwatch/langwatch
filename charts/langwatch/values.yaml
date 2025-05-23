@@ -78,6 +78,7 @@ app:
 
 langwatch_nlp:
   replicaCount: 1
+  annotations: {}  # Custom annotations for the deployment
   service:
     type: ClusterIP
     port: 5561
@@ -95,6 +96,7 @@ langwatch_nlp:
 
 langevals:
   replicaCount: 1
+  annotations: {}  # Custom annotations for the deployment
   service:
     type: ClusterIP
     port: 5562
@@ -107,6 +109,7 @@ langevals:
       memory: 6144Mi
 
 postgres:
+  annotations: {}  # Custom annotations for the deployment
   service:
     type: ClusterIP
     port: 5432
@@ -127,6 +130,7 @@ postgres:
     storageClass: ""
 
 redis:
+  annotations: {}  # Custom annotations for the deployment
   service:
     type: ClusterIP
     port: 6379
@@ -143,6 +147,7 @@ redis:
     storageClass: ""
 
 opensearch:
+  annotations: {}  # Custom annotations for the deployment
   service:
     type: ClusterIP
     ports:

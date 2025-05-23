@@ -18,6 +18,10 @@ spec:
       labels:
         app.kubernetes.io/name: {{ .Release.Name }}-postgres
         app.kubernetes.io/instance: {{ .Release.Name }}
+      annotations:
+        {{- with .Values.postgres.annotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       containers:
         - name: {{ .Chart.Name }}-postgres
