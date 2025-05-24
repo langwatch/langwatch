@@ -46,7 +46,12 @@ async def main(message: cl.Message):
             callbacks=[
                 cl.LangchainCallbackHandler(),
             ],
-            metadata={"user_id": "123", "thread_id": "789", "customer_id": "456"},
+            metadata={
+                "user_id": "123",
+                "thread_id": "789",
+                "customer_id": "456",
+                "labels": ["langchain", "thread"],
+            },
         ),
     ):
         await msg.stream_token(chunk)

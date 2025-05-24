@@ -23,6 +23,9 @@ class CompletionStreaming:
     @langwatch.trace(name="fastapi_sample_endpoint")
     async def execute(self, input: str):
         langwatch.get_current_trace().autotrack_openai_calls(client)
+        langwatch.get_current_trace().update(
+            metadata={"label": "fastapi"},
+        )
 
         completion = client.chat.completions.create(
             model="gpt-4o",

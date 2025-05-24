@@ -23,7 +23,9 @@ thread = client.beta.threads.create()
 @langwatch.span(capture_output=False)
 def pipeline(message: str):
     langwatch.get_current_trace().autotrack_openai_calls(client)
-    langwatch.get_current_trace().update(metadata={"thread_id": thread.id})
+    langwatch.get_current_trace().update(
+        metadata={"labels": ["openai", "assistants_api"], "thread_id": thread.id}
+    )
 
     client.beta.threads.messages.create(
         thread_id=thread.id,

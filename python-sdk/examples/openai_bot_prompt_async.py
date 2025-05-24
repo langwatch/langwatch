@@ -1,3 +1,4 @@
+import os
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -16,8 +17,10 @@ langwatch.setup()
 @cl.on_message
 @langwatch.trace()
 async def main(message: cl.Message):
-
     langwatch.get_current_trace().autotrack_openai_calls(client)
+    langwatch.get_current_trace().update(
+        metadata={"labels": ["openai", "prompt-versioning"]},
+    )
 
     msg = cl.Message(
         content="",
@@ -28,8 +31,8 @@ async def main(message: cl.Message):
     ## directly:
     # Raw prompt {model: 'gpt-4o-mini', messages: [{ role: 'system', content: 'The user is {{user_name}} and their email is {{user_email}}' }, { role: 'user', content: '{{input}}' }]}
     # Autobuilt prompt { model: 'gpt-4o-mini', messages: [{ role: 'system', content: 'The user is John Doe and their email is john.doe@example.com' }, { role: 'user', content: 'I like to eat pizza' }]}
-    # Inbox Narrator prompt
-    prompt_id = "prompt_s_26Tqtw4Z54dbmUbZ5P9"
+    # Public documentation example prompt
+    prompt_id = os.getenv("LANGWATCH_PROMPT_ID", "prompt_TrYXZLsiTJkn9N6PiZiae")
     prompt = await langwatch.prompt.async_get_prompt(prompt_id)
     print(prompt.raw_config())
     messages = prompt.format_messages(

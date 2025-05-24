@@ -287,6 +287,7 @@ async def main(message: cl.Message):
 
     langwatch.get_current_trace().update(
         metadata={
+            "labels": ["langchain", "rag", "tools"],
             "user_id": getattr(cl.user_session.get("user"), "identifier", "unknown"),
             "thread_id": cl.context.session.thread_id,
         }

@@ -20,11 +20,11 @@ dspy.settings.configure(lm=lm, rm=colbertv2_wiki17_abstracts)
 
 
 class GenerateAnswer(dspy.Signature):
-    """Answer questions with short factoid answers."""
+    """Answer questions with careful explanations to the user."""
 
     context = dspy.InputField(desc="may contain relevant facts")
     question = dspy.InputField()
-    answer = dspy.OutputField(desc="often between 1 and 5 words")
+    answer = dspy.OutputField(desc="markdown formatted answer, use some emojis")
 
 
 class RAG(dspy.Module):
@@ -44,6 +44,9 @@ class RAG(dspy.Module):
 @langwatch.trace()
 async def main(message: cl.Message):
     langwatch.get_current_trace().autotrack_dspy()
+    langwatch.get_current_trace().update(
+        metadata={"labels": ["dspy", "thread"], "thread_id": "90210"},
+    )
 
     msg = cl.Message(
         content="",
@@ -54,3 +57,5 @@ async def main(message: cl.Message):
 
     await msg.stream_token(prediction.answer)
     await msg.update()
+
+    return prediction.answer

@@ -183,6 +183,9 @@ async def answer_user(
 @langwatch.trace()
 async def main(message: cl.Message):
     langwatch.get_current_trace().autotrack_openai_calls(client)
+    langwatch.get_current_trace().update(
+        metadata={"labels": ["custom_evaluation"]},
+    )
 
     # Example: "who is the oldest person?"
     question = message.content

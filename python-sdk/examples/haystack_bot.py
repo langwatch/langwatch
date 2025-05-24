@@ -113,6 +113,10 @@ rag_pipeline.connect("prompt_builder", "llm")
 @cl.on_message
 @langwatch.trace()
 async def main(message: cl.Message):
+    langwatch.get_current_trace().update(
+        metadata={"labels": ["haystack", "rag"]},
+    )
+
     msg = cl.Message(
         content="",
     )

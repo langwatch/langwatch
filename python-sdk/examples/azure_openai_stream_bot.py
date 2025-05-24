@@ -56,7 +56,7 @@ async def main(message: cl.Message):
 
     langwatch.get_current_trace().update(
         trace_id=message.id,
-        metadata={"user_id": message.author},
+        metadata={"labels": ["azure"], "user_id": message.author},
     )
 
     completion = client.chat.completions.create(
