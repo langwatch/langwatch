@@ -397,7 +397,7 @@ export const tracesRouter = createTRPCRouter({
   getAllForDownload: protectedProcedure
     .input(
       getAllForProjectInput.extend({
-        includeContexts: z.boolean(),
+        includeSpans: z.boolean(),
         scrollId: z.string().optional(),
       })
     )
@@ -411,7 +411,7 @@ export const tracesRouter = createTRPCRouter({
         },
         ctx,
         downloadMode: true,
-        includeContexts: input.includeContexts,
+        includeSpans: input.includeSpans,
         scrollId: input.scrollId,
       });
     }),
@@ -421,7 +421,7 @@ export const getAllTracesForProject = async ({
   input,
   ctx,
   downloadMode = false,
-  includeContexts = true,
+  includeSpans = false,
   scrollId = undefined,
 }: {
   input: z.infer<typeof getAllForProjectInput>;
@@ -431,7 +431,7 @@ export const getAllTracesForProject = async ({
     publiclyShared?: boolean;
   };
   downloadMode?: boolean;
-  includeContexts?: boolean;
+  includeSpans?: boolean;
   scrollId?: string;
 }) => {
   const { pivotIndexConditions } = generateTracesPivotQueryConditions({
@@ -475,34 +475,9 @@ export const getAllTracesForProject = async ({
           "input.embeddings.embeddings",
           "output.embeddings",
           "output.embeddings.embeddings",
-          ...(downloadMode ? ["spans"] : []),
+          ...(includeSpans ? [] : ["spans"]),
         ],
       },
-      ...(downloadMode && includeContexts
-        ? {
-            // Retrieve only contexts for download, ignore guardrails and all other spans
-            script_fields: {
-              context_spans: {
-                script: {
-                  lang: "painless",
-                  source: `
-                  def spans = [];
-                  if (params._source.spans != null) {
-                    for (def span : params._source.spans) {
-                      if (span.contexts != null && span.contexts.length > 0) {
-                        def contextMap = new HashMap();
-                        contextMap.put('contexts', span.contexts);
-                        spans.add(contextMap);
-                      }
-                    }
-                  }
-                  return spans;
-                `,
-                },
-              },
-            },
-          }
-        : {}),
       body: {
         query: pivotIndexConditions,
         ...(input.sortBy
@@ -557,20 +532,6 @@ export const getAllTracesForProject = async ({
     .map((hit) => hit._source!)
     .map((t) => transformElasticSearchTraceToTrace(t, protections));
 
-  const guardrailsSlugToName = Object.fromEntries(
-    (
-      await prisma.monitor.findMany({
-        where: {
-          projectId: input.projectId,
-        },
-        select: {
-          slug: true,
-          name: true,
-        },
-      })
-    ).map((guardrail) => [guardrail.slug, guardrail.name])
-  );
-
   if (input.groupBy === "thread_id") {
     const threadIds = traces.map((t) => t.metadata.thread_id).filter(Boolean);
     const existingTraceIds = new Set(traces.map((t) => t.trace_id));
@@ -608,57 +569,14 @@ export const getAllTracesForProject = async ({
     }
   }
 
-  const tracesWithGuardrails = traces.map<TraceWithGuardrail>((trace) => {
-    const spans = trace.spans ?? [];
-    const lastSpans = [...spans].reverse();
-    const lastNonGuardrailSpanIndex =
-      lastSpans.findIndex((span) => span.type !== "guardrail") ?? -1;
-    const lastGuardrailSpans =
-      lastNonGuardrailSpanIndex > -1
-        ? lastSpans.slice(0, lastNonGuardrailSpanIndex)
-        : lastSpans;
-
-    const lastFailedGuardrailResult:
-      | (EvaluationResult & { name?: string })
-      | undefined = lastGuardrailSpans?.flatMap((span) =>
-      (span?.output ? [span.output] : [])
-        .filter((output) => output.type === "guardrail_result")
-        .map((output) => {
-          let value = (output.value as unknown as EvaluationResult) || {};
-          if (typeof value === "string") {
-            try {
-              value = JSON.parse(value);
-            } catch {}
-          }
-          return {
-            ...value,
-            name: guardrailsSlugToName[span.name ?? ""],
-          };
-        })
-        .filter((output) => !(output as EvaluationResult)?.passed)
-    )[0];
-
-    let contexts: RAGChunk[] = [];
-    for (const span of spans ?? []) {
-      if ("contexts" in span && Array.isArray(span.contexts)) {
-        contexts = [...contexts, ...span.contexts];
-      }
-    }
-
-    return {
-      ...trace,
-      lastGuardrail: lastFailedGuardrailResult,
-      contexts,
-    };
-  });
-
   totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
 
   const evaluations = Object.fromEntries(
     traces.map((trace) => [trace.trace_id, trace.evaluations ?? []])
   );
 
-  const groups = groupTraces(input.groupBy, tracesWithGuardrails);
+  // TODO: Remove this cast once we have a way to include guardrails in the traces directly on ES
+  const groups = groupTraces(input.groupBy, traces as TraceWithGuardrail[]);
 
   return {
     groups,

@@ -591,39 +591,11 @@ export function MessagesTable({
           }
         >
           <HoverableBigText lineClamp={1}>
-            {trace.contexts
-              ? JSON.stringify(trace.metadata, null, 2)
-              : JSON.stringify(trace.metadata)}
+            {JSON.stringify(trace.metadata, null, 2)}
           </HoverableBigText>
         </Table.Cell>
       ),
       value: (trace: Trace) => JSON.stringify(trace.metadata),
-    },
-    contexts: {
-      name: "Contexts",
-      sortable: true,
-      render: (trace, index) => (
-        <Table.Cell
-          key={index}
-          minWidth="300px"
-          maxWidth="300px"
-          onClick={() =>
-            openDrawer("traceDetails", {
-              traceId: trace.trace_id,
-            })
-          }
-        >
-          <HoverableBigText
-            lineClamp={1}
-            expandedVersion={JSON.stringify(trace.contexts, null, 2)}
-          >
-            {trace.contexts
-              ? JSON.stringify(trace.contexts.map((c) => c.content))
-              : ""}
-          </HoverableBigText>
-        </Table.Cell>
-      ),
-      value: (trace: Trace) => JSON.stringify(trace.contexts),
     },
     topic: {
       name: "Topic",
@@ -817,9 +789,7 @@ export function MessagesTable({
       pageSize: navigationFooter.pageSize,
       sortBy: getSingleQueryParam(router.query.sortBy),
       sortDirection: getSingleQueryParam(router.query.orderBy),
-      includeContexts: checkedHeaderColumnsEntries.some(
-        ([column]) => column === "contexts"
-      ),
+      includeSpans: true,
     });
 
     let scrollId = initialBatch.scrollId;
@@ -839,9 +809,7 @@ export function MessagesTable({
         pageSize: batchSize,
         sortBy: getSingleQueryParam(router.query.sortBy),
         sortDirection: getSingleQueryParam(router.query.orderBy),
-        includeContexts: checkedHeaderColumnsEntries.some(
-          ([column]) => column === "contexts"
-        ),
+        includeSpans: true,
         scrollId: scrollId,
       });
       processedItems += batch.groups.length;
