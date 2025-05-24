@@ -36,8 +36,11 @@ const initTikToken = async (
   try {
     Tiktoken = (await import("tiktoken/lite")).Tiktoken;
     load = (await import("tiktoken/load")).load;
-  } catch (e) {
-    logger.warn({ e }, "tiktoken could not be loaded, skipping tokenization");
+  } catch (error) {
+    logger.warn(
+      { error },
+      "tiktoken could not be loaded, skipping tokenization"
+    );
     return undefined;
   }
 
@@ -166,5 +169,7 @@ export const getMatchingLLMModelCost = async (
 };
 
 // Pre-warm most used models
-initTikToken("gpt-4");
-initTikToken("gpt-4o");
+export const prewarmTiktokenModels = async () => {
+  await initTikToken("gpt-4");
+  await initTikToken("gpt-4o");
+};
