@@ -1,4 +1,4 @@
-name: Build and Push Docker Images
+name: Publish OpenSearch Lite Docker Image
 
 on:
   push:
