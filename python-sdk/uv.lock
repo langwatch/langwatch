@@ -1,5 +1,4 @@
 version = 1
-revision = 1
 requires-python = ">=3.9, !=3.9.7, <3.13"
 resolution-markers = [
     "python_full_version >= '3.12.4'",
@@ -2236,7 +2235,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "coolname" },
@@ -2325,7 +2324,6 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.1" },
     { name = "termcolor", specifier = ">=3.0.1" },
 ]
-provides-extras = ["dspy", "dev", "tests"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "black", specifier = ">=25.1.0" }]
