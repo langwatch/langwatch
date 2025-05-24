@@ -408,10 +408,11 @@ class Evaluation:
         data: Dict[str, Any] = {},
         score: Optional[float] = None,
         passed: Optional[bool] = None,
-        duration: Optional[int] = None,
         label: Optional[str] = None,
         details: Optional[str] = None,
         status: Literal["processed", "error", "skipped"] = "processed",
+        duration: Optional[int] = None,
+        cost: Optional[Money] = None,
         error: Optional[Exception] = None,
     ):
         try:
@@ -430,9 +431,10 @@ class Evaluation:
             data=data,
             score=score,
             passed=passed,
-            duration=duration,
             index=index_,
             label=label,
+            cost=cost,
+            duration=duration,
             details=details if details else str(error) if error else None,
             error_type=type(error).__name__ if error else None,
             traceback=(
@@ -445,10 +447,10 @@ class Evaluation:
         with self.lock:
             self.batch["evaluations"].append(eval)
 
-    async def run(
+    def run(
         self,
         evaluator_id: str,
-        index: int,
+        index: Union[int, Hashable],
         data: Dict[str, Any],
         settings: Dict[str, Any],
         as_guardrail: bool = False,
@@ -476,8 +478,8 @@ class Evaluation:
 
             start_time = time.time()
 
-            async with httpx.AsyncClient(timeout=900) as client:
-                response = await client.post(**request_params)
+            with httpx.Client(timeout=900) as client:
+                response = client.post(**request_params)
                 response.raise_for_status()
 
             result = response.json()
@@ -490,12 +492,13 @@ class Evaluation:
             self.log(
                 metric=evaluator_id,
                 index=index,
-                details=evaluation_result.details,
                 data=data,
                 score=evaluation_result.score,
                 passed=evaluation_result.passed,
-                duration=duration,
+                details=evaluation_result.details,
                 label=evaluation_result.label,
+                duration=duration,
+                cost=evaluation_result.cost,
             )
 
         except httpx.HTTPStatusError as e:

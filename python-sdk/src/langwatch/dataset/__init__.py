@@ -33,7 +33,7 @@ class Dataset:
         for item in dataset.data:
             self.entries.append(DatasetEntry(item))
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_pandas(self) -> pd.DataFrame:
         return pd.DataFrame([entry.entry for entry in self.entries])
 
 
