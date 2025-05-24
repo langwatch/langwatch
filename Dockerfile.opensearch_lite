@@ -1,0 +1,31 @@
+FROM opensearchproject/opensearch:2.19.2
+
+USER root
+
+# Remove heavy ML and analytics plugins
+RUN rm -rf /usr/share/opensearch/plugins/opensearch-ml* \
+    && rm -rf /usr/share/opensearch/plugins/opensearch-knn \
+    && rm -rf /usr/share/opensearch/plugins/opensearch-neural-search \
+    && rm -rf /usr/share/opensearch/plugins/opensearch-anomaly-detection \
+    && rm -rf /usr/share/opensearch/plugins/opensearch-security* \
+    && rm -rf /usr/share/opensearch/plugins/opensearch-sql \
+    && rm -rf /usr/share/opensearch/plugins/opensearch-observability \
+    && rm -rf /usr/share/opensearch/plugins/opensearch-performance-analyzer \
+    && rm -rf /usr/share/opensearch/plugins/opensearch-reports-scheduler \
+    && rm -rf /usr/share/opensearch/plugins/opensearch-alerting \
+    && rm -rf /usr/share/opensearch/plugins/opensearch-flow-framework \
+    && rm -rf /usr/share/opensearch/plugins/opensearch-geospatial \
+    && rm -rf /usr/share/opensearch/plugins/opensearch-cross-cluster-replication \
+    && rm -rf /usr/share/opensearch/plugins/opensearch-index-management \
+    && rm -rf /usr/share/opensearch/plugins/opensearch-ltr \
+    && rm -rf /usr/share/opensearch/plugins/opensearch-skills \
+    && rm -rf /usr/share/opensearch/plugins/opensearch-asynchronous-search \
+    && rm -rf /usr/share/opensearch/plugins/opensearch-notifications* \
+    && rm -rf /usr/share/opensearch/plugins/query-insights
+
+# Keep only essential plugins for basic search
+# - opensearch-job-scheduler (required by some core features)
+# - opensearch-notifications* (lightweight)
+# - opensearch-system-templates (core functionality)
+
+USER opensearch
