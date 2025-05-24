@@ -18,6 +18,7 @@ from .types import LangWatchClientProtocol
 
 from .generated.langwatch_rest_api_client import Client as LangWatchApiClient
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -282,6 +283,7 @@ class Client(LangWatchClientProtocol):
         self._rest_api_client = LangWatchApiClient(
             base_url=self._endpoint_url,
             headers={"X-Auth-Token": self._api_key},
+            raise_on_unexpected_status=True,
         )
 
         return self._rest_api_client

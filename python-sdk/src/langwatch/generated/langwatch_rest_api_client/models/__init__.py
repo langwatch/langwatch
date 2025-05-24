@@ -14,6 +14,14 @@ from .delete_api_prompts_by_id_response_500 import DeleteApiPromptsByIdResponse5
 from .error import Error
 from .evaluation import Evaluation
 from .evaluation_timestamps import EvaluationTimestamps
+from .get_api_dataset_by_slug_or_id_response_200 import GetApiDatasetBySlugOrIdResponse200
+from .get_api_dataset_by_slug_or_id_response_200_data_item import GetApiDatasetBySlugOrIdResponse200DataItem
+from .get_api_dataset_by_slug_or_id_response_200_data_item_entry import GetApiDatasetBySlugOrIdResponse200DataItemEntry
+from .get_api_dataset_by_slug_or_id_response_400 import GetApiDatasetBySlugOrIdResponse400
+from .get_api_dataset_by_slug_or_id_response_401 import GetApiDatasetBySlugOrIdResponse401
+from .get_api_dataset_by_slug_or_id_response_404 import GetApiDatasetBySlugOrIdResponse404
+from .get_api_dataset_by_slug_or_id_response_422 import GetApiDatasetBySlugOrIdResponse422
+from .get_api_dataset_by_slug_or_id_response_500 import GetApiDatasetBySlugOrIdResponse500
 from .get_api_prompts_by_id_response_200 import GetApiPromptsByIdResponse200
 from .get_api_prompts_by_id_response_200_messages_item import GetApiPromptsByIdResponse200MessagesItem
 from .get_api_prompts_by_id_response_200_messages_item_role import GetApiPromptsByIdResponse200MessagesItemRole
@@ -243,6 +251,14 @@ __all__ = (
     "Error",
     "Evaluation",
     "EvaluationTimestamps",
+    "GetApiDatasetBySlugOrIdResponse200",
+    "GetApiDatasetBySlugOrIdResponse200DataItem",
+    "GetApiDatasetBySlugOrIdResponse200DataItemEntry",
+    "GetApiDatasetBySlugOrIdResponse400",
+    "GetApiDatasetBySlugOrIdResponse401",
+    "GetApiDatasetBySlugOrIdResponse404",
+    "GetApiDatasetBySlugOrIdResponse422",
+    "GetApiDatasetBySlugOrIdResponse500",
     "GetApiPromptsByIdResponse200",
     "GetApiPromptsByIdResponse200MessagesItem",
     "GetApiPromptsByIdResponse200MessagesItemRole",

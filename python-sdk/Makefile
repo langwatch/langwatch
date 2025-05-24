@@ -29,10 +29,15 @@ run/example:
 batch-evaluation-example:
 	uv run python $(filter-out $@,$(MAKECMDGOALS))
 
-generate/api-client:
+ensure-openapi-python-client:
+	@if ! command -v openapi-python-client &> /dev/null; then \
+		uv pip install openapi-python-client; \
+	fi
+
+generate/api-client: ensure-openapi-python-client
 	@echo "Building API client..."
 	@mkdir -p .tmp/api-client
-	openapi-python-client generate \
+	uv run openapi-python-client generate \
 		--path ../langwatch/src/app/api/openapiLangWatch.json \
 		--output-path .tmp/api-client \
 		--overwrite

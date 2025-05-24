@@ -1,5 +1,4 @@
-import { Tiktoken } from "tiktoken/lite";
-import { load } from "tiktoken/load";
+import { type Tiktoken } from "tiktoken/lite";
 // @ts-ignore
 import registry from "tiktoken/registry.json";
 // @ts-ignore
@@ -32,6 +31,16 @@ const loadingModel = new Set<string>();
 const initTikToken = async (
   modelName: string
 ): Promise<{ encoder: Tiktoken } | undefined> => {
+  let Tiktoken: typeof import("tiktoken/lite").Tiktoken;
+  let load: typeof import("tiktoken/load").load;
+  try {
+    Tiktoken = (await import("tiktoken/lite")) as any;
+    load = (await import("tiktoken/load")) as any;
+  } catch (e) {
+    logger.warn({ e }, "tiktoken could not be loaded, skipping tokenization");
+    return undefined;
+  }
+
   const fallback = "gpt-4o";
   const tokenizer =
     modelName in models

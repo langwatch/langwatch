@@ -9,6 +9,8 @@ from .state import get_api_key, get_endpoint
 from .__version__ import __version__
 from .utils.initialization import ensure_setup, setup
 import langwatch.evaluations as evaluations
+import langwatch.evaluation as evaluation
+import langwatch.dataset as dataset
 
 @module_property
 def _endpoint():
@@ -75,6 +77,8 @@ __all__ = [
     "ensure_setup",
     "get_current_trace",
     "get_current_span",
+    "evaluation",
+    "dataset",
     "evaluations",
     "langchain",
     "dspy",

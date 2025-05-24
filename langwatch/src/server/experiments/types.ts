@@ -108,6 +108,7 @@ export type ESBatchEvaluation = {
     cost?: number | null;
     duration?: number | null;
     error?: string | null;
+    trace_id?: string | null;
   }[];
   evaluations: {
     evaluator: string;

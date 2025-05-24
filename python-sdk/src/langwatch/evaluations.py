@@ -2,6 +2,7 @@ import json
 from typing import Any, Dict, List, Literal, Optional, Union, cast, TYPE_CHECKING
 from uuid import UUID
 from warnings import warn
+from deprecated import deprecated
 
 import httpx
 import langwatch
@@ -53,6 +54,9 @@ class EvaluationResultModel(BaseModel):
     error_type: Optional[str] = None
 
 
+@deprecated(
+    reason="Please use the new `langwatch.evaluation` module instead. TODO: Link to migration guide"
+)
 def evaluate(
     slug: str,
     name: Optional[str] = None,
@@ -105,6 +109,9 @@ def evaluate(
     raise ValueError("Evaluate failed due to issue creating span")
 
 
+@deprecated(
+    reason="Please use the new `langwatch.evaluation` module instead. TODO: Link to migration guide"
+)
 async def async_evaluate(
     slug: str,
     name: Optional[str] = None,
@@ -319,6 +326,9 @@ def _handle_exception(
     )
 
 
+@deprecated(
+    reason="Please use the new `langwatch.evaluation` module instead. TODO: Link to migration guide"
+)
 def _add_evaluation(  # type: ignore
     *,
     span: Optional["LangWatchSpan"] = None,

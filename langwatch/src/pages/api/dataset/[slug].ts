@@ -3,7 +3,7 @@ import { prisma } from "../../../server/db";
 
 import { createLogger } from "../../../utils/logger";
 
-const logger = createLogger("langwatch:dataset:slug");
+const logger = createLogger("langwatch:dataset:get");
 
 export default async function handler(
   req: NextApiRequest,
@@ -42,7 +42,7 @@ export default async function handler(
 
     if (!dataset) {
       return res
-        .status(200)
+        .status(404)
         .json({ status: "error", message: "Dataset not found." });
     }
 
