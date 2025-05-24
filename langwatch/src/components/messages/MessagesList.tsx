@@ -307,23 +307,32 @@ const ExpandableMessages = React.memo(
             </Box>
           )}
           {isExpanded && groupBy === "thread_id" && (
-            <Box
-              className="group-title"
-              position="absolute"
-              left="64px"
-              right="64px"
-              marginTop="-22px"
-              fontSize="13px"
-              fontWeight={600}
-              color="gray.500"
-              cursor="default"
-            >
-              <Flex justify="space-between" align="center">
+            <>
+              <Box
+                className="group-title"
+                position="absolute"
+                left="64px"
+                marginTop="-22px"
+                fontSize="13px"
+                fontWeight={600}
+                color="gray.500"
+                cursor="default"
+              >
                 <HStack gap={1}>
                   <Text>Thread ID:</Text>
                   <Text>{traceGroup[0]?.metadata.thread_id ?? "null"}</Text>
                 </HStack>
-
+              </Box>
+              <Box
+                className="group-title"
+                position="absolute"
+                right="64px"
+                marginTop="-22px"
+                fontSize="13px"
+                fontWeight={600}
+                color="gray.500"
+                cursor="default"
+              >
                 <HStack gap={1}>
                   <Text>Thread duration:</Text>
                   <Text>
@@ -339,8 +348,8 @@ const ExpandableMessages = React.memo(
                     })()}
                   </Text>
                 </HStack>
-              </Flex>
-            </Box>
+              </Box>
+            </>
           )}
           <VStack width="full" gap={6}>
             {traceGroup
