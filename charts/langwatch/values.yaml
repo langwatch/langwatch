@@ -19,7 +19,6 @@ global:
     enabled: false
     prometheusAnnotations: true
 
-
 # Image configurations
 images:
   app:
@@ -47,7 +46,6 @@ images:
     tag: 2.17.1
     pullPolicy: IfNotPresent
 
-
 # Service configurations
 app:
   replicaCount: 1
@@ -73,10 +71,9 @@ app:
     # User provided environment variables
     BASE_HOST: "http://localhost:5560"
     NEXTAUTH_URL: "http://localhost:5560"
-    NEXTAUTH_SECRET: ""  # Users must provide this values
-    API_TOKEN_JWT_SECRET: ""  # Users must provide this values
+    NEXTAUTH_SECRET: "" # Users must provide this values
+    API_TOKEN_JWT_SECRET: "" # Users must provide this values
     # SENDGRID_API_KEY: ""  # Optional
-
 
 langwatch_nlp:
   replicaCount: 1
@@ -163,14 +160,11 @@ opensearch:
     discovery.type: single-node
     DISABLE_SECURITY_PLUGIN: "true"
     _JAVA_OPTIONS: "-XX:UseSVE=0"
-    plugins.ml_commons.enabled: "false"
     plugins.anomaly_detection.enabled: "false"
     plugins.flow_framework.enabled: "false"
     plugins.security_analytics.ioc_finding_enabled: "false"
     plugins.sql.enabled: "false"
     plugins.rollup.enabled: "false"
-    plugins.neural_search.enabled: "false"
-    plugins.knn.enabled: "false"
     OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m -XX:+UseG1GC -XX:-UseSerialGC -XX:G1ReservePercent=25 -XX:+AlwaysPreTouch -XX:InitiatingHeapOccupancyPercent=30"
     cluster.routing.allocation.disk.threshold_enabled: "false"
     bootstrap.memory_lock: "false"
@@ -191,7 +185,6 @@ opensearch:
     nofile:
       soft: 65536
       hard: 65536
-
 
 # Ingress configuration
 ingress:

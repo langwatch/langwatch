@@ -83,16 +83,12 @@ services:
       - discovery.type=single-node
       - DISABLE_SECURITY_PLUGIN=true
       - "_JAVA_OPTIONS=-XX:UseSVE=0"
-      # Disable ML and related plugins that might download models
-      - "plugins.ml_commons.enabled=false"
+      # Disable most unused plugins that might download models
       - "plugins.anomaly_detection.enabled=false"
       - "plugins.flow_framework.enabled=false"
       - "plugins.security_analytics.ioc_finding_enabled=false"
       - "plugins.sql.enabled=false"
       - "plugins.rollup.enabled=false"
-      # Disable other potential downloaders
-      - "plugins.neural_search.enabled=false"
-      - "plugins.knn.enabled=false"
       # Performance settings
       - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m -XX:+UseG1GC -XX:-UseSerialGC -XX:G1ReservePercent=25 -XX:+AlwaysPreTouch -XX:InitiatingHeapOccupancyPercent=30"
       - "cluster.routing.allocation.disk.threshold_enabled=false"
