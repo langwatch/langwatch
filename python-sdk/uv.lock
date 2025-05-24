@@ -2333,7 +2333,7 @@ examples = [
     { name = "cloudpickle", specifier = ">=3.1.1" },
     { name = "faiss-cpu", specifier = ">=1.8.0,<2.0.0" },
     { name = "fastapi", specifier = ">=0.115.12" },
-    { name = "haystack-ai", specifier = ">=2.7.0,<3.0.0" },
+    { name = "haystack-ai", specifier = ">=2.13.2,<3.0.0" },
     { name = "json-repair", specifier = ">=0.42.0" },
     { name = "jupyter", specifier = ">=1.0.0,<2.0.0" },
     { name = "langchain", specifier = ">=0.2.11" },

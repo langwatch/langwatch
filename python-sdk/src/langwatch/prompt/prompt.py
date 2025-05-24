@@ -1,6 +1,6 @@
 from .formatter import PromptFormatter
-import langwatch
-from typing import List, Any, Dict
+from typing import List, Any
+from openai.types.chat import ChatCompletionMessageParam
 
 
 class Prompt:
@@ -13,7 +13,7 @@ class Prompt:
         self._config = config
         self._formatter = formatter
 
-    def format_messages(self, **variables: Any) -> List[Dict[str, str]]:
+    def format_messages(self, **variables: Any) -> List[ChatCompletionMessageParam]:
         """
         Formats the prompt messages with the provided variables.
         Returns a list of message dictionaries ready for OpenAI's API.
