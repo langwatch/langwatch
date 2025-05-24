@@ -11,4 +11,15 @@ entries:
     urls:
     - https://github.com/langwatch/langwatch/releases/download/langwatch-0.1.2/langwatch-0.1.2.tgz
     version: 0.1.2
-generated: "2025-05-24T22:45:45.349524573Z"
+  langwatch-helm:
+  - apiVersion: v2
+    appVersion: 1.0.0
+    created: "2025-05-24T22:47:11.058912598Z"
+    description: Helm chart for LangWatch application
+    digest: d361ec48fec276bcd87997dedaefa2a547681315d43b5706cf8a6b759aeacc59
+    name: langwatch-helm
+    type: application
+    urls:
+    - https://github.com/langwatch/langwatch/releases/download/langwatch-helm-0.1.2/langwatch-helm-0.1.2.tgz
+    version: 0.1.2
+generated: "2025-05-24T22:47:11.058921384Z"
