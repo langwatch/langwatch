@@ -34,8 +34,8 @@ const initTikToken = async (
   let Tiktoken: typeof import("tiktoken/lite").Tiktoken;
   let load: typeof import("tiktoken/load").load;
   try {
-    Tiktoken = (await import("tiktoken/lite")) as any;
-    load = (await import("tiktoken/load")) as any;
+    Tiktoken = (await import("tiktoken/lite")).Tiktoken;
+    load = (await import("tiktoken/load")).load;
   } catch (e) {
     logger.warn({ e }, "tiktoken could not be loaded, skipping tokenization");
     return undefined;
