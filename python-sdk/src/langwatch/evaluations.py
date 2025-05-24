@@ -55,7 +55,7 @@ class EvaluationResultModel(BaseModel):
 
 
 @deprecated(
-    reason="Please use the new `langwatch.evaluate` module instead. TODO: Link to migration guide"
+    reason="Please use the new `langwatch.evaluation` module instead. TODO: Link to migration guide"
 )
 def evaluate(
     slug: str,
@@ -110,7 +110,7 @@ def evaluate(
 
 
 @deprecated(
-    reason="Please use the new `langwatch.evaluate` module instead. TODO: Link to migration guide"
+    reason="Please use the new `langwatch.evaluation` module instead. TODO: Link to migration guide"
 )
 async def async_evaluate(
     slug: str,
@@ -327,7 +327,7 @@ def _handle_exception(
 
 
 @deprecated(
-    reason="Please use the new `langwatch.evaluate` module instead. TODO: Link to migration guide"
+    reason="Please use the new `langwatch.evaluation` module instead. TODO: Link to migration guide"
 )
 def _add_evaluation(  # type: ignore
     *,

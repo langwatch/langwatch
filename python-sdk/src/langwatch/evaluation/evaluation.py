@@ -58,7 +58,7 @@ class EvaluationResult(BaseModel):
     )
     index: Optional[int] = None
     label: Optional[str] = None
-    cost: Optional[Money] = None
+    cost: Optional[float] = None
     duration: Optional[int] = None
     error_type: Optional[str] = None
     traceback: Optional[List[str]] = Field(
@@ -433,7 +433,7 @@ class Evaluation:
             passed=passed,
             index=index_,
             label=label,
-            cost=cost,
+            cost=cost.amount if cost else None,
             duration=duration,
             details=details if details else str(error) if error else None,
             error_type=type(error).__name__ if error else None,
@@ -453,73 +453,31 @@ class Evaluation:
         index: Union[int, Hashable],
         data: Dict[str, Any],
         settings: Dict[str, Any],
+        name: Optional[str] = None,
         as_guardrail: bool = False,
     ):
         duration: Optional[int] = None
 
-        try:
-            json_body = {
-                "trace_id": format(
-                    trace.get_current_span().get_span_context().trace_id,
-                    "x",
-                ),
-                "evaluator_id": evaluator_id,
-                "evaluation_id": self.run_id,
-                "name": self.name,
-                "data": data,
-                "settings": settings,
-                "as_guardrail": as_guardrail,
-            }
-            request_params = {
-                "url": f"{langwatch.get_endpoint()}/api/evaluations/{evaluator_id}/evaluate",
-                "headers": {"X-Auth-Token": langwatch.get_api_key()},
-                "json": json_body,
-            }
+        start_time = time.time()
+        result = langwatch.evaluations.evaluate(
+            span=langwatch.get_current_span(),
+            slug=evaluator_id,
+            name=name or evaluator_id,
+            settings=settings,
+            as_guardrail=as_guardrail,
+            data=data,
+        )
+        duration = int((time.time() - start_time) * 1000)
 
-            start_time = time.time()
-
-            with httpx.Client(timeout=900) as client:
-                response = client.post(**request_params)
-                response.raise_for_status()
-
-            result = response.json()
-            duration = int((time.time() - start_time) * 1000)
-
-            evaluation_result = EvaluationResult.model_validate(result)
-
-            evaluation_result.duration = duration
-
-            self.log(
-                metric=evaluator_id,
-                index=index,
-                data=data,
-                score=evaluation_result.score,
-                passed=evaluation_result.passed,
-                details=evaluation_result.details,
-                label=evaluation_result.label,
-                duration=duration,
-                cost=evaluation_result.cost,
-            )
-
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code // 100 == 4:
-                raise Exception(f"HTTP error: {e.response.text}")
-
-            self.log(
-                metric=evaluator_id,
-                index=index,
-                data=data,
-                status="error",
-                error=e,
-                duration=duration,
-            )
-
-        except Exception as e:
-            self.log(
-                metric=evaluator_id,
-                index=index,
-                data=data,
-                status="error",
-                error=e,
-                duration=duration,
-            )
+        self.log(
+            metric=name or evaluator_id,
+            index=index,
+            data=data,
+            status=result.status,
+            score=result.score,
+            passed=result.passed,
+            details=result.details,
+            label=result.label,
+            duration=duration,
+            cost=result.cost,
+        )
