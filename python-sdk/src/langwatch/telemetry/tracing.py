@@ -575,10 +575,6 @@ class LangWatchTrace:
     def send_spans(self):
         trace_api.get_tracer_provider().force_flush()
 
-    # Forward all other methods to the underlying tracer
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self.tracer, name)
-
     def _set_callee_input_information(
         self, func: Callable[..., Any], *args: Any, **kwargs: Any
     ):
