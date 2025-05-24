@@ -7,6 +7,8 @@ COPY langwatch ./langwatch
 RUN npm --prefix=langwatch run build
 EXPOSE 5560
 
+ENV NODE_ENV=production
+
 # Set bash as the default shell
 SHELL ["/bin/bash", "-c"]
 

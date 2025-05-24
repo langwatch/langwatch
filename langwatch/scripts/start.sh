@@ -12,7 +12,7 @@ START_APP_COMMAND="npm run start:app"
 START_WORKERS_COMMAND=""
 # if REDIS_URL is availble on .env or set in the environment, start the workers
 if grep -q "^REDIS_URL=\"[a-z]" .env || [ -n "$REDIS_URL" ]; then
-  START_WORKERS_COMMAND="npm run start:workers"
+  START_WORKERS_COMMAND="npm run start:workers && exit 1"
 fi
 
 START_QUICKWIT_COMMAND=""
