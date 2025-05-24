@@ -1,12 +1,15 @@
-name: python-sdk-ci
+name: Python SDK Tests
 
 on:
   push:
     branches:
       - main
+    paths:
+      - "python-sdk/**"
   pull_request:
     paths:
-      - 'python-sdk/**'
+      - "python-sdk/**"
+  workflow_dispatch:
 
 jobs:
   test:
@@ -30,6 +33,7 @@ jobs:
         env:
           LANGWATCH_DEBUG: "true"
           LANGWATCH_API_KEY: ${{ secrets.PYTHON_SDK_LANGWATCH_API_KEY }}
+          LANGWATCH_PROMPT_ID: ${{ secrets.PYTHON_SDK_LANGWATCH_PROMPT_ID }}
           AZURE_OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_API_KEY }}
           AZURE_OPENAI_ENDPOINT: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_ENDPOINT }}
           GEMINI_API_KEY: ${{ secrets.PYTHON_SDK_GEMINI_API_KEY }}
