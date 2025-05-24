@@ -35,7 +35,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             child: {
               terms: {
                 field: "metadata.topic_id",
-                size: 10_000,
+                size: 100,
                 order: { _key: "asc" },
               },
             },
@@ -78,7 +78,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             child: {
               terms: {
                 field: "metadata.subtopic_id",
-                size: 10_000,
+                size: 100,
                 order: { _key: "asc" },
               },
             },
@@ -164,7 +164,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             child: {
               terms: {
                 field: "metadata.thread_id",
-                size: 10_000,
+                size: 100,
                 order: { _key: "asc" },
               },
             },
@@ -207,7 +207,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             child: {
               terms: {
                 field: "metadata.customer_id",
-                size: 10_000,
+                size: 100,
                 order: { _key: "asc" },
               },
             },
@@ -266,7 +266,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                       },
                     }
                   : { field: "metadata.labels" }),
-                size: 10_000,
+                size: 100,
                 order: { _key: "asc" },
               },
             },
