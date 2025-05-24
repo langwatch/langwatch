@@ -599,6 +599,13 @@ export const getAllTracesForProject = async ({
 
       traces.unshift(...filteredTracesByThreadId);
     }
+
+    // If no specific sort order was requested by the user (i.e., input.sortBy is falsy),
+    // and traces might have been reordered by the unshift operation above (due to groupBy === "thread_id"),
+    // re-apply the default sort order by timestamps.started_at descending.
+    if (!input.sortBy) {
+      sortTracesByTimestampDesc(traces);
+    }
   }
 
   const tracesWithGuardrails = traces.map<TraceWithGuardrail>((trace) => {
@@ -789,4 +796,26 @@ export const getEvaluationsMultiple = async (input: {
   return Object.fromEntries(
     traces.map((trace) => [trace.trace_id, trace.evaluations ?? []])
   );
+};
+
+// Helper function to sort traces by timestamp in descending order
+const sortTracesByTimestampDesc = (traces: Trace[]) => {
+  traces.sort((a, b) => {
+    const timeA = a.timestamps?.started_at;
+    const timeB = b.timestamps?.started_at;
+
+    // new Date(null/undefined/invalid string).getTime() results in NaN
+    const dateAValue = timeA ? new Date(timeA).getTime() : NaN;
+    const dateBValue = timeB ? new Date(timeB).getTime() : NaN;
+
+    // Handle NaN cases (invalid or missing dates) by sorting them to the end.
+    const aIsNaN = isNaN(dateAValue);
+    const bIsNaN = isNaN(dateBValue);
+
+    if (aIsNaN && bIsNaN) return 0; // Both are NaN, treat as equal
+    if (aIsNaN) return 1; // a is NaN, so b comes first
+    if (bIsNaN) return -1; // b is NaN, so a comes first
+
+    return dateBValue - dateAValue; // Descending order for valid dates
+  });
 };
