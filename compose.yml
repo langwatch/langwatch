@@ -13,6 +13,7 @@ services:
       LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
       LANGEVALS_ENDPOINT: http://langevals:5562
       INSTALL_METHOD: docker
+      NODE_ENV: production
     env_file:
       - langwatch/.env
     pull_policy: always
