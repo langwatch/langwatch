@@ -162,7 +162,7 @@ opensearch:
   env:
     discovery.type: single-node
     DISABLE_SECURITY_PLUGIN: "true"
-#    _JAVA_OPTIONS: "-XX:UseSVE=0"
+    _JAVA_OPTIONS: "-XX:UseSVE=0"
     plugins.anomaly_detection.enabled: "false"
     plugins.flow_framework.enabled: "false"
     plugins.security_analytics.ioc_finding_enabled: "false"
