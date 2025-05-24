@@ -14,6 +14,7 @@ client = OpenAI()
 
 
 @cl.on_message
+@langwatch.trace()
 async def main(message: cl.Message):
     msg = cl.Message(
         content="",
