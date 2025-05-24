@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "Dockerfile.opensearch_lite"
+  workflow_dispatch:
 
 jobs:
   build-and-push:
@@ -28,6 +29,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: Dockerfile.opensearch_lite
           push: true
           platforms: linux/amd64,linux/arm64/v8
           tags: langwatch/opensearch-lite:latest
