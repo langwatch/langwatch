@@ -42,8 +42,8 @@ images:
     tag: alpine
     pullPolicy: IfNotPresent
   opensearch:
-    repository: opensearchproject/opensearch
-    tag: 2.17.1
+    repository: langwatch/opensearch-lite
+    tag: latest
     pullPolicy: IfNotPresent
 
 # Service configurations
@@ -160,11 +160,6 @@ opensearch:
     discovery.type: single-node
     DISABLE_SECURITY_PLUGIN: "true"
     _JAVA_OPTIONS: "-XX:UseSVE=0"
-    plugins.anomaly_detection.enabled: "false"
-    plugins.flow_framework.enabled: "false"
-    plugins.security_analytics.ioc_finding_enabled: "false"
-    plugins.sql.enabled: "false"
-    plugins.rollup.enabled: "false"
     OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m -XX:+UseG1GC -XX:-UseSerialGC -XX:G1ReservePercent=25 -XX:+AlwaysPreTouch -XX:InitiatingHeapOccupancyPercent=30"
     cluster.routing.allocation.disk.threshold_enabled: "false"
     bootstrap.memory_lock: "false"
