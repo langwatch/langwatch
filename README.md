@@ -19,11 +19,15 @@ LangWatch is framework- and LLM-agnostic, with support for (LangGraph, DSPy, Lan
 
 Our use of **open**, and **community-driven** **standards** is all about supporting your business decisions, and enabling your teams to be flexible to the rapidly changing AI ecosystem without worrying about compatibility.
 
-## 🚢 Deploying LangWatch
+## Getting Started
+
+### Cloud ☁️
+
+The easiest way to get started with LangWatch is via our Cloud offering. [Create a free account](https://app.langwatch.ai) to get started.
 
 ### Local setup 💻
 
-Get up and running in under 30 seconds. The example below uses Docker, but if you prefer helm charts check out the instructions here.
+Get up and running in your own machine using docker compose:
 
 ```bash
 git clone https://github.com/langwatch/langwatch.git
@@ -35,9 +39,15 @@ open http://localhost:5560
 
 You'll be launched right into our onboarding flow. Welcome aboard 🫡.
 
-### Cloud ☁️
+### Self-hosted ⚓️
 
-The easiest way to get started with LangWatch is via our Cloud offering. [Create a free account](https://app.langwatch.ai) to get started.
+Run LangWatch on your own infrastructure:
+
+- [Docker Compose](https://docs.langwatch.ai/self-hosting/open-source#docker-compose) - Run LangWatch on your own machine.
+- [Kubernetes (Helm)](https://docs.langwatch.ai/self-hosting/open-source#helm-chart-for-langwatch) - Run LangWatch on a Kubernetes cluster using Helm for a production-ready setup.
+- [OnPrem](https://docs.langwatch.ai/self-hosting/onprem) - For high-scale deployments, we offer cloud specific setups for AWS, Google Cloud and Azure.
+- [Hybrid (OnPrem data)](https://docs.langwatch.ai/self-hosting/hybrid) - For companies that have strict data residency and control requirements, without needing to go fully on-prem.
+
 
 ### Other Flavours 🍦
 
