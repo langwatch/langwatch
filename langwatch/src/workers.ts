@@ -10,7 +10,7 @@ logger.info("starting");
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 require("./server/background/worker")
-  .start(undefined, 5 * 60 * 1000)
+  .start(undefined, 15 * 60 * 1000)
   .catch((error: Error) => {
     if (error instanceof WorkersRestart) {
       logger.info({ error }, "worker restart");
