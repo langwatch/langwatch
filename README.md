@@ -23,7 +23,9 @@ Our use of **open**, and **community-driven** **standards** is all about support
 
 ### Cloud ☁️
 
-The easiest way to get started with LangWatch is via our Cloud offering. [Create a free account](https://app.langwatch.ai) to get started.
+The easiest way to get started with LangWatch.
+
+[Create a free account](https://app.langwatch.ai) to get started.
 
 ### Local setup 💻
 
