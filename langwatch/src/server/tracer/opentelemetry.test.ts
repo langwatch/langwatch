@@ -304,12 +304,6 @@ const openllmetryOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
                   },
                 },
                 {
-                  key: "gen_ai.completion.0.finish_reason",
-                  value: {
-                    stringValue: "stop",
-                  },
-                },
-                {
                   key: "gen_ai.completion.0.role",
                   value: {
                     stringValue: "assistant",
@@ -830,7 +824,7 @@ const strandsTrace: DeepPartial<IExportTraceServiceRequest> = {
             {
               traceId: "4cmJuE+nwC7cmxIAX8430w==",
               spanId: "S2v3VMCZCUo=",
-              name: "Strands Agent",
+              name: "Model invoke",
               kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
               startTimeUnixNano: "1723006472661658000",
               endTimeUnixNano: "1723006473946042000",
@@ -875,6 +869,13 @@ const strandsTrace: DeepPartial<IExportTraceServiceRequest> = {
                   key: "gen_ai.agent.name",
                   value: {
                     stringValue: "Strands Agent",
+                  },
+                },
+                {
+                  key: "gen_ai.completion.0.text",
+                  value: {
+                    stringValue:
+                      "Hello! What would you like to look at or explore today?",
                   },
                 },
                 {
@@ -983,6 +984,7 @@ describe("opentelemetry traces receiver", () => {
           },
         },
       ],
+      evaluations: [],
       reservedTraceMetadata: {
         user_id: "my-test-user",
         thread_id: "my-test-session",
@@ -1068,6 +1070,7 @@ describe("opentelemetry traces receiver", () => {
           },
         },
       ],
+      evaluations: [],
       reservedTraceMetadata: {},
       customMetadata: {
         "service.name": "unknown_service",
@@ -1164,6 +1167,7 @@ describe("opentelemetry traces receiver", () => {
           },
         },
       ],
+      evaluations: [],
       reservedTraceMetadata: {},
       customMetadata: {
         "service.name": "unknown_service",
@@ -1275,6 +1279,7 @@ describe("opentelemetry traces receiver", () => {
           },
         },
       ],
+      evaluations: [],
       reservedTraceMetadata: {},
       customMetadata: {
         "service.name": "fastapi_sample_endpoint",
@@ -1351,6 +1356,7 @@ describe("opentelemetry traces receiver", () => {
           },
         },
       ],
+      evaluations: [],
       reservedTraceMetadata: {},
       customMetadata: {
         "telemetry.sdk.language": "python",
@@ -1361,7 +1367,7 @@ describe("opentelemetry traces receiver", () => {
     });
   });
 
-  it.only("receives a strands trace", async () => {
+  it("receives a strands trace", async () => {
     const traces = openTelemetryTraceRequestToTracesForCollection(strandsTrace);
 
     expect(traces).toHaveLength(1);
@@ -1383,7 +1389,7 @@ describe("opentelemetry traces receiver", () => {
         {
           span_id: "4b6bf754c099094a",
           trace_id: "e1c989b84fa7c02edc9b12005fce37d3",
-          name: "Strands Agent",
+          name: "Model invoke",
           type: "agent",
           input: {
             type: "chat_messages",
@@ -1398,8 +1404,15 @@ describe("opentelemetry traces receiver", () => {
               },
             ],
           },
+          output: {
+            type: "json",
+            value: [
+              {
+                text: "Hello! What would you like to look at or explore today?",
+              },
+            ],
+          },
           model: "openai/gpt-4.1-nano",
-          output: null,
           metrics: {
             prompt_tokens: 24,
             completion_tokens: 10,

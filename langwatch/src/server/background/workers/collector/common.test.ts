@@ -1232,6 +1232,14 @@ describe("Span organizing and flattening tests", () => {
             },
           ],
         },
+        output: {
+          type: "json",
+          value: [
+            {
+              text: "You're welcome! If you have any more questions or need assistance, feel free to ask. Have a great day!",
+            },
+          ],
+        },
       },
     ];
 
@@ -1239,5 +1247,12 @@ describe("Span organizing and flattening tests", () => {
       spans.map(elasticSearchSpanToSpan as any)
     );
     expect(input).toBe("ohai");
+
+    const output = getLastOutputAsText(
+      spans.map(elasticSearchSpanToSpan as any)
+    );
+    expect(output).toBe(
+      "You're welcome! If you have any more questions or need assistance, feel free to ask. Have a great day!"
+    );
   });
 });

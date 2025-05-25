@@ -21,6 +21,7 @@ import type {
   TypedValueChatMessages,
 } from "./types";
 import {
+  chatMessageSchema,
   customMetadataSchema,
   reservedTraceMetadataSchema,
   rESTEvaluationSchema,
@@ -29,6 +30,7 @@ import {
 } from "./types.generated";
 import { openTelemetryToLangWatchMetadataMapping } from "./metadata";
 import { createLogger } from "~/utils/logger";
+import { z } from "zod";
 
 const logger = createLogger("langwatch.tracer.opentelemetry");
 
@@ -189,7 +191,10 @@ const addOpenTelemetrySpanAsSpan = (
     switch (event.name) {
       case "First Token Stream Event":
       case "llm.content.completion.chunk": {
-        first_token_at = parseTimestamp(event?.timeUnixNano);
+        const ts = parseTimestamp(event?.timeUnixNano);
+        if (ts && (!first_token_at || ts < first_token_at)) {
+          first_token_at = ts;
+        }
         break;
       }
       case "langwatch.evaluation.custom": {
@@ -284,7 +289,7 @@ const addOpenTelemetrySpanAsSpan = (
     delete attributesMap.llm.request.type;
   }
   // vercel
-  if (attributesMap.gen_ai) {
+  if (attributesMap.ai && attributesMap.gen_ai) {
     type = "llm";
   }
   if (attributesMap.operation?.name === "ai.toolCall") {
@@ -358,6 +363,22 @@ const addOpenTelemetrySpanAsSpan = (
     } else {
       input = {
         type: "json",
+        value: attributesMap.gen_ai.prompt,
+      };
+    }
+    delete attributesMap.gen_ai.prompt;
+  }
+
+  if (!input && typeof attributesMap.gen_ai?.prompt === "string") {
+    try {
+      const parsed = JSON.parse(attributesMap.gen_ai.prompt);
+      input = {
+        type: "json",
+        value: parsed,
+      };
+    } catch (error) {
+      output = {
+        type: "text",
         value: attributesMap.gen_ai.prompt,
       };
     }
@@ -487,15 +508,45 @@ const addOpenTelemetrySpanAsSpan = (
     attributesMap.gen_ai?.completion &&
     Array.isArray(attributesMap.gen_ai.completion)
   ) {
-    const output_ = typedValueChatMessagesSchema.safeParse({
-      type: "chat_messages",
-      value: attributesMap.gen_ai.completion,
-    });
+    const output_ = z
+      .object({
+        type: z.literal("chat_messages"),
+        value: z.array(chatMessageSchema.strict()),
+      })
+      .safeParse({
+        type: "chat_messages",
+        value: attributesMap.gen_ai.completion,
+      });
 
-    if (output_.success) {
+    if (
+      output_.success &&
+      output_.data.value.length > 0 &&
+      Object.keys(output_.data.value[0]!).length > 0
+    ) {
       output = output_.data as TypedValueChatMessages;
-      delete attributesMap.gen_ai.completion;
+    } else {
+      output = {
+        type: "json",
+        value: attributesMap.gen_ai.completion,
+      };
     }
+    delete attributesMap.gen_ai.completion;
+  }
+
+  if (!output && typeof attributesMap.gen_ai?.completion === "string") {
+    try {
+      const parsed = JSON.parse(attributesMap.gen_ai.completion);
+      output = {
+        type: "json",
+        value: parsed,
+      };
+    } catch (error) {
+      output = {
+        type: "text",
+        value: attributesMap.gen_ai.completion,
+      };
+    }
+    delete attributesMap.gen_ai.completion;
   }
 
   // vercel
@@ -639,6 +690,22 @@ const addOpenTelemetrySpanAsSpan = (
     delete attributesMap.llm.is_streaming;
   }
 
+  if (attributesMap.user?.id && typeof attributesMap.user.id === "string") {
+    trace.reservedTraceMetadata.user_id = attributesMap.user.id;
+    delete attributesMap.user.id;
+  }
+  if (
+    attributesMap.session?.id &&
+    typeof attributesMap.session.id === "string"
+  ) {
+    trace.reservedTraceMetadata.thread_id = attributesMap.session.id;
+    delete attributesMap.session.id;
+  }
+  if (attributesMap.tag?.tags && Array.isArray(attributesMap.tag.tags)) {
+    trace.reservedTraceMetadata.labels = attributesMap.tag.tags;
+    delete attributesMap.tag.tags;
+  }
+
   // vercel
   if (attributesMap.ai?.prompt?.tools) {
     params = {
@@ -696,14 +763,14 @@ const addOpenTelemetrySpanAsSpan = (
   }
 
   // vercel
-  if (attributesMap.gen_ai && model) {
+  if (!name && type === "llm" && attributesMap.gen_ai && model) {
     name = model;
   }
   if (type === "tool" && attributesMap.ai?.toolCall?.name) {
     name = (attributesMap as any).ai.toolCall.name;
   }
   // Agent
-  if (attributesMap.gen_ai?.agent?.name) {
+  if (!name && attributesMap.gen_ai?.agent?.name) {
     name = (attributesMap as any).gen_ai.agent.name;
   }
 
@@ -798,7 +865,7 @@ const addOpenTelemetrySpanAsSpan = (
   };
 
   const span: BaseSpan & {
-    model: LLMSpan["model"];
+    model?: LLMSpan["model"];
     metrics?: LLMSpan["metrics"];
   } = {
     span_id: otelSpan.spanId as string,
@@ -808,11 +875,11 @@ const addOpenTelemetrySpanAsSpan = (
       : {}),
     name,
     type,
-    model,
+    ...(model ? { model } : {}),
     input,
     output,
     ...(error ? { error } : {}),
-    ...(metrics ? { metrics } : {}),
+    ...(metrics && Object.keys(metrics).length > 0 ? { metrics } : {}),
     ...(contexts && contexts.length > 0 ? { contexts } : {}),
     params,
     timestamps: {

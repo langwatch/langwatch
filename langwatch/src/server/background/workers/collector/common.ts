@@ -288,7 +288,10 @@ export const typedValueToText = (
     try {
       const json = typed.value as any;
 
-      const value = specialKeysMapping(json);
+      const value =
+        Array.isArray(json) && json.length == 1
+          ? specialKeysMapping(json[0])
+          : specialKeysMapping(json);
       if (value !== undefined) {
         return firstAndOnlyKey(value) ?? stringified(value);
       }
