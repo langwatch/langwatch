@@ -96,7 +96,7 @@ export const addLLMTokensCount = async (projectId: string, spans: Span[]) => {
   const llmModelCosts = await getLLMModelCosts({ projectId });
 
   for (const span of spans) {
-    if (span.type == "llm" || span.type == "agent") {
+    if (span.type == "llm") {
       const llmSpan = span as LLMSpan;
       const llmModelCost =
         llmSpan.model && matchingLLMModelCost(llmSpan.model, llmModelCosts);

@@ -297,7 +297,12 @@ const addOpenTelemetrySpanAsSpan = (
   }
   // Agents
   if (attributesMap.gen_ai?.agent || attributesMap.agent?.name) {
-    type = "agent";
+    // Strands agent
+    if (otelSpan.name === "Model invoke") {
+      type = "llm";
+    } else {
+      type = "agent";
+    }
   }
 
   // Model
