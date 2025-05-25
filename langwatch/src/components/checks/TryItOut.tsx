@@ -110,14 +110,13 @@ export function TryItOut({
           trace,
           (trace.spans ?? []).map((span) =>
             transformElasticSearchSpanToSpan(
-              span as ElasticSearchSpan,
               {
-                canSeeCapturedInput: true,
-                canSeeCapturedOutput: true,
-                canSeeCosts: true,
+                canSeeCapturedInput: false,
+                canSeeCapturedOutput: false,
+                canSeeCosts: false,
               },
               new Set()
-            )
+            )(span as ElasticSearchSpan)
           ),
           preconditions
         )

@@ -81,7 +81,7 @@ const openInferenceOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
                   key: "output.value",
                   value: {
                     stringValue:
-                      '{"choices": [{"message": {"content": "Hey there! 😊👋 What’s up? 🌟", "role": "assistant"}, "index": 0, "finish_reason": "stop"}], "id": "chatcmpl-9sdk9jAOO21SHl5mgTZSXVdCVJhDq", "created": 1722809513, "model": "gpt-4o-mini-2024-07-18", "object": "chat.completion.chunk", "system_fingerprint": "fp_611b667b19"}',
+                      '{"choices": [{"message": {"content": "Hey there! 😊👋 What\'s up? 🌟", "role": "assistant"}, "index": 0, "finish_reason": "stop"}], "id": "chatcmpl-9sdk9jAOO21SHl5mgTZSXVdCVJhDq", "created": 1722809513, "model": "gpt-4o-mini-2024-07-18", "object": "chat.completion.chunk", "system_fingerprint": "fp_611b667b19"}',
                   },
                 },
                 {
@@ -169,7 +169,7 @@ const openInferenceOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
                 {
                   key: "llm.output_messages.0.message.content",
                   value: {
-                    stringValue: "Hey there! 😊👋 What’s up? 🌟",
+                    stringValue: "Hey there! 😊👋 What's up? 🌟",
                   },
                 },
               ],
@@ -318,7 +318,7 @@ const openllmetryOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
                 {
                   key: "gen_ai.completion.0.content",
                   value: {
-                    stringValue: "Hey there! 😊 What’s on your mind? 💬✨",
+                    stringValue: "Hey there! 😊 What's on your mind? 💬✨",
                   },
                 },
               ],
@@ -777,7 +777,7 @@ const openllmetryLangChainRequest: DeepPartial<IExportTraceServiceRequest> = {
               traceId: "4cmJuE+nwC7cmxIAX8430w==",
               spanId: "S2v3VMCZCUo=",
               name: "RunnableSequence.workflow",
-              kind: "SPAN_KIND_INTERNAL",
+              kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
               startTimeUnixNano: "1723006472661658000",
               endTimeUnixNano: "1723006473946042000",
               attributes: [
@@ -805,6 +805,106 @@ const openllmetryLangChainRequest: DeepPartial<IExportTraceServiceRequest> = {
                   value: {
                     stringValue:
                       '{"outputs": "\\ud83d\\udc4b Hi there! How can I help you today?", "kwargs": {"tags": [], "inputs": {"question": "hello"}}}',
+                  },
+                },
+              ],
+              status: {},
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const strandsTrace: DeepPartial<IExportTraceServiceRequest> = {
+  resourceSpans: [
+    {
+      resource: { attributes: [] },
+      scopeSpans: [
+        {
+          scope: {
+            name: "opentelemetry.instrumentation.strands",
+          },
+          spans: [
+            {
+              traceId: "4cmJuE+nwC7cmxIAX8430w==",
+              spanId: "S2v3VMCZCUo=",
+              name: "Strands Agent",
+              kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+              startTimeUnixNano: "1723006472661658000",
+              endTimeUnixNano: "1723006473946042000",
+              attributes: [
+                {
+                  key: "event_loop.cycle_id",
+                  value: {
+                    stringValue: "29f8679a-3afb-498e-8dc2-643c25434292",
+                  },
+                },
+                {
+                  key: "gen_ai.request.model",
+                  value: {
+                    stringValue: "openai/gpt-4.1-nano",
+                  },
+                },
+                {
+                  key: "gen_ai.event.start_time",
+                  value: {
+                    stringValue: "2025-05-25T10:37:11.068343+00:00",
+                  },
+                },
+                {
+                  key: "gen_ai.event.end_time",
+                  value: {
+                    stringValue: "2025-05-25T10:37:12.014098+00:00",
+                  },
+                },
+                {
+                  key: "gen_ai.prompt.0.role",
+                  value: {
+                    stringValue: "user",
+                  },
+                },
+                {
+                  key: "gen_ai.prompt.0.content.0.text",
+                  value: {
+                    stringValue: "yo",
+                  },
+                },
+                {
+                  key: "gen_ai.agent.name",
+                  value: {
+                    stringValue: "Strands Agent",
+                  },
+                },
+                {
+                  key: "agent.name",
+                  value: {
+                    stringValue: "Strands Agent",
+                  },
+                },
+                {
+                  key: "gen_ai.usage.prompt_tokens",
+                  value: {
+                    intValue: 24,
+                  },
+                },
+                {
+                  key: "gen_ai.usage.completion_tokens",
+                  value: {
+                    intValue: 10,
+                  },
+                },
+                {
+                  key: "gen_ai.usage.total_tokens",
+                  value: {
+                    intValue: 34,
+                  },
+                },
+                {
+                  key: "scope.name",
+                  value: {
+                    stringValue: "strands-bot",
                   },
                 },
               ],
@@ -864,7 +964,7 @@ describe("opentelemetry traces receiver", () => {
             value: [
               {
                 role: "assistant",
-                content: "Hey there! 😊👋 What’s up? 🌟",
+                content: "Hey there! 😊👋 What's up? 🌟",
               },
             ],
           },
@@ -944,7 +1044,7 @@ describe("opentelemetry traces receiver", () => {
             value: [
               {
                 role: "assistant",
-                content: "Hey there! 😊 What’s on your mind? 💬✨",
+                content: "Hey there! 😊 What's on your mind? 💬✨",
               },
             ],
           },
@@ -1258,6 +1358,84 @@ describe("opentelemetry traces receiver", () => {
         "telemetry.sdk.version": "1.26.0",
         "service.name": "unknown_service",
       },
+    });
+  });
+
+  it.only("receives a strands trace", async () => {
+    const traces = openTelemetryTraceRequestToTracesForCollection(strandsTrace);
+
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0];
+
+    try {
+      z.array(spanSchema).parse(trace!.spans);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      console.log("trace", JSON.stringify(trace, undefined, 2));
+      console.log("validationError", validationError);
+      assert.fail(validationError.message);
+    }
+
+    expect(trace).toEqual({
+      traceId: "e1c989b84fa7c02edc9b12005fce37d3",
+      spans: [
+        {
+          span_id: "4b6bf754c099094a",
+          trace_id: "e1c989b84fa7c02edc9b12005fce37d3",
+          name: "Strands Agent",
+          type: "agent",
+          input: {
+            type: "chat_messages",
+            value: [
+              {
+                role: "user",
+                content: [
+                  {
+                    text: "yo",
+                  },
+                ],
+              },
+            ],
+          },
+          model: "openai/gpt-4.1-nano",
+          output: null,
+          metrics: {
+            prompt_tokens: 24,
+            completion_tokens: 10,
+          },
+          params: {
+            event_loop: {
+              cycle_id: "29f8679a-3afb-498e-8dc2-643c25434292",
+            },
+            gen_ai: {
+              event: {
+                start_time: "2025-05-25T10:37:11.068343+00:00",
+                end_time: "2025-05-25T10:37:12.014098+00:00",
+              },
+              agent: {
+                name: "Strands Agent",
+              },
+              usage: {
+                total_tokens: 34,
+              },
+            },
+            agent: {
+              name: "Strands Agent",
+            },
+            scope: {
+              name: "opentelemetry.instrumentation.strands",
+            },
+          },
+          timestamps: {
+            started_at: 1723006472662,
+            finished_at: 1723006473946,
+          },
+        },
+      ],
+      evaluations: [],
+      reservedTraceMetadata: {},
+      customMetadata: {},
     });
   });
 });

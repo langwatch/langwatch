@@ -290,6 +290,10 @@ const addOpenTelemetrySpanAsSpan = (
   if (attributesMap.operation?.name === "ai.toolCall") {
     type = "tool";
   }
+  // Agents
+  if (attributesMap.gen_ai?.agent || attributesMap.agent?.name) {
+    type = "agent";
+  }
 
   // Model
   if (attributesMap.llm?.model_name) {
@@ -351,8 +355,13 @@ const addOpenTelemetrySpanAsSpan = (
 
     if (input_.success) {
       input = input_.data as TypedValueChatMessages;
-      delete attributesMap.gen_ai.prompt;
+    } else {
+      input = {
+        type: "json",
+        value: attributesMap.gen_ai.prompt,
+      };
     }
+    delete attributesMap.gen_ai.prompt;
   }
 
   // vercel
@@ -599,6 +608,16 @@ const addOpenTelemetrySpanAsSpan = (
       delete attributesMap.ai.usage.completionTokens;
     }
   }
+  if (attributesMap.gen_ai?.usage) {
+    if (typeof attributesMap.gen_ai.usage.prompt_tokens === "number") {
+      metrics.prompt_tokens = attributesMap.gen_ai.usage.prompt_tokens;
+      delete attributesMap.gen_ai.usage.prompt_tokens;
+    }
+    if (typeof attributesMap.gen_ai.usage.completion_tokens === "number") {
+      metrics.completion_tokens = attributesMap.gen_ai.usage.completion_tokens;
+      delete attributesMap.gen_ai.usage.completion_tokens;
+    }
+  }
 
   // Params
   if (attributesMap.llm?.invocation_parameters) {
@@ -682,6 +701,10 @@ const addOpenTelemetrySpanAsSpan = (
   }
   if (type === "tool" && attributesMap.ai?.toolCall?.name) {
     name = (attributesMap as any).ai.toolCall.name;
+  }
+  // Agent
+  if (attributesMap.gen_ai?.agent?.name) {
+    name = (attributesMap as any).gen_ai.agent.name;
   }
 
   const contexts: RAGChunk[] = [];

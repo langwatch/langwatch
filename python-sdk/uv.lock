@@ -1475,6 +1475,19 @@ wheels = [
 ]
 
 [[package]]
+name = "httpx-aiohttp"
+version = "0.1.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "httpx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/83/34/07ee45949f76701c4327d95bbaf31c6d62d72c74677ba6a2087b13df7743/httpx_aiohttp-0.1.4.tar.gz", hash = "sha256:61030eed28deeac26286d2e872b7c167f5450b7b0eec5a617ae7d3f7da9c8684", size = 8375 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ec/77/04b416a0b6e351edf4a0a7a5ff18e9b0ab5dd59d3614cf41030fb86ccaaf/httpx_aiohttp-0.1.4-py3-none-any.whl", hash = "sha256:740a8725af7b7a03d12f21ccd48a83457baa037304646589b87595746c05c87e", size = 4977 },
+]
+
+[[package]]
 name = "httpx-sse"
 version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2289,6 +2302,7 @@ examples = [
     { name = "nanoid" },
     { name = "openai" },
     { name = "openinference-instrumentation-dspy" },
+    { name = "openinference-instrumentation-litellm" },
     { name = "openinference-instrumentation-openai" },
     { name = "opentelemetry-instrumentation-fastapi" },
     { name = "opentelemetry-instrumentation-langchain" },
@@ -2345,6 +2359,7 @@ examples = [
     { name = "nanoid", specifier = ">=2.0.0" },
     { name = "openai", specifier = ">=1.68.2" },
     { name = "openinference-instrumentation-dspy", specifier = ">=0.1.23,<0.2.0" },
+    { name = "openinference-instrumentation-litellm", specifier = ">=0.1.19" },
     { name = "openinference-instrumentation-openai", specifier = ">=0.1.25" },
     { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.53b1" },
     { name = "opentelemetry-instrumentation-langchain", specifier = ">=0.40.4" },
@@ -2377,12 +2392,13 @@ wheels = [
 
 [[package]]
 name = "litellm"
-version = "1.67.0.post1"
+version = "1.71.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "click" },
     { name = "httpx" },
+    { name = "httpx-aiohttp" },
     { name = "importlib-metadata" },
     { name = "jinja2" },
     { name = "jsonschema" },
@@ -2392,9 +2408,9 @@ dependencies = [
     { name = "tiktoken" },
     { name = "tokenizers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3d/05/6f71548f24b8e5eb4a04080a10c37d8ff5f34e00f624df7b425b8a03bb79/litellm-1.67.0.post1.tar.gz", hash = "sha256:1adf69769ee5df93c834c093fad760f406feeb6c59e79638c3f448226887554d", size = 7245557 }
+sdist = { url = "https://files.pythonhosted.org/packages/f5/b2/3675e0c7efdec151f5dde63cd4d0422f687e41630ff6a817ebde3f3946b5/litellm-1.71.0.tar.gz", hash = "sha256:1908ebb61e6f2909a092648c5243adae8f60a9ce24d71530be91e2e727eb43b0", size = 7826195 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/49/f5/9cecf2a6d50c6febf1f363af6145038868fe5945c684394d5ee542c5414a/litellm-1.67.0.post1-py3-none-any.whl", hash = "sha256:b7b3c6a6a032b059a45b326673d24318dc8b65b1016a93194c9ea7ee94b0e00d", size = 7600342 },
+    { url = "https://files.pythonhosted.org/packages/8b/32/7e4a97b127947613d6c8ac95221d01144a6992d5ec29c3e562549a1fddf2/litellm-1.71.0-py3-none-any.whl", hash = "sha256:caae99df64ddc27057d20d63aa2ef4931547ca4cc95fc9d3896081226422ccb2", size = 7916718 },
 ]
 
 [[package]]
@@ -2927,6 +2943,24 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/6b/d4/ac312302aa5c3da53206be49ab305f934cc6f30765057f29e6668fd530f4/openinference_instrumentation_langchain-0.1.41.tar.gz", hash = "sha256:b5037aef7378e8cbeb6072cdfabfa973a0fbcdf3ce4f36cec0c42ac24e88243a", size = 50905 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a8/0f/4bacb4a733339e03d023c289a7a739dce386e30968a2aa84c7fe8c49a924/openinference_instrumentation_langchain-0.1.41-py3-none-any.whl", hash = "sha256:b93089320f545001ea0135e1ddb3dde884556f8534e6a2a9b1edf29a5ed91d35", size = 18695 },
+]
+
+[[package]]
+name = "openinference-instrumentation-litellm"
+version = "0.1.19"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "openinference-instrumentation" },
+    { name = "openinference-semantic-conventions" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-instrumentation" },
+    { name = "opentelemetry-sdk" },
+    { name = "setuptools" },
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ba/c5/3740ea7a357ff0cd837780089a7b6a3f71ce187da19807821d60c370c75f/openinference_instrumentation_litellm-0.1.19.tar.gz", hash = "sha256:23afa2dc0760d6c1d6f16e65609318e93564594e5062e3b9634f7b9db10d612d", size = 16718 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f2/c7/7cb069455b4ae45f4ae179fe5242198be19b05905aaf9e20536606f0423b/openinference_instrumentation_litellm-0.1.19-py3-none-any.whl", hash = "sha256:de357f22960a8b3798be2560d3388405a9229d863ace77018313d4eb44f76ed8", size = 12376 },
 ]
 
 [[package]]

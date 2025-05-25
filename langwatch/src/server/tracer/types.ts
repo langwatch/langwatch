@@ -37,6 +37,9 @@ export type ChatRichContent =
       text?: string;
     }
   | {
+      text: string;
+    }
+  | {
       type: "image_url";
       image_url?: {
         url: string;

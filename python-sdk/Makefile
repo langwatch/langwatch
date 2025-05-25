@@ -5,7 +5,7 @@ test:
 
 # Call it with `make test-examples -- -k "examples/openai_bot.py"` to run a specific example
 test-examples:
-	uv pip install crewai==0.60.0 openinference-instrumentation-crewai duckduckgo_search; \
+	uv pip install crewai==0.60.0 openinference-instrumentation-crewai duckduckgo_search strands-agents; \
 	PYTHONPATH=$$PYTHONPATH:. uv run pytest tests/test_examples.py -p no:warnings -s -x $(filter-out $@,$(MAKECMDGOALS))
 
 install:
@@ -16,6 +16,7 @@ install:
 
 example:
 	@args="$(filter-out $@,$(MAKECMDGOALS))"; \
+	uv pip install strands-agents; \
 	if [[ $$args =~ "fastapi" ]]; then \
 		uv run python $$args; \
 	elif [[ $$args =~ "streamlit" ]]; then \

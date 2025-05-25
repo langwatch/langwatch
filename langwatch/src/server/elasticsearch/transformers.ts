@@ -111,7 +111,7 @@ export const transformElasticSearchTraceToTrace = (
   if (spans) {
     for (const span of spans) {
       transformedSpans.push(
-        transformElasticSearchSpanToSpan(span, protections, redactions)
+        transformElasticSearchSpanToSpan(protections, redactions)(span)
       );
     }
   }
@@ -131,53 +131,54 @@ export const transformElasticSearchTraceToTrace = (
   };
 };
 
-export const transformElasticSearchSpanToSpan = (
-  esSpan: ElasticSearchSpan,
-  protections: Protections,
-  redactions: Set<string>
-): Span => {
-  const { input, output, metrics, ...spanFields } = esSpan;
+export const transformElasticSearchSpanToSpan =
+  (protections: Protections, redactions: Set<string>) =>
+  (esSpan: ElasticSearchSpan): Span => {
+    const { input, output, metrics, ...spanFields } = esSpan;
 
-  let transformedInput: SpanInputOutput | null = null;
-  let transformedOutput: SpanInputOutput | null = null;
-  let transformedMetrics: SpanMetrics | null = null;
+    let transformedInput: SpanInputOutput | null = null;
+    let transformedOutput: SpanInputOutput | null = null;
+    let transformedMetrics: SpanMetrics | null = null;
 
-  if (input) {
-    transformedInput =
-      protections.canSeeCapturedInput === true
-        ? elasticSearchToTypedValue(input)
-        : { type: "text", value: "[REDACTED]" };
-  }
-  if (output) {
-    transformedOutput =
-      protections.canSeeCapturedOutput === true
-        ? elasticSearchToTypedValue(output)
-        : { type: "text", value: "[REDACTED]" };
-  }
-
-  if (transformedInput) {
-    transformedInput.value = redactObject(transformedInput.value, redactions);
-  }
-  if (transformedOutput) {
-    transformedOutput.value = redactObject(transformedOutput.value, redactions);
-  }
-
-  if (metrics) {
-    const { cost, ...otherMetrics } = metrics;
-    transformedMetrics = otherMetrics;
-
-    if (protections.canSeeCosts === true) {
-      transformedMetrics.cost = cost;
+    if (input) {
+      transformedInput =
+        protections.canSeeCapturedInput === true
+          ? elasticSearchToTypedValue(input)
+          : { type: "text", value: "[REDACTED]" };
     }
-  }
+    if (output) {
+      transformedOutput =
+        protections.canSeeCapturedOutput === true
+          ? elasticSearchToTypedValue(output)
+          : { type: "text", value: "[REDACTED]" };
+    }
 
-  return {
-    ...spanFields,
-    input: transformedInput,
-    output: transformedOutput,
-    metrics: transformedMetrics,
+    if (transformedInput) {
+      transformedInput.value = redactObject(transformedInput.value, redactions);
+    }
+    if (transformedOutput) {
+      transformedOutput.value = redactObject(
+        transformedOutput.value,
+        redactions
+      );
+    }
+
+    if (metrics) {
+      const { cost, ...otherMetrics } = metrics;
+      transformedMetrics = otherMetrics;
+
+      if (protections.canSeeCosts === true) {
+        transformedMetrics.cost = cost;
+      }
+    }
+
+    return {
+      ...spanFields,
+      input: transformedInput,
+      output: transformedOutput,
+      metrics: transformedMetrics,
+    };
   };
-};
 
 const extractRedactionsFromAllSpanInputs = (
   spans: ElasticSearchTrace["spans"]

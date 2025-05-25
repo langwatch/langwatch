@@ -83,6 +83,7 @@ examples = [
     "json-repair>=0.42.0",
     "openinference-instrumentation-openai>=0.1.25",
     "opentelemetry-instrumentation-langchain>=0.40.4",
+    "openinference-instrumentation-litellm>=0.1.19",
     "pandas>=2.2.3",
 ]
 tests = [

@@ -153,7 +153,7 @@ export const typedValueToText = (
           ? lastMessage.content
           : Array.isArray(lastMessage.content)
           ? lastMessage.content
-              .map((c) => (c.type === "text" ? c.text : JSON.stringify(c)))
+              .map((c) => ("text" in c ? c.text : JSON.stringify(c)))
               .join("")
           : JSON.stringify(lastMessage)
         : "";

@@ -6,8 +6,16 @@ import {
   getLastOutputAsText,
 } from "./common"; // replace with your actual module path
 import type { BaseSpan } from "../../../tracer/types";
-import { elasticSearchSpanToSpan } from "../../../tracer/utils";
+import { transformElasticSearchSpanToSpan } from "../../../elasticsearch/transformers";
 
+const elasticSearchSpanToSpan = transformElasticSearchSpanToSpan(
+  {
+    canSeeCapturedInput: true,
+    canSeeCapturedOutput: true,
+    canSeeCosts: true,
+  },
+  new Set()
+);
 describe("Span organizing and flattening tests", () => {
   const commonSpanProps = {
     type: "span" as BaseSpan["type"],
@@ -1070,7 +1078,7 @@ describe("Span organizing and flattening tests", () => {
         output: {
           type: "chat_messages",
           value:
-            '[{"role":"assistant","content":"Ahoy there, matey! What brings ye to these treacherous waters? Speak yer mind, and let’s set sail on a grand adventure! Arrr! 🏴\u200d☠️"}]',
+            '[{"role":"assistant","content":"Ahoy there, matey! What brings ye to these treacherous waters? Speak yer mind, and let\'s set sail on a grand adventure! Arrr! 🏴\u200d☠️"}]',
         },
         error: null,
         timestamps: {
@@ -1199,7 +1207,37 @@ describe("Span organizing and flattening tests", () => {
 
     // expect(input).toBe("Hello");
     expect(output).toBe(
-      "Ahoy there, matey! What brings ye to these treacherous waters? Speak yer mind, and let’s set sail on a grand adventure! Arrr! 🏴‍☠️"
+      "Ahoy there, matey! What brings ye to these treacherous waters? Speak yer mind, and let's set sail on a grand adventure! Arrr! 🏴‍☠️"
     );
+  });
+
+  it("extracts text from chat_messages with nested content structure", () => {
+    const spans = [
+      {
+        ...commonSpanProps,
+        span_id: "1",
+        name: "test span",
+        parent_id: null,
+        timestamps: { started_at: 100, finished_at: 500 },
+        input: {
+          type: "chat_messages",
+          value: [
+            {
+              role: "user",
+              content: [
+                {
+                  text: "ohai",
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ];
+
+    const input = getFirstInputAsText(
+      spans.map(elasticSearchSpanToSpan as any)
+    );
+    expect(input).toBe("ohai");
   });
 });
