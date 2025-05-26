@@ -10,7 +10,7 @@ export interface SimulationCardMessage {
 
 export interface SimulationCardProps {
   title: string;
-  status: "completed" | "in-progress" | "failed";
+  status: "success" | "failure" | "in-progress";
   children: React.ReactNode;
   onExpandToggle: () => void;
   isExpanded: boolean;
@@ -25,9 +25,9 @@ export function SimulationCard({
 }: SimulationCardProps) {
   // Status badge color
   const statusColor = {
-    completed: "green",
+    success: "green",
     "in-progress": "yellow",
-    failed: "red",
+    failure: "red",
   }[status];
 
   return (
