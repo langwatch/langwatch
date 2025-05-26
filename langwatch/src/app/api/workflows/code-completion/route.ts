@@ -9,7 +9,7 @@ import { authOptions } from "../../../../server/auth";
 import { prisma } from "../../../../server/db";
 import { getVercelAIModel } from "../../../../server/modelProviders/utils";
 import { createLogger } from "../../../../utils/logger";
-import { loggerMiddleware } from "../../hono-middleware/logger";
+import { loggerMiddleware } from "../../middleware/logger";
 
 const logger = createLogger("langwatch:code-completion");
 
@@ -61,7 +61,7 @@ app.post("/code-completion", async (c) => {
           },
         ],
         maxTokens: 64,
-        temperature: 0
+        temperature: 0,
       });
 
       return { text };
