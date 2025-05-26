@@ -11,6 +11,8 @@ export type IndexSpec = {
   base: string;
 };
 
+const createdClients: Record<string, ElasticClient | OpenSearchClient | undefined> = {};
+
 export const MIGRATION_INDEX = "search-elastic-migrations";
 
 export const TRACE_INDEX: IndexSpec = {
@@ -37,9 +39,28 @@ const getOrgElasticsearchDetailsFromProject = async (projectId: string) => {
   return project?.team.organization ?? null;
 };
 
-export const esClient = async (
-  args: { projectId: string } | { organizationId: string } | { test: true }
-) => {
+type EsClientArgs = { projectId: string } | { organizationId: string } | { test: true };
+
+const createClientArgsToCreatedClientKey = (args: EsClientArgs) => {
+  if ("test" in args) return "test";
+  if ("organizationId" in args) return `organizationId:${args.organizationId}`;
+  if ("projectId" in args) return `projectId:${args.projectId}`;
+
+  throw new Error("Invalid arguments");
+};
+
+export const esClient = async (args: EsClientArgs): Promise<ElasticClient | OpenSearchClient> => {
+  const key = createClientArgsToCreatedClientKey(args);
+  const existingClient = createdClients[key];
+  if (existingClient) {
+    try {
+      await (existingClient as any).ping();
+      return existingClient;
+    } catch (error) {
+      createdClients[key] = void 0;
+    }
+  }
+
   let elasticsearchNodeUrl: string | null = null;
   let elasticsearchApiKey: string | null = null;
 
@@ -110,18 +131,13 @@ export const esClient = async (
     patchForQuickwitCompatibility(client);
   }
 
+  createdClients[key] = client;
+
   return client;
 };
 
 export const FLATENNED_TYPE = env.IS_OPENSEARCH ? "flat_object" : "flattened";
 
-export const traceIndexId = ({
-  traceId,
-  projectId,
-}: {
-  traceId: string;
-  projectId: string;
-}) => `${projectId}/${traceId}`;
 
 export const spanIndexId = ({
   spanId,
