@@ -35,6 +35,8 @@
     "@ag-grid-community/core": "^32.3.3",
     "@ag-grid-community/react": "^32.3.3",
     "@ag-grid-community/styles": "^32.3.3",
+    "@ag-ui/client": "^0.0.28",
+    "@ag-ui/core": "^0.0.28",
     "@ai-sdk/amazon-bedrock": "^1.0.6",
     "@ai-sdk/azure": "^1.0.5",
     "@ai-sdk/google": "^1.0.3",
@@ -47,6 +49,9 @@
     "@aws-sdk/client-sns": "^3.637.0",
     "@chakra-ui/next-js": "^2.4.2",
     "@chakra-ui/react": "^3.8.1",
+    "@copilotkit/react-core": "^1.8.13",
+    "@copilotkit/react-ui": "^1.8.13",
+    "@copilotkit/runtime": "^1.8.13",
     "@dnd-kit/core": "^6.1.0",
     "@dnd-kit/sortable": "^8.0.0",
     "@elastic/elasticsearch": "^8.15.0",
@@ -160,6 +165,7 @@
     "react-spinners": "^0.14.1",
     "recharts": "^2.15.1",
     "remark-gfm": "^4.0.0",
+    "rxjs": "^7.8.2",
     "safe-regex2": "^4.0.1",
     "sass": "^1.79.0",
     "slugify": "^1.6.6",
@@ -178,6 +184,7 @@
     "zustand": "^4.5.2"
   },
   "devDependencies": {
+    "@faker-js/faker": "^9.8.0",
     "@playwright/test": "^1.52.0",
     "@types/bcrypt": "^5.0.2",
     "@types/cookie": "^0.6.0",
@@ -235,5 +242,8 @@
   },
   "workspaces": [
     "saas-src/*"
-  ]
+  ],
+  "resolutions": {
+    "rxjs": "7.8.1"
+  }
 }
