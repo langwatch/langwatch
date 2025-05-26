@@ -53,7 +53,12 @@ export function SimulationCard({
         </HStack>
       </Card.Header>
       <Card.Body>
-        <VStack align="stretch" gap="2">
+        <VStack
+          align="stretch"
+          gap="2"
+          overflowY="scroll"
+          height={isExpanded ? "auto" : "150px"}
+        >
           {children}
         </VStack>
       </Card.Body>
