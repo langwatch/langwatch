@@ -17,7 +17,7 @@
 
 ## Why LangWatch?
 
-**LangWatch is the leading LLM Ops platform on evaluations capabilities and user-friendly collaboration** — evaluate, debug, and optimize your Agents and LLM pipelines with confidence together with your team, locally or in the cloud, with Open-Telemetry native integrations.
+**LangWatch is the leading LLM Ops platform on evaluation capabilities and user-friendly collaboration** — evaluate, debug, and optimize your Agents and LLM pipelines with confidence together with your team, locally or in the cloud, with Open-Telemetry native integrations.
 
 ## Core Features
 
