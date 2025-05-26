@@ -5,15 +5,15 @@
 </h3>
 
 <p align="center">
-<a href="https://discord.gg/kT4PhDS2gH"><img src="https://img.shields.io/discord/1227886780536324106?logo=discord&labelColor=%20%235462eb&logoColor=%20%23f5f5f5&color=%20%235462eb" alt="chat on Discord"></a>
-<a href="https://pypi.python.org/pypi/langwatch"><img src="https://img.shields.io/pypi/dm/langwatch?logo=python&logoColor=white&label=pypi%20langwatch&color=blue" alt="langwatch Python package on PyPi"></a>
-<a href="https://www.npmjs.com/package/langwatch"><img src="https://img.shields.io/npm/dm/langwatch?logo=npm&logoColor=white&label=npm%20langwatch&color=blue" alt="langwatch npm package"></a>
+<a href="https://discord.gg/kT4PhDS2gH" target="_blank"><img src="https://img.shields.io/discord/1227886780536324106?logo=discord&labelColor=%20%235462eb&logoColor=%20%23f5f5f5&color=%20%235462eb" alt="chat on Discord"></a>
+<a href="https://pypi.python.org/pypi/langwatch" target="_blank"><img src="https://img.shields.io/pypi/dm/langwatch?logo=python&logoColor=white&label=pypi%20langwatch&color=blue" alt="langwatch Python package on PyPi"></a>
+<a href="https://www.npmjs.com/package/langwatch" target="_blank"><img src="https://img.shields.io/npm/dm/langwatch?logo=npm&logoColor=white&label=npm%20langwatch&color=blue" alt="langwatch npm package"></a>
 <a href="https://twitter.com/intent/follow?screen_name=langwatchai" target="_blank">
    <img src="https://img.shields.io/twitter/follow/langwatchai?logo=X&color=%20%23f5f5f5"
       alt="follow on X(Twitter)"></a>
 </p>
 
-![LangWatch Quick Gif](assets/langwatch-quick-gif.gif)
+<img src="assets/langwatch-quick-preview.gif" alt="LangWatch Quick Gif" width="100%" style="border-radius: 8px;">
 
 ## Why LangWatch?
 
