@@ -63,6 +63,19 @@ app.post(
   }
 );
 
+app.get("/", async (c) => {
+  console.log("getting events");
+  const events = exampleEvents.filter(
+    (event) =>
+      event.type === EventType.MESSAGES_SNAPSHOT ||
+      (event.type === EventType.CUSTOM &&
+        (event as any).name === "SCENARIO_RUN_FINISHED")
+  );
+
+  // This will ensure that all event objects have messages
+  return c.json({ events });
+});
+
 class ScenarioAgent extends AbstractAgent {
   protected run(input: RunAgentInput): Observable<BaseEvent> {
     const { threadId, runId } = input;
