@@ -565,11 +565,7 @@ const fastApiOpenTelemetryRequest: DeepPartial<IExportTraceServiceRequest> = {
                 {
                   key: "http.status_code",
                   value: {
-                    intValue: {
-                      low: 404,
-                      high: 0,
-                      unsigned: false,
-                    } as any,
+                    intValue: 404,
                   },
                 },
               ],
@@ -1058,6 +1054,9 @@ describe("opentelemetry traces receiver", () => {
                 api_base: "https://api.openai.com/v1/",
               },
             },
+            llm: {
+              headers: "None",
+            },
             scope: {
               name: "opentelemetry.instrumentation.openai.v1",
               version: "0.26.4",
@@ -1137,7 +1136,7 @@ describe("opentelemetry traces receiver", () => {
             http: {
               scheme: "http",
               host: "127.0.0.1:8000",
-              flavor: 1.1,
+              flavor: "1.1",
               target: "/",
               url: "http://127.0.0.1:8000/",
               method: "POST",
@@ -1250,7 +1249,7 @@ describe("opentelemetry traces receiver", () => {
             http: {
               scheme: "http",
               host: "127.0.0.1:8000",
-              flavor: 1.1,
+              flavor: "1.1",
               target: "/",
               url: "http://127.0.0.1:8000/",
               method: "POST",
@@ -1320,7 +1319,7 @@ describe("opentelemetry traces receiver", () => {
                 input: "",
               },
               tags: [],
-              metadata: [],
+              metadata: void 0,
               kwargs: {
                 run_type: null,
                 name: "RunnableSequence",
@@ -1390,9 +1389,9 @@ describe("opentelemetry traces receiver", () => {
           span_id: "4b6bf754c099094a",
           trace_id: "e1c989b84fa7c02edc9b12005fce37d3",
           name: "Model invoke",
-          type: "agent",
+          type: "llm",
           input: {
-            type: "chat_messages",
+            type: "json",
             value: [
               {
                 role: "user",
