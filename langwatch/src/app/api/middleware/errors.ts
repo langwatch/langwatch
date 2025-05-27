@@ -39,6 +39,9 @@ export const errorMiddleware: MiddlewareHandler = async (c, next) => {
     }
 
     // Otherwise treat as server error
-    return c.json({ error: "Internal server error" }, 500);
+    return c.json(
+      { error: "Internal server error", message: error.message },
+      500
+    );
   }
 };
