@@ -181,7 +181,7 @@ const addOpenTelemetrySpanAsSpan = (
   const finished_at: Span["timestamps"]["finished_at"] | undefined =
     parseTimestamp(otelSpan.endTimeUnixNano);
   let error: Span["error"] = null;
-  const attributesMap = keyValueToObject(otelSpan.attributes);
+  const attributesMap = otelAttributesToNestedAttributes(otelSpan.attributes);
 
   // First token at
   let first_token_at: Span["timestamps"]["first_token_at"] = null;
@@ -742,7 +742,7 @@ const addOpenTelemetrySpanAsSpan = (
 
   for (const event of otelSpan?.events ?? []) {
     if (event?.name === "exception") {
-      const eventAttributes = keyValueToObject(event?.attributes);
+      const eventAttributes = otelAttributesToNestedAttributes(event?.attributes);
       error = {
         has_error: true,
         message:
@@ -901,52 +901,67 @@ type RecursiveRecord = {
   [key: string]: (RecursiveRecord & (string | {})) | undefined;
 };
 
-const keyValueToObject = (
+const isNumeric =(n: any) => !isNaN(parseFloat(n)) && isFinite(n);
+
+export function otelAttributesToNestedAttributes(
   attributes: DeepPartial<IKeyValue[]> | undefined
-): RecursiveRecord => {
-  const result: RecursiveRecord = {};
+): RecursiveRecord {
+  const resolveOtelAnyValue = (anyValuePair?: DeepPartial<IAnyValue>): any => {
+    if (!anyValuePair) return void 0;
 
-  attributes?.forEach(
-    (
-      key_value: { key?: string; value?: DeepPartial<IAnyValue> } | undefined
-    ) => {
-      if (!key_value) return;
-      const { key, value } = key_value;
+    if (anyValuePair.stringValue != null) {
+      if (isNumeric(anyValuePair.stringValue)) return anyValuePair.stringValue;
 
-      const keys = key?.split(".");
-      let current = result;
-
-      keys?.forEach((k, i) => {
-        if (i === keys.length - 1) {
-          current[k] = iAnyValueToValue(value);
-        } else {
-          if (/^\d+$/.test(keys[i + 1]!)) {
-            // Next key is a number, so this should be an array
-            current[k] = current[k] ?? ([] as any);
-          } else {
-            current[k] = current[k] ?? ({} as any);
-          }
-          current = current[k] as any;
-        }
-      });
-    }
-  );
-
-  // Convert numbered object keys to arrays
-  const convertToArrays = (obj: Record<string, any>): any => {
-    for (const key in obj) {
-      if (typeof obj[key] === "object" && obj[key] !== null) {
-        obj[key] = convertToArrays(obj[key]);
-        if (Object.keys(obj[key]).every((k) => /^\d+$/.test(k))) {
-          obj[key] = Object.values(obj[key]);
-        }
+      try {
+        return JSON.parse(anyValuePair.stringValue);
+      } catch {
+        return anyValuePair.stringValue;
       }
     }
-    return obj;
+
+    if (anyValuePair.boolValue != null) return anyValuePair.boolValue;
+    if (anyValuePair.intValue != null) return anyValuePair.intValue;
+    if (anyValuePair.doubleValue != null) return anyValuePair.doubleValue;
+    if (anyValuePair.bytesValue != null) return anyValuePair.bytesValue;
+
+    if (anyValuePair.kvlistValue)
+      return otelAttributesToNestedAttributes(anyValuePair.kvlistValue.values);
+
+    if (anyValuePair.arrayValue && anyValuePair.arrayValue.values)
+      return anyValuePair.arrayValue.values.map(resolveOtelAnyValue);
+
+    return void 0;
   };
 
-  return convertToArrays(result);
-};
+  return (attributes ?? []).reduce<RecursiveRecord>((acc, kv) => {
+    if (!kv?.key) return acc;
+
+    const path = kv.key.split(".");
+    const last = path.pop()!;
+    let cursor: any = acc;
+
+    // walk the paths, and create every segment *except* the last
+    path.forEach((seg, i) => {
+      const nextIsIndex = /^\d+$/.test(path[i + 1] ?? "");
+      const segIsIndex  = /^\d+$/.test(seg);
+      const key = segIsIndex ? Number(seg) : seg;
+
+      // prepare the container for the next segment
+      if (typeof cursor[key] !== "object" || cursor[key] === null) {
+        cursor[key] = nextIsIndex ? [] : {};
+      }
+      cursor = cursor[key];
+    });
+
+    // detect leaf type and cast key to correct type
+    const leafIsIndex = /^\d+$/.test(last);
+    const key = leafIsIndex ? Number(last) : last;
+
+    cursor[key] = resolveOtelAnyValue(kv.value);
+
+    return acc;
+  }, {});
+}
 
 const maybeConvertLongBits = (value: any): number => {
   if (value && typeof value === "object" && "high" in value && "low" in value) {
@@ -971,47 +986,6 @@ const maybeConvertLongBits = (value: any): number => {
     }
   }
   return value;
-};
-
-const iAnyValueToValue = (value: DeepPartial<IAnyValue> | undefined): any => {
-  if (typeof value === "undefined") return undefined;
-
-  if (value.stringValue) {
-    if (value.stringValue === "None") {
-      return null; // badly parsed python null by openllmetry
-    }
-    // Try to parse JSON if possible
-    try {
-      return JSON.parse(value.stringValue);
-    } catch {
-      return value.stringValue;
-    }
-  }
-  if (value.arrayValue) {
-    return value.arrayValue?.values?.map((v) => iAnyValueToValue(v));
-  }
-  if (value.boolValue) {
-    return value.boolValue;
-  }
-  if (value.intValue) {
-    return maybeConvertLongBits(value.intValue);
-  }
-  if (value.doubleValue) {
-    return maybeConvertLongBits(value.doubleValue);
-  }
-  if (value.bytesValue) {
-    return Buffer.from(value.bytesValue as Uint8Array).toString("base64");
-  }
-  if (value.kvlistValue) {
-    return Object.fromEntries(
-      value.kvlistValue?.values?.map(
-        (v: DeepPartial<IKeyValue> | undefined) => [
-          v?.key,
-          iAnyValueToValue(v?.value),
-        ]
-      ) ?? []
-    );
-  }
 };
 
 const removeEmptyKeys = (obj: Record<string, any>): Record<string, any> => {
