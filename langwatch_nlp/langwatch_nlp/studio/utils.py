@@ -60,6 +60,7 @@ def disable_dsp_caching():
     MemorizedFunc._is_in_cache_and_valid = lambda *args, **kwargs: False
     AsyncMemorizedFunc._is_in_cache_and_valid = lambda *args, **kwargs: False
     litellm.cache = None
+    dspy.configure_cache(enable_memory_cache=False, enable_disk_cache=False)
 
 
 def set_dspy_cache_dir(cache_dir: str, limit_size=1e9):  # 1 GB
