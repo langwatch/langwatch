@@ -6,10 +6,14 @@ import { useEffect, useState, useRef } from "react";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
 import { CopilotChat } from "@copilotkit/react-ui";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { TextMessage } from "@copilotkit/runtime-client-gql";
+import { TextMessage, MessageRole } from "@copilotkit/runtime-client-gql";
 import { ZoomIn, ZoomOut } from "react-feather";
 import "@copilotkit/react-ui/styles.css";
-import useSWR from "swr";
+import {
+  useFetchScenarioState,
+  useFetchScenarioRuns,
+} from "~/hooks/useScenarioSimulations";
+import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/schemas";
 
 // Main layout for the Simulation Sets page
 export default function SimulationSetsPage() {
@@ -21,17 +25,11 @@ export default function SimulationSetsPage() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Fetch all threads for the project
-  const { data: threadsData } = useSWR<{ threads: string[] }>(
-    project ? `/api/ag-ui/threads` : null,
-    async () => {
-      const res = await fetch("/api/ag-ui/threads", {
-        headers: {
-          "X-Auth-Token": project?.apiKey ?? "",
-        },
-      });
-      return res.json();
-    }
-  );
+  const { data: scenarioRunIds } = useFetchScenarioRuns({
+    refreshInterval: 1000,
+  });
+
+  console.log({ scenarioRunIds });
 
   const isExpanded = (simulationId: string | null) =>
     expandedSimulationId === simulationId;
@@ -129,24 +127,22 @@ export default function SimulationSetsPage() {
                 : {}
             }
           >
-            {threadsData?.threads.map((threadId) => (
+            {scenarioRunIds?.scenarioRunIds.map((scenarioRunId) => (
               <Box
-                key={threadId}
+                key={scenarioRunId}
                 width="full"
-                hidden={!isExpanded(null) && !isExpanded(threadId)}
+                hidden={!isExpanded(null) && !isExpanded(scenarioRunId)}
               >
                 <CopilotKit
                   headers={{
                     "X-Auth-Token": project?.apiKey ?? "",
                   }}
                   runtimeUrl="/api/copilotkit"
-                  agent="scenario-agent"
-                  threadId={threadId}
                 >
                   <CopilotKitWrapper
-                    threadId={threadId}
-                    isExpanded={isExpanded(threadId)}
-                    onExpandToggle={() => handleExpandToggle(threadId)}
+                    scenarioRunId={scenarioRunId}
+                    isExpanded={isExpanded(scenarioRunId)}
+                    onExpandToggle={() => handleExpandToggle(scenarioRunId)}
                   />
                 </CopilotKit>
               </Box>
@@ -159,17 +155,17 @@ export default function SimulationSetsPage() {
 }
 
 function CopilotKitWrapper({
-  threadId,
+  scenarioRunId,
   isExpanded,
   onExpandToggle,
 }: {
-  threadId: string;
+  scenarioRunId: string;
   isExpanded: boolean;
   onExpandToggle: () => void;
 }) {
   const { project } = useOrganizationTeamProject();
-  const [status, setStatus] = useState<"success" | "failure" | "in-progress">(
-    "in-progress"
+  const [status, setStatus] = useState<ScenarioRunStatus>(
+    ScenarioRunStatus.IN_PROGRESS
   );
 
   const { setMessages } = useCopilotChat({
@@ -179,17 +175,12 @@ function CopilotKitWrapper({
   });
 
   // Fetch scenario state for this thread
-  const { data: scenarioState } = useSWR<{ state: any }>(
-    project ? `/api/ag-ui/scenario-state/${threadId}` : null,
-    async () => {
-      const res = await fetch(`/api/ag-ui/scenario-state/${threadId}`, {
-        headers: {
-          "X-Auth-Token": project?.apiKey ?? "",
-        },
-      });
-      return res.json();
-    }
-  );
+  const { data: scenarioState } = useFetchScenarioState({
+    scenarioRunId,
+    options: {
+      refreshInterval: status === ScenarioRunStatus.IN_PROGRESS ? 1000 : 0,
+    },
+  });
 
   useEffect(() => {
     if (scenarioState?.state?.messages) {
@@ -199,13 +190,13 @@ function CopilotKitWrapper({
     }
 
     if (scenarioState?.state?.status) {
-      setStatus(scenarioState.state.status);
+      setStatus(scenarioState.state.status as ScenarioRunStatus);
     }
   }, [scenarioState]);
 
   return (
     <SimulationCard
-      title={`Simulation ${threadId}`}
+      title={`Simulation ${scenarioRunId}`}
       status={status}
       onExpandToggle={onExpandToggle}
       isExpanded={isExpanded}
