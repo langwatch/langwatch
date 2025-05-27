@@ -292,6 +292,10 @@ const addOpenTelemetrySpanAsSpan = (
   if (attributesMap.ai && attributesMap.gen_ai) {
     type = "llm";
   }
+  // infer for others otel gen_ai spec
+  if (attributesMap.gen_ai?.response?.model) {
+    type = "llm";
+  }
   if (attributesMap.operation?.name === "ai.toolCall") {
     type = "tool";
   }
@@ -673,6 +677,24 @@ const addOpenTelemetrySpanAsSpan = (
       metrics.completion_tokens = attributesMap.gen_ai.usage.completion_tokens;
       delete attributesMap.gen_ai.usage.completion_tokens;
     }
+    // Spring AI
+    if (
+      attributesMap.gen_ai.usage.input_tokens &&
+      !isNaN(Number(attributesMap.gen_ai.usage.input_tokens))
+    ) {
+      metrics.prompt_tokens = Number(attributesMap.gen_ai.usage.input_tokens);
+      delete attributesMap.gen_ai.usage.input_tokens;
+    }
+    if (
+      attributesMap.gen_ai.usage.output_tokens &&
+      !isNaN(Number(attributesMap.gen_ai.usage.output_tokens))
+    ) {
+      metrics.completion_tokens = Number(
+        attributesMap.gen_ai.usage.output_tokens
+      );
+      delete attributesMap.gen_ai.usage.output_tokens;
+      delete attributesMap.gen_ai.usage.total_tokens;
+    }
   }
 
   // Params
@@ -742,7 +764,9 @@ const addOpenTelemetrySpanAsSpan = (
 
   for (const event of otelSpan?.events ?? []) {
     if (event?.name === "exception") {
-      const eventAttributes = otelAttributesToNestedAttributes(event?.attributes);
+      const eventAttributes = otelAttributesToNestedAttributes(
+        event?.attributes
+      );
       error = {
         has_error: true,
         message:
@@ -901,7 +925,7 @@ type RecursiveRecord = {
   [key: string]: (RecursiveRecord & (string | {})) | undefined;
 };
 
-const isNumeric =(n: any) => !isNaN(parseFloat(n)) && isFinite(n);
+const isNumeric = (n: any) => !isNaN(parseFloat(n)) && isFinite(n);
 
 export function otelAttributesToNestedAttributes(
   attributes: DeepPartial<IKeyValue[]> | undefined
@@ -943,7 +967,7 @@ export function otelAttributesToNestedAttributes(
     // walk the paths, and create every segment *except* the last
     path.forEach((seg, i) => {
       const nextIsIndex = /^\d+$/.test(path[i + 1] ?? "");
-      const segIsIndex  = /^\d+$/.test(seg);
+      const segIsIndex = /^\d+$/.test(seg);
       const key = segIsIndex ? Number(seg) : seg;
 
       // prepare the container for the next segment
