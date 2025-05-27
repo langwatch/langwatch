@@ -93,3 +93,15 @@ app.get("/scenario-state/:threadId", async (c) => {
 
   return c.json({ state });
 });
+
+// Scenario runner endpoints -- consider moving to a separate route
+app.get("/scenario-thread-ids", async (c) => {
+  const { project } = c.var;
+
+  const scenarioRunnerService = new ScenarioRunnerService();
+  const state = await scenarioRunnerService.getScenarioThreadIds({
+    projectId: project.id,
+  });
+
+  return c.json({ state });
+});
