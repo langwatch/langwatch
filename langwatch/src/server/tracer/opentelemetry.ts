@@ -292,10 +292,6 @@ const addOpenTelemetrySpanAsSpan = (
   if (attributesMap.ai && attributesMap.gen_ai) {
     type = "llm";
   }
-  // infer for others otel gen_ai spec
-  if (attributesMap.gen_ai?.response?.model) {
-    type = "llm";
-  }
   if (attributesMap.operation?.name === "ai.toolCall") {
     type = "tool";
   }
@@ -307,6 +303,10 @@ const addOpenTelemetrySpanAsSpan = (
     } else {
       type = "agent";
     }
+  }
+  // infer for others otel gen_ai spec
+  if (type === "span" && attributesMap.gen_ai?.response?.model) {
+    type = "llm";
   }
 
   // Model
