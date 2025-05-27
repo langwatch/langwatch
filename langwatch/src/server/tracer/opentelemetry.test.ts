@@ -914,6 +914,51 @@ const strandsTrace: DeepPartial<IExportTraceServiceRequest> = {
   ],
 };
 
+const traceWithScalarRootAttribute: DeepPartial<IExportTraceServiceRequest> = {
+  resourceSpans: [
+    {
+      resource: { attributes: [] },
+      scopeSpans: [
+        {
+          scope: {
+            name: "langwatch.scalar.test",
+          },
+          spans: [
+            {
+              traceId: "4cmJuE+nwC7cmxIAX8430w==",
+              spanId: "S2v3VMCZCUo=",
+              kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+              startTimeUnixNano: "1723006472661658000",
+              endTimeUnixNano: "1723006473946042000",
+              attributes: [
+                {
+                  key: "bool",
+                  value: {
+                    boolValue: true,
+                  },
+                },
+                {
+                  key: "bool_override",
+                  value: {
+                    boolValue: true,
+                  },
+                },
+                {
+                  key: "bool_override.string",
+                  value: {
+                    stringValue: "string",
+                  },
+                },
+              ],
+              status: {},
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 describe("opentelemetry traces receiver", () => {
   it("receives a basic openai trace for openinference", async () => {
     const traces = openTelemetryTraceRequestToTracesForCollection(
@@ -1437,6 +1482,53 @@ describe("opentelemetry traces receiver", () => {
             },
             scope: {
               name: "opentelemetry.instrumentation.strands",
+            },
+          },
+          timestamps: {
+            started_at: 1723006472662,
+            finished_at: 1723006473946,
+          },
+        },
+      ],
+      evaluations: [],
+      reservedTraceMetadata: {},
+      customMetadata: {},
+    });
+  });
+
+  it("handles a trace with a scalar root values", async () => {
+    const traces = openTelemetryTraceRequestToTracesForCollection(traceWithScalarRootAttribute);
+
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0];
+
+    try {
+      z.array(spanSchema).parse(trace!.spans);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      console.log("trace", JSON.stringify(trace, undefined, 2));
+      console.log("validationError", validationError);
+      assert.fail(validationError.message);
+    }
+
+    expect(trace).toEqual({
+      traceId: "e1c989b84fa7c02edc9b12005fce37d3",
+      spans: [
+        {
+          input: null,
+          output: null,
+          name: void 0,
+          span_id: "4b6bf754c099094a",
+          trace_id: "e1c989b84fa7c02edc9b12005fce37d3",
+          type: "span",
+          params: {
+            bool: true,
+            bool_override: {
+              string: "string",
+            },
+            scope: {
+              name: "langwatch.scalar.test",
             },
           },
           timestamps: {
