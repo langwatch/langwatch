@@ -8,6 +8,7 @@ import {
   loggerMiddleware,
 } from "../../middleware";
 import { AGUIEventRepository } from "./ag-ui-event.repository";
+import { ScenarioRunnerService } from "./scenario-runner.service";
 
 const logger = createLogger("langwatch:api:prompts");
 
@@ -67,4 +68,28 @@ app.post("/events", async (c) => {
   });
 
   return c.json({ success: true });
+});
+
+app.get("/threads", async (c) => {
+  const { project } = c.var;
+  const repository = c.var.agUIEventRepository;
+
+  const threads = await repository.getAllThreadsForProject(project.id);
+  return c.json({ threads });
+});
+
+// Scenario runner endpoints -- consider moving to a separate route
+app.get("/scenario-state/:threadId", async (c) => {
+  const { project } = c.var;
+  const threadId = c.req.param("threadId");
+
+  const scenarioRunnerService = new ScenarioRunnerService();
+  const state = await scenarioRunnerService.getScenarioState({
+    projectId: project.id,
+    threadId,
+  });
+
+  console.log({ state, threadId });
+
+  return c.json({ state });
 });

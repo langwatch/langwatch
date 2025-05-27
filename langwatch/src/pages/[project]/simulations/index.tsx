@@ -6,11 +6,10 @@ import { useEffect, useState, useRef } from "react";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
 import { CopilotChat } from "@copilotkit/react-ui";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { Role, TextMessage } from "@copilotkit/runtime-client-gql";
+import { TextMessage } from "@copilotkit/runtime-client-gql";
 import { ZoomIn, ZoomOut } from "react-feather";
 import "@copilotkit/react-ui/styles.css";
 import useSWR from "swr";
-import type { Role } from "@ag-ui/core";
 
 // Main layout for the Simulation Sets page
 export default function SimulationSetsPage() {
@@ -20,6 +19,19 @@ export default function SimulationSetsPage() {
   >(null);
   const [scale, setScale] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Fetch all threads for the project
+  const { data: threadsData } = useSWR<{ threads: string[] }>(
+    project ? `/api/ag-ui/threads` : null,
+    async () => {
+      const res = await fetch("/api/ag-ui/threads", {
+        headers: {
+          "X-Auth-Token": project?.apiKey ?? "",
+        },
+      });
+      return res.json();
+    }
+  );
 
   const isExpanded = (simulationId: string | null) =>
     expandedSimulationId === simulationId;
@@ -117,11 +129,11 @@ export default function SimulationSetsPage() {
                 : {}
             }
           >
-            {Array.from({ length: 10 }).map((_, index) => (
+            {threadsData?.threads.map((threadId) => (
               <Box
-                key={index}
+                key={threadId}
                 width="full"
-                hidden={!isExpanded(null) && !isExpanded(index.toString())}
+                hidden={!isExpanded(null) && !isExpanded(threadId)}
               >
                 <CopilotKit
                   headers={{
@@ -129,12 +141,12 @@ export default function SimulationSetsPage() {
                   }}
                   runtimeUrl="/api/copilotkit"
                   agent="scenario-agent"
-                  threadId={`thread-${index}`}
+                  threadId={threadId}
                 >
                   <CopilotKitWrapper
-                    threadId={`thread-${index}`}
-                    isExpanded={isExpanded(index.toString())}
-                    onExpandToggle={() => handleExpandToggle(index.toString())}
+                    threadId={threadId}
+                    isExpanded={isExpanded(threadId)}
+                    onExpandToggle={() => handleExpandToggle(threadId)}
                   />
                 </CopilotKit>
               </Box>
@@ -166,59 +178,30 @@ function CopilotKitWrapper({
     },
   });
 
-  const { data } = useSWR<{
-    events: {
-      threadId: string;
-      type: string;
-      messages?: { content: string; role: string }[];
-      value?: {
-        messages?: { content: string; role: string }[];
-        status?: "success" | "failure";
-      };
-    }[];
-  }>("/api/copilotkit", async () => {
-    const res = await fetch("/api/copilotkit", {
-      method: "GET",
-      headers: {
-        "X-Auth-Token": project?.apiKey ?? "",
-      },
-    });
-    return res.json();
-  });
+  // Fetch scenario state for this thread
+  const { data: scenarioState } = useSWR<{ state: any }>(
+    project ? `/api/ag-ui/scenario-state/${threadId}` : null,
+    async () => {
+      const res = await fetch(`/api/ag-ui/scenario-state/${threadId}`, {
+        headers: {
+          "X-Auth-Token": project?.apiKey ?? "",
+        },
+      });
+      return res.json();
+    }
+  );
 
   useEffect(() => {
-    if (data) {
-      const event = data.events
-        .reverse()
-        .find((event) => event.threadId === threadId);
-
-      const messages = event?.messages ?? event?.value?.messages ?? [];
-      const status = event?.value?.status;
-
-      console.log({
-        messages,
-        data,
-        threadId,
-      });
-
-      if (status) {
-        setStatus(status ?? "in-progress");
-      }
-
-      if (messages) {
-        console.log(messages);
-        setMessages(
-          messages.map(
-            (message) =>
-              new TextMessage({
-                role: message.role as any,
-                content: message.content,
-              })
-          )
-        );
-      }
+    if (scenarioState?.state?.messages) {
+      setMessages(
+        scenarioState.state.messages.map((message) => new TextMessage(message))
+      );
     }
-  }, [data]);
+
+    if (scenarioState?.state?.status) {
+      setStatus(scenarioState.state.status);
+    }
+  }, [scenarioState]);
 
   return (
     <SimulationCard
