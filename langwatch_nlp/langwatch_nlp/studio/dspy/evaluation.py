@@ -275,6 +275,10 @@ class EvaluationReporting:
         reraise=True,
     )
     def post_results(cls, api_key: str, body: dict):
+        if not api_key:
+            print("No API key found, skipping evaluation reporting")
+            return
+
         response = httpx.post(
             f"{langwatch.endpoint}/api/evaluations/batch/log_results",
             headers={

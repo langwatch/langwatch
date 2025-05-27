@@ -28,7 +28,7 @@ class LangWatchWorkflowModule(ReportingModule):
     def forward(self, *args, **kwargs):
         raise NotImplementedError("This method should be implemented by the subclass")
 
-    def wrapped(self, module: T, node_id: str, run: bool = True) -> T:
+    def wrapped(self, module: type[T], node_id: str, run: bool = True) -> type[T]:
         # If already patched, unpatch everything
         if hasattr(module, "__forward_before_autoparsing__"):
             module.forward = module.__forward_before_autoparsing__  # type: ignore

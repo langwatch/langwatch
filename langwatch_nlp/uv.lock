@@ -1583,7 +1583,7 @@ requires-dist = [
     { name = "langchain-openai", marker = "extra == 'dev'", specifier = ">=0.2.2,<0.3.0" },
     { name = "langchain-text-splitters", marker = "extra == 'dev'", specifier = ">=0.3.0,<0.4.0" },
     { name = "langgraph", marker = "extra == 'dev'", specifier = ">=0.2.35,<0.3.0" },
-    { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.40.15,<2.0.0" },
+    { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.68.1,<2.0.0" },
     { name = "nanoid", specifier = ">=2.0.0,<3.0.0" },
     { name = "numexpr", marker = "extra == 'test'", specifier = ">=2.8.7,<3.0.0" },
     { name = "openai", marker = "extra == 'openai'", specifier = ">=1.42.0,<2.0.0" },

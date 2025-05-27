@@ -36,7 +36,7 @@ class ReportingModule(dspy.Module):
     def forward(self, *args, **kwargs):
         raise NotImplementedError("This method should be implemented by the subclass")
 
-    def with_reporting(self, module: T, node_id: str) -> T:
+    def with_reporting(self, module: type[T], node_id: str) -> type[T]:
         # If already patched, repatch so new config can be picked up
         if hasattr(module, "__forward_before_reporting__"):
             module.forward = module.__forward_before_reporting__  # type: ignore
