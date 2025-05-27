@@ -190,6 +190,35 @@ export class AGUIEventRepository {
     return response.hits.hits[0]?._source as CustomEvent;
   }
 
+  async getCustomEventsByName({
+    projectId,
+    name,
+  }: {
+    projectId: string;
+    name: string;
+  }): Promise<CustomEvent & { threadId: string }[]> {
+    const client = await esClient({ test: true });
+
+    const response = await client.search({
+      index: this.indexName,
+      body: {
+        query: {
+          bool: {
+            must: [
+              { term: { projectId } },
+              //   { term: { threadId } },  << must exist maybe?
+              { term: { type: EventType.CUSTOM } },
+              { term: { name } },
+            ],
+          },
+        },
+        sort: [{ timestamp: "desc" }],
+      },
+    });
+
+    return response.hits.hits.map((hit) => hit._source);
+  }
+
   async getAllThreadsForProject(projectId: string): Promise<string[]> {
     const client = await esClient({ test: true });
 
