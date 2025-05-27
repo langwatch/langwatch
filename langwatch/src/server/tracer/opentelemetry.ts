@@ -901,7 +901,7 @@ type RecursiveRecord = {
   [key: string]: (RecursiveRecord & (string | {})) | undefined;
 };
 
-const isNumeric =(n: any) => !isNaN(parseFloat(n)) && isFinite(n);
+const isNumeric = (n: any) => !isNaN(parseFloat(n)) && Number.isFinite(parseFloat(n));
 
 export function otelAttributesToNestedAttributes(
   attributes: DeepPartial<IKeyValue[]> | undefined
@@ -927,7 +927,7 @@ export function otelAttributesToNestedAttributes(
     if (anyValuePair.kvlistValue)
       return otelAttributesToNestedAttributes(anyValuePair.kvlistValue.values);
 
-    if (anyValuePair.arrayValue && anyValuePair.arrayValue.values)
+    if (anyValuePair?.arrayValue?.values)
       return anyValuePair.arrayValue.values.map(resolveOtelAnyValue);
 
     return void 0;
