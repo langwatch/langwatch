@@ -1,6 +1,7 @@
 import { Card } from "@chakra-ui/react";
 import { Badge, Box, HStack, VStack, Text } from "@chakra-ui/react";
 import { Maximize, Minimize } from "react-feather";
+import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/schemas";
 
 // Card props: title, status, messages
 export interface SimulationCardMessage {
@@ -10,7 +11,7 @@ export interface SimulationCardMessage {
 
 export interface SimulationCardProps {
   title: string;
-  status: "success" | "failure" | "in-progress";
+  status: ScenarioRunStatus;
   children: React.ReactNode;
   onExpandToggle: () => void;
   isExpanded: boolean;
@@ -25,9 +26,12 @@ export function SimulationCard({
 }: SimulationCardProps) {
   // Status badge color
   const statusColor = {
-    success: "green",
-    "in-progress": "yellow",
-    failure: "red",
+    [ScenarioRunStatus.SUCCESS]: "green",
+    [ScenarioRunStatus.IN_PROGRESS]: "yellow",
+    [ScenarioRunStatus.ERROR]: "red",
+    [ScenarioRunStatus.CANCELLED]: "gray",
+    [ScenarioRunStatus.PENDING]: "gray",
+    [ScenarioRunStatus.FAILED]: "red",
   }[status];
 
   return (
@@ -37,8 +41,7 @@ export function SimulationCard({
           <VStack align="start" gap="0">
             <Text fontWeight="bold">{title}</Text>
             <Badge colorPalette={statusColor} size="sm" mt="1">
-              {status.charAt(0).toUpperCase() +
-                status.slice(1).replace("-", " ")}
+              {status}
             </Badge>
           </VStack>
           <Box
