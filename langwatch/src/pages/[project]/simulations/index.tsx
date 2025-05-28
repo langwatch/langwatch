@@ -14,6 +14,7 @@ import {
   useFetchScenarioRuns,
 } from "~/hooks/useScenarioSimulations";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/schemas";
+import "./simulations.css";
 
 // Main layout for the Simulation Sets page
 export default function SimulationSetsPage() {
@@ -191,14 +192,6 @@ function CopilotKitWrapper({
 
     if (scenarioState?.state?.status) {
       setStatus(scenarioState.state.status as ScenarioRunStatus);
-    }
-
-    const messagesContainer = document.querySelector(".copilotKitMessages");
-
-    if (messagesContainer) {
-      console.log("scrolling to bottom", messagesContainer);
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      (messagesContainer as HTMLElement).style.height = "150px";
     }
   }, [scenarioState]);
 
