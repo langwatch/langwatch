@@ -5,7 +5,7 @@ import { PHASE_PRODUCTION_BUILD } from "next/constants";
 
 const logger = createLogger("langwatch:redis");
 
-const isBuild =
+export const isBuildOrNoRedis =
   process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD ||
   !!process.env.BUILD_TIME ||
   (!env.REDIS_URL && !env.REDIS_CLUSTER_ENDPOINTS);
@@ -21,7 +21,7 @@ function parseClusterEndpoints(endpointsStr: string) {
 
 export let connection: IORedis | Cluster | undefined;
 
-if (!isBuild) {
+if (!isBuildOrNoRedis) {
   if (useCluster) {
     const clusterEndpoints = parseClusterEndpoints(
       env.REDIS_CLUSTER_ENDPOINTS ?? ""

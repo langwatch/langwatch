@@ -10,6 +10,7 @@ import {
 import * as Sentry from "@sentry/nextjs";
 import NodeFetchCache, { FileSystemCache } from "node-fetch-cache";
 import { createLogger } from "../../../../utils/logger";
+import { isBuildOrNoRedis } from "../../../redis";
 
 const logger = createLogger("langwatch:workers:collector:cost");
 
@@ -61,6 +62,7 @@ const initTikToken = async (
   }
 
   if (!cachedModel[tokenizer]) {
+    logger.info(`loading tiktoken model ${tokenizer}`);
     loadingModel.add(tokenizer);
     const registryInfo = (registry as any)[tokenizer];
     const fetch = NodeFetchCache.create({
@@ -173,3 +175,7 @@ export const prewarmTiktokenModels = async () => {
   await initTikToken("gpt-4");
   await initTikToken("gpt-4o");
 };
+
+if (isBuildOrNoRedis) {
+  prewarmTiktokenModels();
+}
