@@ -6,12 +6,17 @@ import { useEffect, useState, useRef } from "react";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
 import { CopilotChat } from "@copilotkit/react-ui";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { TextMessage, MessageRole } from "@copilotkit/runtime-client-gql";
+import {
+  TextMessage,
+  MessageRole,
+  Role,
+  Message,
+} from "@copilotkit/runtime-client-gql";
 import { ZoomIn, ZoomOut } from "react-feather";
 import "@copilotkit/react-ui/styles.css";
 import {
   useFetchScenarioState,
-  useFetchScenarioRuns,
+  useFetchScenarioRunIds,
 } from "~/hooks/useScenarioSimulations";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/schemas";
 import "./simulations.css";
@@ -26,11 +31,9 @@ export default function SimulationSetsPage() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Fetch all threads for the project
-  const { data: scenarioRunIds } = useFetchScenarioRuns({
+  const { data: scenarioRunIds } = useFetchScenarioRunIds({
     refreshInterval: 1000,
   });
-
-  console.log({ scenarioRunIds });
 
   const isExpanded = (simulationId: string | null) =>
     expandedSimulationId === simulationId;
@@ -128,7 +131,7 @@ export default function SimulationSetsPage() {
                 : {}
             }
           >
-            {scenarioRunIds?.scenarioRunIds.map((scenarioRunId) => (
+            {scenarioRunIds?.map((scenarioRunId) => (
               <Box
                 key={scenarioRunId}
                 width="full"
@@ -184,14 +187,28 @@ function CopilotKitWrapper({
   });
 
   useEffect(() => {
-    if (scenarioState?.state?.messages) {
+    if (scenarioState?.messages) {
       setMessages(
-        scenarioState.state.messages.map((message) => new TextMessage(message))
+        scenarioState.messages
+          .map((message) => {
+            if (
+              [Role.User, Role.Assistant].includes(message.role as MessageRole)
+            ) {
+              return new TextMessage({
+                id: message.id,
+                role: message.role as MessageRole,
+                content: message.content ?? "",
+              });
+            }
+
+            return null;
+          })
+          .filter(Boolean) as Message[]
       );
     }
 
-    if (scenarioState?.state?.status) {
-      setStatus(scenarioState.state.status as ScenarioRunStatus);
+    if (scenarioState?.status) {
+      setStatus(scenarioState.status as ScenarioRunStatus);
     }
   }, [scenarioState]);
 
