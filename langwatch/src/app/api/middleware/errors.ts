@@ -1,7 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 import { createLogger } from "~/utils/logger";
 
-const logger = createLogger("langwatch:api:prompts");
+const logger = createLogger("langwatch:api:errors");
 
 /**
  * Error handling middleware that catches errors and formats responses

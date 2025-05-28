@@ -6,6 +6,7 @@ import {
   loggerMiddleware,
 } from "../../middleware";
 import { ScenarioRunnerService } from "./scenario-event.service";
+import { ScenarioEventType } from "./schemas";
 
 // Define types for our Hono context variables
 type Variables = {
@@ -51,7 +52,7 @@ app.get("/scenario-run/:scenarioRunId", async (c) => {
 });
 
 // Get all scenario run IDs for a project
-app.get("/scenario-runs", async (c) => {
+app.get("/run-ids", async (c) => {
   const { project } = c.var;
 
   const scenarioRunnerService = new ScenarioRunnerService();
@@ -60,4 +61,32 @@ app.get("/scenario-runs", async (c) => {
   });
 
   return c.json({ scenarioRunIds });
+});
+
+// Get all scenario run IDs for a project
+app.get("/", async (c) => {
+  const { project } = c.var;
+
+  const scenarioRunnerService = new ScenarioRunnerService();
+  const events = await scenarioRunnerService.getAllRunEventsForProject({
+    projectId: project.id,
+  });
+
+  return c.json({
+    events: events.filter(
+      (event) => event.type === ScenarioEventType.RUN_FINISHED
+    ),
+  });
+});
+
+// Delete all events for a project
+app.post("/delete-all", async (c) => {
+  const { project } = c.var;
+
+  const scenarioRunnerService = new ScenarioRunnerService();
+  await scenarioRunnerService.deleteAllEventsForProject({
+    projectId: project.id,
+  });
+
+  return c.json({ success: true });
 });
