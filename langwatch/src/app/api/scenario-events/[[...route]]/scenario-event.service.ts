@@ -45,8 +45,6 @@ export class ScenarioRunnerService {
         scenarioRunId,
       });
 
-    console.log({ latestMessageEvent, latestRunFinishedEvent });
-
     return {
       messages: latestMessageEvent?.messages || [],
       status: latestRunFinishedEvent?.status || ScenarioRunStatus.IN_PROGRESS,
