@@ -45,7 +45,7 @@ function ChatContent() {
   }
 
   if (!publishedWorkflow.data) {
-    return <Box p={8}>Workflow não encontrado.</Box>;
+    return <Box p={8}>Workflow not found.</Box>;
   }
 
   return (
