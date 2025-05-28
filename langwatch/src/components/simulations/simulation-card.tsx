@@ -60,7 +60,7 @@ export function SimulationCard({
           align="stretch"
           gap="2"
           overflowY="scroll"
-          height={isExpanded ? "auto" : "150px"}
+          // height={isExpanded ? "auto" : "150px"}
         >
           {children}
         </VStack>
