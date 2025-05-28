@@ -107,3 +107,23 @@ export type ScenarioMessageSnapshotEvent = z.infer<
   typeof scenarioMessageSnapshotSchema
 >;
 export type ScenarioEvent = z.infer<typeof scenarioEventSchema>;
+
+// Define response schemas
+const successSchema = z.object({ success: z.boolean() });
+const errorSchema = z.object({ error: z.string() });
+const stateSchema = z.object({
+  state: z.object({
+    messages: z.array(z.any()),
+    status: z.string(),
+  }),
+});
+const runsSchema = z.object({ runs: z.array(z.string()) });
+const eventsSchema = z.object({ events: z.array(scenarioEventSchema) });
+
+export const responseSchemas = {
+  success: successSchema,
+  error: errorSchema,
+  state: stateSchema,
+  runs: runsSchema,
+  events: eventsSchema,
+};

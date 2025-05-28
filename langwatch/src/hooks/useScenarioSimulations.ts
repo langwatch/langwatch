@@ -1,32 +1,55 @@
 import useSWR from "swr";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { MessageRole } from "@copilotkit/runtime-client-gql";
+import { hc } from "hono/client";
+import type {
+  GetScenarioRunIdsRouteType,
+  GetScenarioRunStateRouteType,
+} from "~/app/api/scenario-events/[[...route]]/app";
 
-const endpoints = {
-  runIds: "/api/scenario-events/run-ids",
-  scenarioRun: "/api/scenario-events/scenario-run",
-  allRunEvents: "/api/scenario-events",
-};
-
-export const useFetchScenarioRuns = (options?: {
+const getScenarioRunIds =
+  hc<GetScenarioRunIdsRouteType>("/").api["scenario-events"]["scenario-runs"][
+    "ids"
+  ].$get;
+/**
+ * Fetch all scenario runs for a project
+ * @param options - Options for the SWR hook
+ * @returns Scenario run IDs
+ */
+export const useFetchScenarioRunIds = (options?: {
   refreshInterval?: number;
   revalidateOnFocus?: boolean;
 }) => {
   const { project } = useOrganizationTeamProject();
-  return useSWR<{ scenarioRunIds: string[] }>(
-    project ? endpoints.runIds : null,
+  const cacheKey = project ? "scenario-events/scenario-runs/ids" : null;
+
+  return useSWR(
+    cacheKey,
     async () => {
-      const res = await fetch(endpoints.runIds, {
-        headers: {
-          "X-Auth-Token": project?.apiKey ?? "",
-        },
-      });
-      return await res.json();
+      const res = await getScenarioRunIds(
+        {},
+        {
+          headers: {
+            "X-Auth-Token": project?.apiKey ?? "",
+          },
+        }
+      );
+      const response = await res.json();
+      return response.ids;
     },
     options
   );
 };
 
+const getScenarioRunState =
+  hc<GetScenarioRunStateRouteType>("/").api["scenario-events"]["scenario-runs"][
+    "state"
+  ][":id"].$get;
+/**
+ * Fetch the state of a scenario run
+ * @param scenarioRunId - The ID of the scenario run
+ * @param options - Options for the SWR hook
+ * @returns Scenario run state
+ */
 export const useFetchScenarioState = ({
   scenarioRunId,
   options,
@@ -38,25 +61,37 @@ export const useFetchScenarioState = ({
   };
 }) => {
   const { project } = useOrganizationTeamProject();
-  const endpoint = `${endpoints.scenarioRun}/${scenarioRunId}`;
-  return useSWR<{
-    state: {
-      messages: { role: MessageRole; content: string }[];
-      status: "success" | "failure" | "in-progress";
-    };
-  }>(
-    project ? endpoint : null,
+  const cacheKey = project
+    ? `scenario-events/scenario-runs/state/${scenarioRunId}`
+    : null;
+
+  return useSWR(
+    cacheKey,
     async () => {
-      const res = await fetch(endpoint, {
-        headers: {
-          "X-Auth-Token": project?.apiKey ?? "",
+      const res = await getScenarioRunState(
+        {
+          param: {
+            id: scenarioRunId,
+          },
         },
-      });
-      return res.json();
+        {
+          headers: {
+            "X-Auth-Token": project?.apiKey ?? "",
+          },
+        }
+      );
+
+      const response = await res.json();
+
+      if ("error" in response) {
+        throw new Error(response.error);
+      }
+
+      return response.state;
     },
     {
-      refreshInterval: 1000, // Poll every second
-      revalidateOnFocus: true, // Revalidate when window regains focus
+      refreshInterval: 1000,
+      revalidateOnFocus: true,
       ...options,
     }
   );
