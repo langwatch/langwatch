@@ -18,6 +18,7 @@ global:
   monitoring:
     enabled: false
     prometheusAnnotations: true
+  annotations: {}  # Global annotations to apply to all deployments/statefulsets
 
 # Image configurations
 images:
@@ -49,6 +50,7 @@ images:
 # Service configurations
 app:
   replicaCount: 1
+  annotations: {}  # Custom annotations for the deployment
   service:
     type: ClusterIP
     port: 5560
@@ -77,6 +79,7 @@ app:
 
 langwatch_nlp:
   replicaCount: 1
+  annotations: {}  # Custom annotations for the deployment
   service:
     type: ClusterIP
     port: 5561
@@ -94,6 +97,7 @@ langwatch_nlp:
 
 langevals:
   replicaCount: 1
+  annotations: {}  # Custom annotations for the deployment
   service:
     type: ClusterIP
     port: 5562
@@ -106,6 +110,7 @@ langevals:
       memory: 6144Mi
 
 postgres:
+  annotations: {}  # Custom annotations for the deployment
   service:
     type: ClusterIP
     port: 5432
@@ -126,6 +131,7 @@ postgres:
     storageClass: ""
 
 redis:
+  annotations: {}  # Custom annotations for the deployment
   service:
     type: ClusterIP
     port: 6379
@@ -142,6 +148,7 @@ redis:
     storageClass: ""
 
 opensearch:
+  annotations: {}  # Custom annotations for the deployment
   service:
     type: ClusterIP
     ports:
@@ -188,7 +195,13 @@ ingress:
   annotations: {}
   hosts:
     - host: chart-example.local
-      paths:
-        - path: /
-          pathType: ImplementationSpecific
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: "{{ .Release.Name }}-app"
+                port:
+                  number: 5560
   tls: []

@@ -22,6 +22,17 @@ spec:
       labels:
         app.kubernetes.io/name: {{ .Release.Name }}-app
         app.kubernetes.io/instance: {{ .Release.Name }}
+      annotations:
+        {{- if .Values.global.monitoring.enabled }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.app.service.port }}"
+        {{- end }}
+        {{- with .Values.global.annotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.app.annotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       # Pod security context
       securityContext:
