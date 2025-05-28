@@ -8,7 +8,7 @@ import { createLogger } from "../../../utils/logger";
 
 const logger = createLogger("langwatch:usageStatsQueue");
 
-export const USAGE_STATS_QUEUE_NAME = "usage_stats";
+export const USAGE_STATS_QUEUE_NAME = "{usage_stats}";
 
 export const usageStatsQueue = new QueueWithFallback<
   UsageStatsJob,
