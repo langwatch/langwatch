@@ -78,7 +78,7 @@ app.get("/", async (c) => {
 });
 
 // Delete all events for a project
-app.post("/delete-all", async (c) => {
+app.delete("/", async (c) => {
   const { project } = c.var;
 
   const scenarioRunnerService = new ScenarioRunnerService();
