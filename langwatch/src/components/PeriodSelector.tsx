@@ -112,6 +112,7 @@ export function PeriodSelector({
   const daysDifference = getDaysDifference(startDate, endDate);
 
   const quickSelectors = [
+    { label: "Today", days: 1 },
     { label: "Last 7 days", days: 7 },
     { label: "Last 15 days", days: 15 },
     { label: "Last 30 days", days: 30 },
