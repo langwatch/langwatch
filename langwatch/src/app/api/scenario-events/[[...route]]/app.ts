@@ -6,7 +6,6 @@ import {
   loggerMiddleware,
 } from "../../middleware";
 import { ScenarioRunnerService } from "./scenario-event.service";
-import { ScenarioEventType } from "./schemas";
 
 // Define types for our Hono context variables
 type Variables = {
@@ -38,6 +37,9 @@ app.post("/", async (c) => {
 });
 
 // Get scenario run state
+// Consider setting up an SSE endpoint for this
+// that polls ES and pushes, and then if a post for a new event comes in,
+// we can 'reactively' push the new event to the client
 app.get("/scenario-run/:scenarioRunId", async (c) => {
   const { project } = c.var;
   const scenarioRunId = c.req.param("scenarioRunId");
@@ -72,11 +74,7 @@ app.get("/", async (c) => {
     projectId: project.id,
   });
 
-  return c.json({
-    events: events.filter(
-      (event) => event.type === ScenarioEventType.RUN_FINISHED
-    ),
-  });
+  return c.json({ events });
 });
 
 // Delete all events for a project
