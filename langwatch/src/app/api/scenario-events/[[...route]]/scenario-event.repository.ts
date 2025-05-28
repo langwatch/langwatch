@@ -157,4 +157,40 @@ export class ScenarioEventRepository {
       )?.buckets?.map((bucket) => bucket.key) ?? []
     );
   }
+
+  async getAllRunEventsForProject({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<ScenarioEvent[]> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+
+    const client = await esClient({ test: true });
+
+    const response = await client.search({
+      index: this.indexName,
+      body: {
+        query: {
+          term: { projectId: validatedProjectId },
+        },
+        sort: [{ timestamp: "desc" }],
+        size: 1000,
+      },
+    });
+
+    return response.hits.hits.map((hit) => hit._source as ScenarioEvent);
+  }
+  async deleteAllEvents({ projectId }: { projectId: string }): Promise<void> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const client = await esClient({ test: true });
+
+    await client.deleteByQuery({
+      index: this.indexName,
+      body: {
+        query: {
+          term: { projectId: validatedProjectId },
+        },
+      },
+    });
+  }
 }
