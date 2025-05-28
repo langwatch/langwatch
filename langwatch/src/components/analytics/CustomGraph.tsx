@@ -311,8 +311,36 @@ const CustomGraph_ = React.memo(
     const getColor = useGetRotatingColorForCharts();
     const gray400 = useColorRawValue("gray.400");
 
-    const formatDate = (date: string) =>
-      date && format(new Date(date), "MMM d");
+    const formatDate = (date: string) => {
+      if (!date) return "";
+
+      // If timeScale is in minutes (10, 30, or 60), show hours
+      const timeScale =
+        typeof input.timeScale === "string"
+          ? parseInt(input.timeScale, 10)
+          : input.timeScale;
+      if ([10, 30, 60].includes(timeScale)) {
+        // Check if we have start and end dates to determine if we need to show the date
+        const startDate = filterParams.startDate || input.startDate;
+        const endDate = filterParams.endDate || input.endDate;
+
+        if (startDate && endDate) {
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          const daysDiff = Math.ceil(
+            (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
+          );
+
+          // If more than one day difference, include the date
+          if (daysDiff > 1) {
+            return format(new Date(date), "MMM d HH:mm");
+          }
+        }
+        return format(new Date(date), "HH:mm");
+      }
+
+      return format(new Date(date), "MMM d");
+    };
     const tooltipValueFormatter = (
       value: number | string,
       _: string,
@@ -975,7 +1003,12 @@ function MonitorGraph({
       >
         <HStack>
           {input.monitorGraph?.isGuardrail && (
-            <Badge colorPalette="blue" variant="solid" size="sm" marginTop="-3px">
+            <Badge
+              colorPalette="blue"
+              variant="solid"
+              size="sm"
+              marginTop="-3px"
+            >
               <LuShield size={16} />
               Guardrail
             </Badge>
