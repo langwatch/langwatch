@@ -167,55 +167,51 @@ export const timeseries = async (input: TimeseriesInputType) => {
     startDate: previousPeriodStartDate.getTime(),
   });
 
+  const tracesPerDayAggs = {
+    date_histogram: {
+      field: "timestamps.started_at",
+      fixed_interval: adjustedTimeScale ? `${adjustedTimeScale}m` : "1d",
+      min_doc_count: 0,
+    },
+    aggs,
+  };
+
   const queryBody: SearchRequest["body"] = {
     size: 0,
     query: pivotIndexConditions,
-    aggs:
-      input.timeScale === "full"
-        ? {
-            previous_vs_current: {
-              range: {
-                field: "timestamps.started_at",
-                ranges: [
-                  {
-                    key: "previous",
-                    from: env.IS_QUICKWIT
-                      ? previousPeriodStartDate.getTime() * 1000 * 1000
-                      : previousPeriodStartDate.toISOString(),
-                    to: env.IS_QUICKWIT
-                      ? startDate.getTime() * 1000 * 1000
-                      : startDate.toISOString(),
-                  },
-                  {
-                    key: "current",
-                    from: env.IS_QUICKWIT
-                      ? startDate.getTime() * 1000 * 1000
-                      : startDate.toISOString(),
-                    to: env.IS_QUICKWIT
-                      ? endDate.getTime() * 1000 * 1000
-                      : endDate.toISOString(),
-                  },
-                ],
-              },
-              aggs,
+    aggs: {
+      previous_vs_current: {
+        range: {
+          field: "timestamps.started_at",
+          ranges: [
+            {
+              key: "previous",
+              from: env.IS_QUICKWIT
+                ? previousPeriodStartDate.getTime() * 1000 * 1000
+                : previousPeriodStartDate.toISOString(),
+              to: env.IS_QUICKWIT
+                ? startDate.getTime() * 1000 * 1000
+                : startDate.toISOString(),
             },
-          }
-        : ({
-            traces_per_day: {
-              date_histogram: {
-                field: "timestamps.started_at",
-                fixed_interval: adjustedTimeScale
-                  ? `${adjustedTimeScale}m`
-                  : "1d",
-                min_doc_count: 0,
-                extended_bounds: {
-                  min: previousPeriodStartDate.getTime(),
-                  max: endDate.getTime(),
-                },
-              },
-              aggs,
+            {
+              key: "current",
+              from: env.IS_QUICKWIT
+                ? startDate.getTime() * 1000 * 1000
+                : startDate.toISOString(),
+              to: env.IS_QUICKWIT
+                ? endDate.getTime() * 1000 * 1000
+                : endDate.toISOString(),
             },
-          } as any),
+          ],
+        },
+        aggs:
+          input.timeScale === "full"
+            ? aggs
+            : {
+                traces_per_day: tracesPerDayAggs,
+              },
+      },
+    } as any,
   };
 
   const client = await esClient({ projectId: input.projectId });
@@ -303,12 +299,18 @@ export const timeseries = async (input: TimeseriesInputType) => {
     };
   }
 
-  const aggregations = parseAggregations(
-    result.aggregations.traces_per_day.buckets
+  const currentPeriod = parseAggregations(
+    result.aggregations.previous_vs_current.buckets.find(
+      (bucket: any) => bucket.key === "current"
+    ).traces_per_day.buckets
   );
-  const toSlice = Math.ceil(daysDifference / timeScaleInDays);
-  let previousPeriod = aggregations.slice(0, toSlice);
-  const currentPeriod = aggregations.slice(toSlice);
+
+  let previousPeriod = parseAggregations(
+    result.aggregations.previous_vs_current.buckets.find(
+      (bucket: any) => bucket.key === "previous"
+    ).traces_per_day.buckets
+  );
+  // Correction for when a single day is selected and we end up querying for 2 days for previous period and dates don't align
   previousPeriod = previousPeriod.slice(
     Math.max(0, previousPeriod.length - currentPeriod.length)
   );
