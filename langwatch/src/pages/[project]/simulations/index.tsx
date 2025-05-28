@@ -192,6 +192,14 @@ function CopilotKitWrapper({
     if (scenarioState?.state?.status) {
       setStatus(scenarioState.state.status as ScenarioRunStatus);
     }
+
+    const messagesContainer = document.querySelector(".copilotKitMessages");
+
+    if (messagesContainer) {
+      console.log("scrolling to bottom", messagesContainer);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      (messagesContainer as HTMLElement).style.height = "150px";
+    }
   }, [scenarioState]);
 
   return (
