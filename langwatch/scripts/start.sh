@@ -10,8 +10,10 @@ fi
 START_APP_COMMAND="npm run start:app"
 
 START_WORKERS_COMMAND=""
-# if REDIS_URL is availble on .env or set in the environment, start the workers
-if grep -q "^REDIS_URL=\"[a-z]" .env || [ -n "$REDIS_URL" ]; then
+# if REDIS_URL or REDIS_CLUSTER_ENDPOINTS is available on .env or set in the environment, start the workers
+if grep -Eq "^(REDIS_URL|REDIS_CLUSTER_ENDPOINTS)=\"?[[:alnum:]]" .env \
+   || [ -n "$REDIS_URL" ] \
+   || [ -n "$REDIS_CLUSTER_ENDPOINTS" ]; then
   START_WORKERS_COMMAND="npm run start:workers && exit 1"
 fi
 

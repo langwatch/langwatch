@@ -31,13 +31,15 @@ if (!isBuild) {
         maxRetriesPerRequest: null,
         offlineQueue: false,
       },
+      dnsLookup: (address, callback) => callback(null, address),
+      scaleReads: 'all'
     });
 
-    // Cluster events
-    connection.on("cluster:connect", () => {
+    connection.on("connect", async () => {
       logger.info("cluster connected");
     });
-    connection.on("cluster:ready", () => {
+
+    connection.on("ready", () => {
       logger.info("cluster is ready to accept commands");
     });
   } else {
@@ -49,7 +51,6 @@ if (!isBuild) {
         : (env.REDIS_URL?.includes("rediss://") as any),
     });
 
-    // Single-node events
     connection.on("connect", () => {
       logger.info("connected");
     });
