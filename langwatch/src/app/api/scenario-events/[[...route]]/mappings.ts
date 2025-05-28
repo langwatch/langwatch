@@ -6,12 +6,13 @@
 import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
 
 // Base event mapping (common to all events)
-const baseEventMapping = {
+const baseScenarioEventMapping = {
   type: { type: "keyword" },
   timestamp: { type: "date" },
   projectId: { type: "keyword" },
   scenarioId: { type: "keyword" },
   scenarioRunId: { type: "keyword" },
+  batchRunId: { type: "keyword" },
 };
 
 // Scenario Run Started Event mapping
@@ -39,7 +40,7 @@ const messageSnapshotMapping = {
 // Combine all mappings
 export const eventMapping = {
   properties: {
-    ...baseEventMapping,
+    ...baseScenarioEventMapping,
     ...runStartedMapping,
     ...runFinishedMapping,
     ...messageSnapshotMapping,
