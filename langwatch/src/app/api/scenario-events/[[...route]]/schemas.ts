@@ -28,6 +28,21 @@ const baseEventSchema = z.object({
   rawEvent: z.any().optional(),
 });
 
+/**
+ * This is the process run id schema
+ */
+const batchRunIdSchema = z.string().refine(
+  (val) => {
+    const uuid = val.replace("batch-run-", "");
+    return (
+      val.startsWith("batch-run-") && z.string().uuid().safeParse(uuid).success
+    );
+  },
+  {
+    message: "ID must start with 'batch-run-' followed by a valid UUID",
+  }
+);
+
 const scenarioRunIdSchema = z.string().refine(
   (val) => {
     const uuid = val.replace("scenario-run-", "");
@@ -54,6 +69,7 @@ const scenarioIdSchema = z
 
 // Base scenario event schema with common fields
 const baseScenarioEventSchema = baseEventSchema.extend({
+  batchRunId: batchRunIdSchema,
   scenarioId: scenarioIdSchema,
   scenarioRunId: scenarioRunIdSchema,
 });
