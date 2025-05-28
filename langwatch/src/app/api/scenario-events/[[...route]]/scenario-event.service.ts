@@ -62,4 +62,20 @@ export class ScenarioRunnerService {
       projectId,
     });
   }
+
+  async getAllRunEventsForProject({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<ScenarioEvent[]> {
+    return await this.eventRepository.getAllRunEventsForProject({
+      projectId,
+    });
+  }
+
+  async deleteAllEventsForProject({ projectId }: { projectId: string }) {
+    return await this.eventRepository.deleteAllEvents({
+      projectId,
+    });
+  }
 }
