@@ -1,3 +1,10 @@
+/**
+ * CopilotKit runtime endpoint
+ * @see https://docs.copilotkit.ai/quickstart?copilot-hosting=self-hosted
+ * @description This is the endpoint required to create the context for the Copilokit
+ * frontend. However, it's not currently doing anything, as we have disabled the input
+ * feature of the frontend and we are setting the messages there directly.
+ */
 import type { Project } from "@prisma/client";
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
@@ -13,12 +20,8 @@ import {
   copilotRuntimeNodeHttpEndpoint,
   ExperimentalEmptyAdapter,
 } from "@copilotkit/runtime";
-import type { BaseEvent } from "@ag-ui/core";
-import { AbstractAgent, EventType, type RunAgentInput } from "@ag-ui/client";
-import { from, Observable } from "rxjs";
-import { exampleEvents } from "./example-events";
 
-const logger = createLogger("langwatch:api:prompts");
+const logger = createLogger("langwatch:api:copilotkit");
 
 // Define types for our Hono context variables
 type Variables = {
@@ -44,12 +47,7 @@ app.post(
   }),
   async (c) => {
     const project = c.get("project");
-    console.log("request received");
-    const runtime = new CopilotRuntime({
-      agents: {
-        "scenario-agent": new ScenarioAgent(),
-      },
-    });
+    const runtime = new CopilotRuntime();
 
     const handler = copilotRuntimeNodeHttpEndpoint({
       runtime,
@@ -62,36 +60,3 @@ app.post(
     return handler(c.req.raw);
   }
 );
-
-app.get("/", async (c) => {
-  console.log("getting events");
-  const events = exampleEvents.filter(
-    (event) =>
-      event.type === EventType.MESSAGES_SNAPSHOT ||
-      (event.type === EventType.CUSTOM &&
-        (event as any).name === "SCENARIO_RUN_FINISHED")
-  );
-
-  // This will ensure that all event objects have messages
-  return c.json({ events });
-});
-
-class ScenarioAgent extends AbstractAgent {
-  protected run(input: RunAgentInput): Observable<BaseEvent> {
-    const { threadId, runId } = input;
-    console.log("running scenario agent", threadId, runId);
-
-    const events =
-      exampleEvents.filter((event) => event.threadId === threadId) ?? [];
-
-    console.log(events);
-
-    return from(
-      events.map((event) => ({
-        ...event,
-        threadId,
-        runId,
-      }))
-    );
-  }
-}
