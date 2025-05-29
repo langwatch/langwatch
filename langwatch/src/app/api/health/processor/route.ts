@@ -1,13 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../server/db";
+import { env } from "../../../../env.mjs";
+import type { ESpanKind } from "@opentelemetry/otlp-transformer";
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
+import type { DeepPartial } from "../../../../utils/types";
 import type { CollectorRESTParams } from "../../../../server/tracer/types";
 import { nanoid } from "nanoid";
-import { env } from "../../../../env.mjs";
-import type {
-  ESpanKind,
-  IExportTraceServiceRequest,
-} from "@opentelemetry/otlp-transformer";
-import type { DeepPartial } from "../../../../utils/types";
 import crypto from "crypto";
 
 export async function GET(req: NextRequest) {
@@ -42,15 +40,16 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  const restTraceId = `trace_${nanoid()}`;
   const restParams: CollectorRESTParams = {
     spans: [
       {
-        trace_id: `trace_${nanoid()}`,
+        trace_id: restTraceId,
         span_id: `span_${nanoid()}`,
         type: "span",
         input: {
           type: "text",
-          value: "🐣",
+          value: "🐤",
         },
         output: {
           type: "text",
@@ -67,6 +66,7 @@ export async function GET(req: NextRequest) {
     },
   };
 
+  const otelTraceId = crypto.randomBytes(16).toString("hex");
   const otelParams: DeepPartial<IExportTraceServiceRequest> = {
     resourceSpans: [
       {
@@ -87,10 +87,7 @@ export async function GET(req: NextRequest) {
             },
             spans: [
               {
-                traceId: Buffer.from(
-                  crypto.randomBytes(16).toString("hex"),
-                  "hex"
-                ).toString("base64"),
+                traceId: Buffer.from(otelTraceId, "hex").toString("base64"),
                 spanId: Buffer.from(
                   crypto.randomBytes(8).toString("hex"),
                   "hex"
@@ -101,6 +98,12 @@ export async function GET(req: NextRequest) {
                 endTimeUnixNano: (Date.now() * 1000 * 1000).toString(),
                 attributes: [
                   {
+                    key: "gen_ai.request.model",
+                    value: {
+                      stringValue: "openai/gpt-4.1-nano",
+                    },
+                  },
+                  {
                     key: "gen_ai.prompt.0.role",
                     value: {
                       stringValue: "user",
@@ -109,7 +112,7 @@ export async function GET(req: NextRequest) {
                   {
                     key: "gen_ai.prompt.0.content.0.text",
                     value: {
-                      stringValue: "🐣",
+                      stringValue: "🐤",
                     },
                   },
                   {
@@ -128,7 +131,7 @@ export async function GET(req: NextRequest) {
     ],
   };
 
-  const [restCollectorResponse, otelCollectorResponse] = await Promise.all([
+  const [restCollectorResponse, otelResponse] = await Promise.all([
     fetch(`${env.BASE_HOST}/api/collector`, {
       method: "POST",
       headers: {
@@ -154,16 +157,62 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  if (!otelCollectorResponse.ok) {
+  if (!otelResponse.ok) {
     return NextResponse.json(
       { message: "Failed to send trace to LangWatch using OTLP" },
       { status: 500 }
     );
   }
 
-  const otelBody = await otelCollectorResponse.json();
+  const otelBody = await otelResponse.json();
+
+  // Check traces with retry mechanism
+  try {
+    await Promise.all([
+      checkTraceWithRetry(restTraceId, authToken).catch((error) => {
+        throw new Error("Failed to get REST trace after multiple retries");
+      }),
+      checkTraceWithRetry(otelTraceId, authToken).catch((error) => {
+        throw new Error("Failed to get OTLP trace after multiple retries");
+      }),
+    ]);
+  } catch (error) {
+    return NextResponse.json(
+      { message: (error as Error).message },
+      { status: 500 }
+    );
+  }
+
   return NextResponse.json({
-    status: otelCollectorResponse.status,
+    status: otelResponse.status,
     body: otelBody,
   });
 }
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+const checkTraceWithRetry = async (
+  traceId: string,
+  authToken: string
+): Promise<Response> => {
+  const startTime = Date.now();
+  const timeoutMs = 60 * 1000; // 60 seconds timeout
+  const retryIntervalMs = 5000; // 5 seconds interval
+
+  while (Date.now() - startTime < timeoutMs) {
+    await sleep(retryIntervalMs);
+
+    const traceResponse = await fetch(`${env.BASE_HOST}/api/trace/${traceId}`, {
+      headers: {
+        "X-Auth-Token": authToken,
+      },
+    });
+
+    if (traceResponse.ok) {
+      return traceResponse;
+    }
+  }
+
+  throw new Error("Timeout waiting for trace to be available");
+};
