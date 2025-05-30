@@ -165,6 +165,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
       field: "timestamps.started_at",
       fixed_interval: adjustedTimeScale ? `${adjustedTimeScale}m` : "1d",
       min_doc_count: 0,
+      time_zone: input.timeZone,
     },
     aggs,
   };

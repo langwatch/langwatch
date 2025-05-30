@@ -192,6 +192,7 @@ const CustomGraph_ = React.memo(
         ...filterParams,
         ...input,
         timeScale,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
       { ...queryOpts, enabled: queryOpts.enabled && load }
     );
