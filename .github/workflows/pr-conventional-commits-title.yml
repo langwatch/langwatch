@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
 
+permissions:
+  pull-requests: read
+  statuses: write
+
 jobs:
   check-pr-title:
     name: Validate PR Title (Conventional Commits)
