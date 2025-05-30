@@ -14,36 +14,29 @@ import {
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
-import { prisma } from "~/server/db";
+import type { Protections } from "../../elasticsearch/protections";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { evaluatePreconditions } from "../../evaluations/preconditions";
 import { checkPreconditionSchema } from "../../evaluations/types.generated";
-import type { Protections } from "../../elasticsearch/protections";
 
-import { getAnnotatedTraceIds } from "~/server/filters/annotations";
-import { sharedFiltersInputSchema } from "../../analytics/types";
-import { TRACE_INDEX, esClient } from "../../elasticsearch";
-import {
-  type ElasticSearchTrace,
-  type EvaluationResult,
-  type RAGChunk,
-  type Trace,
-} from "../../tracer/types";
-import {
-  TeamRoleGroup,
-  checkPermissionOrPubliclyShared,
-  checkUserPermissionForProject,
-} from "../permission";
-import { generateTracesPivotQueryConditions } from "./analytics/common";
+import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import {
   aggregateTraces,
   getTraceById,
   getTracesGroupedByThreadId,
   searchTraces,
 } from "~/server/elasticsearch/traces";
-import { getUserProtectionsForProject } from "../utils";
 import { transformElasticSearchTraceToTrace } from "~/server/elasticsearch/transformers";
-import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
+import { sharedFiltersInputSchema } from "../../analytics/types";
+import { TRACE_INDEX, esClient } from "../../elasticsearch";
+import { type ElasticSearchTrace, type Trace } from "../../tracer/types";
+import {
+  TeamRoleGroup,
+  checkPermissionOrPubliclyShared,
+  checkUserPermissionForProject,
+} from "../permission";
+import { getUserProtectionsForProject } from "../utils";
+import { generateTracesPivotQueryConditions } from "./analytics/common";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
@@ -540,7 +533,7 @@ export const getAllTracesForProject = async ({
       const tracesFromThreadId = await searchTraces({
         connConfig: { projectId: input.projectId },
         search: {
-          size: 100,
+          size: 50,
           query: {
             bool: {
               filter: [
