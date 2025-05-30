@@ -203,7 +203,7 @@ ingress:
             pathType: ImplementationSpecific
             backend:
               service:
-                name: "{{ .Release.Name }}-app"
+                name: "langwatch-app"
                 port:
                   number: 5560
   tls: []
