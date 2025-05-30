@@ -151,12 +151,6 @@ const createIndexes = async (lastMigration: string, client: ElasticClient) => {
       number_of_replicas: 0,
     };
 
-    if (process.env.IS_OPENSEARCH === "true") {
-      settings.index = {
-        knn: true,
-      };
-    }
-
     await client.indices.create({
       index: TRACE_INDEX.base,
       settings: settings,
