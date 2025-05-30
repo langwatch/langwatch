@@ -7,6 +7,7 @@ import { useTableView } from "../../components/messages/HeaderButtons";
 import { api } from "../../utils/api";
 import { useEffect, useState } from "react";
 import { useFilterParams } from "../../hooks/useFilterParams";
+import { useFieldRedaction } from "../../hooks/useFieldRedaction";
 
 export default function MessagesOrIntegrationGuide() {
   const { project } = useOrganizationTeamProject();
@@ -24,6 +25,9 @@ export default function MessagesOrIntegrationGuide() {
     },
     { enabled: !!project && waitingForFirstMessage }
   );
+
+  // Preload field redaction status to avoid cascading loading states
+  useFieldRedaction("input");
 
   useEffect(() => {
     if (!project) return;

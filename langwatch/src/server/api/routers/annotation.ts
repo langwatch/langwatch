@@ -405,6 +405,31 @@ export const annotationRouter = createTRPCRouter({
         trace: traceMap.get(item.traceId) || null,
       }));
     }),
+  getPendingItemsCount: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.annotationQueueItem.count({
+        where: {
+          projectId: input.projectId,
+          doneAt: null,
+          OR: [
+            {
+              userId: ctx.session.user.id,
+            },
+            {
+              annotationQueue: {
+                members: {
+                  some: {
+                    userId: ctx.session.user.id,
+                  },
+                },
+              },
+            },
+          ],
+        },
+      });
+    }),
   createQueueItem: protectedProcedure
     .input(
       z.object({

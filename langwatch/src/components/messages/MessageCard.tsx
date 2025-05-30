@@ -108,12 +108,7 @@ export function MessageCard({
   const traceTopic = topicsMap[trace.metadata.topic_id ?? ""];
   const traceSubtopic = topicsMap[trace.metadata.subtopic_id ?? ""];
 
-  const annotations = api.annotation.getByTraceId.useQuery({
-    traceId: trace.trace_id,
-    projectId: project.id,
-  });
-
-  const Annotation = ({ annotations }: { annotations: Annotation[] }) => {
+  const Annotation = ({ annotationsCount }: { annotationsCount: number }) => {
     const { openDrawer } = useDrawer();
 
     return (
@@ -137,8 +132,8 @@ export function MessageCard({
             <HStack>
               <Edit size={24} />
               <Text>
-                {annotations.length} annotation
-                {annotations.length > 1 ? "s" : ""}
+                {annotationsCount} annotation
+                {annotationsCount > 1 ? "s" : ""}
               </Text>
             </HStack>
           </Tag.Label>
@@ -391,8 +386,8 @@ export function MessageCard({
           </HStack>
         </VStack>
         <Spacer />
-        {annotations.data && annotations.data.length > 0 && (
-          <Annotation annotations={annotations.data} />
+        {trace.annotations?.count && (
+          <Annotation annotationsCount={trace.annotations.count} />
         )}
         {!checksMap && <Skeleton width={100} height="1em" />}
         {checksMap && totalGuardrails > 0 && (
