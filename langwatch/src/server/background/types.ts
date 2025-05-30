@@ -44,6 +44,7 @@ export type CollectorJob = {
   evaluations: RESTEvaluation[] | undefined;
   traceId: string;
   projectId: string;
+  authToken?: string;
   expectedOutput: string | null | undefined;
   reservedTraceMetadata: ReservedTraceMetadata;
   customMetadata: CustomMetadata;
