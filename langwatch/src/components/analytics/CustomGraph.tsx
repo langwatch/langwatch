@@ -779,15 +779,14 @@ const shapeDataForGraph = (
     timeseries.data && flattenGroupData(input, timeseries.data.previousPeriod);
 
   const currentAndPreviousData =
-    flattenCurrentPeriod &&
-    flattenPreviousPeriod?.map((entry, index) => {
+    flattenPreviousPeriod &&
+    flattenCurrentPeriod?.map((entry, index) => {
       return {
-        ...flattenCurrentPeriod[index],
+        ...entry,
         ...Object.fromEntries(
-          Object.entries(entry).map(([key, value]) => [
-            `previous>${key}`,
-            value ?? 0,
-          ])
+          Object.entries(flattenPreviousPeriod[index] ?? {}).map(
+            ([key, value]) => [`previous>${key}`, value ?? 0]
+          )
         ),
       };
     });
