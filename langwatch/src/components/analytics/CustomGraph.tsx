@@ -15,7 +15,7 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { format } from "date-fns";
 import numeral from "numeral";
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Area,
   AreaChart,
@@ -55,6 +55,7 @@ import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { Delayed } from "../Delayed";
 import { useColorRawValue } from "../../components/ui/color-mode";
 import { LuShield } from "react-icons/lu";
+import { usePeriodSelector } from "../PeriodSelector";
 
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
@@ -165,16 +166,32 @@ const CustomGraph_ = React.memo(
   }) {
     const height_ = input.height ?? 300;
     const { filterParams, queryOpts } = useFilterParams();
+    const { daysDifference } = usePeriodSelector();
+
+    const timeScale = useMemo(() => {
+      const timeScale_ = summaryGraphTypes.includes(input.graphType)
+        ? "full"
+        : input.timeScale === "full"
+        ? input.timeScale
+        : parseInt(input.timeScale.toString(), 10);
+
+      // Show 1 hour granularity for full period when days difference is 2 days or less
+      if (
+        typeof timeScale_ === "number" &&
+        timeScale_ >= 1440 &&
+        daysDifference <= 2
+      ) {
+        return 60;
+      }
+
+      return timeScale_;
+    }, [input.graphType, input.timeScale, daysDifference]);
 
     const timeseries = api.analytics.getTimeseries.useQuery(
       {
         ...filterParams,
         ...input,
-        timeScale: summaryGraphTypes.includes(input.graphType)
-          ? "full"
-          : input.timeScale === "full"
-          ? input.timeScale
-          : parseInt(input.timeScale.toString(), 10),
+        timeScale,
       },
       { ...queryOpts, enabled: queryOpts.enabled && load }
     );
@@ -311,8 +328,20 @@ const CustomGraph_ = React.memo(
     const getColor = useGetRotatingColorForCharts();
     const gray400 = useColorRawValue("gray.400");
 
-    const formatDate = (date: string) =>
-      date && format(new Date(date), "MMM d");
+    const formatDate = (date: string) => {
+      if (!date) return "";
+
+      // If timeScale is in minutes (10, 30, or 60), show hours
+      if (typeof timeScale === "number" && timeScale < 1440) {
+        // If more than one day difference, include the date
+        if (daysDifference > 1) {
+          return format(new Date(date), "MMM d HH:mm");
+        }
+        return format(new Date(date), "HH:mm");
+      }
+
+      return format(new Date(date), "MMM d");
+    };
     const tooltipValueFormatter = (
       value: number | string,
       _: string,
@@ -751,15 +780,14 @@ const shapeDataForGraph = (
     timeseries.data && flattenGroupData(input, timeseries.data.previousPeriod);
 
   const currentAndPreviousData =
-    flattenCurrentPeriod &&
-    flattenPreviousPeriod?.map((entry, index) => {
+    flattenPreviousPeriod &&
+    flattenCurrentPeriod?.map((entry, index) => {
       return {
-        ...flattenCurrentPeriod[index],
+        ...entry,
         ...Object.fromEntries(
-          Object.entries(entry).map(([key, value]) => [
-            `previous>${key}`,
-            value ?? 0,
-          ])
+          Object.entries(flattenPreviousPeriod[index] ?? {}).map(
+            ([key, value]) => [`previous>${key}`, value ?? 0]
+          )
         ),
       };
     });
@@ -975,7 +1003,12 @@ function MonitorGraph({
       >
         <HStack>
           {input.monitorGraph?.isGuardrail && (
-            <Badge colorPalette="blue" variant="solid" size="sm" marginTop="-3px">
+            <Badge
+              colorPalette="blue"
+              variant="solid"
+              size="sm"
+              marginTop="-3px"
+            >
               <LuShield size={16} />
               Guardrail
             </Badge>

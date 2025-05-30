@@ -110,6 +110,7 @@ export function PeriodSelector({
   const { open, onOpen, onClose, setOpen } = useDisclosure();
 
   const daysDifference = getDaysDifference(startDate, endDate);
+  const daysDifferenceFromToday = getDaysDifference(endDate, new Date());
 
   const quickSelectors = [
     { label: "Today", days: 1 },
@@ -130,7 +131,8 @@ export function PeriodSelector({
 
   const getDateRangeLabel = () => {
     const quickSelect = quickSelectors.find(
-      (selector) => selector.days === daysDifference
+      (selector) =>
+        selector.days === daysDifference && daysDifferenceFromToday <= 1
     );
     return quickSelect
       ? quickSelect.label

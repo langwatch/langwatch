@@ -65,24 +65,17 @@ export const timeseries = async (input: TimeseriesInputType) => {
     );
 
   // Calculate total time span in minutes
-  const totalMinutes =
-    (endDate.getTime() - previousPeriodStartDate.getTime()) / (1000 * 60);
+  const totalMinutes = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
 
   // Adjust timeScale to avoid too many buckets (max 1000 buckets)
   let adjustedTimeScale = input.timeScale;
   if (typeof input.timeScale === "number") {
     const estimatedBuckets = totalMinutes / input.timeScale;
     if (estimatedBuckets > 1000) {
-      // Round up to nearest minute that would give us less than 1000 buckets
-      adjustedTimeScale = Math.ceil(totalMinutes / 1000);
+      // Round up to one full day at least
+      adjustedTimeScale = 24 * 60;
     }
   }
-
-  // Convert timeScale from minutes to days for the slicing calculation
-  const timeScaleInDays =
-    typeof adjustedTimeScale === "number"
-      ? adjustedTimeScale / (24 * 60) // Convert minutes to days
-      : 1;
 
   let aggs = Object.fromEntries(
     input.series.flatMap(
