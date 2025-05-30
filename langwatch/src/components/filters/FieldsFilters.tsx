@@ -35,6 +35,7 @@ import { useColorRawValue } from "../ui/color-mode";
 import { InputGroup } from "../ui/input-group";
 import { Slider } from "../ui/slider";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { OverflownTextWithTooltip } from "../OverflownText";
 
 export function FieldsFilters() {
   const { nonEmptyFilters } = useFilterParams();
@@ -193,7 +194,7 @@ function FieldsFilter({
               />
             </InputGroup>
           </Popover.Header>
-          <Popover.Body paddingY={1} paddingX={4}>
+          <Popover.Body paddingY={1} paddingX={0}>
             {open && (
               <NestedListSelection
                 query={query}
@@ -205,6 +206,7 @@ function FieldsFilter({
                     : []),
                   filterId,
                 ]}
+                paddingX={4}
               />
             )}
           </Popover.Body>
@@ -219,11 +221,13 @@ function NestedListSelection({
   current,
   keysAhead,
   keysBefore = [],
+  paddingX = 0,
 }: {
   query: string;
   current: FilterParam;
   keysAhead: FilterField[];
   keysBefore?: string[];
+  paddingX?: number;
 }) {
   const { setFilter } = useFilterParams();
 
@@ -307,6 +311,7 @@ function NestedListSelection({
             },
           }
         : {})}
+      paddingX={paddingX}
     />
   );
 }
@@ -318,6 +323,7 @@ function ListSelection({
   currentValues,
   onChange,
   nested,
+  paddingX = 0,
 }: {
   filterId: FilterField;
   query: string;
@@ -325,6 +331,7 @@ function ListSelection({
   currentValues: string[];
   onChange: (value: string[]) => void;
   nested?: (key: string) => React.ReactNode;
+  paddingX?: number;
 }) {
   const filter = availableFilters[filterId];
 
@@ -396,6 +403,7 @@ function ListSelection({
       paddingY={2}
       maxHeight="300px"
       overflowY="auto"
+      paddingX={paddingX}
       ref={parentRef}
     >
       <VStack
@@ -458,11 +466,21 @@ function ListSelection({
                 >
                   <VStack width="full" align="start" gap={"2px"}>
                     {details && (
-                      <Text fontSize="sm" color="gray.500">
+                      <OverflownTextWithTooltip
+                        fontSize="sm"
+                        color="gray.500"
+                        lineClamp={1}
+                        wordBreak="break-all"
+                      >
                         {details}
-                      </Text>
+                      </OverflownTextWithTooltip>
                     )}
-                    <Text>{label === "" ? "<empty>" : label}</Text>
+                    <OverflownTextWithTooltip
+                      lineClamp={1}
+                      wordBreak="break-all"
+                    >
+                      {label === "" ? "<empty>" : label}
+                    </OverflownTextWithTooltip>
                   </VStack>
                 </Checkbox>
                 <Spacer />
