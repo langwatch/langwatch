@@ -1207,6 +1207,7 @@ export const timeseriesSeriesInput = z.object({
   series: z.array(seriesInput),
   groupBy: z.optional(z.enum(flattenAnalyticsGroupsEnum)),
   timeScale: z.optional(z.union([z.literal("full"), z.number().int()])),
+  timeZone: z.string(),
 });
 
 export type TimeseriesSeriesInputType = z.infer<typeof timeseriesSeriesInput>;
