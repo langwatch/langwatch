@@ -42,6 +42,13 @@ export const scheduleUsageStats = async () => {
     },
   });
 
+  if (
+    process.env.DISABLE_USAGE_STATS === "true" ||
+    process.env.IS_SAAS === "true"
+  ) {
+    return;
+  }
+
   if (organizations.length === 0) {
     logger.debug("No organizations found, skipping usage stats");
     return;
