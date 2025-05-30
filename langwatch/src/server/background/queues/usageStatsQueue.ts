@@ -43,7 +43,7 @@ export const scheduleUsageStats = async () => {
   });
 
   if (organizations.length === 0) {
-    logger.error("No organizations found");
+    logger.debug("No organizations found, skipping usage stats");
     return;
   }
 
