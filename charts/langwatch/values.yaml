@@ -188,7 +188,13 @@ ingress:
   annotations: {}
   hosts:
     - host: chart-example.local
-      paths:
-        - path: /
-          pathType: ImplementationSpecific
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: "langwatch-app"
+                port:
+                  number: 5560
   tls: []
