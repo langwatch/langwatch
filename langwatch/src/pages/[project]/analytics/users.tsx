@@ -207,7 +207,7 @@ export default function Users() {
       <HStack alignItems="start" width="full" gap={6}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
           <GridItem colSpan={2} display="inline-grid">
-            <Card.Root overflow="scroll">
+            <Card.Root overflow="auto">
               <Card.Header>
                 <Heading size="sm">User Messages</Heading>
               </Card.Header>
@@ -217,7 +217,7 @@ export default function Users() {
             </Card.Root>
           </GridItem>
           <GridItem colSpan={2} display="inline-grid">
-            <Card.Root overflow="scroll">
+            <Card.Root overflow="auto">
               <Card.Header>
                 <Heading size="sm">User Threads</Heading>
               </Card.Header>

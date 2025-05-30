@@ -197,7 +197,7 @@ export function UserMetrics() {
             <Card.Header paddingBottom={4}>
               <Heading size="sm">Top Topics</Heading>
             </Card.Header>
-            <Card.Body maxHeight="240px" overflowY="scroll">
+            <Card.Body maxHeight="240px" overflowY="auto">
               <TopicsSelector showTitle={false} />
             </Card.Body>
           </Card.Root>
@@ -206,7 +206,7 @@ export function UserMetrics() {
       </GridItem>
       {isNotQuickwit && (
         <GridItem>
-          <Card.Root overflow="scroll">
+          <Card.Root overflow="auto">
             <Card.Header>
               <Heading size="sm">User Threads</Heading>
             </Card.Header>

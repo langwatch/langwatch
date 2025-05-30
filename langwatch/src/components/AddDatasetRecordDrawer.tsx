@@ -259,7 +259,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     >
       <Drawer.Content
         maxWidth="1400px"
-        overflow="scroll"
+        overflow="auto"
         ref={scrollRef}
         onScroll={() =>
           setAtBottom(

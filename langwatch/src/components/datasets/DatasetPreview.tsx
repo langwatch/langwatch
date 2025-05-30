@@ -51,7 +51,7 @@ export function DatasetPreview({
     <Box
       width="100%"
       maxHeight="200px"
-      overflow="scroll"
+      overflow="auto"
       borderBottom={
         rows.length === 0 ? "1px solid rgba(189, 195, 199, 0.58)" : "none"
       }

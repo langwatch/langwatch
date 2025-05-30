@@ -46,6 +46,7 @@ import {
 import { Markdown } from "../Markdown";
 import { RedactedField } from "../ui/RedactedField";
 import { stringifyIfObject } from "../../utils/stringifyIfObject";
+import { OverflownTextWithTooltip } from "../OverflownText";
 
 export type TraceWithGuardrail = Trace & {
   lastGuardrail: (EvaluationResult & { name?: string }) | undefined;
@@ -288,7 +289,9 @@ export function MessageCard({
                 color={getColorForString("colors", traceTopic.id).color}
                 fontSize="12px"
               >
-                {traceTopic.name}
+                <OverflownTextWithTooltip maxWidth="300px" lineClamp={1}>
+                  {traceTopic.name}
+                </OverflownTextWithTooltip>
               </Badge>
             )}
             {traceSubtopic && (
@@ -299,7 +302,9 @@ export function MessageCard({
                 color={getColorForString("colors", traceSubtopic.id).color}
                 fontSize="12px"
               >
-                {traceSubtopic.name}
+                <OverflownTextWithTooltip maxWidth="300px" lineClamp={1}>
+                  {traceSubtopic.name}
+                </OverflownTextWithTooltip>
               </Badge>
             )}
             {(trace.metadata.labels ?? []).map((label) => (
@@ -309,7 +314,9 @@ export function MessageCard({
                 color={getColorForString("colors", label).color}
                 fontSize="12px"
               >
-                {label}
+                <OverflownTextWithTooltip maxWidth="100px" lineClamp={1}>
+                  {label}
+                </OverflownTextWithTooltip>
               </Badge>
             ))}
           </HStack>

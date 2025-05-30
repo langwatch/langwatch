@@ -199,7 +199,7 @@ export default function Users() {
       <HStack alignItems="start" gap={4}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width={"100%"}>
           <GridItem colSpan={2} display="inline-grid">
-            <Card.Root overflow="scroll">
+            <Card.Root overflow="auto">
               <Card.Header>
                 <HStack gap={2}>
                   <BarChart2 color="orange" />
@@ -212,7 +212,7 @@ export default function Users() {
             </Card.Root>
           </GridItem>
           <GridItem colSpan={2} display="inline-grid">
-            <Card.Root overflow="scroll">
+            <Card.Root overflow="auto">
               <Card.Header>
                 <HStack gap={2}>
                   <BarChart2 color="orange" />

@@ -395,8 +395,7 @@ function ListSelection({
       width="full"
       paddingY={2}
       maxHeight="300px"
-      overflowY="scroll"
-      className="js-filter-popover"
+      overflowY="auto"
       ref={parentRef}
     >
       <VStack
@@ -606,46 +605,48 @@ function ThumbsUpDownVoteFilter({
       gap={2}
       paddingY={2}
       maxHeight="300px"
-      overflowY="scroll"
-      className="js-filter-popover"
+      overflowY="auto"
     >
       {[
         { field: -1, label: "negative" },
         { field: 1, label: "positive" },
-      ].map(({ field, label }) => (
-        <Checkbox
-          key={field}
-          width="full"
-          paddingY={1}
-          gap={3}
-          checked={!!(min && max && min <= field && max >= field)}
-          onChange={(e) => {
-            e.stopPropagation();
-            if (e.target.checked) {
-              onChange([
-                (min && min < field ? min : field).toString(),
-                (max && max > field ? max : field).toString(),
-              ]);
-            } else {
-              const other = field === -1 ? 1 : -1;
-              onChange([
-                ((min ?? 0) === field && (max ?? 0) === field
-                  ? undefined
-                  : other
-                )?.toString() ?? "",
-                ((min ?? 0) === field && (max ?? 0) === field
-                  ? undefined
-                  : other
-                )?.toString() ?? "",
-              ]);
-            }
-          }}
-        >
-          <VStack width="full" align="start" gap={"2px"}>
-            <Text>{label}</Text>
-          </VStack>
-        </Checkbox>
-      ))}
+      ].map(({ field, label }) => {
+        const isChecked = !!(min && max && min <= field && max >= field);
+        return (
+          <Checkbox
+            key={field}
+            width="full"
+            paddingY={1}
+            gap={3}
+            checked={isChecked}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isChecked) {
+                onChange([
+                  (min && min < field ? min : field).toString(),
+                  (max && max > field ? max : field).toString(),
+                ]);
+              } else {
+                const other = field === -1 ? 1 : -1;
+                onChange([
+                  ((min ?? 0) === field && (max ?? 0) === field
+                    ? undefined
+                    : other
+                  )?.toString() ?? "",
+                  ((min ?? 0) === field && (max ?? 0) === field
+                    ? undefined
+                    : other
+                  )?.toString() ?? "",
+                ]);
+              }
+            }}
+          >
+            <VStack width="full" align="start" gap={"2px"}>
+              <Text>{label}</Text>
+            </VStack>
+          </Checkbox>
+        );
+      })}
     </VStack>
   );
 }

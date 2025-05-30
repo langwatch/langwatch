@@ -299,7 +299,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                     {columnTypes.length} columns
                   </Text>
                 </HStack>
-                <Box width="100%" overflowX="scroll">
+                <Box width="100%" overflowX="auto">
                   <Box width={`${Math.max(20 * columnTypes.length, 100)}%`}>
                     <DatasetPreview
                       rows={tryToConvertRowsToAppropriateType(
