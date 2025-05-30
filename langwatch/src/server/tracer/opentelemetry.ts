@@ -27,6 +27,9 @@ import {
   rESTEvaluationSchema,
   spanTypesSchema,
   typedValueChatMessagesSchema,
+  spanMetricsSchema,
+  reservedSpanParamsSchema,
+  spanTimestampsSchema,
 } from "./types.generated";
 import { openTelemetryToLangWatchMetadataMapping } from "./metadata";
 import { createLogger } from "~/utils/logger";
@@ -176,9 +179,10 @@ const addOpenTelemetrySpanAsSpan = (
   let output: LLMSpan["output"] = null;
   let params: Span["params"] = {};
   let metadata = {};
-  const started_at: Span["timestamps"]["started_at"] | undefined =
-    parseTimestamp(otelSpan.startTimeUnixNano);
-  const finished_at: Span["timestamps"]["finished_at"] | undefined =
+  let started_at: Span["timestamps"]["started_at"] | undefined = parseTimestamp(
+    otelSpan.startTimeUnixNano
+  );
+  let finished_at: Span["timestamps"]["finished_at"] | undefined =
     parseTimestamp(otelSpan.endTimeUnixNano);
   let error: Span["error"] = null;
   const attributesMap = otelAttributesToNestedAttributes(otelSpan.attributes);
@@ -657,7 +661,7 @@ const addOpenTelemetrySpanAsSpan = (
   }
 
   // Metrics
-  const metrics: LLMSpan["metrics"] = {};
+  let metrics: LLMSpan["metrics"] = {};
   if (attributesMap.ai?.usage) {
     if (typeof attributesMap.ai.usage.promptTokens === "number") {
       metrics.prompt_tokens = attributesMap.ai.usage.promptTokens;
@@ -864,6 +868,52 @@ const addOpenTelemetrySpanAsSpan = (
           trace.reservedTraceMetadata.prompt_version_ids ??= [];
           trace.reservedTraceMetadata.prompt_version_ids.push(version.id);
         }
+      }
+    }
+    // Metrics
+    if (attributesMap.langwatch.metrics) {
+      try {
+        metrics = {
+          ...metrics,
+          ...spanMetricsSchema.parse(attributesMap.langwatch.metrics as any),
+        };
+        delete (attributesMap as any).langwatch.metrics;
+      } catch {
+        // ignore
+      }
+    }
+    // Params
+    if (attributesMap.langwatch.params) {
+      try {
+        params = {
+          ...params,
+          ...reservedSpanParamsSchema.parse(
+            attributesMap.langwatch.params as any
+          ),
+        };
+        delete (attributesMap as any).langwatch.params;
+      } catch {
+        // ignore
+      }
+    }
+    // Timestamps
+    if (attributesMap.langwatch.timestamps) {
+      try {
+        const timestamps = spanTimestampsSchema.parse(
+          attributesMap.langwatch.timestamps as any
+        );
+        if (timestamps.started_at) {
+          started_at = timestamps.started_at;
+        }
+        if (timestamps.finished_at) {
+          finished_at = timestamps.finished_at;
+        }
+        if (timestamps.first_token_at) {
+          first_token_at = timestamps.first_token_at;
+        }
+        delete (attributesMap as any).langwatch.timestamps;
+      } catch {
+        // ignore
       }
     }
   }
