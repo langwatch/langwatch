@@ -8,8 +8,6 @@ import { useEffect, useMemo, useState } from "react";
 import { MultilineCellEditor } from "./MultilineCellEditor";
 import type { ColDef } from "@ag-grid-community/core";
 
-import "@ag-grid-community/styles/ag-grid.css";
-import "@ag-grid-community/styles/ag-theme-balham.css";
 import React from "react";
 import {
   datasetColumnTypeMapping,
