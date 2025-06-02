@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   check-pr-title:
-    name: validate-pr-title
+    name: validate title
     runs-on: ubuntu-latest
     steps:
       - name: Check PR Title
