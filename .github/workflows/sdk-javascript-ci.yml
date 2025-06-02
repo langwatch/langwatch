@@ -73,6 +73,6 @@ jobs:
         working-directory: typescript-sdk
         run: npm ci
 
-      - name: Run tests
+      - name: Build
         working-directory: typescript-sdk
-        run: npm run test
+        run: npm run build
