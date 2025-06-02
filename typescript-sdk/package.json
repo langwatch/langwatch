@@ -19,13 +19,14 @@
   "scripts": {
     "prepare": "./copy-types.sh",
     "test": "vitest",
-    "build": "npm run prepare && tsup && esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js",
+    "prebuild": "npm run prepare",
+    "build": "tsup && esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js",
     "prepublish": "npm run build"
   },
   "author": "",
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "devDependencies": {
     "@ai-sdk/openai": "^0.0.18",
