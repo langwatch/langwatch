@@ -84,13 +84,13 @@ jobs:
           restore-keys: ${{ runner.os }}-modules-
 
       - name: Cache Next.js
-        id: next_cache
+        id: next-cache
         uses: actions/cache/restore@v4
         with:
           path: |
             langwatch/.next/cache/webpack
             langwatch/.next/cache/swc
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/package-lock.json') }}-${{ hashFiles('langwatch/**/*.js', 'langwatch/**/*.jsx', 'langwatch/**/*.ts', 'langwatch/**/*.tsx') }}
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/package-lock.json') }}-
 
@@ -104,11 +104,11 @@ jobs:
         run: npm run build
 
       - name: Save Next.js cache
-        if: steps.next_cache.outputs.cache-hit != 'true'
+        if: steps.next-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
             langwatch/.next/cache/webpack
             langwatch/.next/cache/swc
-          key: ${{ steps.next_cache.outputs.cache-primary-key }}
+          key: ${{ steps.next-cache.outputs.cache-primary-key }}
           compression-level: 1
