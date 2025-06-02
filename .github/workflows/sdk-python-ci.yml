@@ -54,7 +54,7 @@ jobs:
 
       - name: Setup Python UV
         working-directory: python-sdk
-        run: uv sync --all-groups --all-extras && uv pip install strands-agents
+        run: uv sync --all-groups --all-extras && uv pip install strands-agents && uv pip install build
 
       - name: Build package
         working-directory: python-sdk
