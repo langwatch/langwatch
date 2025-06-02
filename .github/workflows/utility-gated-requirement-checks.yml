@@ -15,7 +15,7 @@ on:
 
 jobs:
   gate:
-    name: ${{ inputs.workflow-name }} gate
+    name: ${{ inputs['workflow-name'] }} gate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -26,23 +26,23 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           filters: |
-            ${{ inputs.path }}:
+            target:
               - '${{ inputs.path }}/**'
 
-      - name: Log path changes decision
-        run: echo "${{ inputs.path }} files changed: ${{ steps.filter.outputs[inputs.path] }}"
+      - name: Log path-change decision
+        run: echo "${{ inputs.path }} files changed: ${{ steps.filter.outputs['target'] }}"
 
-      - name: Wait for ${{ inputs.workflow-name }} if changes detected
-        if: steps.filter.outputs[inputs.path] == 'true'
+      - name: Wait for ${{ inputs['workflow-name'] }} if changes detected
+        if: steps.filter.outputs['target'] == 'true'
         uses: lewagon/wait-on-check-action@v1.3.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          running-workflow-name: ${{ inputs.workflow-name }}
+          running-workflow-name: ${{ inputs['workflow-name'] }}
           repo-token: ${{ secrets.token }}
           wait-interval: 5
-          running-timeout: '30m'
-          allowed-conclusions: 'success,neutral'
+          running-timeout: 30m
+          allowed-conclusions: success,neutral
 
-      - name: Report status when no sdk-python changes
-        if: steps.filter.outputs[inputs.path] == 'false'
-        run: echo "No changes in ${{ inputs.path }}/**, ${{ inputs.workflow-name }} Gate check passes by default."
+      - name: Report status when no path changes
+        if: steps.filter.outputs['target'] == 'false'
+        run: echo "No changes in ${{ inputs.path }}/**, ${{ inputs['workflow-name'] }} gate passes by default."
