@@ -54,7 +54,7 @@ jobs:
 
       - name: Run typecheck
         working-directory: typescript-sdk
-        run: tsgo --noEmit --project ./tsconfig.json
+        run: ./node_modules/.bin/tsgo --noEmit --project ./tsconfig.json
 
   build:
     runs-on: ubuntu-latest
