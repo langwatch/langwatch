@@ -41,7 +41,7 @@ jobs:
           check-name: ${{ inputs['workflow-name'] }}
           repo-token: ${{ secrets.token }}
           wait-interval: 5
-          running-timeout: 30m
+          running-timeout: 10m
           allowed-conclusions: success,neutral
 
       - name: Report status when no path changes
