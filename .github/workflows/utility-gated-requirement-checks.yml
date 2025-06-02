@@ -30,7 +30,8 @@ jobs:
               - '${{ inputs.path }}/**'
 
       - name: Log path-change decision
-        run: echo "${{ inputs.path }} files changed: ${{ steps.filter.outputs['target'] }}"
+        run: |
+          echo "${{ inputs.path }} files changed: ${{ steps.filter.outputs['target'] }}"
 
       - name: Wait for ${{ inputs['workflow-name'] }} if changes detected
         if: steps.filter.outputs['target'] == 'true'
@@ -45,4 +46,5 @@ jobs:
 
       - name: Report status when no path changes
         if: steps.filter.outputs['target'] == 'false'
-        run: echo "No changes in ${{ inputs.path }}/**, ${{ inputs['workflow-name'] }} gate passes by default."
+        run: |
+          echo "No changes in ${{ inputs.path }}/**, ${{ inputs['workflow-name'] }} gate passes by default."
