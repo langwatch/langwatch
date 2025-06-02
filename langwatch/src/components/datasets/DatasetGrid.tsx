@@ -1,5 +1,6 @@
 import type { GridOptions } from "@ag-grid-community/core";
 import {
+  type AgGridReactProps,
   type CustomCellEditorProps,
   type CustomCellRendererProps,
 } from "@ag-grid-community/react";
@@ -195,7 +196,7 @@ export const DatasetGrid = React.memo(
           }
         `}</style>
           <AgGridReact
-            ref={ref as React.RefObject<any>}
+            ref={ref as React.RefObject<AgGridReactProps>}
             gridOptions={gridOptions}
             loadingOverlayComponent={() => (
               <Text paddingTop={4}>Loading...</Text>
