@@ -1,16 +1,13 @@
 import type { GridOptions } from "@ag-grid-community/core";
 import {
-  AgGridReact,
-  type AgGridReactProps,
   type CustomCellEditorProps,
   type CustomCellRendererProps,
 } from "@ag-grid-community/react";
 import { Box, Field, Text } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
 import { MultilineCellEditor } from "./MultilineCellEditor";
+import type { ColDef } from "@ag-grid-community/core";
 
-import { ClientSideRowModelModule } from "@ag-grid-community/client-side-row-model";
-import { ModuleRegistry, type ColDef } from "@ag-grid-community/core";
 import "@ag-grid-community/styles/ag-grid.css";
 import "@ag-grid-community/styles/ag-theme-balham.css";
 import React from "react";
@@ -24,8 +21,22 @@ import { MultilineJSONCellEditor } from "./MultilineJSONCellEditor";
 import { Checkbox } from "../ui/checkbox";
 import { Minus } from "react-feather";
 import { useDebounce } from "use-debounce";
+import dynamic from "next/dynamic";
 
-ModuleRegistry.registerModules([ClientSideRowModelModule]);
+const AgGridReact = dynamic(
+  async () => {
+    if (typeof window !== "undefined") {
+      require("@ag-grid-community/styles/ag-grid.css");
+      require("@ag-grid-community/styles/ag-theme-balham.css");
+    }
+    const { AgGridReact } = await import("@ag-grid-community/react");
+    const { ClientSideRowModelModule } = await import("@ag-grid-community/client-side-row-model");
+    const { ModuleRegistry } = await import("@ag-grid-community/core");
+    ModuleRegistry.registerModules([ClientSideRowModelModule]);
+    return AgGridReact;
+  },
+  { ssr: false }
+);
 
 export const JSONCellRenderer = (props: { value: string | undefined }) => {
   return (
@@ -41,7 +52,7 @@ export type DatasetColumnDef = ColDef & { type_: DatasetColumnType };
 
 export const DatasetGrid = React.memo(
   React.forwardRef(function DatasetGrid(
-    props: AgGridReactProps & {
+    props: any & {
       columnDefs: DatasetColumnDef[];
     },
     ref
@@ -186,7 +197,7 @@ export const DatasetGrid = React.memo(
           }
         `}</style>
           <AgGridReact
-            ref={ref as React.RefObject<AgGridReact>}
+            ref={ref as React.RefObject<any>}
             gridOptions={gridOptions}
             loadingOverlayComponent={() => (
               <Text paddingTop={4}>Loading...</Text>
