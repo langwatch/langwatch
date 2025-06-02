@@ -14,4 +14,5 @@ jobs:
     with:
       workflow-name: 'sdk-javascript-ci'
       path: 'typescript-sdk'
+    secrets:
       token: ${{ secrets.token }}
