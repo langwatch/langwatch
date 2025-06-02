@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   mcp-server-gate:
-    uses: ./.github/workflows/utility-gated-requirement-checks.yml@feature/workflow-gate-pattern
+    uses: ./.github/workflows/utility-gated-requirement-checks.yml
     with:
       workflow-name: 'mcp-javascript-ci'
       path: 'mcp-server'
