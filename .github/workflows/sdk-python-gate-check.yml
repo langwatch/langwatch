@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   python-sdk-gate:
-    uses: ./.github/reusable-workflows/gated-requirement-checks.yml
+    uses: ./.github/reusable-workflows/gated-requirement-checks.yml@feature/workflow-gate-pattern
     with:
       workflow-name: 'sdk-python-ci'
       path: 'python-sdk'
