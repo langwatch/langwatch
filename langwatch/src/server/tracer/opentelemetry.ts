@@ -7,7 +7,7 @@ import {
   type IKeyValue,
   type ISpan,
 } from "@opentelemetry/otlp-transformer";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash-es/cloneDeep";
 import type { DeepPartial } from "../../utils/types";
 import type { CollectorJob } from "../background/types";
 import type {
