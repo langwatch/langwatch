@@ -15,4 +15,4 @@ jobs:
       workflow-name: 'langwatch-ci'
       path: 'langwatch'
     secrets:
-      token: ${{ secrets.token }}
+      token: ${{ secrets.GITHUB_TOKEN }}

@@ -15,4 +15,4 @@ jobs:
       workflow-name: 'sdk-javascript-ci'
       path: 'typescript-sdk'
     secrets:
-      token: ${{ secrets.token }}
+      token: ${{ secrets.GITHUB_TOKEN }}
