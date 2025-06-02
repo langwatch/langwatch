@@ -14,3 +14,4 @@ jobs:
     with:
       workflow-name: 'sdk-python-ci'
       path: 'python-sdk'
+      token: ${{ secrets.token }}

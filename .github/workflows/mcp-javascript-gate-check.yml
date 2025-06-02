@@ -14,3 +14,4 @@ jobs:
     with:
       workflow-name: 'mcp-javascript-ci'
       path: 'mcp-server'
+      token: ${{ secrets.token }}

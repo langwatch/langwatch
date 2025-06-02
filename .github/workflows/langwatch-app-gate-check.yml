@@ -14,3 +14,4 @@ jobs:
     with:
       workflow-name: 'langwatch-ci'
       path: 'langwatch'
+      token: ${{ secrets.token }}
