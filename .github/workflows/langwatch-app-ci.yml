@@ -1,0 +1,78 @@
+name: langwatch-app-ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      # - "langwatch/**"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: "langwatch/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: langwatch
+        run: npm ci
+
+      - name: Run tests
+        working-directory: langwatch
+        run: npm run test
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: "langwatch/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: langwatch
+        run: npm ci
+
+      - name: Install TypeScript Native Preview
+        working-directory: langwatch
+        run: npm install -D @typescript/native-preview
+
+      - name: Run typecheck
+        working-directory: langwatch
+        run: tsgo --noEmit --project ./tsconfig.json
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: "langwatch/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: langwatch
+        run: npm ci
+
+      - name: Run tests
+        working-directory: langwatch
+        run: npm run test

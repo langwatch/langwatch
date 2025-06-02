@@ -1,0 +1,48 @@
+name: Gated requirement checks
+
+on:
+  workflow_call:
+    inputs:
+      workflow-name:
+        required: true
+        type: string
+      path:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: true
+
+jobs:
+  gate:
+    name: ${{ inputs.workflow-name }} gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for ${{ inputs.path }} path changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            ${{ inputs.path }}:
+              - '${{ inputs.path }}/**'
+
+      - name: Log path changes decision
+        run: 'echo "${{ inputs.path }} files changed: ${{ steps.filter.outputs.${{ inputs.path }} }}"'
+
+      - name: Wait for ${{ inputs.workflow-name }} if changes detected
+        if: steps.filter.outputs.${{ inputs.path }} == 'true'
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          running-workflow-name: ${{ inputs.workflow-name }}
+          repo-token: ${{ secrets.token }}
+          wait-interval: 5
+          running-timeout: '30m'
+          allowed-conclusions: 'success,neutral'
+
+      - name: Report status when no sdk-python changes
+        if: steps.filter.outputs.${{ inputs.path }} == 'false'
+        run: echo "No changes in ${{ inputs.path }}/**, ${{ inputs.workflow-name }} Gate check passes by default."

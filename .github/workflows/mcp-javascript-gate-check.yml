@@ -1,4 +1,4 @@
-name: sdk-python-gate-check
+name: mcp-javascript-gate-check
 
 on:
   pull_request:
@@ -9,8 +9,8 @@ permissions:
   checks: read
 
 jobs:
-  python-sdk-gate:
+  mcp-server-gate:
     uses: ./.github/reusable-workflows/gated-requirement-checks.yml
     with:
-      workflow-name: 'sdk-python-ci'
-      path: 'python-sdk'
+      workflow-name: 'mcp-javascript-ci'
+      path: 'mcp-server'
