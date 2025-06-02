@@ -111,4 +111,3 @@ jobs:
             langwatch/.next/cache/webpack
             langwatch/.next/cache/swc
           key: ${{ steps.next-cache.outputs.cache-primary-key }}
-          compression-level: 1
