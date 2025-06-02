@@ -25,7 +25,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
 
       - name: Prepare files
         working-directory: langwatch
@@ -50,7 +50,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
 
       - name: Prepare files
         working-directory: langwatch
@@ -74,8 +74,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "npm"
-          cache-dependency-path: "langwatch/package-lock.json"
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: modules-cache
+        with:
+          path: langwatch/node_modules
+          key: ${{ runner.os }}-modules-${{ hashFiles('langwatch/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-modules-
 
       - name: Cache Next.js
         id: next_cache
@@ -89,8 +95,9 @@ jobs:
             ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/package-lock.json') }}-
 
       - name: Install dependencies
+        if: steps.modules-cache.outputs.cache-hit != 'true'
         working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
 
       - name: Build
         working-directory: langwatch
