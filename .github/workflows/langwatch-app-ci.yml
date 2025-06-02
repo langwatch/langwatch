@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -68,7 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -77,14 +77,17 @@ jobs:
           cache: "npm"
           cache-dependency-path: "langwatch/package-lock.json"
 
-      - name: Cache Next.js
-        uses: actions/cache@v4
-        with:
-          path:
-            langwatch/.next/cache
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/package-lock.json') }}-${{ hashFiles('langwatch/**/*.js', 'langwatch/**/*.jsx', 'langwatch/**/*.ts', 'langwatch/**/*.tsx') }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/package-lock.json') }}-
+      # Disabled this for now, because storing the cache actually takes longer than the
+      # time saved by having a cache. annoying.
+
+      # - name: Cache Next.js
+      #   uses: actions/cache@v4
+      #   with:
+      #     path:
+      #       langwatch/.next/cache
+      #     key: ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/package-lock.json') }}-${{ hashFiles('langwatch/**/*.js', 'langwatch/**/*.jsx', 'langwatch/**/*.ts', 'langwatch/**/*.tsx') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/package-lock.json') }}-
 
       - name: Install dependencies
         working-directory: langwatch
