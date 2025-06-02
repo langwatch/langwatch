@@ -25,7 +25,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: mcp-server
-        run: npm ci --prefer-offline --no-audit
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
 
       - name: Install TypeScript Native Preview
         working-directory: mcp-server
@@ -50,7 +50,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: mcp-server
-        run: npm ci --prefer-offline --no-audit
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
 
       - name: Build
         working-directory: mcp-server

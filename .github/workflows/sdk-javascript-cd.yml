@@ -26,7 +26,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: typescript-sdk
-        run: npm ci --prefer-offline --no-audit
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
 
       - name: Run unit tests
         working-directory: ./typescript-sdk

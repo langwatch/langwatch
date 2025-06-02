@@ -25,7 +25,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: typescript-sdk
-        run: npm ci --prefer-offline --no-audit
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
 
       - name: Run tests
         working-directory: typescript-sdk
@@ -46,7 +46,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: typescript-sdk
-        run: npm ci --prefer-offline --no-audit
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
 
       - name: Install TypeScript Native Preview
         working-directory: typescript-sdk
@@ -71,7 +71,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: typescript-sdk
-        run: npm ci --prefer-offline --no-audit
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
 
       - name: Build
         working-directory: typescript-sdk
