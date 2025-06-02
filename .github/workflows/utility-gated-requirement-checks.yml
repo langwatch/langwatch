@@ -30,10 +30,10 @@ jobs:
               - '${{ inputs.path }}/**'
 
       - name: Log path changes decision
-        run: 'echo "${{ inputs.path }} files changed: ${{ steps.filter.outputs.${{ inputs.path }} }}"'
+        run: echo "${{ inputs.path }} files changed: ${{ steps.filter.outputs[inputs.path] }}"
 
       - name: Wait for ${{ inputs.workflow-name }} if changes detected
-        if: steps.filter.outputs.${{ inputs.path }} == 'true'
+        if: steps.filter.outputs[inputs.path] == 'true'
         uses: lewagon/wait-on-check-action@v1.3.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -44,5 +44,5 @@ jobs:
           allowed-conclusions: 'success,neutral'
 
       - name: Report status when no sdk-python changes
-        if: steps.filter.outputs.${{ inputs.path }} == 'false'
+        if: steps.filter.outputs[inputs.path] == 'false'
         run: echo "No changes in ${{ inputs.path }}/**, ${{ inputs.workflow-name }} Gate check passes by default."
