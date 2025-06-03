@@ -1,30 +1,16 @@
 import { Grid, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { SimulationCard } from "~/components/simulations/simulation-card";
 import { useEffect, useState, useRef } from "react";
-import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
-import { CopilotChat } from "@copilotkit/react-ui";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import {
-  TextMessage,
-  MessageRole,
-  Role,
-  Message,
-} from "@copilotkit/runtime-client-gql";
 import { ArrowLeft, ZoomIn, ZoomOut } from "react-feather";
 import "@copilotkit/react-ui/styles.css";
-import {
-  useFetchScenarioState,
-  useFetchScenarioRunsForBatch,
-} from "~/hooks/simulations";
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/schemas";
+import { useFetchScenarioRunsForBatch } from "~/hooks/simulations";
 import { useRouter } from "next/router";
 import "../simulations.css";
+import { SimulationChatViewer } from "~/components/simulations";
 
 // Main layout for a single Simulation Set page
 export default function SimulationSetPage() {
-  const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const [expandedSimulationId, setExpandedSimulationId] = useState<
     string | null
@@ -159,89 +145,16 @@ export default function SimulationSetPage() {
                 width="full"
                 hidden={!isExpanded(null) && !isExpanded(scenarioRunId)}
               >
-                <CopilotKit
-                  headers={{
-                    "X-Auth-Token": project?.apiKey ?? "",
-                  }}
-                  runtimeUrl="/api/copilotkit"
-                >
-                  <CopilotKitWrapper
-                    scenarioRunId={scenarioRunId}
-                    isExpanded={isExpanded(scenarioRunId)}
-                    onExpandToggle={() => handleExpandToggle(scenarioRunId)}
-                  />
-                </CopilotKit>
+                <SimulationChatViewer
+                  scenarioRunId={scenarioRunId}
+                  isExpanded={isExpanded(scenarioRunId)}
+                  onExpandToggle={() => handleExpandToggle(scenarioRunId)}
+                />
               </Box>
             ))}
           </Grid>
         </Box>
       </PageLayout.Container>
     </DashboardLayout>
-  );
-}
-
-function CopilotKitWrapper({
-  scenarioRunId,
-  isExpanded,
-  onExpandToggle,
-}: {
-  scenarioRunId: string;
-  isExpanded: boolean;
-  onExpandToggle: () => void;
-}) {
-  const { project } = useOrganizationTeamProject();
-  const [status, setStatus] = useState<ScenarioRunStatus>(
-    ScenarioRunStatus.IN_PROGRESS
-  );
-
-  const { setMessages } = useCopilotChat({
-    headers: {
-      "X-Auth-Token": project?.apiKey ?? "",
-    },
-  });
-
-  // Fetch scenario state for this thread
-  const { data: scenarioState } = useFetchScenarioState({
-    scenarioRunId,
-    options: {
-      refreshInterval: status === ScenarioRunStatus.IN_PROGRESS ? 1000 : 0,
-    },
-  });
-
-  useEffect(() => {
-    if (scenarioState?.messages) {
-      setMessages(
-        scenarioState.messages
-          .map((message) => {
-            if (
-              [Role.User, Role.Assistant].includes(message.role as MessageRole)
-            ) {
-              return new TextMessage({
-                id: message.id,
-                role: message.role as MessageRole,
-                content: message.content ?? "",
-              });
-            }
-
-            return null;
-          })
-          .filter(Boolean) as Message[]
-      );
-    }
-
-    if (scenarioState?.status) {
-      setStatus(scenarioState.status as ScenarioRunStatus);
-    }
-  }, [scenarioState]);
-
-  return (
-    <SimulationCard
-      title={`Simulation ${scenarioRunId}`}
-      status={status}
-      onExpandToggle={onExpandToggle}
-      isExpanded={isExpanded}
-    >
-      <CopilotChat Input={() => <div></div>} />
-    </SimulationCard>
   );
 }
