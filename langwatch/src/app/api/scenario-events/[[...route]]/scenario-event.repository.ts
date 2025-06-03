@@ -205,6 +205,10 @@ export class ScenarioEventRepository {
     });
   }
 
+  /**
+   * Fetches all batch runs for a project, sorted by the most recent run time (descending).
+   * Sorting is done at the aggregation level using order on the 'last_run' sub-aggregation.
+   */
   async getAllBatchRunsForProject({
     projectId,
   }: {
@@ -225,6 +229,7 @@ export class ScenarioEventRepository {
             terms: {
               field: "batchRunId",
               size: 1000,
+              order: { last_run: "desc" }, // Sort by last_run (timestamp) descending
             },
             aggs: {
               scenario_count: {
@@ -249,6 +254,7 @@ export class ScenarioEventRepository {
       },
     });
 
+    // Map and return the results, already sorted by last_run descending
     return (
       (
         response.aggregations?.unique_batches as {

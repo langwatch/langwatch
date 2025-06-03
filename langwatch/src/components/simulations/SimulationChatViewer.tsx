@@ -1,8 +1,9 @@
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/schemas";
 import { useFetchScenarioState } from "~/hooks/simulations";
 import { SimulationCard } from "./SimulationCard";
 import { CustomCopilotKitChat } from "./CustomCopilotKitChat";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function SimulationChatViewer({
   scenarioRunId,
@@ -13,7 +14,9 @@ export function SimulationChatViewer({
   isExpanded: boolean;
   onExpandToggle: () => void;
 }) {
-  const [status] = useState<ScenarioRunStatus>(ScenarioRunStatus.IN_PROGRESS);
+  const [status, setStatus] = useState<ScenarioRunStatus>(
+    ScenarioRunStatus.IN_PROGRESS
+  );
 
   // Fetch scenario state for this thread
   const { data: scenarioState } = useFetchScenarioState({
@@ -22,6 +25,12 @@ export function SimulationChatViewer({
       refreshInterval: status === ScenarioRunStatus.IN_PROGRESS ? 1000 : 0,
     },
   });
+
+  useEffect(() => {
+    if (scenarioState?.status) {
+      setStatus(scenarioState.status);
+    }
+  }, [scenarioState]);
 
   return (
     <SimulationCard
