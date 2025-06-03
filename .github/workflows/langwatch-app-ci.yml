@@ -1,0 +1,113 @@
+name: langwatch-app-ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - "langwatch/**"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: "langwatch/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: langwatch
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+
+      - name: Prepare files
+        working-directory: langwatch
+        run: npm run start:prepare:files
+
+      - name: Run tests
+        working-directory: langwatch
+        run: npm run test
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: "langwatch/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: langwatch
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+
+      - name: Prepare files
+        working-directory: langwatch
+        run: npm run start:prepare:files
+
+      - name: Install TypeScript Native Preview
+        working-directory: langwatch
+        run: npm install -D @typescript/native-preview
+
+      - name: Run typecheck
+        working-directory: langwatch
+        run: ./node_modules/.bin/tsgo --noEmit --project ./tsconfig.json
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: modules-cache
+        with:
+          path: langwatch/node_modules
+          key: ${{ runner.os }}-modules-${{ hashFiles('langwatch/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-modules-
+
+      - name: Cache Next.js
+        id: next-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            langwatch/.next/cache/webpack
+            langwatch/.next/cache/swc
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/package-lock.json') }}-
+
+      - name: Install dependencies
+        if: steps.modules-cache.outputs.cache-hit != 'true'
+        working-directory: langwatch
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+
+      - name: Build
+        working-directory: langwatch
+        run: npm run build
+
+      - name: Save Next.js cache
+        if: steps.next-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            langwatch/.next/cache/webpack
+            langwatch/.next/cache/swc
+          key: ${{ steps.next-cache.outputs.cache-primary-key }}

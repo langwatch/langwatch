@@ -12,7 +12,7 @@ import {
   Badge,
 } from "@chakra-ui/react";
 import { PIIRedactionLevel, ProjectSensitiveDataVisibilityLevel, type Project } from "@prisma/client";
-import isEqual from "lodash.isequal";
+import isEqual from "lodash-es/isEqual";
 import { useState } from "react";
 import {
   useForm,

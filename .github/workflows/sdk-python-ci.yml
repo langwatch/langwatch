@@ -1,11 +1,9 @@
-name: Python SDK Tests
+name: sdk-python-ci
 
 on:
   push:
     branches:
       - main
-    paths:
-      - "python-sdk/**"
   pull_request:
     paths:
       - "python-sdk/**"
@@ -16,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup UV
         uses: astral-sh/setup-uv@v5
@@ -40,3 +38,24 @@ jobs:
           GROQ_API_KEY: ${{ secrets.PYTHON_SDK_GROQ_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_OPENAI_API_KEY }}
         run: uv run pytest
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "python-sdk/uv.lock"
+
+      - name: Setup Python UV
+        working-directory: python-sdk
+        run: uv sync --all-groups --all-extras && uv pip install strands-agents build
+
+      - name: Build package
+        working-directory: python-sdk
+        run: uv run python -m build

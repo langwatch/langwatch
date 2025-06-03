@@ -11,6 +11,7 @@ import {
   type Trace as ServerTrace,
   type RESTEvaluation as ServerRESTEvaluation,
   type LLMModeTrace as ServerLLMModeTrace,
+  type ErrorCapture as ServerErrorCapture,
 } from "./server/types/tracer";
 
 export type Trace = ServerTrace;
@@ -77,3 +78,5 @@ export type PendingRAGSpan = PendingSpan<RAGSpan>;
 export type RESTEvaluation = SnakeToCamelCaseNested<
   Omit<ServerRESTEvaluation, "error">
 > & { error?: ServerRESTEvaluation["error"] };
+
+export type ErrorCapture = ServerErrorCapture;

@@ -20,7 +20,8 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "build": "tsup && node build.js",
-    "prepublish": "npm run build"
+    "prepublish": "npm run build",
+    "test": "echo \"no tests exist yet\""
   },
   "author": "",
   "license": "MIT",
