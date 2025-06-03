@@ -5,7 +5,6 @@ import inspect
 import json
 import keyword
 import os
-import random
 import re
 import sys
 import threading
@@ -29,6 +28,7 @@ import httpx
 
 from langwatch_nlp.studio.types.dsl import DatasetInline
 from langwatch_nlp.studio.types.dataset import DatasetColumn, DatasetColumnType
+import random
 
 
 def print_class_definition(cls):
@@ -312,7 +312,6 @@ def get_dataset(
     Fetch dataset from the API and transform it into a DatasetInline format.
     Returns a DatasetInline object with records and columnTypes.
     """
-    print("DEBUG: API key", langwatch.api_key)
 
     request_params = {
         "url": langwatch.endpoint + f"/api/dataset/{slug}?limitMb=25",
