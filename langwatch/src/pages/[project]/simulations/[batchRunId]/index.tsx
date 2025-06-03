@@ -1,28 +1,24 @@
 import { Grid, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { useEffect, useState, useRef } from "react";
+import { useState } from "react";
 import { ArrowLeft, ZoomIn, ZoomOut } from "react-feather";
 import "@copilotkit/react-ui/styles.css";
 import { useFetchScenarioRunsForBatch } from "~/hooks/simulations";
 import { useRouter } from "next/router";
 import "../simulations.css";
 import { SimulationChatViewer } from "~/components/simulations";
+import { useZoom } from "~/hooks/useZoom";
 
 // Main layout for a single Simulation Set page
 export default function SimulationSetPage() {
   const router = useRouter();
+  const { scale, containerRef, zoomIn, zoomOut } = useZoom();
   const [expandedSimulationId, setExpandedSimulationId] = useState<
     string | null
   >(null);
-  const [scale, setScale] = useState(1);
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Get batchRunId from URL - it's an optional catch-all route
-  const batchRunId =
-    (Array.isArray(router.query.batchRunId)
-      ? router.query.batchRunId[0] // Take first element if it's an array
-      : router.query.batchRunId) ?? null;
+  const batchRunId = (router.query.batchRunId ?? null) as string | null;
 
   const { data: scenarioRunIds } = useFetchScenarioRunsForBatch({
     batchRunId,
@@ -47,33 +43,6 @@ export default function SimulationSetPage() {
     return calculatedColumns;
   };
 
-  // Handle zoom controls
-  const handleZoomIn = () => {
-    setScale(Math.min(scale + 0.1, 1.0));
-  };
-
-  const handleZoomOut = () => {
-    setScale(Math.max(scale - 0.1, 0.1));
-  };
-
-  // Handle wheel zoom
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const handleWheel = (e: WheelEvent) => {
-      if (e.ctrlKey) {
-        e.preventDefault();
-        const delta = e.deltaY || e.deltaX;
-        const newScale = Math.min(Math.max(scale - delta / 50, 0.1), 1.0);
-        setScale(newScale);
-      }
-    };
-
-    container.addEventListener("wheel", handleWheel, { passive: false });
-    return () => container.removeEventListener("wheel", handleWheel);
-  }, [scale]);
-
   return (
     <DashboardLayout position="relative">
       <PageLayout.Container
@@ -96,10 +65,10 @@ export default function SimulationSetPage() {
             </Text>
           </VStack>
           <HStack position="absolute" right={6} top={8} gap={2}>
-            <Button size="sm" variant="outline" onClick={handleZoomOut}>
+            <Button size="sm" variant="outline" onClick={zoomOut}>
               <ZoomOut size={16} />
             </Button>
-            <Button size="sm" variant="outline" onClick={handleZoomIn}>
+            <Button size="sm" variant="outline" onClick={zoomIn}>
               <ZoomIn size={16} />
             </Button>
             <Box
