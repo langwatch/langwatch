@@ -1,0 +1,12 @@
+name: mcp-javascript-ci
+
+on:
+  pull_request:
+    paths-ignore:
+      - "mcp-server/**"
+
+jobs:
+  unmodified:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "no modifications, skipping"

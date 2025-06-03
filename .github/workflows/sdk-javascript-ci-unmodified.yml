@@ -1,0 +1,12 @@
+name: sdk-javascript-ci
+
+on:
+  pull_request:
+    paths-ignore:
+      - "typescript-sdk/**"
+
+jobs:
+  unmodified:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "no modifications, skipping"
