@@ -1,5 +1,6 @@
 import type { GridOptions } from "@ag-grid-community/core";
 import {
+  AgGridReact,
   type AgGridReactProps,
   type CustomCellEditorProps,
   type CustomCellRendererProps,
@@ -8,6 +9,10 @@ import { Box, Field, Text } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
 import { MultilineCellEditor } from "./MultilineCellEditor";
 import type { ColDef } from "@ag-grid-community/core";
+import { ClientSideRowModelModule } from "@ag-grid-community/client-side-row-model";
+import { ModuleRegistry } from "@ag-grid-community/core";
+import "@ag-grid-community/styles/ag-grid.css";
+import "@ag-grid-community/styles/ag-theme-balham.css";
 
 import React from "react";
 import {
@@ -20,22 +25,8 @@ import { MultilineJSONCellEditor } from "./MultilineJSONCellEditor";
 import { Checkbox } from "../ui/checkbox";
 import { Minus } from "react-feather";
 import { useDebounce } from "use-debounce";
-import dynamic from "next/dynamic";
 
-const AgGridReact = dynamic(
-  async () => {
-    if (typeof window !== "undefined") {
-      require("@ag-grid-community/styles/ag-grid.css");
-      require("@ag-grid-community/styles/ag-theme-balham.css");
-    }
-    const { AgGridReact } = await import("@ag-grid-community/react");
-    const { ClientSideRowModelModule } = await import("@ag-grid-community/client-side-row-model");
-    const { ModuleRegistry } = await import("@ag-grid-community/core");
-    ModuleRegistry.registerModules([ClientSideRowModelModule]);
-    return AgGridReact;
-  },
-  { ssr: false }
-);
+ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
 export const JSONCellRenderer = (props: { value: string | undefined }) => {
   return (
