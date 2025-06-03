@@ -10,7 +10,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  mcp-javascript-ci-test:
+    name: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -31,7 +32,8 @@ jobs:
         working-directory: mcp-server
         run: npm run test
 
-  typecheck:
+  mcp-javascript-ci-typecheck:
+    name: typecheck
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -56,7 +58,8 @@ jobs:
         working-directory: mcp-server
         run: ./node_modules/.bin/tsgo --noEmit --project ./tsconfig.json
 
-  build:
+  mcp-javascript-ci-build:
+    name: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -77,8 +80,9 @@ jobs:
         working-directory: mcp-server
         run: npm run build
 
-  all-required:
+  mcp-javascript-ci-all-required:
+    name: all-required
     runs-on: ubuntu-latest
-    needs: [build, test, typecheck]
+    needs: [mcp-javascript-ci-build, mcp-javascript-ci-test, mcp-javascript-ci-typecheck]
     steps:
       - run: echo "All required jobs passed!"
