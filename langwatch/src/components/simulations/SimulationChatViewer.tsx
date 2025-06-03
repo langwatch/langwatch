@@ -1,6 +1,6 @@
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/schemas";
 import { useFetchScenarioState } from "~/hooks/simulations";
-import { SimulationCard } from "./simulation-card";
+import { SimulationCard } from "./SimulationCard";
 import { CustomCopilotKitChat } from "./CustomCopilotKitChat";
 import { useState } from "react";
 
