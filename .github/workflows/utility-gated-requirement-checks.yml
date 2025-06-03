@@ -22,11 +22,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 20
 
       - name: Check for ${{ inputs.path }} path changes
         id: filter
         uses: dorny/paths-filter@v3
         with:
+          base: main
           filters: |
             target:
               - '${{ inputs.path }}/**'
@@ -37,7 +40,7 @@ jobs:
 
       - name: Wait for ${{ inputs['workflow-name'] }} if changes detected
         if: steps.filter.outputs['target'] == 'true'
-        uses: lewagon/wait-on-check-action@v1.3.4
+        uses: lewagon/wait-on-check-action@v1.3.4t
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           check-name: "${{ inputs['workflow-name'] }} / all-required (pull_request)"
