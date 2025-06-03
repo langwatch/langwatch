@@ -10,6 +10,27 @@ on:
   workflow_dispatch:
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: "mcp-server/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: mcp-server
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+
+      - name: Run tests
+        working-directory: mcp-server
+        run: npm run test
+
   typecheck:
     runs-on: ubuntu-latest
     steps:
