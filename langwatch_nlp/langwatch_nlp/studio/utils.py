@@ -8,11 +8,14 @@ import os
 import re
 import sys
 import threading
-from typing import Any, Dict, List, cast
+import random
+import httpx
 
+from typing import Any, Dict, List, cast
 from joblib.memory import MemorizedFunc, AsyncMemorizedFunc
 import langwatch
 import litellm
+
 
 from langwatch_nlp.studio.types.dsl import (
     DatasetInline,
@@ -24,11 +27,9 @@ from langwatch_nlp.studio.types.dsl import (
 )
 import dspy
 from pydantic import BaseModel
-import httpx
 
-from langwatch_nlp.studio.types.dsl import DatasetInline
+
 from langwatch_nlp.studio.types.dataset import DatasetColumn, DatasetColumnType
-import random
 
 
 def print_class_definition(cls):
@@ -338,7 +339,7 @@ def get_dataset(
         elif entry_selection == "last":
             data = data[-1:]
         elif entry_selection == "random":
-            data = random.choice(data)
+            data = [random.choice(data)] if data else []
 
         # Initialize records dictionary and collect all possible keys
         records = {}
@@ -364,13 +365,13 @@ def get_dataset(
                     records[key].append(value)
 
         # Create columnTypes based on the keys
-        columnTypes = [
+        column_types = [
             DatasetColumn(name=key, type=DatasetColumnType.string) for key in all_keys
         ]
 
-        return DatasetInline(records=records, columnTypes=columnTypes)
+        return DatasetInline(records=records, columnTypes=column_types)
 
     except httpx.HTTPError as e:
-        raise Exception(f"Failed to fetch dataset: {str(e)}")
+        raise Exception(f"Failed to fetch dataset: {str(e)}") from e
     except Exception as e:
-        raise Exception(f"Error processing dataset: {str(e)}")
+        raise Exception(f"Error processing dataset: {str(e)}") from e
