@@ -6,7 +6,7 @@ on:
       - main
   pull_request:
     paths:
-      # - "mcp-server/**"
+      - "mcp-server/**"
   workflow_dispatch:
 
 jobs:

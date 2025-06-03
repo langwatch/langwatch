@@ -6,7 +6,7 @@ on:
       - main
   pull_request:
     paths:
-      # - "langwatch/**"
+      - "langwatch/**"
   workflow_dispatch:
 
 jobs:
