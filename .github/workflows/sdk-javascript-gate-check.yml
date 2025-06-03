@@ -10,7 +10,7 @@ permissions:
   pull-requests: read
 
 jobs:
-  javascript-sdk-gate:
+  gate:
     uses: ./.github/workflows/utility-gated-requirement-checks.yml
     with:
       workflow-name: 'sdk-javascript-ci'

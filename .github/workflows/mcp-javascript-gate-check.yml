@@ -10,7 +10,7 @@ permissions:
   pull-requests: read
 
 jobs:
-  mcp-server-gate:
+  gate:
     uses: ./.github/workflows/utility-gated-requirement-checks.yml
     with:
       workflow-name: 'mcp-javascript-ci'
