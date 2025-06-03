@@ -10,7 +10,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  langwatch-app-ci-test:
+    name: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -35,7 +36,8 @@ jobs:
         working-directory: langwatch
         run: npm run test
 
-  typecheck:
+  langwatch-app-ci-typecheck:
+    name: typecheck
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -64,7 +66,8 @@ jobs:
         working-directory: langwatch
         run: ./node_modules/.bin/tsgo --noEmit --project ./tsconfig.json
 
-  build:
+  langwatch-app-ci-build:
+    name: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -112,8 +115,9 @@ jobs:
             langwatch/.next/cache/swc
           key: ${{ steps.next-cache.outputs.cache-primary-key }}
 
-  all-required:
+  langwatch-app-ci-all-required:
+    name: all-required
     runs-on: ubuntu-latest
-    needs: [build, test, typecheck]
+    needs: [langwatch-app-ci-build, langwatch-app-ci-test, langwatch-app-ci-typecheck]
     steps:
       - run: echo "All required jobs passed!"

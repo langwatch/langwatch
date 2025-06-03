@@ -42,7 +42,7 @@ jobs:
         uses: lewagon/wait-on-check-action@v1.3.4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          check-name: "${{ inputs['workflow-name'] }} / all-required (pull_request)"
+          check-name: "${{ inputs['workflow-name'] }}-all-required"
           repo-token: ${{ secrets.token }}
           wait-interval: 5
           allowed-conclusions: success,skipped

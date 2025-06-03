@@ -13,7 +13,7 @@ jobs:
   gate:
     uses: ./.github/workflows/utility-gated-requirement-checks.yml
     with:
-      workflow-name: 'langwatch-ci'
+      workflow-name: 'langwatch-app-ci'
       path: 'langwatch'
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}
