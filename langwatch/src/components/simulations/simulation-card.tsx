@@ -50,6 +50,7 @@ export function SimulationCard({
             opacity={0.7}
             _hover={{ opacity: 1 }}
             onClick={onExpandToggle}
+            cursor={!!onExpandToggle ? "pointer" : "auto"}
           >
             {!isExpanded ? <Maximize size={16} /> : <Minimize size={16} />}
           </Box>
