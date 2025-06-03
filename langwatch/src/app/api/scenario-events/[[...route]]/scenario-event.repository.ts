@@ -4,6 +4,7 @@ import {
   type ScenarioMessageSnapshotEvent,
   ScenarioEventType,
   scenarioEventSchema,
+  type ScenarioBatch,
 } from "./schemas";
 import { eventMapping } from "./mappings";
 import { esClient } from "~/server/elasticsearch";
@@ -23,10 +24,19 @@ export class ScenarioEventRepository {
   private async initializeIndex() {
     const client = await esClient({ test: true });
 
-    // Delete index if it exists to force mapping update
     const indexExists = await client.indices.exists({
       index: this.indexName,
     });
+
+    // Delete index if it exists to force mapping update
+    // If the index already exists, delete it to ensure the mapping is always up to date.
+    // WARNING: This will remove all existing scenario event data.
+    // This is only appropriate for test/dev environments, not production.
+    // if (indexExists) {
+    //   await client.indices.delete({
+    //     index: this.indexName,
+    //   });
+    // }
 
     if (!indexExists) {
       // Create new index with updated mappings
@@ -180,6 +190,7 @@ export class ScenarioEventRepository {
 
     return response.hits.hits.map((hit) => hit._source as ScenarioEvent);
   }
+
   async deleteAllEvents({ projectId }: { projectId: string }): Promise<void> {
     const validatedProjectId = projectIdSchema.parse(projectId);
     const client = await esClient({ test: true });
@@ -192,5 +203,117 @@ export class ScenarioEventRepository {
         },
       },
     });
+  }
+
+  async getAllBatchRunsForProject({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<Array<ScenarioBatch>> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+
+    const client = await esClient({ test: true });
+
+    const response = await client.search({
+      index: this.indexName,
+      body: {
+        query: {
+          term: { projectId: validatedProjectId },
+        },
+        aggs: {
+          unique_batches: {
+            terms: {
+              field: "batchRunId",
+              size: 1000,
+            },
+            aggs: {
+              scenario_count: {
+                cardinality: {
+                  field: "scenarioRunId",
+                },
+              },
+              last_run: {
+                max: {
+                  field: "timestamp",
+                },
+              },
+              success_count: {
+                filter: {
+                  term: { status: "SUCCESS" },
+                },
+              },
+            },
+          },
+        },
+        size: 0,
+      },
+    });
+
+    return (
+      (
+        response.aggregations?.unique_batches as {
+          buckets: Array<{
+            key: string;
+            scenario_count: { value: number };
+            last_run: { value: number };
+            success_count: { doc_count: number };
+          }>;
+        }
+      )?.buckets?.map((bucket) => ({
+        batchRunId: bucket.key,
+        scenarioCount: bucket.scenario_count.value,
+        lastRunAt: new Date(bucket.last_run.value),
+        successRate:
+          bucket.scenario_count.value > 0
+            ? Math.round(
+                (bucket.success_count.doc_count / bucket.scenario_count.value) *
+                  100
+              )
+            : 0,
+      })) ?? []
+    );
+  }
+
+  async getScenarioRunsForBatch({
+    projectId,
+    batchRunId,
+  }: {
+    projectId: string;
+    batchRunId: string;
+  }): Promise<string[]> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+
+    const client = await esClient({ test: true });
+
+    const response = await client.search({
+      index: this.indexName,
+      body: {
+        query: {
+          bool: {
+            must: [
+              { term: { projectId: validatedProjectId } },
+              { term: { batchRunId: batchRunId } },
+            ],
+          },
+        },
+        aggs: {
+          unique_runs: {
+            terms: {
+              field: "scenarioRunId",
+              size: 1000,
+            },
+          },
+        },
+        size: 0,
+      },
+    });
+
+    return (
+      (
+        response.aggregations?.unique_runs as {
+          buckets: Array<{ key: string }>;
+        }
+      )?.buckets?.map((bucket) => bucket.key) ?? []
+    );
   }
 }

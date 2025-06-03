@@ -76,4 +76,23 @@ export class ScenarioRunnerService {
       projectId,
     });
   }
+
+  async getAllBatchRunsForProject({ projectId }: { projectId: string }) {
+    return this.eventRepository.getAllBatchRunsForProject({
+      projectId,
+    });
+  }
+
+  async getScenarioRunsForBatch({
+    projectId,
+    batchRunId,
+  }: {
+    projectId: string;
+    batchRunId: string;
+  }): Promise<string[]> {
+    return this.eventRepository.getScenarioRunsForBatch({
+      projectId,
+      batchRunId,
+    });
+  }
 }
