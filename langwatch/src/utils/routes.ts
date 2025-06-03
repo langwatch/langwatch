@@ -116,6 +116,15 @@ export const projectRoutes = {
     path: "/[project]/prompts",
     title: "Prompts",
   },
+  simulations: {
+    path: "/[project]/simulations",
+    title: "Simulations",
+  },
+  simulations_batch: {
+    path: "/[project]/simulations/[batchRunId]",
+    title: "Simulations",
+    parent: "simulations",
+  },
 };
 
 export type Route = {
