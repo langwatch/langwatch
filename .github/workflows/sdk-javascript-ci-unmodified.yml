@@ -6,7 +6,17 @@ on:
       - "typescript-sdk/**"
 
 jobs:
-  unmodified:
+  test:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "no modifications, skipping"
+      - run: echo "no modifications, skipping tests"
+        
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "no modifications, skipping typecheck"
+        
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "no modifications, skipping build"

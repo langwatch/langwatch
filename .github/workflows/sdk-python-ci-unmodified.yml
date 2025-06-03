@@ -6,7 +6,12 @@ on:
       - "python-sdk/**"
 
 jobs:
-  unmodified:
+  test:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "no modifications, skipping"
+      - run: echo "no modifications, skipping tests"
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "no modifications, skipping build"
