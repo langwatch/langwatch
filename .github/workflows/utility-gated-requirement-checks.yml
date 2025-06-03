@@ -15,7 +15,6 @@ on:
 
 jobs:
   gate:
-    name: ${{ inputs['workflow-name'] }} gate
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
