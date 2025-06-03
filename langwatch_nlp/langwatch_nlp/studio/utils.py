@@ -26,12 +26,9 @@ from langwatch_nlp.studio.types.dsl import (
 import dspy
 from pydantic import BaseModel
 import httpx
-import logging
 
 from langwatch_nlp.studio.types.dsl import DatasetInline
 from langwatch_nlp.studio.types.dataset import DatasetColumn, DatasetColumnType
-
-logger = logging.getLogger(__name__)
 
 
 def print_class_definition(cls):
@@ -375,8 +372,6 @@ def get_dataset(
         return DatasetInline(records=records, columnTypes=columnTypes)
 
     except httpx.HTTPError as e:
-        logger.error(f"HTTP error while fetching dataset: {str(e)}")
         raise Exception(f"Failed to fetch dataset: {str(e)}")
     except Exception as e:
-        logger.error(f"Error processing dataset: {str(e)}")
         raise Exception(f"Error processing dataset: {str(e)}")
