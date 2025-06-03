@@ -12,6 +12,7 @@ import { Client as ElasticClient } from "@elastic/elasticsearch";
 
 const projectIdSchema = z.string();
 const scenarioRunIdSchema = z.string();
+const batchRunIdSchema = z.string();
 
 export class ScenarioEventRepository {
   private readonly indexName = "scenario-events";
@@ -119,7 +120,6 @@ export class ScenarioEventRepository {
           unique_runs: {
             terms: {
               field: "scenarioRunId",
-              size: 1000,
             },
           },
         },
@@ -152,7 +152,6 @@ export class ScenarioEventRepository {
           term: { projectId: validatedProjectId },
         },
         sort: [{ timestamp: "desc" }],
-        size: 1000,
       },
     });
 
@@ -196,7 +195,6 @@ export class ScenarioEventRepository {
           unique_batches: {
             terms: {
               field: "batchRunId",
-              size: 1000,
               order: { last_run: "desc" }, // Sort by last_run (timestamp) descending
             },
             aggs: {
@@ -256,6 +254,7 @@ export class ScenarioEventRepository {
     batchRunId: string;
   }): Promise<string[]> {
     const validatedProjectId = projectIdSchema.parse(projectId);
+    const validatedBatchRunId = batchRunIdSchema.parse(batchRunId);
 
     const client = await this.getClient();
 
@@ -266,7 +265,7 @@ export class ScenarioEventRepository {
           bool: {
             must: [
               { term: { projectId: validatedProjectId } },
-              { term: { batchRunId: batchRunId } },
+              { term: { batchRunId: validatedBatchRunId } },
             ],
           },
         },
@@ -274,7 +273,6 @@ export class ScenarioEventRepository {
           unique_runs: {
             terms: {
               field: "scenarioRunId",
-              size: 1000,
             },
           },
         },
