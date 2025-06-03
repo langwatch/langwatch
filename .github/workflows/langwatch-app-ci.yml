@@ -111,3 +111,9 @@ jobs:
             langwatch/.next/cache/webpack
             langwatch/.next/cache/swc
           key: ${{ steps.next-cache.outputs.cache-primary-key }}
+
+  all-required:
+    runs-on: ubuntu-latest
+    needs: [build, test, typecheck]
+    steps:
+      - run: echo "All required jobs passed!"
