@@ -16,39 +16,6 @@ const scenarioRunIdSchema = z.string();
 export class ScenarioEventRepository {
   private readonly indexName = "scenario-events";
 
-  constructor() {
-    // Initialize index if it doesn't exist
-    this.initializeIndex();
-  }
-
-  private async initializeIndex() {
-    const client = await esClient({ test: true });
-
-    const indexExists = await client.indices.exists({
-      index: this.indexName,
-    });
-
-    // Delete index if it exists to force mapping update
-    // If the index already exists, delete it to ensure the mapping is always up to date.
-    // WARNING: This will remove all existing scenario event data.
-    // This is only appropriate for test/dev environments, not production.
-    // if (indexExists) {
-    //   await client.indices.delete({
-    //     index: this.indexName,
-    //   });
-    // }
-
-    if (!indexExists) {
-      // Create new index with updated mappings
-      await client.indices.create({
-        index: this.indexName,
-        body: {
-          mappings: eventMapping,
-        },
-      });
-    }
-  }
-
   async saveEvent({
     projectId,
     ...event
