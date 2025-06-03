@@ -1,22 +1,18 @@
-import { Grid, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { ArrowLeft, ZoomIn, ZoomOut } from "react-feather";
+import { useRouter } from "next/router";
+import { SimulationZoomGrid } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { useState } from "react";
-import { ArrowLeft, ZoomIn, ZoomOut } from "react-feather";
-import "@copilotkit/react-ui/styles.css";
-import { useFetchScenarioRunsForBatch } from "~/hooks/simulations";
-import { useRouter } from "next/router";
-import "../simulations.css";
-import { SimulationChatViewer } from "~/components/simulations";
 import { useZoom } from "~/hooks/useZoom";
+import { useFetchScenarioRunsForBatch } from "~/hooks/simulations";
+import "@copilotkit/react-ui/styles.css";
+import "../simulations.css";
 
 // Main layout for a single Simulation Set page
 export default function SimulationSetPage() {
   const router = useRouter();
   const { scale, containerRef, zoomIn, zoomOut } = useZoom();
-  const [expandedSimulationId, setExpandedSimulationId] = useState<
-    string | null
-  >(null);
 
   const batchRunId = (router.query.batchRunId ?? null) as string | null;
 
@@ -26,22 +22,6 @@ export default function SimulationSetPage() {
       refreshInterval: 1000,
     },
   });
-
-  const isExpanded = (simulationId: string | null) =>
-    expandedSimulationId === simulationId;
-
-  const handleExpandToggle = (simulationId: string) => {
-    setExpandedSimulationId(
-      expandedSimulationId === simulationId ? null : simulationId
-    );
-  };
-
-  // Calculate number of columns based on scale
-  const getColsCount = () => {
-    const baseColumns = 3;
-    const calculatedColumns = Math.ceil(baseColumns / scale);
-    return calculatedColumns;
-  };
 
   return (
     <DashboardLayout position="relative">
@@ -83,46 +63,14 @@ export default function SimulationSetPage() {
             </Box>
           </HStack>
         </PageLayout.Header>
-        <Box
-          ref={containerRef}
-          overflow="hidden"
-          style={{
-            touchAction: "none",
-            userSelect: "none",
-            WebkitUserSelect: "none",
-          }}
-        >
-          <Grid
-            templateColumns={
-              isExpanded(null) ? `repeat(${getColsCount()}, 1fr)` : "auto"
-            }
-            gap={6}
-            style={
-              isExpanded(null)
-                ? {
-                    transform: `scale(${scale})`,
-                    transformOrigin: "top left",
-                    width: `${100 / scale}%`,
-                    height: `${100 / scale}%`,
-                  }
-                : {}
-            }
-          >
-            {scenarioRunIds?.map((scenarioRunId) => (
-              <Box
-                key={scenarioRunId}
-                width="full"
-                hidden={!isExpanded(null) && !isExpanded(scenarioRunId)}
-              >
-                <SimulationChatViewer
-                  scenarioRunId={scenarioRunId}
-                  isExpanded={isExpanded(scenarioRunId)}
-                  onExpandToggle={() => handleExpandToggle(scenarioRunId)}
-                />
-              </Box>
-            ))}
-          </Grid>
-        </Box>
+        {/* Use the SimulationZoomGrid component for the grid of simulations */}
+        {scenarioRunIds && (
+          <SimulationZoomGrid
+            scenarioRunIds={scenarioRunIds}
+            scale={scale}
+            containerRef={containerRef}
+          />
+        )}
       </PageLayout.Container>
     </DashboardLayout>
   );
