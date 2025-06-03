@@ -1,9 +1,9 @@
 import { Grid, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { BatchCard } from "~/components/simulations/batch-card";
+import { BatchCard } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { useFetchScenarioBatches } from "~/hooks/useScenarioSimulations";
+import { useFetchScenarioBatches } from "~/hooks/simulations";
 
 export default function SimulationsPage() {
   const router = useRouter();

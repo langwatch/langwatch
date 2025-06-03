@@ -17,7 +17,7 @@ import "@copilotkit/react-ui/styles.css";
 import {
   useFetchScenarioState,
   useFetchScenarioRunsForBatch,
-} from "~/hooks/useScenarioSimulations";
+} from "~/hooks/simulations";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/schemas";
 import { useRouter } from "next/router";
 import "../simulations.css";
