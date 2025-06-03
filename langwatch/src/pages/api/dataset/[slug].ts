@@ -50,9 +50,28 @@ export default async function handler(
       where: { datasetId: dataset.id, projectId: project.id },
     });
 
+    // Check response size if limitMb is specified
+    const limitMb = req.query.limitMb
+      ? parseInt(req.query.limitMb as string)
+      : null;
+    if (limitMb) {
+      const responseSize = JSON.stringify(datasetRecords).length;
+
+      if (responseSize > limitMb * 1024 * 1024) {
+        // Convert MB to bytes
+        return res.status(413).json({
+          status: "error",
+          message: `Dataset response exceeds ${limitMb}MB limit`,
+        });
+      }
+    }
+
     return res.status(200).json({ data: datasetRecords });
   } catch (e) {
-    logger.error({ error: e, projectId: project.id }, 'error fetching dataset records');
+    logger.error(
+      { error: e, projectId: project.id },
+      "error fetching dataset records"
+    );
     return res
       .status(500)
       .json({ status: "error", message: "Internal server error." });
