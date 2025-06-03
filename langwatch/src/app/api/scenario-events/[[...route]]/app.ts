@@ -128,6 +128,65 @@ const getScenarioRunIdsRoute = app.get(
 
 export type GetScenarioRunIdsRouteType = typeof getScenarioRunIdsRoute;
 
+// GET /api/scenario-events/batch-runs - Get all batch runs
+const getBatchRunIdsRoute = app.get(
+  "/batch-runs/ids",
+  describeRoute({
+    description: "List all batch runs with scenario counts",
+    responses: {
+      200: {
+        description: "List of batch runs retrieved successfully",
+        content: {
+          "application/json": { schema: resolver(responseSchemas.batches) },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const { project } = c.var;
+
+    const scenarioRunnerService = new ScenarioRunnerService();
+    const batches = await scenarioRunnerService.getAllBatchRunsForProject({
+      projectId: project.id,
+    });
+
+    return c.json({ batches });
+  }
+);
+
+export type GetBatchRunIdsRouteType = typeof getBatchRunIdsRoute;
+
+// GET /api/scenario-events/batch-runs/:id/scenario-runs - Get scenario runs for a batch
+const getScenarioRunsForBatchRoute = app.get(
+  "/batch-runs/:id/scenario-runs",
+  describeRoute({
+    description: "List scenario runs for a specific batch",
+    responses: {
+      200: {
+        description: "List of scenario runs for batch retrieved successfully",
+        content: {
+          "application/json": { schema: resolver(responseSchemas.runs) },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const { project } = c.var;
+    const batchRunId = c.req.param("id");
+
+    const scenarioRunnerService = new ScenarioRunnerService();
+    const ids = await scenarioRunnerService.getScenarioRunsForBatch({
+      projectId: project.id,
+      batchRunId,
+    });
+
+    return c.json({ ids });
+  }
+);
+
+export type GetScenarioRunsForBatchRouteType =
+  typeof getScenarioRunsForBatchRoute;
+
 // GET /api/scenario-events - Get all events
 app.get(
   "/",

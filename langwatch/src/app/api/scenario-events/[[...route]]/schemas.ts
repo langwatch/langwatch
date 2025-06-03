@@ -135,6 +135,16 @@ const stateSchema = z.object({
 });
 const runsSchema = z.object({ runs: z.array(z.string()) });
 const eventsSchema = z.object({ events: z.array(scenarioEventSchema) });
+const scenarioBatchSchema = z.object({
+  batchRunId: z.string(),
+  scenarioCount: z.number(),
+  successRate: z.number(),
+  lastRunAt: z.date(),
+});
+
+const batchesSchema = z.object({
+  batches: z.array(scenarioBatchSchema),
+});
 
 export const responseSchemas = {
   success: successSchema,
@@ -142,4 +152,8 @@ export const responseSchemas = {
   state: stateSchema,
   runs: runsSchema,
   events: eventsSchema,
+  batches: batchesSchema,
 };
+
+// Export additional types
+export type ScenarioBatch = z.infer<typeof scenarioBatchSchema>;
