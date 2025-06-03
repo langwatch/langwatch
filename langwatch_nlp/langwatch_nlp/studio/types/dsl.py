@@ -114,15 +114,17 @@ class DatasetInline(BaseModel):
     columnTypes: DatasetColumns
 
 
-# Differently from the typescript DSL, we require the dataset to be passed inline in the entry node here
 class NodeDataset(BaseModel):
+    id: Optional[str] = None
     name: Optional[str] = None
     inline: Optional[DatasetInline] = None
+    entry_selection: Optional[str] = None
 
 
 class Entry(BaseComponent):
     inputs: None = None
     dataset: Optional[NodeDataset] = None
+    entry_selection: Optional[str] = None
     train_size: float
     test_size: float
     seed: int

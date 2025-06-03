@@ -29,7 +29,10 @@ from langwatch_nlp.studio.utils import (
     disable_dsp_caching,
     optional_langwatch_trace,
     transpose_inline_dataset_to_object_list,
+    get_dataset,
 )
+
+import langwatch
 
 
 async def execute_flow(
@@ -94,11 +97,16 @@ async def execute_flow(
                     entries = inputs
 
                 else:
-                    if not entry_node.data.dataset.inline:
-                        raise ValueError("Missing inline dataset in entry node")
-                    entries = transpose_inline_dataset_to_object_list(
-                        entry_node.data.dataset.inline
-                    )
+                    if entry_node.data.dataset.inline:
+                        entries = transpose_inline_dataset_to_object_list(
+                            entry_node.data.dataset.inline
+                        )
+                    else:
+                        if not entry_node.data.dataset.id:
+                            raise ValueError("Dataset ID is required")
+                        langwatch.api_key = workflow.api_key
+                        dataset = get_dataset(entry_node.data.dataset.id)
+                        entries = transpose_inline_dataset_to_object_list(dataset)
 
                 if len(entries) == 0:
                     raise ClientReadableValueError(
@@ -107,11 +115,7 @@ async def execute_flow(
 
                 try:
                     input_keys = [input.identifier for input in module_inputs]
-                    inputs_ = {
-                        k: v
-                        for k, v in entries[0].items()
-                        if k in input_keys
-                    }
+                    inputs_ = {k: v for k, v in entries[0].items() if k in input_keys}
                     result = await dspy.asyncify(module.forward)(**inputs_)  # type: ignore
 
                 except Exception as e:

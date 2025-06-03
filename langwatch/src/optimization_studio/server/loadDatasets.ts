@@ -73,28 +73,19 @@ export const loadDatasets = async (
         };
       }
 
-      // Select from database dataset
+      // For database datasets, we'll just pass the ID and let the Python SDK fetch it
       if (!node.data.dataset.id) {
         throw new Error("Dataset ID is required");
       }
-
-      const dataset = await getFullDataset({
-        datasetId: node.data.dataset.id,
-        projectId,
-        entrySelection,
-      });
-      if (!dataset) {
-        throw new Error("Dataset not found");
-      }
-      const inMemoryDataset = datasetDatabaseRecordsToInMemoryDataset(dataset);
-      delete inMemoryDataset.datasetId;
-      const inlineDataset = inMemoryDatasetToNodeDataset(inMemoryDataset);
 
       return {
         ...node,
         data: {
           ...node.data,
-          dataset: inlineDataset,
+          dataset: {
+            id: node.data.dataset.id,
+            entrySelection,
+          },
         },
       } as Node<Component>;
     })

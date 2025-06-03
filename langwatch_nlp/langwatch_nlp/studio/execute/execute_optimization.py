@@ -45,6 +45,7 @@ from dspy.teleprompt import MIPROv2
 from dspy.utils.asyncify import asyncify
 from langwatch_nlp.studio.s3_cache import setup_s3_cache
 import sentry_sdk
+import langwatch_nlp.studio.utils as utils
 
 _original_postprocess_parameter_name = dspy.primitives.module.postprocess_parameter_name
 
@@ -87,12 +88,22 @@ async def execute_optimization(
                 EntryNode,
                 next(node for node in workflow.nodes if isinstance(node.data, Entry)),
             )
+
             if not entry_node.data.dataset:
                 raise ValueError("Missing dataset in entry node")
-            assert entry_node.data.dataset.inline is not None, "Dataset inline is None"
-            entries = transpose_inline_dataset_to_object_list(
-                entry_node.data.dataset.inline
-            )
+            if entry_node.data.dataset.inline:
+                entries = transpose_inline_dataset_to_object_list(
+                    entry_node.data.dataset.inline
+                )
+            else:
+                # Fetch dataset from the API
+                if not entry_node.data.dataset.id:
+                    raise ValueError("Dataset ID is required")
+
+                langwatch.api_key = workflow.api_key
+
+                dataset = utils.get_dataset(entry_node.data.dataset.id)
+                entries = transpose_inline_dataset_to_object_list(dataset)
 
             train_size = entry_node.data.train_size
             test_size = entry_node.data.test_size

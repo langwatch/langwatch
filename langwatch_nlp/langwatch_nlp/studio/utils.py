@@ -5,6 +5,7 @@ import inspect
 import json
 import keyword
 import os
+import random
 import re
 import sys
 import threading
@@ -24,6 +25,13 @@ from langwatch_nlp.studio.types.dsl import (
 )
 import dspy
 from pydantic import BaseModel
+import httpx
+import logging
+
+from langwatch_nlp.studio.types.dsl import DatasetInline
+from langwatch_nlp.studio.types.dataset import DatasetColumn, DatasetColumnType
+
+logger = logging.getLogger(__name__)
 
 
 def print_class_definition(cls):
@@ -258,7 +266,7 @@ reserved_keywords = [
     "while",
     "with",
     "yield",
-    "items"
+    "items",
 ]
 
 
@@ -297,3 +305,78 @@ class SerializableWithStringFallback(SerializableWithPydanticAndPredictEncoder):
             return super().default(o)
         except:
             return str(o)
+
+
+def get_dataset(
+    slug: str,
+    entry_selection: str = "all",
+) -> DatasetInline:
+    """
+    Fetch dataset from the API and transform it into a DatasetInline format.
+    Returns a DatasetInline object with records and columnTypes.
+    """
+    print("DEBUG: API key", langwatch.api_key)
+
+    request_params = {
+        "url": langwatch.endpoint + f"/api/dataset/{slug}",
+        "headers": {"X-Auth-Token": str(langwatch.api_key)},
+    }
+
+    try:
+        with httpx.Client(timeout=300) as client:
+            response = client.get(**request_params)
+            response.raise_for_status()
+
+        result = response.json()
+
+        if "status" in result and result["status"] == "error":
+            error_message = result.get("message", "Unknown error")
+            raise Exception(f"Error: {error_message}")
+
+        data = result.get("data", None)
+        if not data:
+            return DatasetInline(records={}, columnTypes=[])
+
+        if entry_selection == "first":
+            data = data[:1]
+        elif entry_selection == "last":
+            data = data[-1:]
+        elif entry_selection == "random":
+            data = random.choice(data)
+
+        # Initialize records dictionary and collect all possible keys
+        records = {}
+        all_keys = set()
+
+        # First pass: collect all possible keys from entries
+        for record in data:
+            entry = record.get("entry", {})
+            if isinstance(entry, dict):
+                all_keys.update(entry.keys())
+
+        # Initialize lists for each key
+        for key in all_keys:
+            records[key] = []
+
+        # Second pass: populate the lists
+        for record in data:
+            entry = record.get("entry", {})
+            if isinstance(entry, dict):
+                for key in all_keys:
+                    # Get the value for this key, or None if it doesn't exist
+                    value = entry.get(key)
+                    records[key].append(value)
+
+        # Create columnTypes based on the keys
+        columnTypes = [
+            DatasetColumn(name=key, type=DatasetColumnType.string) for key in all_keys
+        ]
+
+        return DatasetInline(records=records, columnTypes=columnTypes)
+
+    except httpx.HTTPError as e:
+        logger.error(f"HTTP error while fetching dataset: {str(e)}")
+        raise Exception(f"Failed to fetch dataset: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error processing dataset: {str(e)}")
+        raise Exception(f"Error processing dataset: {str(e)}")
