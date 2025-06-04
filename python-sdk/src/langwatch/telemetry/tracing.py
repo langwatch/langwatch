@@ -121,6 +121,7 @@ class LangWatchTrace:
                 client.disable_sending = True
 
         # Use the global tracer provider
+        self._tracer_provider = tracer_provider
         self.tracer = (tracer_provider or trace_api).get_tracer(
             instrumenting_module_name="langwatch",
             instrumenting_library_version=__version__,
@@ -128,6 +129,7 @@ class LangWatchTrace:
         self._reset()
 
         # Store root span parameters for later creation
+        self._skip_root_span = skip_root_span
         self._root_span_params = (
             {
                 "span_id": span_id,
@@ -147,6 +149,41 @@ class LangWatchTrace:
             }
             if not skip_root_span
             else None
+        )
+
+    def _reset(self):
+        self._cleaned_up = False
+
+    def _clone(self) -> "LangWatchTrace":
+        root_span_params = self._root_span_params or {}
+
+        return LangWatchTrace(
+            trace_id=(
+                str(self.metadata.get("deprecated.trace_id", None))
+                if self.metadata and self.metadata.get("deprecated.trace_id", None)
+                else None
+            ),
+            metadata=self.metadata,
+            expected_output=self._expected_output,
+            api_key=self.api_key,
+            disable_sending=self.disable_sending,
+            max_string_length=self.max_string_length,
+            tracer_provider=self._tracer_provider,
+            span_id=root_span_params.get("span_id", None),
+            capture_input=root_span_params.get("capture_input", True),
+            capture_output=root_span_params.get("capture_output", True),
+            name=root_span_params.get("name", None),
+            type=root_span_params.get("type", "span"),
+            input=root_span_params.get("input", None),
+            output=root_span_params.get("output", None),
+            error=root_span_params.get("error", None),
+            timestamps=root_span_params.get("timestamps", None),
+            contexts=root_span_params.get("contexts", None),
+            model=root_span_params.get("model", None),
+            params=root_span_params.get("params", None),
+            metrics=root_span_params.get("metrics", None),
+            evaluations=root_span_params.get("evaluations", None),
+            skip_root_span=self._skip_root_span,
         )
 
     @property
@@ -427,8 +464,8 @@ class LangWatchTrace:
 
             @functools.wraps(func)
             async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                async with self:
-                    self._set_callee_input_information(func, *args, **kwargs)
+                async with self._clone() as trace:
+                    trace._set_callee_input_information(func, *args, **kwargs)
                     items = []
                     async for item in func(*args, **kwargs):
                         items.append(item)
@@ -439,15 +476,15 @@ class LangWatchTrace:
                         if all(isinstance(item, str) for item in items)
                         else items
                     )
-                    self._set_callee_output_information(func, output)
+                    trace._set_callee_output_information(func, output)
 
             return wrapper
         elif inspect.isgeneratorfunction(func):
 
             @functools.wraps(func)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
-                with self:
-                    self._set_callee_input_information(func, *args, **kwargs)
+                with self._clone() as trace:
+                    trace._set_callee_input_information(func, *args, **kwargs)
                     items = []
                     for item in func(*args, **kwargs):
                         items.append(item)
@@ -458,17 +495,17 @@ class LangWatchTrace:
                         if all(isinstance(item, str) for item in items)
                         else items
                     )
-                    self._set_callee_output_information(func, output)
+                    trace._set_callee_output_information(func, output)
 
             return wrapper
         elif inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                async with self:
-                    self._set_callee_input_information(func, *args, **kwargs)
+                async with self._clone() as trace:
+                    trace._set_callee_input_information(func, *args, **kwargs)
                     output = await func(*args, **kwargs)
-                    self._set_callee_output_information(func, output)
+                    trace._set_callee_output_information(func, output)
                     return output
 
             return wrapper
@@ -476,16 +513,13 @@ class LangWatchTrace:
 
             @functools.wraps(func)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
-                with self:
-                    self._set_callee_input_information(func, *args, **kwargs)
+                with self._clone() as trace:
+                    trace._set_callee_input_information(func, *args, **kwargs)
                     output = func(*args, **kwargs)
-                    self._set_callee_output_information(func, output)
+                    trace._set_callee_output_information(func, output)
                     return output
 
             return wrapper
-
-    def _reset(self):
-        self._cleaned_up = False
 
     def __enter__(self) -> "LangWatchTrace":
         """Makes the trace usable as a context manager."""
@@ -548,7 +582,7 @@ class LangWatchTrace:
         self._cleanup(None, None, None)
 
     def send_spans(self):
-        trace_api.get_tracer_provider().force_flush()
+        trace_api.get_tracer_provider().force_flush()  # type: ignore
 
     def _set_callee_input_information(
         self, func: Callable[..., Any], *args: Any, **kwargs: Any

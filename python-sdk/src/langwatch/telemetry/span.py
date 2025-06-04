@@ -55,7 +55,7 @@ from langwatch.domain import (
     SpanTypes,
 )
 import langwatch.telemetry.context
-from langwatch.telemetry.types import SpanType, SpanInputType, ContextsType
+from langwatch.telemetry.types import SpanInputType, ContextsType
 from langwatch.__version__ import __version__
 from langwatch.utils.initialization import ensure_setup
 
@@ -86,7 +86,7 @@ class LangWatchSpan:
         capture_input: bool = True,
         capture_output: bool = True,
         name: Optional[str] = None,
-        type: SpanType = "span",
+        type: SpanTypes = "span",
         input: SpanInputType = None,
         output: SpanInputType = None,
         error: Optional[Exception] = None,
@@ -167,6 +167,34 @@ class LangWatchSpan:
         self._lock = threading.Lock()
         self._cleaned_up = False
         self._context_token = None
+
+    def _clone(self) -> "LangWatchSpan":
+        return LangWatchSpan(
+            name=self.name,
+            type=self.type,
+            trace=self.trace,
+            parent=self.parent,
+            span_id=self.attributes.get(AttributeKey.DeprecatedSpanId, None),
+            capture_input=self.capture_input,
+            capture_output=self.capture_output,
+            input=self.input,
+            output=self.output,
+            error=self.error,
+            timestamps=self.timestamps,
+            contexts=self.contexts,
+            model=self.model,
+            params=self.params,
+            metrics=self.metrics,
+            evaluations=self.evaluations,
+            ignore_missing_trace_warning=self.ignore_missing_trace_warning,
+            kind=self.kind,
+            span_context=self.span_context,
+            attributes=self.attributes,
+            links=self.links,
+            start_time=self.start_time,
+            record_exception=self.record_exception,
+            set_status_on_exception=self.set_status_on_exception,
+        )
 
     def _create_span(self, do_not_set_context: bool = False):
         """Internal method to create and start the OpenTelemetry span."""
@@ -546,8 +574,8 @@ class LangWatchSpan:
 
             @functools.wraps(func)
             async def async_gen_wrapper(*args: Any, **kwargs: Any) -> Any:
-                async with self:
-                    self._set_callee_input_information(func, *args, **kwargs)
+                async with self._clone() as span:
+                    span._set_callee_input_information(func, *args, **kwargs)
                     items: List[Any] = []
                     async for item in func(*args, **kwargs):
                         items.append(item)
@@ -558,15 +586,15 @@ class LangWatchSpan:
                         if all(isinstance(item, str) for item in items)
                         else items
                     )
-                    self._set_callee_output_information(func, output)
+                    span._set_callee_output_information(func, output)
 
             return cast(T, async_gen_wrapper)
         elif inspect.isgeneratorfunction(func):
 
             @functools.wraps(func)
             def sync_gen_wrapper(*args: Any, **kwargs: Any):
-                with self:
-                    self._set_callee_input_information(func, *args, **kwargs)
+                with self._clone() as span:
+                    span._set_callee_input_information(func, *args, **kwargs)
                     items: List[Any] = []
                     for item in func(*args, **kwargs):
                         items.append(item)
@@ -577,17 +605,17 @@ class LangWatchSpan:
                         if all(isinstance(item, str) for item in items)
                         else items
                     )
-                    self._set_callee_output_information(func, output)
+                    span._set_callee_output_information(func, output)
 
             return cast(T, sync_gen_wrapper)
         elif inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                async with self:
-                    self._set_callee_input_information(func, *args, **kwargs)
+                async with self._clone() as span:
+                    span._set_callee_input_information(func, *args, **kwargs)
                     output = await func(*args, **kwargs)
-                    self._set_callee_output_information(func, output)
+                    span._set_callee_output_information(func, output)
                     return output
 
             return cast(T, async_wrapper)
@@ -595,10 +623,10 @@ class LangWatchSpan:
 
             @functools.wraps(func)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-                with self:
-                    self._set_callee_input_information(func, *args, **kwargs)
+                with self._clone() as span:
+                    span._set_callee_input_information(func, *args, **kwargs)
                     output = func(*args, **kwargs)
-                    self._set_callee_output_information(func, output)
+                    span._set_callee_output_information(func, output)
                     return output
 
             return cast(T, sync_wrapper)
@@ -623,7 +651,9 @@ class LangWatchSpan:
                     self._span_context_manager = None
 
             if self.trace and self._context_token is not None:
-                langwatch.telemetry.context._reset_current_span(self.trace, self._context_token)
+                langwatch.telemetry.context._reset_current_span(
+                    self.trace, self._context_token
+                )
                 self._context_token = None
 
             self._cleaned_up = True
@@ -799,7 +829,7 @@ def span(
     parent: Optional[Union[OtelSpan, LangWatchSpan]] = None,
     span_id: Optional[Union[str, UUID]] = None,
     name: Optional[str] = None,
-    type: Optional[SpanType] = None,
+    type: Optional[SpanTypes] = None,
     capture_input: bool = True,
     capture_output: bool = True,
     input: SpanInputType = None,
