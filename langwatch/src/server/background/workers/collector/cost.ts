@@ -74,14 +74,31 @@ const initTikToken = async (
       }),
     });
 
-    const model = await load(registryInfo, (url) => {
+    const model = await load(registryInfo, async (url) => {
       const filename = path.basename(url);
+
+      // Prevent directory traversal
+      const isSafeFilename = /^[a-zA-Z0-9._-]+$/.test(filename);
+      if (!isSafeFilename) {
+        logger.warn({ filename }, "Unsafe filename detected; using remote fetch instead");
+        return fetch(url).then((r) => r.text());
+      }
 
       if (process.env.TIKTOKENS_PATH) {
         const localPath = path.join(process.env.TIKTOKENS_PATH, filename);
-        return fs.readFile(localPath, "utf8");
+        logger.debug({ localPath }, "Attempting to load tiktoken model from local file");
+
+        try {
+          return await fs.readFile(localPath, "utf8");
+        } catch (error) {
+          logger.warn(
+            { localPath, error: error instanceof Error ? error.message : String(error) },
+            "Local read failed; falling back to remote fetch"
+          );
+        }
       }
 
+      // Default: fetch from remote
       return fetch(url).then((r) => r.text());
     });
 
