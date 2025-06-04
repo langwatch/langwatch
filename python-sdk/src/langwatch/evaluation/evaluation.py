@@ -40,8 +40,6 @@ from coolname import generate_slug  # type: ignore
 import urllib.parse
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 
-_tracer = trace.get_tracer(__name__)
-
 ItemT = TypeVar("ItemT")
 
 

@@ -1,5 +1,5 @@
 import threading
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Dict, List
 import contextvars
 import warnings
 from opentelemetry import trace as trace_api
@@ -16,7 +16,7 @@ stored_langwatch_trace = contextvars.ContextVar["LangWatchTrace"](
 main_thread_langwatch_trace: List["LangWatchTrace"] = []
 
 stored_langwatch_span = contextvars.ContextVar["LangWatchSpan"]("stored_langwatch_span")
-main_thread_langwatch_span: List["LangWatchSpan"] = []
+main_thread_langwatch_span: Dict[str, List["LangWatchSpan"]] = {}
 
 
 def get_current_trace(
@@ -62,12 +62,18 @@ def get_current_span() -> "LangWatchSpan":
     if span is not None:
         return span
 
-    if _is_on_child_thread() and len(main_thread_langwatch_span) > 0:
-        return main_thread_langwatch_span[-1]
+    trace = get_current_trace()
+
+    if (
+        _is_on_child_thread()
+        and trace.trace_id
+        and trace.trace_id in main_thread_langwatch_span
+        and len(main_thread_langwatch_span[trace.trace_id]) > 0
+    ):
+        return main_thread_langwatch_span[trace.trace_id][-1]
 
     # Fall back to OpenTelemetry context
     otel_span = trace_api.get_current_span()
-    trace = get_current_trace()
 
     from langwatch.telemetry.span import LangWatchSpan
 
@@ -88,8 +94,8 @@ def _set_current_trace(trace: "LangWatchTrace"):
 
 def _set_current_span(span: "LangWatchSpan"):
     global main_thread_langwatch_span
-    if not _is_on_child_thread():
-        main_thread_langwatch_span.append(span)
+    if span.trace and span.trace.trace_id and not _is_on_child_thread():
+        main_thread_langwatch_span.setdefault(span.trace.trace_id, []).append(span)
 
     try:
         return stored_langwatch_span.set(span)
@@ -111,10 +117,15 @@ def _reset_current_trace(token: contextvars.Token):
             warnings.warn(f"Failed to reset LangWatch trace context: {e}")
 
 
-def _reset_current_span(token: contextvars.Token):
+def _reset_current_span(trace: "LangWatchTrace", token: contextvars.Token):
     global main_thread_langwatch_span
-    if not _is_on_child_thread():
-        main_thread_langwatch_span.pop()
+    if (
+        trace
+        and trace.trace_id
+        and trace.trace_id in main_thread_langwatch_span
+        and not _is_on_child_thread()
+    ):
+        main_thread_langwatch_span[trace.trace_id].pop()
 
     try:
         stored_langwatch_span.reset(token)
