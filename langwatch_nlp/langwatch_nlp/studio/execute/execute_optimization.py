@@ -84,6 +84,8 @@ async def execute_optimization(
             module = Module(run_evaluations=True)
             module.prevent_crashes()
 
+            langwatch.setup(workflow.api_key)
+
             entry_node = cast(
                 EntryNode,
                 next(node for node in workflow.nodes if isinstance(node.data, Entry)),
@@ -99,8 +101,6 @@ async def execute_optimization(
                 # Fetch dataset from the API
                 if not entry_node.data.dataset.id:
                     raise ValueError("Dataset ID is required")
-
-                langwatch.api_key = workflow.api_key
 
                 dataset = utils.get_dataset(entry_node.data.dataset.id)
                 entries = transpose_inline_dataset_to_object_list(dataset)
@@ -136,8 +136,6 @@ async def execute_optimization(
             ):
                 score = pred.total_score(weighting="mean")
                 return score
-
-            langwatch.api_key = workflow.api_key
 
             params = event.params.model_dump(exclude_none=True)
             if event.optimizer == "MIPROv2ZeroShot" or event.optimizer == "MIPROv2":

@@ -84,6 +84,8 @@ async def execute_flow(
                 module = Module(run_evaluations=True)
                 module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
 
+                langwatch.setup(workflow.api_key)
+
                 entry_node = cast(
                     EntryNode,
                     next(
@@ -98,13 +100,19 @@ async def execute_flow(
 
                 else:
                     if entry_node.data.dataset.inline:
+                        print("transposing inline dataset")
                         entries = transpose_inline_dataset_to_object_list(
                             entry_node.data.dataset.inline
                         )
                     else:
                         if not entry_node.data.dataset.id:
                             raise ValueError("Dataset ID is required")
-                        langwatch.api_key = workflow.api_key
+
+                        print("getting dataset")
+                        dataset = langwatch.dataset.get_dataset(
+                            entry_node.data.dataset.id
+                        )
+                        print(dataset)
                         dataset = get_dataset(entry_node.data.dataset.id)
                         entries = transpose_inline_dataset_to_object_list(dataset)
 

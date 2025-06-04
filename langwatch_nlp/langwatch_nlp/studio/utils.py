@@ -315,8 +315,8 @@ def get_dataset(
     """
 
     request_params = {
-        "url": langwatch.endpoint + f"/api/dataset/{slug}?limitMb=25",
-        "headers": {"X-Auth-Token": str(langwatch.api_key)},
+        "url": langwatch.get_endpoint() + f"/api/dataset/{slug}?limitMb=25",
+        "headers": {"X-Auth-Token": str(langwatch.get_api_key())},
     }
 
     try:

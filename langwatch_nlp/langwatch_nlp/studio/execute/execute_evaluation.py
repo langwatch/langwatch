@@ -60,6 +60,7 @@ async def execute_evaluation(
         ) as (Module, _):
             module = Module(run_evaluations=True)
             module.prevent_crashes()
+            langwatch.setup(workflow.api_key)
 
             entry_node = cast(
                 EntryNode,
@@ -76,8 +77,6 @@ async def execute_evaluation(
                 # Fetch dataset from the API
                 if not entry_node.data.dataset.id:
                     raise ValueError("Dataset ID is required")
-
-                langwatch.api_key = workflow.api_key
 
                 dataset = utils.get_dataset(
                     entry_node.data.dataset.id,
