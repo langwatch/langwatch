@@ -83,6 +83,9 @@ async def execute_optimization(
             module = Module(run_evaluations=True)
             module.prevent_crashes()
 
+            langwatch.setup(workflow.api_key)
+            langwatch.state.set_api_key(workflow.api_key)
+
             entry_node = cast(
                 EntryNode,
                 next(node for node in workflow.nodes if isinstance(node.data, Entry)),
@@ -125,8 +128,6 @@ async def execute_optimization(
             ):
                 score = pred.total_score(weighting="mean")
                 return score
-
-            langwatch.api_key = workflow.api_key
 
             params = event.params.model_dump(exclude_none=True)
             if event.optimizer == "MIPROv2ZeroShot" or event.optimizer == "MIPROv2":
