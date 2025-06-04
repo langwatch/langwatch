@@ -1,5 +1,5 @@
 import type { LlmConfigOutputType } from "~/types";
-import { badRequestSchema, unauthorizedSchema } from "./schemas";
+import { badRequestSchema, unauthorizedSchema } from "~/app/api/shared/schemas";
 import { resolver } from "hono-openapi/zod";
 import type { RouteResponse } from "./types";
 
