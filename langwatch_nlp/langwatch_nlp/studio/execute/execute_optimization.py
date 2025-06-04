@@ -45,7 +45,6 @@ from dspy.teleprompt import MIPROv2
 from dspy.utils.asyncify import asyncify
 from langwatch_nlp.studio.s3_cache import setup_s3_cache
 import sentry_sdk
-import langwatch_nlp.studio.utils as utils
 
 _original_postprocess_parameter_name = dspy.primitives.module.postprocess_parameter_name
 

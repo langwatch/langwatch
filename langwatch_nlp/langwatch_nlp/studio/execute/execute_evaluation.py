@@ -30,10 +30,7 @@ from dspy.evaluate import Evaluate
 from dspy.utils.asyncify import asyncify
 from sklearn.model_selection import train_test_split
 
-from langwatch.batch_evaluation import DatasetRecord, DatasetEntry
 import langwatch
-
-import langwatch_nlp.studio.utils as utils
 
 
 async def execute_evaluation(
