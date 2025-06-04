@@ -190,6 +190,8 @@ class LangWatchSpan:
             elif parent_span_context is not None:
                 span_ctx = parent_span_context
 
+            self._cleaned_up = False
+
             if do_not_set_context:
                 self._span = tracer.start_span(
                     name=self.name or self.type,
