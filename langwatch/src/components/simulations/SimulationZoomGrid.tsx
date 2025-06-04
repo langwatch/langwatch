@@ -1,6 +1,6 @@
 import { Grid, Box } from "@chakra-ui/react";
-import { useState } from "react";
 import { SimulationChatViewer } from "./SimulationChatViewer";
+import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 
 interface SimulationZoomGridProps {
   scenarioRunIds: string[];
@@ -21,17 +21,10 @@ export function SimulationZoomGrid({
   scale,
   containerRef,
 }: SimulationZoomGridProps) {
-  const [expandedSimulationId, setExpandedSimulationId] = useState<
-    string | null
-  >(null);
-
-  const isExpanded = (simulationId: string | null) =>
-    expandedSimulationId === simulationId;
+  const { goToSimulationRun } = useSimulationRouter();
 
   const handleExpandToggle = (simulationId: string) => {
-    setExpandedSimulationId(
-      expandedSimulationId === simulationId ? null : simulationId
-    );
+    goToSimulationRun(simulationId);
   };
 
   // Calculate number of columns based on scale
@@ -52,30 +45,20 @@ export function SimulationZoomGrid({
       }}
     >
       <Grid
-        templateColumns={
-          isExpanded(null) ? `repeat(${getColsCount()}, 1fr)` : "auto"
-        }
+        templateColumns={`repeat(${getColsCount()}, 1fr)`}
         gap={6}
-        style={
-          isExpanded(null)
-            ? {
-                transform: `scale(${scale})`,
-                transformOrigin: "top left",
-                width: `${100 / scale}%`,
-                height: `${100 / scale}%`,
-              }
-            : {}
-        }
+        style={{
+          transform: `scale(${scale})`,
+          transformOrigin: "top left",
+          width: `${100 / scale}%`,
+          height: `${100 / scale}%`,
+        }}
       >
         {scenarioRunIds?.map((scenarioRunId) => (
-          <Box
-            key={scenarioRunId}
-            width="full"
-            hidden={!isExpanded(null) && !isExpanded(scenarioRunId)}
-          >
+          <Box key={scenarioRunId} width="full">
             <SimulationChatViewer
               scenarioRunId={scenarioRunId}
-              isExpanded={isExpanded(scenarioRunId)}
+              isExpanded={false}
               onExpandToggle={() => handleExpandToggle(scenarioRunId)}
             />
           </Box>
