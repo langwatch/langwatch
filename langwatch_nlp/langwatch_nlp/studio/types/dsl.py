@@ -118,13 +118,12 @@ class NodeDataset(BaseModel):
     id: Optional[str] = None
     name: Optional[str] = None
     inline: Optional[DatasetInline] = None
-    entry_selection: Optional[str] = None
 
 
 class Entry(BaseComponent):
     inputs: None = None
     dataset: Optional[NodeDataset] = None
-    entry_selection: Optional[str] = None
+    entry_selection: Optional[str] | int = None
     train_size: float
     test_size: float
     seed: int

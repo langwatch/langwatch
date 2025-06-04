@@ -307,7 +307,7 @@ class SerializableWithStringFallback(SerializableWithPydanticAndPredictEncoder):
 
 def get_dataset_entry_selection(
     entries: List[Dict[str, Any]],
-    entry_selection: str = "all",
+    entry_selection: str | int = "all",
 ) -> List[Dict[str, Any]]:
     """
     Select entries from a list based on the entry_selection parameter.
@@ -315,7 +315,7 @@ def get_dataset_entry_selection(
 
     Args:
         entries: List of dictionary entries to select from
-        entry_selection: Selection mode - "all", "first", "last", or "random"
+        entry_selection: Selection mode - "all", "first", "last", "random", or an integer index
 
     Returns:
         List of selected entries
@@ -324,7 +324,11 @@ def get_dataset_entry_selection(
     if not entries:
         return []
 
-    if entry_selection == "first":
+    if isinstance(entry_selection, int):
+        if entry_selection < 0 or entry_selection >= len(entries):
+            raise ValueError(f"Invalid entry selection index: {entry_selection}")
+        return [entries[entry_selection]]
+    elif entry_selection == "first":
         return entries[:1]
     elif entry_selection == "last":
         return entries[-1:]
