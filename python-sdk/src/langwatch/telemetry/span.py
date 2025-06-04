@@ -20,7 +20,6 @@ import threading
 import inspect
 
 from langwatch.attributes import AttributeKey
-import langwatch.telemetry.context
 from langwatch.utils.transformation import (
     SerializableWithStringFallback,
     rag_contexts,
