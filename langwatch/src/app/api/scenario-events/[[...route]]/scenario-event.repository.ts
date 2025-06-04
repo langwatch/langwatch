@@ -4,7 +4,6 @@ import {
   type ScenarioMessageSnapshotEvent,
   ScenarioEventType,
   scenarioEventSchema,
-  type ScenarioBatch,
 } from "./schemas";
 import { esClient } from "~/server/elasticsearch";
 import { z } from "zod";
@@ -13,6 +12,7 @@ import { Client as ElasticClient } from "@elastic/elasticsearch";
 const projectIdSchema = z.string();
 const scenarioRunIdSchema = z.string();
 const batchRunIdSchema = z.string();
+const scenarioIdSchema = z.string();
 
 export class ScenarioEventRepository {
   private readonly indexName = "scenario-events";
@@ -286,6 +286,40 @@ export class ScenarioEventRepository {
           buckets: Array<{ key: string }>;
         }
       )?.buckets?.map((bucket) => bucket.key) ?? []
+    );
+  }
+
+  async getScenarioRunFinishedEventsByScenarioId({
+    projectId,
+    scenarioId,
+  }: {
+    projectId: string;
+    scenarioId: string;
+  }): Promise<ScenarioRunFinishedEvent[]> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const validatedScenarioId = scenarioIdSchema.parse(scenarioId);
+
+    const client = await this.getClient();
+
+    const response = await client.search({
+      index: this.indexName,
+      body: {
+        query: {
+          bool: {
+            must: [
+              { term: { projectId: validatedProjectId } },
+              { term: { scenarioId: validatedScenarioId } },
+              { term: { type: ScenarioEventType.RUN_FINISHED } },
+            ],
+          },
+        },
+        sort: [{ timestamp: "desc" }],
+        size: 100,
+      },
+    });
+
+    return response.hits.hits.map(
+      (hit) => hit._source as ScenarioRunFinishedEvent
     );
   }
 
