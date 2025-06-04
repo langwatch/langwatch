@@ -377,11 +377,6 @@ class LangWatchDSPy:
 langwatch_dspy = LangWatchDSPy()
 
 
-# Expose the tracer function at module level
-def tracer(trace: LangWatchTrace):
-    return DSPyTracer(trace=trace)
-
-
 class LangWatchTrackedBootstrapFewShot(BootstrapFewShot):
     last_step: int = 0
     last_round_idx: int = 0
