@@ -5,9 +5,16 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import "@copilotkit/react-ui/styles.css";
 import "../simulations.css";
 import { SimulationChatViewer } from "~/components/simulations";
-import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
-import { useFetchScenarioState } from "~/hooks/simulations";
-import { SimulationResults } from "~/components/simulations/SimulationResults";
+import {
+  useFetchScenarioResultsHistory,
+  useSimulationRouter,
+  useFetchScenarioState,
+} from "~/hooks/simulations";
+import {
+  SimulationResults,
+  SimulationHistoryTable,
+} from "~/components/simulations";
+import { useEffect, useMemo, useState } from "react";
 
 interface IndividuatlSetPageProps {
   scenarioRunId: string;
@@ -16,10 +23,35 @@ interface IndividuatlSetPageProps {
 // Main layout for a single Simulation Set page
 export function IndividuatlSetPage({ scenarioRunId }: IndividuatlSetPageProps) {
   const { back } = useSimulationRouter();
+  const [currentScenarioId, setCurrentScenarioId] = useState<string | null>(
+    null
+  );
 
   const { data: scenarioState } = useFetchScenarioState({
     scenarioRunId,
   });
+  const scenarioId = scenarioState?.scenarioId ?? "";
+
+  const { data: scenarioResultsHistory } = useFetchScenarioResultsHistory({
+    scenarioId,
+  });
+
+  console.log(scenarioState, scenarioId, scenarioResultsHistory);
+  /**
+   * Set the current scenario id when the scenario results history is loaded (once)
+   */
+  useEffect(() => {
+    if (currentScenarioId) return;
+    setCurrentScenarioId(scenarioId);
+  }, [!!scenarioId]);
+
+  const currentScenarioResults = useMemo(
+    () =>
+      scenarioResultsHistory?.history.find(
+        (result) => result.scenarioId === currentScenarioId
+      )?.results,
+    [scenarioResultsHistory, currentScenarioId]
+  );
 
   return (
     <DashboardLayout position="relative">
@@ -46,11 +78,11 @@ export function IndividuatlSetPage({ scenarioRunId }: IndividuatlSetPageProps) {
         <VStack alignItems="flex-start">
           <VStack>
             <HStack height="50vh">
-              {scenarioState?.results ? (
+              {currentScenarioResults ? (
                 <Card.Root w="50%" h="100%" borderWidth={1}>
                   <Card.Body>
-                    {scenarioState.results && (
-                      <SimulationResults results={scenarioState.results} />
+                    {currentScenarioResults && (
+                      <SimulationResults results={currentScenarioResults} />
                     )}
                   </Card.Body>
                 </Card.Root>
@@ -68,6 +100,9 @@ export function IndividuatlSetPage({ scenarioRunId }: IndividuatlSetPageProps) {
               </Box>
             </HStack>
           </VStack>
+          <SimulationHistoryTable
+            history={scenarioResultsHistory?.history ?? []}
+          />
         </VStack>
       </PageLayout.Container>
     </DashboardLayout>

@@ -1,5 +1,9 @@
 import { ScenarioEventRepository } from "./scenario-event.repository";
-import { ScenarioRunStatus, type ScenarioEvent } from "./schemas";
+import {
+  ScenarioRunStatus,
+  type ScenarioEvent,
+  type ScenarioRunFinishedEvent,
+} from "./schemas";
 
 export class ScenarioRunnerService {
   private eventRepository: ScenarioEventRepository;
@@ -24,7 +28,7 @@ export class ScenarioRunnerService {
     });
   }
 
-  async getScenarioRunState({
+  async getScenarioRunData({
     scenarioRunId,
     projectId,
   }: {
@@ -38,6 +42,10 @@ export class ScenarioRunnerService {
         scenarioRunId,
       });
 
+    if (!latestMessageEvent) {
+      return null;
+    }
+
     // Get latest run finished event using dedicated repository method
     const latestRunFinishedEvent =
       await this.eventRepository.getLatestRunFinishedEventByScenarioRunId({
@@ -46,9 +54,11 @@ export class ScenarioRunnerService {
       });
 
     return {
+      scenarioId: latestMessageEvent.scenarioId,
+      batchRunId: latestMessageEvent.batchRunId,
       status: latestRunFinishedEvent?.status || ScenarioRunStatus.IN_PROGRESS,
       results: latestRunFinishedEvent?.results || null,
-      messages: latestMessageEvent?.messages || [],
+      messages: latestMessageEvent.messages || [],
     };
   }
 
@@ -95,5 +105,32 @@ export class ScenarioRunnerService {
       projectId,
       batchRunId,
     });
+  }
+
+  async getScenarioResultsHistory({
+    projectId,
+    scenarioId,
+  }: {
+    projectId: string;
+    scenarioId: string;
+  }): Promise<{
+    results: ScenarioRunFinishedEvent[];
+  }> {
+    const events =
+      await this.eventRepository.getScenarioRunFinishedEventsByScenarioId({
+        projectId,
+        scenarioId,
+      });
+
+    const results = events.map((event) => {
+      return {
+        ...event,
+        results: event.results,
+      };
+    });
+
+    return {
+      results,
+    };
   }
 }

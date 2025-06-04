@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import { useState } from "react";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/schemas";
 
-const getScenarioRunState =
+const getScenarioRunData =
   hc<GetScenarioRunStateRouteType>("/").api["scenario-events"]["scenario-runs"][
     "state"
   ][":id"].$get;
@@ -40,7 +40,7 @@ export const useFetchScenarioState = ({
   const { data, ...rest } = useSWR(
     cacheKey,
     async () => {
-      const res = await getScenarioRunState(
+      const res = await getScenarioRunData(
         {
           param: {
             id: scenarioRunId,
@@ -59,7 +59,7 @@ export const useFetchScenarioState = ({
         throw new Error(response.error);
       }
 
-      return response.state;
+      return response;
     },
     {
       refreshInterval,

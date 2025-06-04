@@ -137,11 +137,12 @@ export type ScenarioEvent = z.infer<typeof scenarioEventSchema>;
 // Define response schemas
 const successSchema = z.object({ success: z.boolean() });
 const errorSchema = z.object({ error: z.string() });
-const stateSchema = z.object({
-  state: z.object({
-    messages: z.array(z.any()),
-    status: z.string(),
-  }),
+const runDataSchema = z.object({
+  scenarioId: scenarioIdSchema,
+  batchRunId: batchRunIdSchema,
+  status: z.nativeEnum(ScenarioRunStatus),
+  results: scenarioResultsSchema.optional().nullable(),
+  messages: z.array(scenarioMessageSnapshotSchema.shape.messages),
 });
 const runsSchema = z.object({ runs: z.array(z.string()) });
 const eventsSchema = z.object({ events: z.array(scenarioEventSchema) });
@@ -159,8 +160,8 @@ const batchesSchema = z.object({
 export const responseSchemas = {
   success: successSchema,
   error: errorSchema,
-  state: stateSchema,
   runs: runsSchema,
   events: eventsSchema,
   batches: batchesSchema,
+  runData: runDataSchema,
 };
