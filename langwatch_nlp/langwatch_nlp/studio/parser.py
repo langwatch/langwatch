@@ -244,7 +244,7 @@ def parse_component(
                 raise ValueError("Workflow ID is required for custom nodes")
 
             params = {
-                "api_key": langwatch.get_api_key(),
+                "api_key": workflow.api_key,
                 "endpoint": langwatch.get_endpoint(),
                 "workflow_id": node.data.workflow_id,
                 "version_id": node.data.version_id,
