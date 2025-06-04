@@ -23,6 +23,15 @@ const runStartedMapping = {
 // Scenario Run Finished Event mapping
 const runFinishedMapping = {
   status: { type: "keyword" },
+  results: {
+    type: "object",
+    properties: {
+      verdict: { type: "keyword" },
+      reasoning: { type: "text" },
+      metCriteria: { type: "keyword" },
+      unmetCriteria: { type: "keyword" },
+    },
+  },
 };
 
 // Scenario Message Snapshot Event mapping

@@ -219,8 +219,11 @@ export const route = app.delete(
   describeRoute({
     description: "Delete all events",
     responses: {
-      204: {
+      200: {
         description: "Events deleted successfully",
+        content: {
+          "application/json": { schema: resolver(responseSchemas.success) },
+        },
       },
     },
   }),
@@ -232,7 +235,7 @@ export const route = app.delete(
       projectId: project.id,
     });
 
-    return c.status(204);
+    return c.json({ success: true }, 200);
   }
 );
 
