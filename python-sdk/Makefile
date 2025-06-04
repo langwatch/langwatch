@@ -1,11 +1,12 @@
 .PHONY: test install example
 
 test:
+	uv pip install strands-agents==0.1.4; \
 	LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv -m "not integration" $(filter-out $@,$(MAKECMDGOALS))
 
-# Call it with `make test-examples -- -k "examples/openai_bot.py"` to run a specific example
+# Call it with `make test-examples -- -k examples/openai_bot.py` to run a specific example
 test-examples:
-	uv pip install crewai==0.60.0 openinference-instrumentation-crewai duckduckgo_search strands-agents; \
+	uv pip install strands-agents==0.1.4; \
 	PYTHONPATH=$$PYTHONPATH:. uv run pytest tests/test_examples.py -p no:warnings -s -x $(filter-out $@,$(MAKECMDGOALS))
 
 install:
