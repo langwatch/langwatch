@@ -280,7 +280,7 @@ class EvaluationReporting:
             return
 
         response = httpx.post(
-            f"{langwatch.endpoint}/api/evaluations/batch/log_results",
+            f"{langwatch.get_endpoint()}/api/evaluations/batch/log_results",
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
