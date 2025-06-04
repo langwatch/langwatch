@@ -11,6 +11,8 @@ import * as Sentry from "@sentry/nextjs";
 import NodeFetchCache, { FileSystemCache } from "node-fetch-cache";
 import { createLogger } from "../../../../utils/logger";
 import { isBuildOrNoRedis } from "../../../redis";
+import fs from "fs/promises";
+import path from "path";
 
 const logger = createLogger("langwatch:workers:collector:cost");
 
@@ -71,9 +73,18 @@ const initTikToken = async (
         ttl: 1000 * 60 * 60 * 24 * 365, // 1 year
       }),
     });
-    const model = await load(registryInfo, (url) =>
-      fetch(url).then((r) => r.text())
-    );
+
+    const model = await load(registryInfo, (url) => {
+      const filename = path.basename(url);
+
+      if (process.env.TIKTOKENS_PATH) {
+        const localPath = path.join(process.env.TIKTOKENS_PATH, filename);
+        return fs.readFile(localPath, "utf8");
+      }
+
+      return fetch(url).then((r) => r.text());
+    });
+
     const encoder = new Tiktoken(
       model.bpe_ranks,
       model.special_tokens,
