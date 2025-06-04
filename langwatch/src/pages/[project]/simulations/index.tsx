@@ -1,4 +1,4 @@
-import { Grid, Text, VStack } from "@chakra-ui/react";
+import { Grid, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { BatchCard } from "~/components/simulations";
@@ -32,6 +32,13 @@ export default function SimulationsPage() {
         <PageLayout.Header>
           <PageLayout.Heading>Simulation Batches</PageLayout.Heading>
         </PageLayout.Header>
+
+        {/* Show loading state */}
+        {isLoading && (
+          <VStack gap={4} align="center" py={8}>
+            <Spinner borderWidth="3px" animationDuration="0.8s" />
+          </VStack>
+        )}
 
         {/* Show error state */}
         {error && (
@@ -68,7 +75,7 @@ export default function SimulationsPage() {
                 title={batch.batchRunId}
                 scenarioCount={batch.scenarioCount}
                 successRate={batch.successRate}
-                lastRunAt={new Date(batch.lastRunAt)}
+                lastRunAt={batch.lastRunAt ? new Date(batch.lastRunAt) : null}
                 onClick={() => handleBatchClick(batch.batchRunId)}
               />
             ))}

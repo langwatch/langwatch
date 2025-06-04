@@ -40,7 +40,12 @@ export const errorMiddleware: MiddlewareHandler = async (c, next) => {
 
     // Otherwise treat as server error
     return c.json(
-      { error: "Internal server error", message: error.message },
+      {
+        error: "Internal server error",
+        ...(process.env.NODE_ENV === "development" && {
+          message: error.message,
+        }),
+      },
       500
     );
   }

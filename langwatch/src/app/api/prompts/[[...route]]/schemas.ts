@@ -65,24 +65,3 @@ export const versionOutputSchema = getLatestConfigVersionSchema().merge(
     commitMessage: z.string().optional().nullable(),
   })
 );
-
-/**
- * Schema for unauthorized error responses
- */
-export const unauthorizedSchema = z.object({
-  error: z.string(),
-});
-
-/**
- * Schema for bad request error responses
- */
-export const badRequestSchema = z.object({
-  error: z.string(),
-});
-
-/**
- * Schema for successful operation responses
- */
-export const successSchema = z.object({
-  success: z.boolean(),
-});
