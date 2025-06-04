@@ -5,7 +5,7 @@ export interface BatchCardProps {
   description?: string;
   successRate: number; // 0-100 percentage
   scenarioCount: number;
-  lastRunAt: Date;
+  lastRunAt: Date | null;
   onClick: () => void;
 }
 
@@ -23,7 +23,9 @@ export function BatchCard({
     return "red";
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: Date | null) => {
+    if (!date) return "Unknown";
+
     return date.toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
