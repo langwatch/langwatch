@@ -67,6 +67,10 @@ async def test_example(example_file: str):
         pytest.skip(
             "langchain_rag_bot_vertex_ai.py is broken due to a bug in current langchain version of global state mutation when running together with other langchain"
         )
+    if example_file == "strands_bot.py":
+        pytest.skip(
+            "strands_bot.py breaks together with dspy_bot.py and litellm_bot.py, test it manually instead"
+        )
 
     module_name = f"examples.{example_file[:-3].replace('/', '.')}"
     module = importlib.import_module(module_name)
