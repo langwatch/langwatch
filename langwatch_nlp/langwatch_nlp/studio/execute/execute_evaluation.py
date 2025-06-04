@@ -78,11 +78,8 @@ async def execute_evaluation(
                 if not entry_node.data.dataset.id:
                     raise ValueError("Dataset ID is required")
 
-                dataset = utils.get_dataset(
-                    entry_node.data.dataset.id,
-                    entry_node.data.dataset.entry_selection or "all",
-                )
-                entries = transpose_inline_dataset_to_object_list(dataset)
+                dataset = langwatch.dataset.get_dataset(entry_node.data.dataset.id)
+                entries = [entry.entry for entry in dataset.entries]
 
             train_size = entry_node.data.train_size
             test_size = entry_node.data.test_size

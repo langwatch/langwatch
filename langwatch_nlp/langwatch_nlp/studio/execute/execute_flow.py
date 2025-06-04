@@ -29,7 +29,7 @@ from langwatch_nlp.studio.utils import (
     disable_dsp_caching,
     optional_langwatch_trace,
     transpose_inline_dataset_to_object_list,
-    get_dataset,
+    get_dataset_entry_selection,
 )
 
 import langwatch
@@ -108,13 +108,14 @@ async def execute_flow(
                         if not entry_node.data.dataset.id:
                             raise ValueError("Dataset ID is required")
 
-                        print("getting dataset")
                         dataset = langwatch.dataset.get_dataset(
                             entry_node.data.dataset.id
                         )
-                        print(dataset)
-                        dataset = get_dataset(entry_node.data.dataset.id)
-                        entries = transpose_inline_dataset_to_object_list(dataset)
+
+                        entries = get_dataset_entry_selection(
+                            [entry.entry for entry in dataset.entries],
+                            entry_node.data.entry_selection or "all",
+                        )
 
                 if len(entries) == 0:
                     raise ClientReadableValueError(

@@ -305,73 +305,30 @@ class SerializableWithStringFallback(SerializableWithPydanticAndPredictEncoder):
             return str(o)
 
 
-def get_dataset(
-    slug: str,
+def get_dataset_entry_selection(
+    entries: List[Dict[str, Any]],
     entry_selection: str = "all",
-) -> DatasetInline:
+) -> List[Dict[str, Any]]:
     """
-    Fetch dataset from the API and transform it into a DatasetInline format.
-    Returns a DatasetInline object with records and columnTypes.
+    Select entries from a list based on the entry_selection parameter.
+    Returns a list of selected entries.
+
+    Args:
+        entries: List of dictionary entries to select from
+        entry_selection: Selection mode - "all", "first", "last", or "random"
+
+    Returns:
+        List of selected entries
     """
+    print("getting dataset entry selection", entry_selection)
+    if not entries:
+        return []
 
-    request_params = {
-        "url": langwatch.get_endpoint() + f"/api/dataset/{slug}?limitMb=25",
-        "headers": {"X-Auth-Token": str(langwatch.get_api_key())},
-    }
-
-    try:
-        with httpx.Client(timeout=300) as client:
-            response = client.get(**request_params)
-            response.raise_for_status()
-
-        result = response.json()
-
-        if "status" in result and result["status"] == "error":
-            error_message = result.get("message", "Unknown error")
-            raise Exception(f"Error: {error_message}")
-
-        data = result.get("data", None)
-        if not data:
-            return DatasetInline(records={}, columnTypes=[])
-
-        if entry_selection == "first":
-            data = data[:1]
-        elif entry_selection == "last":
-            data = data[-1:]
-        elif entry_selection == "random":
-            data = [random.choice(data)] if data else []
-
-        # Initialize records dictionary and collect all possible keys
-        records = {}
-        all_keys = set()
-
-        # First pass: collect all possible keys from entries
-        for record in data:
-            entry = record.get("entry", {})
-            if isinstance(entry, dict):
-                all_keys.update(entry.keys())
-
-        # Initialize lists for each key
-        for key in all_keys:
-            records[key] = []
-
-        # Second pass: populate the lists
-        for record in data:
-            entry = record.get("entry", {})
-            if isinstance(entry, dict):
-                for key in all_keys:
-                    # Get the value for this key, or None if it doesn't exist
-                    value = entry.get(key)
-                    records[key].append(value)
-
-        # Create columnTypes based on the keys
-        column_types = [
-            DatasetColumn(name=key, type=DatasetColumnType.string) for key in all_keys
-        ]
-
-        return DatasetInline(records=records, columnTypes=column_types)
-
-    except httpx.HTTPError as e:
-        raise Exception(f"Failed to fetch dataset: {str(e)}") from e
-    except Exception as e:
-        raise Exception(f"Error processing dataset: {str(e)}") from e
+    if entry_selection == "first":
+        return entries[:1]
+    elif entry_selection == "last":
+        return entries[-1:]
+    elif entry_selection == "random":
+        return [random.choice(entries)] if entries else []
+    else:  # "all" or any other value
+        return entries
