@@ -1,4 +1,4 @@
-name: Publish Python SDK to PyPI
+name: sdk-python-cd
 
 on:
   release:
@@ -10,12 +10,12 @@ permissions:
   contents: read
 
 jobs:
-  publish-pypi:
+  publish:
     if: startsWith(github.event.release.tag_name, 'python-sdk@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"

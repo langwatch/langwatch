@@ -9,6 +9,7 @@ from langwatch.utils.transformation import truncate_object_recursively
 from langwatch.telemetry.tracing import LangWatchTrace
 from typing_extensions import TypedDict
 import langwatch
+from langwatch.state import get_api_key, get_endpoint
 import httpx
 import json
 from pydantic import BaseModel
@@ -372,6 +373,7 @@ class LangWatchDSPy:
         return DSPyTracer(trace=trace)
 
 
+# Create a singleton instance
 langwatch_dspy = LangWatchDSPy()
 
 

@@ -10,7 +10,7 @@ import React, {
   type ForwardedRef,
   type PropsWithChildren,
 } from "react";
-import debounce from "lodash/debounce";
+import debounce from "lodash.debounce";
 
 /**
  * Constants
