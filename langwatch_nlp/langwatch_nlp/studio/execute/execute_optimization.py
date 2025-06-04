@@ -84,7 +84,6 @@ async def execute_optimization(
             module.prevent_crashes()
 
             langwatch.setup(workflow.api_key)
-            langwatch.state.set_api_key(workflow.api_key)
 
             entry_node = cast(
                 EntryNode,
