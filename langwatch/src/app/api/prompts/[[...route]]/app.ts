@@ -7,11 +7,10 @@ import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-con
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger";
 import { loggerMiddleware } from "../../middleware/logger";
+import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import {
-  badRequestSchema,
   llmPromptConfigSchema,
   promptOutputSchema,
-  successSchema,
   versionInputSchema,
   versionOutputSchema,
 } from "./schemas";

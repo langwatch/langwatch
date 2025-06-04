@@ -6,48 +6,17 @@ import {
   scenarioEventSchema,
   type ScenarioBatch,
 } from "./schemas";
-import { eventMapping } from "./mappings";
 import { esClient } from "~/server/elasticsearch";
 import { z } from "zod";
+import { Client as ElasticClient } from "@elastic/elasticsearch";
 
 const projectIdSchema = z.string();
 const scenarioRunIdSchema = z.string();
+const batchRunIdSchema = z.string();
 
 export class ScenarioEventRepository {
   private readonly indexName = "scenario-events";
-
-  constructor() {
-    // Initialize index if it doesn't exist
-    this.initializeIndex();
-  }
-
-  private async initializeIndex() {
-    const client = await esClient({ test: true });
-
-    const indexExists = await client.indices.exists({
-      index: this.indexName,
-    });
-
-    // Delete index if it exists to force mapping update
-    // If the index already exists, delete it to ensure the mapping is always up to date.
-    // WARNING: This will remove all existing scenario event data.
-    // This is only appropriate for test/dev environments, not production.
-    // if (indexExists) {
-    //   await client.indices.delete({
-    //     index: this.indexName,
-    //   });
-    // }
-
-    if (!indexExists) {
-      // Create new index with updated mappings
-      await client.indices.create({
-        index: this.indexName,
-        body: {
-          mappings: eventMapping,
-        },
-      });
-    }
-  }
+  private client: ElasticClient | null = null;
 
   async saveEvent({
     projectId,
@@ -56,7 +25,7 @@ export class ScenarioEventRepository {
     const validatedProjectId = projectIdSchema.parse(projectId);
     const validatedEvent = scenarioEventSchema.parse(event);
 
-    const client = await esClient({ test: true });
+    const client = await this.getClient();
 
     await client.index({
       index: this.indexName,
@@ -78,7 +47,7 @@ export class ScenarioEventRepository {
     const validatedProjectId = projectIdSchema.parse(projectId);
     const validatedScenarioRunId = scenarioRunIdSchema.parse(scenarioRunId);
 
-    const client = await esClient({ test: true });
+    const client = await this.getClient();
 
     const response = await client.search({
       index: this.indexName,
@@ -110,7 +79,7 @@ export class ScenarioEventRepository {
     const validatedProjectId = projectIdSchema.parse(projectId);
     const validatedScenarioRunId = scenarioRunIdSchema.parse(scenarioRunId);
 
-    const client = await esClient({ test: true });
+    const client = await this.getClient();
 
     const response = await client.search({
       index: this.indexName,
@@ -139,7 +108,7 @@ export class ScenarioEventRepository {
   }): Promise<string[]> {
     const validatedProjectId = projectIdSchema.parse(projectId);
 
-    const client = await esClient({ test: true });
+    const client = await this.getClient();
 
     const response = await client.search({
       index: this.indexName,
@@ -151,7 +120,6 @@ export class ScenarioEventRepository {
           unique_runs: {
             terms: {
               field: "scenarioRunId",
-              size: 1000,
             },
           },
         },
@@ -175,7 +143,7 @@ export class ScenarioEventRepository {
   }): Promise<ScenarioEvent[]> {
     const validatedProjectId = projectIdSchema.parse(projectId);
 
-    const client = await esClient({ test: true });
+    const client = await this.getClient();
 
     const response = await client.search({
       index: this.indexName,
@@ -184,7 +152,6 @@ export class ScenarioEventRepository {
           term: { projectId: validatedProjectId },
         },
         sort: [{ timestamp: "desc" }],
-        size: 1000,
       },
     });
 
@@ -193,7 +160,7 @@ export class ScenarioEventRepository {
 
   async deleteAllEvents({ projectId }: { projectId: string }): Promise<void> {
     const validatedProjectId = projectIdSchema.parse(projectId);
-    const client = await esClient({ test: true });
+    const client = await this.getClient();
 
     await client.deleteByQuery({
       index: this.indexName,
@@ -216,7 +183,7 @@ export class ScenarioEventRepository {
   }): Promise<Array<ScenarioBatch>> {
     const validatedProjectId = projectIdSchema.parse(projectId);
 
-    const client = await esClient({ test: true });
+    const client = await this.getClient();
 
     const response = await client.search({
       index: this.indexName,
@@ -228,7 +195,6 @@ export class ScenarioEventRepository {
           unique_batches: {
             terms: {
               field: "batchRunId",
-              size: 1000,
               order: { last_run: "desc" }, // Sort by last_run (timestamp) descending
             },
             aggs: {
@@ -288,8 +254,9 @@ export class ScenarioEventRepository {
     batchRunId: string;
   }): Promise<string[]> {
     const validatedProjectId = projectIdSchema.parse(projectId);
+    const validatedBatchRunId = batchRunIdSchema.parse(batchRunId);
 
-    const client = await esClient({ test: true });
+    const client = await this.getClient();
 
     const response = await client.search({
       index: this.indexName,
@@ -298,7 +265,7 @@ export class ScenarioEventRepository {
           bool: {
             must: [
               { term: { projectId: validatedProjectId } },
-              { term: { batchRunId: batchRunId } },
+              { term: { batchRunId: validatedBatchRunId } },
             ],
           },
         },
@@ -306,7 +273,6 @@ export class ScenarioEventRepository {
           unique_runs: {
             terms: {
               field: "scenarioRunId",
-              size: 1000,
             },
           },
         },
@@ -321,5 +287,17 @@ export class ScenarioEventRepository {
         }
       )?.buckets?.map((bucket) => bucket.key) ?? []
     );
+  }
+
+  /**
+   * Gets or creates a cached Elasticsearch client for test environment.
+   * Avoids recreating the client on every operation for better performance.
+   */
+  private async getClient(): Promise<ElasticClient> {
+    if (!this.client) {
+      this.client = await esClient({ test: true });
+    }
+
+    return this.client;
   }
 }
