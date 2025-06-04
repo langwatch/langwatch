@@ -46,8 +46,8 @@ from langwatch.domain import (
 )
 from langwatch.telemetry.span import LangWatchSpan
 from langwatch.__version__ import __version__
-from langwatch.telemetry.context import stored_langwatch_trace
 from langwatch.utils.initialization import ensure_setup
+import langwatch.telemetry.context
 
 if TYPE_CHECKING:
     from openai import OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI
@@ -103,7 +103,6 @@ class LangWatchTrace:
         self._context_token = None
         self._lock = threading.Lock()
         self._expected_output = expected_output
-        self._cleaned_up = False
         self.span = cast(
             Type[LangWatchSpan], lambda **kwargs: LangWatchSpan(trace=self, **kwargs)
         )
@@ -126,6 +125,7 @@ class LangWatchTrace:
             instrumenting_module_name="langwatch",
             instrumenting_library_version=__version__,
         )
+        self._reset()
 
         # Store root span parameters for later creation
         self._root_span_params = (
@@ -175,26 +175,6 @@ class LangWatchTrace:
                 self._trace_id = context.trace_id
             return self.root_span
 
-    async def _create_root_span_async(self):
-        """Create the root span asynchronously if parameters were provided."""
-        if self._root_span_params is not None:
-            # Pre-serialize timestamps if present
-            root_span_params = dict(self._root_span_params)
-            if (
-                "timestamps" in root_span_params
-                and root_span_params["timestamps"] is not None
-            ):
-                root_span_params["timestamps"] = json.dumps(
-                    root_span_params["timestamps"], cls=SerializableWithStringFallback
-                )
-
-            self.root_span = LangWatchSpan(trace=self, **root_span_params)
-            await self.root_span.__aenter__()
-            context = self.root_span.get_span_context()
-            if context is not None:
-                self._trace_id = context.trace_id
-            return self.root_span
-
     def _cleanup(
         self,
         exc_type: Optional[type],
@@ -213,14 +193,8 @@ class LangWatchTrace:
                 warn(f"Failed to cleanup root span: {e}")
 
             if self._context_token is not None:
-                try:
-                    stored_langwatch_trace.reset(self._context_token)
-                except Exception as e:
-                    # Only warn if it's not a context error
-                    if "different Context" not in str(e):
-                        warn(f"Failed to reset LangWatch trace context: {e}")
-                finally:
-                    self._context_token = None
+                langwatch.telemetry.context._reset_current_trace(self._context_token)
+                self._context_token = None
 
             self._cleaned_up = True
 
@@ -510,13 +484,15 @@ class LangWatchTrace:
 
             return wrapper
 
+    def _reset(self):
+        self._cleaned_up = False
+
     def __enter__(self) -> "LangWatchTrace":
         """Makes the trace usable as a context manager."""
-        try:
-            # Store the old token and set the new one
-            self._context_token = stored_langwatch_trace.set(self)
-        except Exception as e:
-            warn(f"Failed to set LangWatch trace context: {e}")
+        self._reset()
+
+        # Store the old token and set the new one
+        self._context_token = langwatch.telemetry.context._set_current_trace(self)
 
         if self._root_span_params is not None:
             self._create_root_span()
@@ -541,14 +517,13 @@ class LangWatchTrace:
 
     async def __aenter__(self) -> "LangWatchTrace":
         """Makes the trace usable as an async context manager."""
-        try:
-            # Store the old token and set the new one
-            self._context_token = stored_langwatch_trace.set(self)
-        except Exception as e:
-            warn(f"Failed to set LangWatch trace context: {e}")
+        self._reset()
+
+        # Store the old token and set the new one
+        self._context_token = langwatch.telemetry.context._set_current_trace(self)
 
         if self._root_span_params is not None:
-            await self._create_root_span_async()
+            self._create_root_span()
 
         return self
 

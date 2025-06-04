@@ -20,6 +20,7 @@ import threading
 import inspect
 
 from langwatch.attributes import AttributeKey
+import langwatch.telemetry.context
 from langwatch.utils.transformation import (
     SerializableWithStringFallback,
     rag_contexts,
@@ -35,7 +36,6 @@ from opentelemetry.trace import (
     Span as OtelSpan,
     Status,
     StatusCode,
-    get_current_span,
     SpanContext,
     set_span_in_context,
 )
@@ -54,9 +54,9 @@ from langwatch.domain import (
     RAGChunk,
     SpanTypes,
 )
+import langwatch.telemetry.context
 from langwatch.telemetry.types import SpanType, SpanInputType, ContextsType
 from langwatch.__version__ import __version__
-from .context import stored_langwatch_span, stored_langwatch_trace, get_current_trace
 from langwatch.utils.initialization import ensure_setup
 
 if TYPE_CHECKING:
@@ -119,8 +119,7 @@ class LangWatchSpan:
             attributes[AttributeKey.DeprecatedSpanId] = str(span_id)
 
         # Initialize critical instance attributes first
-        self._lock = threading.Lock()
-        self._cleaned_up = False
+        self._reset()
 
         # Initialize other attributes
         self.trace = trace
@@ -154,11 +153,20 @@ class LangWatchSpan:
         self.span = cast(
             Type["LangWatchSpan"],
             lambda **kwargs: LangWatchSpan(
-                trace=trace or stored_langwatch_trace.get(None), **kwargs
+                trace=trace
+                or langwatch.telemetry.context.get_current_trace(
+                    suppress_warning=True, start_if_none=True
+                ),
+                **kwargs,
             ),
         )
 
         self._create_span(do_not_set_context=True)
+
+    def _reset(self):
+        self._lock = threading.Lock()
+        self._cleaned_up = False
+        self._context_token = None
 
     def _create_span(self, do_not_set_context: bool = False):
         """Internal method to create and start the OpenTelemetry span."""
@@ -168,34 +176,12 @@ class LangWatchSpan:
             else:
                 tracer = trace_api.get_tracer("langwatch", __version__)
 
-            # Handle parent span
-            parent = self.parent
-            if parent is None:
-                # If no explicit parent, try to get from context
-                current_span = stored_langwatch_span.get(None)
-                if current_span is not None:
-                    parent = current_span._span
-                else:
-                    # If still no parent, use the current span from OpenTelemetry context
-                    parent = get_current_span()
-            parent_span_context: Optional[Context] = None
-            if isinstance(parent, LangWatchSpan):
-                parent_span_context = set_span_in_context(parent._span)
-
-            span_ctx = None
-            if self.span_context is not None:
-                span_ctx = trace_api.set_span_in_context(
-                    NonRecordingSpan(self.span_context)
-                )
-            elif parent_span_context is not None:
-                span_ctx = parent_span_context
-
-            self._cleaned_up = False
+            # Reset the span to ensure it's in a clean state
+            self._reset()
 
             if do_not_set_context:
                 self._span = tracer.start_span(
                     name=self.name or self.type,
-                    context=span_ctx,
                     kind=self.kind,
                     links=self.links,
                     start_time=self.start_time,
@@ -204,6 +190,23 @@ class LangWatchSpan:
                     attributes=self.attributes,
                 )
             else:
+                # Handle parent span
+                parent = self.parent
+                if parent is None:
+                    parent = langwatch.telemetry.context.get_current_span()
+
+                parent_span_context: Optional[Context] = None
+                if isinstance(parent, LangWatchSpan):
+                    parent_span_context = set_span_in_context(parent._span)
+
+                span_ctx = None
+                if self.span_context is not None:
+                    span_ctx = trace_api.set_span_in_context(
+                        NonRecordingSpan(self.span_context)
+                    )
+                elif parent_span_context is not None:
+                    span_ctx = parent_span_context
+
                 # Create the underlying OpenTelemetry span
                 try:
                     self._span_context_manager = tracer.start_as_current_span(
@@ -218,6 +221,13 @@ class LangWatchSpan:
                         end_on_exit=True,
                     )
                     self._span = self._span_context_manager.__enter__()
+
+                    # Instead of just using OpenTelemetry's context management directly,
+                    # we'll store the span in a way that survives async boundaries
+                    self._context_token = langwatch.telemetry.context._set_current_span(
+                        self
+                    )
+
                 except Exception as e:
                     warn(f"Failed to set span on context: {str(e)}.")
                     return
@@ -336,7 +346,10 @@ class LangWatchSpan:
                 truncate_object_recursively(
                     convert_typed_values(deepcopy(input)),
                     max_string_length=(
-                        self.trace or get_current_trace(suppress_warning=True)
+                        self.trace
+                        or langwatch.telemetry.context.get_current_trace(
+                            suppress_warning=True
+                        )
                     ).max_string_length,
                 ),
                 cls=SerializableWithStringFallback,
@@ -347,7 +360,10 @@ class LangWatchSpan:
                 truncate_object_recursively(
                     convert_typed_values(deepcopy(output)),
                     max_string_length=(
-                        self.trace or get_current_trace(suppress_warning=True)
+                        self.trace
+                        or langwatch.telemetry.context.get_current_trace(
+                            suppress_warning=True
+                        )
                     ).max_string_length,
                 ),
                 cls=SerializableWithStringFallback,
@@ -366,7 +382,10 @@ class LangWatchSpan:
                 truncate_object_recursively(
                     rag_contexts(contexts),
                     max_string_length=(
-                        self.trace or get_current_trace(suppress_warning=True)
+                        self.trace
+                        or langwatch.telemetry.context.get_current_trace(
+                            suppress_warning=True
+                        )
                     ).max_string_length,
                 ),
                 cls=SerializableWithStringFallback,
@@ -603,11 +622,17 @@ class LangWatchSpan:
                 finally:
                     self._span_context_manager = None
 
+            if self._context_token is not None:
+                langwatch.telemetry.context._reset_current_span(self._context_token)
+                self._context_token = None
+
             self._cleaned_up = True
 
     def __enter__(self) -> "LangWatchSpan":
         """Makes the span usable as a context manager."""
-        self.trace = self.trace or stored_langwatch_trace.get(None)
+        self.trace = self.trace or langwatch.telemetry.context.get_current_trace(
+            suppress_warning=True, start_if_none=True
+        )
         if not self.ignore_missing_trace_warning and not self.trace and not self.parent:
             warn("No current trace found, some spans may not be sent to LangWatch")
 
@@ -615,7 +640,11 @@ class LangWatchSpan:
         self.span = cast(
             Type["LangWatchSpan"],
             lambda **kwargs: LangWatchSpan(
-                trace=self.trace or stored_langwatch_trace.get(None), **kwargs
+                trace=self.trace
+                or langwatch.telemetry.context.get_current_trace(
+                    suppress_warning=True, start_if_none=True
+                ),
+                **kwargs,
             ),
         )
 
@@ -640,7 +669,9 @@ class LangWatchSpan:
 
     async def __aenter__(self) -> "LangWatchSpan":
         """Makes the span usable as an async context manager."""
-        self.trace = self.trace or stored_langwatch_trace.get(None)
+        self.trace = self.trace or langwatch.telemetry.context.get_current_trace(
+            suppress_warning=True, start_if_none=True
+        )
         if not self.ignore_missing_trace_warning and not self.trace and not self.parent:
             warn("No current trace found, some spans may not be sent to LangWatch")
 
@@ -648,7 +679,11 @@ class LangWatchSpan:
         self.span = cast(
             Type["LangWatchSpan"],
             lambda **kwargs: LangWatchSpan(
-                trace=self.trace or stored_langwatch_trace.get(None), **kwargs
+                trace=self.trace
+                or langwatch.telemetry.context.get_current_trace(
+                    suppress_warning=True, start_if_none=True
+                ),
+                **kwargs,
             ),
         )
 
@@ -673,7 +708,9 @@ class LangWatchSpan:
 
     def __del__(self):
         """Ensure span context is cleaned up if object is garbage collected."""
-        self._cleanup(None, None, None)
+        # Make sure we don't call _cleanup if the span was not even initialized
+        if hasattr(self, "_lock"):
+            self._cleanup(None, None, None)
 
     def _set_callee_input_information(
         self, func: Callable[..., Any], *args: Any, **kwargs: Any
@@ -749,8 +786,7 @@ class LangWatchSpan:
         span.type = "span"
         span.ignore_missing_trace_warning = True
         span._span = otel_span
-        span._lock = threading.Lock()
-        span._cleaned_up = False
+        span._reset()
         # TODO(afr): Check if this is correct
         span.capture_input = True
         span.capture_output = True
