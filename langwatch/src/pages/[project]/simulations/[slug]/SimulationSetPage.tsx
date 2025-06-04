@@ -10,12 +10,9 @@ import "@copilotkit/react-ui/styles.css";
 import "../simulations.css";
 
 // Main layout for a single Simulation Set page
-export default function SimulationSetPage() {
+export function SimulationSetPage({ batchRunId }: { batchRunId: string }) {
   const router = useRouter();
   const { scale, containerRef, zoomIn, zoomOut } = useZoom();
-
-  const batchRunId = (router.query.batchRunId ?? null) as string | null;
-
   const { data: scenarioRunIds } = useFetchScenarioRunsForBatch({
     batchRunId,
     options: {

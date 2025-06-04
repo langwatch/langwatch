@@ -46,8 +46,9 @@ export class ScenarioRunnerService {
       });
 
     return {
-      messages: latestMessageEvent?.messages || [],
       status: latestRunFinishedEvent?.status || ScenarioRunStatus.IN_PROGRESS,
+      results: latestRunFinishedEvent?.results || null,
+      messages: latestMessageEvent?.messages || [],
     };
   }
 

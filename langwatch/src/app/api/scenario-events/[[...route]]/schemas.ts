@@ -2,8 +2,17 @@
  * Scenario event schemas
  * Extends the AG-UI base event schema to add scenario-specific fields.
  */
-import { z } from "zod";
 import { EventType, MessagesSnapshotEventSchema } from "@ag-ui/core";
+import { z } from "zod";
+
+/**
+ * Verdict enum represents the possible outcomes of a test scenario
+ */
+export enum Verdict {
+  Success = "success",
+  Failure = "failure",
+  Inconclusive = "inconclusive",
+}
 
 // Scenario event type enum
 export enum ScenarioEventType {
@@ -85,19 +94,20 @@ export const scenarioRunStartedSchema = baseScenarioEventSchema.extend({
   //   }),
 });
 
+// Schema for scenario result, matching the provided Python dataclass structure
+const scenarioResultsSchema = z.object({
+  verdict: z.nativeEnum(Verdict),
+  reasoning: z.string().optional(),
+  metCriteria: z.array(z.string()),
+  unmetCriteria: z.array(z.string()),
+});
+export type ScenarioResults = z.infer<typeof scenarioResultsSchema>;
+
 // Scenario Run Finished Event
-// TODO: Consider error, metrics
 export const scenarioRunFinishedSchema = baseScenarioEventSchema.extend({
   type: z.literal(ScenarioEventType.RUN_FINISHED),
   status: z.nativeEnum(ScenarioRunStatus),
-  //   error: z
-  //     .object({
-  //       message: z.string(),
-  //       code: z.string().optional(),
-  //       stack: z.string().optional(),
-  //     })
-  //     .optional(),
-  //   metrics: z.record(z.number()).optional(),
+  results: scenarioResultsSchema.optional().nullable(),
 });
 
 // Scenario Message Snapshot Event
@@ -154,6 +164,3 @@ export const responseSchemas = {
   events: eventsSchema,
   batches: batchesSchema,
 };
-
-// Export additional types
-export type ScenarioBatch = z.infer<typeof scenarioBatchSchema>;
