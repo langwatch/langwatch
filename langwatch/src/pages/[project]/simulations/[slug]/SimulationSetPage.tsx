@@ -4,7 +4,7 @@ import { SimulationZoomGrid } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useZoom } from "~/hooks/useZoom";
-import { useFetchScenarioRunsForBatch } from "~/hooks/simulations";
+import { useFetchScenarioRunIdsForBatch } from "~/hooks/simulations";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import "@copilotkit/react-ui/styles.css";
 import "../simulations.css";
@@ -13,7 +13,7 @@ import "../simulations.css";
 export function SimulationSetPage({ batchRunId }: { batchRunId: string }) {
   const { goToSimulationSets } = useSimulationRouter();
   const { scale, containerRef, zoomIn, zoomOut } = useZoom();
-  const { data: scenarioRunIds } = useFetchScenarioRunsForBatch({
+  const { data: scenarioRunIds } = useFetchScenarioRunIdsForBatch({
     batchRunId,
     options: {
       refreshInterval: 1000,

@@ -247,7 +247,7 @@ export class ScenarioEventRepository {
     );
   }
 
-  async getScenarioRunsForBatch({
+  async getScenarioRunIdsForBatch({
     projectId,
     batchRunId,
   }: {
@@ -321,6 +321,49 @@ export class ScenarioEventRepository {
 
     return response.hits.hits.map(
       (hit) => hit._source as ScenarioRunFinishedEvent
+    );
+  }
+
+  async getScenarioRunIdsForScenario({
+    projectId,
+    scenarioId,
+  }: {
+    projectId: string;
+    scenarioId: string;
+  }): Promise<string[]> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const validatedScenarioId = scenarioIdSchema.parse(scenarioId);
+
+    const client = await this.getClient();
+
+    const response = await client.search({
+      index: this.indexName,
+      body: {
+        query: {
+          bool: {
+            must: [
+              { term: { projectId: validatedProjectId } },
+              { term: { scenarioId: validatedScenarioId } },
+            ],
+          },
+        },
+        aggs: {
+          unique_runs: {
+            terms: {
+              field: "scenarioRunId",
+            },
+          },
+        },
+        size: 0,
+      },
+    });
+
+    return (
+      (
+        response.aggregations?.unique_runs as {
+          buckets: Array<{ key: string }>;
+        }
+      )?.buckets?.map((bucket) => bucket.key) ?? []
     );
   }
 

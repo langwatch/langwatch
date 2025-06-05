@@ -1,12 +1,12 @@
 import useSWR from "swr";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { hc } from "hono/client";
-import type { GetScenarioRunsForBatchRouteType } from "~/app/api/scenario-events/[[...route]]/app";
+import type { GetScenarioRunsIdsForBatchRouteType } from "~/app/api/scenario-events/[[...route]]/app";
 
-const getScenarioRunsForBatch =
-  hc<GetScenarioRunsForBatchRouteType>("/").api["scenario-events"][
+const getScenarioRunIdsForBatch =
+  hc<GetScenarioRunsIdsForBatchRouteType>("/").api["scenario-events"][
     "batch-runs"
-  ][":id"]["scenario-runs"].$get;
+  ][":id"]["scenario-run-ids"].$get;
 
 /**
  * Fetch scenario runs for a specific batch
@@ -14,7 +14,7 @@ const getScenarioRunsForBatch =
  * @param options - Options for the SWR hook
  * @returns Scenario run IDs for the batch
  */
-export const useFetchScenarioRunsForBatch = ({
+export const useFetchScenarioRunIdsForBatch = ({
   batchRunId,
   options,
 }: {
@@ -35,7 +35,7 @@ export const useFetchScenarioRunsForBatch = ({
     async () => {
       if (!batchRunId) return [];
 
-      const res = await getScenarioRunsForBatch(
+      const res = await getScenarioRunIdsForBatch(
         {
           param: {
             id: batchRunId,

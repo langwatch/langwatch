@@ -1,5 +1,5 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { type ScenarioMessageSnapshotEvent } from "~/app/api/scenario-events/[[...route]]/schemas";
+import type { ScenarioMessageSnapshotEvent } from "~/app/api/scenario-events/[[...route]]/types";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
 import { useEffect } from "react";
 import {
