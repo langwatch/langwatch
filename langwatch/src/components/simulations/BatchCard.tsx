@@ -1,4 +1,6 @@
-import { Card, Badge, HStack, VStack, Text } from "@chakra-ui/react";
+import { Card, Badge, HStack, VStack, Text, Box } from "@chakra-ui/react";
+import { BoxIcon } from "lucide-react";
+import { Settings, Clock } from "react-feather";
 
 export interface BatchCardProps {
   title?: string;
@@ -19,20 +21,20 @@ export function BatchCard({
 }: BatchCardProps) {
   const getSuccessColor = (rate: number) => {
     if (rate >= 90) return "green";
-    if (rate >= 50) return "orange";
+    if (rate >= 70) return "orange";
     return "red";
   };
 
   const formatDate = (date: Date | null) => {
     if (!date) return "Unknown";
 
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
       day: "numeric",
-      hour: "2-digit",
+      hour: "numeric",
       minute: "2-digit",
-    });
+      hour12: true,
+    }).format(date);
   };
 
   return (
@@ -41,38 +43,48 @@ export function BatchCard({
       border="1px solid"
       borderColor="gray.200"
       borderRadius="lg"
-      p="6"
-      _hover={{ borderColor: "gray.300", transform: "translateY(-2px)" }}
-      transition="all 0.2s"
-      cursor={!!onClick ? "pointer" : "auto"}
+      p="5"
+      _hover={{
+        borderColor: "gray.300",
+        transform: "translateY(-1px)",
+        shadow: "sm",
+      }}
+      transition="all 0.15s ease"
+      cursor="pointer"
       onClick={onClick}
+      position="relative"
     >
       <VStack align="stretch" gap="4">
-        {/* Header with title and success rate */}
+        {/* Header row with icon, title, and success badge */}
         <HStack justify="space-between" align="start">
-          <Text fontWeight="bold" fontSize="lg" color="gray.900">
-            {title}
-          </Text>
-          <Badge colorPalette={getSuccessColor(successRate)} variant="solid">
+          <HStack gap="3" align="center" flex="1" minWidth="0">
+            <Text fontWeight="600" fontSize="md" color="gray.900" lineClamp={1}>
+              {title}
+            </Text>
+          </HStack>
+          <Badge
+            colorPalette={getSuccessColor(successRate)}
+            variant="solid"
+            fontSize="xs"
+            fontWeight="600"
+            flexShrink={0}
+          >
             {successRate}% Success
           </Badge>
         </HStack>
 
-        {/* Description */}
-        <Text fontSize="sm" color="gray.600">
-          {description}
-        </Text>
+        {/* Scenarios section */}
+        <HStack align="start" gap="1">
+          <Text fontSize="xl" fontWeight="700" color="gray.900">
+            {scenarioCount} scenarios
+          </Text>
+        </HStack>
 
-        {/* Footer with stats and run button */}
-        <HStack justify="space-between" align="center">
-          <VStack align="start" gap="1">
-            <Text fontSize="sm" fontWeight="medium" color="gray.900">
-              {scenarioCount} scenario{scenarioCount !== 1 ? "s" : ""}
-            </Text>
-            <Text fontSize="sm" color="gray.500">
-              Last run: {formatDate(lastRunAt)}
-            </Text>
-          </VStack>
+        {/* Timestamp */}
+        <HStack gap="2" align="center" color="gray.500">
+          <Text fontSize="xs" textTransform="uppercase">
+            Last run: {formatDate(lastRunAt)}
+          </Text>
         </HStack>
       </VStack>
     </Card.Root>
