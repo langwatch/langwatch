@@ -106,7 +106,7 @@ function CriteriaSummary({
 
 // Component for individual history run card
 // Updated to use ScenarioRunData instead of ScenarioRunFinishedEvent
-function HistoryRunCard({
+export function HistoryRunCard({
   run,
   onCardClick,
 }: {
@@ -124,6 +124,7 @@ function HistoryRunCard({
       borderWidth={1}
       borderColor="gray.200"
       bg="gray.50"
+      w="100%"
     >
       <Card.Body py={4} px={6}>
         <HStack justify="space-between" align="center">

@@ -59,8 +59,8 @@ export function IndividuatlSetPage({ scenarioRunId }: IndividuatlSetPageProps) {
           </VStack>
         </PageLayout.Header>
         <VStack alignItems="flex-start" w="100%">
-          <VStack>
-            <HStack height="50vh">
+          <VStack w="100%">
+            <HStack height="50vh" w="100%">
               <Box w="50%" h="100%">
                 <SimulationChatViewer scenarioRunId={scenarioRunId} />
               </Box>
