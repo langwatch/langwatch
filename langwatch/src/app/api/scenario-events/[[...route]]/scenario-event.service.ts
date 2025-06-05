@@ -1,9 +1,6 @@
 import { ScenarioEventRepository } from "./scenario-event.repository";
-import {
-  ScenarioRunStatus,
-  type ScenarioEvent,
-  type ScenarioRunFinishedEvent,
-} from "./schemas";
+import { type ScenarioEvent, type ScenarioRunFinishedEvent } from "./schemas";
+import { ScenarioRunStatus } from "./enums";
 
 export class ScenarioRunnerService {
   private eventRepository: ScenarioEventRepository;

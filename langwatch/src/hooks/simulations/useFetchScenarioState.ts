@@ -4,7 +4,7 @@ import { hc } from "hono/client";
 import type { GetScenarioRunStateRouteType } from "~/app/api/scenario-events/[[...route]]/app";
 import { useEffect } from "react";
 import { useState } from "react";
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/schemas";
+import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 
 const getScenarioRunData =
   hc<GetScenarioRunStateRouteType>("/").api["scenario-events"]["scenario-runs"][
