@@ -8,7 +8,8 @@ import httpx
 import langwatch
 from langwatch.domain import SpanTimestamps
 import nanoid
-from langwatch.telemetry.span import LangWatchSpan, get_current_span
+from langwatch.telemetry.span import LangWatchSpan
+from langwatch.telemetry.context import get_current_span
 from langwatch.state import get_api_key, get_endpoint
 from langwatch.attributes import AttributeKey
 from pydantic import BaseModel
