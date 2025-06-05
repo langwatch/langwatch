@@ -16,8 +16,6 @@ export function SimulationChatViewer({
     scenarioRunId,
   });
 
-  console.log("chatviewer data", data, scenarioRunId);
-
   return (
     <SimulationCard
       title={`Simulation ${scenarioRunId}`}
