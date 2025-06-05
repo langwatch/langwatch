@@ -199,8 +199,8 @@ const getBatchRunIdsRoute = app.get(
 export type GetBatchRunIdsRouteType = typeof getBatchRunIdsRoute;
 
 // GET /api/scenario-events/batch-runs/:id/scenario-runs - Get scenario runs for a batch
-const getScenarioRunsForBatchRoute = app.get(
-  "/batch-runs/:id/scenario-runs",
+const getScenarioRunsIdsForBatchRoute = app.get(
+  "/batch-runs/:id/scenario-run-ids",
   describeRoute({
     description: "List scenario runs for a specific batch",
     responses: {
@@ -217,7 +217,7 @@ const getScenarioRunsForBatchRoute = app.get(
     const batchRunId = c.req.param("id");
 
     const scenarioRunnerService = new ScenarioRunnerService();
-    const ids = await scenarioRunnerService.getScenarioRunsForBatch({
+    const ids = await scenarioRunnerService.getScenarioRunIdsForBatch({
       projectId: project.id,
       batchRunId,
     });
@@ -226,8 +226,30 @@ const getScenarioRunsForBatchRoute = app.get(
   }
 );
 
-export type GetScenarioRunsForBatchRouteType =
-  typeof getScenarioRunsForBatchRoute;
+export type GetScenarioRunsIdsForBatchRouteType =
+  typeof getScenarioRunsIdsForBatchRoute;
+
+const getScenarioRunDataForBatchRoute = app.get(
+  "/batch-runs/:id/scenario-runs",
+  describeRoute({
+    description: "Get scenario run data for a batch",
+  }),
+  async (c) => {
+    const { project } = c.var;
+    const batchRunId = c.req.param("id");
+
+    const scenarioRunnerService = new ScenarioRunnerService();
+    const data = await scenarioRunnerService.getScenarioRunDataForBatch({
+      projectId: project.id,
+      batchRunId,
+    });
+
+    return c.json({ data: data ?? [] });
+  }
+);
+
+export type GetScenarioRunDataForBatchRouteType =
+  typeof getScenarioRunDataForBatchRoute;
 
 // GET /api/scenario-events - Get all events
 app.get(
@@ -280,5 +302,28 @@ export const route = app.delete(
     return c.json({ success: true }, 200);
   }
 );
+
+// GET /api/scenario-events/scenario-runs/data-by-scenario-id/:scenarioId - Get scenario run data by scenario id
+const getScenarioRunDataByScenarioIdRoute = app.get(
+  "/scenario-runs/data-by-scenario-id/:scenarioId",
+  describeRoute({
+    description: "Get scenario run data by scenario id",
+  }),
+  async (c) => {
+    const { project } = c.var;
+    const scenarioId = c.req.param("scenarioId");
+
+    const scenarioRunnerService = new ScenarioRunnerService();
+    const data = await scenarioRunnerService.getScenarioRunDataByScenarioId({
+      projectId: project.id,
+      scenarioId,
+    });
+
+    return c.json({ data });
+  }
+);
+
+export type GetScenarioRunDataByScenarioIdRouteType =
+  typeof getScenarioRunDataByScenarioIdRoute;
 
 export type ScenarioEventsAppType = typeof route;
