@@ -1,13 +1,14 @@
-import {
-  type ScenarioEvent,
-  type ScenarioRunFinishedEvent,
-  type ScenarioMessageSnapshotEvent,
-  ScenarioEventType,
-  scenarioEventSchema,
-} from "./schemas";
-import { esClient } from "~/server/elasticsearch";
-import { z } from "zod";
+import { scenarioEventSchema, scenarioMessageSnapshotSchema } from "./schemas";
+import { ScenarioEventType } from "./enums";
+import type {
+  ScenarioEvent,
+  ScenarioMessageSnapshotEvent,
+  ScenarioRunFinishedEvent,
+  ScenarioBatch,
+} from "./types";
 import { Client as ElasticClient } from "@elastic/elasticsearch";
+import { z } from "zod";
+import { esClient } from "~/server/elasticsearch";
 
 const projectIdSchema = z.string();
 const scenarioRunIdSchema = z.string();

@@ -36,7 +36,6 @@ export function IndividuatlSetPage({ scenarioRunId }: IndividuatlSetPageProps) {
     scenarioId,
   });
 
-  console.log(scenarioState, scenarioId, scenarioResultsHistory);
   /**
    * Set the current scenario id when the scenario results history is loaded (once)
    */
