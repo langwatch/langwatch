@@ -9,7 +9,6 @@ import re
 import sys
 import threading
 import random
-import httpx
 
 from typing import Any, Dict, List, cast
 from joblib.memory import MemorizedFunc, AsyncMemorizedFunc
