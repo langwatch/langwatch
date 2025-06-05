@@ -320,7 +320,6 @@ def get_dataset_entry_selection(
     Returns:
         List of selected entries
     """
-    print("getting dataset entry selection", entry_selection)
     if not entries:
         return []
 
@@ -328,11 +327,10 @@ def get_dataset_entry_selection(
         if entry_selection < 0 or entry_selection >= len(entries):
             raise ValueError(f"Invalid entry selection index: {entry_selection}")
         return [entries[entry_selection]]
-    elif entry_selection == "first":
+    if entry_selection == "first":
         return entries[:1]
-    elif entry_selection == "last":
+    if entry_selection == "last":
         return entries[-1:]
-    elif entry_selection == "random":
+    if entry_selection == "random":
         return [random.choice(entries)] if entries else []
-    else:  # "all" or any other value
-        return entries
+    return entries
