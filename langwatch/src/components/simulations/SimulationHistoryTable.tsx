@@ -74,12 +74,33 @@ function VerdictBadge({ verdict }: { verdict?: string }) {
   );
 }
 
-// Component for completion status badge
-function CompletionBadge() {
+// Component for criteria summary display
+function CriteriaSummary({
+  metCriteria,
+  unmetCriteria,
+}: {
+  metCriteria: string[];
+  unmetCriteria: string[];
+}) {
+  const metCount = metCriteria.length;
+  const totalCount = metCount + unmetCriteria.length;
+
+  if (totalCount === 0) {
+    return null;
+  }
+
+  // Determine color based on success rate
+  const successRate = metCount / totalCount;
+  const getColor = () => {
+    if (successRate === 1) return "green.600";
+    if (successRate >= 0.5) return "yellow.600";
+    return "red.600";
+  };
+
   return (
-    <Badge colorPalette="gray" size="sm" variant="subtle">
-      completed
-    </Badge>
+    <Text fontSize="sm" color={getColor()} fontWeight="bold">
+      {metCount}/{totalCount}
+    </Text>
   );
 }
 
@@ -105,21 +126,28 @@ function HistoryRunCard({
         <HStack justify="space-between" align="center">
           <HStack gap={4} align="center">
             <StatusIcon status={event.status} />
-            <VStack align="start" gap={0}>
+            <VStack align="start" gap={1}>
               <Text fontWeight="semibold" color="gray.900">
                 Run {event.scenarioRunId}
               </Text>
-              <Text fontSize="sm" color="gray.600">
-                {formatDistanceToNow(event.timestamp || Date.now(), {
-                  addSuffix: true,
-                })}
-              </Text>
+              <VStack align="start" gap={0}>
+                <Text fontSize="sm" color="gray.600">
+                  {formatDistanceToNow(event.timestamp || Date.now(), {
+                    addSuffix: true,
+                  })}
+                </Text>
+              </VStack>
             </VStack>
           </HStack>
 
           <HStack gap={3} align="center">
             <VerdictBadge verdict={event.results?.verdict} />
-            <CompletionBadge />
+            {event.results && (
+              <CriteriaSummary
+                metCriteria={event.results.metCriteria}
+                unmetCriteria={event.results.unmetCriteria}
+              />
+            )}
           </HStack>
         </HStack>
       </Card.Body>

@@ -1,17 +1,17 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft, ZoomIn, ZoomOut } from "react-feather";
-import { useRouter } from "next/router";
 import { SimulationZoomGrid } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useZoom } from "~/hooks/useZoom";
 import { useFetchScenarioRunsForBatch } from "~/hooks/simulations";
+import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import "@copilotkit/react-ui/styles.css";
 import "../simulations.css";
 
 // Main layout for a single Simulation Set page
 export function SimulationSetPage({ batchRunId }: { batchRunId: string }) {
-  const router = useRouter();
+  const { goToSimulationSets } = useSimulationRouter();
   const { scale, containerRef, zoomIn, zoomOut } = useZoom();
   const { data: scenarioRunIds } = useFetchScenarioRunsForBatch({
     batchRunId,
@@ -28,11 +28,11 @@ export function SimulationSetPage({ batchRunId }: { batchRunId: string }) {
         marginTop={8}
       >
         <Box mb={4}>
-          <button onClick={() => router.back()}>
+          <Button onClick={() => goToSimulationSets()}>
             <HStack>
               <ArrowLeft size={14} /> Back to Simulation Sets
             </HStack>
-          </button>
+          </Button>
         </Box>
         <PageLayout.Header>
           <VStack alignItems="flex-start">

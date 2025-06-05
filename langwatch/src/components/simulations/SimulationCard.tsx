@@ -1,5 +1,6 @@
 import { Card } from "@chakra-ui/react";
 import { Badge, Box, HStack, VStack, Text } from "@chakra-ui/react";
+import { ExpandIcon } from "lucide-react";
 import { Maximize, Minimize } from "react-feather";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 
@@ -13,8 +14,8 @@ export interface SimulationCardProps {
   title: string;
   status?: ScenarioRunStatus;
   children: React.ReactNode;
-  onExpandToggle: () => void;
-  isExpanded: boolean;
+  onExpandToggle?: () => void;
+  isExpanded?: boolean;
   runAt: Date;
 }
 
@@ -28,8 +29,8 @@ function SimulationCardHeader({
 }: {
   title: string;
   status?: ScenarioRunStatus;
-  isExpanded: boolean;
-  onExpandToggle: () => void;
+  isExpanded?: boolean;
+  onExpandToggle?: () => void;
   runAt: Date;
 }) {
   const statusColor = {
@@ -49,7 +50,7 @@ function SimulationCardHeader({
       borderColor="gray.200"
       w="100%"
     >
-      <HStack justify="space-between" align="center" w="100%">
+      <HStack justify="space-between" align="flex-start" w="100%" gap={6}>
         <VStack align="start" gap={1} flex={1}>
           <Text fontSize="lg" fontWeight="bold" color="gray.900">
             {title}
@@ -65,22 +66,22 @@ function SimulationCardHeader({
             </HStack>
           )}
         </VStack>
-        <Box
-          as="button"
-          aria-label={isExpanded ? "Minimize" : "Expand"}
-          p={2}
-          borderRadius="md"
-          opacity={0.7}
-          _hover={{
-            opacity: 1,
-            bg: "gray.100",
-          }}
-          onClick={onExpandToggle}
-          cursor="pointer"
-          transition="all 0.2s"
-        >
-          {!isExpanded ? <Maximize size={16} /> : <Minimize size={16} />}
-        </Box>
+        {onExpandToggle && (
+          <Box
+            as="button"
+            aria-label={isExpanded ? "Minimize" : "Expand"}
+            borderRadius="md"
+            opacity={0.7}
+            _hover={{
+              opacity: 1,
+            }}
+            onClick={onExpandToggle}
+            cursor="pointer"
+            transition="all 0.2s"
+          >
+            <ExpandIcon size={16} />
+          </Box>
+        )}
       </HStack>
     </Card.Header>
   );

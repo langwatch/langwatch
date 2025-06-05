@@ -13,10 +13,15 @@ export const useSimulationRouter = () => {
     router.push(`/${project?.slug}/simulations/${simulationBatchId}`);
   };
 
+  const goToSimulationSets = () => {
+    router.push(`/${project?.slug}/simulations`);
+  };
+
   return {
     ...router,
     slug: router.query.slug?.toString(),
     goToSimulationRun,
     goToSimulationBatch,
+    goToSimulationSets,
   };
 };
