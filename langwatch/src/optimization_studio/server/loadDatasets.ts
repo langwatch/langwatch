@@ -78,14 +78,27 @@ export const loadDatasets = async (
         throw new Error("Dataset ID is required");
       }
 
+      if (entrySelection == "all") {
+        return node;
+      }
+
+      const dataset = await getFullDataset({
+        datasetId: node.data.dataset.id,
+        projectId,
+        entrySelection,
+      });
+      if (!dataset) {
+        throw new Error("Dataset not found");
+      }
+      const inMemoryDataset = datasetDatabaseRecordsToInMemoryDataset(dataset);
+      delete inMemoryDataset.datasetId;
+      const inlineDataset = inMemoryDatasetToNodeDataset(inMemoryDataset);
+
       return {
         ...node,
         data: {
           ...node.data,
-          dataset: {
-            id: node.data.dataset.id,
-            entrySelection,
-          },
+          dataset: inlineDataset,
         },
       } as Node<Component>;
     })
