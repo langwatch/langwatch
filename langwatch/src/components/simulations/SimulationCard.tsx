@@ -1,7 +1,7 @@
 import { Card } from "@chakra-ui/react";
 import { Badge, Box, HStack, VStack, Text } from "@chakra-ui/react";
 import { Maximize, Minimize } from "react-feather";
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/schemas";
+import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 
 // Card props: title, status, messages
 export interface SimulationCardMessage {
