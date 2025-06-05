@@ -1,22 +1,19 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft, ZoomIn, ZoomOut } from "react-feather";
-import { useRouter } from "next/router";
 import { SimulationZoomGrid } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { useZoom } from "~/hooks/useZoom";
-import { useFetchScenarioRunsForBatch } from "~/hooks/simulations";
+import { useFetchScenarioRunIdsForBatch } from "~/hooks/simulations";
+import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import "@copilotkit/react-ui/styles.css";
 import "../simulations.css";
 
 // Main layout for a single Simulation Set page
-export default function SimulationSetPage() {
-  const router = useRouter();
+export function SimulationSetPage({ batchRunId }: { batchRunId: string }) {
+  const { goToSimulationSets } = useSimulationRouter();
   const { scale, containerRef, zoomIn, zoomOut } = useZoom();
-
-  const batchRunId = (router.query.batchRunId ?? null) as string | null;
-
-  const { data: scenarioRunIds } = useFetchScenarioRunsForBatch({
+  const { data: scenarioRunIds } = useFetchScenarioRunIdsForBatch({
     batchRunId,
     options: {
       refreshInterval: 1000,
@@ -31,11 +28,11 @@ export default function SimulationSetPage() {
         marginTop={8}
       >
         <Box mb={4}>
-          <button onClick={() => router.back()}>
+          <Button onClick={() => goToSimulationSets()}>
             <HStack>
               <ArrowLeft size={14} /> Back to Simulation Sets
             </HStack>
-          </button>
+          </Button>
         </Box>
         <PageLayout.Header>
           <VStack alignItems="flex-start">
