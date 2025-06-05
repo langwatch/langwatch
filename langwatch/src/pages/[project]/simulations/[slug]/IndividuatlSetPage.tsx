@@ -15,6 +15,7 @@ import {
   SimulationHistoryTable,
 } from "~/components/simulations";
 import { useEffect, useState } from "react";
+import { useFetchScenarioRunDataByScenarioId } from "~/hooks/simulations/useFetchScenarioRunDataByScenarioId";
 
 interface IndividuatlSetPageProps {
   scenarioRunId: string;
@@ -26,9 +27,10 @@ export function IndividuatlSetPage({ scenarioRunId }: IndividuatlSetPageProps) {
   const { data: scenarioState } = useFetchScenarioRunData({
     scenarioRunId,
   });
-  const { data: scenarioResultsHistory } = useFetchScenarioResultsHistory({
+  const { data: scenarioRunData } = useFetchScenarioRunDataByScenarioId({
     scenarioId: scenarioState?.scenarioId,
   });
+
   const results = scenarioState?.results;
 
   return (
@@ -75,9 +77,7 @@ export function IndividuatlSetPage({ scenarioRunId }: IndividuatlSetPageProps) {
               )}
             </HStack>
           </VStack>
-          <SimulationHistoryTable
-            history={scenarioResultsHistory?.history ?? []}
-          />
+          <SimulationHistoryTable history={scenarioRunData?.data ?? []} />
         </VStack>
       </PageLayout.Container>
     </DashboardLayout>

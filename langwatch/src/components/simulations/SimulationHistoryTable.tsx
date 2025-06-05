@@ -15,12 +15,12 @@ import {
   AlertTriangle,
 } from "react-feather";
 import { useState } from "react";
-import type { ScenarioRunFinishedEvent } from "~/app/api/scenario-events/[[...route]]/types";
 import { formatDistanceToNow } from "date-fns";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
+import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 
 interface SimulationHistoryTableProps {
-  history: ScenarioRunFinishedEvent[];
+  history: ScenarioRunData[];
 }
 
 // Component for status icon based on status
@@ -105,17 +105,20 @@ function CriteriaSummary({
 }
 
 // Component for individual history run card
+// Updated to use ScenarioRunData instead of ScenarioRunFinishedEvent
 function HistoryRunCard({
-  event,
+  run,
   onCardClick,
 }: {
-  event: ScenarioRunFinishedEvent;
+  run: ScenarioRunData;
   onCardClick: (runId: string) => void;
 }) {
+  // Assumption: scenarioRunId is the unique identifier for the run
+  // If you want to use a different field, update accordingly
   return (
     <Card.Root
       cursor="pointer"
-      onClick={() => onCardClick(event.scenarioRunId)}
+      onClick={() => onCardClick(run.scenarioRunId)}
       _hover={{ bg: "gray.25", borderColor: "gray.300" }}
       transition="all 0.2s"
       borderWidth={1}
@@ -125,14 +128,15 @@ function HistoryRunCard({
       <Card.Body py={4} px={6}>
         <HStack justify="space-between" align="center">
           <HStack gap={4} align="center">
-            <StatusIcon status={event.status} />
+            <StatusIcon status={run.status} />
             <VStack align="start" gap={1}>
               <Text fontWeight="semibold" color="gray.900">
-                Run {event.scenarioRunId}
+                Run {run.scenarioRunId}
               </Text>
               <VStack align="start" gap={0}>
                 <Text fontSize="sm" color="gray.600">
-                  {formatDistanceToNow(event.timestamp || Date.now(), {
+                  {/* No timestamp in ScenarioRunData, so we use Date.now() as fallback */}
+                  {formatDistanceToNow(Date.now(), {
                     addSuffix: true,
                   })}
                 </Text>
@@ -141,11 +145,11 @@ function HistoryRunCard({
           </HStack>
 
           <HStack gap={3} align="center">
-            <VerdictBadge verdict={event.results?.verdict} />
-            {event.results && (
+            <VerdictBadge verdict={run.results?.verdict} />
+            {run.results && (
               <CriteriaSummary
-                metCriteria={event.results.metCriteria}
-                unmetCriteria={event.results.unmetCriteria}
+                metCriteria={run.results.metCriteria}
+                unmetCriteria={run.results.unmetCriteria}
               />
             )}
           </HStack>
@@ -193,10 +197,10 @@ export function SimulationHistoryTable({
           <Collapsible.Content>
             <Box mt={4}>
               <VStack gap={3} align="stretch">
-                {history.map((event) => (
+                {history.map((run) => (
                   <HistoryRunCard
-                    key={event.scenarioRunId}
-                    event={event}
+                    key={run.scenarioRunId}
+                    run={run}
                     onCardClick={handleCardClick}
                   />
                 ))}

@@ -1,12 +1,11 @@
-import { EventType, MessagesSnapshotEventSchema } from "@ag-ui/core";
 import { z } from "zod";
-import { ScenarioEventType, ScenarioRunStatus, Verdict } from "./enums";
 import {
   scenarioRunStartedSchema,
   scenarioRunFinishedSchema,
   scenarioMessageSnapshotSchema,
   scenarioEventSchema,
   scenarioBatchSchema,
+  runDataSchema,
 } from "./schemas";
 
 // Type exports
@@ -19,3 +18,4 @@ export type ScenarioMessageSnapshotEvent = z.infer<
 >;
 export type ScenarioEvent = z.infer<typeof scenarioEventSchema>;
 export type ScenarioBatch = z.infer<typeof scenarioBatchSchema>;
+export type ScenarioRunData = z.infer<typeof runDataSchema>;

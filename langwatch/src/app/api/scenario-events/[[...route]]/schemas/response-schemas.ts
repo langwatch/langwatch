@@ -10,19 +10,22 @@ import {
   scenarioIdSchema,
   batchRunIdSchema,
   scenarioResultsSchema,
+  scenarioRunIdSchema,
 } from "./event-schemas";
 
 // Define response schemas
 const successSchema = z.object({ success: z.boolean() });
 const errorSchema = z.object({ error: z.string() });
-const runDataSchema = z.object({
+export const runDataSchema = z.object({
   scenarioId: scenarioIdSchema,
   batchRunId: batchRunIdSchema,
+  scenarioRunId: scenarioRunIdSchema,
   status: z.nativeEnum(ScenarioRunStatus),
   results: scenarioResultsSchema.optional().nullable(),
-  messages: z.array(scenarioMessageSnapshotSchema.shape.messages),
+  messages: scenarioMessageSnapshotSchema.shape.messages,
+  timestamp: z.number(),
 });
-const runsSchema = z.object({ runs: z.array(z.string()) });
+const runsSchema = z.object({ runs: z.array(runDataSchema) });
 const eventsSchema = z.object({ events: z.array(scenarioEventSchema) });
 export const scenarioBatchSchema = z.object({
   batchRunId: z.string(),

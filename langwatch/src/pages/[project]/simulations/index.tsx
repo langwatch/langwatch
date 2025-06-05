@@ -1,12 +1,15 @@
-import { Grid, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
+import { useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { BatchCard } from "~/components/simulations";
+import { BatchesTable, ViewToggle, ViewMode } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useFetchScenarioBatches } from "~/hooks/simulations";
 
 export default function SimulationsPage() {
   const router = useRouter();
+  const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Table);
 
   // Fetch all batch run IDs with scenario counts
   const {
@@ -30,7 +33,13 @@ export default function SimulationsPage() {
         marginTop={8}
       >
         <PageLayout.Header>
-          <PageLayout.Heading>Simulation Batches</PageLayout.Heading>
+          <HStack justify="space-between" align="center" w="full">
+            <PageLayout.Heading>Simulation Batches</PageLayout.Heading>
+            {/* Only show view toggle when we have batches */}
+            {batches && batches.length > 0 && (
+              <ViewToggle currentView={viewMode} onViewChange={setViewMode} />
+            )}
+          </HStack>
         </PageLayout.Header>
 
         {/* Show loading state */}
@@ -62,24 +71,34 @@ export default function SimulationsPage() {
           </VStack>
         )}
 
-        {/* Grid layout for batch cards */}
+        {/* Render based on view mode */}
         {batches && batches.length > 0 && (
-          <Grid
-            templateColumns="repeat(auto-fit, minmax(300px, 1fr))"
-            gap={6}
-            width="full"
-          >
-            {batches.map((batch) => (
-              <BatchCard
-                key={batch.batchRunId}
-                title={batch.batchRunId}
-                scenarioCount={batch.scenarioCount}
-                successRate={batch.successRate}
-                lastRunAt={batch.lastRunAt ? new Date(batch.lastRunAt) : null}
-                onClick={() => handleBatchClick(batch.batchRunId)}
-              />
-            ))}
-          </Grid>
+          <>
+            {viewMode === ViewMode.Grid && (
+              <Grid
+                templateColumns="repeat(auto-fit, minmax(300px, 1fr))"
+                gap={6}
+                width="full"
+              >
+                {batches.map((batch) => (
+                  <BatchCard
+                    key={batch.batchRunId}
+                    title={batch.batchRunId}
+                    scenarioCount={batch.scenarioCount}
+                    successRate={batch.successRate}
+                    lastRunAt={
+                      batch.lastRunAt ? new Date(batch.lastRunAt) : null
+                    }
+                    onClick={() => handleBatchClick(batch.batchRunId)}
+                  />
+                ))}
+              </Grid>
+            )}
+
+            {viewMode === ViewMode.Table && (
+              <BatchesTable batches={batches} onBatchClick={handleBatchClick} />
+            )}
+          </>
         )}
       </PageLayout.Container>
     </DashboardLayout>
