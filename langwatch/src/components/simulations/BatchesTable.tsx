@@ -12,8 +12,12 @@ import { ChevronDown, Package } from "react-feather";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import type { ScenarioBatch } from "~/app/api/scenario-events/[[...route]]/types";
-import { SimulationHistoryTable } from "./SimulationHistoryTable";
+import {
+  HistoryRunCard,
+  SimulationHistoryTable,
+} from "./SimulationHistoryTable";
 import { useFetchScenarioRunDataForBatch } from "~/hooks/simulations/useFetchScenarioRunDataForBatch";
+import { useSimulationRouter } from "~/hooks/simulations";
 
 interface BatchesTableProps {
   batches: ScenarioBatch[];
@@ -75,12 +79,7 @@ function BatchCard({
   };
 
   return (
-    <Card.Root
-      borderWidth={1}
-      borderColor="gray.200"
-      bg="gray.50"
-      transition="all 0.2s"
-    >
+    <Card.Root borderWidth={1} borderColor="gray.200" transition="all 0.2s">
       <Card.Body py={4} px={6}>
         <Collapsible.Root
           open={isExpanded}
@@ -120,38 +119,11 @@ function BatchCard({
 
           <Collapsible.Content>
             <Box mt={4} pt={4} borderTop="1px solid" borderColor="gray.200">
-              <VStack align="start" gap={4}>
-                <HStack gap={4}>
-                  <Text fontSize="sm" color="gray.700">
-                    Success Rate: {batch.successRate}%
-                  </Text>
-                  <Text fontSize="sm" color="gray.700">
-                    Scenarios: {batch.scenarioCount}
-                  </Text>
-                </HStack>
-
-                <Box
-                  as="button"
-                  onClick={handleCardClick}
-                  bg="blue.50"
-                  color="blue.600"
-                  px={3}
-                  py={2}
-                  borderRadius="md"
-                  fontSize="sm"
-                  fontWeight="medium"
-                  _hover={{ bg: "blue.100" }}
-                  transition="all 0.2s"
-                >
-                  View Batch Details →
-                </Box>
-
-                {/* Use the wrapper component that fetches runs on-demand */}
-                <BatchRunsHistoryWrapper
-                  batchRunId={batch.batchRunId}
-                  isOpen={isExpanded}
-                />
-              </VStack>
+              {/* Use the wrapper component that fetches runs on-demand */}
+              <BatchRunsHistoryWrapper
+                batchRunId={batch.batchRunId}
+                isOpen={isExpanded}
+              />
             </Box>
           </Collapsible.Content>
         </Collapsible.Root>
@@ -163,23 +135,15 @@ function BatchCard({
 // Main batches table component - no longer collapsible
 export function BatchesTable({ batches, onBatchClick }: BatchesTableProps) {
   return (
-    <Card.Root w="100%">
-      <Card.Body>
-        <Text fontSize="lg" fontWeight="bold" color="gray.900" mb={4}>
-          Simulation Batches ({batches.length})
-        </Text>
-
-        <VStack gap={3} align="stretch">
-          {batches.map((batch) => (
-            <BatchCard
-              key={batch.batchRunId}
-              batch={batch}
-              onCardClick={onBatchClick}
-            />
-          ))}
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+    <VStack gap={3} align="stretch">
+      {batches.map((batch) => (
+        <BatchCard
+          key={batch.batchRunId}
+          batch={batch}
+          onCardClick={onBatchClick}
+        />
+      ))}
+    </VStack>
   );
 }
 
@@ -192,6 +156,7 @@ export function BatchRunsHistoryWrapper({
   batchRunId,
   isOpen,
 }: BatchRunsHistoryWrapperProps) {
+  const { goToSimulationRun } = useSimulationRouter();
   const { data, isLoading } = useFetchScenarioRunDataForBatch({
     batchRunId,
     options: {
@@ -219,5 +184,19 @@ export function BatchRunsHistoryWrapper({
     );
   }
 
-  return <SimulationHistoryTable history={data} />;
+  const handleCardClick = (runId: string) => {
+    goToSimulationRun(runId);
+  };
+
+  return (
+    <VStack gap={2} py={4} w="100%">
+      {data.map((run) => (
+        <HistoryRunCard
+          key={run.scenarioRunId}
+          run={run}
+          onCardClick={handleCardClick}
+        />
+      ))}
+    </VStack>
+  );
 }

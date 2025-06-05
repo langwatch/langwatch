@@ -31,7 +31,7 @@ export const scenarioBatchSchema = z.object({
   batchRunId: z.string(),
   scenarioCount: z.number(),
   successRate: z.number(),
-  lastRunAt: z.date(),
+  lastRunAt: z.number(), // timestamp
 });
 
 const batchesSchema = z.object({
