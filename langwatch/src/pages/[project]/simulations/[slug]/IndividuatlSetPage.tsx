@@ -6,7 +6,6 @@ import "@copilotkit/react-ui/styles.css";
 import "../simulations.css";
 import { SimulationChatViewer } from "~/components/simulations";
 import {
-  useFetchScenarioResultsHistory,
   useSimulationRouter,
   useFetchScenarioRunData,
 } from "~/hooks/simulations";
@@ -14,7 +13,6 @@ import {
   SimulationResults,
   SimulationHistoryTable,
 } from "~/components/simulations";
-import { useEffect, useState } from "react";
 import { useFetchScenarioRunDataByScenarioId } from "~/hooks/simulations/useFetchScenarioRunDataByScenarioId";
 
 interface IndividuatlSetPageProps {
@@ -27,8 +25,9 @@ export function IndividuatlSetPage({ scenarioRunId }: IndividuatlSetPageProps) {
   const { data: scenarioState } = useFetchScenarioRunData({
     scenarioRunId,
   });
+  const scenarioId = scenarioState?.scenarioId;
   const { data: scenarioRunData } = useFetchScenarioRunDataByScenarioId({
-    scenarioId: scenarioState?.scenarioId,
+    scenarioId,
   });
 
   const results = scenarioState?.results;
@@ -53,6 +52,9 @@ export function IndividuatlSetPage({ scenarioRunId }: IndividuatlSetPageProps) {
         <PageLayout.Header>
           <VStack alignItems="flex-start">
             <PageLayout.Heading>Simulation</PageLayout.Heading>
+            <Text fontSize="sm" color="gray.500" mt={1} fontWeight="bold">
+              Scenario ID: {scenarioId}
+            </Text>
             <Text fontSize="sm" color="gray.500" mt={1}>
               Scenario Run ID: {scenarioRunId}
             </Text>

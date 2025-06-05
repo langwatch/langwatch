@@ -9,7 +9,7 @@ import { useFetchScenarioBatches } from "~/hooks/simulations";
 
 export default function SimulationsPage() {
   const router = useRouter();
-  const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Table);
+  const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Grid);
 
   // Fetch all batch run IDs with scenario counts
   const {
@@ -80,10 +80,10 @@ export default function SimulationsPage() {
                 gap={6}
                 width="full"
               >
-                {batches.map((batch) => (
+                {batches.map((batch, index) => (
                   <BatchCard
                     key={batch.batchRunId}
-                    title={batch.batchRunId}
+                    title={`Batch #${index + 1}`}
                     scenarioCount={batch.scenarioCount}
                     successRate={batch.successRate}
                     lastRunAt={
