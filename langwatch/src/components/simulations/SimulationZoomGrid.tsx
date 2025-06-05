@@ -55,7 +55,7 @@ export function SimulationZoomGrid({
         }}
       >
         {scenarioRunIds?.map((scenarioRunId) => (
-          <Box key={scenarioRunId} width="full">
+          <Box key={scenarioRunId} width="full" height="400px">
             <SimulationChatViewer
               scenarioRunId={scenarioRunId}
               isExpanded={false}

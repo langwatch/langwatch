@@ -1,4 +1,4 @@
-import { Box, Card, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Card, HStack, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft } from "react-feather";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -22,7 +22,7 @@ interface IndividuatlSetPageProps {
 
 // Main layout for a single Simulation Set page
 export function IndividuatlSetPage({ scenarioRunId }: IndividuatlSetPageProps) {
-  const { back } = useSimulationRouter();
+  const { goToSimulationBatch } = useSimulationRouter();
   const { data: scenarioState } = useFetchScenarioRunData({
     scenarioRunId,
   });
@@ -39,11 +39,14 @@ export function IndividuatlSetPage({ scenarioRunId }: IndividuatlSetPageProps) {
         marginTop={8}
       >
         <Box mb={4}>
-          <button onClick={() => back()}>
+          <Button
+            p={0}
+            onClick={() => goToSimulationBatch(scenarioState?.batchRunId ?? "")}
+          >
             <HStack>
               <ArrowLeft size={14} /> Back to Simulation Batch
             </HStack>
-          </button>
+          </Button>
         </Box>
         <PageLayout.Header>
           <VStack alignItems="flex-start">
@@ -57,11 +60,7 @@ export function IndividuatlSetPage({ scenarioRunId }: IndividuatlSetPageProps) {
           <VStack>
             <HStack height="50vh">
               <Box w="50%" h="100%">
-                <SimulationChatViewer
-                  scenarioRunId={scenarioRunId}
-                  isExpanded={true}
-                  onExpandToggle={() => {}}
-                />
+                <SimulationChatViewer scenarioRunId={scenarioRunId} />
               </Box>
               {results ? (
                 <Card.Root w="50%" borderWidth={1} alignSelf="flex-start">

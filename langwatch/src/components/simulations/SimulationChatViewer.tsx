@@ -8,8 +8,8 @@ export function SimulationChatViewer({
   onExpandToggle,
 }: {
   scenarioRunId: string;
-  isExpanded: boolean;
-  onExpandToggle: () => void;
+  isExpanded?: boolean;
+  onExpandToggle?: () => void;
 }) {
   // Fetch scenario state for this thread
   const { data } = useFetchScenarioRunData({
