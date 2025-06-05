@@ -1,4 +1,4 @@
-import { useFetchScenarioState } from "~/hooks/simulations";
+import { useFetchScenarioRunData } from "~/hooks/simulations";
 import { SimulationCard } from "./SimulationCard";
 import { CustomCopilotKitChat } from "./CustomCopilotKitChat";
 
@@ -12,18 +12,21 @@ export function SimulationChatViewer({
   onExpandToggle: () => void;
 }) {
   // Fetch scenario state for this thread
-  const { data: scenarioState } = useFetchScenarioState({
+  const { data } = useFetchScenarioRunData({
     scenarioRunId,
   });
+
+  console.log("chatviewer data", data, scenarioRunId);
 
   return (
     <SimulationCard
       title={`Simulation ${scenarioRunId}`}
-      status={scenarioState?.status}
+      status={data?.status}
       onExpandToggle={onExpandToggle}
       isExpanded={isExpanded}
+      runAt={new Date(data?.timestamp ?? new Date())}
     >
-      <CustomCopilotKitChat messages={scenarioState?.messages ?? []} />
+      <CustomCopilotKitChat messages={data?.messages ?? []} />
     </SimulationCard>
   );
 }

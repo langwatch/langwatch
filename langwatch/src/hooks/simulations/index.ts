@@ -1,5 +1,5 @@
 export * from "./useFetchScenarioRunIds";
-export * from "./useFetchScenarioState";
+export * from "./useFetchScenarioRunData";
 export * from "./useFetchScenarioBatches";
 export * from "./useFetchScenarioRunsForBatch";
 export * from "./useFetchScenarioResultsHistory";

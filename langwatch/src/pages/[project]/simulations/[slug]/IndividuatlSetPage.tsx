@@ -8,13 +8,13 @@ import { SimulationChatViewer } from "~/components/simulations";
 import {
   useFetchScenarioResultsHistory,
   useSimulationRouter,
-  useFetchScenarioState,
+  useFetchScenarioRunData,
 } from "~/hooks/simulations";
 import {
   SimulationResults,
   SimulationHistoryTable,
 } from "~/components/simulations";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 interface IndividuatlSetPageProps {
   scenarioRunId: string;
@@ -23,34 +23,13 @@ interface IndividuatlSetPageProps {
 // Main layout for a single Simulation Set page
 export function IndividuatlSetPage({ scenarioRunId }: IndividuatlSetPageProps) {
   const { back } = useSimulationRouter();
-  const [currentScenarioId, setCurrentScenarioId] = useState<string | null>(
-    null
-  );
-
-  const { data: scenarioState } = useFetchScenarioState({
+  const { data: scenarioState } = useFetchScenarioRunData({
     scenarioRunId,
   });
-  const scenarioId = scenarioState?.scenarioId ?? "";
-
   const { data: scenarioResultsHistory } = useFetchScenarioResultsHistory({
-    scenarioId,
+    scenarioId: scenarioState?.scenarioId,
   });
-
-  /**
-   * Set the current scenario id when the scenario results history is loaded (once)
-   */
-  useEffect(() => {
-    if (currentScenarioId) return;
-    setCurrentScenarioId(scenarioId);
-  }, [!!scenarioId]);
-
-  const currentScenarioResults = useMemo(
-    () =>
-      scenarioResultsHistory?.history.find(
-        (result) => result.scenarioId === currentScenarioId
-      )?.results,
-    [scenarioResultsHistory, currentScenarioId]
-  );
+  const results = scenarioState?.results;
 
   return (
     <DashboardLayout position="relative">
@@ -74,22 +53,9 @@ export function IndividuatlSetPage({ scenarioRunId }: IndividuatlSetPageProps) {
             </Text>
           </VStack>
         </PageLayout.Header>
-        <VStack alignItems="flex-start">
+        <VStack alignItems="flex-start" w="100%">
           <VStack>
             <HStack height="50vh">
-              {currentScenarioResults ? (
-                <Card.Root w="50%" h="100%" borderWidth={1}>
-                  <Card.Body>
-                    {currentScenarioResults && (
-                      <SimulationResults results={currentScenarioResults} />
-                    )}
-                  </Card.Body>
-                </Card.Root>
-              ) : (
-                <Text mt={4} color="gray.400" fontStyle="italic">
-                  No results available for this scenario run.
-                </Text>
-              )}
               <Box w="50%" h="100%">
                 <SimulationChatViewer
                   scenarioRunId={scenarioRunId}
@@ -97,6 +63,17 @@ export function IndividuatlSetPage({ scenarioRunId }: IndividuatlSetPageProps) {
                   onExpandToggle={() => {}}
                 />
               </Box>
+              {results ? (
+                <Card.Root w="50%" borderWidth={1} alignSelf="flex-start">
+                  <Card.Body>
+                    <SimulationResults results={results} />
+                  </Card.Body>
+                </Card.Root>
+              ) : (
+                <Text mt={4} color="gray.400" fontStyle="italic">
+                  No results available for this scenario run.
+                </Text>
+              )}
             </HStack>
           </VStack>
           <SimulationHistoryTable

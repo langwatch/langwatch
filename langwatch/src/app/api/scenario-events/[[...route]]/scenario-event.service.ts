@@ -1,6 +1,6 @@
 import { ScenarioEventRepository } from "./scenario-event.repository";
-import { type ScenarioEvent, type ScenarioRunFinishedEvent } from "./schemas";
 import { ScenarioRunStatus } from "./enums";
+import type { ScenarioEvent, ScenarioRunFinishedEvent } from "./types";
 
 export class ScenarioRunnerService {
   private eventRepository: ScenarioEventRepository;
@@ -56,6 +56,7 @@ export class ScenarioRunnerService {
       status: latestRunFinishedEvent?.status || ScenarioRunStatus.IN_PROGRESS,
       results: latestRunFinishedEvent?.results || null,
       messages: latestMessageEvent.messages || [],
+      timestamp: latestMessageEvent.timestamp,
     };
   }
 

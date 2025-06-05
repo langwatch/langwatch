@@ -19,7 +19,7 @@ const getScenarioRunData =
  * @param options - Options for the SWR hook
  * @returns Scenario run state
  */
-export const useFetchScenarioState = ({
+export const useFetchScenarioRunData = ({
   scenarioRunId,
   options,
 }: {

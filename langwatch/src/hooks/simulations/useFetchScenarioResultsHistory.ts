@@ -18,7 +18,7 @@ export const useFetchScenarioResultsHistory = ({
   scenarioId,
   options,
 }: {
-  scenarioId: string;
+  scenarioId?: string;
   options?: {
     refreshInterval?: number;
     revalidateOnFocus?: boolean;
@@ -32,6 +32,8 @@ export const useFetchScenarioResultsHistory = ({
   return useSWR(
     cacheKey,
     async () => {
+      if (!scenarioId) return { history: [] };
+
       const res = await getScenarioRunFinishedEventsByScenarioId(
         {
           param: {
@@ -54,6 +56,7 @@ export const useFetchScenarioResultsHistory = ({
       return { history: response.results };
     },
     {
+      enabled: !!scenarioId,
       refreshInterval: options?.refreshInterval,
       revalidateOnFocus: options?.revalidateOnFocus ?? true,
       ...options,

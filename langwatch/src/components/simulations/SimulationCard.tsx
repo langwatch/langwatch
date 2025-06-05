@@ -15,16 +15,23 @@ export interface SimulationCardProps {
   children: React.ReactNode;
   onExpandToggle: () => void;
   isExpanded: boolean;
+  runAt: Date;
 }
 
-export function SimulationCard({
+// Component for the card header with status and expand button
+function SimulationCardHeader({
   title,
   status,
-  children,
-  onExpandToggle,
   isExpanded,
-}: SimulationCardProps) {
-  // Status badge color
+  onExpandToggle,
+  runAt,
+}: {
+  title: string;
+  status?: ScenarioRunStatus;
+  isExpanded: boolean;
+  onExpandToggle: () => void;
+  runAt: Date;
+}) {
   const statusColor = {
     [ScenarioRunStatus.SUCCESS]: "green",
     [ScenarioRunStatus.IN_PROGRESS]: "yellow",
@@ -35,33 +42,111 @@ export function SimulationCard({
   }[status ?? ScenarioRunStatus.IN_PROGRESS];
 
   return (
-    <Card.Root height="100%">
-      <VStack height="100%">
-        <Card.Header flex={0}>
-          <HStack justify="space-between" align="start">
-            <VStack align="start" gap="0">
-              <Text fontWeight="bold">{title}</Text>
-              <Badge colorPalette={statusColor} size="sm" mt="1">
+    <Card.Header
+      py={4}
+      px={6}
+      borderBottom="1px solid"
+      borderColor="gray.200"
+      w="100%"
+    >
+      <HStack justify="space-between" align="center" w="100%">
+        <VStack align="start" gap={1} flex={1}>
+          <Text fontSize="lg" fontWeight="bold" color="gray.900">
+            {title}
+          </Text>
+          {status && (
+            <HStack align="center" gap={2}>
+              <Text fontSize="sm" color="gray.600">
+                Run: {runAt.toLocaleString()}
+              </Text>
+              <Badge colorPalette={statusColor} size="sm">
                 {status}
               </Badge>
-            </VStack>
-            <Box
-              as="button"
-              aria-label="Expand"
-              opacity={0.7}
-              _hover={{ opacity: 1 }}
-              onClick={onExpandToggle}
-              cursor={!!onExpandToggle ? "pointer" : "auto"}
-            >
-              {!isExpanded ? <Maximize size={16} /> : <Minimize size={16} />}
-            </Box>
-          </HStack>
-        </Card.Header>
-        <Card.Body position="relative" height="100%" width="100%">
-          <VStack position="absolute" top={0} left={0} right={0} bottom={0}>
-            {children}
-          </VStack>
-        </Card.Body>
+            </HStack>
+          )}
+        </VStack>
+        <Box
+          as="button"
+          aria-label={isExpanded ? "Minimize" : "Expand"}
+          p={2}
+          borderRadius="md"
+          opacity={0.7}
+          _hover={{
+            opacity: 1,
+            bg: "gray.100",
+          }}
+          onClick={onExpandToggle}
+          cursor="pointer"
+          transition="all 0.2s"
+        >
+          {!isExpanded ? <Maximize size={16} /> : <Minimize size={16} />}
+        </Box>
+      </HStack>
+    </Card.Header>
+  );
+}
+
+// Component for the chat content area
+function SimulationCardContent({ children }: { children: React.ReactNode }) {
+  return (
+    <Card.Body p={0} height="100%" overflow="hidden" position="relative">
+      <Box height="100%" width="100%" position="relative">
+        {children}
+
+        {/* Top fade overlay */}
+        <Box
+          position="absolute"
+          top={0}
+          left={0}
+          right={0}
+          height="30px"
+          background="linear-gradient(to bottom, white, transparent)"
+          pointerEvents="none"
+          zIndex={10}
+        />
+
+        {/* Bottom fade overlay */}
+        <Box
+          position="absolute"
+          bottom={0}
+          left={0}
+          right={0}
+          height="60px"
+          background="linear-gradient(to top, white, transparent)"
+          pointerEvents="none"
+          zIndex={10}
+        />
+      </Box>
+    </Card.Body>
+  );
+}
+
+// Main simulation card component
+export function SimulationCard({
+  title,
+  status,
+  children,
+  onExpandToggle,
+  isExpanded,
+  runAt,
+}: SimulationCardProps) {
+  return (
+    <Card.Root
+      height="100%"
+      borderWidth={1}
+      borderColor="gray.200"
+      borderRadius="lg"
+      overflow="hidden"
+    >
+      <VStack height="100%" gap={0}>
+        <SimulationCardHeader
+          title={title}
+          status={status}
+          runAt={runAt}
+          isExpanded={isExpanded}
+          onExpandToggle={onExpandToggle}
+        />
+        <SimulationCardContent>{children}</SimulationCardContent>
       </VStack>
     </Card.Root>
   );
