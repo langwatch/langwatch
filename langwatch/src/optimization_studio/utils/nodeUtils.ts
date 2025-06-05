@@ -30,11 +30,9 @@ export const findLowestAvailableName = (nodesIds: string[], prefix: string) => {
 
 export const getEntryInputs = (edges: Edge[], nodes: Node[]) => {
   const entryEdges = edges.filter((edge: Edge) => edge.source === "entry");
-  const evaluators = nodes.filter(checkIsEvaluator);
 
   const entryInputs = entryEdges.filter(
     (edge: Edge, index, self) =>
-      !evaluators?.some((evaluator: Node) => evaluator.id === edge.target) &&
       self.findIndex((e) => e.sourceHandle === edge.sourceHandle) === index
   );
 
