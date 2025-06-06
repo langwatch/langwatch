@@ -28,13 +28,29 @@ export const findLowestAvailableName = (nodesIds: string[], prefix: string) => {
   return { name, id };
 };
 
-export const getEntryInputs = (edges: Edge[], nodes: Node[]) => {
+export const getEntryInputs = (
+  edges: Edge[],
+  nodes: Node[]
+): (Edge & { optional?: boolean })[] => {
   const entryEdges = edges.filter((edge: Edge) => edge.source === "entry");
+  const evaluators = nodes.filter(checkIsEvaluator);
 
-  const entryInputs = entryEdges.filter(
-    (edge: Edge, index, self) =>
-      self.findIndex((e) => e.sourceHandle === edge.sourceHandle) === index
-  );
+  const entryInputs = entryEdges
+    .filter(
+      (edge: Edge, index, self) =>
+        self.findIndex((e) => e.sourceHandle === edge.sourceHandle) === index
+    )
+    .map((edge: Edge) => {
+      if (
+        !evaluators?.some((evaluator: Node) => evaluator.id === edge.target)
+      ) {
+        return edge;
+      }
+      return {
+        ...edge,
+        optional: true,
+      };
+    });
 
   return entryInputs;
 };
@@ -42,10 +58,11 @@ export const getEntryInputs = (edges: Edge[], nodes: Node[]) => {
 export const getInputsOutputs = (edges: Edge[], nodes: Node[]) => {
   const entryInputs = getEntryInputs(edges, nodes);
 
-  const inputs = entryInputs.map((edge: Edge) => {
+  const inputs = entryInputs.map((edge) => {
     return {
       identifier: edge.sourceHandle?.split(".")[1],
       type: "str",
+      ...(edge.optional ? { optional: true } : {}),
     };
   });
 

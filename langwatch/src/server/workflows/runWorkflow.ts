@@ -43,9 +43,11 @@ const checkForRequiredInputs = (
   );
 
   const requiredInputs: string[] = [];
-  entryInputs.map((input) => {
-    requiredInputs.push(input.sourceHandle?.split(".")[1] ?? "");
-  });
+  entryInputs
+    .filter((input) => !input.optional)
+    .map((input) => {
+      requiredInputs.push(input.sourceHandle?.split(".")[1] ?? "");
+    });
 
   requiredInputs.forEach((input) => {
     if (!bodyInputs.includes(input)) {
