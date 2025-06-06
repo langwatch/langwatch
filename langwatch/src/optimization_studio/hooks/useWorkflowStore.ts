@@ -142,6 +142,7 @@ export const initialDSL: Workflow = {
   enable_tracing: true,
   workflow_type: "workflow",
   state: {},
+  experiment_id: undefined,
 };
 
 export const initialState: State = {
