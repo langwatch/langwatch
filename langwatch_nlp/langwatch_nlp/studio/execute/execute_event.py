@@ -22,6 +22,7 @@ from langwatch_nlp.studio.types.events import (
     ErrorPayload,
     component_error_event,
 )
+import langwatch
 
 
 async def execute_event(
@@ -35,6 +36,7 @@ async def execute_event(
             case "is_alive":
                 yield IsAliveResponse()
             case "execute_component":
+                langwatch.setup(api_key=event.payload.workflow.api_key)
                 try:
                     async for event_ in execute_component(event.payload):
                         yield event_
@@ -48,6 +50,7 @@ async def execute_event(
                         error=_error_repr(e),
                     )
             case "execute_flow":
+                langwatch.setup(api_key=event.payload.workflow.api_key)
                 try:
                     async for event_ in execute_flow(event.payload, queue):
                         yield event_
@@ -57,12 +60,14 @@ async def execute_event(
                     traceback.print_exc()
                     yield Error(payload=ErrorPayload(message=_error_repr(e)))
             case "execute_evaluation":
+                langwatch.setup(api_key=event.payload.workflow.api_key)
                 try:
                     async for event_ in execute_evaluation(event.payload, queue):
                         yield event_
                 except Exception as e:
                     yield Error(payload=ErrorPayload(message=_error_repr(e)))
             case "execute_optimization":
+                langwatch.setup(api_key=event.payload.workflow.api_key)
                 try:
                     async for event_ in execute_optimization(event.payload, queue):
                         yield event_

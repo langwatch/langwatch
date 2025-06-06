@@ -2,7 +2,6 @@ import time
 from typing import Optional, cast
 import dspy
 import sentry_sdk
-import langwatch
 from langwatch_nlp.studio.parser import parsed_and_materialized_workflow_class
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.dspy.evaluation import EvaluationReporting
@@ -47,8 +46,6 @@ async def execute_evaluation(
         # TODO: handle workflow errors here throwing an special event showing the error was during the execution of the workflow?
         yield start_evaluation_event(run_id)
         valid = True
-
-        langwatch.setup(api_key=workflow.api_key)
 
         with parsed_and_materialized_workflow_class(
             workflow,

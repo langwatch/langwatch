@@ -74,8 +74,6 @@ async def execute_optimization(
         if event.s3_cache_key:
             setup_s3_cache(event.s3_cache_key)
 
-        langwatch.setup(api_key=workflow.api_key)
-
         with parsed_and_materialized_workflow_class(
             workflow,
             format=False,
