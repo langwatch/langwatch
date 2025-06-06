@@ -34,12 +34,13 @@ export class LangWatchExporter implements SpanExporter {
   }
 
   export(
-    allSpans: ReadableSpan[],
+    spans: ReadableSpan[],
     resultCallback: (result: ExportResult) => void
   ): void {
-    const spans = allSpans.filter(
+    const filteredSpans = spans.filter(
       (span) => this.includeAllSpans || this.isAiSdkSpan(span)
     );
+
     if (spans.length === 0) {
       resultCallback({ code: ExportResultCode.SUCCESS });
       return;
@@ -50,7 +51,7 @@ export class LangWatchExporter implements SpanExporter {
 
     let body;
     try {
-      body = JSON.stringify(createExportTraceServiceRequest(spans));
+      body = JSON.stringify(createExportTraceServiceRequest(filteredSpans));
     } catch (error) {
       console.error("[LangWatchExporter] Failed to serialize spans:", error);
       resultCallback({ code: ExportResultCode.FAILED });
