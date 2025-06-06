@@ -452,7 +452,7 @@ export const getFullDataset = async ({
 }: {
   datasetId: string;
   projectId: string;
-  entrySelection?: "first" | "last" | "random" | "all";
+  entrySelection?: "first" | "last" | "random" | "all" | number;
   limitMb?: number | null;
 }): Promise<
   | (Dataset & {
@@ -524,7 +524,20 @@ export const getFullDataset = async ({
       where: { datasetId, projectId },
     });
 
-    if (entrySelection === "random" || entrySelection === "last") {
+    if (
+      entrySelection === "random" ||
+      entrySelection === "last" ||
+      typeof entrySelection === "number"
+    ) {
+      const skip =
+        entrySelection === "last"
+          ? Math.max(count - 1, 0)
+          : entrySelection === "random"
+          ? Math.floor(Math.random() * count)
+          : typeof entrySelection === "number"
+          ? Math.max(0, Math.min(entrySelection, count - 1) - 1)
+          : 0;
+
       return {
         ...dataset,
         count,
@@ -532,12 +545,7 @@ export const getFullDataset = async ({
           where: { datasetId, projectId },
           orderBy: { createdAt: "asc" },
           take: 1,
-          skip:
-            entrySelection === "last"
-              ? Math.max(count - 1, 0)
-              : entrySelection === "random"
-              ? Math.floor(Math.random() * count)
-              : 0,
+          skip,
         }),
       };
     }

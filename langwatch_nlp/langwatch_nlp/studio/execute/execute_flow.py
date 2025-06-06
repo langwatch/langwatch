@@ -29,7 +29,10 @@ from langwatch_nlp.studio.utils import (
     disable_dsp_caching,
     optional_langwatch_trace,
     transpose_inline_dataset_to_object_list,
+    get_dataset_entry_selection,
 )
+
+import langwatch
 
 
 async def execute_flow(
@@ -81,6 +84,8 @@ async def execute_flow(
                 module = Module(run_evaluations=True)
                 module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
 
+                langwatch.setup(workflow.api_key)
+
                 entry_node = cast(
                     EntryNode,
                     next(
@@ -94,11 +99,23 @@ async def execute_flow(
                     entries = inputs
 
                 else:
-                    if not entry_node.data.dataset.inline:
-                        raise ValueError("Missing inline dataset in entry node")
-                    entries = transpose_inline_dataset_to_object_list(
-                        entry_node.data.dataset.inline
-                    )
+                    if entry_node.data.dataset.inline:
+                        print("transposing inline dataset")
+                        entries = transpose_inline_dataset_to_object_list(
+                            entry_node.data.dataset.inline
+                        )
+                    else:
+                        if not entry_node.data.dataset.id:
+                            raise ValueError("Dataset ID is required")
+
+                        dataset = langwatch.dataset.get_dataset(
+                            entry_node.data.dataset.id
+                        )
+
+                        entries = get_dataset_entry_selection(
+                            [entry.entry for entry in dataset.entries],
+                            entry_node.data.entry_selection or "all",
+                        )
 
                 if len(entries) == 0:
                     raise ClientReadableValueError(
@@ -107,11 +124,7 @@ async def execute_flow(
 
                 try:
                     input_keys = [input.identifier for input in module_inputs]
-                    inputs_ = {
-                        k: v
-                        for k, v in entries[0].items()
-                        if k in input_keys
-                    }
+                    inputs_ = {k: v for k, v in entries[0].items() if k in input_keys}
                     result = await dspy.asyncify(module.forward)(**inputs_)  # type: ignore
 
                 except Exception as e:

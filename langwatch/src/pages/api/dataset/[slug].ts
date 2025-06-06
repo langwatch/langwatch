@@ -5,6 +5,8 @@ import { createLogger } from "../../../utils/logger";
 
 const logger = createLogger("langwatch:dataset:get");
 
+const MAX_LIMIT_MB = 25;
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -50,9 +52,22 @@ export default async function handler(
       where: { datasetId: dataset.id, projectId: project.id },
     });
 
+    const responseSize = JSON.stringify(datasetRecords).length;
+
+    if (responseSize > MAX_LIMIT_MB * 1024 * 1024) {
+      // Convert MB to bytes
+      return res.status(401).json({
+        status: "error",
+        message: `Dataset size exceeds ${MAX_LIMIT_MB}MB limit`,
+      });
+    }
+
     return res.status(200).json({ data: datasetRecords });
   } catch (e) {
-    logger.error({ error: e, projectId: project.id }, 'error fetching dataset records');
+    logger.error(
+      { error: e, projectId: project.id },
+      "error fetching dataset records"
+    );
     return res
       .status(500)
       .json({ status: "error", message: "Internal server error." });

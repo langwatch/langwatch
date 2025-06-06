@@ -127,7 +127,7 @@ class BatchEvaluation:
         self.threads: List[threading.Thread] = []
 
     def run(self):
-        if langwatch.api_key is None:
+        if langwatch.get_api_key() is None:
             print("API key was not detected, calling langwatch.login()...")
             langwatch.login()
 
@@ -136,8 +136,8 @@ class BatchEvaluation:
         print("Starting batch evaluation...")
         with httpx.Client(timeout=60) as client:
             response = client.post(
-                f"{langwatch.endpoint}/api/experiment/init",
-                headers={"X-Auth-Token": langwatch.api_key or ""},
+                f"{langwatch.get_endpoint()}/api/experiment/init",
+                headers={"X-Auth-Token": langwatch.get_api_key() or ""},
                 json={
                     "experiment_name": self.experiment,
                     "experiment_slug": self.experiment,
@@ -145,7 +145,7 @@ class BatchEvaluation:
                 },
             )
         if response.status_code == 401:
-            langwatch.api_key = None
+            langwatch.get_api_key()
             raise ValueError(
                 "API key is not valid, please try to login again with langwatch.login()"
             )
@@ -155,7 +155,7 @@ class BatchEvaluation:
 
         url_encoded_run_id = urllib.parse.quote(self.run_id)
         print(
-            f"Follow the results at: {langwatch.endpoint}{experiment_path}?runId={url_encoded_run_id}"
+            f"Follow the results at: {langwatch.get_endpoint()}{experiment_path}?runId={url_encoded_run_id}"
         )
 
         if dataset is None:
@@ -187,7 +187,7 @@ class BatchEvaluation:
 
         except Exception as e:
             BatchEvaluation.post_results(
-                langwatch.api_key or "",
+                langwatch.get_api_key() or "",
                 {
                     "experiment_slug": self.experiment_slug,
                     "run_id": self.run_id,
@@ -342,7 +342,7 @@ class BatchEvaluation:
             # Start a new thread to send the batch
             thread = threading.Thread(
                 target=BatchEvaluation.post_results,
-                args=(langwatch.api_key, body),
+                args=(langwatch.get_api_key(), body),
             )
             thread.start()
             self.threads.append(thread)
@@ -359,7 +359,7 @@ class BatchEvaluation:
     )
     def post_results(cls, api_key: str, body: dict):
         response = httpx.post(
-            f"{langwatch.endpoint}/api/evaluations/batch/log_results",
+            f"{langwatch.get_endpoint()}/api/evaluations/batch/log_results",
             headers={"Authorization": f"Bearer {api_key}"},
             json=body,
             timeout=60,
@@ -396,8 +396,8 @@ async def run_evaluation(
         }
 
         request_params = {
-            "url": langwatch.endpoint + f"/api/evaluations/{evaluation}/evaluate",
-            "headers": {"X-Auth-Token": langwatch.api_key},
+            "url": langwatch.get_endpoint() + f"/api/evaluations/{evaluation}/evaluate",
+            "headers": {"X-Auth-Token": langwatch.get_api_key()},
             "json": json_data,
         }
 
@@ -447,8 +447,8 @@ def get_dataset(
     slug: str,
 ) -> list[DatasetRecord]:
     request_params = {
-        "url": langwatch.endpoint + f"/api/dataset/{slug}",
-        "headers": {"X-Auth-Token": str(langwatch.api_key)},
+        "url": langwatch.get_endpoint() + f"/api/dataset/{slug}",
+        "headers": {"X-Auth-Token": str(langwatch.get_api_key())},
     }
 
     with httpx.Client(timeout=300) as client:
