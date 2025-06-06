@@ -1563,7 +1563,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.2.2"
+version = "0.2.3"
 source = { editable = "../python-sdk" }
 dependencies = [
     { name = "coolname" },
@@ -1625,7 +1625,7 @@ examples = [
     { name = "openai", specifier = ">=1.68.2" },
     { name = "openinference-instrumentation-dspy", specifier = ">=0.1.23,<0.2.0" },
     { name = "openinference-instrumentation-litellm", specifier = ">=0.1.19" },
-    { name = "openinference-instrumentation-openai", specifier = ">=0.1.25" },
+    { name = "openinference-instrumentation-openai", specifier = ">=0.1.30" },
     { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.53b1" },
     { name = "opentelemetry-instrumentation-langchain", specifier = ">=0.40.4" },
     { name = "pandas", specifier = ">=2.2.3" },
