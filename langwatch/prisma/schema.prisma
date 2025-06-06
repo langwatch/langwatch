@@ -72,6 +72,25 @@ model User {
     llmPromptConfigVersions LlmPromptConfigVersion[]
 }
 
+enum AnalyticsKey {
+    TRACE_COUNT_PER_DAY
+    ACCOUNT_ACTIVE
+}
+
+model Analytics {
+    id        String       @id @default(nanoid())
+    projectId String
+    project   Project      @relation(fields: [projectId], references: [id])
+    key       AnalyticsKey
+    value     Json
+    createdAt DateTime     @default(now())
+
+    @@index([projectId])
+    @@index([key])
+    @@index([createdAt])
+    @@index([projectId, key])
+}
+
 model VerificationToken {
     identifier String
     token      String   @unique
@@ -216,6 +235,7 @@ model Project {
     s3SecretAccessKey        String?
     s3Bucket                 String?
     llmPromptConfigs         LlmPromptConfig[]
+    Analytics                Analytics[]
 
     @@index([teamId])
 }
