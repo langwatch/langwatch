@@ -4,6 +4,7 @@ from typing import Any, Dict, Set, cast
 
 import dspy
 import asyncer
+import langwatch
 import sentry_sdk
 from langwatch_nlp.studio.parser import (
     parsed_and_materialized_workflow_class,
@@ -57,11 +58,12 @@ async def execute_flow(
     # TODO: handle workflow errors here throwing an special event showing the error was during the execution of the workflow?
     yield start_workflow_event(workflow, trace_id)
 
+    langwatch.setup(api_key=event.workflow.api_key)
+
     try:
         with optional_langwatch_trace(
             do_not_trace=do_not_trace,
             trace_id=event.trace_id,
-            api_key=event.workflow.api_key,
             skip_root_span=True,
             metadata={
                 "platform": "optimization_studio",
@@ -107,11 +109,7 @@ async def execute_flow(
 
                 try:
                     input_keys = [input.identifier for input in module_inputs]
-                    inputs_ = {
-                        k: v
-                        for k, v in entries[0].items()
-                        if k in input_keys
-                    }
+                    inputs_ = {k: v for k, v in entries[0].items() if k in input_keys}
                     result = await dspy.asyncify(module.forward)(**inputs_)  # type: ignore
 
                 except Exception as e:

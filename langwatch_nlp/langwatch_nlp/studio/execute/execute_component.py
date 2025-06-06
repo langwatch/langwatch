@@ -15,6 +15,7 @@ from langwatch_nlp.studio.types.events import (
     end_component_event,
     start_component_event,
 )
+import langwatch
 
 
 async def execute_component(event: ExecuteComponentPayload):
@@ -27,11 +28,12 @@ async def execute_component(event: ExecuteComponentPayload):
 
     do_not_trace = not event.workflow.enable_tracing
 
+    langwatch.setup(api_key=event.workflow.api_key)
+
     try:
         with optional_langwatch_trace(
             do_not_trace=do_not_trace,
             trace_id=event.trace_id,
-            api_key=event.workflow.api_key,
             skip_root_span=True,
             metadata={
                 "platform": "optimization_studio",

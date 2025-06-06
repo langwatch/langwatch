@@ -28,7 +28,7 @@ from typing import (
 from warnings import warn
 import inspect
 
-from langwatch.state import get_api_key, get_endpoint, get_instance
+from langwatch.state import get_api_key, get_endpoint, get_instance, set_api_key
 from langwatch.domain import (
     ChatMessage,
     Conversation,
@@ -95,7 +95,12 @@ class LangWatchTrace:
         skip_root_span: bool = False,
         tracer_provider: Optional[TracerProvider] = None,
     ):
-        ensure_setup(api_key=api_key)
+        ensure_setup()
+        if api_key is not None:
+            warn(
+                "Setting API key on trace is deprecated. Please set it on the LangWatch client instance instead using `langwatch.setup(api_key=<api_key>)`"
+            )
+            set_api_key(api_key=api_key)
 
         self.metadata = metadata
         self.api_key = api_key
@@ -709,7 +714,12 @@ def trace(
     It can contain multiple spans representing different operations within that cycle.
     """
     # Ensure client is setup
-    ensure_setup(api_key=api_key)
+    ensure_setup()
+    if api_key is not None:
+        warn(
+            "Setting API key on trace is deprecated. Please set it on the LangWatch client instance instead using `langwatch.setup(api_key=<api_key>)`"
+        )
+        set_api_key(api_key=api_key)
 
     return LangWatchTrace(
         trace_id=trace_id,
