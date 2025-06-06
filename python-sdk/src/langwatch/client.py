@@ -18,6 +18,8 @@ from .types import LangWatchClientProtocol
 
 from .generated.langwatch_rest_api_client import Client as LangWatchApiClient
 
+import opentelemetry.trace
+from opentelemetry.util._once import Once
 
 logger = logging.getLogger(__name__)
 
@@ -125,16 +127,23 @@ class Client(LangWatchClientProtocol):
         if value == self._api_key:
             return
 
+        api_key_has_changed = bool(self._api_key)
+
         self._api_key = value
 
-        # Shut down any existing tracer provider, as API key change requires re-initialization.
-        self.__shutdown_tracer_provider()
+        if api_key_has_changed:
+            # Shut down any existing tracer provider, as API key change requires re-initialization.
+            self.__shutdown_tracer_provider()
 
-        # If a new API key is provided and sending is not disabled, set up a new tracer provider.
-        if self._api_key and not self._disable_sending:
-            self.__setup_tracer_provider()
+            # HACK: set global tracer provider to a proxy tracer provider back
+            opentelemetry.trace._TRACER_PROVIDER = None
+            opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
 
-        if self._api_key:
+            # If a new API key is provided and sending is not disabled, set up a new tracer provider.
+            if value and not self._disable_sending:
+                self.__setup_tracer_provider()
+
+        if value:
             self._setup_rest_api_client()
 
     @property

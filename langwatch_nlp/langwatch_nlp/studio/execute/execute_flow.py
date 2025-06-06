@@ -57,83 +57,75 @@ async def execute_flow(
     # TODO: handle workflow errors here throwing an special event showing the error was during the execution of the workflow?
     yield start_workflow_event(workflow, trace_id)
 
-    try:
-        with optional_langwatch_trace(
+    with optional_langwatch_trace(
+        do_not_trace=do_not_trace,
+        trace_id=event.trace_id,
+        skip_root_span=True,
+        metadata={
+            "platform": "optimization_studio",
+            "environment": "development" if manual_execution_mode else "production",
+        },
+    ) as trace:
+        if not do_not_trace and trace:
+            trace.autotrack_dspy()
+
+        with parsed_and_materialized_workflow_class(
+            workflow,
+            format=False,
+            debug_level=0,
+            until_node_id=until_node_id,
             do_not_trace=do_not_trace,
-            trace_id=event.trace_id,
-            api_key=event.workflow.api_key,
-            skip_root_span=True,
-            metadata={
-                "platform": "optimization_studio",
-                "environment": "development" if manual_execution_mode else "production",
-            },
-        ) as trace:
-            if not do_not_trace and trace:
-                trace.autotrack_dspy()
+        ) as (Module, module_inputs):
+            module = Module(run_evaluations=True)
+            module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
 
-            with parsed_and_materialized_workflow_class(
-                workflow,
-                format=False,
-                debug_level=0,
-                until_node_id=until_node_id,
-                do_not_trace=do_not_trace,
-            ) as (Module, module_inputs):
-                module = Module(run_evaluations=True)
-                module.set_reporting(queue=queue, trace_id=trace_id, workflow=workflow)
+            entry_node = cast(
+                EntryNode,
+                next(
+                    node for node in workflow.nodes if isinstance(node.data, Entry)
+                ),
+            )
+            if not entry_node.data.dataset:
+                raise ValueError("Missing dataset in entry node")
 
-                entry_node = cast(
-                    EntryNode,
-                    next(
-                        node for node in workflow.nodes if isinstance(node.data, Entry)
-                    ),
+            if inputs:
+                entries = inputs
+
+            else:
+                if not entry_node.data.dataset.inline:
+                    raise ValueError("Missing inline dataset in entry node")
+                entries = transpose_inline_dataset_to_object_list(
+                    entry_node.data.dataset.inline
                 )
-                if not entry_node.data.dataset:
-                    raise ValueError("Missing dataset in entry node")
 
-                if inputs:
-                    entries = inputs
+            if len(entries) == 0:
+                raise ClientReadableValueError(
+                    "Dataset is empty, please add at least one entry and try again"
+                )
 
-                else:
-                    if not entry_node.data.dataset.inline:
-                        raise ValueError("Missing inline dataset in entry node")
-                    entries = transpose_inline_dataset_to_object_list(
-                        entry_node.data.dataset.inline
-                    )
+            try:
+                input_keys = [input.identifier for input in module_inputs]
+                inputs_ = {k: v for k, v in entries[0].items() if k in input_keys}
+                result = await dspy.asyncify(module.forward)(**inputs_)  # type: ignore
 
-                if len(entries) == 0:
-                    raise ClientReadableValueError(
-                        "Dataset is empty, please add at least one entry and try again"
-                    )
+            except Exception as e:
+                import traceback
 
-                try:
-                    input_keys = [input.identifier for input in module_inputs]
-                    inputs_ = {
-                        k: v
-                        for k, v in entries[0].items()
-                        if k in input_keys
-                    }
-                    result = await dspy.asyncify(module.forward)(**inputs_)  # type: ignore
+                traceback.print_exc()
+                yield error_workflow_event(trace_id, str(e))
+                sentry_sdk.capture_exception(
+                    e,
+                    extras={
+                        "trace_id": trace_id,
+                        "workflow_id": workflow.workflow_id,
+                    },
+                )
+                return
 
-                except Exception as e:
-                    import traceback
+    # cost = result.cost if hasattr(result, "cost") else None
 
-                    traceback.print_exc()
-                    yield error_workflow_event(trace_id, str(e))
-                    sentry_sdk.capture_exception(
-                        e,
-                        extras={
-                            "trace_id": trace_id,
-                            "workflow_id": workflow.workflow_id,
-                        },
-                    )
-                    return
+    yield end_workflow_event(workflow, trace_id, result)
 
-        # cost = result.cost if hasattr(result, "cost") else None
-
-        yield end_workflow_event(workflow, trace_id, result)
-    finally:
-        if trace:
-            await asyncer.asyncify(trace.send_spans)()
 
 
 def start_workflow_event(workflow: Workflow, trace_id: str):
