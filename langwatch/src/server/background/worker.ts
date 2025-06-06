@@ -18,6 +18,7 @@ import {
 } from "./workers/evaluationsWorker";
 import { startTrackEventsWorker } from "./workers/trackEventsWorker";
 import { startCollectorWorker } from "./workers/collectorWorker";
+import { startPostgresFallbackWorker } from "./workers/postgresFallbackWorker";
 
 import "../../instrumentation.node";
 import http from "http";
@@ -42,6 +43,7 @@ type Workers = {
   topicClusteringWorker: Worker<TopicClusteringJob, void, string> | undefined;
   trackEventsWorker: Worker<TrackEventJob, void, string> | undefined;
   usageStatsWorker: Worker<UsageStatsJob, void, string> | undefined;
+  postgresFallbackWorker: Worker<CollectorJob, void, string> | undefined;
 };
 
 export const start = (
@@ -60,6 +62,7 @@ export const start = (
     const topicClusteringWorker = startTopicClusteringWorker();
     const trackEventsWorker = startTrackEventsWorker();
     const usageStatsWorker = startUsageStatsWorker();
+    const postgresFallbackWorker = startPostgresFallbackWorker();
     startMetricsServer();
     incrementWorkerRestartCount();
 
@@ -73,6 +76,7 @@ export const start = (
     topicClusteringWorker?.on("closing", closingListener);
     trackEventsWorker?.on("closing", closingListener);
     usageStatsWorker?.on("closing", closingListener);
+    postgresFallbackWorker?.on("closing", closingListener);
 
     if (maxRuntimeMs) {
       setTimeout(() => {
@@ -84,12 +88,14 @@ export const start = (
           topicClusteringWorker?.off("closing", closingListener);
           trackEventsWorker?.off("closing", closingListener);
           usageStatsWorker?.off("closing", closingListener);
+          postgresFallbackWorker?.off("closing", closingListener);
           await Promise.all([
             collectorWorker?.close(),
             evaluationsWorker?.close(),
             topicClusteringWorker?.close(),
             trackEventsWorker?.close(),
             usageStatsWorker?.close(),
+            postgresFallbackWorker?.close(),
           ]);
 
           setTimeout(() => {
@@ -106,6 +112,7 @@ export const start = (
         topicClusteringWorker,
         trackEventsWorker,
         usageStatsWorker,
+        postgresFallbackWorker,
       });
     }
   });
