@@ -6,7 +6,7 @@ import type { DatasetColumns } from "../../../../server/datasets/types";
 import { prisma } from "../../../../server/db";
 import { describeRoute } from "hono-openapi";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
-import { loggerMiddleware } from "../../hono-middleware/logger";
+import { loggerMiddleware } from "../../middleware/logger";
 import { baseResponses } from "./constants";
 import { buildStandardSuccessResponse } from "./utils";
 import { datasetOutputSchema, errorSchema } from "./schemas";

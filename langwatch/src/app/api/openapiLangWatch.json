@@ -2954,7 +2954,7 @@
             }
           },
           "404": {
-            "description": "Prompt not found",
+            "description": "Dataset not found",
             "content": {
               "application/json": {
                 "schema": {
