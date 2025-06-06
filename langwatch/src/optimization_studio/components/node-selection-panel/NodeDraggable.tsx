@@ -48,7 +48,7 @@ export const NodeDraggable = (props: {
       data: {
         ...props.component,
         name: newName,
-        behave_as: props.behave_as,
+        ...(props.behave_as ? { behave_as: props.behave_as } : {}),
         ...(props.type === "code"
           ? {
               parameters: updateCodeClassName(
