@@ -114,7 +114,7 @@ export const studioBackendPostEvent = async ({
   try {
     const s3CacheKey = getS3CacheKey(projectId);
 
-    reader = await invokeLambda(message, s3CacheKey);
+    reader = await invokeLambda(projectId, message, s3CacheKey);
   } catch (error) {
     if (
       (error as any)?.cause?.code === "ECONNREFUSED" ||
