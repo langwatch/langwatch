@@ -2,11 +2,13 @@ import {
   LambdaClient,
   ListFunctionsCommand,
   DeleteFunctionCommand,
+  GetFunctionCommand,
 } from "@aws-sdk/client-lambda";
 import {
   CloudWatchLogsClient,
   DescribeLogStreamsCommand,
   DeleteLogGroupCommand,
+  DescribeLogGroupsCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
 import { createLogger } from "../utils/logger";
 
@@ -127,70 +129,164 @@ const deleteLogGroup = async (
   }
 };
 
+const checkLambdaExists = async (
+  lambdaClient: LambdaClient,
+  functionName: string
+): Promise<boolean> => {
+  try {
+    await lambdaClient.send(
+      new GetFunctionCommand({ FunctionName: functionName })
+    );
+    return true;
+  } catch (error: any) {
+    if (error.name === "ResourceNotFoundException") {
+      return false;
+    }
+    throw error;
+  }
+};
+
 export default async function execute() {
   const { lambda, logs } = createAWSClients();
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
 
-  logger.info("Starting cleanup of old Lambda functions...");
-  logger.info(`Cutoff date: ${sevenDaysAgo.toISOString()}`);
+  logger.info("Starting cleanup of old Lambda functions and log groups...");
+  logger.info(`Lambda cutoff date (7 days): ${sevenDaysAgo.toISOString()}`);
+  logger.info(`Log group cutoff date (365 days): ${oneYearAgo.toISOString()}`);
 
   try {
-    // List all Lambda functions starting with langwatch_nlp-
+    // PHASE 1: Clean up Lambda functions (7 days) and their log groups (365 days)
+    logger.info("=== PHASE 1: Processing existing Lambda functions ===");
+
     const listCommand = new ListFunctionsCommand({});
     const response = await lambda.send(listCommand);
 
     if (!response.Functions) {
       logger.info("No Lambda functions found");
-      return;
-    }
-
-    const nlpLambdas = response.Functions.filter(
-      (func) => func.FunctionName?.startsWith("langwatch_nlp-")
-    );
-
-    logger.info(`Found ${nlpLambdas.length} langwatch_nlp- Lambda functions`);
-
-    for (const func of nlpLambdas) {
-      if (!func.FunctionName) continue;
-
-      logger.info(`Checking function: ${func.FunctionName}`);
-
-      // Get last event time from CloudWatch logs
-      const lastEventTime = await getLastEventTime(logs, func.FunctionName);
-
-      if (!lastEventTime) {
-        logger.warn(
-          `No last event time found for ${func.FunctionName}, skipping deletion`
-        );
-        continue;
-      }
-
-      logger.info(
-        `Last event time for ${
-          func.FunctionName
-        }: ${lastEventTime.toISOString()}`
+    } else {
+      const nlpLambdas = response.Functions.filter(
+        (func) => func.FunctionName?.startsWith("langwatch_nlp-")
       );
 
-      if (lastEventTime < sevenDaysAgo) {
+      logger.info(`Found ${nlpLambdas.length} langwatch_nlp- Lambda functions`);
+
+      for (const func of nlpLambdas) {
+        if (!func.FunctionName) continue;
+
+        logger.info(`Checking function: ${func.FunctionName}`);
+
+        // Get last event time from CloudWatch logs
+        const lastEventTime = await getLastEventTime(logs, func.FunctionName);
+
+        if (!lastEventTime) {
+          logger.warn(
+            `No last event time found for ${func.FunctionName}, skipping deletion`
+          );
+          continue;
+        }
+
         logger.info(
-          `Function ${func.FunctionName} is older than 7 days, deleting...`
+          `Last event time for ${
+            func.FunctionName
+          }: ${lastEventTime.toISOString()}`
         );
 
-        // Delete the Lambda function
-        await deleteLambdaFunction(lambda, func.FunctionName);
+        // Delete Lambda function if older than 7 days
+        if (lastEventTime < sevenDaysAgo) {
+          logger.info(
+            `Function ${func.FunctionName} is older than 7 days, deleting Lambda...`
+          );
+          await deleteLambdaFunction(lambda, func.FunctionName);
+        } else {
+          logger.info(
+            `Function ${func.FunctionName} is recent, keeping Lambda`
+          );
+        }
 
-        // Delete the log group
-        await deleteLogGroup(logs, func.FunctionName);
-
-        logger.info(`Successfully cleaned up ${func.FunctionName}`);
-      } else {
-        logger.info(`Function ${func.FunctionName} is recent, keeping it`);
+        // Delete log group if older than 365 days
+        if (lastEventTime < oneYearAgo) {
+          logger.info(
+            `Log group for ${func.FunctionName} is older than 365 days, deleting logs...`
+          );
+          await deleteLogGroup(logs, func.FunctionName);
+        } else {
+          logger.info(
+            `Log group for ${func.FunctionName} is recent enough, keeping logs`
+          );
+        }
       }
     }
 
-    logger.info("Lambda cleanup completed");
+    // PHASE 2: Clean up orphaned log groups (where Lambda function no longer exists)
+    logger.info("=== PHASE 2: Processing orphaned log groups ===");
+
+    const logGroupsCommand = new DescribeLogGroupsCommand({
+      logGroupNamePrefix: "/aws/lambda/langwatch_nlp-",
+    });
+    const logGroupsResponse = await logs.send(logGroupsCommand);
+
+    if (!logGroupsResponse.logGroups) {
+      logger.info("No langwatch_nlp log groups found");
+    } else {
+      logger.info(
+        `Found ${logGroupsResponse.logGroups.length} langwatch_nlp log groups`
+      );
+
+      for (const logGroup of logGroupsResponse.logGroups) {
+        if (!logGroup.logGroupName) continue;
+
+        // Extract function name from log group name: /aws/lambda/langwatch_nlp-xxx -> langwatch_nlp-xxx
+        const functionName = logGroup.logGroupName.replace("/aws/lambda/", "");
+
+        logger.info(`Checking orphaned log group: ${logGroup.logGroupName}`);
+
+        // Check if the Lambda function still exists
+        const lambdaExists = await checkLambdaExists(lambda, functionName);
+
+        if (lambdaExists) {
+          logger.info(
+            `Lambda function ${functionName} still exists, skipping log group`
+          );
+          continue;
+        }
+
+        logger.info(
+          `Lambda function ${functionName} no longer exists, checking log group age`
+        );
+
+        // Get last event time for this orphaned log group
+        const lastEventTime = await getLastEventTime(logs, functionName);
+
+        if (!lastEventTime) {
+          logger.warn(
+            `No last event time found for orphaned log group ${logGroup.logGroupName}, skipping deletion`
+          );
+          continue;
+        }
+
+        logger.info(
+          `Last event time for orphaned log group ${
+            logGroup.logGroupName
+          }: ${lastEventTime.toISOString()}`
+        );
+
+        // Delete orphaned log group if older than 365 days
+        if (lastEventTime < oneYearAgo) {
+          logger.info(
+            `Orphaned log group ${logGroup.logGroupName} is older than 365 days, deleting...`
+          );
+          await deleteLogGroup(logs, functionName);
+        } else {
+          logger.info(
+            `Orphaned log group ${logGroup.logGroupName} is recent enough, keeping it`
+          );
+        }
+      }
+    }
+
+    logger.info("Lambda and log group cleanup completed");
   } catch (error) {
-    logger.error("Error during Lambda cleanup:", error);
-    throw error;
+    logger.error({ error }, "Error during Lambda cleanup, skipping");
   }
 }
