@@ -42,7 +42,7 @@ const parseLambdaConfig = (): LangWatchLambdaConfig => {
   }
 };
 
-const createLambdaClient = (): LambdaClient => {
+export const createLambdaClient = (): LambdaClient => {
   const config = parseLambdaConfig();
   return new LambdaClient({
     region: config.AWS_REGION,
