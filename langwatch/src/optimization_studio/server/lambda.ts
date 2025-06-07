@@ -5,6 +5,11 @@ import {
   GetFunctionCommand,
   UpdateFunctionCodeCommand,
 } from "@aws-sdk/client-lambda";
+import {
+  CloudWatchLogsClient,
+  PutRetentionPolicyCommand,
+  CreateLogGroupCommand,
+} from "@aws-sdk/client-cloudwatch-logs";
 import type { FunctionConfiguration } from "@aws-sdk/client-lambda";
 import type { StudioClientEvent } from "../types/events";
 import * as Sentry from "@sentry/node";
@@ -48,6 +53,17 @@ const createLambdaClient = (): LambdaClient => {
   });
 };
 
+const createLogsClient = (): CloudWatchLogsClient => {
+  const config = parseLambdaConfig();
+  return new CloudWatchLogsClient({
+    region: config.AWS_REGION,
+    credentials: {
+      accessKeyId: config.AWS_ACCESS_KEY_ID,
+      secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
+    },
+  });
+};
+
 const checkLambdaExists = async (
   lambda: LambdaClient,
   functionName: string
@@ -61,6 +77,58 @@ const checkLambdaExists = async (
       return null;
     }
     throw error;
+  }
+};
+
+const createLogGroupWithRetention = async (
+  functionName: string,
+  retentionInDays: number = 365
+): Promise<void> => {
+  const logsClient = createLogsClient();
+  const logGroupName = `/aws/lambda/${functionName}`;
+
+  try {
+    // Create the log group
+    const createCommand = new CreateLogGroupCommand({
+      logGroupName,
+    });
+    await logsClient.send(createCommand);
+
+    logger.info({ functionName }, "Created log group for Lambda function");
+
+    // Set retention policy
+    const retentionCommand = new PutRetentionPolicyCommand({
+      logGroupName,
+      retentionInDays,
+    });
+    await logsClient.send(retentionCommand);
+
+    logger.info(
+      { functionName, retentionInDays },
+      `Set log group retention policy to ${retentionInDays} days`
+    );
+  } catch (error: any) {
+    if (error.name === "ResourceAlreadyExistsException") {
+      // Log group already exists, just set retention
+      logger.info({ functionName }, "Log group already exists, setting retention policy");
+
+      const retentionCommand = new PutRetentionPolicyCommand({
+        logGroupName,
+        retentionInDays,
+      });
+      await logsClient.send(retentionCommand);
+
+      logger.info(
+        { functionName, retentionInDays },
+        `Updated existing log group retention policy to ${retentionInDays} days`
+      );
+    } else {
+      logger.error(
+        { functionName, error },
+        "Failed to create log group or set retention policy"
+      );
+      throw error;
+    }
   }
 };
 
@@ -94,6 +162,18 @@ const createProjectLambda = async (
   });
 
   const response = await lambda.send(command);
+
+  // Create log group with retention policy immediately after Lambda creation
+  try {
+    await createLogGroupWithRetention(functionName, 365);
+  } catch (error) {
+    // Log the error but don't fail Lambda creation
+    logger.warn(
+      { functionName, error },
+      "Failed to create log group with retention, Lambda function created successfully"
+    );
+  }
+
   return response;
 };
 
@@ -162,7 +242,7 @@ export const getProjectLambdaArn = async (projectId: string): Promise<string> =>
   let lambdaConfig = await checkLambdaExists(lambda, functionName);
 
   if (!lambdaConfig) {
-    // Create the Lambda function
+    // Create the Lambda function (includes log group creation with retention)
     logger.info({ projectId }, `Creating Lambda function for project`);
     lambdaConfig = await createProjectLambda(lambda, functionName, config);
   } else {
