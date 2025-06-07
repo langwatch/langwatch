@@ -146,6 +146,28 @@ const checkLambdaExists = async (
   }
 };
 
+const getAllLambdaFunctions = async (lambda: LambdaClient): Promise<any[]> => {
+  const allFunctions: any[] = [];
+  let marker: string | undefined;
+
+  do {
+    const listCommand = new ListFunctionsCommand({
+      ...(marker ? { Marker: marker } : {}),
+    });
+
+    const response = await lambda.send(listCommand);
+
+    if (response.Functions) {
+      allFunctions.push(...response.Functions);
+      logger.info(`Retrieved ${response.Functions.length} functions (total so far: ${allFunctions.length})`);
+    }
+
+    marker = response.NextMarker;
+  } while (marker);
+
+  return allFunctions;
+};
+
 export default async function execute() {
   const { lambda, logs } = createAWSClients();
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -159,17 +181,18 @@ export default async function execute() {
     // PHASE 1: Clean up Lambda functions (7 days) and their log groups (365 days)
     logger.info("=== PHASE 1: Processing existing Lambda functions ===");
 
-    const listCommand = new ListFunctionsCommand({});
-    const response = await lambda.send(listCommand);
+    // Get all Lambda functions with pagination support
+    const allFunctions = await getAllLambdaFunctions(lambda);
+    logger.info(`Retrieved total of ${allFunctions.length} Lambda functions from account`);
 
-    if (!response.Functions) {
+    if (allFunctions.length === 0) {
       logger.info("No Lambda functions found");
     } else {
-      const nlpLambdas = response.Functions.filter(
+      const nlpLambdas = allFunctions.filter(
         (func) => func.FunctionName?.startsWith("langwatch_nlp-")
       );
 
-      logger.info(`Found ${nlpLambdas.length} langwatch_nlp- Lambda functions`);
+      logger.info(`Found ${nlpLambdas.length} langwatch_nlp- Lambda functions out of ${allFunctions.length} total`);
 
       for (const func of nlpLambdas) {
         if (!func.FunctionName) continue;
