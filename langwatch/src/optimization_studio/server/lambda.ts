@@ -153,7 +153,7 @@ const updateProjectLambdaImage = async (
   return response;
 };
 
-const getProjectLambdaArn = async (projectId: string): Promise<string> => {
+export const getProjectLambdaArn = async (projectId: string): Promise<string> => {
   const config = parseLambdaConfig();
   const lambda = createLambdaClient();
   const functionName = `langwatch_nlp-${projectId}`;

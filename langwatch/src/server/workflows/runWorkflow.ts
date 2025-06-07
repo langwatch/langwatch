@@ -12,6 +12,7 @@ import { getProjectModelProviders } from "../api/routers/modelProviders";
 import { prisma } from "../db";
 import type { SingleEvaluationResult } from "../evaluations/evaluators.generated";
 import { type MaybeStoredModelProvider } from "../modelProviders/registry";
+import { getProjectLambdaArn } from "../../optimization_studio/server/lambda";
 
 const getWorkFlow = (state: Workflow) => {
   return {
@@ -194,21 +195,20 @@ export async function runWorkflow(
   };
 
   const event = await addEnvs(messageWithoutEnvs, projectId);
+  const functionArn = process.env.LANGWATCH_NLP_LAMBDA_CONFIG
+    ? await getProjectLambdaArn(projectId)
+    : process.env.LANGWATCH_NLP_SERVICE!;
+
   const response = await lambdaFetch<{
     result: any;
     status: ExecutionStatus;
-  }>(
-    process.env.LANGWATCH_NLP_SERVICE_INVOKE_ARN ??
-      process.env.LANGWATCH_NLP_SERVICE!,
-    "/studio/execute_sync",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(event),
-    }
-  );
+  }>(functionArn, "/studio/execute_sync", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(event),
+  });
 
   if (!response.ok) {
     throw new Error(`Error running workflow: ${response.statusText}`);
