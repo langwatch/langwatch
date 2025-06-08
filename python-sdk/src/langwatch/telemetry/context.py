@@ -101,7 +101,8 @@ def _set_current_span(span: "LangWatchSpan"):
 def _reset_current_trace(token: contextvars.Token):
     global main_thread_langwatch_trace
     if not _is_on_child_thread():
-        main_thread_langwatch_trace.pop()
+        if len(main_thread_langwatch_trace) > 0:
+            main_thread_langwatch_trace.pop()
 
     try:
         stored_langwatch_trace.reset(token)
@@ -114,7 +115,8 @@ def _reset_current_trace(token: contextvars.Token):
 def _reset_current_span(token: contextvars.Token):
     global main_thread_langwatch_span
     if not _is_on_child_thread():
-        main_thread_langwatch_span.pop()
+        if len(main_thread_langwatch_span) > 0:
+            main_thread_langwatch_span.pop()
 
     try:
         stored_langwatch_span.reset(token)
