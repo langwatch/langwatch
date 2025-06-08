@@ -6,12 +6,16 @@ from typing import List, Optional, Sequence
 from langwatch.__version__ import __version__
 from langwatch.attributes import AttributeKey
 from langwatch.domain import BaseAttributes, SpanProcessingExcludeRule
+from langwatch.state import get_instance
 from opentelemetry import trace
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.trace.sampling import TraceIdRatioBased, ALWAYS_OFF
+from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
+from opentelemetry.trace import Span
+
 
 from .exporters.filterable_batch_span_exporter import FilterableBatchSpanProcessor
 from .types import LangWatchClientProtocol
@@ -162,13 +166,11 @@ class Client(LangWatchClientProtocol):
         if self._disable_sending == value:
             return
 
-        self._disable_sending = value
+        # force flush the tracer provider before changing the disable_sending flag
+        if self.tracer_provider:
+            self.tracer_provider.force_flush()
 
-        # Use the new helper methods to manage the tracer provider
-        if value:  # if disable_sending is True
-            self.__shutdown_tracer_provider()
-        else:  # if disable_sending is False
-            self.__setup_tracer_provider()
+        self._disable_sending = value
 
     def __shutdown_tracer_provider(self) -> None:
         """Shuts down the current tracer provider, including flushing."""
@@ -275,8 +277,13 @@ class Client(LangWatchClientProtocol):
             timeout=int(os.getenv("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", 30)),
         )
 
+        # Wrap the exporter with conditional logic
+        conditional_exporter = ConditionalSpanExporter(
+            wrapped_exporter=otlp_exporter,
+        )
+
         processor = FilterableBatchSpanProcessor(
-            span_exporter=otlp_exporter,
+            span_exporter=conditional_exporter,
             exclude_rules=self._span_exclude_rules,
             max_export_batch_size=int(os.getenv("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", 100)),
             max_queue_size=int(os.getenv("OTEL_BSP_MAX_QUEUE_SIZE", 512)),
@@ -296,3 +303,27 @@ class Client(LangWatchClientProtocol):
         )
 
         return self._rest_api_client
+
+
+class ConditionalSpanExporter(SpanExporter):
+    def __init__(self, wrapped_exporter: SpanExporter):
+        self.wrapped_exporter = wrapped_exporter
+
+    def export(self, spans: Sequence[Span]) -> SpanExportResult:
+        # Check your singleton's disable flag
+        client = get_instance()
+        if client and client.disable_sending:
+            # Drop all spans - return success without sending
+            return SpanExportResult.SUCCESS
+
+        # Normal export
+        return self.wrapped_exporter.export(spans)  # type: ignore
+
+    def shutdown(self) -> None:
+        return self.wrapped_exporter.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        client = get_instance()
+        if client and client.disable_sending:
+            return True  # Nothing to flush
+        return self.wrapped_exporter.force_flush(timeout_millis)

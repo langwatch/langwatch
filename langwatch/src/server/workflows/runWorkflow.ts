@@ -111,7 +111,13 @@ export async function runEvaluationWorkflow(
   status: ExecutionStatus;
 }> {
   try {
-    const data = await runWorkflow(workflowId, projectId, inputs, versionId);
+    const data = await runWorkflow(
+      workflowId,
+      projectId,
+      inputs,
+      versionId,
+      true
+    );
 
     // Process the result
     if (data.result) {
@@ -151,7 +157,8 @@ export async function runWorkflow(
   workflowId: string,
   projectId: string,
   inputs: Record<string, string>,
-  versionId?: string
+  versionId?: string,
+  do_not_trace?: boolean
 ) {
   const workflow = await prisma.workflow.findUnique({
     where: { id: workflowId, projectId },
@@ -193,6 +200,12 @@ export async function runWorkflow(
       workflow: getWorkFlow(workflowData),
       inputs: [inputs],
       manual_execution_mode: false,
+      do_not_trace:
+        typeof do_not_trace === "boolean"
+          ? do_not_trace
+          : typeof inputs.do_not_trace === "boolean"
+          ? inputs.do_not_trace
+          : false,
     },
   };
 
