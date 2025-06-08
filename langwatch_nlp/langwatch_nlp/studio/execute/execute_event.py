@@ -60,14 +60,16 @@ async def execute_event(
                     traceback.print_exc()
                     yield Error(payload=ErrorPayload(message=_error_repr(e)))
             case "execute_evaluation":
-                langwatch.setup(api_key=event.payload.workflow.api_key)
+                client = langwatch.setup(api_key=event.payload.workflow.api_key)
+                client.disable_sending = True
                 try:
                     async for event_ in execute_evaluation(event.payload, queue):
                         yield event_
                 except Exception as e:
                     yield Error(payload=ErrorPayload(message=_error_repr(e)))
             case "execute_optimization":
-                langwatch.setup(api_key=event.payload.workflow.api_key)
+                client = langwatch.setup(api_key=event.payload.workflow.api_key)
+                client.disable_sending = True
                 try:
                     async for event_ in execute_optimization(event.payload, queue):
                         yield event_
