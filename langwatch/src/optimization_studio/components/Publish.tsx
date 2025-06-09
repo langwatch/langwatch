@@ -245,15 +245,13 @@ function PublishMenu({
     }
   );
 
-  let workflow = getWorkflow();
-  if (publishedWorkflow.data) {
-    workflow = publishedWorkflow.data.dsl as unknown as Workflow;
-  }
+  const workflow = publishedWorkflow.data
+    ? (publishedWorkflow.data.dsl as unknown as Workflow)
+    : getWorkflow();
 
   // Add dataset fetching hooks here
-  const datasetId = workflow
-    ? ((workflow as unknown as Workflow).nodes[0]?.data as any)?.dataset?.id
-    : undefined;
+  const datasetId = (workflow?.nodes[0]?.data as NodeDataWithDataset)?.dataset
+    ?.id;
 
   const datasetRecords = api.datasetRecord.getAll.useQuery(
     {
@@ -371,10 +369,6 @@ function PublishMenu({
   };
 
   const handleExportWorkflow = () => {
-    let workflow = getWorkflow();
-    if (publishedWorkflow.data) {
-      workflow = publishedWorkflow.data.dsl as unknown as Workflow;
-    }
     exportWorkflow(workflow, datasetRecords.data ?? undefined);
   };
 
