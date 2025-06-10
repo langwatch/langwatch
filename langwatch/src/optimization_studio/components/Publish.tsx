@@ -187,6 +187,7 @@ const exportWorkflow = async (
 
     dsl.workflow_id = "";
     dsl.experiment_id = "";
+    dsl.state = {};
 
     //Create and trigger download
     const url = window.URL.createObjectURL(new Blob([JSON.stringify(dsl)]));
