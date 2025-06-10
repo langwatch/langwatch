@@ -23,6 +23,7 @@ jobs:
           node-version: 20
           cache: "npm"
           cache-dependency-path: "typescript-sdk/package-lock.json"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         working-directory: typescript-sdk
