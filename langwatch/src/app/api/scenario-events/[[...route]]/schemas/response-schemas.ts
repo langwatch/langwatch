@@ -26,6 +26,7 @@ export const runDataSchema = z.object({
   results: scenarioResultsSchema.optional().nullable(),
   messages: scenarioMessageSnapshotSchema.shape.messages,
   timestamp: z.number(),
+  durationInMs: z.number(),
 });
 const runsSchema = z.object({ runs: z.array(runDataSchema) });
 const eventsSchema = z.object({ events: z.array(scenarioEventSchema) });
