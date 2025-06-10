@@ -96,7 +96,7 @@ The `Middleware` function accepts optional configuration functions:
 
 ## Collected Attributes
 
-The middleware adds attributes to the client span, following [OpenTelemetry GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/general/) where applicable.
+The middleware adds attributes to the client span, following [OpenTelemetry GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) where applicable.
 
 **Request Attributes:**
 
