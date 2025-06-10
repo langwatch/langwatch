@@ -4,6 +4,7 @@ import "go.opentelemetry.io/otel/attribute"
 
 const (
 	AttributeLangWatchInput       = attribute.Key("langwatch.input")
+	AttributeLangWatchPrompt      = attribute.Key("langwatch.prompt")
 	AttributeLangWatchOutput      = attribute.Key("langwatch.output")
 	AttributeLangWatchSpanType    = attribute.Key("langwatch.span.type")
 	AttributeLangWatchRAGContexts = attribute.Key("langwatch.contexts")
