@@ -65,6 +65,8 @@ func main() {
 	ctx, span := tracer.Start(ctx, "CustomInputOutputLLMInteraction")
 	defer span.End()
 
+	log.Printf("trace_id: %v\n", span.SpanContext().TraceID())
+
 	userMessage := "Hello, OpenAI!"
 
 	// Record the user message as input, will be shown in the LangWatch UI

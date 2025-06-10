@@ -65,6 +65,8 @@ func main() {
 	ctx, span := tracer.Start(ctx, "SimpleLLMInteraction")
 	defer span.End()
 
+	log.Printf("trace_id: %v\n", span.SpanContext().TraceID())
+
 	// Make API calls as usual
 	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Model: openai.ChatModelGPT4oMini,

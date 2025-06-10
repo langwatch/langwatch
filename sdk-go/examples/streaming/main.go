@@ -65,6 +65,8 @@ func main() {
 	ctx, span := tracer.Start(ctx, "StreamingLLMInteraction")
 	defer span.End()
 
+	log.Printf("trace_id: %v\n", span.SpanContext().TraceID())
+
 	// Make API calls as usual
 	stream := client.Chat.Completions.NewStreaming(ctx, openai.ChatCompletionNewParams{
 		Model: openai.ChatModelGPT4oMini,
