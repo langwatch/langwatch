@@ -181,4 +181,10 @@ export class ScenarioRunnerService {
 
     return runs.filter(Boolean) as ScenarioRunData[];
   }
+
+  async getScenarioSetsDataForProject({ projectId }: { projectId: string }) {
+    return await this.eventRepository.getScenarioSetsDataForProject({
+      projectId,
+    });
+  }
 }

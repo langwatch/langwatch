@@ -368,6 +368,114 @@ export class ScenarioEventRepository {
   }
 
   /**
+   * Gets all scenario sets data for a project with aggregated metadata.
+   *
+   * Returns set information including:
+   * - Unique scenario count per set (distinct scenarioId values)
+   * - Latest run timestamp across all scenarios in each set
+   * - Success rate calculated from finished scenario runs
+   *
+   * Optimized using Elasticsearch aggregations to minimize data transfer
+   * and compute statistics server-side rather than in application memory.
+   *
+   * @param projectId - The project identifier to filter sets by
+   * @returns Promise resolving to array of scenario set metadata objects
+   */
+  async getScenarioSetsDataForProject({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<
+    {
+      batchRunId: string;
+      scenarioCount: number;
+      lastRunAt: number;
+    }[]
+  > {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const client = await this.getClient();
+
+    const response = await client.search({
+      index: this.indexName,
+      body: {
+        query: {
+          bool: {
+            must: [
+              { term: { projectId: validatedProjectId } },
+              { exists: { field: "scenarioSetId" } }, // Only events that are part of a scenario set
+            ],
+          },
+        },
+        aggs: {
+          // Group by scenario set ID to get each unique set
+          scenario_sets: {
+            terms: {
+              field: "scenarioSetId",
+              size: 1000, // Reasonable limit for scenario sets per project
+            },
+            aggs: {
+              // Count unique scenarios within each set
+              unique_scenario_count: {
+                cardinality: {
+                  field: "scenarioId",
+                },
+              },
+              // Get the latest timestamp across all events in this set
+              latest_run_timestamp: {
+                max: {
+                  field: "timestamp",
+                },
+              },
+              // Calculate success rate from finished runs only
+              finished_runs: {
+                filter: {
+                  term: { type: "scenario_run_finished" },
+                },
+                aggs: {
+                  total_runs: {
+                    value_count: {
+                      field: "scenarioRunId",
+                    },
+                  },
+                  successful_runs: {
+                    filter: {
+                      term: { "results.success": true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        size: 0, // We only need aggregation results, not individual documents
+      },
+    });
+
+    const setBuckets =
+      (
+        response.aggregations?.scenario_sets as {
+          buckets: Array<{
+            key: string;
+            unique_scenario_count: { value: number };
+            latest_run_timestamp: { value: number };
+            finished_runs: {
+              total_runs: { value: number };
+              successful_runs: { doc_count: number };
+            };
+          }>;
+        }
+      )?.buckets ?? [];
+
+    return setBuckets.map((bucket) => {
+      return {
+        batchRunId: bucket.key, // Using existing interface property name for scenarioSetId
+        scenarioCount: bucket.unique_scenario_count.value,
+        lastRunAt: bucket.latest_run_timestamp.value,
+      };
+    });
+  }
+
+  /**
    * Gets or creates a cached Elasticsearch client for test environment.
    * Avoids recreating the client on every operation for better performance.
    */

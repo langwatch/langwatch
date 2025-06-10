@@ -5,20 +5,25 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { BatchCard } from "~/components/simulations";
 import { BatchesTable, ViewToggle, ViewMode } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { useFetchScenarioBatches } from "~/hooks/simulations";
+import { api } from "~/utils/api";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 export default function SimulationsPage() {
   const router = useRouter();
+  const { project } = useOrganizationTeamProject();
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Grid);
 
-  // Fetch all batch run IDs with scenario counts
   const {
-    data: batches,
+    data: scenarioSetsData,
     isLoading,
     error,
-  } = useFetchScenarioBatches({
-    refreshInterval: 5000, // Refresh every 5 seconds to show new batches
-  });
+  } = api.scenarios.getScenarioSetsData.useQuery(
+    { projectId: project?.id ?? "" },
+    {
+      refetchInterval: 5000,
+      enabled: !!project,
+    }
+  );
 
   const handleBatchClick = (batchRunId: string) => {
     // Navigate to the specific batch page using the catch-all route
@@ -34,7 +39,7 @@ export default function SimulationsPage() {
       >
         <PageLayout.Header>
           <HStack justify="space-between" align="center" w="full">
-            <PageLayout.Heading>Simulation Batches</PageLayout.Heading>
+            <PageLayout.Heading>Simulation Sets</PageLayout.Heading>
             {/* Only show view toggle when we have batches */}
             {batches && batches.length > 0 && (
               <ViewToggle currentView={viewMode} onViewChange={setViewMode} />
