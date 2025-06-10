@@ -1,16 +1,16 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { ArrowLeft, ZoomIn, ZoomOut } from "react-feather";
+import { Box, HStack } from "@chakra-ui/react";
 import {
   SimulationZoomGrid,
   SetRunHistorySidebar,
 } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import "@copilotkit/react-ui/styles.css";
-import "../simulations.css";
+import "../../simulations.css";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
+import { useEffect, useMemo } from "react";
 
 // Main layout for a single Simulation Set page
 export function SimulationSetPage({
@@ -19,17 +19,42 @@ export function SimulationSetPage({
   scenarioSetId: string;
 }) {
   const { project } = useOrganizationTeamProject();
-  const { goToSimulationSets } = useSimulationRouter();
+  const { batchRunId, goToSimulationBatchRuns } = useSimulationRouter();
 
   const { data: scenarioSetData } =
-    api.scenarios.getScenarioSetRunData.useQuery({
-      projectId: project?.id ?? "",
-      scenarioSetId,
-    });
+    api.scenarios.getScenarioSetRunData.useQuery(
+      {
+        projectId: project?.id ?? "",
+        scenarioSetId,
+      },
+      {
+        enabled: !!project?.id && !!scenarioSetId,
+        refetchInterval: 1000,
+      }
+    );
 
-  const scenarioRunIds = scenarioSetData
-    ?.map((scenario) => scenario.scenarioRunId)
-    .filter(Boolean) as string[];
+  const scenarioRunIds = useMemo(
+    () =>
+      scenarioSetData
+        ?.sort((a, b) => {
+          return (
+            new Date(a.timestamp ?? 0).getTime() -
+            new Date(b.timestamp ?? 0).getTime()
+          );
+        })
+        ?.filter((scenario) => scenario.batchRunId === batchRunId)
+        ?.map((scenario) => scenario.scenarioRunId),
+    [scenarioSetData, batchRunId]
+  );
+
+  useEffect(() => {
+    if (!batchRunId) {
+      const length = scenarioSetData?.length ?? 0;
+      const batchRunId = scenarioSetData?.[length - 1]?.batchRunId;
+      if (!batchRunId) return;
+      goToSimulationBatchRuns(scenarioSetId, batchRunId, { replace: true });
+    }
+  }, [scenarioSetData]);
 
   return (
     <DashboardLayout>
@@ -49,7 +74,7 @@ export function SimulationSetPage({
                 <Box mb={4}>
                   <SimulationZoomGrid.Controls />
                 </Box>
-                {scenarioRunIds?.length > 0 && (
+                {scenarioRunIds && scenarioRunIds.length > 0 && (
                   <SimulationZoomGrid.Grid scenarioRunIds={scenarioRunIds} />
                 )}
               </Box>

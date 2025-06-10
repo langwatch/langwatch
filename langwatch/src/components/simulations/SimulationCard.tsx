@@ -1,7 +1,6 @@
 import { Card } from "@chakra-ui/react";
 import { Badge, Box, HStack, VStack, Text } from "@chakra-ui/react";
-import { ExpandIcon } from "lucide-react";
-import { Maximize, Minimize } from "react-feather";
+import { Check, X, AlertCircle } from "react-feather";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 
 // Card props: title, status, messages
@@ -23,17 +22,11 @@ export interface SimulationCardProps {
 function SimulationCardHeader({
   title,
   status,
-  isExpanded,
-  onExpandToggle,
-  runAt,
 }: {
   title: string;
   status?: ScenarioRunStatus;
-  isExpanded?: boolean;
-  onExpandToggle?: () => void;
-  runAt: Date;
 }) {
-  const statusColor = {
+  const colorPallete = {
     [ScenarioRunStatus.SUCCESS]: "green",
     [ScenarioRunStatus.IN_PROGRESS]: "yellow",
     [ScenarioRunStatus.ERROR]: "red",
@@ -42,6 +35,8 @@ function SimulationCardHeader({
     [ScenarioRunStatus.FAILED]: "red",
   }[status ?? ScenarioRunStatus.IN_PROGRESS];
 
+  const bgColor = `${colorPallete}.100`;
+
   return (
     <Card.Header
       py={4}
@@ -49,48 +44,87 @@ function SimulationCardHeader({
       borderBottom="1px solid"
       borderColor="gray.200"
       w="100%"
+      bgColor={bgColor}
     >
       <HStack justify="space-between" align="flex-start" w="100%" gap={6}>
-        <VStack align="start" gap={1} flex={1}>
-          <Text fontSize="lg" fontWeight="bold" color="gray.900">
-            {title}
-          </Text>
-          {status && (
-            <HStack align="center" gap={2}>
-              <Text fontSize="sm" color="gray.600">
-                Run: {runAt.toLocaleString()}
-              </Text>
-              <Badge colorPalette={statusColor} size="sm">
-                {status}
-              </Badge>
-            </HStack>
-          )}
-        </VStack>
-        {onExpandToggle && (
-          <Box
-            as="button"
-            aria-label={isExpanded ? "Minimize" : "Expand"}
-            borderRadius="md"
-            opacity={0.7}
-            _hover={{
-              opacity: 1,
-            }}
-            onClick={onExpandToggle}
-            cursor="pointer"
-            transition="all 0.2s"
-          >
-            <ExpandIcon size={16} />
-          </Box>
+        <Text fontSize="md" fontWeight="bold" color="gray.900">
+          {title}
+        </Text>
+        {status && (
+          <HStack align="center" gap={2}>
+            <Badge colorPalette={colorPallete} size="sm">
+              {status}
+            </Badge>
+          </HStack>
         )}
       </HStack>
     </Card.Header>
   );
 }
 
-// Component for the chat content area
-function SimulationCardContent({ children }: { children: React.ReactNode }) {
+// Component for the status overlay when simulation is complete
+function SimulationStatusOverlay({ status }: { status: ScenarioRunStatus }) {
+  const isComplete =
+    status === ScenarioRunStatus.SUCCESS ||
+    status === ScenarioRunStatus.FAILED ||
+    status === ScenarioRunStatus.ERROR ||
+    status === ScenarioRunStatus.CANCELLED;
+
+  if (!isComplete) return null;
+
+  const isPass = status === ScenarioRunStatus.SUCCESS;
+  const isCancelled = status === ScenarioRunStatus.CANCELLED;
+
+  // Determine background color based on status
+  const bgColor = isPass
+    ? "rgba(72, 187, 120, 0.9)" // Green for success
+    : isCancelled
+    ? "rgba(113, 128, 150, 0.9)" // Gray for cancelled
+    : "rgba(245, 101, 101, 0.9)"; // Red for failed/error
+
+  // Determine icon and text based on status
+  const Icon = isPass ? Check : isCancelled ? AlertCircle : X;
+  const statusText = isPass ? "Pass" : isCancelled ? "Cancelled" : "Fail";
+
   return (
-    <Card.Body p={0} height="100%" overflow="hidden" position="relative">
+    <Box
+      position="absolute"
+      top={0}
+      left={0}
+      right={0}
+      bottom={0}
+      bg={bgColor}
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      zIndex={20}
+    >
+      <VStack gap={3}>
+        <Icon size={48} color="white" />
+        <Text fontSize="2xl" fontWeight="bold" color="white">
+          {statusText}
+        </Text>
+      </VStack>
+    </Box>
+  );
+}
+
+// Component for the chat content area
+function SimulationCardContent({
+  children,
+  status,
+}: {
+  children: React.ReactNode;
+  status?: ScenarioRunStatus;
+}) {
+  return (
+    <Card.Body
+      p={0}
+      height="100%"
+      overflow="hidden"
+      position="relative"
+      w="100%"
+    >
       <Box height="100%" width="100%" position="relative">
         {children}
 
@@ -117,6 +151,9 @@ function SimulationCardContent({ children }: { children: React.ReactNode }) {
           pointerEvents="none"
           zIndex={10}
         />
+
+        {/* Status overlay for completed simulations */}
+        {status && <SimulationStatusOverlay status={status} />}
       </Box>
     </Card.Body>
   );
@@ -147,7 +184,9 @@ export function SimulationCard({
           isExpanded={isExpanded}
           onExpandToggle={onExpandToggle}
         />
-        <SimulationCardContent>{children}</SimulationCardContent>
+        <SimulationCardContent status={status}>
+          {children}
+        </SimulationCardContent>
       </VStack>
     </Card.Root>
   );

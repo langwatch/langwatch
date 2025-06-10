@@ -14,7 +14,10 @@ import {
 } from "./event-schemas";
 
 // Define response schemas
-const successSchema = z.object({ success: z.boolean() });
+const successSchema = z.object({
+  success: z.boolean(),
+  url: z.string(),
+});
 const errorSchema = z.object({ error: z.string() });
 export const runDataSchema = z.object({
   scenarioId: scenarioIdSchema,
