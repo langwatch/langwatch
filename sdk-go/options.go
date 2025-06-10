@@ -22,8 +22,8 @@ func WithAPIKey(apiKey string) ClientOption {
 	}
 }
 
-// WithEnvironmentApiKey sets the API key for the client from an environment variable.
-func WithEnvironmentApiKey(environmentVariable string) ClientOption {
+// WithEnvironmentAPIKey sets the API key for the client from an environment variable.
+func WithEnvironmentAPIKey(environmentVariable string) ClientOption {
 	return func(c *client) {
 		c.apiKey = os.Getenv(environmentVariable)
 	}

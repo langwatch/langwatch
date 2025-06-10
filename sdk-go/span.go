@@ -6,7 +6,7 @@ import (
 
 	"go.opentelemetry.io/otel/trace"
 
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 )
 
 type SpanType string
@@ -63,6 +63,7 @@ func (s *Span) RecordInput(input any) {
 	})
 	if err != nil {
 		log.Default().Printf("error marshalling input: %v", err)
+		return
 	}
 
 	s.SetAttributes(AttributeLangWatchInput.String(string(jsonStr)))
@@ -109,11 +110,11 @@ func (s *Span) SetType(spanType SpanType) {
 }
 
 func (s *Span) SetRequestModel(model string) {
-	s.SetAttributes(semconv.GenAiRequestModelKey.String(model))
+	s.SetAttributes(semconv.GenAIRequestModelKey.String(model))
 }
 
 func (s *Span) SetResponseModel(model string) {
-	s.SetAttributes(semconv.GenAiResponseModelKey.String(model))
+	s.SetAttributes(semconv.GenAIResponseModelKey.String(model))
 }
 
 func (s *Span) SetTimestamps(timestamps SpanTimestamps) {

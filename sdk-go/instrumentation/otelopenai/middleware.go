@@ -22,7 +22,7 @@ import (
 
 const (
 	tracerName             = "github.com/langwatch/go-sdk/instrumentation/otelopenai"
-	instrumentationVersion = "0.0.1" // TODO: Consider linking this to package version
+	instrumentationVersion = "0.0.1"
 )
 
 // Middleware sets up a handler to start tracing the requests made to OpenAI by the
@@ -127,6 +127,10 @@ func Middleware(name string, opts ...Option) oaioption.Middleware {
 						state := &streamProcessingState{}
 
 						scanner := bufio.NewScanner(originalBody)
+
+						// Allow up to 1 MiB per SSE line – adjust if needed.
+						scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
 						for scanner.Scan() {
 							lineBytes := scanner.Bytes()
 							// Write the current line (event) to the pipe for the client
@@ -170,11 +174,12 @@ func Middleware(name string, opts ...Option) oaioption.Middleware {
 						contentType := resp.Header.Get("Content-Type")
 						if strings.HasPrefix(contentType, "application/json") {
 							var respData jsonData
-							if cfg.recordOutput {
-								span.RecordOutput(respData)
-							}
 							if err := json.Unmarshal(respBody, &respData); err == nil {
 								setNonStreamResponseAttributes(span, respData)
+
+								if cfg.recordOutput {
+									span.RecordOutput(respData)
+								}
 							} else {
 								log.Default().Printf("Failed to parse non-stream OpenAI response body JSON: %v", err)
 							}

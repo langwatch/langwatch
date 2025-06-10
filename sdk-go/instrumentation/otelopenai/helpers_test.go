@@ -64,7 +64,9 @@ func TestJSONHelpers(t *testing.T) {
 
 		_, ok := getInt(data, "float_key") // Should truncate
 		assert.True(t, ok, "Should convert float to int")
-		// assert.Equal(t, 123, valTruncated) // Keep commented assertion example
+
+		val, _ := getInt(data, "float_key")
+		assert.Equal(t, 123, val, "Should truncate float to int")
 
 		_, ok = getInt(data, "string_key")
 		assert.False(t, ok, "Should fail for wrong type")

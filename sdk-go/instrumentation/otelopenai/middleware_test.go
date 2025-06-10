@@ -490,10 +490,8 @@ data: [DONE]
 						err := json.Unmarshal([]byte(outputAttrValue.AsString()), &parsedAttr)
 						require.NoError(t, err, "Failed to parse langwatch.output attribute (non-streaming): %s", outputAttrValue.AsString())
 						assert.Equal(t, "json", parsedAttr.Type, "langwatch.output attribute type mismatch (non-streaming)")
-						// Expect "null" as the value based on test failure logs for this case
-						// assert.JSONEq(t, `"null"`, string(parsedAttr.Value), "Output value JSON mismatch (non-streaming recording), expected null")
-						// assert.Nil(t, string(parsedAttr.Value), "Output value JSON mismatch (non-streaming recording), expected null")
-						assert.Equal(t, "null", string(parsedAttr.Value), "Output value JSON mismatch (non-streaming recording), expected null")
+						// Expect the actual response JSON as the value
+						assert.JSONEq(t, tt.mockResponseBody, string(parsedAttr.Value), "Output value JSON mismatch (non-streaming recording), expected full response body")
 					}
 				} else if tt.name == "Chat Completion Stream Success With Recording" {
 					assert.True(t, outputPresent, "Attribute '%s' should be present for stream (set by mock)", string(langwatch.AttributeLangWatchOutput))
