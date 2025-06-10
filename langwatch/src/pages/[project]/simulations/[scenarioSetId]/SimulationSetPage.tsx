@@ -6,7 +6,6 @@ import {
 } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { useZoom } from "~/hooks/useZoom";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import "@copilotkit/react-ui/styles.css";
 import "../simulations.css";
@@ -21,62 +20,42 @@ export function SimulationSetPage({
 }) {
   const { project } = useOrganizationTeamProject();
   const { goToSimulationSets } = useSimulationRouter();
-  const { scale, containerRef, zoomIn, zoomOut } = useZoom();
+
+  const { data: scenarioSetData } =
+    api.scenarios.getScenarioSetRunData.useQuery({
+      projectId: project?.id ?? "",
+      scenarioSetId,
+    });
+
+  const scenarioRunIds = scenarioSetData
+    ?.map((scenario) => scenario.scenarioRunId)
+    .filter(Boolean) as string[];
 
   return (
-    <DashboardLayout position="relative">
+    <DashboardLayout>
       <HStack w="full" h="full">
         <SetRunHistorySidebar scenarioSetId={scenarioSetId} />
-        <PageLayout.Container
-          maxW={"calc(100vw - 200px)"}
-          padding={6}
-          marginTop={8}
-          h="full"
-        >
-          <Box mb={4}>
-            <Button onClick={() => goToSimulationSets()}>
-              <HStack>
-                <ArrowLeft size={14} /> Back to Simulation Sets
-              </HStack>
-            </Button>
-          </Box>
-          <PageLayout.Header>
-            <VStack alignItems="flex-start">
-              <PageLayout.Heading>Simulations</PageLayout.Heading>
-              <Text fontSize="sm" color="gray.500" mt={1}>
-                Scenario Set ID: {scenarioSetId}
-              </Text>
-            </VStack>
-            <HStack position="absolute" right={6} top={8} gap={2}>
-              <Button size="sm" variant="outline" onClick={zoomOut}>
-                <ZoomOut size={16} />
-              </Button>
-              <Button size="sm" variant="outline" onClick={zoomIn}>
-                <ZoomIn size={16} />
-              </Button>
-              <Box
-                px={2}
-                py={1}
-                bg="gray.100"
-                borderRadius="md"
-                fontSize="xs"
-                fontFamily="mono"
-              >
-                {Math.round(scale * 100)}%
+        <Box w="full" position="relative" h="full">
+          <PageLayout.Container
+            maxW={"calc(100vw - 200px)"}
+            marginTop={0}
+            h="full"
+            overflow="scroll"
+            padding={0}
+            position="absolute"
+          >
+            <SimulationZoomGrid.Root>
+              <Box p={6}>
+                <Box mb={4}>
+                  <SimulationZoomGrid.Controls />
+                </Box>
+                {scenarioRunIds?.length > 0 && (
+                  <SimulationZoomGrid.Grid scenarioRunIds={scenarioRunIds} />
+                )}
               </Box>
-            </HStack>
-          </PageLayout.Header>
-          <HStack>
-            {/* Use the SimulationZoomGrid component for the grid of simulations */}
-            {/* {scenarioSetData && (
-            <SimulationZoomGrid
-              scenarioRunIds={scenarioSetData.scenarioRunIds}
-              scale={scale}
-              containerRef={containerRef}
-            />
-          )} */}
-          </HStack>
-        </PageLayout.Container>
+            </SimulationZoomGrid.Root>
+          </PageLayout.Container>
+        </Box>
       </HStack>
     </DashboardLayout>
   );
