@@ -75,6 +75,10 @@ export class ScenarioRunnerService {
       timestamp: latestMessageEvent.timestamp || 0,
       name: runStartedEvent?.metadata?.name || null,
       description: runStartedEvent?.metadata?.description || null,
+      durationInMs:
+        runStartedEvent?.timestamp && latestRunFinishedEvent?.timestamp
+          ? latestRunFinishedEvent.timestamp - runStartedEvent.timestamp
+          : 0,
     };
   }
 

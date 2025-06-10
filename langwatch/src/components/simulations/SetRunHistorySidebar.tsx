@@ -159,7 +159,7 @@ const useSetRunHistorySidebarController = (
         id: run.scenarioRunId,
         label: `Run #${Object.keys(batchRuns).length + 1}`,
         date: new Date(run.timestamp ?? 0).toLocaleString(),
-        duration: "10s",
+        duration: `${Math.round(run.durationInMs) / 1000}s`,
         items: [
           {
             title: run.name ?? "",
