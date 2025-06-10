@@ -72,25 +72,6 @@ model User {
     llmPromptConfigVersions LlmPromptConfigVersion[]
 }
 
-enum AnalyticsKey {
-    TRACE_COUNT_PER_DAY
-    ACCOUNT_ACTIVE
-}
-
-model Analytics {
-    id        String       @id @default(nanoid())
-    projectId String
-    project   Project      @relation(fields: [projectId], references: [id])
-    key       AnalyticsKey
-    value     Json
-    createdAt DateTime     @default(now())
-
-    @@index([projectId])
-    @@index([key])
-    @@index([createdAt])
-    @@index([projectId, key])
-}
-
 model VerificationToken {
     identifier String
     token      String   @unique
@@ -775,4 +756,28 @@ model LlmPromptConfigVersion {
     @@index([configId])
     @@index([authorId])
     @@index([createdAt]) // Index important for finding the latest efficiently
+}
+
+enum AnalyticsKey {
+    PROJECT_ACTIVE_TODAY
+    PROJECT_TRACE_COUNT_PER_DAY
+}
+
+model Analytics {
+    id           String       @id @default(nanoid())
+    projectId    String
+    project      Project      @relation(fields: [projectId], references: [id])
+    key          AnalyticsKey
+    value        Json // For complex/metadata
+    numericValue Float? // For metrics that need aggregation
+    stringValue  String? // For categorical data
+    boolValue    Boolean? // For true/false metrics
+    createdAt    DateTime     @default(now())
+
+    @@index([projectId])
+    @@index([key])
+    @@index([createdAt])
+    @@index([projectId, key])
+    @@index([projectId, key, numericValue])
+    @@index([projectId, key, boolValue]) // New index for boolean queries
 }
