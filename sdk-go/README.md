@@ -21,7 +21,7 @@ go get github.com/langwatch/langwatch/sdk-go
 go get github.com/langwatch/langwatch/sdk-go/instrumentation/openai
 ```
 
-### 3. Add 3 Lines of Code
+### 3. Add 3 Bits of Code
 
 Here's a complete example that instruments OpenAI API calls and sends traces to LangWatch:
 
@@ -345,6 +345,13 @@ The `LangWatchSpan` embeds the standard `go.opentelemetry.io/otel/trace.Span`, s
 ### OpenAI Middleware Options
 
 ```go
+import (
+	"github.com/openai/openai-go"
+	oaioption "github.com/openai/openai-go/option"
+	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	"go.opentelemetry.io/otel/semconv/v1.30.0"
+)
+
 client := openai.NewClient(
 	oaioption.WithAPIKey(apiKey),
 	oaioption.WithMiddleware(otelopenai.Middleware("my-app",
@@ -383,6 +390,8 @@ If you prefer to set up OpenTelemetry manually or need more control:
 
 ```go
 import (
+	"context"
+	"log"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -411,12 +420,10 @@ func setupLangWatch(ctx context.Context, apiKey string) func() {
 }
 ```
 
-For other backends or more complex setups, see the [OpenTelemetry Go documentation](https://opentelemetry.io/docs/languages/go/getting-started/).
-
 ## Contributing
 
 We welcome contributions! Please see our [Contributing Guide](../CONTRIBUTING.md) for details.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
