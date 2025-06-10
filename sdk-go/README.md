@@ -213,7 +213,6 @@ go run cmd/main.go run-examples
 * 🧵 **Thread support** - Group related LLM interactions together
 * 📝 **Custom input/output recording** - Fine-grained control over what's captured
 * 🔄 **Streaming support** - Real-time capture of streaming responses
-* 🎯 **Zero-config setup** - Works out of the box with minimal setup
 
 ## Core Concepts
 
