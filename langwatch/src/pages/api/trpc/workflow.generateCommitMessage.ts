@@ -4,7 +4,7 @@ import trpc from "./[trpc]";
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: "6mb",
+      sizeLimit: "5mb",
     },
     responseLimit: "10mb",
   },
@@ -14,6 +14,6 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  req.query.trpc = "workflow.getVersions";
+  req.query.trpc = "workflow.generateCommitMessage";
   return trpc(req, res);
 }
