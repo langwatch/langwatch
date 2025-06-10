@@ -27,7 +27,7 @@ export const scenarioRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
     .query(async ({ input, ctx }) => {
       const scenarioRunnerService = new ScenarioRunnerService();
-      const data = await scenarioRunnerService.getBatchRunDataForScenarioSet({
+      const data = await scenarioRunnerService.getRunDataForScenarioSet({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
       });

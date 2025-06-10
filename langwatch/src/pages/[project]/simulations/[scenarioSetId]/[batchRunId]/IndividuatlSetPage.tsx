@@ -21,7 +21,7 @@ interface IndividuatlSetPageProps {
 
 // Main layout for a single Simulation Set page
 export function IndividuatlSetPage({ scenarioRunId }: IndividuatlSetPageProps) {
-  const { goToSimulationBatch } = useSimulationRouter();
+  const { goToSimulationSet } = useSimulationRouter();
   const { data: scenarioState } = useFetchScenarioRunData({
     scenarioRunId,
   });
@@ -42,7 +42,7 @@ export function IndividuatlSetPage({ scenarioRunId }: IndividuatlSetPageProps) {
         <Box mb={4}>
           <Button
             p={0}
-            onClick={() => goToSimulationBatch(scenarioState?.batchRunId ?? "")}
+            onClick={() => goToSimulationSet(scenarioState?.batchRunId ?? "")}
           >
             <HStack>
               <ArrowLeft size={14} /> Back to Simulation Batch

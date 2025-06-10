@@ -56,7 +56,12 @@ app.post(
       ...event,
     });
 
-    return c.json({ success: true }, 201);
+    const path = `/${project.slug}/simulations/${
+      event.scenarioSetId ?? "default"
+    }`;
+    const url = `${process.env.BASE_HOST}${path}`;
+
+    return c.json({ success: true, url }, 201);
   }
 );
 

@@ -25,7 +25,12 @@ export function SimulationChatViewer({
 
   return (
     <SimulationCard
-      title={`Simulation ${scenarioRunId}`}
+      title={
+        data?.name ??
+        data?.scenarioId ??
+        data?.timestamp.toString() ??
+        "scenario"
+      }
       status={data?.status}
       onExpandToggle={onExpandToggle}
       isExpanded={isExpanded}

@@ -498,6 +498,17 @@ export class ScenarioEventRepository {
             terms: {
               field: "batchRunId",
               size: 10000,
+              // Sort by latest timestamp to get most recent batch runs first
+              order: {
+                latest_timestamp: "desc",
+              },
+            },
+            aggs: {
+              latest_timestamp: {
+                max: {
+                  field: "timestamp",
+                },
+              },
             },
           },
         },

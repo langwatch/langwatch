@@ -15,6 +15,7 @@ import { withController } from "~/utils/withControllerHOC";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 
 // Types for props
 type RunItem = {
@@ -24,6 +25,7 @@ type RunItem = {
 };
 
 type Run = {
+  batchRunId: string;
   id: string;
   label: string;
   date: string;
@@ -58,7 +60,15 @@ const RunHistoryItem = ({ item }: { item: RunItem }) => (
 );
 
 // Run accordion section
-const RunAccordionItem = ({ run, isOpen }: { run: Run; isOpen: boolean }) => {
+const RunAccordionItem = ({
+  run,
+  isOpen,
+  onRunClick,
+}: {
+  run: Run;
+  isOpen: boolean;
+  onRunClick: (batchRunId: string) => void;
+}) => {
   const { passedCount, failedCount } = run.items.reduce(
     (acc, item) => {
       if (item.status === ScenarioRunStatus.SUCCESS) {
@@ -82,10 +92,13 @@ const RunAccordionItem = ({ run, isOpen }: { run: Run; isOpen: boolean }) => {
       border="none"
       borderBottom="1px solid"
       borderColor="gray.200"
-      p={4}
+      borderLeft={isOpen ? "4px solid" : "none"}
+      borderLeftColor={isOpen ? "orange.400" : "transparent"}
+      onClick={() => onRunClick(run.batchRunId)}
+      p={0}
     >
       <h2>
-        <Accordion.ItemTrigger>
+        <Accordion.ItemTrigger p={2}>
           <HStack w="full">
             <VStack align="flex-start" w="full" gap={0}>
               <HStack flex="1" textAlign="left" gap={2}>
@@ -129,7 +142,7 @@ const RunAccordionItem = ({ run, isOpen }: { run: Run; isOpen: boolean }) => {
       </h2>
       <Accordion.ItemContent>
         <Accordion.ItemBody>
-          <VStack align="stretch" gap={0}>
+          <VStack align="stretch" gap={0} pb={3}>
             {run.items.map((item, idx) => (
               <RunHistoryItem key={idx} item={item} />
             ))}
@@ -145,6 +158,7 @@ const useSetRunHistorySidebarController = (
 ) => {
   const { scenarioSetId } = props;
   const { project } = useOrganizationTeamProject();
+  const { goToSimulationBatchRuns } = useSimulationRouter();
 
   const { data: runData } = api.scenarios.getScenarioSetRunData.useQuery(
     {
@@ -156,13 +170,13 @@ const useSetRunHistorySidebarController = (
     }
   );
 
-  const batchRuns: Record<string, Run> = {};
+  const batchRuns: Record<string, Omit<Run, "label">> = {};
 
   runData?.forEach((run) => {
     if (!batchRuns[run.batchRunId]) {
       batchRuns[run.batchRunId] = {
         id: run.scenarioRunId,
-        label: `Run #${Object.keys(batchRuns).length + 1}`,
+        batchRunId: run.batchRunId,
         date: new Date(run.timestamp ?? 0).toLocaleString(),
         duration: `${Math.round(run.durationInMs) / 1000}s`,
         items: [
@@ -183,10 +197,23 @@ const useSetRunHistorySidebarController = (
     }
   });
 
-  const runs = Object.values(batchRuns);
+  const runs = Object.values(batchRuns)
+    .sort((a, b) => {
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    })
+    .map((run, idx) => {
+      return {
+        ...run,
+        label: `Run #${idx + 1}`,
+      };
+    })
+    .reverse();
 
   return {
     runs,
+    onRunClick: (batchRunId: string) => {
+      goToSimulationBatchRuns(scenarioSetId, batchRunId);
+    },
   };
 };
 
@@ -195,7 +222,7 @@ const SetRunHistorySidebarComponent = (
   props: ReturnType<typeof useSetRunHistorySidebarController>
 ) => {
   const [openIndex, setOpenIndex] = useState<string[]>(["0"]);
-  const { runs } = props;
+  const { runs, onRunClick } = props;
 
   return (
     <Box
@@ -225,6 +252,7 @@ const SetRunHistorySidebarComponent = (
             key={run.id}
             run={run}
             isOpen={openIndex.includes(run.id)}
+            onRunClick={onRunClick}
           />
         ))}
       </Accordion.Root>
