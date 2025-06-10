@@ -7,20 +7,12 @@ import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:trpc");
 
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: "5mb",
-    },
-    responseLimit: "10mb",
-  },
-};
-
 // export API handler
 export default createNextApiHandler({
   router: appRouter,
   createContext: createTRPCContext,
   onError: ({ ctx, error, input, path, type }) => {
+    console.log("onError", { ctx, error, input, path, type });
     const logData: Record<string, any> = {
       error,
       path,

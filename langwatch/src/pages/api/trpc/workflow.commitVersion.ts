@@ -14,6 +14,6 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  req.query.trpc = "workflow.getVersions";
+  req.query.trpc = "workflow.commitVersion";
   return trpc(req, res);
 }
