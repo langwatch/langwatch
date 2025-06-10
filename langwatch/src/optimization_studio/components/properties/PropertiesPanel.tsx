@@ -148,6 +148,7 @@ export function PropertiesPanel() {
           borderColor: "var(--chakra-colors-gray-350)",
           zIndex: 100,
           overflowY: "auto",
+          overflowX: "hidden",
         }}
       >
         <Box ref={ref}>

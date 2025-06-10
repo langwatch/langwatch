@@ -83,8 +83,6 @@ async def execute_optimization(
             module = Module(run_evaluations=True)
             module.prevent_crashes()
 
-            langwatch.setup(workflow.api_key)
-
             entry_node = cast(
                 EntryNode,
                 next(node for node in workflow.nodes if isinstance(node.data, Entry)),

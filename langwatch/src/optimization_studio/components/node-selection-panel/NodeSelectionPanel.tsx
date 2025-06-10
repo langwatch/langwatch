@@ -2,45 +2,28 @@ import {
   Box,
   Button,
   HStack,
-  Icon,
   Link,
   Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useReactFlow, type Node, type XYPosition } from "@xyflow/react";
-import { useEffect, useMemo, useRef } from "react";
-import { useDrag, useDragLayer } from "react-dnd";
-import { getEmptyImage } from "react-dnd-html5-backend";
+import { type Node, type XYPosition } from "@xyflow/react";
+import { useEffect, useRef } from "react";
+import { useDragLayer } from "react-dnd";
 import { BookOpen, Box as BoxIcon, ChevronsLeft, GitHub } from "react-feather";
-import { LuGripVertical } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { HoverableBigText } from "../../../components/HoverableBigText";
 import { IconWrapper } from "../../../components/IconWrapper";
 import { DiscordOutlineIcon } from "../../../components/icons/DiscordOutline";
-import {
-  updateCodeClassName,
-  useWorkflowStore,
-} from "../../hooks/useWorkflowStore";
+import { Tooltip } from "../../../components/ui/tooltip";
+import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import { MODULES } from "../../registry";
-import {
-  type Component,
-  type ComponentType,
-  type Custom,
-  type Field,
-} from "../../types/dsl";
-import {
-  findLowestAvailableName,
-  getInputsOutputs,
-  nameToId,
-} from "../../utils/nodeUtils";
-import { ComponentIcon } from "../ColorfulBlockIcons";
+import { type ComponentType, type Custom, type Field } from "../../types/dsl";
+import { getInputsOutputs } from "../../utils/nodeUtils";
 import { NodeComponents } from "../nodes";
 import { PromptingTechniqueDraggingNode } from "../nodes/PromptingTechniqueNode";
-import { Tooltip } from "../../../components/ui/tooltip";
-import { NodeDraggable } from "./NodeDraggable";
 import { LlmSignatureNodeDraggable } from "./LlmSignatureNodeDraggable";
+import { NodeDraggable } from "./NodeDraggable";
 
 export function NodeSelectionPanelButton({
   isOpen,

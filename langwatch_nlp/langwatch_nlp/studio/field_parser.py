@@ -113,6 +113,18 @@ def with_autoparsing(module: type[T]) -> type[T]:
             return FieldType.bool
         elif annotation is str:
             return FieldType.str
+        elif (
+            annotation is dict
+            or str(annotation).startswith("dict[")
+            or str(annotation).startswith("Dict[")
+        ):
+            return FieldType.dict
+        elif (
+            annotation is list
+            or str(annotation).startswith("list[")
+            or str(annotation).startswith("List[")
+        ):
+            return FieldType.list
 
         return None  # Default to no type conversion
 

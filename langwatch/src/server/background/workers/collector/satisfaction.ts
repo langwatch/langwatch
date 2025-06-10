@@ -40,8 +40,7 @@ export const scoreSatisfactionFromInput = async ({
 
   const embeddingsModel = await getProjectEmbeddingsModel(projectId);
   const response = await lambdaFetch<SatisfactionScoreResult>(
-    process.env.LANGWATCH_NLP_SERVICE_INVOKE_ARN ??
-      process.env.LANGWATCH_NLP_SERVICE!,
+    process.env.LANGWATCH_NLP_SERVICE!,
     "/sentiment",
     {
       method: "POST",

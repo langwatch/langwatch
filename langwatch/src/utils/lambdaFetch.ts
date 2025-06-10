@@ -1,4 +1,5 @@
-import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
+import { InvokeCommand } from "@aws-sdk/client-lambda";
+import { createLambdaClient } from "../optimization_studio/server/lambda";
 
 type LambdaFetchInit = {
   method?: string;
@@ -21,10 +22,7 @@ export const lambdaFetch = async <T>(
 ): Promise<LambdaFetchResponse<T>> => {
   // If it's a Lambda ARN
   if (urlOrArn.startsWith("arn:aws:lambda")) {
-    const region =
-      process.env.AWS_REGION ??
-      urlOrArn.replace(/^arn:aws:lambda:([^:]+):.*$/, "$1");
-    const lambda = new LambdaClient({ region });
+    const lambda = createLambdaClient();
 
     const payload = {
       rawPath: path,
