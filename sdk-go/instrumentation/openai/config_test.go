@@ -9,6 +9,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 )
 
 func TestOptions(t *testing.T) {
@@ -68,18 +69,34 @@ func TestOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "With GenAISystem Groq",
+			opts: []Option{WithGenAISystem(semconv.GenAISystemGroq)},
+			expectedConf: config{
+				genAISystem: semconv.GenAISystemGroq,
+			},
+		},
+		{
+			name: "With GenAISystem Custom",
+			opts: []Option{WithGenAISystem(semconv.GenAISystemKey.String("custom"))},
+			expectedConf: config{
+				genAISystem: semconv.GenAISystemKey.String("custom"),
+			},
+		},
+		{
 			name: "With All Options",
 			opts: []Option{
 				WithTracerProvider(traceProvider),
 				WithPropagators(propagators),
 				WithCaptureInput(),
 				WithCaptureOutput(),
+				WithGenAISystem(semconv.GenAISystemGroq),
 			},
 			expectedConf: config{
 				tracerProvider: traceProvider,
 				propagators:    propagators,
 				recordInput:    true,
 				recordOutput:   true,
+				genAISystem:    semconv.GenAISystemGroq,
 			},
 		},
 	}
