@@ -1,4 +1,4 @@
-package otelopenai
+package openai
 
 import (
 	"context"

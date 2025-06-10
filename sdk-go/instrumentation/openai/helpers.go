@@ -1,4 +1,4 @@
-package otelopenai
+package openai
 
 // jsonData is a type alias for a map of string keys to interface{} values.
 type jsonData = map[string]interface{}

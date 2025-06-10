@@ -1,4 +1,4 @@
-# otelopenai
+# openai
 
 This package provides OpenTelemetry instrumentation middleware for the official `openai-go` client library (`github.com/openai/openai-go`).
 
@@ -7,12 +7,12 @@ It automatically creates client spans for OpenAI API calls made through the inst
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go/instrumentation/otelopenai
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/openai
 ```
 
 ## Usage
 
-Wrap the `otelopenai.Middleware` using `option.WithMiddleware` when creating the `openai.Client`:
+Wrap the `openai.Middleware` using `option.WithMiddleware` when creating the `openai.Client`:
 
 ```go
 package main
@@ -21,7 +21,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/langwatch/langwatch/sdk-go/instrumentation/otelopenai"
+	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
@@ -37,14 +37,14 @@ func main() {
 	client := openai.NewClient(
 		oaioption.WithAPIKey("YOUR_API_KEY"),
 		oaioption.WithMiddleware(otelopenai.Middleware("my-openai-client",
-			// Optional: Capture request/response bodies (be mindful of sensitive data)
+			// Optional: Capture request/response content (be mindful of sensitive data)
 			otelopenai.WithCaptureInput(),
 			otelopenai.WithCaptureOutput(),
 		)),
 	)
 
 	// Make API calls as usual
-	_, err := client.Chat.Completions.New(context.Background(), openai.ChatCompletionNewParams{
+	_, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Model: openai.ChatModelGPT4oMini,
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.SystemMessage("You are a helpful assistant."),
@@ -57,7 +57,7 @@ func main() {
 }
 
 func setupOTelWithLangWatch(ctx context.Context) {
-	tracerProvider, err := newLangWatchTracerProvider(ctx, resource)
+	tracerProvider, err := newLangWatchTracerProvider(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -65,9 +65,9 @@ func setupOTelWithLangWatch(ctx context.Context) {
 	otel.SetTracerProvider(tracerProvider)
 }
 
-func newLangWatchTracerProvider(ctx context.Context, res *resource.Resource) *trace.TracerProvider {
+func newLangWatchTracerProvider(ctx context.Context) *trace.TracerProvider {
 	opts := []otlptracehttp.Option{
-		otlptracehttp.WithEndpointURL("https://app.langwatch.ai/api/otel"),
+		otlptracehttp.WithEndpointURL("https://app.langwatch.ai/api/otel/v1/traces"),
 		otlptracehttp.WithHeaders(map[string]string{
 			"Authorization": "Bearer " + os.Getenv("LANGWATCH_API_KEY"),
 		}),
@@ -80,7 +80,6 @@ func newLangWatchTracerProvider(ctx context.Context, res *resource.Resource) *tr
 
 	return trace.NewTracerProvider(
 		trace.WithBatcher(traceExporter, trace.WithBatchTimeout(time.Second)),
-		trace.WithResource(res),
 	)
 }
 ```

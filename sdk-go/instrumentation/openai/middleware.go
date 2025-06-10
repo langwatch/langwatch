@@ -1,4 +1,4 @@
-package otelopenai
+package openai
 
 import (
 	"bufio"
@@ -17,11 +17,11 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 	"go.opentelemetry.io/otel/trace"
 
-	langwatch "github.com/langwatch/go-sdk"
+	langwatch "github.com/langwatch/langwatch/sdk-go"
 )
 
 const (
-	tracerName             = "github.com/langwatch/go-sdk/instrumentation/otelopenai"
+	tracerName             = "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
 	instrumentationVersion = "0.0.1"
 )
 

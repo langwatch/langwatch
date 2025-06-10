@@ -1,4 +1,4 @@
-package otelopenai
+package openai
 
 import (
 	"bufio"
@@ -24,7 +24,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
-	langwatch "github.com/langwatch/go-sdk"
+	langwatch "github.com/langwatch/langwatch/sdk-go"
 	"go.opentelemetry.io/otel"
 )
 
