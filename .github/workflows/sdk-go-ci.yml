@@ -1,0 +1,53 @@
+name: sdk-go-ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - 'sdk-go/**'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Install dependencies
+        working-directory: ./sdk-go
+        run: go mod download
+
+      - name: Run tests
+        working-directory: ./sdk-go
+        run: go test -v ./...
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "no typechecking is needed for go"
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Install dependencies
+        working-directory: ./sdk-go
+        run: go mod download
+
+      - name: Build
+        working-directory: ./sdk-go
+        run: go build -v ./...
