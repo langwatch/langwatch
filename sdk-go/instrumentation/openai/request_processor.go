@@ -17,13 +17,15 @@ import (
 
 // RequestProcessor handles the processing of OpenAI API requests
 type RequestProcessor struct {
-	recordInput bool
+	recordInput     bool
+	genAISystemName string
 }
 
 // NewRequestProcessor creates a new request processor
-func NewRequestProcessor(recordInput bool) *RequestProcessor {
+func NewRequestProcessor(recordInput bool, genAISystemName string) *RequestProcessor {
 	return &RequestProcessor{
-		recordInput: recordInput,
+		recordInput:     recordInput,
+		genAISystemName: genAISystemName,
 	}
 }
 
@@ -130,11 +132,11 @@ func (p *RequestProcessor) processGenericRequest(reqBody []byte, span *langwatch
 	return isStreaming, nil
 }
 
-// setCommonRequestAttributes sets attributes common to all OpenAI operations
+// setCommonRequestAttributes sets attributes common to all GenAI operations
 func (p *RequestProcessor) setCommonRequestAttributes(span *langwatch.Span, reqData jsonData, operation string) {
 	if model, ok := getString(reqData, "model"); ok {
 		span.SetRequestModel(model)
-		span.SetName(fmt.Sprintf("openai.%s.%s", operation, model))
+		span.SetName(fmt.Sprintf("%s.%s.%s", p.genAISystemName, operation, model))
 	}
 	if temp, ok := getFloat64(reqData, "temperature"); ok {
 		span.SetAttributes(semconv.GenAIRequestTemperature(temp))
@@ -164,14 +166,18 @@ func (p *RequestProcessor) setStreamingAttribute(span *langwatch.Span, isStreami
 // setResponsesRequestAttributes sets attributes specific to Responses API requests using proper types
 func (p *RequestProcessor) setResponsesRequestAttributes(span *langwatch.Span, reqParams responses.ResponseNewParams) {
 	span.SetRequestModel(string(reqParams.Model))
-	span.SetName(fmt.Sprintf("openai.responses.%s", string(reqParams.Model)))
+	span.SetName(fmt.Sprintf("%s.responses.%s", p.genAISystemName, string(reqParams.Model)))
 
-	if reqParams.Instructions.Valid() && reqParams.Instructions.Value != "" && p.recordInput {
-		span.RecordInput(map[string]any{"instructions": reqParams.Instructions.Value})
+	if reqParams.Instructions.Valid() && reqParams.Instructions.Value != "" {
+		span.SetAttributes(attribute.String(string(langwatch.AttributeLangWatchInstructions), reqParams.Instructions.Value))
+	}
+
+	if reqParams.Input.OfString.Valid() && reqParams.Input.OfString.Value != "" && p.recordInput {
+		span.RecordInputString(reqParams.Input.OfString.Value)
 	}
 
 	if reqParams.MaxOutputTokens.Valid() && reqParams.MaxOutputTokens.Value > 0 {
-		span.SetAttributes(attribute.Int("gen_ai.request.max_output_tokens", int(reqParams.MaxOutputTokens.Value)))
+		span.SetAttributes(semconv.GenAIRequestMaxTokens((int(reqParams.MaxOutputTokens.Value))))
 	}
 
 	if reqParams.Temperature.Valid() && reqParams.Temperature.Value > 0 {
@@ -186,10 +192,6 @@ func (p *RequestProcessor) setResponsesRequestAttributes(span *langwatch.Span, r
 		span.SetAttributes(attribute.Bool("gen_ai.request.parallel_tool_calls", reqParams.ParallelToolCalls.Value))
 	}
 
-	if reqParams.Metadata != nil {
-		setJSONAttribute(span, "gen_ai.request.metadata", reqParams.Metadata)
-	}
-
 	if len(reqParams.Tools) > 0 {
 		setJSONAttribute(span, "gen_ai.request.tools", reqParams.Tools)
 	}
@@ -202,7 +204,7 @@ func (p *RequestProcessor) setResponsesRequestAttributes(span *langwatch.Span, r
 func (p *RequestProcessor) setChatCompletionsRequestAttributes(span *langwatch.Span, reqParams openai.ChatCompletionNewParams) {
 	// Set model info (required field, direct type)
 	span.SetRequestModel(string(reqParams.Model))
-	span.SetName(fmt.Sprintf("openai.completions.%s", string(reqParams.Model)))
+	span.SetName(fmt.Sprintf("%s.completions.%s", p.genAISystemName, string(reqParams.Model)))
 
 	if reqParams.Temperature.Valid() && reqParams.Temperature.Value > 0 {
 		span.SetAttributes(semconv.GenAIRequestTemperature(reqParams.Temperature.Value))

@@ -23,7 +23,9 @@ const (
 // Middleware sets up a handler to start tracing the requests made to OpenAI by the
 // OpenAI library.
 func Middleware(name string, opts ...Option) oaioption.Middleware {
-	cfg := config{}
+	cfg := config{
+		genAISystem: semconv.GenAISystemOpenai, // Default to "openai"
+	}
 	for _, opt := range opts {
 		opt.apply(&cfg)
 	}
@@ -43,7 +45,8 @@ func Middleware(name string, opts ...Option) oaioption.Middleware {
 
 	return func(req *http.Request, next oaioption.MiddlewareNext) (*http.Response, error) {
 		operation := path.Base(req.URL.Path)
-		spanName := "openai." + operation
+		genAISystemName := cfg.genAISystem.Value.AsString()
+		spanName := genAISystemName + "." + operation
 
 		genAIOperation := getGenAIOperationFromPath(req.URL.Path)
 
@@ -52,7 +55,7 @@ func Middleware(name string, opts ...Option) oaioption.Middleware {
 				semconv.HTTPRequestMethodKey.String(req.Method),
 				semconv.ServerAddressKey.String(req.URL.Hostname()),
 				semconv.URLPathKey.String(req.URL.Path),
-				semconv.GenAISystemOpenai,
+				cfg.genAISystem,
 				genAIOperation,
 			),
 			trace.WithSpanKind(trace.SpanKindClient),
@@ -67,7 +70,7 @@ func Middleware(name string, opts ...Option) oaioption.Middleware {
 			}
 		}()
 
-		requestProcessor := NewRequestProcessor(cfg.recordInput)
+		requestProcessor := NewRequestProcessor(cfg.recordInput, genAISystemName)
 		responseProcessor := NewResponseProcessor(cfg.recordOutput)
 		isStreaming, err := requestProcessor.ProcessRequest(req, span, operation)
 		if err != nil {
