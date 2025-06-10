@@ -241,7 +241,12 @@ export function SpanDetails({
             whiteSpace="pre-wrap"
             color="red.900"
           >
-            {span.error.stacktrace}
+            {span.error.message}
+            {span.error.stacktrace && (
+              <Box>
+                <Text as="code" fontSize="12px">{span.error.stacktrace.join("\n")}</Text>
+              </Box>
+            )}
           </Box>
         </VStack>
       ) : (
