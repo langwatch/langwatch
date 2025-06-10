@@ -775,8 +775,6 @@ const addOpenTelemetrySpanAsSpan = (
       let errorMessage: string;
       if (eventAttributes.exception?.message && eventAttributes.exception?.type) {
         errorMessage = `${eventAttributes.exception.type}: ${eventAttributes.exception.message}`;
-      } else if (eventAttributes.exception?.message && eventAttributes.exception?.type) {
-        errorMessage = `${eventAttributes.exception.type}: ${eventAttributes.exception.message}`;
       } else if (otelSpan.status?.message) {
         errorMessage = otelSpan.status.message;
       } else {
