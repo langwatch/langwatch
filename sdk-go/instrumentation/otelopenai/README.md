@@ -28,16 +28,15 @@ import (
 )
 
 func main() {
-	// Configure OpenTelemetry provider (e.g., using LangWatch, Jaeger, OTLP exporter)
-	// ... setup code for your tracer provider ...
-	tracerProvider := otel.GetTracerProvider() // Get configured global provider
+	ctx := context.Background()
+
+	// Setup LangWatch tracer provider
+	setupOTelWithLangWatch(ctx)
 
 	// Create instrumented OpenAI client
 	client := openai.NewClient(
 		oaioption.WithAPIKey("YOUR_API_KEY"),
 		oaioption.WithMiddleware(otelopenai.Middleware("my-openai-client",
-			// Optional: Provide specific tracer provider
-			otelopenai.WithTracerProvider(tracerProvider),
 			// Optional: Capture request/response bodies (be mindful of sensitive data)
 			otelopenai.WithCaptureInput(),
 			otelopenai.WithCaptureOutput(),
@@ -57,6 +56,33 @@ func main() {
 	}
 }
 
+func setupOTelWithLangWatch(ctx context.Context) {
+	tracerProvider, err := newLangWatchTracerProvider(ctx, resource)
+	if err != nil {
+		panic(err)
+	}
+
+	otel.SetTracerProvider(tracerProvider)
+}
+
+func newLangWatchTracerProvider(ctx context.Context, res *resource.Resource) *trace.TracerProvider {
+	opts := []otlptracehttp.Option{
+		otlptracehttp.WithEndpointURL("https://app.langwatch.ai/api/otel"),
+		otlptracehttp.WithHeaders(map[string]string{
+			"Authorization": "Bearer " + os.Getenv("LANGWATCH_API_KEY"),
+		}),
+	}
+
+	traceExporter, err := otlptracehttp.New(ctx, opts...)
+	if err != nil {
+		panic(err)
+	}
+
+	return trace.NewTracerProvider(
+		trace.WithBatcher(traceExporter, trace.WithBatchTimeout(time.Second)),
+		trace.WithResource(res),
+	)
+}
 ```
 
 ## Configuration Options
@@ -65,8 +91,8 @@ The `Middleware` function accepts optional configuration functions:
 
 - `WithTracerProvider(provider oteltrace.TracerProvider)`: Specifies the OTel `TracerProvider`. Defaults to the global provider.
 - `WithPropagators(propagators propagation.TextMapPropagator)`: Specifies OTel propagators. Defaults to global propagators.
-- `WithCaptureInput()`: Records the full HTTP request body as the `langwatch.input.value` span attribute. Use with caution if requests contain sensitive data.
-- `WithCaptureOutput()`: Records the HTTP response body as the `langwatch.output.value` span attribute. For streaming responses, this attribute will contain the accumulated textual content from stream events. Use with caution if responses contain sensitive data.
+- `WithCaptureInput()`: Records the full conversation input as the `langwatch.input.value` span attribute. Use with caution if conversations contain sensitive data.
+- `WithCaptureOutput()`: Records the conversation output as the `langwatch.output.value` span attribute. For streaming responses, this attribute will contain the accumulated textual content from stream events. Use with caution if conversations contain sensitive data.
 
 ## Collected Attributes
 
