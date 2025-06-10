@@ -33,10 +33,6 @@ type Run = {
   items: RunItem[];
 };
 
-type SetRunHistorySidebarProps = {
-  scenarioSetId: string;
-};
-
 // Single test case row
 const RunHistoryItem = ({ item }: { item: RunItem }) => (
   <HStack align="center" gap={3} py={2} pl={3}>
@@ -153,17 +149,14 @@ const RunAccordionItem = ({
   );
 };
 
-const useSetRunHistorySidebarController = (
-  props: SetRunHistorySidebarProps
-) => {
-  const { scenarioSetId } = props;
+const useSetRunHistorySidebarController = () => {
+  const { goToSimulationBatchRuns, scenarioSetId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
-  const { goToSimulationBatchRuns } = useSimulationRouter();
 
   const { data: runData } = api.scenarios.getScenarioSetRunData.useQuery(
     {
       projectId: project?.id ?? "",
-      scenarioSetId,
+      scenarioSetId: scenarioSetId ?? "",
     },
     {
       enabled: !!project?.id && !!scenarioSetId,
@@ -212,8 +205,13 @@ const useSetRunHistorySidebarController = (
   return {
     runs,
     onRunClick: (batchRunId: string) => {
-      goToSimulationBatchRuns(scenarioSetId, batchRunId);
+      if (scenarioSetId) {
+        goToSimulationBatchRuns(scenarioSetId, batchRunId);
+      } else {
+        console.warn("scenarioSetId is not defined");
+      }
     },
+    scenarioSetId,
   };
 };
 
