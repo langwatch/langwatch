@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	defaultEndpointURL                   = "https://app.langwatch.ai"
+	defaultEndpointURL                   = "https://app.langwatch.ai/"
 	defaultAPIKeyEnvironmentVariableName = "LANGWATCH_API_KEY"
 )
 

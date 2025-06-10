@@ -27,7 +27,7 @@ First, get the necessary OpenTelemetry and LangWatch packages:
 go get go.opentelemetry.io/otel \
        go.opentelemetry.io/otel/sdk \
        go.opentelemetry.io/otel/trace \
-       github.com/langwatch/langwatch/go-sdk
+       github.com/langwatch/langwatch/sdk-go
 ```
 
 ### Using the LangWatch SDK
@@ -38,7 +38,7 @@ Once OpenTelemetry is set up (see Appendix if you haven't done this yet), you ca
 import (
 	"context"
 	"go.opentelemetry.io/otel/trace"
-	langwatch "github.com/langwatch/langwatch/go-sdk"
+	langwatch "github.com/langwatch/langwatch/sdk-go"
 )
 
 func main() {
@@ -61,7 +61,7 @@ func main() {
 
 ### Working with LangWatch Spans
 
-The `LangWatchSpan` (from `libraries/langwatch/span.go`) embeds the standard `go.opentelemetry.io/otel/trace.Span`, so you can use all the standard OpenTelemetry span methods. In addition, it provides several helper methods to easily set LangWatch-specific attributes. These attributes help LangWatch understand and display your LLM interactions more effectively.
+The `LangWatchSpan` (from `span.go`) embeds the standard `go.opentelemetry.io/otel/trace.Span`, so you can use all the standard OpenTelemetry span methods. In addition, it provides several helper methods to easily set LangWatch-specific attributes. These attributes help LangWatch understand and display your LLM interactions more effectively.
 
 Here are the key methods provided by `LangWatchSpan`:
 
@@ -173,7 +173,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace" // Example: stdout exporter
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 )
 
 // newExporter creates a new trace exporter.
@@ -250,13 +250,13 @@ import (
 	"os/signal"
 	"time"
 
-	langwatch "github.com/langwatch/langwatch/go-sdk"
+	langwatch "github.com/langwatch/langwatch/sdk-go"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
