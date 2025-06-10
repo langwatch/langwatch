@@ -5,8 +5,14 @@ export const useSimulationRouter = () => {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
 
-  const goToSimulationRun = (simulationRunId: string) => {
-    router.push(`/${project?.slug}/simulations/${simulationRunId}`);
+  const goToSimulationRun = (
+    scenarioSetId: string,
+    batchRunId: string,
+    scenarioRunId: string
+  ) => {
+    router.push(
+      `/${project?.slug}/simulations/${scenarioSetId}/${batchRunId}/${scenarioRunId}`
+    );
   };
 
   const goToSimulationSet = (simulationBatchId: string) => {

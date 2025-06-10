@@ -81,7 +81,8 @@ interface GridProps {
 
 function GridComponent({ scenarioRunIds }: GridProps) {
   const { scale, containerRef } = useZoomContext();
-  const { goToSimulationRun } = useSimulationRouter();
+  const { goToSimulationRun, scenarioSetId, batchRunId } =
+    useSimulationRouter();
 
   // State to track container dimensions and column count
   const [containerWidth, setContainerWidth] = useState(0);
@@ -92,7 +93,11 @@ function GridComponent({ scenarioRunIds }: GridProps) {
   const GRID_GAP = 24; // 6 * 4px from gap={6} in Chakra UI
 
   const handleExpandToggle = (simulationId: string) => {
-    goToSimulationRun(simulationId);
+    if (scenarioSetId && batchRunId) {
+      goToSimulationRun(scenarioSetId, batchRunId, simulationId);
+    } else {
+      console.warn("scenarioSetId or batchRunId is not defined");
+    }
   };
 
   // Calculate optimal column count based on container width and scale
@@ -157,7 +162,13 @@ function GridComponent({ scenarioRunIds }: GridProps) {
         }}
       >
         {scenarioRunIds?.map((scenarioRunId) => (
-          <Box key={scenarioRunId} width="full" height="400px">
+          <Box
+            key={scenarioRunId}
+            width="full"
+            height="400px"
+            cursor="pointer"
+            onClick={() => handleExpandToggle(scenarioRunId)}
+          >
             <SimulationChatViewer
               scenarioRunId={scenarioRunId}
               isExpanded={false}
