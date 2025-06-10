@@ -1,3 +1,11 @@
 {
-  "typescript.experimental.useTsgo": false
+  "typescript.experimental.useTsgo": false,
+  "workbench.colorCustomizations": {
+    "titleBar.activeBackground": "#007ACC",
+    "titleBar.activeForeground": "#FFFFFF",
+    "titleBar.inactiveBackground": "#005A9E",
+    "titleBar.inactiveForeground": "#CCCCCC",
+    "window.activeBorder": "#FF0000",
+    "window.inactiveBorder": "#FF0000"
+  }
 }
