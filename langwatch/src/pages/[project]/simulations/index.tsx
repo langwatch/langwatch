@@ -3,7 +3,6 @@ import { useRouter } from "next/router";
 import { useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { SetCard } from "~/components/simulations";
-import { ViewToggle, ViewMode } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -11,7 +10,6 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 export default function SimulationsPage() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
-  const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Grid);
 
   const {
     data: scenarioSetsData,

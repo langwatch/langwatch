@@ -21,6 +21,19 @@ export const scenarioRouter = createTRPCRouter({
       return data;
     }),
 
+  // Get all run data for a scenario set
+  getScenarioSetRunData: protectedProcedure
+    .input(projectSchema.extend({ scenarioSetId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
+    .query(async ({ input, ctx }) => {
+      const scenarioRunnerService = new ScenarioRunnerService();
+      const data = await scenarioRunnerService.getBatchRunDataForScenarioSet({
+        projectId: input.projectId,
+        scenarioSetId: input.scenarioSetId,
+      });
+      return data;
+    }),
+
   // OLD ROUTES
   // Get scenario run state
   getRunState: protectedProcedure
