@@ -48,17 +48,16 @@ const baseScenarioEventSchema = baseEventSchema.extend({
   batchRunId: batchRunIdSchema,
   scenarioId: scenarioIdSchema,
   scenarioRunId: scenarioRunIdSchema,
+  scenarioSetId: z.string().optional().default("default"),
 });
 
 // Scenario Run Started Event
-// TODO: Consider metadata
 export const scenarioRunStartedSchema = baseScenarioEventSchema.extend({
   type: z.literal(ScenarioEventType.RUN_STARTED),
-  //   metadata: z.object({
-  //     name: z.string(),
-  //     description: z.string().optional(),
-  //     config: z.record(z.unknown()).optional(),
-  //   }),
+  metadata: z.object({
+    name: z.string(),
+    description: z.string().optional(),
+  }),
 });
 
 // Schema for scenario result, matching the provided Python dataclass structure
