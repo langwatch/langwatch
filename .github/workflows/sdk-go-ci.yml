@@ -28,6 +28,17 @@ jobs:
         working-directory: ./sdk-go
         run: go test -v ./...
 
+      - name: Install example dependencies
+        working-directory: ./sdk-go/examples
+        run: go mod download
+
+      - name: Run examples
+        working-directory: ./sdk-go/examples
+        run: go run cmd/main.go --ci run-examples
+        env:
+          LANGWATCH_API_KEY: ${{ secrets.GO_SDK_LANGWATCH_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.GO_SDK_OPENAI_API_KEY }}
+
   typecheck:
     runs-on: ubuntu-latest
     steps:
