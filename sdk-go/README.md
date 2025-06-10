@@ -96,6 +96,12 @@ Here are the key methods provided by `LangWatchSpan`:
     span.RecordOutputString(llmResponseString)
     ```
 
+- **`SetThreadID(threadID string)`**:
+    Sets the thread ID for the operation. This is used to group related spans together.
+    ```go
+    span.SetThreadID("thread_0123456789")
+    ```
+
 - **`SetRequestModel(model string)`**:
     Sets the model name used for a request (e.g., "gpt-4", "claude-3-opus"). This uses the semantic convention key `gen_ai.request.model`.
     ```go
