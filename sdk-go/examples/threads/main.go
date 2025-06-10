@@ -59,7 +59,7 @@ func main() {
 	// Create instrumented OpenAI client
 	client := openai.NewClient(
 		oaioption.WithAPIKey(openaiAPIKey),
-		oaioption.WithMiddleware(otelopenai.Middleware("custom-input-output-openai-client")),
+		oaioption.WithMiddleware(otelopenai.Middleware("threads-openai-client")),
 	)
 
 	history := []openai.ChatCompletionMessageParamUnion{
