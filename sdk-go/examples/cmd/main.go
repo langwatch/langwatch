@@ -22,6 +22,7 @@ var examples = map[string]string{
 	"custom-input-output": "./custom-input-output/main.go",
 	"streaming":           "./streaming/main.go",
 	"simple":              "./simple/main.go",
+	"responses":           "./responses/main.go",
 }
 
 // runExample executes a single example in a subprocess and streams its output.
