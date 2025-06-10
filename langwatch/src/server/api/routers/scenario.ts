@@ -18,7 +18,7 @@ export const scenarioRouter = createTRPCRouter({
       const data = await scenarioRunnerService.getScenarioSetsDataForProject({
         projectId: input.projectId,
       });
-      return { data };
+      return data;
     }),
 
   // OLD ROUTES

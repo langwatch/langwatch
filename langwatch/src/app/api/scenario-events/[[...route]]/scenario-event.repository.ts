@@ -5,6 +5,7 @@ import type {
   ScenarioMessageSnapshotEvent,
   ScenarioRunFinishedEvent,
   ScenarioBatch,
+  ScenarioSetData,
 } from "./types";
 import { Client as ElasticClient } from "@elastic/elasticsearch";
 import { z } from "zod";
@@ -385,13 +386,7 @@ export class ScenarioEventRepository {
     projectId,
   }: {
     projectId: string;
-  }): Promise<
-    {
-      batchRunId: string;
-      scenarioCount: number;
-      lastRunAt: number;
-    }[]
-  > {
+  }): Promise<ScenarioSetData[]> {
     const validatedProjectId = projectIdSchema.parse(projectId);
     const client = await this.getClient();
 
@@ -468,7 +463,7 @@ export class ScenarioEventRepository {
 
     return setBuckets.map((bucket) => {
       return {
-        batchRunId: bucket.key, // Using existing interface property name for scenarioSetId
+        scenarioSetId: bucket.key,
         scenarioCount: bucket.unique_scenario_count.value,
         lastRunAt: bucket.latest_run_timestamp.value,
       };

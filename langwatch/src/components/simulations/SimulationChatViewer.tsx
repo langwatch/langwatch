@@ -1,6 +1,7 @@
-import { useFetchScenarioRunData } from "~/hooks/simulations";
 import { SimulationCard } from "./SimulationCard";
 import { CustomCopilotKitChat } from "./CustomCopilotKitChat";
+import { api } from "~/utils/api";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 export function SimulationChatViewer({
   scenarioRunId,
@@ -11,10 +12,16 @@ export function SimulationChatViewer({
   isExpanded?: boolean;
   onExpandToggle?: () => void;
 }) {
-  // Fetch scenario state for this thread
-  const { data } = useFetchScenarioRunData({
-    scenarioRunId,
-  });
+  const { project } = useOrganizationTeamProject();
+  const { data } = api.scenarios.getRunState.useQuery(
+    {
+      scenarioRunId,
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project,
+    }
+  );
 
   return (
     <SimulationCard
