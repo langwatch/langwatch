@@ -7,7 +7,7 @@ It automatically creates client spans for OpenAI API calls made through the inst
 ## Installation
 
 ```bash
-go get github.com/langwatch/go-sdk/instrumentation/otelopenai
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/otelopenai
 ```
 
 ## Usage
@@ -21,7 +21,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/langwatch/go-sdk/instrumentation/otelopenai"
+	"github.com/langwatch/langwatch/sdk-go/instrumentation/otelopenai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
@@ -96,7 +96,7 @@ The `Middleware` function accepts optional configuration functions:
 
 ## Collected Attributes
 
-The middleware adds attributes to the client span, following [OpenTelemetry GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/general/) where applicable.
+The middleware adds attributes to the client span, following [OpenTelemetry GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) where applicable.
 
 **Request Attributes:**
 

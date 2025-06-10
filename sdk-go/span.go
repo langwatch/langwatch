@@ -113,6 +113,10 @@ func (s *Span) SetRequestModel(model string) {
 	s.SetAttributes(semconv.GenAIRequestModelKey.String(model))
 }
 
+func (s *Span) SetThreadID(threadID string) {
+	s.SetAttributes(AttributeLangWatchThreadID.String(threadID))
+}
+
 func (s *Span) SetResponseModel(model string) {
 	s.SetAttributes(semconv.GenAIResponseModelKey.String(model))
 }

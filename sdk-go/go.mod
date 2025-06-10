@@ -1,6 +1,8 @@
 module github.com/langwatch/go-sdk
 
-go 1.24.2
+go 1.22.0
+
+toolchain go1.24.2
 
 require (
 	github.com/openai/openai-go v0.1.0-beta.10

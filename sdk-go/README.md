@@ -2,9 +2,6 @@
 
 The Go SDK for tracing and evaluating LLM applications using [LangWatch](https://langwatch.ai).
 
-> [!WARNING]  
-> The LangWatch Go SDK is split into two parts. The Core SDK, and the OpenAI instrumentor. The Core Go SDK is still early in development and not ready for production use, but the OpenAI instrumentor is ready for production use. Read it's [readme](./instrumentation/otelopenai/README.md) for more information.
-
 ## Features
 
 * Seamless integration with OpenTelemetry.
@@ -16,7 +13,7 @@ The Go SDK for tracing and evaluating LLM applications using [LangWatch](https:/
 
 ### Prerequisites
 
-* Go (version 1.18 or later recommended)
+* Go (version 1.20 or later recommended)
 * An OpenTelemetry-compatible backend to send your traces to, such as [LangWatch](https://langwatch.ai) or [Grafana ](https://grafana.com/)
 
 ### Installation
@@ -27,7 +24,7 @@ First, get the necessary OpenTelemetry and LangWatch packages:
 go get go.opentelemetry.io/otel \
        go.opentelemetry.io/otel/sdk \
        go.opentelemetry.io/otel/trace \
-       github.com/langwatch/langwatch/go-sdk
+       github.com/langwatch/langwatch/sdk-go
 ```
 
 ### Using the LangWatch SDK
@@ -38,7 +35,7 @@ Once OpenTelemetry is set up (see Appendix if you haven't done this yet), you ca
 import (
 	"context"
 	"go.opentelemetry.io/otel/trace"
-	langwatch "github.com/langwatch/langwatch/go-sdk"
+	langwatch "github.com/langwatch/langwatch/sdk-go"
 )
 
 func main() {
@@ -61,7 +58,7 @@ func main() {
 
 ### Working with LangWatch Spans
 
-The `LangWatchSpan` (from `libraries/langwatch/span.go`) embeds the standard `go.opentelemetry.io/otel/trace.Span`, so you can use all the standard OpenTelemetry span methods. In addition, it provides several helper methods to easily set LangWatch-specific attributes. These attributes help LangWatch understand and display your LLM interactions more effectively.
+The `LangWatchSpan` (from `span.go`) embeds the standard `go.opentelemetry.io/otel/trace.Span`, so you can use all the standard OpenTelemetry span methods. In addition, it provides several helper methods to easily set LangWatch-specific attributes. These attributes help LangWatch understand and display your LLM interactions more effectively.
 
 Here are the key methods provided by `LangWatchSpan`:
 
@@ -97,6 +94,12 @@ Here are the key methods provided by `LangWatchSpan`:
     ```go
     llmResponseString := "Bonjour"
     span.RecordOutputString(llmResponseString)
+    ```
+
+- **`SetThreadID(threadID string)`**:
+    Sets the thread ID for the operation. This is used to group related spans together.
+    ```go
+    span.SetThreadID("thread_0123456789")
     ```
 
 - **`SetRequestModel(model string)`**:
@@ -173,7 +176,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace" // Example: stdout exporter
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 )
 
 // newExporter creates a new trace exporter.
@@ -250,13 +253,13 @@ import (
 	"os/signal"
 	"time"
 
-	langwatch "github.com/langwatch/langwatch/go-sdk"
+	langwatch "github.com/langwatch/langwatch/sdk-go"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
