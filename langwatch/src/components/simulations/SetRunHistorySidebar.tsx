@@ -18,7 +18,7 @@ import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums"
 
 // Types for props
 type RunItem = {
-  status: string;
+  status: ScenarioRunStatus;
   title: string;
   description: string;
 };
@@ -39,8 +39,10 @@ type SetRunHistorySidebarProps = {
 const RunHistoryItem = ({ item }: { item: RunItem }) => (
   <HStack align="center" gap={3} py={2} pl={3}>
     <Icon
-      as={item.status === "passed" ? Check : XCircle}
-      color={item.status === "passed" ? "green.400" : "red.400"}
+      as={item.status === ScenarioRunStatus.SUCCESS ? Check : XCircle}
+      color={
+        item.status === ScenarioRunStatus.SUCCESS ? "green.400" : "red.400"
+      }
       boxSize={4}
       mt={1}
     />
@@ -59,12 +61,15 @@ const RunHistoryItem = ({ item }: { item: RunItem }) => (
 const RunAccordionItem = ({ run, isOpen }: { run: Run; isOpen: boolean }) => {
   const { passedCount, failedCount } = run.items.reduce(
     (acc, item) => {
-      if (item.status === "passed") {
+      if (item.status === ScenarioRunStatus.SUCCESS) {
         acc.passedCount++;
-      } else if (item.status === "failed") {
+      } else if (
+        item.status === ScenarioRunStatus.FAILED ||
+        item.status === ScenarioRunStatus.ERROR
+      ) {
         acc.failedCount++;
       } else {
-        // do nothing
+        // do nothing for other statuses like IN_PROGRESS, PENDING, CANCELLED
       }
       return acc;
     },
@@ -164,8 +169,7 @@ const useSetRunHistorySidebarController = (
           {
             title: run.name ?? "",
             description: run.description ?? "",
-            status:
-              run.status === ScenarioRunStatus.SUCCESS ? "passed" : "failed",
+            status: run.status,
           },
         ],
       };
@@ -174,7 +178,7 @@ const useSetRunHistorySidebarController = (
       batchRuns[run.batchRunId]?.items.push({
         title: run.name ?? "",
         description: run.description ?? "",
-        status: run.status === ScenarioRunStatus.SUCCESS ? "passed" : "failed",
+        status: run.status,
       });
     }
   });
