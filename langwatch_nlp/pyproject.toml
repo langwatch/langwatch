@@ -48,4 +48,4 @@ dev = [
 package = false
 
 [tool.uv.sources]
-langwatch = { path = "../python-sdk-legacy", editable = true }
+langwatch = { path = "../python-sdk", editable = true }

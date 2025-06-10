@@ -1,13 +1,13 @@
-import { Box, HStack, Table, VStack } from "@chakra-ui/react";
-import { Tooltip } from "../../../components/ui/tooltip";
+import { Box, Button, HStack, Table, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import { useEffect, useRef } from "react";
-import { Info } from "react-feather";
+import { Tooltip } from "../../../components/ui/tooltip";
 import type { ESBatchEvaluation } from "../../../server/experiments/types";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
-import { HoverableBigText } from "../../HoverableBigText";
+import { useDrawer } from "../../CurrentDrawer";
 import { ExternalImage, isImageUrl } from "../../ExternalImage";
+import { HoverableBigText } from "../../HoverableBigText";
 
 type RenderableRow = {
   render: () => React.ReactNode;
@@ -68,7 +68,8 @@ const evaluationResultsTableRow = (
               maxHeight="120px"
               maxWidth="100%"
             />
-          ) : datasetEntry?.entry?.[column] ? (
+          ) : datasetEntry?.entry?.[column] !== undefined &&
+            datasetEntry?.entry?.[column] !== null ? (
             <HoverableBigText>
               {stringify(datasetEntry.entry[column])}
             </HoverableBigText>
@@ -103,7 +104,7 @@ const evaluationResultsTableRow = (
 
             return (
               <Table.Cell key={`predicted-${node}-${column}`} maxWidth="250px">
-                {value ? (
+                {value !== undefined && value !== null ? (
                   <HoverableBigText>{stringify(value)}</HoverableBigText>
                 ) : (
                   "-"
@@ -499,6 +500,12 @@ export function BatchEvaluationV2EvaluationResult({
     };
   }, [results, isFinished, hasScrolled]);
 
+  const hasAnyTraceId = Object.values(datasetByIndex).some(
+    (d) => d.trace_id && d.trace_id !== "0"
+  );
+
+  const { openDrawer } = useDrawer();
+
   return (
     <Box ref={containerRef}>
       {/* @ts-ignore */}
@@ -540,7 +547,7 @@ export function BatchEvaluationV2EvaluationResult({
                   paddingY={2}
                   borderTop="none"
                 >
-                  <Box>Evaluation Entry</Box>
+                  <Box>Evaluation Data</Box>
                 </Table.ColumnHeader>
               )}
 
@@ -561,6 +568,12 @@ export function BatchEvaluationV2EvaluationResult({
                   {column}
                 </Table.ColumnHeader>
               )
+            )}
+
+            {hasAnyTraceId && (
+              <Table.ColumnHeader rowSpan={2} borderTop="none">
+                Trace
+              </Table.ColumnHeader>
             )}
           </Table.Row>
           <Table.Row>
@@ -611,6 +624,31 @@ export function BatchEvaluationV2EvaluationResult({
               {Array.from(
                 row.evaluationsColumns[evaluator]?.evaluationResults ?? []
               ).map((result) => result.render())}
+
+              {hasAnyTraceId && (
+                <Table.Cell>
+                  {(() => {
+                    const traceId = datasetByIndex[index]?.trace_id;
+                    return (
+                      traceId && (
+                        <Button
+                          size="xs"
+                          colorPalette="gray"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            openDrawer("traceDetails", {
+                              traceId,
+                              selectedTab: "traceDetails",
+                            });
+                          }}
+                        >
+                          View
+                        </Button>
+                      )
+                    );
+                  })()}
+                </Table.Cell>
+              )}
             </Table.Row>
           ))}
         </Table.Body>

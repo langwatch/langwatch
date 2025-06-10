@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import { inputsAndOutputsToDemostrationColumns } from "../llmPromptConfigUtils";
-import isEqual from "lodash.isequal";
+import isEqual from "lodash-es/isEqual";
 
 const promptConfigSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -52,7 +52,11 @@ export const usePromptConfigForm = ({
   initialConfigValues,
 }: UsePromptConfigFormProps) => {
   const methods = useForm<PromptConfigFormValues>({
-    defaultValues: initialConfigValues,
+    /**
+     * Don't pass undefined as defaultValue
+     * @see https://react-hook-form.com/docs/useform#defaultValues
+     */
+    defaultValues: initialConfigValues ?? {},
     resolver: zodResolver(formSchema),
   });
 
@@ -64,7 +68,7 @@ export const usePromptConfigForm = ({
     const outputs = formData.version?.configData.outputs ?? [];
     const newColumns = inputsAndOutputsToDemostrationColumns(inputs, outputs);
     const currentColumns =
-      formData.version?.configData.demonstrations.columns ?? [];
+      formData.version?.configData.demonstrations?.columns ?? [];
 
     if (!isEqual(newColumns, currentColumns)) {
       methods.setValue("version.configData.demonstrations.columns", newColumns);

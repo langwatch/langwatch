@@ -21,6 +21,10 @@ import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { TopicsSelector } from "../../../components/filters/TopicsSelector";
 
+// Time unit conversion constants
+const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
+const ONE_DAY = MINUTES_IN_DAY;
+
 const threadsPerTopic = {
   graphId: "custom",
   graphType: "stacked_bar",
@@ -34,7 +38,7 @@ const threadsPerTopic = {
   ],
   groupBy: "topics.topics",
   includePrevious: false,
-  timeScale: 1,
+  timeScale: ONE_DAY,
   height: 300,
 };
 
@@ -108,7 +112,7 @@ export default function Topics() {
               <Card.Header>
                 <Heading size="sm">Top Topics</Heading>
               </Card.Header>
-              <Card.Body maxHeight="340px" overflowY="scroll">
+              <Card.Body maxHeight="340px" overflowY="auto">
                 <TopicsSelector showTitle={false} />
               </Card.Body>
             </Card.Root>

@@ -1,0 +1,48 @@
+name: sdk-javascript-cd
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+jobs:
+  publish-sdk-npm:
+    if: startsWith(github.event.release.tag_name, 'typescript-sdk@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: "typescript-sdk/package-lock.json"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        working-directory: typescript-sdk
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+
+      - name: Run unit tests
+        working-directory: ./typescript-sdk
+        run: npm run test
+
+      - name: Typecheck
+        working-directory: ./typescript-sdk
+        run: npm install -D @typescript/native-preview
+
+      - name: Build
+        working-directory: ./typescript-sdk
+        run: npm run build
+
+      - name: Publish to npm
+        working-directory: ./typescript-sdk
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

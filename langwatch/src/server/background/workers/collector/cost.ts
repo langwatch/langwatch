@@ -1,5 +1,4 @@
-import { Tiktoken } from "tiktoken/lite";
-import { load } from "tiktoken/load";
+import { type Tiktoken } from "tiktoken/lite";
 // @ts-ignore
 import registry from "tiktoken/registry.json";
 // @ts-ignore
@@ -11,6 +10,7 @@ import {
 import * as Sentry from "@sentry/nextjs";
 import NodeFetchCache, { FileSystemCache } from "node-fetch-cache";
 import { createLogger } from "../../../../utils/logger";
+import { isBuildOrNoRedis } from "../../../redis";
 
 const logger = createLogger("langwatch:workers:collector:cost");
 
@@ -32,6 +32,19 @@ const loadingModel = new Set<string>();
 const initTikToken = async (
   modelName: string
 ): Promise<{ encoder: Tiktoken } | undefined> => {
+  let Tiktoken: typeof import("tiktoken/lite").Tiktoken;
+  let load: typeof import("tiktoken/load").load;
+  try {
+    Tiktoken = (await import("tiktoken/lite")).Tiktoken;
+    load = (await import("tiktoken/load")).load;
+  } catch (error) {
+    logger.warn(
+      { error },
+      "tiktoken could not be loaded, skipping tokenization"
+    );
+    return undefined;
+  }
+
   const fallback = "gpt-4o";
   const tokenizer =
     modelName in models
@@ -49,6 +62,7 @@ const initTikToken = async (
   }
 
   if (!cachedModel[tokenizer]) {
+    logger.info(`loading tiktoken model ${tokenizer}`);
     loadingModel.add(tokenizer);
     const registryInfo = (registry as any)[tokenizer];
     const fetch = NodeFetchCache.create({
@@ -157,5 +171,11 @@ export const getMatchingLLMModelCost = async (
 };
 
 // Pre-warm most used models
-initTikToken("gpt-4");
-initTikToken("gpt-4o");
+export const prewarmTiktokenModels = async () => {
+  await initTikToken("gpt-4");
+  await initTikToken("gpt-4o");
+};
+
+if (isBuildOrNoRedis) {
+  prewarmTiktokenModels();
+}

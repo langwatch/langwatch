@@ -1,5 +1,7 @@
 import httpx
-from .state import get_api_key, get_endpoint, set_api_key
+
+import langwatch
+from .state import get_api_key, get_endpoint
 from getpass import getpass
 
 
@@ -25,5 +27,5 @@ def login(relogin=False):
         raise ValueError("API key is not valid, please try to login again")
     response.raise_for_status()
 
-    set_api_key(api_key)
+    langwatch.setup(api_key=api_key)
     print("LangWatch API key set")

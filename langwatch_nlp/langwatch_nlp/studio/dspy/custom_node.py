@@ -28,6 +28,8 @@ class CustomNode(dspy.Module):
         else:
             url = f"{self.endpoint}/api/workflows/{self.workflow_id}/run"
 
+        kwargs["do_not_trace"] = True
+
         response = httpx.post(
             url,
             headers={"X-Auth-Token": self.api_key, "Content-Type": "application/json"},

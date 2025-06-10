@@ -3,6 +3,12 @@ import { prisma } from "../../../../server/db";
 import type { CollectorRESTParams } from "../../../../server/tracer/types";
 import { nanoid } from "nanoid";
 import { env } from "../../../../env.mjs";
+import type {
+  ESpanKind,
+  IExportTraceServiceRequest,
+} from "@opentelemetry/otlp-transformer";
+import type { DeepPartial } from "../../../../utils/types";
+import crypto from "crypto";
 
 export async function GET(req: NextRequest) {
   const xAuthToken = req.headers.get("x-auth-token");
@@ -36,16 +42,15 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const traceId = `trace_${nanoid()}`;
-  const params: CollectorRESTParams = {
+  const restParams: CollectorRESTParams = {
     spans: [
       {
-        trace_id: traceId,
+        trace_id: `trace_${nanoid()}`,
         span_id: `span_${nanoid()}`,
         type: "span",
         input: {
           type: "text",
-          value: "🐤",
+          value: "🐣",
         },
         output: {
           type: "text",
@@ -62,63 +67,103 @@ export async function GET(req: NextRequest) {
     },
   };
 
-  const response = await fetch(`${env.BASE_HOST}/api/collector`, {
-    method: "POST",
-    headers: {
-      "X-Auth-Token": authToken,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(params),
-  });
-  if (!response.ok) {
-    return NextResponse.json(
-      { message: "Failed to send trace to LangWatch" },
-      { status: 500 }
-    );
-  }
+  const otelParams: DeepPartial<IExportTraceServiceRequest> = {
+    resourceSpans: [
+      {
+        resource: {
+          attributes: [
+            {
+              key: "canary",
+              value: {
+                stringValue: "true",
+              },
+            },
+          ],
+        },
+        scopeSpans: [
+          {
+            scope: {
+              name: "opentelemetry.langwatch.health_check",
+            },
+            spans: [
+              {
+                traceId: Buffer.from(
+                  crypto.randomBytes(16).toString("hex"),
+                  "hex"
+                ).toString("base64"),
+                spanId: Buffer.from(
+                  crypto.randomBytes(8).toString("hex"),
+                  "hex"
+                ).toString("base64"),
+                name: "Health check",
+                kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                startTimeUnixNano: (Date.now() * 1000 * 1000).toString(),
+                endTimeUnixNano: (Date.now() * 1000 * 1000).toString(),
+                attributes: [
+                  {
+                    key: "gen_ai.prompt.0.role",
+                    value: {
+                      stringValue: "user",
+                    },
+                  },
+                  {
+                    key: "gen_ai.prompt.0.content.0.text",
+                    value: {
+                      stringValue: "🐣",
+                    },
+                  },
+                  {
+                    key: "gen_ai.completion.0.text",
+                    value: {
+                      stringValue: "💯",
+                    },
+                  },
+                ],
+                status: {},
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
 
-  const body = await response.json();
-
-  // Check trace with retry mechanism
-  try {
-    await checkTraceWithRetry(traceId, authToken);
-  } catch (error) {
-    return NextResponse.json(
-      { message: "Failed to get trace after multiple retries" },
-      { status: 500 }
-    );
-  }
-
-  return NextResponse.json({
-    status: response.status,
-    body,
-  });
-}
-
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
-
-const checkTraceWithRetry = async (
-  traceId: string,
-  authToken: string
-): Promise<Response> => {
-  const startTime = Date.now();
-  const timeoutMs = 60 * 1000; // 60 seconds timeout
-  const retryIntervalMs = 5000; // 5 seconds interval
-
-  while (Date.now() - startTime < timeoutMs) {
-    await sleep(retryIntervalMs);
-
-    const traceResponse = await fetch(`${env.BASE_HOST}/api/trace/${traceId}`, {
+  const [restCollectorResponse, otelCollectorResponse] = await Promise.all([
+    fetch(`${env.BASE_HOST}/api/collector`, {
+      method: "POST",
       headers: {
         "X-Auth-Token": authToken,
+        "Content-Type": "application/json",
       },
-    });
+      body: JSON.stringify(restParams),
+    }),
+    fetch(`${env.BASE_HOST}/api/otel/v1/traces`, {
+      method: "POST",
+      headers: {
+        "X-Auth-Token": authToken,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(otelParams),
+    }),
+  ]);
 
-    if (traceResponse.ok) {
-      return traceResponse;
-    }
+  if (!restCollectorResponse.ok) {
+    return NextResponse.json(
+      { message: "Failed to send trace to LangWatch using REST" },
+      { status: 500 }
+    );
   }
 
-  throw new Error("Timeout waiting for trace to be available");
-};
+  if (!otelCollectorResponse.ok) {
+    return NextResponse.json(
+      { message: "Failed to send trace to LangWatch using OTLP" },
+      { status: 500 }
+    );
+  }
+
+  const otelBody = await otelCollectorResponse.json();
+  return NextResponse.json({
+    status: otelCollectorResponse.status,
+    body: otelBody,
+  });
+}

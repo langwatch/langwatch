@@ -14,7 +14,6 @@ import { Tag } from "@chakra-ui/react";
 import { Tooltip } from "../ui/tooltip";
 import { Popover } from "../ui/popover";
 import type { Annotation, Project } from "@prisma/client";
-import NextLink from "next/link";
 import numeral from "numeral";
 import {
   CheckCircle,
@@ -46,6 +45,8 @@ import {
 } from "../../utils/parsePythonInsideJson";
 import { Markdown } from "../Markdown";
 import { RedactedField } from "../ui/RedactedField";
+import { stringifyIfObject } from "../../utils/stringifyIfObject";
+import { OverflownTextWithTooltip } from "../OverflownText";
 
 export type TraceWithGuardrail = Trace & {
   lastGuardrail: (EvaluationResult & { name?: string }) | undefined;
@@ -107,12 +108,7 @@ export function MessageCard({
   const traceTopic = topicsMap[trace.metadata.topic_id ?? ""];
   const traceSubtopic = topicsMap[trace.metadata.subtopic_id ?? ""];
 
-  const annotations = api.annotation.getByTraceId.useQuery({
-    traceId: trace.trace_id,
-    projectId: project.id,
-  });
-
-  const Annotation = ({ annotations }: { annotations: Annotation[] }) => {
+  const Annotation = ({ annotationsCount }: { annotationsCount: number }) => {
     const { openDrawer } = useDrawer();
 
     return (
@@ -136,8 +132,8 @@ export function MessageCard({
             <HStack>
               <Edit size={24} />
               <Text>
-                {annotations.length} annotation
-                {annotations.length > 1 ? "s" : ""}
+                {annotationsCount} annotation
+                {annotationsCount > 1 ? "s" : ""}
               </Text>
             </HStack>
           </Tag.Label>
@@ -149,8 +145,10 @@ export function MessageCard({
   const evaluationsPopover = useDisclosure();
   const { openDrawer } = useDrawer();
 
-  const inputIsJson = isJson(trace.input?.value ?? "");
-  const inputIsPythonRepr = isPythonRepr(trace.input?.value ?? "");
+  const inputIsJson = isJson(stringifyIfObject(trace.input?.value) ?? "");
+  const inputIsPythonRepr = isPythonRepr(
+    stringifyIfObject(trace.input?.value) ?? ""
+  );
 
   return (
     <VStack
@@ -180,7 +178,9 @@ export function MessageCard({
           <Box fontWeight="bold">
             <RedactedField field="input">
               {inputIsJson || inputIsPythonRepr ? (
-                <MessageCardJsonOutput value={trace.input?.value ?? ""} />
+                <MessageCardJsonOutput
+                  value={stringifyIfObject(trace.input?.value) ?? ""}
+                />
               ) : (
                 <Text lineClamp={1} wordBreak="break-all" lineHeight="2.1em">
                   <Markdown className="markdown markdown-without-margin">
@@ -216,9 +216,11 @@ export function MessageCard({
               </Box>
               <Box wordBreak="break-all">
                 {trace.output?.value &&
-                (isJson(trace.output.value) ||
-                  isPythonRepr(trace.output.value)) ? (
-                  <MessageCardJsonOutput value={trace.output.value} />
+                (isJson(stringifyIfObject(trace.output.value)) ||
+                  isPythonRepr(stringifyIfObject(trace.output.value))) ? (
+                  <MessageCardJsonOutput
+                    value={stringifyIfObject(trace.output.value)}
+                  />
                 ) : trace.output?.value ? (
                   <Markdown className="markdown">
                     {getSlicedOutput(trace)}
@@ -282,7 +284,9 @@ export function MessageCard({
                 color={getColorForString("colors", traceTopic.id).color}
                 fontSize="12px"
               >
-                {traceTopic.name}
+                <OverflownTextWithTooltip maxWidth="300px" lineClamp={1}>
+                  {traceTopic.name}
+                </OverflownTextWithTooltip>
               </Badge>
             )}
             {traceSubtopic && (
@@ -293,7 +297,9 @@ export function MessageCard({
                 color={getColorForString("colors", traceSubtopic.id).color}
                 fontSize="12px"
               >
-                {traceSubtopic.name}
+                <OverflownTextWithTooltip maxWidth="300px" lineClamp={1}>
+                  {traceSubtopic.name}
+                </OverflownTextWithTooltip>
               </Badge>
             )}
             {(trace.metadata.labels ?? []).map((label) => (
@@ -303,7 +309,9 @@ export function MessageCard({
                 color={getColorForString("colors", label).color}
                 fontSize="12px"
               >
-                {label}
+                <OverflownTextWithTooltip maxWidth="100px" lineClamp={1}>
+                  {label}
+                </OverflownTextWithTooltip>
               </Badge>
             ))}
           </HStack>
@@ -378,8 +386,8 @@ export function MessageCard({
           </HStack>
         </VStack>
         <Spacer />
-        {annotations.data && annotations.data.length > 0 && (
-          <Annotation annotations={annotations.data} />
+        {trace.annotations?.count && (
+          <Annotation annotationsCount={trace.annotations.count} />
         )}
         {!checksMap && <Skeleton width={100} height="1em" />}
         {checksMap && totalGuardrails > 0 && (
@@ -518,41 +526,44 @@ export function MessageCard({
   );
 }
 
-export const getExtractedInput = (trace: Trace) => {
+export const getExtractedInput = (trace: Trace): string => {
   const input = trace.input;
 
-  let value = input?.value ?? "";
+  let value = input?.value ? stringifyIfObject(input.value) : "";
+
   try {
     const json: any = JSON.parse(value);
-    if (
-      "input" in json &&
-      typeof json.input === "string" &&
-      json.input.length > 0
-    ) {
+
+    if (typeof json?.input === "string" && json.input.length > 0) {
       value = json.input;
     }
   } catch {
     // ignore
   }
 
-  return value ? value : "<empty>";
+  return value ?? "<empty>";
 };
 
 const getSlicedOutput = (trace: Trace) => {
-  const value = trace.output?.value.slice(0, 600);
+  const value = stringifyIfObject(trace.output?.value).slice(0, 600);
 
   return (
     (value ? value : "<empty>") +
-    (trace.output && trace.output.value.length >= 600 ? "..." : "")
+    (trace.output && stringifyIfObject(trace.output?.value).length >= 600
+      ? "..."
+      : "")
   );
 };
 
 export const getSlicedExpectedOutput = (trace: Trace) => {
-  const value = trace.expected_output?.value.slice(0, 600);
+  const value = stringifyIfObject(trace.expected_output?.value).slice(0, 600);
 
   return (
     (value ? value : "<empty>") +
-    (trace.output && trace.output.value.length >= 600 ? "..." : "")
+    (trace.output &&
+    stringifyIfObject(trace.expected_output?.value).length >= 600
+      ? "..."
+      : "")
   );
 };
 

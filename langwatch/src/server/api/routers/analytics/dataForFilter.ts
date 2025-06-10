@@ -8,7 +8,6 @@ import { availableFilters } from "../../../filters/registry";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
 import { generateTracesPivotQueryConditions } from "./common";
 import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/typesWithBodyKey";
-import { getAnnotatedTraceIds } from "~/server/filters/annotations";
 
 export const dataForFilter = protectedProcedure
   .input(

@@ -9,6 +9,7 @@ from langwatch.utils.transformation import truncate_object_recursively
 from langwatch.telemetry.tracing import LangWatchTrace
 from typing_extensions import TypedDict
 import langwatch
+from langwatch.state import get_api_key, get_endpoint
 import httpx
 import json
 from pydantic import BaseModel
@@ -157,15 +158,16 @@ class LangWatchDSPy:
         workflow_id: Optional[str] = None,
         workflow_version_id: Optional[str] = None,
     ):
-        if langwatch.api_key is None:
+        api_key = get_api_key()
+        if not api_key:
             print("API key was not detected, calling langwatch.login()...")
             langwatch.login()
             return
 
         try:
             response = httpx.post(
-                f"{langwatch.endpoint}/api/experiment/init",
-                headers={"X-Auth-Token": langwatch.api_key or ""},
+                f"{get_endpoint()}/api/experiment/init",
+                headers={"X-Auth-Token": api_key},
                 json={
                     "experiment_slug": slug or experiment,
                     "experiment_type": "DSPY",
@@ -177,7 +179,6 @@ class LangWatchDSPy:
         except Exception as e:
             raise Exception(f"Error initializing LangWatch experiment: {e}")
         if response.status_code == 401:
-            langwatch.api_key = None
             raise ValueError(
                 "API key is not valid, please try to login again with langwatch.login()"
             )
@@ -201,7 +202,7 @@ class LangWatchDSPy:
         self.experiment_path = result["path"]
         print(f"\n[LangWatch] Experiment initialized, run_id: {self.run_id}")
         print(
-            f"[LangWatch] Open {langwatch.endpoint}{self.experiment_path}?runIds={self.run_id} to track your DSPy training session live\n"
+            f"[LangWatch] Open {get_endpoint()}{self.experiment_path}?runIds={self.run_id} to track your DSPy training session live\n"
         )
 
     def patch_optimizer(self, optimizer: Teleprompter):
@@ -357,9 +358,9 @@ class LangWatchDSPy:
             for item in data_list
         ]
         response = httpx.post(
-            f"{langwatch.endpoint}/api/dspy/log_steps",
+            f"{get_endpoint()}/api/dspy/log_steps",
             headers={
-                "X-Auth-Token": langwatch.api_key or "",
+                "X-Auth-Token": get_api_key() or "",
                 "Content-Type": "application/json",
             },
             data=json.dumps(data),  # type: ignore
@@ -372,6 +373,7 @@ class LangWatchDSPy:
         return DSPyTracer(trace=trace)
 
 
+# Create a singleton instance
 langwatch_dspy = LangWatchDSPy()
 
 

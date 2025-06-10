@@ -1057,7 +1057,7 @@ const getExperimentBatchEvaluationRuns = async (
             return [
               bucket.key,
               {
-                name: bucket.name.buckets[0].key ?? bucket.key,
+                name: bucket.name.buckets[0]?.key ?? bucket.key,
                 average_score: bucket.processed_evaluations.average_score.value,
                 ...(bucket.processed_evaluations.has_passed.doc_count > 0
                   ? {

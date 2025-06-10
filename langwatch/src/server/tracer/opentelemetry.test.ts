@@ -81,7 +81,7 @@ const openInferenceOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
                   key: "output.value",
                   value: {
                     stringValue:
-                      '{"choices": [{"message": {"content": "Hey there! 😊👋 What’s up? 🌟", "role": "assistant"}, "index": 0, "finish_reason": "stop"}], "id": "chatcmpl-9sdk9jAOO21SHl5mgTZSXVdCVJhDq", "created": 1722809513, "model": "gpt-4o-mini-2024-07-18", "object": "chat.completion.chunk", "system_fingerprint": "fp_611b667b19"}',
+                      '{"choices": [{"message": {"content": "Hey there! 😊👋 What\'s up? 🌟", "role": "assistant"}, "index": 0, "finish_reason": "stop"}], "id": "chatcmpl-9sdk9jAOO21SHl5mgTZSXVdCVJhDq", "created": 1722809513, "model": "gpt-4o-mini-2024-07-18", "object": "chat.completion.chunk", "system_fingerprint": "fp_611b667b19"}',
                   },
                 },
                 {
@@ -169,7 +169,7 @@ const openInferenceOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
                 {
                   key: "llm.output_messages.0.message.content",
                   value: {
-                    stringValue: "Hey there! 😊👋 What’s up? 🌟",
+                    stringValue: "Hey there! 😊👋 What's up? 🌟",
                   },
                 },
               ],
@@ -304,12 +304,6 @@ const openllmetryOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
                   },
                 },
                 {
-                  key: "gen_ai.completion.0.finish_reason",
-                  value: {
-                    stringValue: "stop",
-                  },
-                },
-                {
                   key: "gen_ai.completion.0.role",
                   value: {
                     stringValue: "assistant",
@@ -318,7 +312,7 @@ const openllmetryOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
                 {
                   key: "gen_ai.completion.0.content",
                   value: {
-                    stringValue: "Hey there! 😊 What’s on your mind? 💬✨",
+                    stringValue: "Hey there! 😊 What's on your mind? 💬✨",
                   },
                 },
               ],
@@ -571,11 +565,7 @@ const fastApiOpenTelemetryRequest: DeepPartial<IExportTraceServiceRequest> = {
                 {
                   key: "http.status_code",
                   value: {
-                    intValue: {
-                      low: 404,
-                      high: 0,
-                      unsigned: false,
-                    } as any,
+                    intValue: 404,
                   },
                 },
               ],
@@ -777,7 +767,7 @@ const openllmetryLangChainRequest: DeepPartial<IExportTraceServiceRequest> = {
               traceId: "4cmJuE+nwC7cmxIAX8430w==",
               spanId: "S2v3VMCZCUo=",
               name: "RunnableSequence.workflow",
-              kind: "SPAN_KIND_INTERNAL",
+              kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
               startTimeUnixNano: "1723006472661658000",
               endTimeUnixNano: "1723006473946042000",
               attributes: [
@@ -805,6 +795,230 @@ const openllmetryLangChainRequest: DeepPartial<IExportTraceServiceRequest> = {
                   value: {
                     stringValue:
                       '{"outputs": "\\ud83d\\udc4b Hi there! How can I help you today?", "kwargs": {"tags": [], "inputs": {"question": "hello"}}}',
+                  },
+                },
+              ],
+              status: {},
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const strandsTrace: DeepPartial<IExportTraceServiceRequest> = {
+  resourceSpans: [
+    {
+      resource: { attributes: [] },
+      scopeSpans: [
+        {
+          scope: {
+            name: "opentelemetry.instrumentation.strands",
+          },
+          spans: [
+            {
+              traceId: "4cmJuE+nwC7cmxIAX8430w==",
+              spanId: "S2v3VMCZCUo=",
+              name: "Model invoke",
+              kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+              startTimeUnixNano: "1723006472661658000",
+              endTimeUnixNano: "1723006473946042000",
+              attributes: [
+                {
+                  key: "event_loop.cycle_id",
+                  value: {
+                    stringValue: "29f8679a-3afb-498e-8dc2-643c25434292",
+                  },
+                },
+                {
+                  key: "gen_ai.request.model",
+                  value: {
+                    stringValue: "openai/gpt-4.1-nano",
+                  },
+                },
+                {
+                  key: "gen_ai.event.start_time",
+                  value: {
+                    stringValue: "2025-05-25T10:37:11.068343+00:00",
+                  },
+                },
+                {
+                  key: "gen_ai.event.end_time",
+                  value: {
+                    stringValue: "2025-05-25T10:37:12.014098+00:00",
+                  },
+                },
+                {
+                  key: "gen_ai.prompt.0.role",
+                  value: {
+                    stringValue: "user",
+                  },
+                },
+                {
+                  key: "gen_ai.prompt.0.content.0.text",
+                  value: {
+                    stringValue: "yo",
+                  },
+                },
+                {
+                  key: "gen_ai.agent.name",
+                  value: {
+                    stringValue: "Strands Agent",
+                  },
+                },
+                {
+                  key: "gen_ai.completion.0.text",
+                  value: {
+                    stringValue:
+                      "Hello! What would you like to look at or explore today?",
+                  },
+                },
+                {
+                  key: "agent.name",
+                  value: {
+                    stringValue: "Strands Agent",
+                  },
+                },
+                {
+                  key: "gen_ai.usage.prompt_tokens",
+                  value: {
+                    intValue: 24,
+                  },
+                },
+                {
+                  key: "gen_ai.usage.completion_tokens",
+                  value: {
+                    intValue: 10,
+                  },
+                },
+                {
+                  key: "gen_ai.usage.total_tokens",
+                  value: {
+                    intValue: 34,
+                  },
+                },
+                {
+                  key: "scope.name",
+                  value: {
+                    stringValue: "strands-bot",
+                  },
+                },
+              ],
+              status: {},
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const springAITrace: DeepPartial<IExportTraceServiceRequest> = {
+  resourceSpans: [
+    {
+      resource: {
+        attributes: [
+          {
+            key: "service.name",
+            value: {
+              stringValue: "spring-ai-sample-service",
+            },
+          },
+          {
+            key: "telemetry.sdk.language",
+            value: {
+              stringValue: "java",
+            },
+          },
+          {
+            key: "telemetry.sdk.name",
+            value: {
+              stringValue: "opentelemetry",
+            },
+          },
+          {
+            key: "telemetry.sdk.version",
+            value: {
+              stringValue: "1.30.0",
+            },
+          },
+        ],
+      },
+      scopeSpans: [
+        {
+          scope: {
+            name: "org.springframework.boot",
+            version: "3.4.0",
+          },
+          spans: [
+            {
+              traceId: "755b1db22272958b92cb003f30058e74",
+              spanId: "0dedf6826df097a9",
+              parentSpanId: "8127960fb3f7c04d",
+              name: "chat gpt-4o-mini",
+              kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+              startTimeUnixNano: "1748353030869334708",
+              endTimeUnixNano: "1748353033397302125",
+              attributes: [
+                {
+                  key: "gen_ai.request.model",
+                  value: {
+                    stringValue: "gpt-4o-mini",
+                  },
+                },
+                {
+                  key: "gen_ai.response.model",
+                  value: {
+                    stringValue: "gpt-4o-mini-2024-07-18",
+                  },
+                },
+                {
+                  key: "gen_ai.usage.total_tokens",
+                  value: {
+                    stringValue: "24",
+                  },
+                },
+                {
+                  key: "gen_ai.system",
+                  value: {
+                    stringValue: "openai",
+                  },
+                },
+                {
+                  key: "gen_ai.response.id",
+                  value: {
+                    stringValue: "chatcmpl-BbomNo3DGToKpx88WKctb1VdKxJso",
+                  },
+                },
+                {
+                  key: "gen_ai.request.temperature",
+                  value: {
+                    stringValue: "0.7",
+                  },
+                },
+                {
+                  key: "gen_ai.operation.name",
+                  value: {
+                    stringValue: "chat",
+                  },
+                },
+                {
+                  key: "gen_ai.usage.input_tokens",
+                  value: {
+                    stringValue: "11",
+                  },
+                },
+                {
+                  key: "gen_ai.usage.output_tokens",
+                  value: {
+                    stringValue: "13",
+                  },
+                },
+                {
+                  key: "gen_ai.response.finish_reasons",
+                  value: {
+                    stringValue: "[\"STOP\"]",
                   },
                 },
               ],
@@ -864,7 +1078,7 @@ describe("opentelemetry traces receiver", () => {
             value: [
               {
                 role: "assistant",
-                content: "Hey there! 😊👋 What’s up? 🌟",
+                content: "Hey there! 😊👋 What's up? 🌟",
               },
             ],
           },
@@ -883,6 +1097,7 @@ describe("opentelemetry traces receiver", () => {
           },
         },
       ],
+      evaluations: [],
       reservedTraceMetadata: {
         user_id: "my-test-user",
         thread_id: "my-test-session",
@@ -944,7 +1159,7 @@ describe("opentelemetry traces receiver", () => {
             value: [
               {
                 role: "assistant",
-                content: "Hey there! 😊 What’s on your mind? 💬✨",
+                content: "Hey there! 😊 What's on your mind? 💬✨",
               },
             ],
           },
@@ -955,6 +1170,9 @@ describe("opentelemetry traces receiver", () => {
               openai: {
                 api_base: "https://api.openai.com/v1/",
               },
+            },
+            llm: {
+              headers: "None",
             },
             scope: {
               name: "opentelemetry.instrumentation.openai.v1",
@@ -968,6 +1186,7 @@ describe("opentelemetry traces receiver", () => {
           },
         },
       ],
+      evaluations: [],
       reservedTraceMetadata: {},
       customMetadata: {
         "service.name": "unknown_service",
@@ -1034,7 +1253,7 @@ describe("opentelemetry traces receiver", () => {
             http: {
               scheme: "http",
               host: "127.0.0.1:8000",
-              flavor: 1.1,
+              flavor: "1.1",
               target: "/",
               url: "http://127.0.0.1:8000/",
               method: "POST",
@@ -1064,6 +1283,7 @@ describe("opentelemetry traces receiver", () => {
           },
         },
       ],
+      evaluations: [],
       reservedTraceMetadata: {},
       customMetadata: {
         "service.name": "unknown_service",
@@ -1146,7 +1366,7 @@ describe("opentelemetry traces receiver", () => {
             http: {
               scheme: "http",
               host: "127.0.0.1:8000",
-              flavor: 1.1,
+              flavor: "1.1",
               target: "/",
               url: "http://127.0.0.1:8000/",
               method: "POST",
@@ -1175,6 +1395,7 @@ describe("opentelemetry traces receiver", () => {
           },
         },
       ],
+      evaluations: [],
       reservedTraceMetadata: {},
       customMetadata: {
         "service.name": "fastapi_sample_endpoint",
@@ -1215,7 +1436,7 @@ describe("opentelemetry traces receiver", () => {
                 input: "",
               },
               tags: [],
-              metadata: [],
+              metadata: void 0,
               kwargs: {
                 run_type: null,
                 name: "RunnableSequence",
@@ -1251,12 +1472,166 @@ describe("opentelemetry traces receiver", () => {
           },
         },
       ],
+      evaluations: [],
       reservedTraceMetadata: {},
       customMetadata: {
         "telemetry.sdk.language": "python",
         "telemetry.sdk.name": "opentelemetry",
         "telemetry.sdk.version": "1.26.0",
         "service.name": "unknown_service",
+      },
+    });
+  });
+
+  it("receives a strands trace", async () => {
+    const traces = openTelemetryTraceRequestToTracesForCollection(strandsTrace);
+
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0];
+
+    try {
+      z.array(spanSchema).parse(trace!.spans);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      console.log("trace", JSON.stringify(trace, undefined, 2));
+      console.log("validationError", validationError);
+      assert.fail(validationError.message);
+    }
+
+    expect(trace).toEqual({
+      traceId: "e1c989b84fa7c02edc9b12005fce37d3",
+      spans: [
+        {
+          span_id: "4b6bf754c099094a",
+          trace_id: "e1c989b84fa7c02edc9b12005fce37d3",
+          name: "Model invoke",
+          type: "llm",
+          input: {
+            type: "chat_messages",
+            value: [
+              {
+                role: "user",
+                content: [
+                  {
+                    text: "yo",
+                  },
+                ],
+              },
+            ],
+          },
+          output: {
+            type: "json",
+            value: [
+              {
+                text: "Hello! What would you like to look at or explore today?",
+              },
+            ],
+          },
+          model: "openai/gpt-4.1-nano",
+          metrics: {
+            prompt_tokens: 24,
+            completion_tokens: 10,
+          },
+          params: {
+            event_loop: {
+              cycle_id: "29f8679a-3afb-498e-8dc2-643c25434292",
+            },
+            gen_ai: {
+              event: {
+                start_time: "2025-05-25T10:37:11.068343+00:00",
+                end_time: "2025-05-25T10:37:12.014098+00:00",
+              },
+              agent: {
+                name: "Strands Agent",
+              },
+              usage: {
+                total_tokens: 34,
+              },
+            },
+            agent: {
+              name: "Strands Agent",
+            },
+            scope: {
+              name: "opentelemetry.instrumentation.strands",
+            },
+          },
+          timestamps: {
+            started_at: 1723006472662,
+            finished_at: 1723006473946,
+          },
+        },
+      ],
+      evaluations: [],
+      reservedTraceMetadata: {},
+      customMetadata: {},
+    });
+  });
+
+  it("receives a Spring AI trace", async () => {
+    const traces = openTelemetryTraceRequestToTracesForCollection(springAITrace);
+
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0];
+
+    try {
+      z.array(spanSchema).parse(trace!.spans);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      console.log("trace", JSON.stringify(trace, undefined, 2));
+      console.log("validationError", validationError);
+      assert.fail(validationError.message);
+    }
+
+    expect(trace).toEqual({
+      traceId: "ef9e5bd5d6f6db6ef6f79f1bf7671bd34ddfdf4d39f1eef8",
+      spans: [
+        {
+          span_id: "d1d79d7faf36e9d7f4f7b6bd",
+          trace_id: "ef9e5bd5d6f6db6ef6f79f1bf7671bd34ddfdf4d39f1eef8",
+          parent_id: "f35dbbf7ad1f6f77fb734e1d",
+          name: "chat gpt-4o-mini",
+          type: "llm",
+          model: "gpt-4o-mini-2024-07-18",
+          metrics: {
+            prompt_tokens: 11,
+            completion_tokens: 13,
+          },
+          input: null,
+          output: null,
+          params: {
+            gen_ai: {
+              request: {
+                temperature: "0.7",
+              },
+              response: {
+                id: "chatcmpl-BbomNo3DGToKpx88WKctb1VdKxJso",
+                finish_reasons: ["STOP"],
+              },
+              system: "openai",
+              operation: {
+                name: "chat",
+              },
+            },
+            scope: {
+              name: "org.springframework.boot",
+              version: "3.4.0",
+            },
+          },
+          timestamps: {
+            started_at: 1748353030869,
+            finished_at: 1748353033397,
+          },
+        },
+      ],
+      evaluations: [],
+      reservedTraceMetadata: {},
+      customMetadata: {
+        "service.name": "spring-ai-sample-service",
+        "telemetry.sdk.language": "java",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.30.0",
       },
     });
   });

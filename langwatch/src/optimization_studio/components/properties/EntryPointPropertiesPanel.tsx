@@ -338,26 +338,56 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
             </Box>
           </Tooltip>
         </HStack>
-        <NativeSelect.Root>
-          <NativeSelect.Field
-            value={node.data.entry_selection}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-              const entrySelection = e.target.value as Entry["entry_selection"];
-              setNode({
-                id: node.id,
-                data: {
-                  ...node.data,
-                  entry_selection: entrySelection,
-                },
-              });
-            }}
-          >
-            <option value="first">First</option>
-            <option value="last">Last</option>
-            <option value="random">Random</option>
-          </NativeSelect.Field>
-          <NativeSelect.Indicator />
-        </NativeSelect.Root>
+        <VStack width="full" align="start" gap={2}>
+          <NativeSelect.Root>
+            <NativeSelect.Field
+              value={
+                typeof node.data.entry_selection === "number"
+                  ? "specific"
+                  : node.data.entry_selection
+              }
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                const value = e.target.value;
+                setNode({
+                  id: node.id,
+                  data: {
+                    ...node.data,
+                    entry_selection: value === "specific" ? 0 : value,
+                  },
+                });
+              }}
+            >
+              <option value="first">First</option>
+              <option value="last">Last</option>
+              <option value="random">Random</option>
+              <option value="specific">Specific Row ID</option>
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
+          {typeof node.data.entry_selection === "number" && (
+            <Field.Root width="full">
+              <Input
+                type="number"
+                size="sm"
+                min={0}
+                value={node.data.entry_selection}
+                onChange={(e) => {
+                  const value = e.target.value
+                    ? parseInt(e.target.value, 10)
+                    : 0;
+                  setNode({
+                    id: node.id,
+                    data: {
+                      ...node.data,
+                      entry_selection: value,
+                    },
+                  });
+                }}
+                placeholder="Enter row ID"
+              />
+            </Field.Root>
+          )}
+        </VStack>
       </VStack>
     </BasePropertiesPanel>
   );

@@ -6,15 +6,24 @@ from typing import List, Optional, Sequence
 from langwatch.__version__ import __version__
 from langwatch.attributes import AttributeKey
 from langwatch.domain import BaseAttributes, SpanProcessingExcludeRule
+from langwatch.state import get_instance
 from opentelemetry import trace
 from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.trace.sampling import TraceIdRatioBased, ALWAYS_OFF
+from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
+from opentelemetry.trace import Span
+
 
 from .exporters.filterable_batch_span_exporter import FilterableBatchSpanProcessor
 from .types import LangWatchClientProtocol
+
+from .generated.langwatch_rest_api_client import Client as LangWatchApiClient
+
+import opentelemetry.trace
+from opentelemetry.util._once import Once
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +42,7 @@ class Client(LangWatchClientProtocol):
     _flush_on_exit: bool = True
     _span_exclude_rules: List[SpanProcessingExcludeRule] = []
     _ignore_global_tracer_provider_override_warning: bool = False
+    _rest_api_client: LangWatchApiClient
 
     def __init__(
         self,
@@ -88,6 +98,8 @@ class Client(LangWatchClientProtocol):
         for instrumentor in self.instrumentors:
             instrumentor.instrument(tracer_provider=self.tracer_provider)
 
+        self._setup_rest_api_client()
+
     @property
     def debug(self) -> bool:
         """Get the debug flag for the client."""
@@ -119,19 +131,34 @@ class Client(LangWatchClientProtocol):
         if value == self._api_key:
             return
 
+        api_key_has_changed = bool(self._api_key)
+
         self._api_key = value
 
-        # Shut down any existing tracer provider, as API key change requires re-initialization.
-        self.__shutdown_tracer_provider()
+        if api_key_has_changed:
+            # Shut down any existing tracer provider, as API key change requires re-initialization.
+            self.__shutdown_tracer_provider()
 
-        # If a new API key is provided and sending is not disabled, set up a new tracer provider.
-        if self._api_key and not self._disable_sending:
-            self.__setup_tracer_provider()
+            # HACK: set global tracer provider to a proxy tracer provider back
+            opentelemetry.trace._TRACER_PROVIDER = None
+            opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
+
+            # If a new API key is provided and sending is not disabled, set up a new tracer provider.
+            if value and not self._disable_sending:
+                self.__setup_tracer_provider()
+
+        if value:
+            self._setup_rest_api_client()
 
     @property
     def disable_sending(self) -> bool:
         """Get whether sending is disabled."""
         return self._disable_sending
+
+    @property
+    def rest_api_client(self) -> LangWatchApiClient:
+        """Get the REST API client for the client."""
+        return self._rest_api_client
 
     @disable_sending.setter
     def disable_sending(self, value: bool) -> None:
@@ -139,13 +166,11 @@ class Client(LangWatchClientProtocol):
         if self._disable_sending == value:
             return
 
-        self._disable_sending = value
+        # force flush the tracer provider before changing the disable_sending flag
+        if self.tracer_provider:
+            self.tracer_provider.force_flush()
 
-        # Use the new helper methods to manage the tracer provider
-        if value:  # if disable_sending is True
-            self.__shutdown_tracer_provider()
-        else:  # if disable_sending is False
-            self.__setup_tracer_provider()
+        self._disable_sending = value
 
     def __shutdown_tracer_provider(self) -> None:
         """Shuts down the current tracer provider, including flushing."""
@@ -252,8 +277,13 @@ class Client(LangWatchClientProtocol):
             timeout=int(os.getenv("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", 30)),
         )
 
+        # Wrap the exporter with conditional logic
+        conditional_exporter = ConditionalSpanExporter(
+            wrapped_exporter=otlp_exporter,
+        )
+
         processor = FilterableBatchSpanProcessor(
-            span_exporter=otlp_exporter,
+            span_exporter=conditional_exporter,
             exclude_rules=self._span_exclude_rules,
             max_export_batch_size=int(os.getenv("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", 100)),
             max_queue_size=int(os.getenv("OTEL_BSP_MAX_QUEUE_SIZE", 512)),
@@ -261,3 +291,39 @@ class Client(LangWatchClientProtocol):
             export_timeout_millis=float(os.getenv("OTEL_BSP_EXPORT_TIMEOUT", 10000)),
         )
         provider.add_span_processor(processor)
+
+    def _setup_rest_api_client(self) -> LangWatchApiClient:
+        """
+        Sets up the REST API client for the client.
+        """
+        self._rest_api_client = LangWatchApiClient(
+            base_url=self._endpoint_url,
+            headers={"X-Auth-Token": self._api_key},
+            raise_on_unexpected_status=True,
+        )
+
+        return self._rest_api_client
+
+
+class ConditionalSpanExporter(SpanExporter):
+    def __init__(self, wrapped_exporter: SpanExporter):
+        self.wrapped_exporter = wrapped_exporter
+
+    def export(self, spans: Sequence[Span]) -> SpanExportResult:
+        # Check your singleton's disable flag
+        client = get_instance()
+        if client and client.disable_sending:
+            # Drop all spans - return success without sending
+            return SpanExportResult.SUCCESS
+
+        # Normal export
+        return self.wrapped_exporter.export(spans)  # type: ignore
+
+    def shutdown(self) -> None:
+        return self.wrapped_exporter.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        client = get_instance()
+        if client and client.disable_sending:
+            return True  # Nothing to flush
+        return self.wrapped_exporter.force_flush(timeout_millis)

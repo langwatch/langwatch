@@ -39,6 +39,7 @@ import {
 
 import { AnnotationExpectedOutputs } from "../../components/AnnotationExpectedOutputs";
 import { RedactedField } from "../ui/RedactedField";
+import { stringifyIfObject } from "~/utils/stringifyIfObject";
 
 export const TraceMessages = React.forwardRef(function TraceMessages(
   {
@@ -91,6 +92,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
   }, [annotations.data]);
 
   const commentState = useAnnotationCommentStore();
+
   return (
     <VStack ref={ref as any} align="start" width="full" gap={0}>
       <Grid
@@ -193,9 +195,11 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                   <Text color="red.900">{trace.error.message}</Text>
                 </VStack>
               ) : trace.output?.value &&
-                (isJson(trace.output.value) ||
-                  isPythonRepr(trace.output.value)) ? (
-                <MessageCardJsonOutput value={trace.output.value} />
+                (isJson(stringifyIfObject(trace.output.value)) ||
+                  isPythonRepr(stringifyIfObject(trace.output.value))) ? (
+                <MessageCardJsonOutput
+                  value={stringifyIfObject(trace.output.value)}
+                />
               ) : trace.output?.value ? (
                 <VStack
                   alignItems="flex-start"
@@ -203,33 +207,31 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                   paddingY={2}
                   width="80%"
                 >
-                  {(commentState.action !== "new" ||
-                    trace.trace_id !== commentState.traceId) && (
-                    <Box
-                      onDoubleClick={() => {
-                        setCommentState?.({
-                          traceId: trace.trace_id,
-                          action: "new",
-                          annotationId: undefined,
-                          expectedOutput: trace.output?.value,
-                          expectedOutputAction: "new",
-                        });
-                      }}
-                    >
-                      <RedactedField field="output">
-                        <Markdown className="markdown">
-                          {translationState.translatedTextOutput &&
-                          translationState.translationActive
-                            ? translationState.translatedTextOutput
-                            : trace.output.value}
-                        </Markdown>
-                      </RedactedField>
-                    </Box>
-                  )}
+                  <Box
+                    onDoubleClick={() => {
+                      setCommentState?.({
+                        traceId: trace.trace_id,
+                        action: "new",
+                        annotationId: undefined,
+                        expectedOutput: stringifyIfObject(trace.output?.value),
+                        expectedOutputAction: "new",
+                      });
+                    }}
+                  >
+                    <RedactedField field="output">
+                      <Markdown className="markdown">
+                        {translationState.translatedTextOutput &&
+                        translationState.translationActive
+                          ? translationState.translatedTextOutput
+                          : stringifyIfObject(trace.output.value)}
+                      </Markdown>
+                    </RedactedField>
+                  </Box>
+
                   <AnnotationExpectedOutputs
                     traceId={trace.trace_id}
                     setHover={setHover}
-                    output={trace.output.value}
+                    output={stringifyIfObject(trace.output.value)}
                   />
                 </VStack>
               ) : (

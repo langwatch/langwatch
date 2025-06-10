@@ -14,7 +14,12 @@ client = OpenAI()
 
 
 @cl.on_message
+@langwatch.trace()
 async def main(message: cl.Message):
+    langwatch.get_current_trace().update(
+        metadata={"labels": ["distributed_tracing"]},
+    )
+
     msg = cl.Message(
         content="",
     )
@@ -45,7 +50,7 @@ async def main(message: cl.Message):
     def send_span(index: int):
         with httpx.Client() as httpx_client:
             httpx_client.post(
-                f"{langwatch.endpoint}/api/collector",
+                f"{langwatch.get_endpoint()}/api/collector",
                 json={
                     "trace_id": trace_id,
                     "spans": [
@@ -68,7 +73,7 @@ async def main(message: cl.Message):
                     ],
                 },
                 headers={
-                    "X-Auth-Token": str(langwatch.api_key),
+                    "X-Auth-Token": str(langwatch.get_api_key()),
                     "Content-Type": "application/json",
                 },
             )

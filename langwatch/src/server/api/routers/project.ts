@@ -413,7 +413,6 @@ export const projectRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        field: z.enum(["input", "output"]),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.PROJECT_VIEW))
@@ -422,10 +421,10 @@ export const projectRouter = createTRPCRouter({
         input,
         ctx,
       }: {
-        input: { projectId: string; field: "input" | "output" };
+        input: { projectId: string };
         ctx: { session: Session; prisma: PrismaClient };
       }) => {
-        const { projectId, field } = input;
+        const { projectId } = input;
         const prisma = ctx.prisma;
 
         const project = await prisma.project.findUnique({
@@ -463,17 +462,18 @@ export const projectRouter = createTRPCRouter({
             teamUser.role === TeamUserRole.ADMIN
         );
 
-        const visibilitySetting =
-          field === "input"
-            ? project.capturedInputVisibility
-            : project.capturedOutputVisibility;
-
-        const canUserSeeData = canAccessSensitiveData(
-          visibilitySetting,
-          isUserPrivileged
-        );
-
-        return !canUserSeeData;
+        return {
+          isRedacted: {
+            input: !canAccessSensitiveData(
+              project.capturedInputVisibility,
+              isUserPrivileged
+            ),
+            output: !canAccessSensitiveData(
+              project.capturedOutputVisibility,
+              isUserPrivileged
+            ),
+          },
+        };
       }
     ),
 });

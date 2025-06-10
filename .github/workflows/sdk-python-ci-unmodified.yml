@@ -1,0 +1,17 @@
+name: sdk-python-ci
+
+on:
+  pull_request:
+    paths-ignore:
+      - "python-sdk/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "no modifications, skipping tests"
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "no modifications, skipping build"

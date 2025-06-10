@@ -1,4 +1,4 @@
-import isEqual from "lodash.isequal";
+import isEqual from "lodash-es/isEqual";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { useForm, useWatch, type SubmitHandler } from "react-hook-form";

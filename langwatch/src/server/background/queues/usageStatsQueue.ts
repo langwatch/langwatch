@@ -8,7 +8,7 @@ import { createLogger } from "../../../utils/logger";
 
 const logger = createLogger("langwatch:usageStatsQueue");
 
-export const USAGE_STATS_QUEUE_NAME = "usage_stats";
+export const USAGE_STATS_QUEUE_NAME = "{usage_stats}";
 
 export const usageStatsQueue = new QueueWithFallback<
   UsageStatsJob,
@@ -42,8 +42,15 @@ export const scheduleUsageStats = async () => {
     },
   });
 
+  if (
+    process.env.DISABLE_USAGE_STATS === "true" ||
+    process.env.IS_SAAS === "true"
+  ) {
+    return;
+  }
+
   if (organizations.length === 0) {
-    logger.error("No organizations found");
+    logger.debug("No organizations found, skipping usage stats");
     return;
   }
 

@@ -49,6 +49,10 @@ Here's how to propose a change:
 5. Make sure your code lints.
 6. Issue that pull request!
 
+## Commit Messages and PR Titles
+
+We follow the [Conventional Commits](https://www.conventionalcommits.org) specification for our commit messages and PR titles. This helps us automate versioning and generate changelogs.
+
 ## Additional Notes
 
 Please don't use the issue tracker for support questions. Check whether the [Docs](https://docs.langwatch.ai/) offer any help with your problem.

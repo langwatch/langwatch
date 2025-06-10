@@ -6,7 +6,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { Play } from "react-feather";
 import { useForm, type FieldError } from "react-hook-form";
 import { HorizontalFormControl } from "../HorizontalFormControl";
@@ -34,11 +34,24 @@ export const ExecutionInputPanel = ({
   title = "Inputs",
   buttonText = "Execute",
 }: InputPanelProps) => {
+  const defaultValues = useMemo(() => {
+    return Object.fromEntries(
+      fields.map((field) => [
+        field.identifier,
+        typeof field.value === "object"
+          ? JSON.stringify(field.value)
+          : field.value ?? "",
+      ])
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(fields)]);
+
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<Record<string, string>>({
+    defaultValues: defaultValues as Record<string, string>,
     resolver: (values) => {
       const response: {
         values: Record<string, string>;

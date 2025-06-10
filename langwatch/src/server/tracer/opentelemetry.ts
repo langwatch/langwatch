@@ -7,7 +7,7 @@ import {
   type IKeyValue,
   type ISpan,
 } from "@opentelemetry/otlp-transformer";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash-es/cloneDeep";
 import type { DeepPartial } from "../../utils/types";
 import type { CollectorJob } from "../background/types";
 import type {
@@ -21,20 +21,29 @@ import type {
   TypedValueChatMessages,
 } from "./types";
 import {
+  chatMessageSchema,
   customMetadataSchema,
   reservedTraceMetadataSchema,
   rESTEvaluationSchema,
   spanTypesSchema,
   typedValueChatMessagesSchema,
+  spanMetricsSchema,
+  reservedSpanParamsSchema,
+  spanTimestampsSchema,
 } from "./types.generated";
 import { openTelemetryToLangWatchMetadataMapping } from "./metadata";
 import { createLogger } from "~/utils/logger";
+import { z } from "zod";
 
 const logger = createLogger("langwatch.tracer.opentelemetry");
 
 export type TraceForCollection = Pick<
   CollectorJob,
-  "traceId" | "spans" | "reservedTraceMetadata" | "customMetadata" | "evaluations"
+  | "traceId"
+  | "spans"
+  | "reservedTraceMetadata"
+  | "customMetadata"
+  | "evaluations"
 >;
 
 export const openTelemetryTraceRequestToTracesForCollection = (
@@ -170,12 +179,13 @@ const addOpenTelemetrySpanAsSpan = (
   let output: LLMSpan["output"] = null;
   let params: Span["params"] = {};
   let metadata = {};
-  const started_at: Span["timestamps"]["started_at"] | undefined =
-    parseTimestamp(otelSpan.startTimeUnixNano);
-  const finished_at: Span["timestamps"]["finished_at"] | undefined =
+  let started_at: Span["timestamps"]["started_at"] | undefined = parseTimestamp(
+    otelSpan.startTimeUnixNano
+  );
+  let finished_at: Span["timestamps"]["finished_at"] | undefined =
     parseTimestamp(otelSpan.endTimeUnixNano);
   let error: Span["error"] = null;
-  const attributesMap = keyValueToObject(otelSpan.attributes);
+  const attributesMap = otelAttributesToNestedAttributes(otelSpan.attributes);
 
   // First token at
   let first_token_at: Span["timestamps"]["first_token_at"] = null;
@@ -185,13 +195,21 @@ const addOpenTelemetrySpanAsSpan = (
     switch (event.name) {
       case "First Token Stream Event":
       case "llm.content.completion.chunk": {
-        first_token_at = parseTimestamp(event?.timeUnixNano);
+        const ts = parseTimestamp(event?.timeUnixNano);
+        if (ts && (!first_token_at || ts < first_token_at)) {
+          first_token_at = ts;
+        }
         break;
       }
       case "langwatch.evaluation.custom": {
-        const jsonPayload = event.attributes?.find((attr) => attr?.key === "json_encoded_event")?.value?.stringValue;
+        const jsonPayload = event.attributes?.find(
+          (attr) => attr?.key === "json_encoded_event"
+        )?.value?.stringValue;
         if (!jsonPayload) {
-          logger.warn({ event }, "event for `langwatch.evaluation.custom` has no json_encoded_event");
+          logger.warn(
+            { event },
+            "event for `langwatch.evaluation.custom` has no json_encoded_event"
+          );
           break;
         }
 
@@ -202,7 +220,10 @@ const addOpenTelemetrySpanAsSpan = (
           if (!trace.evaluations) trace.evaluations = [];
           trace.evaluations.push(evaluation);
         } catch (error) {
-          logger.error({ error, jsonPayload }, "error parsing json_encoded_event from `langwatch.evaluation.custom`, event discarded");
+          logger.error(
+            { error, jsonPayload },
+            "error parsing json_encoded_event from `langwatch.evaluation.custom`, event discarded"
+          );
         }
         break;
       }
@@ -213,7 +234,8 @@ const addOpenTelemetrySpanAsSpan = (
   }
   if (started_at && attributesMap.ai?.response?.msToFirstChunk) {
     first_token_at =
-      started_at + parseInt((attributesMap as any).ai.response.msToFirstChunk, 10);
+      started_at +
+      parseInt((attributesMap as any).ai.response.msToFirstChunk, 10);
   }
 
   // Type
@@ -271,11 +293,24 @@ const addOpenTelemetrySpanAsSpan = (
     delete attributesMap.llm.request.type;
   }
   // vercel
-  if (attributesMap.gen_ai) {
+  if (attributesMap.ai && attributesMap.gen_ai) {
     type = "llm";
   }
   if (attributesMap.operation?.name === "ai.toolCall") {
     type = "tool";
+  }
+  // Agents
+  if (attributesMap.gen_ai?.agent || attributesMap.agent?.name) {
+    // Strands agent
+    if (otelSpan.name === "Model invoke") {
+      type = "llm";
+    } else {
+      type = "agent";
+    }
+  }
+  // infer for others otel gen_ai spec
+  if (type === "span" && attributesMap.gen_ai?.response?.model) {
+    type = "llm";
   }
 
   // Model
@@ -338,8 +373,29 @@ const addOpenTelemetrySpanAsSpan = (
 
     if (input_.success) {
       input = input_.data as TypedValueChatMessages;
-      delete attributesMap.gen_ai.prompt;
+    } else {
+      input = {
+        type: "json",
+        value: attributesMap.gen_ai.prompt,
+      };
     }
+    delete attributesMap.gen_ai.prompt;
+  }
+
+  if (!input && typeof attributesMap.gen_ai?.prompt === "string") {
+    try {
+      const parsed = JSON.parse(attributesMap.gen_ai.prompt);
+      input = {
+        type: "json",
+        value: parsed,
+      };
+    } catch (error) {
+      output = {
+        type: "text",
+        value: attributesMap.gen_ai.prompt,
+      };
+    }
+    delete attributesMap.gen_ai.prompt;
   }
 
   // vercel
@@ -465,15 +521,45 @@ const addOpenTelemetrySpanAsSpan = (
     attributesMap.gen_ai?.completion &&
     Array.isArray(attributesMap.gen_ai.completion)
   ) {
-    const output_ = typedValueChatMessagesSchema.safeParse({
-      type: "chat_messages",
-      value: attributesMap.gen_ai.completion,
-    });
+    const output_ = z
+      .object({
+        type: z.literal("chat_messages"),
+        value: z.array(chatMessageSchema.strict()),
+      })
+      .safeParse({
+        type: "chat_messages",
+        value: attributesMap.gen_ai.completion,
+      });
 
-    if (output_.success) {
+    if (
+      output_.success &&
+      output_.data.value.length > 0 &&
+      Object.keys(output_.data.value[0]!).length > 0
+    ) {
       output = output_.data as TypedValueChatMessages;
-      delete attributesMap.gen_ai.completion;
+    } else {
+      output = {
+        type: "json",
+        value: attributesMap.gen_ai.completion,
+      };
     }
+    delete attributesMap.gen_ai.completion;
+  }
+
+  if (!output && typeof attributesMap.gen_ai?.completion === "string") {
+    try {
+      const parsed = JSON.parse(attributesMap.gen_ai.completion);
+      output = {
+        type: "json",
+        value: parsed,
+      };
+    } catch (error) {
+      output = {
+        type: "text",
+        value: attributesMap.gen_ai.completion,
+      };
+    }
+    delete attributesMap.gen_ai.completion;
   }
 
   // vercel
@@ -556,9 +642,7 @@ const addOpenTelemetrySpanAsSpan = (
     if (genAIChoice?.message) {
       output = {
         type: "chat_messages",
-        value: [
-          genAIChoice.message
-        ],
+        value: [genAIChoice.message],
       };
     }
   }
@@ -577,7 +661,7 @@ const addOpenTelemetrySpanAsSpan = (
   }
 
   // Metrics
-  const metrics: LLMSpan["metrics"] = {};
+  let metrics: LLMSpan["metrics"] = {};
   if (attributesMap.ai?.usage) {
     if (typeof attributesMap.ai.usage.promptTokens === "number") {
       metrics.prompt_tokens = attributesMap.ai.usage.promptTokens;
@@ -586,6 +670,34 @@ const addOpenTelemetrySpanAsSpan = (
     if (typeof attributesMap.ai.usage.completionTokens === "number") {
       metrics.completion_tokens = attributesMap.ai.usage.completionTokens;
       delete attributesMap.ai.usage.completionTokens;
+    }
+  }
+  if (attributesMap.gen_ai?.usage) {
+    if (typeof attributesMap.gen_ai.usage.prompt_tokens === "number") {
+      metrics.prompt_tokens = attributesMap.gen_ai.usage.prompt_tokens;
+      delete attributesMap.gen_ai.usage.prompt_tokens;
+    }
+    if (typeof attributesMap.gen_ai.usage.completion_tokens === "number") {
+      metrics.completion_tokens = attributesMap.gen_ai.usage.completion_tokens;
+      delete attributesMap.gen_ai.usage.completion_tokens;
+    }
+    // Spring AI
+    if (
+      attributesMap.gen_ai.usage.input_tokens &&
+      !isNaN(Number(attributesMap.gen_ai.usage.input_tokens))
+    ) {
+      metrics.prompt_tokens = Number(attributesMap.gen_ai.usage.input_tokens);
+      delete attributesMap.gen_ai.usage.input_tokens;
+    }
+    if (
+      attributesMap.gen_ai.usage.output_tokens &&
+      !isNaN(Number(attributesMap.gen_ai.usage.output_tokens))
+    ) {
+      metrics.completion_tokens = Number(
+        attributesMap.gen_ai.usage.output_tokens
+      );
+      delete attributesMap.gen_ai.usage.output_tokens;
+      delete attributesMap.gen_ai.usage.total_tokens;
     }
   }
 
@@ -607,6 +719,22 @@ const addOpenTelemetrySpanAsSpan = (
         attributesMap.llm.is_streaming !== "False",
     };
     delete attributesMap.llm.is_streaming;
+  }
+
+  if (attributesMap.user?.id && typeof attributesMap.user.id === "string") {
+    trace.reservedTraceMetadata.user_id = attributesMap.user.id;
+    delete attributesMap.user.id;
+  }
+  if (
+    attributesMap.session?.id &&
+    typeof attributesMap.session.id === "string"
+  ) {
+    trace.reservedTraceMetadata.thread_id = attributesMap.session.id;
+    delete attributesMap.session.id;
+  }
+  if (attributesMap.tag?.tags && Array.isArray(attributesMap.tag.tags)) {
+    trace.reservedTraceMetadata.labels = attributesMap.tag.tags;
+    delete attributesMap.tag.tags;
   }
 
   // vercel
@@ -640,7 +768,9 @@ const addOpenTelemetrySpanAsSpan = (
 
   for (const event of otelSpan?.events ?? []) {
     if (event?.name === "exception") {
-      const eventAttributes = keyValueToObject(event?.attributes);
+      const eventAttributes = otelAttributesToNestedAttributes(
+        event?.attributes
+      );
       error = {
         has_error: true,
         message:
@@ -666,11 +796,15 @@ const addOpenTelemetrySpanAsSpan = (
   }
 
   // vercel
-  if (attributesMap.gen_ai && model) {
+  if (!name && type === "llm" && attributesMap.gen_ai && model) {
     name = model;
   }
   if (type === "tool" && attributesMap.ai?.toolCall?.name) {
     name = (attributesMap as any).ai.toolCall.name;
+  }
+  // Agent
+  if (!name && attributesMap.gen_ai?.agent?.name) {
+    name = (attributesMap as any).gen_ai.agent.name;
   }
 
   const contexts: RAGChunk[] = [];
@@ -695,7 +829,10 @@ const addOpenTelemetrySpanAsSpan = (
       (attributesMap as any).langwatch.span.type = void 0;
     }
     if (attributesMap.langwatch.input) {
-      if (Array.isArray(attributesMap.langwatch.input) && attributesMap.langwatch.input.length === 1) {
+      if (
+        Array.isArray(attributesMap.langwatch.input) &&
+        attributesMap.langwatch.input.length === 1
+      ) {
         input = (attributesMap as any).langwatch.input[0];
       } else {
         input = (attributesMap as any).langwatch.input;
@@ -703,7 +840,10 @@ const addOpenTelemetrySpanAsSpan = (
       (attributesMap as any).langwatch.input = void 0;
     }
     if (attributesMap.langwatch.output) {
-      if (Array.isArray(attributesMap.langwatch.output) && attributesMap.langwatch.output.length === 1) {
+      if (
+        Array.isArray(attributesMap.langwatch.output) &&
+        attributesMap.langwatch.output.length === 1
+      ) {
         output = (attributesMap as any).langwatch.output[0];
       } else {
         output = (attributesMap as any).langwatch.output;
@@ -715,6 +855,66 @@ const addOpenTelemetrySpanAsSpan = (
         contexts.push(ragContext);
       }
       (attributesMap as any).langwatch.rag_contexts = void 0;
+    }
+    const prompt = attributesMap.langwatch.prompt;
+    if (prompt) {
+      if (typeof prompt?.id === "string") {
+        trace.reservedTraceMetadata.prompt_ids ??= [];
+        trace.reservedTraceMetadata.prompt_ids.push(prompt.id);
+      }
+      if (prompt?.version) {
+        const version = prompt.version;
+        if (typeof version?.id === "string") {
+          trace.reservedTraceMetadata.prompt_version_ids ??= [];
+          trace.reservedTraceMetadata.prompt_version_ids.push(version.id);
+        }
+      }
+    }
+    // Metrics
+    if (attributesMap.langwatch.metrics) {
+      try {
+        metrics = {
+          ...metrics,
+          ...spanMetricsSchema.parse(attributesMap.langwatch.metrics as any),
+        };
+        delete (attributesMap as any).langwatch.metrics;
+      } catch {
+        // ignore
+      }
+    }
+    // Params
+    if (attributesMap.langwatch.params) {
+      try {
+        params = {
+          ...params,
+          ...reservedSpanParamsSchema.parse(
+            attributesMap.langwatch.params as any
+          ),
+        };
+        delete (attributesMap as any).langwatch.params;
+      } catch {
+        // ignore
+      }
+    }
+    // Timestamps
+    if (attributesMap.langwatch.timestamps) {
+      try {
+        const timestamps = spanTimestampsSchema.parse(
+          attributesMap.langwatch.timestamps as any
+        );
+        if (timestamps.started_at) {
+          started_at = timestamps.started_at;
+        }
+        if (timestamps.finished_at) {
+          finished_at = timestamps.finished_at;
+        }
+        if (timestamps.first_token_at) {
+          first_token_at = timestamps.first_token_at;
+        }
+        delete (attributesMap as any).langwatch.timestamps;
+      } catch {
+        // ignore
+      }
     }
   }
 
@@ -744,7 +944,7 @@ const addOpenTelemetrySpanAsSpan = (
   };
 
   const span: BaseSpan & {
-    model: LLMSpan["model"];
+    model?: LLMSpan["model"];
     metrics?: LLMSpan["metrics"];
   } = {
     span_id: otelSpan.spanId as string,
@@ -754,11 +954,11 @@ const addOpenTelemetrySpanAsSpan = (
       : {}),
     name,
     type,
-    model,
+    ...(model ? { model } : {}),
     input,
     output,
     ...(error ? { error } : {}),
-    ...(metrics ? { metrics } : {}),
+    ...(metrics && Object.keys(metrics).length > 0 ? { metrics } : {}),
     ...(contexts && contexts.length > 0 ? { contexts } : {}),
     params,
     timestamps: {
@@ -775,52 +975,67 @@ type RecursiveRecord = {
   [key: string]: (RecursiveRecord & (string | {})) | undefined;
 };
 
-const keyValueToObject = (
+const isNumeric = (n: any) => !isNaN(parseFloat(n)) && isFinite(n);
+
+export function otelAttributesToNestedAttributes(
   attributes: DeepPartial<IKeyValue[]> | undefined
-): RecursiveRecord => {
-  const result: RecursiveRecord = {};
+): RecursiveRecord {
+  const resolveOtelAnyValue = (anyValuePair?: DeepPartial<IAnyValue>): any => {
+    if (!anyValuePair) return void 0;
 
-  attributes?.forEach(
-    (
-      key_value: { key?: string; value?: DeepPartial<IAnyValue> } | undefined
-    ) => {
-      if (!key_value) return;
-      const { key, value } = key_value;
+    if (anyValuePair.stringValue != null) {
+      if (isNumeric(anyValuePair.stringValue)) return anyValuePair.stringValue;
 
-      const keys = key?.split(".");
-      let current = result;
-
-      keys?.forEach((k, i) => {
-        if (i === keys.length - 1) {
-          current[k] = iAnyValueToValue(value);
-        } else {
-          if (/^\d+$/.test(keys[i + 1]!)) {
-            // Next key is a number, so this should be an array
-            current[k] = current[k] ?? ([] as any);
-          } else {
-            current[k] = current[k] ?? ({} as any);
-          }
-          current = current[k] as any;
-        }
-      });
-    }
-  );
-
-  // Convert numbered object keys to arrays
-  const convertToArrays = (obj: Record<string, any>): any => {
-    for (const key in obj) {
-      if (typeof obj[key] === "object" && obj[key] !== null) {
-        obj[key] = convertToArrays(obj[key]);
-        if (Object.keys(obj[key]).every((k) => /^\d+$/.test(k))) {
-          obj[key] = Object.values(obj[key]);
-        }
+      try {
+        return JSON.parse(anyValuePair.stringValue);
+      } catch {
+        return anyValuePair.stringValue;
       }
     }
-    return obj;
+
+    if (anyValuePair.boolValue != null) return anyValuePair.boolValue;
+    if (anyValuePair.intValue != null) return anyValuePair.intValue;
+    if (anyValuePair.doubleValue != null) return anyValuePair.doubleValue;
+    if (anyValuePair.bytesValue != null) return anyValuePair.bytesValue;
+
+    if (anyValuePair.kvlistValue)
+      return otelAttributesToNestedAttributes(anyValuePair.kvlistValue.values);
+
+    if (anyValuePair.arrayValue && anyValuePair.arrayValue.values)
+      return anyValuePair.arrayValue.values.map(resolveOtelAnyValue);
+
+    return void 0;
   };
 
-  return convertToArrays(result);
-};
+  return (attributes ?? []).reduce<RecursiveRecord>((acc, kv) => {
+    if (!kv?.key) return acc;
+
+    const path = kv.key.split(".");
+    const last = path.pop()!;
+    let cursor: any = acc;
+
+    // walk the paths, and create every segment *except* the last
+    path.forEach((seg, i) => {
+      const nextIsIndex = /^\d+$/.test(path[i + 1] ?? "");
+      const segIsIndex = /^\d+$/.test(seg);
+      const key = segIsIndex ? Number(seg) : seg;
+
+      // prepare the container for the next segment
+      if (typeof cursor[key] !== "object" || cursor[key] === null) {
+        cursor[key] = nextIsIndex ? [] : {};
+      }
+      cursor = cursor[key];
+    });
+
+    // detect leaf type and cast key to correct type
+    const leafIsIndex = /^\d+$/.test(last);
+    const key = leafIsIndex ? Number(last) : last;
+
+    cursor[key] = resolveOtelAnyValue(kv.value);
+
+    return acc;
+  }, {});
+}
 
 const maybeConvertLongBits = (value: any): number => {
   if (value && typeof value === "object" && "high" in value && "low" in value) {
@@ -845,47 +1060,6 @@ const maybeConvertLongBits = (value: any): number => {
     }
   }
   return value;
-};
-
-const iAnyValueToValue = (value: DeepPartial<IAnyValue> | undefined): any => {
-  if (typeof value === "undefined") return undefined;
-
-  if (value.stringValue) {
-    if (value.stringValue === "None") {
-      return null; // badly parsed python null by openllmetry
-    }
-    // Try to parse JSON if possible
-    try {
-      return JSON.parse(value.stringValue);
-    } catch {
-      return value.stringValue;
-    }
-  }
-  if (value.arrayValue) {
-    return value.arrayValue?.values?.map((v) => iAnyValueToValue(v));
-  }
-  if (value.boolValue) {
-    return value.boolValue;
-  }
-  if (value.intValue) {
-    return maybeConvertLongBits(value.intValue);
-  }
-  if (value.doubleValue) {
-    return maybeConvertLongBits(value.doubleValue);
-  }
-  if (value.bytesValue) {
-    return Buffer.from(value.bytesValue as Uint8Array).toString("base64");
-  }
-  if (value.kvlistValue) {
-    return Object.fromEntries(
-      value.kvlistValue?.values?.map(
-        (v: DeepPartial<IKeyValue> | undefined) => [
-          v?.key,
-          iAnyValueToValue(v?.value),
-        ]
-      ) ?? []
-    );
-  }
 };
 
 const removeEmptyKeys = (obj: Record<string, any>): Record<string, any> => {
@@ -938,7 +1112,7 @@ const applyMappingsToMetadata = (metadata: any) => {
       return [langWatchKey, value];
     })
   );
-}
+};
 
 const extractReservedAndCustomMetadata = (metadata: any) => {
   if ("threadId" in metadata) {

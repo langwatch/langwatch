@@ -58,6 +58,10 @@ class TrackedInMemoryBM25Retriever(InMemoryBM25Retriever):
         )
         return results
 
+    @component.output_types(documents=List[Document])
+    async def run_async(self, query: str, **kwargs):
+        return self.run(query, **kwargs)
+
 
 retriever = TrackedInMemoryBM25Retriever(document_store=document_store)
 
@@ -67,6 +71,10 @@ class TrackedPromptBuilder(PromptBuilder):
     @component.output_types(prompt=str)
     def run(self, template=None, template_variables=None, **kwargs):
         return super().run(template, template_variables, **kwargs)
+
+    @component.output_types(prompt=str)
+    async def run_async(self, template=None, template_variables=None, **kwargs):
+        return self.run(template, template_variables, **kwargs)
 
 
 prompt_builder = TrackedPromptBuilder(template=prompt_template)
@@ -86,6 +94,9 @@ class TrackedOpenAIGenerator(OpenAIGenerator):
         )
         return result
 
+    async def run_async(self, prompt: str, **kwargs):
+        return self.run(prompt, **kwargs)
+
 
 llm = TrackedOpenAIGenerator(
     api_key=Secret.from_token(os.environ["OPENAI_API_KEY"]), model="gpt-4o-mini"
@@ -102,6 +113,10 @@ rag_pipeline.connect("prompt_builder", "llm")
 @cl.on_message
 @langwatch.trace()
 async def main(message: cl.Message):
+    langwatch.get_current_trace().update(
+        metadata={"labels": ["haystack", "rag"]},
+    )
+
     msg = cl.Message(
         content="",
     )

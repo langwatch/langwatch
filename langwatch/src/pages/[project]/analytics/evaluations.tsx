@@ -21,6 +21,10 @@ import { api } from "~/utils/api";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { getEvaluatorDefinitions } from "../../../server/evaluations/getEvaluator";
 
+// Time unit conversion constants
+const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
+const ONE_DAY = MINUTES_IN_DAY;
+
 const creatChecks = (checks: any) => {
   return checks.map((check: any) => {
     let checksAverage = {};
@@ -42,7 +46,7 @@ const creatChecks = (checks: any) => {
         ],
         groupBy: "evaluations.evaluation_passed",
         includePrevious: false,
-        timeScale: 1,
+        timeScale: ONE_DAY,
         height: 300,
       };
 
@@ -64,7 +68,7 @@ const creatChecks = (checks: any) => {
         ],
         groupBy: "evaluations.evaluation_passed",
         includePrevious: false,
-        timeScale: 1,
+        timeScale: ONE_DAY,
         height: 300,
       };
     } else {
@@ -81,7 +85,7 @@ const creatChecks = (checks: any) => {
           },
         ],
         includePrevious: false,
-        timeScale: 1,
+        timeScale: ONE_DAY,
         height: 200,
       };
 
@@ -98,7 +102,7 @@ const creatChecks = (checks: any) => {
           },
         ],
         includePrevious: false,
-        timeScale: 1,
+        timeScale: ONE_DAY,
         height: 200,
       };
     }

@@ -6,6 +6,10 @@ import { SatisfactionGraphs } from "./SatisfactionGraph";
 import { TopicsSelector } from "../filters/TopicsSelector";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 
+// Time unit conversion constants
+const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
+const ONE_DAY = MINUTES_IN_DAY;
+
 export const userThreads = {
   graphId: "custom",
   graphType: "summary",
@@ -49,7 +53,7 @@ export const userThreads = {
     },
   ],
   includePrevious: false,
-  timeScale: "1",
+  timeScale: ONE_DAY,
   height: 300,
 };
 
@@ -70,7 +74,7 @@ export function UserMetrics() {
     ],
     groupBy: undefined,
     includePrevious: true,
-    timeScale: 1,
+    timeScale: ONE_DAY,
   };
 
   const threadsGraph: CustomGraphInput = {
@@ -86,7 +90,7 @@ export function UserMetrics() {
     ],
     groupBy: undefined,
     includePrevious: true,
-    timeScale: 1,
+    timeScale: ONE_DAY,
   };
 
   const usersGraph: CustomGraphInput = {
@@ -102,7 +106,7 @@ export function UserMetrics() {
     ],
     groupBy: undefined,
     includePrevious: true,
-    timeScale: 1,
+    timeScale: ONE_DAY,
   };
 
   return (
@@ -193,7 +197,7 @@ export function UserMetrics() {
             <Card.Header paddingBottom={4}>
               <Heading size="sm">Top Topics</Heading>
             </Card.Header>
-            <Card.Body maxHeight="240px" overflowY="scroll">
+            <Card.Body maxHeight="240px" overflowY="auto">
               <TopicsSelector showTitle={false} />
             </Card.Body>
           </Card.Root>
@@ -202,7 +206,7 @@ export function UserMetrics() {
       </GridItem>
       {isNotQuickwit && (
         <GridItem>
-          <Card.Root overflow="scroll">
+          <Card.Root overflow="auto">
             <Card.Header>
               <Heading size="sm">User Threads</Heading>
             </Card.Header>

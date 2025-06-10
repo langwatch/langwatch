@@ -2,12 +2,12 @@ import { Box, Text, type BoxProps } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Mention, MentionsInput } from "react-mentions";
 
-export type PromptTextAreaOnAddMention = {
+export interface PromptTextAreaOnAddMention {
   value: string;
   display: string;
   startPos: number;
   endPos: number;
-};
+}
 
 export function PromptTextArea({
   availableFields,

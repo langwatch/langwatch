@@ -18,7 +18,7 @@ describe("safeTruncate", () => {
 
   it("should truncate long strings", () => {
     const longString = "a".repeat(40 * 1024); // 40KB string
-    const result = safeTruncate({ text: longString }) as { text: string };
+    const result = safeTruncate({ text: longString }, 16 * 1024); // Truncate to 16kb
 
     expect(result.text.length).toBeLessThan(17 * 1024); // 16KB + "..."
     expect(result.text.endsWith("...")).toBe(true);
@@ -33,7 +33,7 @@ describe("safeTruncate", () => {
       },
     };
 
-    const result = safeTruncate(input) as any;
+    const result = safeTruncate(input, 16 * 1024);
     expect(result.level1.level2.text.length).toBeLessThan(17 * 1024);
     expect(result.level1.level2.text.endsWith("...")).toBe(true);
   });

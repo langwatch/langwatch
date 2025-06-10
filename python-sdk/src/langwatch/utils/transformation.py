@@ -10,7 +10,7 @@ from langwatch.domain import (
     RAGChunk,
 )
 import json
-from typing import List, Optional, TypeVar, Union, cast
+from typing import Any, Dict, List, Optional, TypeVar, Union, cast
 from pydantic import BaseModel, ValidationError
 import pydantic
 
@@ -64,9 +64,11 @@ class SerializableWithStringFallback(SerializableAndPydanticEncoder):
             return str(o)
 
 
-def validate_safe(type_, item: dict, min_required_keys_for_pydantic_1: List[str]):
+def validate_safe(
+    type_: Any, item: Dict[str, Any], min_required_keys_for_pydantic_1: List[str]
+):
     """Safely validate a dictionary against a type, handling both TypedDict and BaseModel."""
-    if not isinstance(item, dict) or not all(
+    if not isinstance(item, dict) or not all(  # type: ignore
         key in item for key in min_required_keys_for_pydantic_1
     ):
         return False
@@ -109,7 +111,8 @@ def validate_safe(type_, item: dict, min_required_keys_for_pydantic_1: List[str]
 
 def rag_contexts(value: Union[List[RAGChunk], List[str]]) -> List[RAGChunk]:
     if type(value) == list and all(
-        validate_safe(RAGChunk, cast(dict, item), ["content"]) for item in value
+        validate_safe(RAGChunk, cast(Dict[str, Any], item), ["content"])
+        for item in value
     ):
         return cast(List[RAGChunk], value)
     if type(value) == list and all(isinstance(item, str) for item in value):
@@ -120,7 +123,7 @@ def rag_contexts(value: Union[List[RAGChunk], List[str]]) -> List[RAGChunk]:
 
 
 def convert_typed_values(
-    value: Union[SpanInputOutput, ChatMessage, str, dict, list],
+    value: Union[SpanInputOutput, ChatMessage, str, Dict[str, Any], List[Any]],
 ) -> SpanInputOutput:
     value_ = value
 
@@ -176,14 +179,14 @@ def truncate_object_recursively(
     ):
         return obj
 
-    def truncate_string(s):
+    def truncate_string(s: str):
         return (
             s[:max_string_length] + "... (truncated string)"
             if len(s) > max_string_length
             else s
         )
 
-    def process_item(item):
+    def process_item(item: Any):
         if isinstance(item, str):
             return truncate_string(item)
         elif isinstance(item, (list, dict)):

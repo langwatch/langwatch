@@ -103,6 +103,10 @@ import {
 } from "../../../../utils/stringCasing";
 import { LuChartArea } from "react-icons/lu";
 
+// Time unit conversion constants
+const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
+const ONE_DAY = MINUTES_IN_DAY;
+
 export interface CustomGraphFormData {
   title?: string;
   startDate?: Date;
@@ -226,7 +230,7 @@ const defaultValues: CustomGraphFormData = {
     },
   ],
   groupBy: undefined,
-  timeScale: 1,
+  timeScale: ONE_DAY,
   includePrevious: true,
 };
 

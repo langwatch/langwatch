@@ -9,7 +9,7 @@ import {
   type SpyInstanceFn,
 } from "vitest";
 import { openai } from "@ai-sdk/openai";
-import { generateText, type CoreMessage } from "ai";
+import { generateText, LanguageModel, type CoreMessage } from "ai";
 import "dotenv/config";
 import { version } from "../package.json";
 
@@ -369,14 +369,14 @@ describe("LangWatch tracer", () => {
     });
 
     const response = await generateText({
-      model: model,
+      model: model as LanguageModel,
       messages: messages,
     });
 
     span.end({
       output: {
         type: "chat_messages",
-        value: convertFromVercelAIMessages(response.responseMessages),
+        value: convertFromVercelAIMessages(response.response.messages),
       },
       metrics: {
         promptTokens: response.usage?.promptTokens,

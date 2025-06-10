@@ -1193,9 +1193,7 @@ def send_spans(
 
     json_data = json.dumps(data, cls=SerializableWithStringFallback, indent=2)
 
-    get_logger().debug(
-        f"Sending trace: {json_data}"
-    )
+    get_logger().debug(f"Sending trace: {json_data}")
 
     api_key = api_key or langwatch.api_key
     if not api_key:

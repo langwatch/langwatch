@@ -1,14 +1,26 @@
+import dynamic from "next/dynamic";
 import { Box, Card as ChakraCard } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { FullLogo } from "../../../components/icons/FullLogo";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { ChatBox } from "../../../optimization_studio/components/ChatWindow";
 import { api } from "../../../utils/api";
 import { type Edge, type Node } from "@xyflow/react";
 import { type Workflow } from "../../../optimization_studio/types/dsl";
 import { LoadingScreen } from "../../../components/LoadingScreen";
+import { useEffect, useState } from "react";
 
-export default function ChatPage() {
+const ChatBox = dynamic(
+  () =>
+    import("../../../optimization_studio/components/ChatWindow").then(
+      (mod) => mod.ChatBox
+    ),
+  {
+    ssr: false,
+    loading: () => <LoadingScreen />,
+  }
+);
+
+function ChatContent() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const workflowId = router.query.workflow as string;
@@ -19,16 +31,21 @@ export default function ChatPage() {
       projectId: project?.id ?? "",
     },
     {
-      enabled: !!project?.id,
+      enabled: !!project?.id && !!workflowId,
     }
   );
 
-  if (publishedWorkflow.isLoading) {
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient || !router.isReady || publishedWorkflow.isLoading) {
     return <LoadingScreen />;
   }
 
   if (!publishedWorkflow.data) {
-    return;
+    return <Box p={8}>Workflow not found.</Box>;
   }
 
   return (
@@ -52,4 +69,12 @@ export default function ChatPage() {
       </Box>
     </Box>
   );
+}
+
+const ClientOnlyChatContent = dynamic(() => Promise.resolve(ChatContent), {
+  ssr: false,
+});
+
+export default function ChatPage() {
+  return <ClientOnlyChatContent />;
 }

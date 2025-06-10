@@ -60,6 +60,7 @@ def disable_dsp_caching():
     MemorizedFunc._is_in_cache_and_valid = lambda *args, **kwargs: False
     AsyncMemorizedFunc._is_in_cache_and_valid = lambda *args, **kwargs: False
     litellm.cache = None
+    dspy.configure_cache(enable_memory_cache=False, enable_disk_cache=False)
 
 
 def set_dspy_cache_dir(cache_dir: str, limit_size=1e9):  # 1 GB
@@ -192,17 +193,17 @@ def forceful_exit(self):
 
 @contextmanager
 def optional_langwatch_trace(
-    do_not_trace=False, trace_id=None, api_key=None, skip_root_span=False, metadata=None
+    do_not_trace=False, trace_id=None, skip_root_span=False, metadata=None
 ):
-    if do_not_trace:
-        yield None
-    else:
-        with langwatch.trace(
-            trace_id=trace_id,
-            api_key=api_key,
-            skip_root_span=skip_root_span,
-            metadata=metadata,
-        ) as trace:
+    with langwatch.trace(
+        trace_id=trace_id,
+        skip_root_span=skip_root_span,
+        metadata=metadata,
+        disable_sending=do_not_trace,
+    ) as trace:
+        if do_not_trace:
+            yield None
+        else:
             yield trace
 
 

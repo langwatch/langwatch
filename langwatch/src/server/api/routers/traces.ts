@@ -7,43 +7,36 @@ import {
 } from "@elastic/elasticsearch/lib/api/types";
 import { PublicShareResourceTypes, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import shuffle from "lodash/shuffle";
+import shuffle from "lodash-es/shuffle";
 import type { Session } from "next-auth";
 import {
   createTRPCRouter,
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
-import { prisma } from "~/server/db";
+import type { Protections } from "../../elasticsearch/protections";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { evaluatePreconditions } from "../../evaluations/preconditions";
 import { checkPreconditionSchema } from "../../evaluations/types.generated";
-import type { Protections } from "../../elasticsearch/protections";
 
-import { getAnnotatedTraceIds } from "~/server/filters/annotations";
-import { sharedFiltersInputSchema } from "../../analytics/types";
-import { TRACE_INDEX, esClient } from "../../elasticsearch";
-import {
-  type ElasticSearchTrace,
-  type EvaluationResult,
-  type RAGChunk,
-  type Trace,
-} from "../../tracer/types";
-import {
-  TeamRoleGroup,
-  checkPermissionOrPubliclyShared,
-  checkUserPermissionForProject,
-} from "../permission";
-import { generateTracesPivotQueryConditions } from "./analytics/common";
+import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import {
   aggregateTraces,
   getTraceById,
   getTracesGroupedByThreadId,
   searchTraces,
 } from "~/server/elasticsearch/traces";
-import { getUserProtectionsForProject } from "../utils";
 import { transformElasticSearchTraceToTrace } from "~/server/elasticsearch/transformers";
-import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
+import { sharedFiltersInputSchema } from "../../analytics/types";
+import { TRACE_INDEX, esClient } from "../../elasticsearch";
+import { type ElasticSearchTrace, type Trace } from "../../tracer/types";
+import {
+  TeamRoleGroup,
+  checkPermissionOrPubliclyShared,
+  checkUserPermissionForProject,
+} from "../permission";
+import { getUserProtectionsForProject } from "../utils";
+import { generateTracesPivotQueryConditions } from "./analytics/common";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
@@ -397,7 +390,7 @@ export const tracesRouter = createTRPCRouter({
   getAllForDownload: protectedProcedure
     .input(
       getAllForProjectInput.extend({
-        includeContexts: z.boolean(),
+        includeSpans: z.boolean(),
         scrollId: z.string().optional(),
       })
     )
@@ -411,7 +404,7 @@ export const tracesRouter = createTRPCRouter({
         },
         ctx,
         downloadMode: true,
-        includeContexts: input.includeContexts,
+        includeSpans: input.includeSpans,
         scrollId: input.scrollId,
       });
     }),
@@ -421,7 +414,7 @@ export const getAllTracesForProject = async ({
   input,
   ctx,
   downloadMode = false,
-  includeContexts = true,
+  includeSpans = false,
   scrollId = undefined,
 }: {
   input: z.infer<typeof getAllForProjectInput>;
@@ -431,7 +424,7 @@ export const getAllTracesForProject = async ({
     publiclyShared?: boolean;
   };
   downloadMode?: boolean;
-  includeContexts?: boolean;
+  includeSpans?: boolean;
   scrollId?: string;
 }) => {
   const { pivotIndexConditions } = generateTracesPivotQueryConditions({
@@ -475,34 +468,9 @@ export const getAllTracesForProject = async ({
           "input.embeddings.embeddings",
           "output.embeddings",
           "output.embeddings.embeddings",
-          ...(downloadMode ? ["spans"] : []),
+          ...(includeSpans ? [] : ["spans"]),
         ],
       },
-      ...(downloadMode && includeContexts
-        ? {
-            // Retrieve only contexts for download, ignore guardrails and all other spans
-            script_fields: {
-              context_spans: {
-                script: {
-                  lang: "painless",
-                  source: `
-                  def spans = [];
-                  if (params._source.spans != null) {
-                    for (def span : params._source.spans) {
-                      if (span.contexts != null && span.contexts.length > 0) {
-                        def contextMap = new HashMap();
-                        contextMap.put('contexts', span.contexts);
-                        spans.add(contextMap);
-                      }
-                    }
-                  }
-                  return spans;
-                `,
-                },
-              },
-            },
-          }
-        : {}),
       body: {
         query: pivotIndexConditions,
         ...(input.sortBy
@@ -557,20 +525,6 @@ export const getAllTracesForProject = async ({
     .map((hit) => hit._source!)
     .map((t) => transformElasticSearchTraceToTrace(t, protections));
 
-  const guardrailsSlugToName = Object.fromEntries(
-    (
-      await prisma.monitor.findMany({
-        where: {
-          projectId: input.projectId,
-        },
-        select: {
-          slug: true,
-          name: true,
-        },
-      })
-    ).map((guardrail) => [guardrail.slug, guardrail.name])
-  );
-
   if (input.groupBy === "thread_id") {
     const threadIds = traces.map((t) => t.metadata.thread_id).filter(Boolean);
     const existingTraceIds = new Set(traces.map((t) => t.trace_id));
@@ -579,7 +533,7 @@ export const getAllTracesForProject = async ({
       const tracesFromThreadId = await searchTraces({
         connConfig: { projectId: input.projectId },
         search: {
-          size: 100,
+          size: 50,
           query: {
             bool: {
               filter: [
@@ -599,51 +553,14 @@ export const getAllTracesForProject = async ({
 
       traces.unshift(...filteredTracesByThreadId);
     }
-  }
 
-  const tracesWithGuardrails = traces.map<TraceWithGuardrail>((trace) => {
-    const spans = trace.spans ?? [];
-    const lastSpans = [...spans].reverse();
-    const lastNonGuardrailSpanIndex =
-      lastSpans.findIndex((span) => span.type !== "guardrail") ?? -1;
-    const lastGuardrailSpans =
-      lastNonGuardrailSpanIndex > -1
-        ? lastSpans.slice(0, lastNonGuardrailSpanIndex)
-        : lastSpans;
-
-    const lastFailedGuardrailResult:
-      | (EvaluationResult & { name?: string })
-      | undefined = lastGuardrailSpans?.flatMap((span) =>
-      (span?.output ? [span.output] : [])
-        .filter((output) => output.type === "guardrail_result")
-        .map((output) => {
-          let value = (output.value as unknown as EvaluationResult) || {};
-          if (typeof value === "string") {
-            try {
-              value = JSON.parse(value);
-            } catch {}
-          }
-          return {
-            ...value,
-            name: guardrailsSlugToName[span.name ?? ""],
-          };
-        })
-        .filter((output) => !(output as EvaluationResult)?.passed)
-    )[0];
-
-    let contexts: RAGChunk[] = [];
-    for (const span of spans ?? []) {
-      if ("contexts" in span && Array.isArray(span.contexts)) {
-        contexts = [...contexts, ...span.contexts];
-      }
+    // If no specific sort order was requested by the user (i.e., input.sortBy is falsy),
+    // and traces might have been reordered by the unshift operation above (due to groupBy === "thread_id"),
+    // re-apply the default sort order by timestamps.started_at descending.
+    if (!input.sortBy) {
+      sortTracesByTimestampDesc(traces);
     }
-
-    return {
-      ...trace,
-      lastGuardrail: lastFailedGuardrailResult,
-      contexts,
-    };
-  });
+  }
 
   totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
 
@@ -651,7 +568,8 @@ export const getAllTracesForProject = async ({
     traces.map((trace) => [trace.trace_id, trace.evaluations ?? []])
   );
 
-  const groups = groupTraces(input.groupBy, tracesWithGuardrails);
+  // TODO: Remove this cast once we have a way to include guardrails in the traces directly on ES
+  const groups = groupTraces(input.groupBy, traces as TraceWithGuardrail[]);
 
   return {
     groups,
@@ -789,4 +707,26 @@ export const getEvaluationsMultiple = async (input: {
   return Object.fromEntries(
     traces.map((trace) => [trace.trace_id, trace.evaluations ?? []])
   );
+};
+
+// Helper function to sort traces by timestamp in descending order
+const sortTracesByTimestampDesc = (traces: Trace[]) => {
+  traces.sort((a, b) => {
+    const timeA = a.timestamps?.started_at;
+    const timeB = b.timestamps?.started_at;
+
+    // new Date(null/undefined/invalid string).getTime() results in NaN
+    const dateAValue = timeA ? new Date(timeA).getTime() : NaN;
+    const dateBValue = timeB ? new Date(timeB).getTime() : NaN;
+
+    // Handle NaN cases (invalid or missing dates) by sorting them to the end.
+    const aIsNaN = isNaN(dateAValue);
+    const bIsNaN = isNaN(dateBValue);
+
+    if (aIsNaN && bIsNaN) return 0; // Both are NaN, treat as equal
+    if (aIsNaN) return 1; // a is NaN, so b comes first
+    if (bIsNaN) return -1; // b is NaN, so a comes first
+
+    return dateBValue - dateAValue; // Descending order for valid dates
+  });
 };

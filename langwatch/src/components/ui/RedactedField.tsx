@@ -10,7 +10,11 @@ interface RedactedFieldProps {
   loadingComponent?: React.ReactNode;
 }
 
-export const RedactedField: React.FC<RedactedFieldProps> = ({ field, children, loadingComponent }) => {
+export const RedactedField: React.FC<RedactedFieldProps> = ({
+  field,
+  children,
+  loadingComponent,
+}) => {
   const { isRedacted, isLoading } = useFieldRedaction(field);
 
   if (isLoading || isRedacted === undefined) {
@@ -36,4 +40,4 @@ export const RedactedField: React.FC<RedactedFieldProps> = ({ field, children, l
   }
 
   return <>{children}</>;
-}; 
+};

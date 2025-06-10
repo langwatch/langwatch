@@ -89,7 +89,7 @@ async def main(message: cl.Message):
     msg = cl.Message(content="")
 
     langwatch.get_current_trace().update(
-        metadata={"customer_id": "customer_example", "labels": ["v1.0.0"]}
+        metadata={"customer_id": "customer_example", "labels": ["langchain", "rag", "vertex_ai"]}
     )
 
     async for chunk in agent.astream(

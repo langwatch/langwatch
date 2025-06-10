@@ -126,8 +126,6 @@ async def execute_optimization(
                 score = pred.total_score(weighting="mean")
                 return score
 
-            langwatch.api_key = workflow.api_key
-
             params = event.params.model_dump(exclude_none=True)
             if event.optimizer == "MIPROv2ZeroShot" or event.optimizer == "MIPROv2":
                 llm_config = event.params.llm

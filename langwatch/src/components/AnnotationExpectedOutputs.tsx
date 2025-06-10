@@ -33,6 +33,7 @@ export const AnnotationExpectedOutputs = ({
       {commentState.expectedOutputAction === "new" &&
         traceId === commentState.traceId && (
           <>
+            <Text fontWeight="500">Suggest output:</Text>
             <Textarea
               width="full"
               backgroundColor="white"

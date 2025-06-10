@@ -140,7 +140,7 @@ export const datasetRouter = createTRPCRouter({
 
       const dataset = await ctx.prisma.dataset.create({
         data: {
-          id: `dataset-${nanoid()}`,
+          id: `dataset_${nanoid()}`,
           slug,
           name,
           projectId: input.projectId,

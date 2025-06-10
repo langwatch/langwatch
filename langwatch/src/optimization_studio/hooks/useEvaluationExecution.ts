@@ -66,9 +66,11 @@ export const useEvaluationExecution = () => {
     ({
       workflow_version_id,
       evaluate_on,
+      dataset_entry,
     }: {
       workflow_version_id: string;
-      evaluate_on: "full" | "test" | "train";
+      evaluate_on: "full" | "test" | "train" | "specific";
+      dataset_entry?: number;
     }) => {
       if (!socketAvailable()) {
         return;
@@ -91,6 +93,7 @@ export const useEvaluationExecution = () => {
           workflow: getWorkflow(),
           workflow_version_id,
           evaluate_on,
+          dataset_entry,
         },
       };
       sendMessage(payload);

@@ -15,9 +15,9 @@ import {
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash-es/cloneDeep";
 import numeral from "numeral";
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { ChevronDown, Search, X } from "react-feather";
 import { useDebounceValue } from "usehooks-ts";
 import { useDrawer } from "~/components/CurrentDrawer";
@@ -34,6 +34,8 @@ import { Tooltip } from "../ui/tooltip";
 import { useColorRawValue } from "../ui/color-mode";
 import { InputGroup } from "../ui/input-group";
 import { Slider } from "../ui/slider";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { OverflownTextWithTooltip } from "../OverflownText";
 
 export function FieldsFilters() {
   const { nonEmptyFilters } = useFilterParams();
@@ -192,7 +194,7 @@ function FieldsFilter({
               />
             </InputGroup>
           </Popover.Header>
-          <Popover.Body paddingY={1} paddingX={4}>
+          <Popover.Body paddingY={1} paddingX={0}>
             {open && (
               <NestedListSelection
                 query={query}
@@ -204,6 +206,7 @@ function FieldsFilter({
                     : []),
                   filterId,
                 ]}
+                paddingX={4}
               />
             )}
           </Popover.Body>
@@ -218,11 +221,13 @@ function NestedListSelection({
   current,
   keysAhead,
   keysBefore = [],
+  paddingX = 0,
 }: {
   query: string;
   current: FilterParam;
   keysAhead: FilterField[];
   keysBefore?: string[];
+  paddingX?: number;
 }) {
   const { setFilter } = useFilterParams();
 
@@ -306,6 +311,7 @@ function NestedListSelection({
             },
           }
         : {})}
+      paddingX={paddingX}
     />
   );
 }
@@ -317,6 +323,7 @@ function ListSelection({
   currentValues,
   onChange,
   nested,
+  paddingX = 0,
 }: {
   filterId: FilterField;
   query: string;
@@ -324,6 +331,7 @@ function ListSelection({
   currentValues: string[];
   onChange: (value: string[]) => void;
   nested?: (key: string) => React.ReactNode;
+  paddingX?: number;
 }) {
   const filter = availableFilters[filterId];
 
@@ -366,25 +374,55 @@ function ListSelection({
     );
   }
 
+  const options = useMemo(() => {
+    return filterData.data?.options
+      .sort((a, b) => (a.count > b.count ? -1 : 1))
+      .filter((option) => {
+        if (query) {
+          return option.label.toLowerCase().includes(query.toLowerCase());
+        }
+        return true;
+      });
+  }, [filterData.data?.options, query]);
+
+  const parentRef = React.useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: options?.length ?? 0,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 35,
+    gap: 8,
+    overscan: 5,
+  });
+
+  const isEmpty = options && options.length === 0;
+
   return (
-    <VStack
+    <Box
       width="full"
-      align="start"
-      gap={2}
       paddingY={2}
       maxHeight="300px"
-      overflowY="scroll"
-      className="js-filter-popover"
+      overflowY="auto"
+      paddingX={paddingX}
+      ref={parentRef}
     >
-      {filterData.data?.options
-        .sort((a, b) => (a.count > b.count ? -1 : 1))
-        .filter((option) => {
-          if (query) {
-            return option.label.toLowerCase().includes(query.toLowerCase());
-          }
-          return true;
-        })
-        .map(({ field, label, count }) => {
+      <VStack
+        width="full"
+        align="start"
+        gap={2}
+        height={
+          filterData.isLoading || isEmpty
+            ? "auto"
+            : `${virtualizer.getTotalSize()}px`
+        }
+        position="relative"
+      >
+        {virtualizer.getVirtualItems().map((virtualItem) => {
+          let { field, label, count } = options?.[virtualItem.index] ?? {
+            field: "",
+            label: "",
+            count: 0,
+          };
           let details = "";
           const labelDetailsMatch = label.match(/^\[(.*)\] (.*)/);
           if (labelDetailsMatch) {
@@ -406,7 +444,17 @@ function ListSelection({
           };
 
           return (
-            <React.Fragment key={field}>
+            <VStack
+              key={field}
+              width="full"
+              gap={2}
+              position="absolute"
+              top={0}
+              left={0}
+              transform={`translateY(${virtualItem.start}px)`}
+              data-index={virtualItem.index}
+              ref={virtualizer.measureElement}
+            >
               <HStack width="full">
                 <Checkbox
                   width="full"
@@ -418,11 +466,21 @@ function ListSelection({
                 >
                   <VStack width="full" align="start" gap={"2px"}>
                     {details && (
-                      <Text fontSize="sm" color="gray.500">
+                      <OverflownTextWithTooltip
+                        fontSize="sm"
+                        color="gray.500"
+                        lineClamp={1}
+                        wordBreak="break-all"
+                      >
                         {details}
-                      </Text>
+                      </OverflownTextWithTooltip>
                     )}
-                    <Text>{label === "" ? "<empty>" : label}</Text>
+                    <OverflownTextWithTooltip
+                      lineClamp={1}
+                      wordBreak="break-all"
+                    >
+                      {label === "" ? "<empty>" : label}
+                    </OverflownTextWithTooltip>
                   </VStack>
                 </Checkbox>
                 <Spacer />
@@ -435,25 +493,26 @@ function ListSelection({
               <Box width="full" paddingLeft={4}>
                 {nested && currentValues.includes(field) && nested(field)}
               </Box>
-            </React.Fragment>
+            </VStack>
           );
         })}
-      {filterData.data && filterData.data.options.length === 0 && (
-        <Text>No options found</Text>
-      )}
-      {filterData.isLoading &&
-        Array.from({ length: keys && keys.length > 0 ? 2 : 5 }).map((_, i) => (
-          <Checkbox
-            key={i}
-            checked={false}
-            paddingY={2}
-            gap={3}
-            onChange={() => void 0}
-          >
-            <Skeleton height="12px" width="120px" />
-          </Checkbox>
-        ))}
-    </VStack>
+        {isEmpty && <Text>No options found</Text>}
+        {filterData.isLoading &&
+          Array.from({ length: keys && keys.length > 0 ? 2 : 5 }).map(
+            (_, i) => (
+              <Checkbox
+                key={i}
+                checked={false}
+                paddingY={2}
+                gap={3}
+                onChange={() => void 0}
+              >
+                <Skeleton height="12px" width="120px" />
+              </Checkbox>
+            )
+          )}
+      </VStack>
+    </Box>
   );
 }
 
@@ -564,46 +623,48 @@ function ThumbsUpDownVoteFilter({
       gap={2}
       paddingY={2}
       maxHeight="300px"
-      overflowY="scroll"
-      className="js-filter-popover"
+      overflowY="auto"
     >
       {[
         { field: -1, label: "negative" },
         { field: 1, label: "positive" },
-      ].map(({ field, label }) => (
-        <Checkbox
-          key={field}
-          width="full"
-          paddingY={1}
-          gap={3}
-          checked={!!(min && max && min <= field && max >= field)}
-          onChange={(e) => {
-            e.stopPropagation();
-            if (e.target.checked) {
-              onChange([
-                (min && min < field ? min : field).toString(),
-                (max && max > field ? max : field).toString(),
-              ]);
-            } else {
-              const other = field === -1 ? 1 : -1;
-              onChange([
-                ((min ?? 0) === field && (max ?? 0) === field
-                  ? undefined
-                  : other
-                )?.toString() ?? "",
-                ((min ?? 0) === field && (max ?? 0) === field
-                  ? undefined
-                  : other
-                )?.toString() ?? "",
-              ]);
-            }
-          }}
-        >
-          <VStack width="full" align="start" gap={"2px"}>
-            <Text>{label}</Text>
-          </VStack>
-        </Checkbox>
-      ))}
+      ].map(({ field, label }) => {
+        const isChecked = !!(min && max && min <= field && max >= field);
+        return (
+          <Checkbox
+            key={field}
+            width="full"
+            paddingY={1}
+            gap={3}
+            checked={isChecked}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isChecked) {
+                onChange([
+                  (min && min < field ? min : field).toString(),
+                  (max && max > field ? max : field).toString(),
+                ]);
+              } else {
+                const other = field === -1 ? 1 : -1;
+                onChange([
+                  ((min ?? 0) === field && (max ?? 0) === field
+                    ? undefined
+                    : other
+                  )?.toString() ?? "",
+                  ((min ?? 0) === field && (max ?? 0) === field
+                    ? undefined
+                    : other
+                  )?.toString() ?? "",
+                ]);
+              }
+            }}
+          >
+            <VStack width="full" align="start" gap={"2px"}>
+              <Text>{label}</Text>
+            </VStack>
+          </Checkbox>
+        );
+      })}
     </VStack>
   );
 }

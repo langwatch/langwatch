@@ -37,8 +37,10 @@ export default async function execute() {
   });
 
   for (const org of organizations) {
+    console.log("Checking for org:", org.name);
     await elasticsearchMigrate(org.id);
   }
+  console.log("Checking for default elasticsearch");
   await elasticsearchMigrate();
 }
 
@@ -148,12 +150,6 @@ const createIndexes = async (lastMigration: string, client: ElasticClient) => {
       number_of_shards: 4,
       number_of_replicas: 0,
     };
-
-    if (process.env.IS_OPENSEARCH === "true") {
-      settings.index = {
-        knn: true,
-      };
-    }
 
     await client.indices.create({
       index: TRACE_INDEX.base,

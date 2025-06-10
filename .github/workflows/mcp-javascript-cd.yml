@@ -1,0 +1,35 @@
+name: mcp-javascript-cd
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+jobs:
+  publish:
+    if: startsWith(github.event.release.tag_name, 'typescript-mcp-server@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+          cache-dependency-path: "mcp-server/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: ./mcp-server
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+
+      - name: Build and publish
+        working-directory: ./mcp-server
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

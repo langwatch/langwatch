@@ -1,2 +1,4 @@
-package-lock.json linguist-generated merge=ours
-uv.lock           linguist-generated merge=ours
+**/package-lock.json                    linguist-generated=true merge=ours
+**/uv.lock                              linguist-generated=true merge=ours
+**/go.sum                                  linguist-generated=true merge=ours
+python-sdk/src/langwatch/generated/**/* linguist-generated=true

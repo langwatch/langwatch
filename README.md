@@ -1,12 +1,25 @@
 ![logo.webp](assets/logo-header.webp)
 
+<h3 align="center">
+    <a href="https://langwatch.ai">Website</a> · <a href="https://docs.langwatch.ai">Docs</a> · <a href="https://discord.gg/kT4PhDS2gH">Discord</a> · <a href="https://docs.langwatch.ai/self-hosting/overview">Self-hosting</a>
+</h3>
+
 <p align="center">
-<a href="https://discord.gg/kT4PhDS2gH"><img src="https://img.shields.io/badge/LangWatch-Discord-%235865F2.svg" alt="Discord"></a>
-<a href="https://pypi.org/project/langwatch/"><img src="https://img.shields.io/pypi/v/langwatch?color=007EC6" alt="LangWatch Python SDK version"></a>
-<a href="https://www.npmjs.com/package/langwatch"><img src="https://img.shields.io/npm/v/langwatch?color=007EC6" alt="LangWatch TypeScript SDK version"></a>
+<a href="https://discord.gg/kT4PhDS2gH" target="_blank"><img src="https://img.shields.io/discord/1227886780536324106?logo=discord&labelColor=%20%235462eb&logoColor=%20%23f5f5f5&color=%20%235462eb" alt="chat on Discord"></a>
+<a href="https://pypi.python.org/pypi/langwatch" target="_blank"><img src="https://img.shields.io/pypi/dm/langwatch?logo=python&logoColor=white&label=pypi%20langwatch&color=blue" alt="langwatch Python package on PyPi"></a>
+<a href="https://www.npmjs.com/package/langwatch" target="_blank"><img src="https://img.shields.io/npm/dm/langwatch?logo=npm&logoColor=white&label=npm%20langwatch&color=blue" alt="langwatch npm package"></a>
+<a href="https://twitter.com/intent/follow?screen_name=langwatchai" target="_blank">
+   <img src="https://img.shields.io/twitter/follow/langwatchai?logo=X&color=%20%23f5f5f5"
+      alt="follow on X(Twitter)"></a>
 </p>
 
-LangWatch is an open platform for **Observing**, **Evaluating** and **Optimizing** your LLM and Agentic applications. We offer:
+<img src="assets/langwatch-quick-preview.gif" alt="LangWatch Quick Gif" width="100%" style="border-radius: 8px;">
+
+## Why LangWatch?
+
+**LangWatch is the leading LLM Ops platform on evaluation capabilities and user-friendly collaboration** — evaluate, debug, and optimize your Agents and LLM pipelines together with your team, locally or in the cloud, with Open-Telemetry native integrations.
+
+## Core Features
 
 - [**Observability**](https://docs.langwatch.ai/integration/overview) - Add tracing to your LLM, based on the OpenTelemetry standard, allowing LangWatch to provide real-time powers.
 - [**Evaluation**](https://docs.langwatch.ai/llm-evaluation/offline-evaluation) - Run real-time and offline evaluations against production or synthetic datasets. Compare performance across various matrixes (prompts, modules, hosting providers, and complete LLM pipelines).
@@ -15,27 +28,40 @@ LangWatch is an open platform for **Observing**, **Evaluating** and **Optimizing
 - [**Prompt Management & Optimization**](https://docs.langwatch.ai/features/prompt-versioning) – Version prompts, test changes on datasets, and improve real-world performance. Auto-optimize with DSPy's MIPROv2 to generate better prompts and few-shot examples.
 - [**Annotations**](https://docs.langwatch.ai/features/annotations) - Human in the Loop, done right. Accelerate better data creation by combining domain expert input with smart workflows. Use LangWatch's intuitive annotation interface to collaborate directly with experts while keeping full control over your code. Quickly generate high-quality labels, catch edge cases, and fine-tune datasets to build more accurate, robust AI models.
 
-LangWatch is framework- and LLM-agnostic, with support for (LangGraph, DSPy, Langflow, Flowise, and others) and LLM providers (OpenAI, Azure, Bedrock, Gemini, Deepseek, Groq, MistralAI, VertexAI, LiteLLM, and others) via [OpenTelemetry](https://opentelemetry.io/).
+LangWatch is framework- and LLM-agnostic, with support for (LangGraph, DSPy, Langflow, Flowise, Vercel, Mastra, Agno and others) and LLM providers (OpenAI, Azure, Bedrock, Gemini, Deepseek, Groq, MistralAI, VertexAI, LiteLLM, and others) via [OpenTelemetry](https://opentelemetry.io/).
 
-Our use of **open**, and **community-driven** **standards** is all about supporting your business decisions, and enabling your teams to be flexible to the rapidly changing AI ecosystem without worrying about compatibility.
+Our use of **open**, and **community-driven** **standards** enables your team to be flexible to the rapidly changing AI ecosystem without worrying about compatibility.
 
-## 🚢 Deploying LangWatch
+## Getting Started
+
+### Cloud ☁️
+
+The easiest way to get started with LangWatch.
+
+[Create a free account](https://app.langwatch.ai) to get started.
 
 ### Local setup 💻
 
-Get up and running in under 30 seconds. The example below uses Docker, but if you prefer helm charts check out the instructions here.
+Get up and running in your own machine using docker compose:
 
 ```bash
 git clone https://github.com/langwatch/langwatch.git
+cd langwatch
+cp langwatch/.env.example langwatch/.env
 docker compose up -d --wait --build
 open http://localhost:5560
 ```
 
 You'll be launched right into our onboarding flow. Welcome aboard 🫡.
 
-### Cloud ☁️
+### Self-hosted ⚓️
 
-The easiest way to get started with LangWatch is via our Cloud offering. [Create a free account](https://app.langwatch.ai) to get started.
+Run LangWatch on your own infrastructure:
+
+- [Docker Compose](https://docs.langwatch.ai/self-hosting/open-source#docker-compose) - Run LangWatch on your own machine.
+- [Kubernetes (Helm)](https://docs.langwatch.ai/self-hosting/open-source#helm-chart-for-langwatch) - Run LangWatch on a Kubernetes cluster using Helm for a production-ready setup.
+- [OnPrem](https://docs.langwatch.ai/self-hosting/onprem) - For high-scale deployments, we offer cloud specific setups for AWS, Google Cloud and Azure.
+- [Hybrid (OnPrem data)](https://docs.langwatch.ai/self-hosting/hybrid) - For companies that have strict data residency and control requirements, without needing to go fully on-prem.
 
 ### Other Flavours 🍦
 
@@ -44,12 +70,14 @@ The easiest way to get started with LangWatch is via our Cloud offering. [Create
 LangWatch offers a fully self-hosted version of the platform for companies that require strict data control and compliance, complete with Azure AD support.
 
 Read more about it on our [docs](https://docs.langwatch.ai/self-hosting/overview).
+
 </details>
 <details>
 <summary>Hybrid (OnPrem data) 🔀</summary>
 LangWatch offers a hybrid setup for companies that have strict data control and compliance requirements, without needing to go fully on-prem.
 
 Read more about it on our [docs](https://docs.langwatch.ai/hybrid-setup/overview).
+
 </details>
 <details>
 <summary>Local Development 👩‍💻</summary>
@@ -67,13 +95,14 @@ Then, on another terminal, install the dependencies and start LangWatch:
 make install
 make start
 ```
+
 </details>
 
 ## 🚀 Quick Start
 
 Get observing in minutes. Now you have an account and have created a project inside LangWatch, lets get your messages flowing through LangWatch.
 
-> [!NOTE]  
+> [!NOTE]
 > Not using Python or OpenAI? Don't worry, we have your back . [Visit our docs](https://docs.langwatch.ai/integration/overview) for full guides for other popular languages, LLM providers, and frameworks.
 
 ### Install and configure SDK
@@ -182,10 +211,10 @@ Please read our [LICENSE.md](http://LICENSE.md) file.
 
 As a platform that has access to data that is highly likely to be be sensitive, we take security incredibly seriously and treat it as a core part of our culture.
 
-| Legal Framework | Current Status |
-| --- | --- |
-| GDPR | Compliant. DPA available upon request. |
-| ISO 27001 | Certified. Certification report available upon request on our Enterprise plan. |
+| Legal Framework | Current Status                                                                 |
+| --------------- | ------------------------------------------------------------------------------ |
+| GDPR            | Compliant. DPA available upon request.                                         |
+| ISO 27001       | Certified. Certification report available upon request on our Enterprise plan. |
 
 Please refer to our Security page for more information. Contact us at [security@langwatch.ai](mailto:security@langwatch.ai) if you have any further questions.
 

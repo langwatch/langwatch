@@ -35,19 +35,17 @@ import { useTableView } from "./messages/HeaderButtons";
 import { useColorRawValue } from "./ui/color-mode";
 import { Link } from "./ui/link";
 import { Tooltip } from "./ui/tooltip";
+import { api } from "../utils/api";
 
 export const MENU_WIDTH = "88px";
 
 export const MainMenu = React.memo(function MainMenu() {
   const { project, hasOrganizationPermission, isPublicRoute } =
     useOrganizationTeamProject();
-  const { assignedQueueItems, memberAccessibleQueueItems } =
-    useAnnotationQueues();
-  const totalQueueItems = useMemo(
-    () =>
-      (assignedQueueItems?.filter((item) => !item.doneAt)?.length ?? 0) +
-      (memberAccessibleQueueItems?.filter((item) => !item.doneAt)?.length ?? 0),
-    [assignedQueueItems, memberAccessibleQueueItems]
+
+  const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id }
   );
 
   return (
@@ -122,7 +120,7 @@ export const MainMenu = React.memo(function MainMenu() {
             icon={Edit}
             label={projectRoutes.annotations.title}
             project={project}
-            badgeNumber={totalQueueItems}
+            badgeNumber={pendingItemsCount.data}
             iconStyle={{ marginLeft: "1px" }}
           />
 

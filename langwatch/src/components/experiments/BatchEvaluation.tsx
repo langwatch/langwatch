@@ -331,7 +331,7 @@ export default function BatchEvaluation({
         paddingBottom={12}
         display="flex"
         justifyContent="center"
-        overflowX="scroll"
+        overflowX="auto"
         paddingX={6}
       >
         <VStack align="start" minWidth="0">

@@ -44,6 +44,7 @@ import { evaluationStatusColor } from "./EvaluationStatus";
 import { toaster } from "../../components/ui/toaster";
 import { InputGroup } from "../ui/input-group";
 import { RedactedField } from "../ui/RedactedField";
+import { getUserProtectionsForProject } from "~/server/api/utils";
 
 export function TryItOut({
   form,
@@ -108,11 +109,14 @@ export function TryItOut({
           evaluatorType,
           trace,
           (trace.spans ?? []).map((span) =>
-            transformElasticSearchSpanToSpan(span as ElasticSearchSpan, {
-              canSeeCapturedInput: true,
-              canSeeCapturedOutput: true,
-              canSeeCosts: true,
-            })
+            transformElasticSearchSpanToSpan(
+              {
+                canSeeCapturedInput: false,
+                canSeeCapturedOutput: false,
+                canSeeCosts: false,
+              },
+              new Set()
+            )(span as ElasticSearchSpan)
           ),
           preconditions
         )

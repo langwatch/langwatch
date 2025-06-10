@@ -1,0 +1,78 @@
+name: sdk-javascript-ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - "typescript-sdk/**"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: "typescript-sdk/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: typescript-sdk
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+
+      - name: Run tests
+        working-directory: typescript-sdk
+        run: npm run test
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: "typescript-sdk/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: typescript-sdk
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+
+      - name: Install TypeScript Native Preview
+        working-directory: typescript-sdk
+        run: npm install -D @typescript/native-preview
+
+      - name: Run typecheck
+        working-directory: typescript-sdk
+        run: ./node_modules/.bin/tsgo --noEmit --project ./tsconfig.json
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: "typescript-sdk/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: typescript-sdk
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+
+      - name: Build
+        working-directory: typescript-sdk
+        run: npm run build

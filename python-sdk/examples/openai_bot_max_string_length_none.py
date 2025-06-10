@@ -13,6 +13,9 @@ client = OpenAI()
 @langwatch.trace(max_string_length=None)  # default is 5000
 async def main(message: cl.Message):
     langwatch.get_current_trace().autotrack_openai_calls(client)
+    langwatch.get_current_trace().update(
+        metadata={"labels": ["openai", "max_length"]},
+    )
 
     msg = cl.Message(
         content="",

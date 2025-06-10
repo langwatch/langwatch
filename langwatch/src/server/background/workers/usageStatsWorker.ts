@@ -22,11 +22,11 @@ export async function runUsageStatsJob(job: Job<UsageStatsJob, void, string>) {
   getJobProcessingCounter("usage_stats", "processing").inc();
   const start = Date.now();
 
-  const stats = await collectUsageStats(job.data.instance_id);
-
-  logger.info({ stats }, "usage stats collected");
-
   try {
+    const stats = await collectUsageStats(job.data.instance_id);
+
+    logger.info({ stats }, "usage stats collected");
+
     const installMethod = process.env.INSTALL_METHOD || "self-hosted"; // Default to self-hosted if not specified
 
     fetch("https://app.langwatch.ai/api/track_usage", {
@@ -55,7 +55,6 @@ export async function runUsageStatsJob(job: Job<UsageStatsJob, void, string>) {
       scope.setExtra("job", job.data);
       Sentry.captureException(error);
     });
-    throw error;
   }
 }
 

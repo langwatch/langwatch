@@ -1,0 +1,61 @@
+name: sdk-python-ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - "python-sdk/**"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "python-sdk/uv.lock"
+
+      - name: Setup Python UV
+        working-directory: python-sdk
+        run: uv sync --all-groups --all-extras && uv pip install strands-agents
+
+      - name: Run tests
+        working-directory: python-sdk
+        env:
+          LANGWATCH_DEBUG: "true"
+          LANGWATCH_API_KEY: ${{ secrets.PYTHON_SDK_LANGWATCH_API_KEY }}
+          LANGWATCH_PROMPT_ID: ${{ secrets.PYTHON_SDK_LANGWATCH_PROMPT_ID }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_ENDPOINT }}
+          GEMINI_API_KEY: ${{ secrets.PYTHON_SDK_GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.PYTHON_SDK_GROQ_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_OPENAI_API_KEY }}
+        run: uv run pytest
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "python-sdk/uv.lock"
+
+      - name: Setup Python UV
+        working-directory: python-sdk
+        run: uv sync --all-groups --all-extras && uv pip install strands-agents build
+
+      - name: Build package
+        working-directory: python-sdk
+        run: uv run python -m build

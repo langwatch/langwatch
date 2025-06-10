@@ -44,6 +44,9 @@ def rag_retrieval(query: str):
 @langwatch.trace()
 async def main(message: cl.Message):
     langwatch.get_current_trace().autotrack_openai_calls(client)
+    langwatch.get_current_trace().update(
+        metadata={"labels": ["openai", "rag"]},
+    )
 
     msg = cl.Message(
         content="",
