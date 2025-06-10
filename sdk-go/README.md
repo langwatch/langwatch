@@ -1,167 +1,29 @@
-# langwatch
+# LangWatch Go SDK
 
 The Go SDK for tracing and evaluating LLM applications using [LangWatch](https://langwatch.ai).
 
-## Features
+**Get complete visibility into your LLM applications** - Automatically capture requests, responses, token usage, costs, and performance metrics from OpenAI, Anthropic, and other providers.
 
-* Seamless integration with OpenTelemetry.
-* Specialized `LangWatchTracer` for creating LangWatch-enhanced spans.
-* `LangWatchSpan` with helper methods to easily record LLM-specific attributes (inputs, outputs, token counts, models, RAG context, etc.).
-* Typed `SpanType` for classifying spans within LangWatch.
+## Quick Start
 
-## Getting Started
-
-### Prerequisites
-
-* Go (version 1.20 or later recommended)
-* An OpenTelemetry-compatible backend to send your traces to, such as [LangWatch](https://langwatch.ai) or [Grafana ](https://grafana.com/)
-
-### Installation
-
-First, get the necessary OpenTelemetry and LangWatch packages:
+### 1. Get Your API Keys
 
 ```bash
-go get go.opentelemetry.io/otel \
-       go.opentelemetry.io/otel/sdk \
-       go.opentelemetry.io/otel/trace \
-       github.com/langwatch/langwatch/sdk-go
+# Required
+export LANGWATCH_API_KEY="your-langwatch-api-key"  # Get free at https://langwatch.ai
+export OPENAI_API_KEY="your-openai-api-key"        # For OpenAI examples
 ```
 
-### Using the LangWatch SDK
+### 2. Install
 
-Once OpenTelemetry is set up (see Appendix if you haven't done this yet), you can obtain a `LangWatchTracer`. This tracer is a wrapper around the standard OpenTelemetry tracer but ensures that started spans are `LangWatchSpan` instances, giving you access to specialized methods.
-
-```go
-import (
-	"context"
-	"go.opentelemetry.io/otel/trace"
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-)
-
-func main() {
-	// Setup OpenTelemetry
-
-	// Get a LangWatchTracer instance
-	// It's recommended to use a descriptive name for your tracer, such as the package path/name
-	tracer := langwatch.Tracer("github.com/my/package/main.main")
-
-	// Start a new span
-	ctx, span := tracer.Start(context.Background(), "myLlmOperation")
-	defer span.End() // Always remember to end your spans!
-
-	// span is a *langwatch.LangWatchSpan, it contains an enriched OpenTelemetry Span,
-	// with LangWatch-specific helper methods
-
-	// ... do your operation ...
-}
+```bash
+go get github.com/langwatch/langwatch/sdk-go
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/openai
 ```
 
-### Working with LangWatch Spans
+### 3. Add 3 Lines of Code
 
-The `LangWatchSpan` (from `span.go`) embeds the standard `go.opentelemetry.io/otel/trace.Span`, so you can use all the standard OpenTelemetry span methods. In addition, it provides several helper methods to easily set LangWatch-specific attributes. These attributes help LangWatch understand and display your LLM interactions more effectively.
-
-Here are the key methods provided by `LangWatchSpan`:
-
-- **`SetType(spanType SpanType)`**:
-    Sets the type of the span, which LangWatch uses for categorization and specialized processing. `SpanType` is an enum with predefined values like `SpanTypeLLM`, `SpanTypeChain`, `SpanTypeTool`, `SpanTypeAgent`, `SpanTypeRAG`, etc.
-    ```go
-    span.SetType(langwatch.SpanTypeLLM)
-    ```
-
-- **`RecordInput(input any)`**:
-    Records the input to the operation represented by the span. The input is marshalled to JSON.
-    ```go
-    userInput := map[string]string{"prompt": "Translate 'hello' to French."}
-    span.RecordInput(userInput)
-    ```
-
-- **`RecordInputString(input string)`**:
-    Records a raw string as input to the operation represented by the span.
-    ```go
-    userInputString := "Translate 'hello' to French."
-    span.RecordInputString(userInputString)
-    ```
-
-- **`RecordOutput(output any)`**:
-    Records the output of the operation. The output is marshalled to JSON.
-    ```go
-    llmResponse := map[string]string{"translation": "Bonjour"}
-    span.RecordOutput(llmResponse)
-    ```
-
-- **`RecordOutputString(output string)`**:
-    Records a raw string as output of the operation.
-    ```go
-    llmResponseString := "Bonjour"
-    span.RecordOutputString(llmResponseString)
-    ```
-
-- **`SetThreadID(threadID string)`**:
-    Sets the thread ID for the operation. This is used to group related spans together.
-    ```go
-    span.SetThreadID("thread_0123456789")
-    ```
-
-- **`SetRequestModel(model string)`**:
-    Sets the model name used for a request (e.g., "gpt-4", "claude-3-opus"). This uses the semantic convention key `gen_ai.request.model`.
-    ```go
-    span.SetRequestModel("gpt-4-turbo")
-    ```
-
-- **`SetResponseModel(model string)`**:
-    Sets the model name that generated the response. This uses the semantic convention key `gen_ai.response.model`.
-    ```go
-    span.SetResponseModel("gpt-4-turbo-2024-04-09")
-    ```
-
-- **`SetTimestamps(timestamps SpanTimestamps)`**:
-    Records fine-grained timestamps for the operation, such as when the first token was received. `SpanTimestamps` is a struct:
-    ```go
-    type SpanTimestamps struct {
-        StartedAtUnix    int64  `json:"started_at"`      // Unix timestamp (seconds or milliseconds)
-        FirstTokenAtUnix *int64 `json:"first_token_at"`  // Unix timestamp for first token
-        FinishedAtUnix   int64  `json:"finished_at"`     // Unix timestamp
-    }
-    ```
-    Example:
-    ```go
-    // Timestamps should be in Unix epoch (e.g., time.Now().UnixMilli())
-    // These are often set automatically by LangWatch if not provided,
-    // but can be set manually for more precise control or when
-    // integrating with systems that provide these timings.
-    // span.SetTimestamps(langwatch.SpanTimestamps{...})
-    ```
-
-- **`SetRAGContextChunks(contexts []SpanRAGContextChunk)`**:
-    Records the context chunks used in a Retrieval Augmented Generation (RAG) operation. `SpanRAGContextChunk` is a struct:
-    ```go
-    type SpanRAGContextChunk struct {
-        DocumentID string `json:"document_id"`
-        ChunkID    string `json:"chunk_id"`
-        Content    any    `json:"content"`
-    }
-    ```
-    Example:
-    ```go
-    chunks := []langwatch.SpanRAGContextChunk{
-        {DocumentID: "doc1", ChunkID: "chunkA", Content: "Some relevant text..."},
-        {DocumentID: "doc2", ChunkID: "chunkB", Content: "More relevant text..."},
-    }
-    span.SetRAGContextChunks(chunks)
-    ```
-
-- **`SetRAGContextChunk(context SpanRAGContextChunk)`**:
-    A convenience method to record a single RAG context chunk.
-    ```go
-    chunk := langwatch.SpanRAGContextChunk{DocumentID: "doc3", ChunkID: "chunkC", Content: "Another piece of context."}
-    span.SetRAGContextChunk(chunk)
-    ```
-
-## Appendix: Setting up OpenTelemetry for Tracing
-
-To use `langwatch`, you first need to set up the OpenTelemetry SDK in your application. This involves configuring a tracer provider and registering it globally. The tracer provider will be responsible for creating tracers and processing the spans they generate.
-
-Here's a minimal setup for tracing. You'll need to choose and configure an exporter that sends your trace data to your telemetry backend.
+Here's a complete example that instruments OpenAI API calls and sends traces to LangWatch:
 
 ```go
 package main
@@ -170,181 +32,391 @@ import (
 	"context"
 	"log"
 	"os"
-	"os/signal"
-
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace" // Example: stdout exporter
-	"go.opentelemetry.io/otel/sdk/resource"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
-)
-
-// newExporter creates a new trace exporter.
-// Replace this with your desired exporter (e.g., OTLP).
-func newExporter(ctx context.Context) (sdktrace.SpanExporter, error) {
-	return stdouttrace.New(stdouttrace.WithPrettyPrint())
-}
-
-// newTraceProvider creates a new tracer provider.
-func newTraceProvider(exp sdktrace.SpanExporter) *sdktrace.TracerProvider {
-	// Ensure default SDK resources and any custom resources are attributes on traces.
-	r, err := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceNameKey.String("your-llm-app-name"), // Set your service name
-		),
-	)
-
-	if err != nil {
-		panic(err)
-	}
-
-	return sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exp),
-		sdktrace.WithResource(r),
-	)
-}
-
-func main() {
-	ctx := context.Background()
-
-	// Configure the exporter
-	exporter, err := newExporter(ctx)
-	if err != nil {
-		log.Fatalf("failed to create exporter: %v", err)
-	}
-
-	// Create and register the TracerProvider
-	tp := newTraceProvider(exporter)
-	otel.SetTracerProvider(tp)
-
-	// Cleanly shutdown and flush telemetry when the application exits.
-	defer func() {
-		if err := tp.Shutdown(ctx); err != nil {
-			log.Fatalf("failed to shutdown TracerProvider: %v", err)
-		}
-	}()
-
-	// ... Your application code using LangWatch tracer will go here ...
-
-	log.Println("Application started. Tracing initialized.")
-
-	// ... Your application code using LangWatch tracer will go here ...
-}
-
-```
-
-**Note**: The example above uses a `stdouttrace` exporter, which prints traces to the console. For production, you should configure an OTLP exporter or another exporter suitable for your backend.
-
-For a comprehensive guide on setting up OpenTelemetry in Go, including different exporters, sampling, and other configurations, please refer to the official OpenTelemetry Go Getting Started guide: [https://opentelemetry.io/docs/languages/go/getting-started/](https://opentelemetry.io/docs/languages/go/getting-started/)
-
-### Full Example (with OpenTelemetry Setup)
-
-This example demonstrates initializing OpenTelemetry and then using the LangWatch SDK.
-
-```go
-package main
-
-import (
-	"context"
-	"log"
-	"os"
-	"os/signal"
-	"time"
 
 	langwatch "github.com/langwatch/langwatch/sdk-go"
+	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
 
+	"github.com/openai/openai-go"
+	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
-	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
-// (Re-use newExporter and newTraceProvider from the setup section above)
-func newExporter(ctx context.Context) (sdktrace.SpanExporter, error) {
-	return stdouttrace.New(stdouttrace.WithPrettyPrint())
-}
-
-func newTraceProvider(exp sdktrace.SpanExporter) *sdktrace.TracerProvider {
-	r, err := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceNameKey.String("example-llm-service"),
-		),
-	)
-	if err != nil {
-		panic(err)
-	}
-	return sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exp),
-		sdktrace.WithResource(r),
-	)
-}
-
-
 func main() {
 	ctx := context.Background()
+	
+	// 🔸 First - setup LangWatch tracing
+	setupLangWatch(ctx)
 
-	exporter, err := newExporter(ctx)
-	if err != nil {
-		log.Fatalf("failed to create exporter: %v", err)
-	}
-	tp := newTraceProvider(exporter)
-	otel.SetTracerProvider(tp)
-	defer func() {
-		if err := tp.Shutdown(ctx); err != nil {
-			log.Fatalf("failed to shutdown TracerProvider: %v", err)
-		}
-	}()
+	// 🔸 Second - add the middleware to your OpenAI client
+	client := openai.NewClient(
+		oaioption.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
+		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
+			otelopenai.WithCaptureInput(),
+			otelopenai.WithCaptureOutput(),
+		)),
+	)
 
-	// Get LangWatch Tracer
-	tracer := langwatch.Tracer("app.feature.translation", trace.WithInstrumentationVersion("v0.1.0"))
-
-	// Simulate an LLM operation
-	processTranslationRequest(ctx, tracer, "Hello")
-
-	log.Println("Application finished. Traces should be exported.")
-
-	// For demonstration, wait a bit for batch processor to export
-	time.Sleep(2 * time.Second)
-}
-
-func processTranslationRequest(ctx context.Context, tracer *langwatch.LangWatchTracer, textToTranslate string) {
-	var span *langwatch.LangWatchSpan
-	ctx, span = tracer.Start(ctx, "translateTextToFrench")
+	// 🔸 Optionally, create spans for your operations (recommended)
+	tracer := langwatch.Tracer("my-app", trace.WithInstrumentationVersion("v1.0.0"))
+	ctx, span := tracer.Start(ctx, "ChatWithUser")
 	defer span.End()
 
-	span.SetType(langwatch.SpanTypeLLM)
-	span.SetRequestModel("simulated-translation-model-v1")
-
-	// Record input
-	input := map[string]string{"text": textToTranslate, "target_language": "French"}
-	span.RecordInput(input)
-
-	// Simulate work & getting a response
-	time.Sleep(100 * time.Millisecond) // Simulate API call
-	translatedText := "Bonjour"       // Simulated LLM response
-	firstTokenTime := time.Now().UnixMilli() - 50 // Simulated timestamp
-
-	// Record output
-	output := map[string]string{"translation": translatedText}
-	span.RecordOutput(output)
-
-	// Record timestamps
-	span.SetTimestamps(langwatch.SpanTimestamps{
-		StartedAtUnix:    time.Now().Add(-100 * time.Millisecond).UnixMilli(), // Approximate
-		FirstTokenAtUnix: &firstTokenTime,
-		FinishedAtUnix:   time.Now().UnixMilli(),
+	// Nothing here has changed!
+	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: openai.ChatModelGPT4oMini,
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.SystemMessage("You are a helpful assistant."),
+			openai.UserMessage("Hello, OpenAI!"),
+		},
 	})
+	if err != nil {
+		log.Fatalf("Chat completion failed: %v", err)
+	}
 
-	span.SetAttribute("custom.annotation", "This was a successful translation")
-	log.Printf("Translated '%s' to '%s'\n", textToTranslate, translatedText)
+	// 🎉 View your traces at https://app.langwatch.ai
 }
 
+func setupLangWatch(ctx context.Context) {
+	exporter, err := otlptracehttp.New(ctx,
+		otlptracehttp.WithEndpointURL("https://app.langwatch.ai/api/otel/v1/traces"),
+		otlptracehttp.WithHeaders(map[string]string{
+			"Authorization": "Bearer " + os.Getenv("LANGWATCH_API_KEY"),
+		}),
+	)
+	if err != nil {
+		log.Fatalf("failed to create OTLP exporter: %v", err)
+	}
+
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+	otel.SetTracerProvider(tp)
+}
 ```
 
-This comprehensive example demonstrates initializing OpenTelemetry, getting a `LangWatchTracer`, starting a `LangWatchSpan`, and using its various methods to record detailed information about an LLM operation.
+**That's it!** 🎉 Your LLM interactions are now being traced and will appear in your [LangWatch dashboard](https://app.langwatch.ai).
+
+## OpenAI + Multi-Provider Support
+
+### Automatic OpenAI Instrumentation
+
+The OpenAI instrumentation automatically captures:
+
+- ✅ **All request parameters** - Model, temperature, max tokens, etc.
+- ✅ **Complete responses** - Token usage, finish reasons, response ID
+- ✅ **Streaming support** - Real-time capture of streaming responses
+- ✅ **Input/Output capture** - Full conversation context (when enabled)
+- ✅ **Performance metrics** - Latency, first token time, throughput
+
+### Works with Any OpenAI-Compatible Provider
+
+The same code works with multiple AI providers that support the OpenAI API specification:
+
+| Provider | What to Change | Example Model |
+|----------|---------------|---------------|
+| **OpenAI** | Nothing! | `gpt-4o-mini` |
+| **Anthropic** | Base URL + API key | `claude-3-5-sonnet-20241022` |
+| **Azure OpenAI** | Base URL + API key | `gpt-4` |
+| **OpenRouter** | Base URL + API key | `anthropic/claude-3.5-sonnet` |
+| **Local (Ollama)** | Base URL only | `llama3.1` |
+
+#### Example: Anthropic (Claude)
+
+```bash
+export ANTHROPIC_API_KEY="your-anthropic-api-key"
+```
+
+```go
+import (
+	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/option"
+	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	"go.opentelemetry.io/otel/semconv/v1.30.0"
+)
+
+client := openai.NewClient(
+	option.WithBaseURL("https://api.anthropic.com/v1"),
+	option.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")),
+	option.WithMiddleware(otelopenai.Middleware("my-app-anthropic",
+		otelopenai.WithCaptureInput(),
+		otelopenai.WithCaptureOutput(),
+		otelopenai.WithGenAISystem(semconv.GenAISystemKey.String("anthropic")),
+	)),
+)
+
+response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+	Model: openai.ChatModel("claude-3-5-sonnet-20241022"),
+	Messages: []openai.ChatCompletionMessageParamUnion{
+		openai.UserMessage("Hello, Claude!"),
+	},
+})
+```
+
+#### Example: Azure OpenAI
+
+```bash
+export AZURE_OPENAI_API_KEY="your-azure-openai-api-key"
+```
+
+```go
+client := openai.NewClient(
+	option.WithBaseURL("https://your-resource.openai.azure.com/openai/deployments/your-deployment"),
+	option.WithAPIKey(os.Getenv("AZURE_OPENAI_API_KEY")),
+	option.WithMiddleware(otelopenai.Middleware("my-app-azure",
+		otelopenai.WithCaptureInput(),
+		otelopenai.WithCaptureOutput(),
+		otelopenai.WithGenAISystem(semconv.GenAISystemKey.String("azure.openai")),
+	)),
+)
+```
+
+#### Example: Local Models (Ollama)
+
+```go
+client := openai.NewClient(
+	option.WithBaseURL("http://localhost:11434/v1"),
+	option.WithAPIKey("not-needed"), // Ollama doesn't require API key
+	option.WithMiddleware(otelopenai.Middleware("my-app-local",
+		otelopenai.WithCaptureInput(),
+		otelopenai.WithCaptureOutput(),
+		otelopenai.WithGenAISystem(semconv.GenAISystemKey.String("ollama")),
+	)),
+)
+```
+
+## Examples & Use Cases
+
+Explore real working examples in the [`examples/`](./examples/) directory:
+
+| Example | What It Shows | Run It |
+|---------|---------------|---------|
+| **[`simple/`](./examples/simple/)** | Basic OpenAI instrumentation | `go run cmd/main.go run-example simple` |
+| **[`custom-input-output/`](./examples/custom-input-output/)** | Recording custom data | `go run cmd/main.go run-example custom-input-output` |
+| **[`streaming/`](./examples/streaming/)** | Streaming completions | `go run cmd/main.go run-example streaming` |
+| **[`threads/`](./examples/threads/)** | Grouping conversations | `go run cmd/main.go run-example threads` |
+| **[`filtered-spans/`](./examples/filtered-spans/)** | Filtering what gets traced | `go run cmd/main.go run-example filtered-spans` |
+
+Run all examples:
+```bash
+cd examples/
+go run cmd/main.go run-examples
+```
+
+## Features
+
+* 🔗 **Seamless OpenTelemetry integration** - Works with your existing OTel setup
+* 🚀 **OpenAI instrumentation** - Automatic tracing for OpenAI API calls
+* 🌐 **Multi-provider support** - OpenAI, Anthropic, Azure, local models, and more
+* 📊 **Rich LLM telemetry** - Capture inputs, outputs, token usage, and model information  
+* 🔍 **Specialized span types** - LLM, Chain, Tool, Agent, RAG, and more
+* 🧵 **Thread support** - Group related LLM interactions together
+* 📝 **Custom input/output recording** - Fine-grained control over what's captured
+* 🔄 **Streaming support** - Real-time capture of streaming responses
+* 🎯 **Zero-config setup** - Works out of the box with minimal setup
+
+## Core Concepts
+
+### LangWatch Tracer
+
+The `LangWatchTracer` wraps OpenTelemetry tracers to provide LangWatch-specific functionality:
+
+```go
+import langwatch "github.com/langwatch/langwatch/sdk-go"
+
+tracer := langwatch.Tracer("my-service")
+ctx, span := tracer.Start(context.Background(), "my-operation")
+defer span.End()
+```
+
+### LangWatch Spans
+
+`LangWatchSpan` embeds the standard OpenTelemetry span with additional helper methods:
+
+```go
+// Set span type for LangWatch categorization
+span.SetType(langwatch.SpanTypeLLM)
+
+// Record input and output
+span.RecordInputString("What is the capital of France?")
+span.RecordOutputString("The capital of France is Paris.")
+
+// Set model information
+span.SetRequestModel("gpt-4-turbo")
+span.SetResponseModel("gpt-4-turbo-2024-04-09")
+
+// Group related spans
+span.SetThreadID("conversation-123")
+```
+
+### Span Types
+
+LangWatch categorizes spans to provide specialized processing and visualization:
+
+```go
+langwatch.SpanTypeLLM      // LLM API calls
+langwatch.SpanTypeChain    // Chain of operations
+langwatch.SpanTypeTool     // Tool/function calls
+langwatch.SpanTypeAgent    // Agent operations
+langwatch.SpanTypeRAG      // Retrieval Augmented Generation
+langwatch.SpanTypeQuery    // Database queries
+langwatch.SpanTypeRetrieval // Document retrieval
+```
+
+## Advanced Features
+
+### Recording Custom Input/Output
+
+For fine-grained control over what's captured:
+
+```go
+// Record custom user input
+userMessage := "What's the weather like?"
+span.RecordInputString(userMessage)
+
+// Make your LLM call here...
+
+// Record the response you want to show in LangWatch
+span.RecordOutputString(response.Choices[0].Message.Content)
+```
+
+### Recording RAG Context
+
+For Retrieval Augmented Generation operations:
+
+```go
+chunks := []langwatch.SpanRAGContextChunk{
+	{DocumentID: "doc1", ChunkID: "chunk1", Content: "Relevant context..."},
+	{DocumentID: "doc2", ChunkID: "chunk2", Content: "More context..."},
+}
+span.SetRAGContextChunks(chunks)
+```
+
+### Custom Timestamps
+
+Record precise timing information:
+
+```go
+span.SetTimestamps(langwatch.SpanTimestamps{
+	StartedAtUnix:    startTime.UnixMilli(),
+	FirstTokenAtUnix: &firstTokenTime.UnixMilli(),
+	FinishedAtUnix:   endTime.UnixMilli(),
+})
+```
+
+### Thread Management
+
+Group related interactions into conversations:
+
+```go
+threadID := "user-session-123"
+span.SetThreadID(threadID)
+```
+
+## API Reference
+
+The `LangWatchSpan` embeds the standard `go.opentelemetry.io/otel/trace.Span`, so you can use all standard OpenTelemetry span methods. In addition, it provides these LangWatch-specific helper methods:
+
+### Input/Output Recording
+
+- **`RecordInput(input any)`** - Records structured input (JSON-serialized)
+- **`RecordInputString(input string)`** - Records raw string input  
+- **`RecordOutput(output any)`** - Records structured output (JSON-serialized)
+- **`RecordOutputString(output string)`** - Records raw string output
+
+### Model Information
+
+- **`SetRequestModel(model string)`** - Model used for request (e.g., "gpt-4-turbo")
+- **`SetResponseModel(model string)`** - Model that generated response
+
+### Categorization
+
+- **`SetType(spanType SpanType)`** - Span type for LangWatch processing
+- **`SetThreadID(threadID string)`** - Groups related spans together
+
+### Advanced Features
+
+- **`SetTimestamps(timestamps SpanTimestamps)`** - Fine-grained timing information
+- **`SetRAGContextChunks(contexts []SpanRAGContextChunk)`** - RAG context chunks
+- **`SetRAGContextChunk(context SpanRAGContextChunk)`** - Single RAG chunk
+
+## Configuration Options
+
+### OpenAI Middleware Options
+
+```go
+client := openai.NewClient(
+	oaioption.WithAPIKey(apiKey),
+	oaioption.WithMiddleware(otelopenai.Middleware("my-app",
+		// Capture full input/output (be mindful of sensitive data)
+		otelopenai.WithCaptureInput(),
+		otelopenai.WithCaptureOutput(),
+		
+		// For OpenAI-compatible APIs (Azure, etc.)
+		// otelopenai.WithGenAISystem(semconv.GenAISystemKey.String("azure.openai")),
+		
+		// Custom tracer provider  
+		// otelopenai.WithTracerProvider(customProvider),
+	)),
+)
+```
+
+### Environment Variables
+
+```bash
+# Required for LangWatch
+export LANGWATCH_API_KEY="your-langwatch-api-key"
+
+# Required for OpenAI examples  
+export OPENAI_API_KEY="your-openai-api-key"
+
+# For Anthropic (when using OpenAI-compatible API)
+export ANTHROPIC_API_KEY="your-anthropic-api-key"
+
+# For Azure OpenAI
+export AZURE_OPENAI_API_KEY="your-azure-openai-api-key"
+```
+
+## Manual OpenTelemetry Setup
+
+If you prefer to set up OpenTelemetry manually or need more control:
+
+```go
+import (
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+)
+
+func setupLangWatch(ctx context.Context, apiKey string) func() {
+	exporter, err := otlptracehttp.New(ctx,
+		otlptracehttp.WithEndpointURL("https://app.langwatch.ai/api/otel/v1/traces"),
+		otlptracehttp.WithHeaders(map[string]string{
+			"Authorization": "Bearer " + apiKey,
+		}),
+	)
+	if err != nil {
+		log.Fatalf("failed to create OTLP exporter: %v", err)
+	}
+
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+	otel.SetTracerProvider(tp)
+
+	// Return cleanup function
+	return func() {
+		if err := tp.Shutdown(ctx); err != nil {
+			log.Printf("Error shutting down tracer provider: %v", err)
+		}
+	}
+}
+```
+
+For other backends or more complex setups, see the [OpenTelemetry Go documentation](https://opentelemetry.io/docs/languages/go/getting-started/).
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guide](../CONTRIBUTING.md) for details.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
