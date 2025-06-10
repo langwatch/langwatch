@@ -35,7 +35,18 @@ export class ScenarioRunnerService {
   }: {
     scenarioRunId: string;
     projectId: string;
-  }) {
+  }): Promise<ScenarioRunData | null> {
+    // Get run started event using dedicated repository method
+    const runStartedEvent =
+      await this.eventRepository.getRunStartedEventByScenarioRunId({
+        projectId,
+        scenarioRunId,
+      });
+
+    if (!runStartedEvent) {
+      return null;
+    }
+
     // Get latest message snapshot event using dedicated repository method
     const latestMessageEvent =
       await this.eventRepository.getLatestMessageSnapshotEventByScenarioRunId({
@@ -61,7 +72,9 @@ export class ScenarioRunnerService {
       status: latestRunFinishedEvent?.status || ScenarioRunStatus.IN_PROGRESS,
       results: latestRunFinishedEvent?.results || null,
       messages: latestMessageEvent.messages || [],
-      timestamp: latestMessageEvent.timestamp,
+      timestamp: latestMessageEvent.timestamp || 0,
+      name: runStartedEvent?.metadata?.name || null,
+      description: runStartedEvent?.metadata?.description || null,
     };
   }
 
@@ -186,5 +199,43 @@ export class ScenarioRunnerService {
     return await this.eventRepository.getScenarioSetsDataForProject({
       projectId,
     });
+  }
+
+  // Get batch run data for a scenario set
+  // TODO: This is a temporary solution as it's making a lot of queries to the database.
+  async getBatchRunDataForScenarioSet({
+    projectId,
+    scenarioSetId,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+  }) {
+    // 1. Get batch run IDs
+    const batchRunIds = await this.eventRepository.getBatchRunIdsForScenarioSet(
+      {
+        projectId,
+        scenarioSetId,
+      }
+    );
+
+    if (batchRunIds.length === 0) return [];
+
+    // 2. Get scenario run IDs
+    const scenarioRunIds =
+      await this.eventRepository.getScenarioRunIdsForBatchRuns({
+        projectId,
+        batchRunIds,
+      });
+
+    if (scenarioRunIds.length === 0) return [];
+
+    // 3. Get and compose the data using existing service method
+    const runs = await Promise.all(
+      scenarioRunIds.map((id) =>
+        this.getScenarioRunData({ projectId, scenarioRunId: id })
+      )
+    );
+
+    return runs.filter(Boolean) as ScenarioRunData[];
   }
 }

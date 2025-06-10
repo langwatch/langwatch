@@ -20,6 +20,7 @@ export const useSimulationRouter = () => {
   return {
     ...router,
     slug: router.query.slug?.toString(),
+    scenarioSetId: router.query.scenarioSetId?.toString(),
     goToSimulationRun,
     goToSimulationBatch,
     goToSimulationSets,

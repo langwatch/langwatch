@@ -20,6 +20,8 @@ export const runDataSchema = z.object({
   scenarioId: scenarioIdSchema,
   batchRunId: batchRunIdSchema,
   scenarioRunId: scenarioRunIdSchema,
+  name: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
   status: z.nativeEnum(ScenarioRunStatus),
   results: scenarioResultsSchema.optional().nullable(),
   messages: scenarioMessageSnapshotSchema.shape.messages,

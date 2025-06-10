@@ -6,6 +6,8 @@ import type {
   ScenarioRunFinishedEvent,
   ScenarioBatch,
   ScenarioSetData,
+  ScenarioRunData,
+  ScenarioRunStartedEvent,
 } from "./types";
 import { Client as ElasticClient } from "@elastic/elasticsearch";
 import { z } from "zod";
@@ -468,6 +470,126 @@ export class ScenarioEventRepository {
         lastRunAt: bucket.latest_run_timestamp.value,
       };
     });
+  }
+
+  async getBatchRunIdsForScenarioSet({
+    projectId,
+    scenarioSetId,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+  }): Promise<string[]> {
+    const client = await this.getClient();
+
+    const response = await client.search({
+      index: this.indexName,
+      body: {
+        query: {
+          bool: {
+            must: [
+              { term: { projectId } },
+              { term: { scenarioSetId } },
+              { exists: { field: "batchRunId" } },
+            ],
+          },
+        },
+        aggs: {
+          unique_batch_runs: {
+            terms: {
+              field: "batchRunId",
+              size: 10000,
+            },
+          },
+        },
+        size: 0,
+      },
+    });
+
+    return (
+      (
+        response.aggregations?.unique_batch_runs as {
+          buckets: Array<{ key: string }>;
+        }
+      )?.buckets ?? []
+    ).map((bucket) => bucket.key);
+  }
+
+  async getScenarioRunIdsForBatchRuns({
+    projectId,
+    batchRunIds,
+  }: {
+    projectId: string;
+    batchRunIds: string[];
+  }): Promise<string[]> {
+    if (batchRunIds.length === 0) {
+      return [];
+    }
+
+    const client = await this.getClient();
+
+    const response = await client.search({
+      index: this.indexName,
+      body: {
+        query: {
+          bool: {
+            must: [
+              { term: { projectId } },
+              { terms: { batchRunId: batchRunIds } },
+              { exists: { field: "scenarioRunId" } },
+            ],
+          },
+        },
+        aggs: {
+          unique_scenario_runs: {
+            terms: {
+              field: "scenarioRunId",
+              size: 10000,
+            },
+          },
+        },
+        size: 0,
+      },
+    });
+
+    return (
+      (
+        response.aggregations?.unique_scenario_runs as {
+          buckets: Array<{ key: string }>;
+        }
+      )?.buckets ?? []
+    ).map((bucket) => bucket.key);
+  }
+
+  async getRunStartedEventByScenarioRunId({
+    projectId,
+    scenarioRunId,
+  }: {
+    projectId: string;
+    scenarioRunId: string;
+  }): Promise<ScenarioRunStartedEvent | undefined> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const validatedScenarioRunId = scenarioRunIdSchema.parse(scenarioRunId);
+
+    const client = await this.getClient();
+
+    const response = await client.search({
+      index: this.indexName,
+      body: {
+        query: {
+          bool: {
+            must: [
+              { term: { projectId: validatedProjectId } },
+              { term: { scenarioRunId: validatedScenarioRunId } },
+              { term: { type: ScenarioEventType.RUN_STARTED } },
+            ],
+          },
+        },
+        sort: [{ timestamp: "desc" }],
+        size: 1,
+      },
+    });
+
+    return response.hits.hits[0]?._source as ScenarioRunStartedEvent;
   }
 
   /**
