@@ -29,7 +29,10 @@ from langwatch_nlp.studio.utils import (
     disable_dsp_caching,
     optional_langwatch_trace,
     transpose_inline_dataset_to_object_list,
+    get_dataset_entry_selection,
 )
+
+import langwatch
 
 
 async def execute_flow(
@@ -81,9 +84,7 @@ async def execute_flow(
 
             entry_node = cast(
                 EntryNode,
-                next(
-                    node for node in workflow.nodes if isinstance(node.data, Entry)
-                ),
+                next(node for node in workflow.nodes if isinstance(node.data, Entry)),
             )
             if not entry_node.data.dataset:
                 raise ValueError("Missing dataset in entry node")
@@ -125,7 +126,6 @@ async def execute_flow(
     # cost = result.cost if hasattr(result, "cost") else None
 
     yield end_workflow_event(workflow, trace_id, result)
-
 
 
 def start_workflow_event(workflow: Workflow, trace_id: str):
