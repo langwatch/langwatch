@@ -771,15 +771,19 @@ const addOpenTelemetrySpanAsSpan = (
       const eventAttributes = otelAttributesToNestedAttributes(
         event?.attributes
       );
+
+      let errorMessage: string;
+      if (eventAttributes.exception?.message && eventAttributes.exception?.type) {
+        errorMessage = `${eventAttributes.exception.type}: ${eventAttributes.exception.message}`;
+      } else if (otelSpan.status?.message) {
+        errorMessage = otelSpan.status.message;
+      } else {
+        errorMessage = "Unknown Exception Occurred";
+      }
+
       error = {
         has_error: true,
-        message:
-          eventAttributes.exception?.message && eventAttributes.exception?.type
-            ? `${eventAttributes.exception.type}: ${eventAttributes.exception.message}`
-            : eventAttributes.exception?.message &&
-              eventAttributes.exception?.type
-            ? `${eventAttributes.exception.type}: ${eventAttributes.exception.message}`
-            : otelSpan.status?.message ?? "Exception",
+        message: errorMessage,
         stacktrace: eventAttributes.exception?.stacktrace
           ? (eventAttributes.exception?.stacktrace as string).split("\n")
           : [],

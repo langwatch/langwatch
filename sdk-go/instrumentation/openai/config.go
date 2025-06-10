@@ -1,6 +1,7 @@
-package otelopenai
+package openai
 
 import (
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
@@ -13,6 +14,7 @@ type config struct {
 	traceSampledResponseHeaderKey string
 	recordInput                   bool
 	recordOutput                  bool
+	genAISystem                   attribute.KeyValue
 }
 
 // Option specifies instrumentation configuration options.
@@ -59,5 +61,13 @@ func WithCaptureInput() Option {
 func WithCaptureOutput() Option {
 	return optionFunc(func(c *config) {
 		c.recordOutput = true
+	})
+}
+
+// WithGenAISystem sets the gen_ai.system attribute on the span. By
+// default, it is set to "openai".
+func WithGenAISystem(system attribute.KeyValue) Option {
+	return optionFunc(func(c *config) {
+		c.genAISystem = system
 	})
 }

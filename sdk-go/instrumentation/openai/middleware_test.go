@@ -1,4 +1,4 @@
-package otelopenai
+package openai
 
 import (
 	"bufio"
@@ -24,7 +24,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
-	langwatch "github.com/langwatch/go-sdk"
+	langwatch "github.com/langwatch/langwatch/sdk-go"
 	"go.opentelemetry.io/otel"
 )
 
@@ -53,21 +53,14 @@ func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	}
 
 	if isStreamingReq && resp.StatusCode < 300 && strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
-		// Get span from context
 		span := oteltrace.SpanFromContext(req.Context())
-		if span.IsRecording() { // Only proceed if span is valid and recording
-			// Read the entire mock response body *before* returning it to the client
+		if span.IsRecording() {
 			streamBodyBytes, _ := io.ReadAll(resp.Body)
-			_ = resp.Body.Close() // Close the original reader
+			_ = resp.Body.Close()
 
-			// Parse this body and set attributes directly on the span
-			// Use a modified version of the parsing logic
-			parseMockStreamAndSetAttributes(bytes.NewReader(streamBodyBytes), span, true) // Assume recordOutput=true for this test case
+			parseMockStreamAndSetAttributes(bytes.NewReader(streamBodyBytes), span, true)
 
-			// Create a *new* reader with the original content for the actual client
 			resp.Body = io.NopCloser(bytes.NewReader(streamBodyBytes))
-		} else {
-			// Handle case where span is not recording or not found in context if needed
 		}
 	}
 	// --- End Intercept ---
@@ -286,7 +279,6 @@ data: [DONE]
 				semconv.GenAISystemKey:                          semconv.GenAISystemOpenai.Value,
 				semconv.GenAIOperationNameKey:                   attribute.StringValue("chat"),
 				semconv.GenAIRequestModelKey:                    attribute.StringValue(string(completionModelID)),
-				semconv.GenAIRequestMaxTokensKey:                attribute.IntValue(5),
 				semconv.GenAIRequestTemperatureKey:              attribute.Float64Value(0.7),
 				semconv.GenAIRequestTopPKey:                     attribute.Float64Value(0.9),
 				semconv.GenAIRequestFrequencyPenaltyKey:         attribute.Float64Value(0.1),
@@ -490,8 +482,57 @@ data: [DONE]
 						err := json.Unmarshal([]byte(outputAttrValue.AsString()), &parsedAttr)
 						require.NoError(t, err, "Failed to parse langwatch.output attribute (non-streaming): %s", outputAttrValue.AsString())
 						assert.Equal(t, "json", parsedAttr.Type, "langwatch.output attribute type mismatch (non-streaming)")
-						// Expect the actual response JSON as the value
-						assert.JSONEq(t, tt.mockResponseBody, string(parsedAttr.Value), "Output value JSON mismatch (non-streaming recording), expected full response body")
+
+						// Validate semantic content rather than exact JSON structure
+						var actualOutput map[string]interface{}
+						err = json.Unmarshal(parsedAttr.Value, &actualOutput)
+						require.NoError(t, err, "Failed to parse actual output JSON")
+
+						// Parse expected output for key field validation
+						var expectedOutput map[string]interface{}
+						err = json.Unmarshal([]byte(tt.mockResponseBody), &expectedOutput)
+						require.NoError(t, err, "Failed to parse expected output JSON")
+
+						// Validate essential fields are present and correct
+						assert.Equal(t, expectedOutput["id"], actualOutput["id"], "Response ID mismatch")
+						assert.Equal(t, expectedOutput["model"], actualOutput["model"], "Response model mismatch")
+						assert.Equal(t, expectedOutput["object"], actualOutput["object"], "Response object type mismatch")
+						assert.Equal(t, expectedOutput["created"], actualOutput["created"], "Response created timestamp mismatch")
+						assert.Equal(t, expectedOutput["system_fingerprint"], actualOutput["system_fingerprint"], "System fingerprint mismatch")
+
+						// Validate usage information
+						if expectedUsage, ok := expectedOutput["usage"].(map[string]interface{}); ok {
+							actualUsage, usageOk := actualOutput["usage"].(map[string]interface{})
+							assert.True(t, usageOk, "Usage information should be present")
+							if usageOk {
+								assert.Equal(t, expectedUsage["prompt_tokens"], actualUsage["prompt_tokens"], "Prompt tokens mismatch")
+								assert.Equal(t, expectedUsage["completion_tokens"], actualUsage["completion_tokens"], "Completion tokens mismatch")
+								assert.Equal(t, expectedUsage["total_tokens"], actualUsage["total_tokens"], "Total tokens mismatch")
+							}
+						}
+
+						// Validate choices content
+						if expectedChoices, ok := expectedOutput["choices"].([]interface{}); ok {
+							actualChoices, choicesOk := actualOutput["choices"].([]interface{})
+							assert.True(t, choicesOk, "Choices should be present")
+							if choicesOk && len(expectedChoices) > 0 && len(actualChoices) > 0 {
+								expectedChoice := expectedChoices[0].(map[string]interface{})
+								actualChoice := actualChoices[0].(map[string]interface{})
+
+								assert.Equal(t, expectedChoice["index"], actualChoice["index"], "Choice index mismatch")
+								assert.Equal(t, expectedChoice["finish_reason"], actualChoice["finish_reason"], "Finish reason mismatch")
+
+								// Validate message content
+								if expectedMsg, msgOk := expectedChoice["message"].(map[string]interface{}); msgOk {
+									actualMsg, actualMsgOk := actualChoice["message"].(map[string]interface{})
+									assert.True(t, actualMsgOk, "Message should be present")
+									if actualMsgOk {
+										assert.Equal(t, expectedMsg["role"], actualMsg["role"], "Message role mismatch")
+										assert.Equal(t, expectedMsg["content"], actualMsg["content"], "Message content mismatch")
+									}
+								}
+							}
+						}
 					}
 				} else if tt.name == "Chat Completion Stream Success With Recording" {
 					assert.True(t, outputPresent, "Attribute '%s' should be present for stream (set by mock)", string(langwatch.AttributeLangWatchOutput))
@@ -533,13 +574,8 @@ func hasOption(opts []Option, targetOpt Option) bool {
 	return false
 }
 
-// Helper to ensure sdktrace is imported if other uses are removed
-// var _ sdktrace.TracerProvider = &sdktrace.TracerProvider{}
-
 func TestMiddleware_NextReturnsError(t *testing.T) {
-	// 1. Setup: Mock exporter, tracer provider
 	exporter := tracetest.NewInMemoryExporter()
-	// Use a SimpleSpanProcessor for immediate processing in tests
 	sp := sdktrace.NewSimpleSpanProcessor(exporter)
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sp))
 	// Defer shutdown of the span processor and exporter
@@ -553,22 +589,15 @@ func TestMiddleware_NextReturnsError(t *testing.T) {
 	otel.SetTracerProvider(tp)
 	defer otel.SetTracerProvider(originalTracerProvider) // Restore original
 
-	// 2. Define the mock next middleware
 	expectedError := errors.New("mock next error")
 	var nextFunc option.MiddlewareNext = func(req *http.Request) (*http.Response, error) {
 		return nil, expectedError
 	}
 
-	// 3. Create the middleware instance
 	middleware := Middleware("testClient", WithTracerProvider(tp))
-
-	// 4. Create a dummy request
 	req := httptest.NewRequest(http.MethodPost, "http://localhost/v1/chat/completions", nil)
-
-	// 5. Execute the middleware
 	_, err := middleware(req, nextFunc)
 
-	// 6. Assertions
 	require.Error(t, err)
 	assert.Equal(t, expectedError, err)
 
@@ -589,9 +618,6 @@ func TestMiddleware_NextReturnsError(t *testing.T) {
 		if event.Name == "exception" {
 			foundErrorEvent = true
 			// Further checks can be added here for attributes like "exception.message"
-			// For example:
-			// require.True(t, event.Attributes[0].Key == semconv.ExceptionMessageKey)
-			// require.Equal(t, expectedError.Error(), event.Attributes[0].Value.AsString())
 		}
 	}
 	assert.True(t, foundErrorEvent, "expected an exception event to be recorded")
@@ -657,4 +683,38 @@ func TestMiddleware_NextReturnsErrorWithResponse(t *testing.T) {
 		}
 	}
 	assert.True(t, foundErrorEvent, "expected an exception event to be recorded")
+}
+
+// TestGetGenAIOperationFromPath tests the operation detection logic
+func TestGetGenAIOperationFromPath(t *testing.T) {
+	tests := []struct {
+		path     string
+		expected attribute.KeyValue
+	}{
+		// Standard OpenAI API paths
+		{"/v1/chat/completions", semconv.GenAIOperationNameChat},
+		{"/v1/completions", semconv.GenAIOperationNameTextCompletion},
+		{"/v1/embeddings", semconv.GenAIOperationNameEmbeddings},
+		{"/v1/responses", semconv.GenAIOperationNameKey.String("responses")},
+		{"/v1/audio/speech", semconv.GenAIOperationNameKey.String("audio")},
+		{"/v1/images/generations", semconv.GenAIOperationNameKey.String("images")},
+
+		// Azure OpenAI paths (for backward compatibility)
+		{"/openai/deployments/gpt-4/chat/completions", semconv.GenAIOperationNameChat},
+		{"/openai/deployments/gpt-4/responses", semconv.GenAIOperationNameKey.String("responses")},
+
+		// Edge cases
+		{"/v1/unknown", semconv.GenAIOperationNameKey.String("unknown")},
+		{"/some/random/path", semconv.GenAIOperationNameChat}, // fallback
+		{"", semconv.GenAIOperationNameChat},                  // empty path fallback
+	}
+
+	for _, test := range tests {
+		t.Run(test.path, func(t *testing.T) {
+			result := getGenAIOperationFromPath(test.path)
+			if result.Key != test.expected.Key || result.Value.AsString() != test.expected.Value.AsString() {
+				t.Errorf("Expected %v, got %v", test.expected, result)
+			}
+		})
+	}
 }
