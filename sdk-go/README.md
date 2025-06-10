@@ -1,6 +1,6 @@
 # LangWatch Go SDK
 
-The Go SDK for tracing and evaluating LLM applications using [LangWatch](https://langwatch.ai).
+The Go SDK for tracing LLM applications using [LangWatch](https://langwatch.ai).
 
 **Get complete visibility into your LLM applications** - Automatically capture requests, responses, token usage, costs, and performance metrics from OpenAI, Anthropic, and other providers.
 
@@ -208,7 +208,7 @@ go run cmd/main.go run-examples
 * 🔗 **Seamless OpenTelemetry integration** - Works with your existing OTel setup
 * 🚀 **OpenAI instrumentation** - Automatic tracing for OpenAI API calls
 * 🌐 **Multi-provider support** - OpenAI, Anthropic, Azure, local models, and more
-* 📊 **Rich LLM telemetry** - Capture inputs, outputs, token usage, and model information  
+* 📊 **Rich LLM telemetry** - Capture inputs, outputs, token usage, and model information
 * 🔍 **Specialized span types** - LLM, Chain, Tool, Agent, RAG, and more
 * 🧵 **Thread support** - Group related LLM interactions together
 * 📝 **Custom input/output recording** - Fine-grained control over what's captured
