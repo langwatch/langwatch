@@ -2,9 +2,6 @@
 
 The Go SDK for tracing and evaluating LLM applications using [LangWatch](https://langwatch.ai).
 
-> [!WARNING]  
-> The LangWatch Go SDK is split into two parts. The Core SDK, and the OpenAI instrumentor. The Core Go SDK is still early in development and not ready for production use, but the OpenAI instrumentor is ready for production use. Read it's [readme](./instrumentation/otelopenai/README.md) for more information.
-
 ## Features
 
 * Seamless integration with OpenTelemetry.
@@ -16,7 +13,7 @@ The Go SDK for tracing and evaluating LLM applications using [LangWatch](https:/
 
 ### Prerequisites
 
-* Go (version 1.18 or later recommended)
+* Go (version 1.20 or later recommended)
 * An OpenTelemetry-compatible backend to send your traces to, such as [LangWatch](https://langwatch.ai) or [Grafana ](https://grafana.com/)
 
 ### Installation
