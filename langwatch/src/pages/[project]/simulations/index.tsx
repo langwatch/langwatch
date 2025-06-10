@@ -2,8 +2,8 @@ import { Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { BatchCard } from "~/components/simulations";
-import { BatchesTable, ViewToggle, ViewMode } from "~/components/simulations";
+import { SetCard } from "~/components/simulations";
+import { ViewToggle, ViewMode } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -25,9 +25,9 @@ export default function SimulationsPage() {
     }
   );
 
-  const handleBatchClick = (batchRunId: string) => {
-    // Navigate to the specific batch page using the catch-all route
-    void router.push(`${router.asPath}/${batchRunId}`);
+  const handleSetClick = (scenarioSetId: string) => {
+    // Navigate to the specific set page using the catch-all route
+    void router.push(`${router.asPath}/${scenarioSetId}`);
   };
 
   return (
@@ -40,10 +40,6 @@ export default function SimulationsPage() {
         <PageLayout.Header>
           <HStack justify="space-between" align="center" w="full">
             <PageLayout.Heading>Simulation Sets</PageLayout.Heading>
-            {/* Only show view toggle when we have batches */}
-            {batches && batches.length > 0 && (
-              <ViewToggle currentView={viewMode} onViewChange={setViewMode} />
-            )}
           </HStack>
         </PageLayout.Header>
 
@@ -65,45 +61,34 @@ export default function SimulationsPage() {
         )}
 
         {/* Show empty state when no batches */}
-        {!isLoading && !error && (!batches || batches.length === 0) && (
-          <VStack gap={4} align="center" py={8}>
-            <Text fontSize="lg" color="gray.600">
-              No simulation batches found
-            </Text>
-            <Text fontSize="sm" color="gray.500">
-              Start creating simulations to see them here
-            </Text>
-          </VStack>
-        )}
+        {!isLoading &&
+          !error &&
+          (!scenarioSetsData || scenarioSetsData.length === 0) && (
+            <VStack gap={4} align="center" py={8}>
+              <Text fontSize="lg" color="gray.600">
+                No simulation batches found
+              </Text>
+              <Text fontSize="sm" color="gray.500">
+                Start creating simulations to see them here
+              </Text>
+            </VStack>
+          )}
 
         {/* Render based on view mode */}
-        {batches && batches.length > 0 && (
-          <>
-            {viewMode === ViewMode.Grid && (
-              <Grid
-                templateColumns="repeat(auto-fit, minmax(300px, 1fr))"
-                gap={6}
-                width="full"
-              >
-                {batches.map((batch, index) => (
-                  <BatchCard
-                    key={batch.batchRunId}
-                    title={`Batch #${index + 1}`}
-                    scenarioCount={batch.scenarioCount}
-                    successRate={batch.successRate}
-                    lastRunAt={
-                      batch.lastRunAt ? new Date(batch.lastRunAt) : null
-                    }
-                    onClick={() => handleBatchClick(batch.batchRunId)}
-                  />
-                ))}
-              </Grid>
-            )}
-
-            {viewMode === ViewMode.Table && (
-              <BatchesTable batches={batches} onBatchClick={handleBatchClick} />
-            )}
-          </>
+        {scenarioSetsData && scenarioSetsData.length > 0 && (
+          <Grid
+            templateColumns="repeat(auto-fit, minmax(300px, 1fr))"
+            gap={6}
+            width="full"
+          >
+            {scenarioSetsData.map((setData) => (
+              <SetCard
+                {...setData}
+                key={setData.scenarioSetId}
+                onClick={() => handleSetClick(setData.scenarioSetId)}
+              />
+            ))}
+          </Grid>
         )}
       </PageLayout.Container>
     </DashboardLayout>

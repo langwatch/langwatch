@@ -9,15 +9,23 @@ import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
 const baseScenarioEventMapping = {
   type: { type: "keyword" },
   timestamp: { type: "date" },
+  rawEvent: { type: "object" }, // Added from base schema
   projectId: { type: "keyword" },
   scenarioId: { type: "keyword" },
   scenarioRunId: { type: "keyword" },
   batchRunId: { type: "keyword" },
+  scenarioSetId: { type: "keyword" }, // Added from base scenario event schema
 };
 
 // Scenario Run Started Event mapping
 const runStartedMapping = {
-  // No additional fields beyond base mapping
+  metadata: {
+    type: "object",
+    properties: {
+      name: { type: "text" },
+      description: { type: "text" },
+    },
+  },
 };
 
 // Scenario Run Finished Event mapping

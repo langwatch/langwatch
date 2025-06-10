@@ -19,3 +19,9 @@ export type ScenarioMessageSnapshotEvent = z.infer<
 export type ScenarioEvent = z.infer<typeof scenarioEventSchema>;
 export type ScenarioBatch = z.infer<typeof scenarioBatchSchema>;
 export type ScenarioRunData = z.infer<typeof runDataSchema>;
+
+export type ScenarioSetData = {
+  scenarioSetId: string;
+  scenarioCount: number;
+  lastRunAt: number;
+};
