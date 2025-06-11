@@ -8,3 +8,4 @@ export * from "./SetRunHistorySidebar";
 export * from "./SimulationConsole";
 export * from "./SimulationChatWrapper";
 export * from "./SimulationChatFadeOverlay";
+export * from "./SimulationLayout";
