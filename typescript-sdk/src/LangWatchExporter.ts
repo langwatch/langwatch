@@ -2,8 +2,10 @@ import {
   type ReadableSpan,
   type SpanExporter,
 } from "@opentelemetry/sdk-trace-base";
-import { createExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
-
+import {
+  JsonTraceSerializer,
+  type ISerializer,
+} from "@opentelemetry/otlp-transformer";
 import { type ExportResult, ExportResultCode } from "@opentelemetry/core";
 
 export class LangWatchExporter implements SpanExporter {
@@ -11,6 +13,7 @@ export class LangWatchExporter implements SpanExporter {
   private apiKey: string;
   private includeAllSpans: boolean;
   private debug: boolean;
+  private serializer: ISerializer<ReadableSpan[], unknown>;
 
   constructor(
     params: {
@@ -27,6 +30,7 @@ export class LangWatchExporter implements SpanExporter {
     this.apiKey = params.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
     this.includeAllSpans = params.includeAllSpans ?? false;
     this.debug = params.debug ?? false;
+    this.serializer = JsonTraceSerializer;
 
     if (!this.apiKey) {
       throw new Error("LANGWATCH_API_KEY is not set");
@@ -40,6 +44,7 @@ export class LangWatchExporter implements SpanExporter {
     const spans = allSpans.filter(
       (span) => this.includeAllSpans || this.isAiSdkSpan(span)
     );
+
     if (spans.length === 0) {
       resultCallback({ code: ExportResultCode.SUCCESS });
       return;
@@ -50,7 +55,7 @@ export class LangWatchExporter implements SpanExporter {
 
     let body;
     try {
-      body = JSON.stringify(createExportTraceServiceRequest(spans));
+      body = this.serializer.serializeRequest(spans);
     } catch (error) {
       console.error("[LangWatchExporter] Failed to serialize spans:", error);
       resultCallback({ code: ExportResultCode.FAILED });
@@ -82,7 +87,7 @@ export class LangWatchExporter implements SpanExporter {
   }
 
   private isAiSdkSpan(span: ReadableSpan): boolean {
-    return span.instrumentationLibrary.name === "ai";
+    return span.instrumentationScope?.name === "ai";
   }
 
   shutdown(): Promise<void> {

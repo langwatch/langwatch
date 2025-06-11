@@ -28,6 +28,7 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
       until_node_id: z.string().optional(),
       inputs: z.array(z.record(z.string())).optional(),
       manual_execution_mode: z.boolean().optional(),
+      do_not_trace: z.boolean().optional(),
     }),
   }),
   z.object({

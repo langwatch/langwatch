@@ -29,7 +29,7 @@ class WorkflowModule(LangWatchWorkflowModule):
         super().__init__()
 
         {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|list %}
-        self.{{ node.id }} = self.wrapped({{ node_templates[node.id][1] }}, node_id="{{ node.id }}", {% if node.type == "evaluator" or node.behave_as == "evaluator" %}run=run_evaluations{% endif %})(
+        self.{{ node.id }} = self.wrapped({{ node_templates[node.id][1] }}, node_id="{{ node.id }}", {% if node.type == "evaluator" or node.data.behave_as == "evaluator" %}run=run_evaluations{% endif %})(
             {% for key, value in node_templates[node.id][2].items() %}
             {% if node.type == "retriever" and key == "rm" %}
             {{ key }}={{ value }},
@@ -163,7 +163,7 @@ class WorkflowModule(LangWatchWorkflowModule):
         {% endfor %}
 
         return PredictionWithEvaluationAndMetadata(
-            {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|selectattr("type", "ne", "evaluator")|selectattr("behave_as", "ne", "evaluator")|list %}
+            {% for node in nodes|selectattr("type", "ne", "entry")|selectattr("type", "ne", "end")|selectattr("type", "ne", "evaluator")|selectattr("data.behave_as", "ne", "evaluator")|list %}
             {{ node.id }}={{ node.id }},
             {% endfor %}
             {% if ns.end_node %}
@@ -183,7 +183,7 @@ class WorkflowModule(LangWatchWorkflowModule):
             },
             {% endif %}
             evaluations={
-                {% for node in nodes if node.type == "evaluator" or node.behave_as == "evaluator" %}
+                {% for node in nodes if node.type == "evaluator" or (node.data.behave_as == "evaluator" and node.type != "end") %}
                 "{{ node.id }}": {{ node.id }},
                 {% endfor %}
             },
