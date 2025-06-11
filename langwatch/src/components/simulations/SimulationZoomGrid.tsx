@@ -86,7 +86,11 @@ function GridComponent({ scenarioRunIds }: GridProps) {
 
   const handleExpandToggle = (simulationId: string) => {
     if (scenarioSetId && batchRunId) {
-      goToSimulationRun(scenarioSetId, batchRunId, simulationId);
+      goToSimulationRun({
+        scenarioSetId,
+        batchRunId,
+        scenarioRunId: simulationId,
+      });
     } else {
       console.warn("scenarioSetId or batchRunId is not defined");
     }
@@ -161,11 +165,7 @@ function GridComponent({ scenarioRunIds }: GridProps) {
             cursor="pointer"
             onClick={() => handleExpandToggle(scenarioRunId)}
           >
-            <SimulationChatViewer
-              scenarioRunId={scenarioRunId}
-              isExpanded={false}
-              onExpandToggle={() => handleExpandToggle(scenarioRunId)}
-            />
+            <SimulationChatViewer scenarioRunId={scenarioRunId} />
           </Box>
         ))}
       </Grid>

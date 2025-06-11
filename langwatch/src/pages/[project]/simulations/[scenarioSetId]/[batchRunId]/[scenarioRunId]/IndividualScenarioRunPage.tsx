@@ -14,6 +14,7 @@ import "@copilotkit/react-ui/styles.css";
 import "../../../simulations.css";
 import {
   CustomCopilotKitChat,
+  SimulationChatFadeOverlay,
   SimulationConsole,
 } from "~/components/simulations";
 import { useSimulationRouter } from "~/hooks/simulations";
@@ -55,7 +56,11 @@ function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
           _hover={{ bg: "gray.100" }}
           onClick={() => {
             if (scenarioSetId && batchRunId) {
-              goToSimulationRun(run.scenarioRunId, scenarioSetId, batchRunId);
+              goToSimulationRun({
+                scenarioSetId,
+                batchRunId,
+                scenarioRunId: run.scenarioRunId,
+              });
             }
           }}
         >
@@ -227,9 +232,12 @@ export function IndividualScenarioRunPage({}: IndividualScenarioRunPageProps) {
                   </Box>
                   {/* Conversation Area - Scrollable */}
                   <Box flex="1" w="100%" p={6} overflow="auto" maxHeight="100%">
-                    <CustomCopilotKitChat
-                      messages={scenarioState?.messages ?? []}
-                    />
+                    <Box position="relative" height="100%" width="100%">
+                      <CustomCopilotKitChat
+                        messages={scenarioState?.messages ?? []}
+                      />
+                      <SimulationChatFadeOverlay />
+                    </Box>
                   </Box>
 
                   {/* Console Area - Fixed at bottom */}
