@@ -3,20 +3,33 @@ package openai
 import (
 	"log/slog"
 
+	langwatch "github.com/langwatch/langwatch/sdk-go"
+	"github.com/langwatch/langwatch/sdk-go/instrumentation/openai/events"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/propagation"
-	oteltrace "go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace"
 )
+
+// Config holds configuration for OpenAI instrumentation
+type Config struct {
+	genAISystemName     string
+	contentRecordPolicy events.RecordPolicy
+}
 
 // config is used to configure the middleware.
 type config struct {
-	tracerProvider                oteltrace.TracerProvider
+	tracerProvider                trace.TracerProvider
+	loggerProvider                log.LoggerProvider
 	propagators                   propagation.TextMapPropagator
 	traceIDResponseHeaderKey      string
 	traceSampledResponseHeaderKey string
-	recordInput                   bool
-	recordOutput                  bool
 	genAISystem                   attribute.KeyValue
+
+	contentRecordPolicy events.RecordPolicy
+
+	tracer langwatch.LangWatchTracer
+	logger log.Logger
 
 	// caller can inject their own for more control
 	slogger *slog.Logger
@@ -35,9 +48,17 @@ func (o optionFunc) apply(c *config) {
 
 // WithTracerProvider specifies a tracer provider to use for creating a tracer.
 // If none is specified, the global provider is used.
-func WithTracerProvider(provider oteltrace.TracerProvider) Option {
+func WithTracerProvider(provider trace.TracerProvider) Option {
 	return optionFunc(func(c *config) {
 		c.tracerProvider = provider
+	})
+}
+
+// WithLoggerProvider specifies a logger provider to use for creating a logger.
+// If none is specified, the global provider is used.
+func WithLoggerProvider(provider log.LoggerProvider) Option {
+	return optionFunc(func(c *config) {
+		c.loggerProvider = provider
 	})
 }
 
@@ -50,22 +71,44 @@ func WithPropagators(propagators propagation.TextMapPropagator) Option {
 	})
 }
 
-// WithCaptureInput enables recording the full request body content
-// under the `langwatch.input.value` attribute.
-// Be cautious with sensitive data.
-func WithCaptureInput() Option {
+// WithCaptureAllInput enables recording of all input content.
+func WithCaptureAllInput() Option {
 	return optionFunc(func(c *config) {
-		c.recordInput = true
+		if c.contentRecordPolicy == nil {
+			c.contentRecordPolicy = events.NewProtectedContentRecordPolicy()
+		}
+		c.contentRecordPolicy.SetRecordSystemInputContent(true)
+		c.contentRecordPolicy.SetRecordUserInputContent(true)
 	})
 }
 
-// WithCaptureOutput enables recording the full response body content
-// (or accumulated stream content, if middleware could parse it)
-// under the `langwatch.output.value` attribute.
-// Be cautious with sensitive data.
+// WithCaptureSystemInput enables recording of system and developer input.
+func WithCaptureSystemInput() Option {
+	return optionFunc(func(c *config) {
+		if c.contentRecordPolicy == nil {
+			c.contentRecordPolicy = events.NewProtectedContentRecordPolicy()
+		}
+		c.contentRecordPolicy.SetRecordSystemInputContent(true)
+	})
+}
+
+// WithCaptureUserInput enables recording of user input.
+func WithCaptureUserInput() Option {
+	return optionFunc(func(c *config) {
+		if c.contentRecordPolicy == nil {
+			c.contentRecordPolicy = events.NewProtectedContentRecordPolicy()
+		}
+		c.contentRecordPolicy.SetRecordUserInputContent(true)
+	})
+}
+
+// WithCaptureOutput enables recording of the full response body content.
 func WithCaptureOutput() Option {
 	return optionFunc(func(c *config) {
-		c.recordOutput = true
+		if c.contentRecordPolicy == nil {
+			c.contentRecordPolicy = events.NewProtectedContentRecordPolicy()
+		}
+		c.contentRecordPolicy.SetRecordOutputContent(true)
 	})
 }
 
