@@ -25,6 +25,7 @@ import {
   type Evaluation,
   type Span,
   type SpanInputOutput,
+  type SpanTimestamps,
 } from "../../tracer/types";
 import { COLLECTOR_QUEUE, collectorQueue } from "../queues/collectorQueue";
 import { getFirstInputAsText, getLastOutputAsText } from "./collector/common";
@@ -236,15 +237,18 @@ const processCollectorJob_ = async (
   spans = addInputAndOutputForRAGs(spans);
 
   const esSpans: ElasticSearchSpan[] = spans.map((span) => {
-    const esSpan = {
+    const currentTime = Date.now();
+    const esSpan: ElasticSearchSpan = {
       ...span,
       input: span.input ? typedValueToElasticSearch(span.input) : null,
       output: span.output ? typedValueToElasticSearch(span.output) : null,
       project_id: project.id,
       timestamps: {
         ...span.timestamps,
-        inserted_at: Date.now(),
-        updated_at: Date.now(),
+        // If ignore_timestamps_on_write is set, we'll preserve existing timestamps in the ES update script
+        // For now, set the required fields but they may be overridden during update
+        inserted_at: span.timestamps.ignore_timestamps_on_write ? (existingTrace?.inserted_at ?? currentTime) : currentTime,
+        updated_at: currentTime,
       },
     };
     if (esSpan.params && typeof span.params === "object") {
@@ -299,6 +303,9 @@ const processCollectorJob_ = async (
     delete existingTrace?.existing_metadata.all_keys;
   }
 
+  // Check if any spans have ignore_timestamps_on_write flag
+  const hasIgnoreTimestamps = spans.some((span) => span.timestamps.ignore_timestamps_on_write);
+  
   // Create the trace
   const trace: Omit<ElasticSearchTrace, "spans"> = {
     trace_id: traceId,
@@ -321,9 +328,13 @@ const processCollectorJob_ = async (
       ),
     },
     timestamps: {
-      started_at:
-        Math.min(...allSpans.map((span) => span.timestamps.started_at)) ??
-        Date.now(),
+      // If any span has ignore_timestamps_on_write, preserve existing trace timestamps where possible
+      started_at: hasIgnoreTimestamps && existingTrace?.inserted_at
+        ? (existingSpans.length > 0 
+            ? Math.min(...existingSpans.map((span) => span.timestamps.started_at))
+            : Math.min(...allSpans.map((span) => span.timestamps.started_at))
+          )
+        : Math.min(...allSpans.map((span) => span.timestamps.started_at)) ?? Date.now(),
       inserted_at: existingTrace?.inserted_at ?? Date.now(),
       updated_at: Date.now(),
     } as ElasticSearchTrace["timestamps"],
@@ -470,10 +481,24 @@ const updateTrace = async (
               }
             }
             if (existingSpanIndex >= 0) {
+              def existingSpan = ctx._source.spans[existingSpanIndex];
               if (newSpan.timestamps == null) {
                 newSpan.timestamps = new HashMap();
                 newSpan.timestamps.inserted_at = currentTime;
               }
+              
+              // If ignore_timestamps_on_write is set, preserve existing timestamps where possible
+              if (newSpan.timestamps.ignore_timestamps_on_write == true && existingSpan.timestamps != null) {
+                newSpan.timestamps.started_at = existingSpan.timestamps.started_at;
+                newSpan.timestamps.inserted_at = existingSpan.timestamps.inserted_at;
+                if (existingSpan.timestamps.first_token_at != null) {
+                  newSpan.timestamps.first_token_at = existingSpan.timestamps.first_token_at;
+                }
+                if (existingSpan.timestamps.finished_at != null) {
+                  newSpan.timestamps.finished_at = existingSpan.timestamps.finished_at;
+                }
+              }
+              
               newSpan.timestamps.updated_at = currentTime;
               ctx._source.spans[existingSpanIndex] = newSpan;
             } else {
@@ -499,10 +524,25 @@ const updateTrace = async (
               }
             }
             if (existingEvaluationIndex >= 0) {
+              def existingEvaluation = ctx._source.evaluations[existingEvaluationIndex];
               if (newEvaluation.timestamps == null) {
                 newEvaluation.timestamps = new HashMap();
                 newEvaluation.timestamps.inserted_at = currentTime;
               }
+              
+              // If ignore_timestamps_on_write is set, preserve existing timestamps where possible
+              if (newEvaluation.timestamps.ignore_timestamps_on_write == true && existingEvaluation.timestamps != null) {
+                if (existingEvaluation.timestamps.started_at != null) {
+                  newEvaluation.timestamps.started_at = existingEvaluation.timestamps.started_at;
+                }
+                if (existingEvaluation.timestamps.inserted_at != null) {
+                  newEvaluation.timestamps.inserted_at = existingEvaluation.timestamps.inserted_at;
+                }
+                if (existingEvaluation.timestamps.finished_at != null) {
+                  newEvaluation.timestamps.finished_at = existingEvaluation.timestamps.finished_at;
+                }
+              }
+              
               newEvaluation.timestamps.updated_at = currentTime;
               ctx._source.evaluations[existingEvaluationIndex] = newEvaluation;
             } else {
