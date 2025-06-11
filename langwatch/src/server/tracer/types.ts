@@ -1,14 +1,3 @@
-import type { CollectorJob } from "../background/types";
-
-export type TraceForCollection = Pick<
-  CollectorJob,
-  | "traceId"
-  | "spans"
-  | "reservedTraceMetadata"
-  | "customMetadata"
-  | "evaluations"
->;
-
 type ChatRole =
   | "system"
   | "user"

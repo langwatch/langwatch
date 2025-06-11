@@ -13,12 +13,10 @@ import type { CollectorJob } from "../background/types";
 import type {
   BaseSpan,
   ChatMessage,
-  Evaluation,
   LLMSpan,
   RAGChunk,
   Span,
   SpanTypes,
-  TraceForCollection,
   TypedValueChatMessages,
 } from "./types";
 import {
@@ -37,6 +35,15 @@ import { createLogger } from "~/utils/logger";
 import { z } from "zod";
 
 const logger = createLogger("langwatch.tracer.opentelemetry");
+
+export type TraceForCollection = Pick<
+  CollectorJob,
+  | "traceId"
+  | "spans"
+  | "reservedTraceMetadata"
+  | "customMetadata"
+  | "evaluations"
+>;
 
 export const openTelemetryTraceRequestToTracesForCollection = (
   otelTrace: DeepPartial<IExportTraceServiceRequest>

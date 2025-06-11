@@ -1,8 +1,8 @@
 import type { DeepPartial } from "~/utils/types";
-import type { SpanInputOutput, TraceForCollection, TypedValueJson } from "./types";
+import type { TypedValueJson } from "./types";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { createLogger } from "~/utils/logger";
-import { log } from "console";
+import type { TraceForCollection } from "./otel.traces";
 
 const logger = createLogger("langwatch.tracer.otel.logs");
 
