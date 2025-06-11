@@ -1,5 +1,4 @@
-import { Card } from "@chakra-ui/react";
-import { Badge, Box, HStack, VStack, Text } from "@chakra-ui/react";
+import { Card, Badge, Box, HStack, VStack, Text } from "@chakra-ui/react";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import { SimulationStatusOverlay } from "./SimulationStatusOverlay";
 

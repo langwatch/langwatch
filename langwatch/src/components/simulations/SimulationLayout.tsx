@@ -4,17 +4,13 @@ import { SetRunHistorySidebar } from "./SetRunHistorySidebar";
 import { useSimulationRouter } from "~/hooks/simulations";
 import { HistoryIcon } from "../icons/History";
 
+// TODO: This file could be better organized.
 export const SimulationLayout = ({
   children,
 }: {
   children: React.ReactNode;
 }) => {
-  const {
-    open: isHistorySidebarOpen,
-    onOpen,
-    onClose,
-    onToggle,
-  } = useDisclosure({
+  const { open: isHistorySidebarOpen, onToggle } = useDisclosure({
     defaultOpen: true,
   });
 

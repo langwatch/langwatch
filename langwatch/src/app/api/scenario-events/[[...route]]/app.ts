@@ -9,6 +9,9 @@ import {
 } from "../../middleware";
 import { ScenarioRunnerService } from "./scenario-event.service";
 import { scenarioEventSchema, responseSchemas } from "./schemas";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("langwatch:api:scenario-events");
 
 // Define types for our Hono context variables
 type Variables = {
@@ -59,7 +62,18 @@ app.post(
     const path = `/${project.slug}/simulations/${
       event.scenarioSetId ?? "default"
     }`;
-    const url = `${process.env.BASE_HOST}${path}`;
+
+    const base = process.env.BASE_HOST;
+
+    if (!base) {
+      logger.error(
+        "BASE_HOST is not set, but required for scenario event url payload"
+      );
+
+      return c.json({ success: false }, 500);
+    }
+
+    const url = `${base}${path}`;
 
     return c.json({ success: true, url }, 201);
   }

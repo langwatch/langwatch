@@ -16,7 +16,7 @@ import {
 // Define response schemas
 const successSchema = z.object({
   success: z.boolean(),
-  url: z.string(),
+  url: z.string().optional().nullable(),
 });
 const errorSchema = z.object({ error: z.string() });
 export const runDataSchema = z.object({
