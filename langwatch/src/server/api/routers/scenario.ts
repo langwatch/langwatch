@@ -49,7 +49,10 @@ export const scenarioRouter = createTRPCRouter({
         scenarioRunId: input.scenarioRunId,
       });
       if (!data) {
-        throw new Error("Scenario run not found");
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Scenario run not found",
+        });
       }
       return data;
     }),

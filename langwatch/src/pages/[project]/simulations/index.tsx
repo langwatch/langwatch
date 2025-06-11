@@ -25,7 +25,7 @@ export default function SimulationsPage() {
 
   const handleSetClick = (scenarioSetId: string) => {
     // Navigate to the specific set page using the catch-all route
-    void router.push(`${router.asPath}/${scenarioSetId}`);
+    void router.push(`${router.pathname}/${scenarioSetId}`);
   };
 
   return (
