@@ -9,11 +9,12 @@ import {
   getJobProcessingDurationHistogram,
 } from "../../metrics";
 import { collectUsageStats } from "~/server/collectUsageStats";
+import { env } from "~/env.mjs";
 
 const logger = createLogger("langwatch:workers:usageStatsWorker");
 
 export async function runUsageStatsJob(job: Job<UsageStatsJob, void, string>) {
-  if (process.env.DISABLE_USAGE_STATS || process.env.IS_SAAS === "true") {
+  if (env.DISABLE_USAGE_STATS || env.IS_SAAS) {
     logger.info("usage stats disabled, skipping job");
     return;
   }
@@ -59,7 +60,7 @@ export async function runUsageStatsJob(job: Job<UsageStatsJob, void, string>) {
 }
 
 export const startUsageStatsWorker = () => {
-  if (process.env.DISABLE_USAGE_STATS || process.env.IS_SAAS === "true") {
+  if (env.DISABLE_USAGE_STATS || env.IS_SAAS) {
     logger.info("usage stats disabled, skipping job");
     return;
   }
