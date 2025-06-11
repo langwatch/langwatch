@@ -1,10 +1,6 @@
-import { Box, HStack } from "@chakra-ui/react";
-import {
-  SimulationZoomGrid,
-  SetRunHistorySidebar,
-} from "~/components/simulations";
+import { Box } from "@chakra-ui/react";
+import { SimulationZoomGrid, SimulationLayout } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { DashboardLayout } from "~/components/DashboardLayout";
 import "@copilotkit/react-ui/styles.css";
 import "../../simulations.css";
 import { api } from "~/utils/api";
@@ -57,31 +53,25 @@ export function SimulationSetPage({
   }, [scenarioSetData]);
 
   return (
-    <DashboardLayout>
-      <HStack w="full" h="full">
-        <SetRunHistorySidebar />
-        <Box w="full" position="relative" h="full">
-          <PageLayout.Container
-            maxW={"calc(100vw - 200px)"}
-            marginTop={0}
-            h="full"
-            overflow="scroll"
-            padding={0}
-            position="absolute"
-          >
-            <SimulationZoomGrid.Root>
-              <Box p={6}>
-                <Box mb={4}>
-                  <SimulationZoomGrid.Controls />
-                </Box>
-                {scenarioRunIds && scenarioRunIds.length > 0 && (
-                  <SimulationZoomGrid.Grid scenarioRunIds={scenarioRunIds} />
-                )}
-              </Box>
-            </SimulationZoomGrid.Root>
-          </PageLayout.Container>
-        </Box>
-      </HStack>
-    </DashboardLayout>
+    <SimulationLayout>
+      <PageLayout.Container
+        marginTop={0}
+        h="full"
+        overflow="scroll"
+        padding={0}
+        position="absolute"
+      >
+        <SimulationZoomGrid.Root>
+          <Box p={6}>
+            <Box mb={4}>
+              <SimulationZoomGrid.Controls />
+            </Box>
+            {scenarioRunIds && scenarioRunIds.length > 0 && (
+              <SimulationZoomGrid.Grid scenarioRunIds={scenarioRunIds} />
+            )}
+          </Box>
+        </SimulationZoomGrid.Root>
+      </PageLayout.Container>
+    </SimulationLayout>
   );
 }

@@ -7,6 +7,7 @@ import {
   VStack,
   Badge,
   Flex,
+  Spinner,
 } from "@chakra-ui/react";
 import { ArrowLeft, Clock, Check, X } from "react-feather";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -20,7 +21,7 @@ import {
 import { useSimulationRouter } from "~/hooks/simulations";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { LayoutWithSetRunHistory } from "~/components/simulations/LayoutWithSetRunHistory";
+import { SimulationLayout } from "~/components/simulations/SimulationLayout";
 
 interface IndividualScenarioRunPageProps {
   scenarioRunId: string;
@@ -32,7 +33,7 @@ function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
   const { goToSimulationRun, scenarioSetId, batchRunId } =
     useSimulationRouter();
 
-  const { data: scenarioRunData } =
+  const { data: scenarioRunData, isLoading } =
     api.scenarios.getRunDataByScenarioId.useQuery(
       {
         projectId: project?.id ?? "",
@@ -127,18 +128,19 @@ export function IndividualScenarioRunPage({}: IndividualScenarioRunPageProps) {
   const [showPreviousRuns, setShowPreviousRuns] = useState(false);
   const { goToSimulationSet, scenarioRunId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
-
+  const { scenarioSetId } = useSimulationRouter();
   // Fetch scenario run data using the correct API
-  const { data: scenarioState } = api.scenarios.getRunState.useQuery(
-    {
-      scenarioRunId: scenarioRunId ?? "",
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project?.id && !!scenarioRunId,
-      refetchInterval: 1000,
-    }
-  );
+  const { data: scenarioState, isLoading: isScenarioStateLoading } =
+    api.scenarios.getRunState.useQuery(
+      {
+        scenarioRunId: scenarioRunId ?? "",
+        projectId: project?.id ?? "",
+      },
+      {
+        enabled: !!project?.id && !!scenarioRunId,
+        refetchInterval: 1000,
+      }
+    );
 
   const results = scenarioState?.results;
   const scenarioId = scenarioState?.scenarioId;
@@ -148,14 +150,16 @@ export function IndividualScenarioRunPage({}: IndividualScenarioRunPageProps) {
   }
 
   return (
-    <LayoutWithSetRunHistory>
+    <SimulationLayout>
       <PageLayout.Container
-        maxW="100vw"
+        w="full"
         padding={6}
         marginTop={0}
         height="full"
         position="absolute"
         overflow="hidden"
+        margin="auto"
+        maxW="100%"
       >
         <VStack height="full" w="full">
           {/* Header with Back Button and Title */}
@@ -166,9 +170,11 @@ export function IndividualScenarioRunPage({}: IndividualScenarioRunPageProps) {
                   variant="ghost"
                   size="sm"
                   margin={0}
-                  onClick={() =>
-                    goToSimulationSet(scenarioState?.batchRunId ?? "")
-                  }
+                  onClick={() => {
+                    if (scenarioSetId) {
+                      goToSimulationSet(scenarioSetId);
+                    }
+                  }}
                 >
                   <ArrowLeft size={14} />
                   <Text>Back to Grid View</Text>
@@ -193,8 +199,9 @@ export function IndividualScenarioRunPage({}: IndividualScenarioRunPageProps) {
             border="1px"
             borderColor="gray.200"
             overflow="hidden"
+            w="full"
           >
-            <VStack gap={0} height="100%">
+            <VStack gap={0} height="100%" w="full">
               {/* Content Area */}
               <HStack align="start" gap={0} flex="1" w="100%" overflow="hidden">
                 {/* Main Content Area */}
@@ -291,6 +298,6 @@ export function IndividualScenarioRunPage({}: IndividualScenarioRunPageProps) {
           </Box>
         </VStack>
       </PageLayout.Container>
-    </LayoutWithSetRunHistory>
+    </SimulationLayout>
   );
 }
