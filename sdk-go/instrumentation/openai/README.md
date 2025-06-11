@@ -67,8 +67,6 @@ func main() {
 			// Optional: Capture request/response content (be mindful of sensitive data)
 			otelopenai.WithCaptureInput(),
 			otelopenai.WithCaptureOutput(),
-			// Optional: Set system name for OpenAI-compatible APIs (defaults to "openai")
-			// otelopenai.WithGenAISystem(semconv.GenAISystemKey.String("azure.openai")),
 		)),
 	)
 
@@ -119,7 +117,9 @@ func setupOTelWithLangWatch(ctx context.Context) func() {
 
 The `Middleware` function accepts a required instrumentor name (string) to identify your application, followed by optional configuration functions:
 
+- `WithLogger(logger *slog.Logger)`: Specifies a structured logger to use for logging. Defaults to a zero-noise default (discard) logger. The logger should be configured by the caller with appropriate levels and outputs.
 - `WithTracerProvider(provider oteltrace.TracerProvider)`: Specifies the OTel `TracerProvider`. Defaults to the global provider.
+- `WithLoggerProvider(provider log.LoggerProvider)`: Specifies the OTel `LoggerProvider`. Defaults to the global provider.
 - `WithPropagators(propagators propagation.TextMapPropagator)`: Specifies OTel propagators. Defaults to global propagators.
 - `WithGenAISystem(system attribute.KeyValue)`: Sets the `gen_ai.system` attribute on spans. Defaults to `"openai"`. Use this when the middleware is used with OpenAI-compatible APIs from other providers.
 - `WithCaptureInput()`: Records the full conversation input as the `langwatch.input.value` span attribute. Use with caution if conversations contain sensitive data.
@@ -141,7 +141,6 @@ The middleware adds attributes to the client span, following [OpenTelemetry GenA
 - `gen_ai.request.max_tokens`
 - `langwatch.gen_ai.streaming` (boolean)
 - `gen_ai.operation.name` (e.g., `completions`)
-- `langwatch.input.value` (if `WithCaptureInput()` is used)
 
 **Response Attributes:**
 
@@ -151,7 +150,6 @@ The middleware adds attributes to the client span, following [OpenTelemetry GenA
 - `gen_ai.usage.input_tokens`
 - `gen_ai.usage.output_tokens`
 - `gen_ai.openai.response.system_fingerprint`
-- `langwatch.output.value` (if `WithCaptureOutput()` is used; for streaming responses, this is the accumulated textual content from stream events)
 
 Standard HTTP client attributes (`http.request.method`, `url.path`, `server.address`, `http.response.status_code`) are also included.
 
