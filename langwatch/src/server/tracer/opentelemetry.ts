@@ -832,6 +832,19 @@ const addOpenTelemetrySpanAsSpan = (
       type = (attributesMap as any).langwatch.span.type;
       (attributesMap as any).langwatch.span.type = void 0;
     }
+    if (typeof attributesMap.langwatch.thread?.id === "string") {
+      trace.reservedTraceMetadata.thread_id = attributesMap.langwatch.thread.id;
+      (attributesMap as any).langwatch.thread.id = void 0;
+    }
+    if (typeof attributesMap.langwatch.user?.id === "string") {
+      trace.reservedTraceMetadata.user_id = attributesMap.langwatch.user.id;
+      (attributesMap as any).langwatch.user.id = void 0;
+    }
+    if (typeof attributesMap.langwatch.customer?.id === "string") {
+      trace.reservedTraceMetadata.customer_id = attributesMap.langwatch.customer.id;
+      (attributesMap as any).langwatch.customer.id = void 0;
+    }
+
     if (attributesMap.langwatch.input) {
       if (
         Array.isArray(attributesMap.langwatch.input) &&

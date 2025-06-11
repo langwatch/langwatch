@@ -14,6 +14,7 @@ export const openTelemetryToLangWatchMetadataMapping: ReservedTraceMetadataMappi
 
 	"langwatch.thread.id": "thread_id",
 	"langwatch.customer.id": "customer_id",
+	"langwatch.user.id": "user_id",
 	"langwatch.sdk.language": "sdk_language",
 	"langwatch.sdk.name": "sdk_name",
 	"langwatch.sdk.version": "sdk_version",
