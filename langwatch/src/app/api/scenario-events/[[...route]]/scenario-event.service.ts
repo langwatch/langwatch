@@ -1,10 +1,6 @@
 import { ScenarioEventRepository } from "./scenario-event.repository";
 import { ScenarioRunStatus } from "./enums";
-import type {
-  ScenarioEvent,
-  ScenarioRunData,
-  ScenarioRunFinishedEvent,
-} from "./types";
+import type { ScenarioEvent, ScenarioRunData } from "./types";
 
 export class ScenarioRunnerService {
   private eventRepository: ScenarioEventRepository;
@@ -82,95 +78,10 @@ export class ScenarioRunnerService {
     };
   }
 
-  async getScenarioRunIds({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<string[]> {
-    return this.eventRepository.getAllScenarioRunsForProject({
-      projectId,
-    });
-  }
-
-  async getAllRunEventsForProject({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<ScenarioEvent[]> {
-    return await this.eventRepository.getAllRunEventsForProject({
-      projectId,
-    });
-  }
-
   async deleteAllEventsForProject({ projectId }: { projectId: string }) {
     return await this.eventRepository.deleteAllEvents({
       projectId,
     });
-  }
-
-  async getAllBatchRunsForProject({ projectId }: { projectId: string }) {
-    return this.eventRepository.getAllBatchRunsForProject({
-      projectId,
-    });
-  }
-
-  async getScenarioRunIdsForBatch({
-    projectId,
-    batchRunId,
-  }: {
-    projectId: string;
-    batchRunId: string;
-  }): Promise<string[]> {
-    return this.eventRepository.getScenarioRunIdsForBatch({
-      projectId,
-      batchRunId,
-    });
-  }
-
-  async getScenarioRunDataForBatch({
-    projectId,
-    batchRunId,
-  }: {
-    projectId: string;
-    batchRunId: string;
-  }) {
-    const ids = await this.eventRepository.getScenarioRunIdsForBatch({
-      projectId,
-      batchRunId,
-    });
-
-    const runs = await Promise.all(
-      ids.map((id) => this.getScenarioRunData({ projectId, scenarioRunId: id }))
-    );
-
-    return runs.filter(Boolean) as ScenarioRunData[];
-  }
-
-  async getScenarioResultsHistory({
-    projectId,
-    scenarioId,
-  }: {
-    projectId: string;
-    scenarioId: string;
-  }): Promise<{
-    results: ScenarioRunFinishedEvent[];
-  }> {
-    const events =
-      await this.eventRepository.getScenarioRunFinishedEventsByScenarioId({
-        projectId,
-        scenarioId,
-      });
-
-    const results = events.map((event) => {
-      return {
-        ...event,
-        results: event.results,
-      };
-    });
-
-    return {
-      results,
-    };
   }
 
   async getScenarioRunDataByScenarioId({
