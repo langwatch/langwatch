@@ -1,5 +1,5 @@
 import type { DeepPartial } from "~/utils/types";
-import type { TraceForCollection } from "./types";
+import type { SpanInputOutput, TraceForCollection, TypedValueJson } from "./types";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { createLogger } from "~/utils/logger";
 import { log } from "console";
@@ -48,14 +48,6 @@ export const openTelemetryLogsRequestToTracesForCollection = (
 					continue;
 				}
 
-				const trace = traceMap[traceId] ?? {
-					traceId,
-					spans: [],
-					evaluations: [],
-					reservedTraceMetadata: {},
-					customMetadata: {},
-				} satisfies TraceForCollection;
-
 				const logString = logRecord.body.stringValue;
 				const [identifier, content] = logString.split("\n", 2);
 				if (!identifier || !content) {
@@ -74,47 +66,61 @@ export const openTelemetryLogsRequestToTracesForCollection = (
 					continue;
 				}
 
+				let input: TypedValueJson | null = null;
+				let output: TypedValueJson | null = null;
+
 				switch (identifier) {
 					case "Chat Model Completion:":
-						trace.spans.push({
-							span_id: spanId,
-							trace_id: traceId,
-							type: "span",
-							output: {
-								type: "json",
-								value: jsonParsedContent as any,
-							},
-							timestamps: {
-								ignore_timestamps_on_write: true,
-								started_at: convertFromUnixNano(logRecord.timeUnixNano),
-								finished_at: 0,
-							},
-						});
+						output = {
+							type: "json",
+							value: jsonParsedContent as TypedValueJson["value"],
+						};
 						break;
 					
 					case "Chat Model Prompt Content:":
-						trace.spans.push({
-							span_id: spanId,
-							trace_id: traceId,
-							type: "span",
-							input: {
-								type: "json",
-								value: jsonParsedContent as any,
-							},
-							timestamps: {
-								ignore_timestamps_on_write: true,
-								started_at: convertFromUnixNano(logRecord.timeUnixNano),
-								finished_at: 0,
-							},
-						});
+						input = {
+							type: "json",
+							value: jsonParsedContent as TypedValueJson["value"],
+						};
+						break;
+					
 					default:
 						continue;
+				}
+
+				let trace = traceMap[traceId];
+				if (!trace) {
+					trace = {
+						traceId,
+						spans: [],
+						evaluations: [],
+						reservedTraceMetadata: {},
+						customMetadata: {},
+					} satisfies TraceForCollection;
+					traceMap[traceId] = trace;
+				}
+
+				let existingSpan = trace.spans.find(span => span.span_id === spanId);
+				if (!existingSpan) {
+					existingSpan = {
+						span_id: spanId,
+						trace_id: traceId,
+						type: "llm",
+						input: input,
+						output: output,
+						timestamps: {
+							ignore_timestamps_on_write: true,
+							started_at: convertFromUnixNano(logRecord.timeUnixNano),
+							finished_at: 0,
+						},
+					};
+					trace.spans.push(existingSpan);
 				}
 			}
 		}
 	}
 
-	return [];
+	return Object.values(traceMap);
 }
 
 const decodeOpenTelemetryId = (id: unknown): string | null => {
