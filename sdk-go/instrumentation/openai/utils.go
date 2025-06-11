@@ -2,7 +2,7 @@ package openai
 
 import (
 	"encoding/json"
-	"log"
+	"fmt"
 
 	langwatch "github.com/langwatch/langwatch/sdk-go"
 	"go.opentelemetry.io/otel/attribute"
@@ -48,7 +48,9 @@ func getStreamingFlag(reqData jsonData) bool {
 
 // logError provides consistent error logging across the package.
 func logError(format string, args ...interface{}) {
-	log.Default().Printf("[openai-instrumentation] "+format, args...)
+	defaultLogger.Error(fmt.Sprintf(format, args...),
+		"component", "github.com/langwatch/langwatch/sdk-go/instrumentation/openai/utils",
+	)
 }
 
 // setJSONAttribute safely marshals data to JSON and sets it as a span attribute.
