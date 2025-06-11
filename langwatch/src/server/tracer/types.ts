@@ -378,6 +378,7 @@ export type Evaluation = {
   error?: ErrorCapture | null;
   retries?: number | null;
   timestamps: {
+    ignore_timestamps_on_write?: boolean | null;
     inserted_at?: number | null;
     started_at?: number | null;
     finished_at?: number | null;
