@@ -5,7 +5,7 @@ import {
 } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { prisma } from "../../../../../server/db";
-import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/opentelemetry";
+import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
 import * as Sentry from "@sentry/nextjs";
 import * as crypto from "crypto";
 import {

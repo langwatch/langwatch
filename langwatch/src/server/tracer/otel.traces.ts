@@ -18,6 +18,7 @@ import type {
   RAGChunk,
   Span,
   SpanTypes,
+  TraceForCollection,
   TypedValueChatMessages,
 } from "./types";
 import {
@@ -36,15 +37,6 @@ import { createLogger } from "~/utils/logger";
 import { z } from "zod";
 
 const logger = createLogger("langwatch.tracer.opentelemetry");
-
-export type TraceForCollection = Pick<
-  CollectorJob,
-  | "traceId"
-  | "spans"
-  | "reservedTraceMetadata"
-  | "customMetadata"
-  | "evaluations"
->;
 
 export const openTelemetryTraceRequestToTracesForCollection = (
   otelTrace: DeepPartial<IExportTraceServiceRequest>
@@ -827,11 +819,12 @@ const addOpenTelemetrySpanAsSpan = (
   }
 
   // langwatch
-  if (attributesMap.langwatch) {
+  if (attributesMap.langwatch && typeof attributesMap.langwatch === "object") {
     if (attributesMap.langwatch.span?.type) {
       type = (attributesMap as any).langwatch.span.type;
       (attributesMap as any).langwatch.span.type = void 0;
     }
+    
     if (typeof attributesMap.langwatch.thread?.id === "string") {
       trace.reservedTraceMetadata.thread_id = attributesMap.langwatch.thread.id;
       (attributesMap as any).langwatch.thread.id = void 0;

@@ -1,3 +1,14 @@
+import type { CollectorJob } from "../background/types";
+
+export type TraceForCollection = Pick<
+  CollectorJob,
+  | "traceId"
+  | "spans"
+  | "reservedTraceMetadata"
+  | "customMetadata"
+  | "evaluations"
+>;
+
 type ChatRole =
   | "system"
   | "user"
@@ -159,6 +170,7 @@ export type ReservedSpanParams = {
 export type SpanParams = ReservedSpanParams & Record<string, any>;
 
 export interface SpanTimestamps {
+  ignore_timestamps_on_write?: boolean | null;
   started_at: number;
   first_token_at?: number | null;
   finished_at: number;
