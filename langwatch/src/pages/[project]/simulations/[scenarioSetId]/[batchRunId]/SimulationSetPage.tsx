@@ -31,8 +31,8 @@ export function SimulationSetPage({
 
   const scenarioRunIds = useMemo(
     () =>
-      scenarioSetData
-        ?.sort((a, b) => {
+      [...(scenarioSetData ?? [])]
+        .sort((a, b) => {
           return (
             new Date(a.timestamp ?? 0).getTime() -
             new Date(b.timestamp ?? 0).getTime()
@@ -50,7 +50,7 @@ export function SimulationSetPage({
       if (!batchRunId) return;
       goToSimulationBatchRuns(scenarioSetId, batchRunId, { replace: true });
     }
-  }, [scenarioSetData]);
+  }, [scenarioSetData, scenarioSetId, batchRunId, goToSimulationBatchRuns]);
 
   return (
     <SimulationLayout>
