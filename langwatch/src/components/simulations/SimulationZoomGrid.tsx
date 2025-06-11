@@ -10,15 +10,7 @@ import { SimulationChatViewer } from "./SimulationChatViewer";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { useZoom } from "~/hooks/useZoom";
 
-// Context for zoom state
-interface ZoomContextType {
-  scale: number;
-  containerRef: React.RefObject<HTMLDivElement>;
-  zoomIn: () => void;
-  zoomOut: () => void;
-}
-
-const ZoomContext = createContext<ZoomContextType | null>(null);
+const ZoomContext = createContext<ReturnType<typeof useZoom> | null>(null);
 
 const useZoomContext = () => {
   const context = useContext(ZoomContext);
