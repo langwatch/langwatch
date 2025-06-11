@@ -1,5 +1,9 @@
 import type { LlmConfigOutputType } from "~/types";
-import { badRequestSchema, unauthorizedSchema } from "~/app/api/shared/schemas";
+import {
+  badRequestSchema,
+  unauthorizedSchema,
+  errorSchema,
+} from "~/app/api/shared/schemas";
 import { resolver } from "hono-openapi/zod";
 import type { RouteResponse } from "./types";
 
@@ -29,7 +33,7 @@ export const baseResponses: Record<number, RouteResponse> = {
   500: {
     description: "Internal Server Error",
     content: {
-      "application/json": { schema: resolver(badRequestSchema) },
+      "application/json": { schema: resolver(errorSchema) },
     },
   },
 };

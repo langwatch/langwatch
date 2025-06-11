@@ -232,7 +232,8 @@
     "@zag-js/core": "^0.82.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-is": "19.0.0"
+    "react-is": "19.0.0",
+    "rxjs": "7.8.1"
   },
   "ct3aMetadata": {
     "initVersion": "7.19.0"
@@ -242,8 +243,5 @@
   },
   "workspaces": [
     "saas-src/*"
-  ],
-  "resolutions": {
-    "rxjs": "7.8.1"
-  }
+  ]
 }

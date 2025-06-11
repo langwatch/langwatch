@@ -141,7 +141,23 @@ const RunAccordionItem = ({
             alignItems="flex-start"
           >
             <HStack flex="1" textAlign="left" gap={2}>
-              <Icon as={AlertCircle} color="yellow.400" boxSize={2} />
+              <Icon
+                as={
+                  passedCount > 0 && failedCount === 0
+                    ? CheckCircle
+                    : failedCount > 0
+                    ? XCircle
+                    : AlertCircle
+                }
+                color={
+                  passedCount > 0 && failedCount === 0
+                    ? "green.400"
+                    : failedCount > 0
+                    ? "red.400"
+                    : "yellow.400"
+                }
+                boxSize={2}
+              />
               <Text fontWeight="semibold" fontSize="sm">
                 {run.label}
               </Text>
