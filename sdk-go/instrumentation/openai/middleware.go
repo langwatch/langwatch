@@ -25,6 +25,7 @@ const (
 func Middleware(name string, opts ...Option) oaioption.Middleware {
 	cfg := config{
 		genAISystem: semconv.GenAISystemOpenai, // Default to "openai"
+		slogger:             defaultLogger, // zero-noise default
 	}
 	for _, opt := range opts {
 		opt.apply(&cfg)

@@ -1,6 +1,8 @@
 package openai
 
 import (
+	"log/slog"
+
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -15,6 +17,9 @@ type config struct {
 	recordInput                   bool
 	recordOutput                  bool
 	genAISystem                   attribute.KeyValue
+
+	// caller can inject their own for more control
+	slogger *slog.Logger
 }
 
 // Option specifies instrumentation configuration options.
@@ -69,5 +74,14 @@ func WithCaptureOutput() Option {
 func WithGenAISystem(system attribute.KeyValue) Option {
 	return optionFunc(func(c *config) {
 		c.genAISystem = system
+	})
+}
+
+// WithLogger specifies a structured logger to use for logging.
+// If none is specified, a zero-noise default (discard) logger is used.
+// The logger should be configured by the caller with appropriate levels and outputs.
+func WithLogger(logger *slog.Logger) Option {
+	return optionFunc(func(c *config) {
+		c.slogger = logger
 	})
 }
