@@ -118,18 +118,19 @@ export class ScenarioRunnerService {
 
   // Get batch run data for a scenario set
   // TODO: This is a temporary solution as it's making a lot of queries to the database.
+  // come up with a better solution.
   async getRunDataForScenarioSet({
     projectId,
     scenarioSetId,
   }: {
     projectId: string;
-    scenarioSetId?: string;
+    scenarioSetId: string;
   }) {
     // Use provided batchRunIds or fetch them for the scenario set
     const resolvedBatchRunIds =
       await this.eventRepository.getBatchRunIdsForScenarioSet({
         projectId,
-        scenarioSetId: scenarioSetId!,
+        scenarioSetId,
       });
 
     if (resolvedBatchRunIds.length === 0) return [];
