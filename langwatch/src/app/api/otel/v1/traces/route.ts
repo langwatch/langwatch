@@ -1,10 +1,3 @@
-/**
- * Let Op!
- *
- * This endpoint does not work when running on devmode with turbo pack.
- * To develop it, start the server with `USE_WEBPACK=true npm run dev`.
- */
-
 import { NextResponse, type NextRequest } from "next/server";
 import {
   type IExportTraceServiceRequest,
@@ -12,7 +5,7 @@ import {
 } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { prisma } from "../../../../../server/db";
-import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/opentelemetry";
+import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
 import * as Sentry from "@sentry/nextjs";
 import * as crypto from "crypto";
 import {

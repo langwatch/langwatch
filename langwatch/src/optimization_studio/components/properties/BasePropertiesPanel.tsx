@@ -251,6 +251,8 @@ export function FieldsDefinition({
                           )}
                           <option value="float">float</option>
                           <option value="bool">bool</option>
+                          <option value="dict">dict</option>
+                          <option value="list">list</option>
                         </NativeSelect.Field>
                       </NativeSelect.Root>
                     </>

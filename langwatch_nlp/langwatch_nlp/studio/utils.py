@@ -8,11 +8,13 @@ import os
 import re
 import sys
 import threading
-from typing import Any, Dict, List, cast
+import random
 
+from typing import Any, Dict, List, cast
 from joblib.memory import MemorizedFunc, AsyncMemorizedFunc
 import langwatch
 import litellm
+
 
 from langwatch_nlp.studio.types.dsl import (
     DatasetInline,
@@ -24,6 +26,9 @@ from langwatch_nlp.studio.types.dsl import (
 )
 import dspy
 from pydantic import BaseModel
+
+
+from langwatch_nlp.studio.types.dataset import DatasetColumn, DatasetColumnType
 
 
 def print_class_definition(cls):
@@ -193,17 +198,17 @@ def forceful_exit(self):
 
 @contextmanager
 def optional_langwatch_trace(
-    do_not_trace=False, trace_id=None, api_key=None, skip_root_span=False, metadata=None
+    do_not_trace=False, trace_id=None, skip_root_span=False, metadata=None
 ):
-    if do_not_trace:
-        yield None
-    else:
-        with langwatch.trace(
-            trace_id=trace_id,
-            api_key=api_key,
-            skip_root_span=skip_root_span,
-            metadata=metadata,
-        ) as trace:
+    with langwatch.trace(
+        trace_id=trace_id,
+        skip_root_span=skip_root_span,
+        metadata=metadata,
+        disable_sending=do_not_trace,
+    ) as trace:
+        if do_not_trace:
+            yield None
+        else:
             yield trace
 
 
@@ -258,7 +263,7 @@ reserved_keywords = [
     "while",
     "with",
     "yield",
-    "items"
+    "items",
 ]
 
 
@@ -297,3 +302,34 @@ class SerializableWithStringFallback(SerializableWithPydanticAndPredictEncoder):
             return super().default(o)
         except:
             return str(o)
+
+
+def get_dataset_entry_selection(
+    entries: List[Dict[str, Any]],
+    entry_selection: str | int = "all",
+) -> List[Dict[str, Any]]:
+    """
+    Select entries from a list based on the entry_selection parameter.
+    Returns a list of selected entries.
+
+    Args:
+        entries: List of dictionary entries to select from
+        entry_selection: Selection mode - "all", "first", "last", "random", or an integer index
+
+    Returns:
+        List of selected entries
+    """
+    if not entries:
+        return []
+
+    if isinstance(entry_selection, int):
+        if entry_selection < 0 or entry_selection >= len(entries):
+            raise ValueError(f"Invalid entry selection index: {entry_selection}")
+        return [entries[entry_selection]]
+    if entry_selection == "first":
+        return entries[:1]
+    if entry_selection == "last":
+        return entries[-1:]
+    if entry_selection == "random":
+        return [random.choice(entries)] if entries else []
+    return entries

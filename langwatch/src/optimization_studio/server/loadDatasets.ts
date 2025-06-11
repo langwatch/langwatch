@@ -73,9 +73,13 @@ export const loadDatasets = async (
         };
       }
 
-      // Select from database dataset
+      // For database datasets, we'll just pass the ID and let the Python SDK fetch it
       if (!node.data.dataset.id) {
         throw new Error("Dataset ID is required");
+      }
+
+      if (entrySelection == "all") {
+        return node;
       }
 
       const dataset = await getFullDataset({

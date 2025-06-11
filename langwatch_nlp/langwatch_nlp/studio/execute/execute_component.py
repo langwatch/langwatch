@@ -1,5 +1,4 @@
 import dspy
-import asyncer
 import sentry_sdk
 from langwatch_nlp.studio.field_parser import autoparse_fields
 from langwatch_nlp.studio.parser import (
@@ -31,7 +30,6 @@ async def execute_component(event: ExecuteComponentPayload):
         with optional_langwatch_trace(
             do_not_trace=do_not_trace,
             trace_id=event.trace_id,
-            api_key=event.workflow.api_key,
             skip_root_span=True,
             metadata={
                 "platform": "optimization_studio",
@@ -66,6 +64,3 @@ async def execute_component(event: ExecuteComponentPayload):
             },
         )
         raise e
-    finally:
-        if trace:
-            await asyncer.asyncify(trace.send_spans)()

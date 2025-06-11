@@ -7,13 +7,12 @@ import {
   type IKeyValue,
   type ISpan,
 } from "@opentelemetry/otlp-transformer";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash-es/cloneDeep";
 import type { DeepPartial } from "../../utils/types";
 import type { CollectorJob } from "../background/types";
 import type {
   BaseSpan,
   ChatMessage,
-  Evaluation,
   LLMSpan,
   RAGChunk,
   Span,
@@ -771,15 +770,19 @@ const addOpenTelemetrySpanAsSpan = (
       const eventAttributes = otelAttributesToNestedAttributes(
         event?.attributes
       );
+
+      let errorMessage: string;
+      if (eventAttributes.exception?.message && eventAttributes.exception?.type) {
+        errorMessage = `${eventAttributes.exception.type}: ${eventAttributes.exception.message}`;
+      } else if (otelSpan.status?.message) {
+        errorMessage = otelSpan.status.message;
+      } else {
+        errorMessage = "Unknown Exception Occurred";
+      }
+
       error = {
         has_error: true,
-        message:
-          eventAttributes.exception?.message && eventAttributes.exception?.type
-            ? `${eventAttributes.exception.type}: ${eventAttributes.exception.message}`
-            : eventAttributes.exception?.message &&
-              eventAttributes.exception?.type
-            ? `${eventAttributes.exception.type}: ${eventAttributes.exception.message}`
-            : otelSpan.status?.message ?? "Exception",
+        message: errorMessage,
         stacktrace: eventAttributes.exception?.stacktrace
           ? (eventAttributes.exception?.stacktrace as string).split("\n")
           : [],
@@ -823,11 +826,25 @@ const addOpenTelemetrySpanAsSpan = (
   }
 
   // langwatch
-  if (attributesMap.langwatch) {
+  if (attributesMap.langwatch && typeof attributesMap.langwatch === "object") {
     if (attributesMap.langwatch.span?.type) {
       type = (attributesMap as any).langwatch.span.type;
       (attributesMap as any).langwatch.span.type = void 0;
     }
+    
+    if (typeof attributesMap.langwatch.thread?.id === "string") {
+      trace.reservedTraceMetadata.thread_id = attributesMap.langwatch.thread.id;
+      (attributesMap as any).langwatch.thread.id = void 0;
+    }
+    if (typeof attributesMap.langwatch.user?.id === "string") {
+      trace.reservedTraceMetadata.user_id = attributesMap.langwatch.user.id;
+      (attributesMap as any).langwatch.user.id = void 0;
+    }
+    if (typeof attributesMap.langwatch.customer?.id === "string") {
+      trace.reservedTraceMetadata.customer_id = attributesMap.langwatch.customer.id;
+      (attributesMap as any).langwatch.customer.id = void 0;
+    }
+
     if (attributesMap.langwatch.input) {
       if (
         Array.isArray(attributesMap.langwatch.input) &&

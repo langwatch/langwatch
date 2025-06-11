@@ -28,7 +28,7 @@ from typing import (
 from warnings import warn
 import inspect
 
-from langwatch.state import get_api_key, get_endpoint, get_instance
+from langwatch.state import get_api_key, get_endpoint, get_instance, set_api_key
 from langwatch.domain import (
     ChatMessage,
     Conversation,
@@ -46,8 +46,8 @@ from langwatch.domain import (
 )
 from langwatch.telemetry.span import LangWatchSpan
 from langwatch.__version__ import __version__
-from langwatch.telemetry.context import stored_langwatch_trace
 from langwatch.utils.initialization import ensure_setup
+import langwatch.telemetry.context
 
 if TYPE_CHECKING:
     from openai import OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI
@@ -95,7 +95,12 @@ class LangWatchTrace:
         skip_root_span: bool = False,
         tracer_provider: Optional[TracerProvider] = None,
     ):
-        ensure_setup(api_key=api_key)
+        ensure_setup()
+        if api_key is not None:
+            warn(
+                "Setting API key on trace is deprecated. Please set it on the LangWatch client instance instead using `langwatch.setup(api_key=<api_key>)`"
+            )
+            set_api_key(api_key=api_key)
 
         self.metadata = metadata
         self.api_key = api_key
@@ -103,7 +108,6 @@ class LangWatchTrace:
         self._context_token = None
         self._lock = threading.Lock()
         self._expected_output = expected_output
-        self._cleaned_up = False
         self.span = cast(
             Type[LangWatchSpan], lambda **kwargs: LangWatchSpan(trace=self, **kwargs)
         )
@@ -122,12 +126,15 @@ class LangWatchTrace:
                 client.disable_sending = True
 
         # Use the global tracer provider
+        self._tracer_provider = tracer_provider
         self.tracer = (tracer_provider or trace_api).get_tracer(
             instrumenting_module_name="langwatch",
             instrumenting_library_version=__version__,
         )
+        self._reset()
 
         # Store root span parameters for later creation
+        self._skip_root_span = skip_root_span
         self._root_span_params = (
             {
                 "span_id": span_id,
@@ -147,6 +154,41 @@ class LangWatchTrace:
             }
             if not skip_root_span
             else None
+        )
+
+    def _reset(self):
+        self._cleaned_up = False
+
+    def _clone(self) -> "LangWatchTrace":
+        root_span_params = self._root_span_params or {}
+
+        return LangWatchTrace(
+            trace_id=(
+                str(self.metadata.get("deprecated.trace_id", None))
+                if self.metadata and self.metadata.get("deprecated.trace_id", None)
+                else None
+            ),
+            metadata=self.metadata,
+            expected_output=self._expected_output,
+            api_key=self.api_key,
+            disable_sending=self.disable_sending,
+            max_string_length=self.max_string_length,
+            tracer_provider=self._tracer_provider,
+            span_id=root_span_params.get("span_id", None),
+            capture_input=root_span_params.get("capture_input", True),
+            capture_output=root_span_params.get("capture_output", True),
+            name=root_span_params.get("name", None),
+            type=root_span_params.get("type", "span"),
+            input=root_span_params.get("input", None),
+            output=root_span_params.get("output", None),
+            error=root_span_params.get("error", None),
+            timestamps=root_span_params.get("timestamps", None),
+            contexts=root_span_params.get("contexts", None),
+            model=root_span_params.get("model", None),
+            params=root_span_params.get("params", None),
+            metrics=root_span_params.get("metrics", None),
+            evaluations=root_span_params.get("evaluations", None),
+            skip_root_span=self._skip_root_span,
         )
 
     @property
@@ -175,26 +217,6 @@ class LangWatchTrace:
                 self._trace_id = context.trace_id
             return self.root_span
 
-    async def _create_root_span_async(self):
-        """Create the root span asynchronously if parameters were provided."""
-        if self._root_span_params is not None:
-            # Pre-serialize timestamps if present
-            root_span_params = dict(self._root_span_params)
-            if (
-                "timestamps" in root_span_params
-                and root_span_params["timestamps"] is not None
-            ):
-                root_span_params["timestamps"] = json.dumps(
-                    root_span_params["timestamps"], cls=SerializableWithStringFallback
-                )
-
-            self.root_span = LangWatchSpan(trace=self, **root_span_params)
-            await self.root_span.__aenter__()
-            context = self.root_span.get_span_context()
-            if context is not None:
-                self._trace_id = context.trace_id
-            return self.root_span
-
     def _cleanup(
         self,
         exc_type: Optional[type],
@@ -213,14 +235,8 @@ class LangWatchTrace:
                 warn(f"Failed to cleanup root span: {e}")
 
             if self._context_token is not None:
-                try:
-                    stored_langwatch_trace.reset(self._context_token)
-                except Exception as e:
-                    # Only warn if it's not a context error
-                    if "different Context" not in str(e):
-                        warn(f"Failed to reset LangWatch trace context: {e}")
-                finally:
-                    self._context_token = None
+                langwatch.telemetry.context._reset_current_trace(self._context_token)
+                self._context_token = None
 
             self._cleaned_up = True
 
@@ -250,7 +266,7 @@ class LangWatchTrace:
         ensure_setup()
         import langwatch.dspy
 
-        langwatch.dspy.tracer(trace=self)
+        langwatch.dspy.DSPyTracer(trace=self)
 
     def share(self) -> str:
         """Share this trace and get a shareable URL."""
@@ -453,8 +469,8 @@ class LangWatchTrace:
 
             @functools.wraps(func)
             async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                async with self:
-                    self._set_callee_input_information(func, *args, **kwargs)
+                async with self._clone() as trace:
+                    trace._set_callee_input_information(func, *args, **kwargs)
                     items = []
                     async for item in func(*args, **kwargs):
                         items.append(item)
@@ -465,15 +481,15 @@ class LangWatchTrace:
                         if all(isinstance(item, str) for item in items)
                         else items
                     )
-                    self._set_callee_output_information(func, output)
+                    trace._set_callee_output_information(func, output)
 
             return wrapper
         elif inspect.isgeneratorfunction(func):
 
             @functools.wraps(func)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
-                with self:
-                    self._set_callee_input_information(func, *args, **kwargs)
+                with self._clone() as trace:
+                    trace._set_callee_input_information(func, *args, **kwargs)
                     items = []
                     for item in func(*args, **kwargs):
                         items.append(item)
@@ -484,17 +500,17 @@ class LangWatchTrace:
                         if all(isinstance(item, str) for item in items)
                         else items
                     )
-                    self._set_callee_output_information(func, output)
+                    trace._set_callee_output_information(func, output)
 
             return wrapper
         elif inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                async with self:
-                    self._set_callee_input_information(func, *args, **kwargs)
+                async with self._clone() as trace:
+                    trace._set_callee_input_information(func, *args, **kwargs)
                     output = await func(*args, **kwargs)
-                    self._set_callee_output_information(func, output)
+                    trace._set_callee_output_information(func, output)
                     return output
 
             return wrapper
@@ -502,21 +518,20 @@ class LangWatchTrace:
 
             @functools.wraps(func)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
-                with self:
-                    self._set_callee_input_information(func, *args, **kwargs)
+                with self._clone() as trace:
+                    trace._set_callee_input_information(func, *args, **kwargs)
                     output = func(*args, **kwargs)
-                    self._set_callee_output_information(func, output)
+                    trace._set_callee_output_information(func, output)
                     return output
 
             return wrapper
 
     def __enter__(self) -> "LangWatchTrace":
         """Makes the trace usable as a context manager."""
-        try:
-            # Store the old token and set the new one
-            self._context_token = stored_langwatch_trace.set(self)
-        except Exception as e:
-            warn(f"Failed to set LangWatch trace context: {e}")
+        self._reset()
+
+        # Store the old token and set the new one
+        self._context_token = langwatch.telemetry.context._set_current_trace(self)
 
         if self._root_span_params is not None:
             self._create_root_span()
@@ -541,14 +556,13 @@ class LangWatchTrace:
 
     async def __aenter__(self) -> "LangWatchTrace":
         """Makes the trace usable as an async context manager."""
-        try:
-            # Store the old token and set the new one
-            self._context_token = stored_langwatch_trace.set(self)
-        except Exception as e:
-            warn(f"Failed to set LangWatch trace context: {e}")
+        self._reset()
+
+        # Store the old token and set the new one
+        self._context_token = langwatch.telemetry.context._set_current_trace(self)
 
         if self._root_span_params is not None:
-            await self._create_root_span_async()
+            self._create_root_span()
 
         return self
 
@@ -573,7 +587,7 @@ class LangWatchTrace:
         self._cleanup(None, None, None)
 
     def send_spans(self):
-        trace_api.get_tracer_provider().force_flush()
+        trace_api.get_tracer_provider().force_flush()  # type: ignore
 
     def _set_callee_input_information(
         self, func: Callable[..., Any], *args: Any, **kwargs: Any
@@ -700,7 +714,12 @@ def trace(
     It can contain multiple spans representing different operations within that cycle.
     """
     # Ensure client is setup
-    ensure_setup(api_key=api_key)
+    ensure_setup()
+    if api_key is not None:
+        warn(
+            "Setting API key on trace is deprecated. Please set it on the LangWatch client instance instead using `langwatch.setup(api_key=<api_key>)`"
+        )
+        set_api_key(api_key=api_key)
 
     return LangWatchTrace(
         trace_id=trace_id,

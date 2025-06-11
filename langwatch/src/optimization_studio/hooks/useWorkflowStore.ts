@@ -9,7 +9,7 @@ import {
   applyNodeChanges,
 } from "@xyflow/react";
 import isDeepEqual from "fast-deep-equal";
-import debounce from "lodash.debounce";
+import debounce from "lodash-es/debounce";
 import { temporal } from "zundo";
 import { create } from "zustand";
 
@@ -142,6 +142,7 @@ export const initialDSL: Workflow = {
   enable_tracing: true,
   workflow_type: "workflow",
   state: {},
+  experiment_id: undefined,
 };
 
 export const initialState: State = {

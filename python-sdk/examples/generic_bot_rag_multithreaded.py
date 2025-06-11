@@ -4,41 +4,34 @@ from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor
 import chainlit as cl
 import langwatch
-from langwatch.telemetry.span import LangWatchSpan
 
 load_dotenv()
 
-# langwatch.debug = True
+
+@langwatch.span(type="llm")
+def generate(question_id: str, contexts: list[str], message: str):
+    time.sleep(1)  # generating the message...
+    generated_message = "Hello there! How can I help?"
+    langwatch.get_current_span().update(model="custom_model")
+    return generated_message
 
 
-def generate(
-    question_id: str, contexts: list[str], message: str, span_context: LangWatchSpan
-):
-    with langwatch.span(type="llm", parent=span_context, input=message):
-        time.sleep(1)  # generating the message...
-        generated_message = "Hello there! How can I help?"
-        langwatch.get_current_span().update(model="custom_model")
-        return generated_message
+@langwatch.span(name="retrieve", type="rag")
+def retrieve(question_id: str, message: str):
+    time.sleep(0.5)
+    contexts = ["context1", "context2"]
+    langwatch.get_current_span().update(contexts=contexts)
+    return contexts
 
 
-def retrieve(question_id: str, message: str, span_context: LangWatchSpan):
-    with langwatch.span(type="rag", parent=span_context, input=message):
-        time.sleep(0.5)
-        contexts = ["context1", "context2"]
-        langwatch.get_current_span().update(contexts=contexts)
-        return contexts
-
-
-@langwatch.span()
+@langwatch.span(name="parallel_rag")
 def parallel_rag(question_id: str, message: str):
     langwatch.get_current_trace().update(trace_id=question_id)
 
     # Create a ThreadPoolExecutor to run tasks in parallel
     with ThreadPoolExecutor(max_workers=2) as executor:
         # Submit retrieve task
-        retrieve_future = executor.submit(
-            retrieve, question_id, message, span_context=langwatch.get_current_span()
-        )
+        retrieve_future = executor.submit(retrieve, question_id, message)
 
         # Wait for retrieve to complete and then submit generate
         contexts = retrieve_future.result() or []
@@ -47,7 +40,6 @@ def parallel_rag(question_id: str, message: str):
             question_id,
             contexts,
             message,
-            span_context=langwatch.get_current_span(),
         )
 
         # Get the final result

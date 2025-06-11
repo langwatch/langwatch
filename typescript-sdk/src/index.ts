@@ -34,6 +34,7 @@ import {
   type RESTEvaluation,
   type SpanInputOutput,
   type LLMModeTrace,
+  type ErrorCapture,
 } from "./types";
 import { camelToSnakeCaseNested, type Strict } from "./typeUtils";
 import {
@@ -56,6 +57,7 @@ export type {
   RAGSpan,
   SpanInputOutput,
   LLMModeTrace,
+  ErrorCapture,
 };
 
 export {

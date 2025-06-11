@@ -399,6 +399,7 @@ For other changes:
 but the actual change that was made inside the fields with as few words as possible, like "avoid word <example>".
 - By the way, always refer to the prompt as "prompt", not "instructions".
 - When changing the evaluator, it's not just the name the changes, it means the workflow is actually now using a different evaluator.
+- Do not use the word "edge", the user doesn't know the internal structure of the DSL, understand what is going on instead.
             `,
           },
           {

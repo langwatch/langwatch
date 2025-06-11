@@ -7,7 +7,7 @@ import {
 } from "@elastic/elasticsearch/lib/api/types";
 import { PublicShareResourceTypes, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import shuffle from "lodash/shuffle";
+import shuffle from "lodash-es/shuffle";
 import type { Session } from "next-auth";
 import {
   createTRPCRouter,

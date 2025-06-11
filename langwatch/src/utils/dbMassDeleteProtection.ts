@@ -1,5 +1,5 @@
 // From: https://github.com/prisma/prisma/issues/20169
-import { isEmpty } from "lodash";
+import isEmpty from "lodash-es/isEmpty";
 import { type Prisma } from "@prisma/client";
 
 /**

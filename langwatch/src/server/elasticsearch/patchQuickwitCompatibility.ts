@@ -1,7 +1,7 @@
 import { type Client as ElasticClient } from "@elastic/elasticsearch";
 
 import { env } from "../../env.mjs";
-import { throttle } from "lodash";
+import throttle from "lodash-es/throttle";
 
 // Hold a temporary in-memory db to accumulate the updates together and send just the latest to quickwit
 const inMemoryDb: Record<string, Record<string, unknown>> = {};
