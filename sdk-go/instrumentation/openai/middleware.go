@@ -1,14 +1,19 @@
 package openai
 
 import (
+	"fmt"
 	"net/http"
 	"path"
 	"strings"
 
+	"github.com/langwatch/langwatch/sdk-go/instrumentation/openai/apis"
+	"github.com/langwatch/langwatch/sdk-go/instrumentation/openai/events"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/log"
+	"go.opentelemetry.io/otel/log/global"
 	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 	"go.opentelemetry.io/otel/trace"
 
@@ -16,7 +21,7 @@ import (
 )
 
 const (
-	tracerName             = "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	instrumentationName    = "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
 	instrumentationVersion = "0.0.1"
 )
 
@@ -24,25 +29,35 @@ const (
 // OpenAI library.
 func Middleware(name string, opts ...Option) oaioption.Middleware {
 	cfg := config{
-		genAISystem: semconv.GenAISystemOpenai, // Default to "openai"
+		genAISystem:         semconv.GenAISystemOpenai,
+		contentRecordPolicy: events.NewProtectedContentRecordPolicy(),
 		slogger:             defaultLogger, // zero-noise default
 	}
 	for _, opt := range opts {
 		opt.apply(&cfg)
 	}
+
 	if cfg.tracerProvider == nil {
 		cfg.tracerProvider = otel.GetTracerProvider()
 	}
+	if cfg.loggerProvider == nil {
+		cfg.loggerProvider = global.GetLoggerProvider()
+	}
+	if cfg.propagators == nil {
+		cfg.propagators = otel.GetTextMapPropagator()
+	}
+
 	tracerOpts := []trace.TracerOption{
 		trace.WithInstrumentationVersion(instrumentationVersion),
 		trace.WithSchemaURL(semconv.SchemaURL),
 	}
-
-	tracer := langwatch.Tracer(tracerName, tracerOpts...)
-
-	if cfg.propagators == nil {
-		cfg.propagators = otel.GetTextMapPropagator()
+	loggerOpts := []log.LoggerOption{
+		log.WithInstrumentationVersion(instrumentationVersion),
+		log.WithSchemaURL(semconv.SchemaURL),
 	}
+
+	cfg.tracer = *langwatch.TracerFromTracerProvider(cfg.tracerProvider, instrumentationName, tracerOpts...)
+	cfg.logger = cfg.loggerProvider.Logger(instrumentationName, loggerOpts...)
 
 	return func(req *http.Request, next oaioption.MiddlewareNext) (*http.Response, error) {
 		operation := path.Base(req.URL.Path)
@@ -51,7 +66,7 @@ func Middleware(name string, opts ...Option) oaioption.Middleware {
 
 		genAIOperation := getGenAIOperationFromPath(req.URL.Path)
 
-		ctx, span := tracer.Start(req.Context(), spanName,
+		ctx, span := cfg.tracer.Start(req.Context(), spanName,
 			trace.WithAttributes(
 				semconv.HTTPRequestMethodKey.String(req.Method),
 				semconv.ServerAddressKey.String(req.URL.Hostname()),
@@ -71,9 +86,9 @@ func Middleware(name string, opts ...Option) oaioption.Middleware {
 			}
 		}()
 
-		requestProcessor := NewRequestProcessor(cfg.recordInput, genAISystemName)
-		responseProcessor := NewResponseProcessor(cfg.recordOutput)
-		isStreaming, err := requestProcessor.ProcessRequest(req, span, operation)
+		// Use the new refactored processor with domain-specific handling
+		processor := apis.NewProcessor(genAISystemName, cfg.contentRecordPolicy, cfg.loggerProvider, cfg.slogger)
+		isStreaming, err := processor.ProcessRequest(ctx, req, span)
 		if err != nil {
 			span.SetStatus(codes.Error, err.Error())
 			span.RecordError(err)
@@ -92,19 +107,21 @@ func Middleware(name string, opts ...Option) oaioption.Middleware {
 
 		if resp != nil {
 			span.SetAttributes(semconv.HTTPResponseStatusCodeKey.Int(resp.StatusCode))
+
+			// Set span status based on HTTP status code
 			if resp.StatusCode >= 400 {
 				span.SetStatus(codes.Error, http.StatusText(resp.StatusCode))
-				return resp, nil
 			} else {
 				span.SetStatus(codes.Ok, "")
 			}
 
+			// Process response body for both success and error cases to extract attributes
 			if resp.Body != nil && resp.Body != http.NoBody {
 				if isStreaming {
 					// For streaming responses, the span will be ended by the response processor
 					// so we prevent the defer from ending it
 					shouldEndSpan = false
-					newBody, err := responseProcessor.ProcessStreamingResponse(resp.Body, span)
+					newBody, err := processor.ProcessResponse(ctx, resp, span, isStreaming)
 					if err != nil {
 						// If there's an error setting up streaming, we need to end the span here
 						shouldEndSpan = true
@@ -114,10 +131,12 @@ func Middleware(name string, opts ...Option) oaioption.Middleware {
 					}
 					resp.Body = newBody
 				} else {
-					if err := responseProcessor.ProcessNonStreamingResponse(resp, span); err != nil {
+					if _, err := processor.ProcessResponse(ctx, resp, span, isStreaming); err != nil {
 						logError("Error processing non-streaming response: %v", err)
 					}
 				}
+			} else {
+				fmt.Printf("DEBUG: No response body to process\n")
 			}
 		}
 
