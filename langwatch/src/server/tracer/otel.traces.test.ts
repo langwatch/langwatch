@@ -9,7 +9,7 @@ import { assert, describe, expect, it } from "vitest";
 import { z, type ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import type { DeepPartial } from "../../utils/types";
-import { openTelemetryTraceRequestToTracesForCollection } from "./opentelemetry";
+import { openTelemetryTraceRequestToTracesForCollection } from "./otel.traces";
 import { spanSchema } from "./types.generated";
 
 const openInferenceOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {

@@ -13,7 +13,6 @@ import type { CollectorJob } from "../background/types";
 import type {
   BaseSpan,
   ChatMessage,
-  Evaluation,
   LLMSpan,
   RAGChunk,
   Span,
@@ -827,11 +826,12 @@ const addOpenTelemetrySpanAsSpan = (
   }
 
   // langwatch
-  if (attributesMap.langwatch) {
+  if (attributesMap.langwatch && typeof attributesMap.langwatch === "object") {
     if (attributesMap.langwatch.span?.type) {
       type = (attributesMap as any).langwatch.span.type;
       (attributesMap as any).langwatch.span.type = void 0;
     }
+    
     if (typeof attributesMap.langwatch.thread?.id === "string") {
       trace.reservedTraceMetadata.thread_id = attributesMap.langwatch.thread.id;
       (attributesMap as any).langwatch.thread.id = void 0;
