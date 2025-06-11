@@ -177,13 +177,7 @@ export function SimulationCard({
       overflow="hidden"
     >
       <VStack height="100%" gap={0}>
-        <SimulationCardHeader
-          title={title}
-          status={status}
-          runAt={runAt}
-          isExpanded={isExpanded}
-          onExpandToggle={onExpandToggle}
-        />
+        <SimulationCardHeader title={title} status={status} />
         <SimulationCardContent status={status}>
           {children}
         </SimulationCardContent>

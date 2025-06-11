@@ -238,7 +238,7 @@ export class ScenarioEventRepository {
       )?.buckets?.map((bucket) => ({
         batchRunId: bucket.key,
         scenarioCount: bucket.scenario_count.value,
-        lastRunAt: new Date(bucket.last_run.value),
+        lastRunAt: bucket.last_run.value,
         successRate:
           bucket.scenario_count.value > 0
             ? Math.round(
