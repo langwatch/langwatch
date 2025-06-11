@@ -500,7 +500,23 @@ const updateTrace = async (
               }
               
               newSpan.timestamps.updated_at = currentTime;
-              ctx._source.spans[existingSpanIndex] = newSpan;
+              
+              // Deep merge spans
+              for (String key : newSpan.keySet()) {
+                if (newSpan[key] instanceof Map) {
+                  if (!existingSpan.containsKey(key) || !(existingSpan[key] instanceof Map)) {
+                    existingSpan[key] = new HashMap();
+                  }
+                  Map nestedSource = existingSpan[key];
+                  Map nestedUpdate = newSpan[key];
+                  for (String nestedKey : nestedUpdate.keySet()) {
+                    nestedSource[nestedKey] = nestedUpdate[nestedKey];
+                  }
+                } else {
+                  existingSpan[key] = newSpan[key];
+                }
+              }
+              ctx._source.spans[existingSpanIndex] = existingSpan;
             } else {
               ctx._source.spans.add(newSpan);
             }
