@@ -86,7 +86,7 @@ export const openTelemetryLogsRequestToTracesForCollection = (
 							},
 							timestamps: {
 								ignore_timestamps_on_write: true,
-								started_at: convertTimeUnixNano(logRecord.timeUnixNano),
+								started_at: convertFromUnixNano(logRecord.timeUnixNano),
 								finished_at: 0,
 							},
 						});
@@ -103,7 +103,7 @@ export const openTelemetryLogsRequestToTracesForCollection = (
 							},
 							timestamps: {
 								ignore_timestamps_on_write: true,
-								started_at: convertTimeUnixNano(logRecord.timeUnixNano),
+								started_at: convertFromUnixNano(logRecord.timeUnixNano),
 								finished_at: 0,
 							},
 						});
@@ -128,22 +128,21 @@ const decodeOpenTelemetryId = (id: unknown): string | null => {
 	return null;
 }
 
-const convertTimeUnixNano = (timeUnixNano: unknown): number => {
+const convertFromUnixNano = (timeUnixNano: unknown): number => {
+	let unixNano: number;
+	
 	if (typeof timeUnixNano === "number") {
-		return timeUnixNano;
-	}
-	if (typeof timeUnixNano === "string") {
+		unixNano = timeUnixNano;
+	} else if (typeof timeUnixNano === "string") {
 		const parsed = parseInt(timeUnixNano, 10);
-		if (!isNaN(parsed)) {
-			return parsed;
-		}
-	}
-	if (timeUnixNano && typeof timeUnixNano === "object" && "low" in timeUnixNano && "high" in timeUnixNano) {
-		const low = (timeUnixNano as any).low ?? 0;
-		const high = (timeUnixNano as any).high ?? 0;
-		return high * 0x100000000 + low;
+		unixNano = !isNaN(parsed) ? parsed : Date.now() * 1000000;
+	} else if (timeUnixNano && typeof timeUnixNano === "object" && "low" in timeUnixNano && "high" in timeUnixNano) {
+		const { low = 0, high = 0 } = timeUnixNano as any;
+		unixNano = high * 0x100000000 + low;
+	} else {
+		unixNano = Date.now() * 1000000;
 	}
 	
-	// Default to current time in nanoseconds
-	return Date.now() * 1000000;
+	// Convert nanoseconds to milliseconds
+	return Math.round(unixNano / 1000000);
 }
