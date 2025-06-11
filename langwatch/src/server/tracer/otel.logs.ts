@@ -115,6 +115,13 @@ export const openTelemetryLogsRequestToTracesForCollection = (
 						},
 					};
 					trace.spans.push(existingSpan);
+				} else {
+					if (input) {
+						existingSpan.input = input;
+					}
+					if (output) {
+						existingSpan.output = output;
+					}
 				}
 			}
 		}
