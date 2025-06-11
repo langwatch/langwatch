@@ -1255,4 +1255,28 @@ describe("Span organizing and flattening tests", () => {
       "You're welcome! If you have any more questions or need assistance, feel free to ask. Have a great day!"
     );
   });
+
+  it("extracts 'message' from input json", () => {
+    const spans = [
+      {
+        ...commonSpanProps,
+        span_id: "1",
+        name: "test span",
+        parent_id: null,
+        timestamps: { started_at: 100, finished_at: 500 },
+        input: {
+          type: "json",
+          value: {
+            session_id: "123",
+            message: "how much is 2+2?",
+          },
+        },
+      },
+    ];
+
+    const input = getFirstInputAsText(
+      spans.map(elasticSearchSpanToSpan as any)
+    );
+    expect(input).toBe("how much is 2+2?");
+  });
 });

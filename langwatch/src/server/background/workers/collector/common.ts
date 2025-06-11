@@ -180,6 +180,9 @@ export const typedValueToText = (
       if (json.query !== undefined) {
         return json.user_query;
       }
+      if (json.message !== undefined && typeof json.message === "string") {
+        return json.message;
+      }
       // Langflow
       if (json.input_value !== undefined) {
         return json.input_value;
