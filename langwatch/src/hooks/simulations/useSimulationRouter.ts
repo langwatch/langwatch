@@ -6,13 +6,13 @@ export const useSimulationRouter = () => {
   const { scenarioRunId, scenarioSetId, batchRunId } = router.query;
   const { project } = useOrganizationTeamProject();
 
-  const goToSimulationRun = (
-    scenarioSetId: string,
-    batchRunId: string,
-    scenarioRunId: string
-  ) => {
+  const goToSimulationRun = (ids: {
+    scenarioSetId: string;
+    batchRunId: string;
+    scenarioRunId: string;
+  }) => {
     router.push(
-      `/${project?.slug}/simulations/${scenarioSetId}/${batchRunId}/${scenarioRunId}`
+      `/${project?.slug}/simulations/${ids.scenarioSetId}/${ids.batchRunId}/${ids.scenarioRunId}`
     );
   };
 

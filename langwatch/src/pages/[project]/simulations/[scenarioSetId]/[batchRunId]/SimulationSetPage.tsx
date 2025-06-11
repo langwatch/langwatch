@@ -59,7 +59,7 @@ export function SimulationSetPage({
   return (
     <DashboardLayout>
       <HStack w="full" h="full">
-        <SetRunHistorySidebar scenarioSetId={scenarioSetId} />
+        <SetRunHistorySidebar />
         <Box w="full" position="relative" h="full">
           <PageLayout.Container
             maxW={"calc(100vw - 200px)"}

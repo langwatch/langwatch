@@ -7,5 +7,9 @@ import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 export default function SlugRouter() {
   const { scenarioSetId } = useSimulationRouter();
 
+  if (!scenarioSetId) {
+    return null;
+  }
+
   return <SimulationSetPage scenarioSetId={scenarioSetId} />;
 }
