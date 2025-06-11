@@ -3,6 +3,7 @@ import { useOrganizationTeamProject } from "../useOrganizationTeamProject";
 
 export const useSimulationRouter = () => {
   const router = useRouter();
+  const { scenarioRunId, scenarioSetId, batchRunId } = router.query;
   const { project } = useOrganizationTeamProject();
 
   const goToSimulationRun = (
@@ -43,9 +44,9 @@ export const useSimulationRouter = () => {
 
   return {
     ...router,
-    slug: router.query.slug?.toString(),
-    scenarioSetId: router.query.scenarioSetId?.toString(),
-    batchRunId: router.query.batchRunId?.toString(),
+    scenarioSetId: scenarioSetId?.toString(),
+    batchRunId: batchRunId?.toString(),
+    scenarioRunId: scenarioRunId?.toString(),
     goToSimulationRun,
     goToSimulationSet,
     goToSimulationSets,

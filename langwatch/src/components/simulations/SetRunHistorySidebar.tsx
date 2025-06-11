@@ -227,7 +227,6 @@ const SetRunHistorySidebarComponent = (
       bg={useColorModeValue("white", "gray.900")}
       borderRight="1px"
       borderColor={useColorModeValue("gray.200", "gray.700")}
-      h="100vh"
       w="500px"
       overflowY="auto"
     >

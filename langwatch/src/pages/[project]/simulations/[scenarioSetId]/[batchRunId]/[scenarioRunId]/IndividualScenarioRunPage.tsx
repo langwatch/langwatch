@@ -5,99 +5,31 @@ import {
   HStack,
   Text,
   VStack,
-  Drawer,
-  Code,
+  Badge,
+  Flex,
 } from "@chakra-ui/react";
-import { ArrowLeft, Clock } from "react-feather";
+import { ArrowLeft, Clock, Check, X } from "react-feather";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { DashboardLayout } from "~/components/DashboardLayout";
 import "@copilotkit/react-ui/styles.css";
 import "../../../simulations.css";
-import { SimulationChatViewer } from "~/components/simulations";
+import {
+  CustomCopilotKitChat,
+  SimulationConsole,
+} from "~/components/simulations";
 import { useSimulationRouter } from "~/hooks/simulations";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useColorModeValue } from "~/components/ui/color-mode";
 import { LayoutWithSetRunHistory } from "~/components/simulations/LayoutWithSetRunHistory";
 
 interface IndividualScenarioRunPageProps {
   scenarioRunId: string;
 }
 
-// Console-like component for displaying test results
-function SimulationConsole({
-  results,
-  scenarioName,
-  status,
-  durationInMs,
-}: {
-  results?: any;
-  scenarioName?: string;
-  status?: string;
-  durationInMs?: number;
-}) {
-  const consoleBg = useColorModeValue("gray.900", "gray.800");
-  const consoleText = useColorModeValue("green.300", "green.300");
-
-  const passed = status === "SUCCESS" ? 1 : 0;
-  const failed = status === "SUCCESS" ? 0 : 1;
-  const successRate = status === "SUCCESS" ? "100.0%" : "0.0%";
-  const duration = durationInMs ? (durationInMs / 1000).toFixed(2) : "0.00";
-  const agentTime = durationInMs
-    ? ((durationInMs * 0.7) / 1000).toFixed(2)
-    : "0.00"; // Mock agent time as 70% of total
-
-  const consoleOutput = `=== Scenario Test Report ===
-Total Scenarios: 1
-Passed: ${passed}
-Failed: ${failed}  
-Success Rate: ${successRate}
-1. ${scenarioName || "User is looking for a order cancellation request"} – ${
-    status === "SUCCESS" ? "PASSED" : "FAILED"
-  } in ${duration}s (agent: ${agentTime}s)
-   Reasoning: ${
-     results?.reasoning ||
-     "The recipe provided is vegetarian, includes a list of ingredients, and has step-by-step cooking instructions."
-   }
-   Success Criteria: ${results?.metCriteria?.length || 1}/${
-     (results?.metCriteria?.length || 1) + (results?.unmetCriteria?.length || 0)
-   }`;
-
-  return (
-    <Box
-      bg={consoleBg}
-      color={consoleText}
-      p={4}
-      borderRadius="md"
-      fontFamily="mono"
-      fontSize="sm"
-      minHeight="200px"
-      overflow="auto"
-    >
-      <Code
-        colorScheme="green"
-        bg="transparent"
-        color="inherit"
-        whiteSpace="pre-wrap"
-      >
-        {consoleOutput}
-      </Code>
-    </Box>
-  );
-}
-
-// Previous Runs Sidebar Component
-function PreviousRunsSidebar({
-  isOpen,
-  onClose,
-  scenarioId,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  scenarioId?: string;
-}) {
+// Previous Runs List Component
+function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
   const { project } = useOrganizationTeamProject();
-  const { goToSimulationRun } = useSimulationRouter();
+  const { goToSimulationRun, scenarioSetId, batchRunId } =
+    useSimulationRouter();
 
   const { data: scenarioRunData } =
     api.scenarios.getRunDataByScenarioId.useQuery(
@@ -110,37 +42,71 @@ function PreviousRunsSidebar({
       }
     );
 
-  if (!isOpen) return null;
-
   return (
     <VStack gap={3} align="stretch">
       {scenarioRunData?.data?.map((run, index) => (
         <Box
           key={run.scenarioRunId}
-          p={3}
-          bg="gray.50"
+          p={4}
           borderRadius="md"
+          border="1px solid"
+          borderColor="gray.200"
           cursor="pointer"
           _hover={{ bg: "gray.100" }}
-          onClick={() => goToSimulationRun(run.scenarioRunId)}
+          onClick={() => {
+            if (scenarioSetId && batchRunId) {
+              goToSimulationRun(run.scenarioRunId, scenarioSetId, batchRunId);
+            }
+          }}
         >
-          <HStack justify="space-between">
-            <VStack align="start" gap={1}>
-              <Text fontWeight="medium" fontSize="sm">
-                {run.status === "SUCCESS" ? "✅ completed" : "⏳ running"}
-              </Text>
+          <VStack align="start" gap={3} w="100%">
+            {/* Status Badge and Timestamp Row */}
+            <Flex
+              align="start"
+              w="100%"
+              flexWrap="wrap"
+              gap={2}
+              alignItems="center"
+            >
+              {run.status === "SUCCESS" && <Check size={12} />}
+              <Badge
+                colorScheme={run.status === "SUCCESS" ? "green" : "orange"}
+                variant="subtle"
+                display="flex"
+                alignItems="center"
+                gap={1}
+                px={2}
+                py={1}
+                borderRadius="md"
+              >
+                <Text fontSize="xs" fontWeight="medium">
+                  {run.status === "SUCCESS" ? "completed" : "running"}
+                </Text>
+              </Badge>
+            </Flex>
+
+            {/* Metrics Row */}
+            <VStack align="start" gap={1} w="100%">
               <Text fontSize="xs" color="gray.600">
-                {new Date(run.timestamp).toLocaleDateString()} •{" "}
-                {Math.round(run.durationInMs / 1000)}s
+                <Text>Duration: {Math.round(run.durationInMs / 1000)}s</Text>
+                <Text>
+                  Accuracy:{" "}
+                  {run.results?.metCriteria?.length &&
+                  run.results?.unmetCriteria?.length
+                    ? (run.results?.metCriteria?.length /
+                        (run.results?.metCriteria?.length +
+                          run.results?.unmetCriteria?.length)) *
+                      100
+                    : 0}
+                  %
+                </Text>
               </Text>
-              <Text fontSize="xs" color="gray.500">
-                Accuracy: {run.status === "SUCCESS" ? "100.0%" : "0.0%"}
+              <Text fontSize="xs" color="gray.400" whiteSpace="nowrap">
+                {new Date(run.timestamp).toLocaleDateString()},{" "}
+                {new Date(run.timestamp).toLocaleTimeString()}
               </Text>
             </VStack>
-            <Text fontSize="xs" color="gray.400">
-              6/{index + 1}/2025, 9:21:36 AM
-            </Text>
-          </HStack>
+          </VStack>
         </Box>
       )) ?? (
         <Text color="gray.500" fontSize="sm">
@@ -152,103 +118,170 @@ function PreviousRunsSidebar({
 }
 
 // Main component
-export function IndividualScenarioRunPage({
-  scenarioRunId,
-}: IndividualScenarioRunPageProps) {
+export function IndividualScenarioRunPage({}: IndividualScenarioRunPageProps) {
   const [showPreviousRuns, setShowPreviousRuns] = useState(false);
-  const { goToSimulationSet } = useSimulationRouter();
+  const { goToSimulationSet, scenarioRunId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
 
   // Fetch scenario run data using the correct API
   const { data: scenarioState } = api.scenarios.getRunState.useQuery(
     {
-      scenarioRunId,
+      scenarioRunId: scenarioRunId ?? "",
       projectId: project?.id ?? "",
     },
     {
-      enabled: !!project?.id,
+      enabled: !!project?.id && !!scenarioRunId,
+      refetchInterval: 1000,
     }
   );
 
   const results = scenarioState?.results;
   const scenarioId = scenarioState?.scenarioId;
 
+  if (!scenarioRunId) {
+    return null;
+  }
+
   return (
     <LayoutWithSetRunHistory>
       <PageLayout.Container
         maxW="100vw"
-        padding={0}
+        padding={6}
         marginTop={0}
-        height="100vh"
+        height="full"
+        position="absolute"
+        overflow="hidden"
       >
-        {/* Header with Back Button and Title */}
-        <Box p={6} borderBottom="1px" borderColor="gray.200">
-          <HStack justify="space-between" align="center">
-            <VStack gap={4}>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  goToSimulationSet(scenarioState?.batchRunId ?? "")
-                }
-              >
-                <ArrowLeft size={14} />
-                <Text>Back to Grid View</Text>
-              </Button>
-
-              <VStack align="start" gap={0}>
-                <HStack>
-                  <Text fontSize="lg" fontWeight="semibold">
-                    {scenarioState?.name || "Order Cancellation Request"}
-                  </Text>
-                </HStack>
-                <Text fontSize="sm" color="gray.500">
-                  ID: {scenarioId ?? "scenario-001"}
-                </Text>
+        <VStack height="full" w="full">
+          {/* Header with Back Button and Title */}
+          <Box p={6} borderBottom="1px" borderColor="gray.200" w="100%">
+            <HStack justify="space-between" align="center">
+              <VStack>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  margin={0}
+                  onClick={() =>
+                    goToSimulationSet(scenarioState?.batchRunId ?? "")
+                  }
+                >
+                  <ArrowLeft size={14} />
+                  <Text>Back to Grid View</Text>
+                </Button>
               </VStack>
-            </VStack>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowPreviousRuns((prev) => !prev)}
-            >
-              <Clock size={14} />
-              Previous Runs
-            </Button>
-          </HStack>
-        </Box>
-        <HStack>
-          <Box w="full">
-            {/* Main Content Area */}
-            <VStack gap={0} height="calc(100vh - 100px)">
-              {/* Conversation Area */}
-              <Box flex="1" w="100%" p={6}>
-                <SimulationChatViewer
-                  scenarioRunId={scenarioRunId}
-                  isExpanded={true}
-                />
-              </Box>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPreviousRuns((prev) => !prev)}
+              >
+                <Clock size={14} />
+                Previous Runs
+              </Button>
+            </HStack>
+          </Box>
+          {/* Single Card Container */}
+          <Box
+            bg="white"
+            borderRadius="lg"
+            boxShadow="sm"
+            border="1px"
+            borderColor="gray.200"
+            overflow="hidden"
+          >
+            <VStack gap={0} height="100%">
+              {/* Content Area */}
+              <HStack align="start" gap={0} flex="1" w="100%" overflow="hidden">
+                {/* Main Content Area */}
+                <VStack
+                  gap={0}
+                  height="100%"
+                  flex="1"
+                  w={showPreviousRuns ? "calc(100% - 320px)" : "100%"}
+                  transition="width 0.2s"
+                  overflow="hidden"
+                >
+                  {/* Header with Back Button and Title */}
+                  <Box p={6} borderBottom="1px" borderColor="gray.200" w="100%">
+                    <HStack justify="space-between" align="center">
+                      <VStack gap={4}>
+                        <VStack align="space-between" gap={0}>
+                          <HStack>
+                            {scenarioState?.status === "SUCCESS" ? (
+                              <Check size={12} color="green" />
+                            ) : scenarioState?.status === "FAILED" ? (
+                              <X size={12} color="red" />
+                            ) : (
+                              <Clock size={12} color="orange" />
+                            )}
+                            <Text fontSize="lg" fontWeight="semibold">
+                              {scenarioState?.name}
+                            </Text>
+                          </HStack>
+                          <Text fontSize="sm" color="gray.500" ml={5}>
+                            ID: {scenarioId}
+                          </Text>
+                        </VStack>
+                      </VStack>
+                    </HStack>
+                  </Box>
+                  {/* Conversation Area - Scrollable */}
+                  <Box flex="1" w="100%" p={6} overflow="auto" maxHeight="100%">
+                    <CustomCopilotKitChat
+                      messages={scenarioState?.messages ?? []}
+                    />
+                  </Box>
 
-              {/* Console Area */}
-              <Box w="100%" p={6} pt={0}>
-                <SimulationConsole
-                  results={results}
-                  scenarioName={scenarioState?.name}
-                  status={scenarioState?.status}
-                  durationInMs={scenarioState?.durationInMs}
-                />
-              </Box>
+                  {/* Console Area - Fixed at bottom */}
+                  <Box
+                    w="100%"
+                    p={6}
+                    pt={0}
+                    borderTop="1px"
+                    borderColor="gray.100"
+                  >
+                    <SimulationConsole
+                      results={results}
+                      scenarioName={scenarioState?.name ?? undefined}
+                      status={scenarioState?.status}
+                      durationInMs={scenarioState?.durationInMs}
+                    />
+                  </Box>
+                </VStack>
+
+                {/* Previous Runs Sidebar - Scrollable */}
+                {showPreviousRuns && (
+                  <Box
+                    w="250px"
+                    height="100%"
+                    borderLeft="1px"
+                    borderColor="gray.200"
+                    borderStyle="solid"
+                    borderTopRightRadius="lg"
+                    borderBottomRightRadius="lg"
+                    overflow="hidden"
+                    display="flex"
+                    flexDirection="column"
+                  >
+                    <Box
+                      p={6}
+                      borderBottom="1px"
+                      borderColor="gray.200"
+                      borderStyle="solid"
+                    >
+                      <Text fontSize="md" fontWeight="semibold">
+                        Previous Runs
+                      </Text>
+                    </Box>
+                    <Box flex="1" overflow="auto" p={4} pt={3}>
+                      <PreviousRunsList scenarioId={scenarioId} />
+                    </Box>
+                  </Box>
+                )}
+              </HStack>
             </VStack>
           </Box>
-
-          {/* Previous Runs Sidebar */}
-          <PreviousRunsSidebar
-            isOpen={showPreviousRuns}
-            onClose={() => setShowPreviousRuns(false)}
-            scenarioId={scenarioId}
-          />
-        </HStack>
+        </VStack>
       </PageLayout.Container>
     </LayoutWithSetRunHistory>
   );

@@ -9,7 +9,7 @@ export const LayoutWithSetRunHistory = ({
 }) => {
   return (
     <DashboardLayout>
-      <HStack w="full" h="full">
+      <HStack w="full" h="full" alignItems="stretch">
         <SetRunHistorySidebar />
         <Box w="full" position="relative" h="full">
           {children}

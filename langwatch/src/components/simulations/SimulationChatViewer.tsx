@@ -3,14 +3,11 @@ import { CustomCopilotKitChat } from "./CustomCopilotKitChat";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
+// TODO: move this to hook wrapper
 export function SimulationChatViewer({
   scenarioRunId,
-  isExpanded,
-  onExpandToggle,
 }: {
   scenarioRunId: string;
-  isExpanded?: boolean;
-  onExpandToggle?: () => void;
 }) {
   const { project } = useOrganizationTeamProject();
   const { data } = api.scenarios.getRunState.useQuery(
@@ -32,9 +29,6 @@ export function SimulationChatViewer({
         "scenario"
       }
       status={data?.status}
-      onExpandToggle={onExpandToggle}
-      isExpanded={isExpanded}
-      runAt={new Date(data?.timestamp ?? new Date())}
     >
       <CustomCopilotKitChat messages={data?.messages ?? []} />
     </SimulationCard>
