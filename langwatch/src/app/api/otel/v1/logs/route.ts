@@ -1,9 +1,12 @@
 import { type IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import * as Sentry from "@sentry/nextjs";
+import crypto from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "../../../../../server/db";
 import { createLogger } from "../../../../../utils/logger";
+import { openTelemetryLogsRequestToTracesForCollection } from "~/server/tracer/otel.logs";
+import { fetchExistingMD5s, scheduleTraceCollectionWithFallback } from "~/server/background/workers/collectorWorker";
 
 const logger = createLogger("langwatch:otel:v1:logs");
 
@@ -80,5 +83,41 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ message: "Not implemented" }, { status: 501 });
+  const tracesGeneratedFromLogs = openTelemetryLogsRequestToTracesForCollection(logRequest);
+
+  const promises: Promise<void>[] = [];
+  for (const traceForCollection of tracesGeneratedFromLogs) {
+    const paramsMD5 = crypto
+      .createHash("md5")
+      .update(JSON.stringify({ ...traceForCollection }))
+      .digest("hex");
+    const existingTrace = await fetchExistingMD5s(
+      traceForCollection.traceId,
+      project.id
+    );
+    if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
+      continue;
+    }
+
+    logger.info({ traceId: traceForCollection.traceId }, 'collecting traces from logs');
+
+    promises.push(
+      scheduleTraceCollectionWithFallback({
+        ...traceForCollection,
+        projectId: project.id,
+        existingTrace,
+        paramsMD5,
+        expectedOutput: undefined,
+        evaluations: undefined,
+        collectedAt: Date.now(),
+      })
+    );
+  }
+
+  if (promises.length === 0) {
+    return NextResponse.json({ message: "No changes" });
+  }
+
+  await Promise.all(promises);
+  return NextResponse.json({ message: "OK" }, { status: 200 });
 }
