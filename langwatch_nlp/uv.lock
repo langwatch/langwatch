@@ -666,6 +666,18 @@ wheels = [
 ]
 
 [[package]]
+name = "dspy-ai"
+version = "2.6.25"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dspy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/bc/c1/edf340edf402d692657b2413e4d225926bdcf4a29a2edfea8977a0525224/dspy_ai-2.6.25.tar.gz", hash = "sha256:166ea503ea7d8df37b9b1afddfee9bd6f6546e4ae890b3b7849bc1c248a1a5b7", size = 1128 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3e/ed/15065f09d76f96a3b4f43958cbffd20711c3938437e71ed413fed822d800/dspy_ai-2.6.25-py3-none-any.whl", hash = "sha256:d94bfdde7e0d53b5a6b213ae66d29ee2774a504bab001ad8bdbd47beceabf721", size = 1107 },
+]
+
+[[package]]
 name = "email-validator"
 version = "2.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1551,64 +1563,79 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.1.44"
-source = { editable = "../python-sdk-legacy" }
+version = "0.2.3"
+source = { editable = "../python-sdk" }
 dependencies = [
     { name = "coolname" },
-    { name = "deprecated" },
+    { name = "dspy-ai" },
     { name = "httpx" },
+    { name = "litellm" },
     { name = "nanoid" },
-    { name = "pandas" },
-    { name = "pydantic" },
+    { name = "openinference-instrumentation-haystack" },
+    { name = "openinference-instrumentation-langchain" },
+    { name = "openinference-instrumentation-openai" },
+    { name = "openinference-semantic-conventions" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-sdk" },
     { name = "retry" },
-    { name = "tqdm" },
+    { name = "termcolor" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", marker = "extra == 'dev'", specifier = ">=0.36.0,<0.37.0" },
-    { name = "chainlit", marker = "extra == 'dev'", specifier = ">=1.3.0,<2" },
-    { name = "coolname", specifier = ">=2.2.0,<3.0.0" },
-    { name = "deprecated", specifier = ">=1.2.14,<2.0.0" },
+    { name = "coolname", specifier = ">=2.2.0" },
+    { name = "dspy-ai", specifier = ">=2.5.2,<3.0.0" },
     { name = "dspy-ai", marker = "extra == 'dspy'", specifier = ">=2.5.2,<3.0.0" },
-    { name = "faiss-cpu", marker = "extra == 'dev'", specifier = ">=1.8.0,<2.0.0" },
-    { name = "freezegun", marker = "extra == 'test'", specifier = ">=1.2.2,<2.0.0" },
-    { name = "haystack-ai", marker = "extra == 'dev'", specifier = ">=2.5.1,<3.0.0" },
-    { name = "httpx", specifier = ">=0.27.0,<0.28.0" },
-    { name = "json-repair", marker = "extra == 'dev'", specifier = ">=0.30.2,<1" },
-    { name = "jupyter", marker = "extra == 'dev'", specifier = ">=1.0.0,<2.0.0" },
-    { name = "langchain", marker = "extra == 'langchain'", specifier = ">=0.3.0,<1.0.0" },
-    { name = "langchain-community", marker = "extra == 'dev'", specifier = ">=0.3.2,<0.4.0" },
-    { name = "langchain-google-vertexai", marker = "extra == 'dev'", specifier = ">=2.0.4,<3.0.0" },
-    { name = "langchain-openai", marker = "extra == 'dev'", specifier = ">=0.2.2,<0.3.0" },
-    { name = "langchain-text-splitters", marker = "extra == 'dev'", specifier = ">=0.3.0,<0.4.0" },
-    { name = "langgraph", marker = "extra == 'dev'", specifier = ">=0.2.35,<0.3.0" },
-    { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.68.1,<2.0.0" },
+    { name = "httpx", specifier = ">=0.27.0" },
+    { name = "litellm", specifier = ">=1.52.1" },
     { name = "nanoid", specifier = ">=2.0.0,<3.0.0" },
-    { name = "numexpr", marker = "extra == 'test'", specifier = ">=2.8.7,<3.0.0" },
-    { name = "openai", marker = "extra == 'openai'", specifier = ">=1.42.0,<2.0.0" },
-    { name = "openinference-instrumentation-dspy", marker = "extra == 'dev'", specifier = ">=0.1.12,<0.2.0" },
-    { name = "openinference-instrumentation-haystack", marker = "extra == 'dev'", specifier = ">=0.1.12,<0.2.0" },
-    { name = "openinference-instrumentation-langchain", marker = "extra == 'dev'", specifier = ">=0.1.28,<0.2.0" },
-    { name = "openinference-instrumentation-openai", marker = "extra == 'dev'", specifier = ">=0.1.14,<0.2.0" },
-    { name = "opentelemetry-instrumentation-anthropic", marker = "extra == 'dev'", specifier = ">=0.31.3,<0.32.0" },
-    { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'dev'", specifier = ">=0.48b0" },
-    { name = "opentelemetry-instrumentation-langchain", marker = "extra == 'dev'", specifier = ">=0.31.3,<0.32.0" },
-    { name = "opentelemetry-instrumentation-llamaindex", marker = "extra == 'dev'", specifier = ">=0.31.3,<0.32.0" },
-    { name = "opentelemetry-instrumentation-openai", marker = "extra == 'dev'", specifier = ">=0.31.0,<0.32.0" },
-    { name = "pandas", specifier = ">=2.2.2,<3.0.0" },
-    { name = "pydantic", specifier = ">=1,<3" },
-    { name = "pydantic", marker = "extra == 'dev'", specifier = ">=1,<2.10.2" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.2,<8.0.0" },
-    { name = "pytest", marker = "extra == 'test'", specifier = ">=7.4.2,<8.0.0" },
-    { name = "pytest-asyncio", marker = "extra == 'test'", specifier = ">=0.21.1,<0.22.0" },
-    { name = "pytest-httpx", marker = "extra == 'test'", specifier = ">=0.30.0,<0.31.0" },
-    { name = "python-dotenv", marker = "extra == 'dev'", specifier = "==1.0.1" },
-    { name = "requests-mock", marker = "extra == 'test'", specifier = ">=1.11.0,<2.0.0" },
-    { name = "retry", specifier = ">=0.9.2,<0.10.0" },
-    { name = "streamlit", marker = "extra == 'dev'", specifier = ">=1.37.1,<2.0.0" },
-    { name = "tqdm", specifier = ">=4.66.2,<5.0.0" },
+    { name = "openinference-instrumentation-haystack", specifier = ">=0.1.20" },
+    { name = "openinference-instrumentation-langchain", specifier = ">=0.1.24" },
+    { name = "openinference-instrumentation-openai", specifier = ">=0.1.25" },
+    { name = "openinference-semantic-conventions", specifier = ">=0.1.17" },
+    { name = "opentelemetry-api", specifier = ">=1.32.1" },
+    { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.32.1" },
+    { name = "opentelemetry-sdk", specifier = ">=1.32.1" },
+    { name = "pytest", marker = "extra == 'tests'", specifier = ">=7.4.2,<8.0.0" },
+    { name = "pytest-asyncio", marker = "extra == 'tests'", specifier = ">=0.21.1,<0.22.0" },
+    { name = "retry", specifier = ">=0.9.2" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.1" },
+    { name = "termcolor", specifier = ">=3.0.1" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "black", specifier = ">=25.1.0" }]
+examples = [
+    { name = "anthropic", specifier = ">=0.36.0,<0.37.0" },
+    { name = "chainlit", specifier = ">=1.3.0,<2" },
+    { name = "cloudpickle", specifier = ">=3.1.1" },
+    { name = "faiss-cpu", specifier = ">=1.8.0,<2.0.0" },
+    { name = "fastapi", specifier = ">=0.115.12" },
+    { name = "haystack-ai", specifier = ">=2.13.2,<3.0.0" },
+    { name = "json-repair", specifier = ">=0.42.0" },
+    { name = "jupyter", specifier = ">=1.0.0,<2.0.0" },
+    { name = "langchain", specifier = ">=0.2.11" },
+    { name = "langchain-community", specifier = ">=0.2.11" },
+    { name = "langchain-google-vertexai", specifier = ">=1.0.7" },
+    { name = "langchain-openai", specifier = ">=0.1.19" },
+    { name = "langchain-text-splitters", specifier = ">=0.3.0,<0.4.0" },
+    { name = "langgraph", specifier = ">=0.2.35,<0.3.0" },
+    { name = "nanoid", specifier = ">=2.0.0" },
+    { name = "openai", specifier = ">=1.68.2" },
+    { name = "openinference-instrumentation-dspy", specifier = ">=0.1.23,<0.2.0" },
+    { name = "openinference-instrumentation-litellm", specifier = ">=0.1.19" },
+    { name = "openinference-instrumentation-openai", specifier = ">=0.1.30" },
+    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.53b1" },
+    { name = "opentelemetry-instrumentation-langchain", specifier = ">=0.40.4" },
+    { name = "pandas", specifier = ">=2.2.3" },
+    { name = "pydantic", specifier = ">=1,<2.10.2" },
+    { name = "pytest", specifier = ">=7.4.2,<8.0.0" },
+    { name = "python-dotenv", specifier = "==1.0.1" },
+    { name = "streamlit", specifier = ">=1.37.1,<2.0.0" },
+    { name = "uvicorn", specifier = ">=0.25.0,<0.26.0" },
+]
+tests = [{ name = "pytest-asyncio", specifier = ">=0.21.2" }]
 
 [[package]]
 name = "langwatch-nlp"
@@ -1668,7 +1695,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.4" },
     { name = "langchain-community", specifier = ">=0.0.28,<0.1" },
     { name = "langevals-core", specifier = ">=0.1.14,<0.2" },
-    { name = "langwatch", editable = "../python-sdk-legacy" },
+    { name = "langwatch", editable = "../python-sdk" },
     { name = "litellm", extras = ["proxy"], specifier = ">=1.67.6,<2" },
     { name = "mangum", specifier = ">=0.17.0,<0.18" },
     { name = "nanoid", specifier = ">=2.0.0,<3" },
@@ -2044,6 +2071,179 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/99/b1/318f5d4c482f19c5fcbcde190801bfaaaec23413cda0b88a29f6897448ff/openai-1.75.0.tar.gz", hash = "sha256:fb3ea907efbdb1bcfd0c44507ad9c961afd7dce3147292b54505ecfd17be8fd1", size = 429492 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/80/9a/f34f163294345f123673ed03e77c33dee2534f3ac1f9d18120384457304d/openai-1.75.0-py3-none-any.whl", hash = "sha256:fe6f932d2ded3b429ff67cc9ad118c71327db32eb9d32dd723de3acfca337125", size = 646972 },
+]
+
+[[package]]
+name = "openinference-instrumentation"
+version = "0.1.32"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "openinference-semantic-conventions" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-sdk" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cb/0d/317dcf8fc1d2ea7db4b55afff6a535136c43fcfcffecd562a54f3b56d184/openinference_instrumentation-0.1.32.tar.gz", hash = "sha256:f59e02d9b45acc8aab4c11c00f6cc6ff6b63a2487e04741cf145702e85408072", size = 21438 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/81/2a/ad75feeba2024d56dc7b3748b7fc2206ea26b6a2b4c9039572212cf9d7d6/openinference_instrumentation-0.1.32-py3-none-any.whl", hash = "sha256:dbc11a6e1cb719522749b0cd1226feaecdbeeaebe7ff0b73ecb31143a9d92b57", size = 26856 },
+]
+
+[[package]]
+name = "openinference-instrumentation-haystack"
+version = "0.1.24"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "openinference-instrumentation" },
+    { name = "openinference-semantic-conventions" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-instrumentation" },
+    { name = "opentelemetry-semantic-conventions" },
+    { name = "typing-extensions" },
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b1/15/d750f65dff58524fb7c1d679bae91948447e1a3547bc32e662e6d3ac7fcc/openinference_instrumentation_haystack-0.1.24.tar.gz", hash = "sha256:14aea1e46d16415e373dd3f65d4e2ae94a1aa705b7b6967e606ab6e5dbb2cc18", size = 13001 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/96/2f/0bad4a4840de04defa9f82fc6ffaa48b02dd19aa085fdf08701ba349cb59/openinference_instrumentation_haystack-0.1.24-py3-none-any.whl", hash = "sha256:55628441fdccb13904c7bc90e3621d18d346acf9bf3884b9fac672a6dba9ad2f", size = 14415 },
+]
+
+[[package]]
+name = "openinference-instrumentation-langchain"
+version = "0.1.43"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "openinference-instrumentation" },
+    { name = "openinference-semantic-conventions" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-instrumentation" },
+    { name = "opentelemetry-semantic-conventions" },
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/69/84/f85ea5c4b73ee6570f5f4a0a247243fc08cde8ed3b5c4ae40df7b9580c38/openinference_instrumentation_langchain-0.1.43.tar.gz", hash = "sha256:18b5ac3ba52fcb85a576dd94175e025c6cbacce9cb2619a8f8b281b2c30e06cb", size = 52212 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/27/b1/08b85cf9af64d8e994e554edda3898af5563b9b6073f6690a463af67338d/openinference_instrumentation_langchain-0.1.43-py3-none-any.whl", hash = "sha256:66645839eac2c3cf986bc917ef309dc89c468f3bb0a56b20eaba6c89b8b44e9a", size = 18776 },
+]
+
+[[package]]
+name = "openinference-instrumentation-openai"
+version = "0.1.30"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "openinference-instrumentation" },
+    { name = "openinference-semantic-conventions" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-instrumentation" },
+    { name = "opentelemetry-semantic-conventions" },
+    { name = "typing-extensions" },
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/65/14/d72575256fe8eb511ed1d052ea3272fcc46eaa7d61adaf1043090a2ad213/openinference_instrumentation_openai-0.1.30.tar.gz", hash = "sha256:b5ef3576433900ae71f328ca771905bb1392f7ad6c3dc0c0b942ceb138f091c3", size = 21343 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b3/b9/6026fb57c1856ce71e02b35fe9c8a40563abe3eacab2776532c88325c6b5/openinference_instrumentation_openai-0.1.30-py3-none-any.whl", hash = "sha256:de0ac47405e7f4a94bd67b8ca0512e109c97bee4d37023d8eab7cbb421705f29", size = 28366 },
+]
+
+[[package]]
+name = "openinference-semantic-conventions"
+version = "0.1.17"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ea/c1/851eed629ee65d38395f586eb4d82d9cc7c61c31de4c523394cc84ee4940/openinference_semantic_conventions-0.1.17.tar.gz", hash = "sha256:8c382f756344887c77f03c8def1702318d8d8cc8b4055f46924aabb7c89ed8bd", size = 9635 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fb/99/306c007c3a2accafcf47fc5c20ea81648c039292ca6770c9c1ab7914dd6b/openinference_semantic_conventions-0.1.17-py3-none-any.whl", hash = "sha256:919b7f2c0b0bdd406377288337d77046efb84866ad4805ad7a73a09368147398", size = 9384 },
+]
+
+[[package]]
+name = "opentelemetry-api"
+version = "1.33.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "deprecated" },
+    { name = "importlib-metadata" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9a/8d/1f5a45fbcb9a7d87809d460f09dc3399e3fbd31d7f3e14888345e9d29951/opentelemetry_api-1.33.1.tar.gz", hash = "sha256:1c6055fc0a2d3f23a50c7e17e16ef75ad489345fd3df1f8b8af7c0bbf8a109e8", size = 65002 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/05/44/4c45a34def3506122ae61ad684139f0bbc4e00c39555d4f7e20e0e001c8a/opentelemetry_api-1.33.1-py3-none-any.whl", hash = "sha256:4db83ebcf7ea93e64637ec6ee6fabee45c5cbe4abd9cf3da95c43828ddb50b83", size = 65771 },
+]
+
+[[package]]
+name = "opentelemetry-exporter-otlp-proto-common"
+version = "1.33.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "opentelemetry-proto" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7a/18/a1ec9dcb6713a48b4bdd10f1c1e4d5d2489d3912b80d2bcc059a9a842836/opentelemetry_exporter_otlp_proto_common-1.33.1.tar.gz", hash = "sha256:c57b3fa2d0595a21c4ed586f74f948d259d9949b58258f11edb398f246bec131", size = 20828 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/09/52/9bcb17e2c29c1194a28e521b9d3f2ced09028934c3c52a8205884c94b2df/opentelemetry_exporter_otlp_proto_common-1.33.1-py3-none-any.whl", hash = "sha256:b81c1de1ad349785e601d02715b2d29d6818aed2c809c20219f3d1f20b038c36", size = 18839 },
+]
+
+[[package]]
+name = "opentelemetry-exporter-otlp-proto-http"
+version = "1.33.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "deprecated" },
+    { name = "googleapis-common-protos" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-proto-common" },
+    { name = "opentelemetry-proto" },
+    { name = "opentelemetry-sdk" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/60/48/e4314ac0ed2ad043c07693d08c9c4bf5633857f5b72f2fefc64fd2b114f6/opentelemetry_exporter_otlp_proto_http-1.33.1.tar.gz", hash = "sha256:46622d964a441acb46f463ebdc26929d9dec9efb2e54ef06acdc7305e8593c38", size = 15353 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/63/ba/5a4ad007588016fe37f8d36bf08f325fe684494cc1e88ca8fa064a4c8f57/opentelemetry_exporter_otlp_proto_http-1.33.1-py3-none-any.whl", hash = "sha256:ebd6c523b89a2ecba0549adb92537cc2bf647b4ee61afbbd5a4c6535aa3da7cf", size = 17733 },
+]
+
+[[package]]
+name = "opentelemetry-instrumentation"
+version = "0.54b1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-semantic-conventions" },
+    { name = "packaging" },
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c3/fd/5756aea3fdc5651b572d8aef7d94d22a0a36e49c8b12fcb78cb905ba8896/opentelemetry_instrumentation-0.54b1.tar.gz", hash = "sha256:7658bf2ff914b02f246ec14779b66671508125c0e4227361e56b5ebf6cef0aec", size = 28436 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f4/89/0790abc5d9c4fc74bd3e03cb87afe2c820b1d1a112a723c1163ef32453ee/opentelemetry_instrumentation-0.54b1-py3-none-any.whl", hash = "sha256:a4ae45f4a90c78d7006c51524f57cd5aa1231aef031eae905ee34d5423f5b198", size = 31019 },
+]
+
+[[package]]
+name = "opentelemetry-proto"
+version = "1.33.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f6/dc/791f3d60a1ad8235930de23eea735ae1084be1c6f96fdadf38710662a7e5/opentelemetry_proto-1.33.1.tar.gz", hash = "sha256:9627b0a5c90753bf3920c398908307063e4458b287bb890e5c1d6fa11ad50b68", size = 34363 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c4/29/48609f4c875c2b6c80930073c82dd1cafd36b6782244c01394007b528960/opentelemetry_proto-1.33.1-py3-none-any.whl", hash = "sha256:243d285d9f29663fc7ea91a7171fcc1ccbbfff43b48df0774fd64a37d98eda70", size = 55854 },
+]
+
+[[package]]
+name = "opentelemetry-sdk"
+version = "1.33.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-semantic-conventions" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/67/12/909b98a7d9b110cce4b28d49b2e311797cffdce180371f35eba13a72dd00/opentelemetry_sdk-1.33.1.tar.gz", hash = "sha256:85b9fcf7c3d23506fbc9692fd210b8b025a1920535feec50bd54ce203d57a531", size = 161885 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/df/8e/ae2d0742041e0bd7fe0d2dcc5e7cce51dcf7d3961a26072d5b43cc8fa2a7/opentelemetry_sdk-1.33.1-py3-none-any.whl", hash = "sha256:19ea73d9a01be29cacaa5d6c8ce0adc0b7f7b4d58cc52f923e4413609f670112", size = 118950 },
+]
+
+[[package]]
+name = "opentelemetry-semantic-conventions"
+version = "0.54b1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "deprecated" },
+    { name = "opentelemetry-api" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5b/2c/d7990fc1ffc82889d466e7cd680788ace44a26789809924813b164344393/opentelemetry_semantic_conventions-0.54b1.tar.gz", hash = "sha256:d1cecedae15d19bdaafca1e56b29a66aa286f50b5d08f036a145c7f3e9ef9cee", size = 118642 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0a/80/08b1698c52ff76d96ba440bf15edc2f4bc0a279868778928e947c1004bdd/opentelemetry_semantic_conventions-0.54b1-py3-none-any.whl", hash = "sha256:29dab644a7e435b58d3a3918b58c333c92686236b30f7891d5e51f02933ca60d", size = 194938 },
 ]
 
 [[package]]
@@ -3210,6 +3410,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a3/4d/6a19536c50b849338fcbe9290d562b52cbdcf30d8963d3588a68a4107df1/tenacity-8.5.0.tar.gz", hash = "sha256:8bc6c0c8a09b31e6cad13c47afbed1a567518250a9a171418582ed8d9c20ca78", size = 47309 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d2/3f/8ba87d9e287b9d385a02a7114ddcef61b26f86411e121c9003eb509a1773/tenacity-8.5.0-py3-none-any.whl", hash = "sha256:b594c2a5945830c267ce6b79a166228323ed52718f30302c1359836112346687", size = 28165 },
+]
+
+[[package]]
+name = "termcolor"
+version = "3.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ca/6c/3d75c196ac07ac8749600b60b03f4f6094d54e132c4d94ebac6ee0e0add0/termcolor-3.1.0.tar.gz", hash = "sha256:6a6dd7fbee581909eeec6a756cff1d7f7c376063b14e4a298dc4980309e55970", size = 14324 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4f/bd/de8d508070629b6d84a30d01d57e4a65c69aa7f5abe7560b8fad3b50ea59/termcolor-3.1.0-py3-none-any.whl", hash = "sha256:591dd26b5c2ce03b9e43f391264626557873ce1d379019786f99b0c2bee140aa", size = 7684 },
 ]
 
 [[package]]

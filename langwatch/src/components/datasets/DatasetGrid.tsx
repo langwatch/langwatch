@@ -8,11 +8,12 @@ import {
 import { Box, Field, Text } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
 import { MultilineCellEditor } from "./MultilineCellEditor";
-
+import type { ColDef } from "@ag-grid-community/core";
 import { ClientSideRowModelModule } from "@ag-grid-community/client-side-row-model";
-import { ModuleRegistry, type ColDef } from "@ag-grid-community/core";
+import { ModuleRegistry } from "@ag-grid-community/core";
 import "@ag-grid-community/styles/ag-grid.css";
 import "@ag-grid-community/styles/ag-theme-balham.css";
+
 import React from "react";
 import {
   datasetColumnTypeMapping,
@@ -41,7 +42,7 @@ export type DatasetColumnDef = ColDef & { type_: DatasetColumnType };
 
 export const DatasetGrid = React.memo(
   React.forwardRef(function DatasetGrid(
-    props: AgGridReactProps & {
+    props: any & {
       columnDefs: DatasetColumnDef[];
     },
     ref
@@ -186,7 +187,7 @@ export const DatasetGrid = React.memo(
           }
         `}</style>
           <AgGridReact
-            ref={ref as React.RefObject<AgGridReact>}
+            ref={ref as React.RefObject<AgGridReactProps>}
             gridOptions={gridOptions}
             loadingOverlayComponent={() => (
               <Text paddingTop={4}>Loading...</Text>

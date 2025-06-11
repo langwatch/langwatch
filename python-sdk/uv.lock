@@ -2248,7 +2248,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.2.2"
+version = "0.2.3"
 source = { editable = "." }
 dependencies = [
     { name = "coolname" },
@@ -2360,7 +2360,7 @@ examples = [
     { name = "openai", specifier = ">=1.68.2" },
     { name = "openinference-instrumentation-dspy", specifier = ">=0.1.23,<0.2.0" },
     { name = "openinference-instrumentation-litellm", specifier = ">=0.1.19" },
-    { name = "openinference-instrumentation-openai", specifier = ">=0.1.25" },
+    { name = "openinference-instrumentation-openai", specifier = ">=0.1.30" },
     { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.53b1" },
     { name = "opentelemetry-instrumentation-langchain", specifier = ">=0.40.4" },
     { name = "pandas", specifier = ">=2.2.3" },
@@ -2965,7 +2965,7 @@ wheels = [
 
 [[package]]
 name = "openinference-instrumentation-openai"
-version = "0.1.25"
+version = "0.1.30"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "openinference-instrumentation" },
@@ -2976,9 +2976,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/45/15/2420984d90246ae07148bae3bf25882bf75d6004ffbb7c1614add2a849b5/openinference_instrumentation_openai-0.1.25.tar.gz", hash = "sha256:40c52e6086079b389dd7468a5c5da1d24158b4e4c7e15ac2312af761ad95cc8a", size = 21079 }
+sdist = { url = "https://files.pythonhosted.org/packages/65/14/d72575256fe8eb511ed1d052ea3272fcc46eaa7d61adaf1043090a2ad213/openinference_instrumentation_openai-0.1.30.tar.gz", hash = "sha256:b5ef3576433900ae71f328ca771905bb1392f7ad6c3dc0c0b942ceb138f091c3", size = 21343 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/25/bb/2b82e0bfbb37b945e617aa55ac1b898184b16789a920d7aa5d79d3e52cef/openinference_instrumentation_openai-0.1.25-py3-none-any.whl", hash = "sha256:e68d689f2d2e947c539f12d558b4ae517d66acd465eb4b7bfe55a61904634b41", size = 28083 },
+    { url = "https://files.pythonhosted.org/packages/b3/b9/6026fb57c1856ce71e02b35fe9c8a40563abe3eacab2776532c88325c6b5/openinference_instrumentation_openai-0.1.30-py3-none-any.whl", hash = "sha256:de0ac47405e7f4a94bd67b8ca0512e109c97bee4d37023d8eab7cbb421705f29", size = 28366 },
 ]
 
 [[package]]

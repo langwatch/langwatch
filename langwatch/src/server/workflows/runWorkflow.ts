@@ -12,6 +12,7 @@ import { getProjectModelProviders } from "../api/routers/modelProviders";
 import { prisma } from "../db";
 import type { SingleEvaluationResult } from "../evaluations/evaluators.generated";
 import { type MaybeStoredModelProvider } from "../modelProviders/registry";
+import { getProjectLambdaArn } from "../../optimization_studio/server/lambda";
 
 const getWorkFlow = (state: Workflow) => {
   return {
@@ -43,9 +44,11 @@ const checkForRequiredInputs = (
   );
 
   const requiredInputs: string[] = [];
-  entryInputs.map((input) => {
-    requiredInputs.push(input.sourceHandle?.split(".")[1] ?? "");
-  });
+  entryInputs
+    .filter((input) => !input.optional)
+    .map((input) => {
+      requiredInputs.push(input.sourceHandle?.split(".")[1] ?? "");
+    });
 
   requiredInputs.forEach((input) => {
     if (!bodyInputs.includes(input)) {
@@ -108,7 +111,13 @@ export async function runEvaluationWorkflow(
   status: ExecutionStatus;
 }> {
   try {
-    const data = await runWorkflow(workflowId, projectId, inputs, versionId);
+    const data = await runWorkflow(
+      workflowId,
+      projectId,
+      inputs,
+      versionId,
+      true
+    );
 
     // Process the result
     if (data.result) {
@@ -148,7 +157,8 @@ export async function runWorkflow(
   workflowId: string,
   projectId: string,
   inputs: Record<string, string>,
-  versionId?: string
+  versionId?: string,
+  do_not_trace?: boolean
 ) {
   const workflow = await prisma.workflow.findUnique({
     where: { id: workflowId, projectId },
@@ -190,25 +200,30 @@ export async function runWorkflow(
       workflow: getWorkFlow(workflowData),
       inputs: [inputs],
       manual_execution_mode: false,
+      do_not_trace:
+        typeof do_not_trace === "boolean"
+          ? do_not_trace
+          : typeof inputs.do_not_trace === "boolean"
+          ? inputs.do_not_trace
+          : false,
     },
   };
 
   const event = await addEnvs(messageWithoutEnvs, projectId);
+  const functionArn = process.env.LANGWATCH_NLP_LAMBDA_CONFIG
+    ? await getProjectLambdaArn(projectId)
+    : process.env.LANGWATCH_NLP_SERVICE!;
+
   const response = await lambdaFetch<{
     result: any;
     status: ExecutionStatus;
-  }>(
-    process.env.LANGWATCH_NLP_SERVICE_INVOKE_ARN ??
-      process.env.LANGWATCH_NLP_SERVICE!,
-    "/studio/execute_sync",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(event),
-    }
-  );
+  }>(functionArn, "/studio/execute_sync", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(event),
+  });
 
   if (!response.ok) {
     throw new Error(`Error running workflow: ${response.statusText}`);

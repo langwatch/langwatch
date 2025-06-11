@@ -186,6 +186,8 @@ const exportWorkflow = async (
     }
 
     dsl.workflow_id = "";
+    dsl.experiment_id = "";
+    dsl.state = {};
 
     //Create and trigger download
     const url = window.URL.createObjectURL(new Blob([JSON.stringify(dsl)]));
@@ -219,10 +221,11 @@ function PublishMenu({
   onTogglePublish: () => void;
   onToggleApi: () => void;
 }) {
-  const { workflowId, workflow_type } = useWorkflowStore(
-    ({ workflow_id: workflowId, workflow_type }) => ({
+  const { workflowId, workflow_type, getWorkflow } = useWorkflowStore(
+    ({ workflow_id: workflowId, workflow_type, getWorkflow }) => ({
       workflowId,
       workflow_type,
+      getWorkflow,
     })
   );
 
@@ -243,13 +246,13 @@ function PublishMenu({
     }
   );
 
+  const workflow = publishedWorkflow.data
+    ? (publishedWorkflow.data.dsl as unknown as Workflow)
+    : getWorkflow();
+
   // Add dataset fetching hooks here
-  const datasetId = publishedWorkflow.data?.dsl
-    ? (
-        (publishedWorkflow.data.dsl as unknown as Workflow).nodes[0]
-          ?.data as any
-      )?.dataset?.id
-    : undefined;
+  const datasetId = (workflow?.nodes[0]?.data as NodeDataWithDataset)?.dataset
+    ?.id;
 
   const datasetRecords = api.datasetRecord.getAll.useQuery(
     {
@@ -367,13 +370,7 @@ function PublishMenu({
   };
 
   const handleExportWorkflow = () => {
-    if (!publishedWorkflow.data) return;
-
-    // Type cast the publishedWorkflow.data to avoid type errors
-    exportWorkflow(
-      publishedWorkflow.data.dsl as unknown as Workflow,
-      datasetRecords.data ?? undefined
-    );
+    exportWorkflow(workflow, datasetRecords.data ?? undefined);
   };
 
   return (
@@ -445,9 +442,7 @@ function PublishMenu({
         <Code size={16} /> View API Reference
       </SubscriptionMenuItem>
       <SubscriptionMenuItem
-        tooltip={publishDisabledLabel}
         onClick={handleExportWorkflow}
-        disabled={!!publishDisabledLabel}
         value="export-workflow"
       >
         <Share2 size={16} /> Export Workflow

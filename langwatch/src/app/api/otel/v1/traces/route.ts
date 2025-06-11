@@ -1,10 +1,3 @@
-/**
- * Let Op!
- *
- * This endpoint does not work when running on devmode with turbo pack.
- * To develop it, start the server with `USE_WEBPACK=true npm run dev`.
- */
-
 import { NextResponse, type NextRequest } from "next/server";
 import {
   type IExportTraceServiceRequest,

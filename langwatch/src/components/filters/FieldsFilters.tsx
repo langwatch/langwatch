@@ -15,7 +15,7 @@ import {
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash-es/cloneDeep";
 import numeral from "numeral";
 import React, { useEffect, useMemo } from "react";
 import { ChevronDown, Search, X } from "react-feather";

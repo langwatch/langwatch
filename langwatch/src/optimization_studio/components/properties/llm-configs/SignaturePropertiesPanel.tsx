@@ -1,6 +1,6 @@
 import { Spinner, VStack } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
-import debounce from "lodash.debounce";
+import debounce from "lodash-es/debounce";
 import { useEffect, useMemo, useRef } from "react";
 import { FormProvider, useFieldArray } from "react-hook-form";
 
