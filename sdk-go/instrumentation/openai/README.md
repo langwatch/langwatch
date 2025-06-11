@@ -122,8 +122,9 @@ The `Middleware` function accepts a required instrumentor name (string) to ident
 - `WithLoggerProvider(provider log.LoggerProvider)`: Specifies the OTel `LoggerProvider`. Defaults to the global provider.
 - `WithPropagators(propagators propagation.TextMapPropagator)`: Specifies OTel propagators. Defaults to global propagators.
 - `WithGenAISystem(system attribute.KeyValue)`: Sets the `gen_ai.system` attribute on spans. Defaults to `"openai"`. Use this when the middleware is used with OpenAI-compatible APIs from other providers.
-- `WithCaptureInput()`: Records the full conversation input as the `langwatch.input.value` span attribute. Use with caution if conversations contain sensitive data.
-- `WithCaptureOutput()`: Records the conversation output as the `langwatch.output.value` span attribute. For streaming responses, this attribute will contain the accumulated textual content from stream events. Use with caution if conversations contain sensitive data.
+- `WithCaptureAllInput()`: Capture all input content sent to an LLM.
+- `WithCaptureSystemInput()`: Capture system and developer input content sent to an LLM.
+- `WithCaptureOutput()`: Capture assistant output content from an LLM.
 
 ## Collected Attributes
 
