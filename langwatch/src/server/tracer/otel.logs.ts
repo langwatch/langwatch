@@ -9,7 +9,7 @@ const logger = createLogger("langwatch.tracer.otel.logs");
 const supportedScopeNames = [
 	"org.springframework.ai.chat.observation.ChatModelCompletionObservationHandler",
 	"org.springframework.ai.chat.observation.ChatModelPromptContentObservationHandler",
-]
+];
 
 export const openTelemetryLogsRequestToTracesForCollection = (
 	otelLogs: DeepPartial<IExportLogsServiceRequest>
@@ -62,8 +62,9 @@ export const openTelemetryLogsRequestToTracesForCollection = (
 					logger.warn({
 						identifier,
 						error,
-					}, "failed to parse log content as json, rejecting");
-					continue;
+					}, "failed to parse log content as json, falling back to just a string");
+
+					jsonParsedContent = [content];
 				}
 
 				let input: TypedValueJson | null = null;
