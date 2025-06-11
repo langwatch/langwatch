@@ -118,6 +118,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "No changes" });
   }
 
-  // return NextResponse.json({ message: "Not implemented" }, { status: 501 });
+  await Promise.all(promises);
   return NextResponse.json({ message: "OK" }, { status: 200 });
 }
