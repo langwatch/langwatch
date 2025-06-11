@@ -65,7 +65,7 @@ func main() {
 		option.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
 		option.WithMiddleware(otelopenai.Middleware("my-app",
 			// Optional: Capture request/response content (be mindful of sensitive data)
-			otelopenai.WithCaptureInput(),
+			otelopenai.WithCaptureAllInput(),
 			otelopenai.WithCaptureOutput(),
 		)),
 	)
