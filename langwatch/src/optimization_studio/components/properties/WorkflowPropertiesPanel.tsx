@@ -57,7 +57,7 @@ export const WorkflowPropertiesPanel = () => {
     ) {
       updateNode(workflow.workflow_type);
     }
-  }, [workflow.workflow_type]);
+  }, [workflow.workflow_type, isEvaluator]);
 
   const updateNode = (workflowType: WorkflowTypes) => {
     if (!endNode) return;

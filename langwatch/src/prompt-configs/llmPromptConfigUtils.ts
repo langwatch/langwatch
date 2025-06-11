@@ -101,9 +101,7 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
       {
         identifier: "prompting_technique",
         type: "prompting_technique",
-        value: {
-          ref: formValues.version?.configData?.prompting_technique,
-        },
+        value: formValues.version?.configData?.prompting_technique,
       },
     ],
   };
