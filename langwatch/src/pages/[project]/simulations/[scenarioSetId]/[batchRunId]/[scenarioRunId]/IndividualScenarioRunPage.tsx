@@ -159,7 +159,7 @@ export function IndividualScenarioRunPage({}: IndividualScenarioRunPageProps) {
       >
         <VStack height="full" w="full">
           {/* Header with Back Button and Title */}
-          <Box p={6} borderBottom="1px" borderColor="gray.200" w="100%">
+          <Box borderBottom="1px" borderColor="gray.200" w="100%" mb={2}>
             <HStack justify="space-between" align="center">
               <VStack>
                 <Button

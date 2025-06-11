@@ -22,11 +22,13 @@ type RunItem = {
   status: ScenarioRunStatus;
   title: string;
   description: string;
+  batchRunId: string;
+  scenarioRunId: string;
 };
 
 type Run = {
   batchRunId: string;
-  id: string;
+  scenarioRunId: string;
   label: string;
   date: string;
   duration: string;
@@ -34,26 +36,45 @@ type Run = {
 };
 
 // Single test case row
-const RunHistoryItem = ({ item }: { item: RunItem }) => (
-  <HStack align="center" gap={3} py={2} pl={3}>
-    <Icon
-      as={item.status === ScenarioRunStatus.SUCCESS ? Check : XCircle}
-      color={
-        item.status === ScenarioRunStatus.SUCCESS ? "green.400" : "red.400"
-      }
-      boxSize={4}
-      mt={1}
-    />
-    <Box>
-      <Text fontWeight="semibold" fontSize="xs">
-        {item.title}
-      </Text>
-      <Text fontSize="xs" color={useColorModeValue("gray.600", "gray.400")}>
-        {item.description}
-      </Text>
-    </Box>
-  </HStack>
-);
+const RunHistoryItem = ({ item }: { item: RunItem }) => {
+  const { goToSimulationRun, scenarioSetId } = useSimulationRouter();
+  return (
+    <HStack
+      align="center"
+      gap={3}
+      py={2}
+      pl={3}
+      cursor="pointer"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (scenarioSetId) {
+          goToSimulationRun({
+            scenarioSetId,
+            batchRunId: item.batchRunId,
+            scenarioRunId: item.scenarioRunId,
+          });
+        }
+      }}
+    >
+      <Icon
+        as={item.status === ScenarioRunStatus.SUCCESS ? Check : XCircle}
+        color={
+          item.status === ScenarioRunStatus.SUCCESS ? "green.400" : "red.400"
+        }
+        boxSize={4}
+        mt={1}
+      />
+      <Box>
+        <Text fontWeight="semibold" fontSize="xs">
+          {item.title}
+        </Text>
+        <Text fontSize="xs" color={useColorModeValue("gray.600", "gray.400")}>
+          {item.description}
+        </Text>
+      </Box>
+    </HStack>
+  );
+};
 
 // Run accordion section
 const RunAccordionItem = ({
@@ -84,19 +105,26 @@ const RunAccordionItem = ({
 
   return (
     <Accordion.Item
-      value={run.id}
+      value={run.scenarioRunId}
       border="none"
       borderBottom="1px solid"
       borderColor="gray.200"
       borderLeft={isOpen ? "4px solid" : "none"}
       borderLeftColor={isOpen ? "orange.400" : "transparent"}
-      onClick={() => onRunClick(run.batchRunId)}
       p={0}
     >
       <h2>
         <Accordion.ItemTrigger p={2}>
           <HStack w="full">
-            <VStack align="flex-start" w="full" gap={0}>
+            <VStack
+              align="flex-start"
+              w="full"
+              gap={0}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRunClick(run.batchRunId);
+              }}
+            >
               <HStack flex="1" textAlign="left" gap={2}>
                 <Icon as={AlertCircle} color="yellow.400" boxSize={2} />
                 <Text fontWeight="semibold" fontSize="sm">
@@ -168,7 +196,7 @@ const useSetRunHistorySidebarController = () => {
   runData?.forEach((run) => {
     if (!batchRuns[run.batchRunId]) {
       batchRuns[run.batchRunId] = {
-        id: run.scenarioRunId,
+        scenarioRunId: run.scenarioRunId,
         batchRunId: run.batchRunId,
         date: new Date(run.timestamp ?? 0).toLocaleString(),
         duration: `${Math.round(run.durationInMs) / 1000}s`,
@@ -177,6 +205,8 @@ const useSetRunHistorySidebarController = () => {
             title: run.name ?? "",
             description: run.description ?? "",
             status: run.status,
+            batchRunId: run.batchRunId,
+            scenarioRunId: run.scenarioRunId,
           },
         ],
       };
@@ -186,6 +216,8 @@ const useSetRunHistorySidebarController = () => {
         title: run.name ?? "",
         description: run.description ?? "",
         status: run.status,
+        batchRunId: run.batchRunId,
+        scenarioRunId: run.scenarioRunId,
       });
     }
   });
@@ -229,11 +261,11 @@ const SetRunHistorySidebarComponent = (
       borderColor={useColorModeValue("gray.200", "gray.700")}
       w="500px"
       overflowY="auto"
+      h="100%"
     >
       <Text
         fontSize="lg"
         fontWeight="bold"
-        mb={4}
         p={4}
         borderBottom="1px solid"
         borderColor="gray.200"
@@ -246,9 +278,9 @@ const SetRunHistorySidebarComponent = (
       >
         {runs.map((run, idx) => (
           <RunAccordionItem
-            key={run.id}
+            key={run.scenarioRunId}
             run={run}
-            isOpen={openIndex.includes(run.id)}
+            isOpen={openIndex.includes(run.scenarioRunId)}
             onRunClick={onRunClick}
           />
         ))}
