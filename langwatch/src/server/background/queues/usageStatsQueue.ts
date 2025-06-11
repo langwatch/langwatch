@@ -5,7 +5,7 @@ import { runUsageStatsJob } from "../workers/usageStatsWorker";
 import type { ConnectionOptions } from "bullmq";
 import { prisma } from "../../db";
 import { createLogger } from "../../../utils/logger";
-
+import { env } from "~/env.mjs";
 const logger = createLogger("langwatch:usageStatsQueue");
 
 export const USAGE_STATS_QUEUE_NAME = "{usage_stats}";
@@ -42,10 +42,7 @@ export const scheduleUsageStats = async () => {
     },
   });
 
-  if (
-    process.env.DISABLE_USAGE_STATS === "true" ||
-    process.env.IS_SAAS === "true"
-  ) {
+  if (env.DISABLE_USAGE_STATS || env.IS_SAAS) {
     return;
   }
 
@@ -90,10 +87,7 @@ export const scheduleUsageStatsForOrganization = async (organization: {
   id: string;
   name: string;
 }) => {
-  if (
-    process.env.DISABLE_USAGE_STATS === "true" ||
-    process.env.IS_SAAS === "true"
-  ) {
+  if (env.DISABLE_USAGE_STATS || env.IS_SAAS) {
     return;
   }
 

@@ -65,7 +65,7 @@ export const env = createEnv({
     AZURE_TENANT_ID: z.string().optional(),
     POSTHOG_KEY: z.string().optional(),
     POSTHOG_HOST: z.string().optional(),
-    DISABLE_USAGE_STATS: z.string().optional(),
+    DISABLE_USAGE_STATS: z.boolean().optional(),
   },
 
   /**
@@ -141,7 +141,8 @@ export const env = createEnv({
     AZURE_TENANT_ID: process.env.AZURE_TENANT_ID,
     POSTHOG_KEY: process.env.POSTHOG_KEY,
     POSTHOG_HOST: process.env.POSTHOG_HOST,
-    DISABLE_USAGE_STATS: process.env.DISABLE_USAGE_STATS === "1" ||
+    DISABLE_USAGE_STATS:
+      process.env.DISABLE_USAGE_STATS === "1" ||
       process.env.DISABLE_USAGE_STATS?.toLowerCase() === "true",
   },
   /**
