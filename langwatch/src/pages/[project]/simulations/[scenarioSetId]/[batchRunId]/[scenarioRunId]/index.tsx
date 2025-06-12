@@ -23,10 +23,6 @@ import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { SimulationLayout } from "~/components/simulations/SimulationLayout";
 
-interface IndividualScenarioRunPageProps {
-  scenarioRunId: string;
-}
-
 // Previous Runs List Component
 function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
   const { project } = useOrganizationTeamProject();
@@ -124,7 +120,7 @@ function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
 }
 
 // Main component
-export function IndividualScenarioRunPage({}: IndividualScenarioRunPageProps) {
+export default function IndividualScenarioRunPage() {
   const [showPreviousRuns, setShowPreviousRuns] = useState(false);
   const { goToSimulationSet, scenarioRunId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
