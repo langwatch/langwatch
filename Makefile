@@ -20,9 +20,6 @@ start/postgres:
 tsc-watch:
 	cd langwatch && npm run tsc-watch
 
-start/docker:
-	docker compose up -d --wait --build
-
 quickstart: 
 	@echo "Starting Langwatch..."
 	@docker compose up redis postgres opensearch -d
