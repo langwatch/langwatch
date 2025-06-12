@@ -1,6 +1,6 @@
 import "@copilotkit/react-ui/styles.css";
 import "../simulations.css";
-import { SimulationSetPage } from "./[batchRunId]/SimulationSetPage";
+import { SimulationSetPage } from "./[batchRunId]";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 
 // Main layout for a single Simulation Set page
