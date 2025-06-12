@@ -59,6 +59,11 @@ export function llmConfigToOptimizationStudioNodeData(
         type: "chat_messages",
         value: version.configData.messages ?? [],
       },
+      {
+        identifier: "prompting_technique",
+        type: "prompting_technique",
+        value: version.configData.prompting_technique,
+      },
     ],
   };
 }
@@ -92,6 +97,11 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
         identifier: "messages",
         type: "chat_messages",
         value: formValues.version?.configData?.messages ?? [],
+      },
+      {
+        identifier: "prompting_technique",
+        type: "prompting_technique",
+        value: formValues.version?.configData?.prompting_technique,
       },
     ],
   };
@@ -130,6 +140,8 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
               }
             )?.rows ?? [],
         },
+        prompting_technique: parametersMap.prompting_technique
+          ?.value as PromptConfigFormValues["version"]["configData"]["prompting_technique"],
       },
     },
   };

@@ -416,6 +416,9 @@ export function SignaturePropertiesPanel({
               max_tokens: llm?.max_tokens ?? currentConfigData.max_tokens,
               demonstrations:
                 rest?.demonstrations ?? currentConfigData.demonstrations,
+              prompting_technique:
+                rest?.prompting_technique ??
+                currentConfigData.prompting_technique,
             } as LatestConfigVersionSchema["configData"],
             "Save from legacy node"
           );

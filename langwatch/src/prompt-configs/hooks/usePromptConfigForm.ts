@@ -30,6 +30,8 @@ const formSchema = promptConfigSchema.extend({
       }),
       demonstrations:
         latestConfigVersionSchema.shape.configData.shape.demonstrations,
+      prompting_technique:
+        latestConfigVersionSchema.shape.configData.shape.prompting_technique,
     }),
   }),
 });
