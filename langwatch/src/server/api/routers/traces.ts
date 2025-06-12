@@ -283,6 +283,10 @@ export const tracesRouter = createTRPCRouter({
         protections,
       });
 
+      if (!isPublicRoute) {
+        return tracesGrouped;
+      }
+
       const filteredTraces = tracesGrouped.filter((trace) =>
         publicSharedTraces.some(
           (publicShare) => publicShare.resourceId === trace.trace_id
