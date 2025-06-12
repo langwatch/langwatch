@@ -119,13 +119,15 @@ export const MainMenu = React.memo(function MainMenu() {
             isActive={router.pathname.includes("/prompt-configs")}
           />
 
-          <PageMenuLink
-            path={projectRoutes.simulations.path}
-            icon={PlayCircle}
-            label={projectRoutes.simulations.title}
-            project={project}
-            isActive={router.pathname.includes("/simulations")}
-          />
+          {process.env.NODE_ENV === "development" && (
+            <PageMenuLink
+              path={projectRoutes.simulations.path}
+              icon={PlayCircle}
+              label={projectRoutes.simulations.title}
+              project={project}
+              isActive={router.pathname.includes("/simulations")}
+            />
+          )}
 
           <PageMenuLink
             path={projectRoutes.datasets.path}
