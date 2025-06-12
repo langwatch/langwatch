@@ -7,7 +7,7 @@ import {
   errorMiddleware,
   loggerMiddleware,
 } from "../../middleware";
-import { ScenarioRunnerService } from "./scenario-event.service";
+import { ScenarioEventService } from "./scenario-event.service";
 import { scenarioEventSchema, responseSchemas } from "./schemas";
 import { createLogger } from "~/utils/logger";
 import { baseResponses } from "../../shared/base-responses";
@@ -55,7 +55,7 @@ app.post(
     const { project } = c.var;
     const event = c.req.valid("json");
 
-    const scenarioRunnerService = new ScenarioRunnerService();
+    const scenarioRunnerService = new ScenarioEventService();
     await scenarioRunnerService.saveScenarioEvent({
       projectId: project.id,
       ...event,
@@ -99,7 +99,7 @@ export const route = app.delete(
   async (c) => {
     const { project } = c.var;
 
-    const scenarioRunnerService = new ScenarioRunnerService();
+    const scenarioRunnerService = new ScenarioEventService();
     await scenarioRunnerService.deleteAllEventsForProject({
       projectId: project.id,
     });

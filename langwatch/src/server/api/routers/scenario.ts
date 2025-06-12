@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { ScenarioRunnerService } from "~/app/api/scenario-events/[[...route]]/scenario-event.service";
+import { ScenarioEventService } from "~/app/api/scenario-events/[[...route]]/scenario-event.service";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import { TRPCError } from "@trpc/server";
 
@@ -15,7 +15,7 @@ export const scenarioRouter = createTRPCRouter({
     .input(projectSchema)
     .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
     .query(async ({ input, ctx }) => {
-      const scenarioRunnerService = new ScenarioRunnerService();
+      const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getScenarioSetsDataForProject({
         projectId: input.projectId,
       });
@@ -27,7 +27,7 @@ export const scenarioRouter = createTRPCRouter({
     .input(projectSchema.extend({ scenarioSetId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
     .query(async ({ input, ctx }) => {
-      const scenarioRunnerService = new ScenarioRunnerService();
+      const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getRunDataForScenarioSet({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
@@ -44,7 +44,7 @@ export const scenarioRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
     .query(async ({ input, ctx }) => {
-      const scenarioRunnerService = new ScenarioRunnerService();
+      const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getScenarioRunData({
         projectId: input.projectId,
         scenarioRunId: input.scenarioRunId,
@@ -67,7 +67,7 @@ export const scenarioRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
     .query(async ({ input, ctx }) => {
-      const scenarioRunnerService = new ScenarioRunnerService();
+      const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getScenarioRunDataByScenarioId({
         projectId: input.projectId,
         scenarioId: input.scenarioId,

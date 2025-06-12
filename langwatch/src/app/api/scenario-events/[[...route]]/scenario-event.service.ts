@@ -2,13 +2,26 @@ import { ScenarioEventRepository } from "./scenario-event.repository";
 import { ScenarioRunStatus } from "./enums";
 import type { ScenarioEvent, ScenarioRunData } from "./types";
 
-export class ScenarioRunnerService {
+/**
+ * Service responsible for managing scenario events and their associated data.
+ * Handles operations like saving events, retrieving run data, and managing project-wide event operations.
+ */
+export class ScenarioEventService {
   private eventRepository: ScenarioEventRepository;
 
   constructor() {
     this.eventRepository = new ScenarioEventRepository();
   }
 
+  /**
+   * Saves a scenario event to the repository.
+   * @param {Object} params - The parameters for saving the event
+   * @param {string} params.projectId - The ID of the project
+   * @param {string} params.type - The type of event
+   * @param {string} params.scenarioId - The ID of the scenario
+   * @param {string} params.scenarioRunId - The ID of the scenario run
+   * @param {Object} [params.metadata] - Additional metadata for the event
+   */
   async saveScenarioEvent({
     projectId,
     ...event
@@ -25,6 +38,13 @@ export class ScenarioRunnerService {
     });
   }
 
+  /**
+   * Retrieves the complete run data for a specific scenario run.
+   * @param {Object} params - The parameters for retrieving run data
+   * @param {string} params.scenarioRunId - The ID of the scenario run
+   * @param {string} params.projectId - The ID of the project
+   * @returns {Promise<ScenarioRunData | null>} The scenario run data or null if not found
+   */
   async getScenarioRunData({
     scenarioRunId,
     projectId,
@@ -78,12 +98,25 @@ export class ScenarioRunnerService {
     };
   }
 
+  /**
+   * Deletes all events associated with a specific project.
+   * @param {Object} params - The parameters for deletion
+   * @param {string} params.projectId - The ID of the project
+   * @returns {Promise<void>}
+   */
   async deleteAllEventsForProject({ projectId }: { projectId: string }) {
     return await this.eventRepository.deleteAllEvents({
       projectId,
     });
   }
 
+  /**
+   * Retrieves run data for all runs of a specific scenario.
+   * @param {Object} params - The parameters for retrieving scenario run data
+   * @param {string} params.projectId - The ID of the project
+   * @param {string} params.scenarioId - The ID of the scenario
+   * @returns {Promise<ScenarioRunData[] | null>} Array of scenario run data or null if no runs found
+   */
   async getScenarioRunDataByScenarioId({
     projectId,
     scenarioId,
@@ -110,15 +143,27 @@ export class ScenarioRunnerService {
     return runs.filter(Boolean) as ScenarioRunData[];
   }
 
+  /**
+   * Retrieves scenario sets data for a specific project.
+   * @param {Object} params - The parameters for retrieving scenario sets
+   * @param {string} params.projectId - The ID of the project
+   * @returns {Promise<any>} The scenario sets data
+   */
   async getScenarioSetsDataForProject({ projectId }: { projectId: string }) {
     return await this.eventRepository.getScenarioSetsDataForProject({
       projectId,
     });
   }
 
-  // Get batch run data for a scenario set
-  // TODO: This is a temporary solution as it's making a lot of queries to the database.
-  // come up with a better solution.
+  /**
+   * Retrieves run data for all scenarios in a scenario set.
+   * Note: This is a temporary implementation that may be optimized in the future.
+   * TODO: Optimize this.
+   * @param {Object} params - The parameters for retrieving run data
+   * @param {string} params.projectId - The ID of the project
+   * @param {string} params.scenarioSetId - The ID of the scenario set
+   * @returns {Promise<ScenarioRunData[]>} Array of scenario run data
+   */
   async getRunDataForScenarioSet({
     projectId,
     scenarioSetId,
@@ -141,6 +186,13 @@ export class ScenarioRunnerService {
     });
   }
 
+  /**
+   * Retrieves run data for multiple batch runs.
+   * @param {Object} params - The parameters for retrieving batch run data
+   * @param {string} params.projectId - The ID of the project
+   * @param {string[]} params.batchRunIds - Array of batch run IDs
+   * @returns {Promise<ScenarioRunData[]>} Array of scenario run data
+   */
   async getRunDataForBatchIds({
     projectId,
     batchRunIds,
