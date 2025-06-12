@@ -12,7 +12,6 @@ export default createNextApiHandler({
   router: appRouter,
   createContext: createTRPCContext,
   onError: ({ ctx, error, input, path, type }) => {
-    console.log("onError", { ctx, error, input, path, type });
     const logData: Record<string, any> = {
       error,
       path,
