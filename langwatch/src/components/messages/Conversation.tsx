@@ -34,7 +34,6 @@ export function Conversation({
       projectId: project?.id ?? "",
       threadId: threadId ?? "",
       traceId: traceId ?? "",
-      isPublicRoute,
     },
     {
       enabled: !!project && !!threadId,
