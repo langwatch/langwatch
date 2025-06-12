@@ -13,9 +13,9 @@ export const errorSchema = z.object({ error: z.string() });
 /**
  * Schema for unauthorized error responses
  */
-export const unauthorizedSchema = z.object({ error: z.string() });
+export const unauthorizedSchema = errorSchema;
 
 /**
  * Schema for bad request error responses
  */
-export const badRequestSchema = z.object({ error: z.string() });
+export const badRequestSchema = errorSchema;
