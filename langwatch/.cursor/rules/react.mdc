@@ -1,0 +1,38 @@
+---
+description: 
+globs: *.tsx
+alwaysApply: false
+---
+React Component Development Guidelines:
+
+1. Component Structure
+   - Create smaller, focused components
+   - Compose larger components from smaller ones
+   - When prototyping, keep small components in the same file, but mark to be removed:
+   ie: 
+
+/**
+ * ExampleComponent
+ * Responsibilities: 
+ * To be an example component
+ * 
+ * TODO: Move to a separate file
+ */
+function ExampleComponent() {
+  return <div>ExampleComponent</div>;
+}
+
+
+2. Hook Organization
+   - Break complex logic into smaller hooks
+   - Compose hooks when it makes sense
+   - Keep hooks in the same file as their components
+
+3. Code Separation
+   - Separate business logic from UI rendering
+   - Keep related code together
+   - Maintain clear boundaries between concerns
+
+4. Documentation
+   - Add TSDoc style documentation when write functions and components.
+   - Always include "Single Responsibility" in the description
