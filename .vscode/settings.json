@@ -1,5 +1,6 @@
 {
   "typescript.experimental.useTsgo": false,
+  // Provide custom color scheme to differentiate between projects
   "workbench.colorCustomizations": {
     "titleBar.activeBackground": "#007ACC",
     "titleBar.activeForeground": "#FFFFFF",
