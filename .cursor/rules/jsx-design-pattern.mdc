@@ -1,7 +1,0 @@
----
-description: 
-globs: *.tsx
-alwaysApply: false
----
-When building React components, always try to create smaller components to compose larger components instead of writing large components, and try to compose hooks into smaller hooks when it makes sense. Try to separate logic from UI as much as possible. All of this can be done in the same file. 
-

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { ScenarioRunnerService } from "~/app/api/scenario-events/[[...route]]/scenario-event.service";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { TRPCError } from "@trpc/server";
 
 // Base schema for all project-related operations
 const projectSchema = z.object({

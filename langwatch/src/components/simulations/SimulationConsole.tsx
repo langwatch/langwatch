@@ -43,17 +43,17 @@ function StatusDisplay({
   colors: ReturnType<typeof useConsoleColors>;
 }) {
   const getStatusColor = () => {
-    if (verdict === Verdict.Success) return colors.successColor;
-    if (verdict === Verdict.Failure) return colors.failureColor;
-    if (verdict === Verdict.Inconclusive) return colors.warningColor;
+    if (verdict === Verdict.SUCCESS) return colors.successColor;
+    if (verdict === Verdict.FAILURE) return colors.failureColor;
+    if (verdict === Verdict.INCONCLUSIVE) return colors.warningColor;
     return status === "SUCCESS" ? colors.successColor : colors.failureColor;
   };
 
   const getStatusText = () => {
     if (verdict) {
-      return verdict === Verdict.Success
+      return verdict === Verdict.SUCCESS
         ? "PASSED"
-        : verdict === Verdict.Failure
+        : verdict === Verdict.FAILURE
         ? "FAILED"
         : "INCONCLUSIVE";
     }
@@ -76,7 +76,7 @@ function MetricsSummary({
   durationInMs,
   colors,
 }: {
-  results?: ScenarioResults;
+  results?: ScenarioResults | null;
   durationInMs?: number;
   colors: ReturnType<typeof useConsoleColors>;
 }) {
@@ -120,7 +120,7 @@ function CriteriaDetails({
   results,
   colors,
 }: {
-  results?: ScenarioResults;
+  results?: ScenarioResults | null;
   colors: ReturnType<typeof useConsoleColors>;
 }) {
   if (!results) return null;
@@ -187,7 +187,7 @@ export function SimulationConsole({
   status,
   durationInMs,
 }: {
-  results?: ScenarioResults;
+  results?: ScenarioResults | null;
   scenarioName?: string;
   status?: string;
   durationInMs?: number;
