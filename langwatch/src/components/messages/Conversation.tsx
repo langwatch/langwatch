@@ -26,13 +26,15 @@ export function Conversation({
   const traceIdParam = (router.query.trace as string) || traceId;
   const { trace } = useTraceDetailsState(traceIdParam);
 
-  const { project } = useOrganizationTeamProject();
+  const { project, isPublicRoute } = useOrganizationTeamProject();
 
   const currentTraceRef = useRef<HTMLDivElement>(null);
   const threadTraces = api.traces.getTracesByThreadId.useQuery(
     {
       projectId: project?.id ?? "",
       threadId: threadId ?? "",
+      traceId: traceId ?? "",
+      isPublicRoute,
     },
     {
       enabled: !!project && !!threadId,
@@ -98,7 +100,7 @@ export function Conversation({
                       highlighted={trace.trace_id == modalTraceId}
                     />
                   ))
-              ) : threadTraces.error ? (
+              ) : threadTraces.error && !isPublicRoute ? (
                 <Box maxWidth="800px" paddingTop={8} paddingBottom={4}>
                   <Text color="red.500">
                     Something went wrong trying to load previous messages
