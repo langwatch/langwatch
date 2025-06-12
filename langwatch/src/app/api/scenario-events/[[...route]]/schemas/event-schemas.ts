@@ -77,7 +77,7 @@ const baseScenarioEventSchema = baseEventSchema.extend({
 export const scenarioRunStartedSchema = baseScenarioEventSchema.extend({
   type: z.literal(ScenarioEventType.RUN_STARTED),
   metadata: z.object({
-    name: z.string(),
+    name: z.string().optional(),
     description: z.string().optional(),
   }),
 });
