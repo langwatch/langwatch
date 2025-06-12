@@ -1,5 +1,5 @@
 import { scenarioEventSchema } from "./schemas";
-import { ScenarioEventType } from "./enums";
+import { ScenarioEventType, Verdict } from "./enums";
 import type {
   ScenarioEvent,
   ScenarioMessageSnapshotEvent,
@@ -13,13 +13,31 @@ import { esClient } from "~/server/elasticsearch";
 
 const projectIdSchema = z.string();
 const scenarioRunIdSchema = z.string();
-const batchRunIdSchema = z.string();
 const scenarioIdSchema = z.string();
 
+/**
+ * Repository class for managing scenario events in Elasticsearch.
+ * Handles CRUD operations and complex queries for scenario events, including:
+ * - Individual scenario events
+ * - Scenario runs
+ * - Scenario sets
+ * - Batch runs
+ *
+ * All operations are scoped to a specific project for data isolation.
+ * Uses Elasticsearch for efficient querying and aggregation of event data.
+ */
 export class ScenarioEventRepository {
   private readonly indexName = "scenario-events";
   private client: ElasticClient | null = null;
 
+  /**
+   * Saves a scenario event to Elasticsearch.
+   * Validates the project ID and event data before saving.
+   * Automatically adds timestamp if not provided.
+   *
+   * @param event - The scenario event to save, including project ID
+   * @throws {z.ZodError} If validation fails for projectId or event data
+   */
   async saveEvent({
     projectId,
     ...event
@@ -39,6 +57,15 @@ export class ScenarioEventRepository {
     });
   }
 
+  /**
+   * Retrieves the most recent message snapshot event for a specific scenario run.
+   * Used to get the latest state of a conversation in a scenario run.
+   *
+   * @param projectId - The project identifier
+   * @param scenarioRunId - The scenario run identifier
+   * @returns The latest message snapshot event or undefined if none exists
+   * @throws {z.ZodError} If validation fails for projectId or scenarioRunId
+   */
   async getLatestMessageSnapshotEventByScenarioRunId({
     projectId,
     scenarioRunId,
@@ -71,6 +98,15 @@ export class ScenarioEventRepository {
     return response.hits.hits[0]?._source as ScenarioMessageSnapshotEvent;
   }
 
+  /**
+   * Retrieves the most recent run finished event for a specific scenario run.
+   * Used to determine if and how a scenario run completed.
+   *
+   * @param projectId - The project identifier
+   * @param scenarioRunId - The scenario run identifier
+   * @returns The latest run finished event or undefined if the run hasn't finished
+   * @throws {z.ZodError} If validation fails for projectId or scenarioRunId
+   */
   async getLatestRunFinishedEventByScenarioRunId({
     projectId,
     scenarioRunId,
@@ -103,6 +139,13 @@ export class ScenarioEventRepository {
     return response.hits.hits[0]?._source as ScenarioRunFinishedEvent;
   }
 
+  /**
+   * Deletes all events associated with a project.
+   * This is a destructive operation that cannot be undone.
+   *
+   * @param projectId - The project identifier
+   * @throws {z.ZodError} If validation fails for projectId
+   */
   async deleteAllEvents({ projectId }: { projectId: string }): Promise<void> {
     const validatedProjectId = projectIdSchema.parse(projectId);
     const client = await this.getClient();
@@ -117,6 +160,15 @@ export class ScenarioEventRepository {
     });
   }
 
+  /**
+   * Retrieves all scenario run IDs associated with a specific scenario.
+   * Used to track the history of runs for a particular scenario.
+   *
+   * @param projectId - The project identifier
+   * @param scenarioId - The scenario identifier
+   * @returns Array of scenario run IDs, ordered by most recent first
+   * @throws {z.ZodError} If validation fails for projectId or scenarioId
+   */
   async getScenarioRunIdsForScenario({
     projectId,
     scenarioId,
@@ -168,11 +220,23 @@ export class ScenarioEventRepository {
    * - Latest run timestamp across all scenarios in each set
    * - Success rate calculated from finished scenario runs
    *
+   * Example response:
+   * ```typescript
+   * [
+   *   {
+   *     scenarioSetId: "set-123",
+   *     scenarioCount: 5,
+   *     lastRunAt: 1678901234567
+   *   }
+   * ]
+   * ```
+   *
    * Optimized using Elasticsearch aggregations to minimize data transfer
    * and compute statistics server-side rather than in application memory.
    *
    * @param projectId - The project identifier to filter sets by
    * @returns Promise resolving to array of scenario set metadata objects
+   * @throws {z.ZodError} If validation fails for projectId
    */
   async getScenarioSetsDataForProject({
     projectId,
@@ -226,7 +290,7 @@ export class ScenarioEventRepository {
                   },
                   successful_runs: {
                     filter: {
-                      term: { "results.success": true },
+                      term: { "results.verdict": Verdict.SUCCESS },
                     },
                   },
                 },
@@ -262,6 +326,15 @@ export class ScenarioEventRepository {
     });
   }
 
+  /**
+   * Retrieves all batch run IDs associated with a scenario set.
+   * Results are sorted by latest timestamp in descending order.
+   *
+   * @param projectId - The project identifier
+   * @param scenarioSetId - The scenario set identifier
+   * @returns Array of batch run IDs, ordered by most recent first
+   * @throws {z.ZodError} If validation fails for projectId or scenarioSetId
+   */
   async getBatchRunIdsForScenarioSet({
     projectId,
     scenarioSetId,
@@ -315,6 +388,15 @@ export class ScenarioEventRepository {
     ).map((bucket) => bucket.key);
   }
 
+  /**
+   * Retrieves all scenario run IDs associated with a list of batch runs.
+   * Used to find all scenario runs that were part of specific batch executions.
+   *
+   * @param projectId - The project identifier
+   * @param batchRunIds - Array of batch run IDs to search for
+   * @returns Array of scenario run IDs
+   * @throws {z.ZodError} If validation fails for projectId
+   */
   async getScenarioRunIdsForBatchRuns({
     projectId,
     batchRunIds,
@@ -361,6 +443,15 @@ export class ScenarioEventRepository {
     ).map((bucket) => bucket.key);
   }
 
+  /**
+   * Retrieves the run started event for a specific scenario run.
+   * Used to get the initial state and configuration of a scenario run.
+   *
+   * @param projectId - The project identifier
+   * @param scenarioRunId - The scenario run identifier
+   * @returns The run started event or undefined if not found
+   * @throws {z.ZodError} If validation fails for projectId or scenarioRunId
+   */
   async getRunStartedEventByScenarioRunId({
     projectId,
     scenarioRunId,
@@ -396,6 +487,9 @@ export class ScenarioEventRepository {
   /**
    * Gets or creates a cached Elasticsearch client for test environment.
    * Avoids recreating the client on every operation for better performance.
+   *
+   * @returns Promise resolving to an Elasticsearch client instance
+   * @private
    */
   private async getClient(): Promise<ElasticClient> {
     if (!this.client) {
