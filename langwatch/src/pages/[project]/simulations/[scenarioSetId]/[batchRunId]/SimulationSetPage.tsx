@@ -29,24 +29,24 @@ export function SimulationSetPage({
       }
     );
 
+  const sortedScenarioSetData = useMemo(() => {
+    return [...(scenarioSetData ?? [])].sort((a, b) => {
+      return a.timestamp - b.timestamp;
+    });
+  }, [scenarioSetData]);
+
   const scenarioRunIds = useMemo(
     () =>
-      [...(scenarioSetData ?? [])]
-        .sort((a, b) => {
-          return (
-            new Date(a.timestamp ?? 0).getTime() -
-            new Date(b.timestamp ?? 0).getTime()
-          );
-        })
+      sortedScenarioSetData
         ?.filter((scenario) => scenario.batchRunId === batchRunId)
         ?.map((scenario) => scenario.scenarioRunId),
-    [scenarioSetData, batchRunId]
+    [sortedScenarioSetData, batchRunId]
   );
 
   useEffect(() => {
     if (!batchRunId) {
-      const length = scenarioSetData?.length ?? 0;
-      const batchRunId = scenarioSetData?.[length - 1]?.batchRunId;
+      const length = sortedScenarioSetData?.length ?? 0;
+      const batchRunId = sortedScenarioSetData?.[length - 1]?.batchRunId;
       if (!batchRunId) return;
       goToSimulationBatchRuns(scenarioSetId, batchRunId, { replace: true });
     }
