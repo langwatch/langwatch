@@ -252,7 +252,6 @@ export const tracesRouter = createTRPCRouter({
         projectId: z.string(),
         threadId: z.string(),
         traceId: z.string(),
-        isPublicRoute: z.boolean(),
       })
     )
     .use(
@@ -265,7 +264,7 @@ export const tracesRouter = createTRPCRouter({
       )
     )
     .query(async ({ input, ctx }) => {
-      const { projectId, threadId, isPublicRoute } = input;
+      const { projectId, threadId } = input;
 
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -277,7 +276,7 @@ export const tracesRouter = createTRPCRouter({
         protections,
       });
 
-      if (!isPublicRoute) {
+      if (!ctx.publiclyShared) {
         return tracesGrouped;
       }
 
