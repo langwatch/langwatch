@@ -10,6 +10,7 @@ import {
 import { ScenarioRunnerService } from "./scenario-event.service";
 import { scenarioEventSchema, responseSchemas } from "./schemas";
 import { createLogger } from "~/utils/logger";
+import { baseResponses } from "../../shared/base-responses";
 
 const logger = createLogger("langwatch:api:scenario-events");
 
@@ -34,6 +35,7 @@ app.post(
   describeRoute({
     description: "Create a new scenario event",
     responses: {
+      ...baseResponses,
       201: {
         description: "Event created successfully",
         content: {
@@ -85,6 +87,7 @@ export const route = app.delete(
   describeRoute({
     description: "Delete all events",
     responses: {
+      ...baseResponses,
       200: {
         description: "Events deleted successfully",
         content: {

@@ -23,7 +23,7 @@ import {
   buildStandardSuccessResponse,
   getOutputsToResponseFormat,
 } from "./utils";
-import { baseResponses } from "./constants";
+import { baseResponses } from "../../shared/base-responses";
 
 const logger = createLogger("langwatch:api:prompts");
 
