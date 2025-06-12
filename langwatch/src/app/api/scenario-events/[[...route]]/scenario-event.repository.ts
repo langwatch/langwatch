@@ -342,6 +342,8 @@ export class ScenarioEventRepository {
     projectId: string;
     scenarioSetId: string;
   }): Promise<string[]> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
     const client = await this.getClient();
 
     const response = await client.search({
@@ -350,8 +352,8 @@ export class ScenarioEventRepository {
         query: {
           bool: {
             must: [
-              { term: { projectId } },
-              { term: { scenarioSetId } },
+              { term: { projectId: validatedProjectId } },
+              { term: { scenarioSetId: validatedScenarioSetId } },
               { exists: { field: "batchRunId" } },
             ],
           },
