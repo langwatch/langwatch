@@ -283,6 +283,7 @@ export const tracesRouter = createTRPCRouter({
       const publicSharedTraces = await ctx.prisma.publicShare.findMany({
         where: {
           projectId: projectId,
+          resourceType: PublicShareResourceTypes.TRACE,
           resourceId: {
             in: tracesGrouped.map((trace) => trace.trace_id),
           },
