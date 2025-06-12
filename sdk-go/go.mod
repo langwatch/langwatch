@@ -1,11 +1,11 @@
-module github.com/langwatch/go-sdk
+module github.com/langwatch/langwatch/sdk-go
 
 go 1.22.0
 
 toolchain go1.24.2
 
 require (
-	github.com/openai/openai-go v0.1.0-beta.10
+	github.com/openai/openai-go v1.4.0
 	github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/otel v1.35.0
 	go.opentelemetry.io/otel/sdk v1.35.0

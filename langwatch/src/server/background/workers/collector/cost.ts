@@ -11,6 +11,8 @@ import * as Sentry from "@sentry/nextjs";
 import NodeFetchCache, { FileSystemCache } from "node-fetch-cache";
 import { createLogger } from "../../../../utils/logger";
 import { isBuildOrNoRedis } from "../../../redis";
+import fs from "fs/promises";
+import path from "path";
 
 const logger = createLogger("langwatch:workers:collector:cost");
 
@@ -71,9 +73,35 @@ const initTikToken = async (
         ttl: 1000 * 60 * 60 * 24 * 365, // 1 year
       }),
     });
-    const model = await load(registryInfo, (url) =>
-      fetch(url).then((r) => r.text())
-    );
+
+    const model = await load(registryInfo, async (url) => {
+      const filename = path.basename(url);
+
+      // Prevent directory traversal
+      const isSafeFilename = /^[a-zA-Z0-9._-]+$/.test(filename);
+      if (!isSafeFilename) {
+        logger.warn({ filename }, "Unsafe filename detected; using remote fetch instead");
+        return fetch(url).then((r) => r.text());
+      }
+
+      if (process.env.TIKTOKENS_PATH) {
+        const localPath = path.join(process.env.TIKTOKENS_PATH, filename);
+        logger.debug({ localPath }, "Attempting to load tiktoken model from local file");
+
+        try {
+          return await fs.readFile(localPath, "utf8");
+        } catch (error) {
+          logger.warn(
+            { localPath, error: error instanceof Error ? error.message : String(error) },
+            "Local read failed; falling back to remote fetch"
+          );
+        }
+      }
+
+      // Default: fetch from remote
+      return fetch(url).then((r) => r.text());
+    });
+
     const encoder = new Tiktoken(
       model.bpe_ranks,
       model.special_tokens,

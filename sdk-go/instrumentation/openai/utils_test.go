@@ -1,4 +1,4 @@
-package otelopenai
+package openai
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestJSONHelpers(t *testing.T) {
+func TestJSONUtils(t *testing.T) {
 	jsonDataStr := `{
 		"string_key": "hello",
 		"float_key": 123.45,
