@@ -1,6 +1,6 @@
 import { Box, Button, HStack, Text, useDisclosure } from "@chakra-ui/react";
 import { DashboardLayout } from "../DashboardLayout";
-import { SetRunHistorySidebar } from "./SetRunHistorySidebar";
+import { SetRunHistorySidebar } from "./set-run-history-sidebar";
 import { useSimulationRouter } from "~/hooks/simulations";
 import { HistoryIcon } from "../icons/History";
 
