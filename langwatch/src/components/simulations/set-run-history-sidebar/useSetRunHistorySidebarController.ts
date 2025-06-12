@@ -4,6 +4,9 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import type { Run, RunItem } from "./types";
 import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("useSetRunHistorySidebarController");
 
 /**
  * Custom hook that manages the state and behavior for the Set Run History Sidebar.
@@ -49,7 +52,7 @@ export const useSetRunHistorySidebarController = () => {
   const handleRunClick = useMemo(
     () => (batchRunId: string) => {
       if (!scenarioSetId) {
-        console.warn("Cannot navigate: scenarioSetId is not defined");
+        logger.warn("Cannot navigate: scenarioSetId is not defined");
         return;
       }
       goToSimulationBatchRuns(scenarioSetId, batchRunId);
