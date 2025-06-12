@@ -2,9 +2,9 @@
  * Verdict enum represents the possible outcomes of a test scenario
  */
 export enum Verdict {
-  Success = "success",
-  Failure = "failure",
-  Inconclusive = "inconclusive",
+  SUCCESS = "success",
+  FAILURE = "failure",
+  INCONCLUSIVE = "inconclusive",
 }
 
 // Scenario event type enum
