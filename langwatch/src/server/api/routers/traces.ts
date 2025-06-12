@@ -267,12 +267,6 @@ export const tracesRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const { projectId, threadId, isPublicRoute } = input;
 
-      const publicSharedTraces = await ctx.prisma.publicShare.findMany({
-        where: {
-          projectId: projectId,
-        },
-      });
-
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
       });
@@ -286,6 +280,15 @@ export const tracesRouter = createTRPCRouter({
       if (!isPublicRoute) {
         return tracesGrouped;
       }
+
+      const publicSharedTraces = await ctx.prisma.publicShare.findMany({
+        where: {
+          projectId: projectId,
+          resourceId: {
+            in: tracesGrouped.map((trace) => trace.trace_id),
+          },
+        },
+      });
 
       const filteredTraces = tracesGrouped.filter((trace) =>
         publicSharedTraces.some(
