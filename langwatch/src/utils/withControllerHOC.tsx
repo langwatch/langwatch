@@ -28,13 +28,18 @@ import React from "react";
  * export default withController(MyComponent, useMyController);
  * ```
  */
-export function withController<P extends object>(
-  Component: React.ComponentType<any>,
-  useController: (props: P) => any
+export function withController<P extends object, C>(
+  Component: React.ComponentType<P & C>,
+  useController: (props: P) => C
 ): React.ComponentType<P> {
-  // eslint-disable-next-line react/display-name
-  return ((props: P) => {
+  const WrappedComponent = (props: P) => {
     const controller = useController(props);
     return <Component {...props} {...controller} />;
-  }) as React.ComponentType<P>;
+  };
+
+  WrappedComponent.displayName = `withController(${
+    Component.displayName || Component.name || "Component"
+  })`;
+
+  return WrappedComponent;
 }
