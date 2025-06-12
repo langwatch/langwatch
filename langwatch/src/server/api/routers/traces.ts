@@ -246,20 +246,57 @@ export const tracesRouter = createTRPCRouter({
         labels: result.labels.map((bucket) => bucket.key),
       };
     }),
-  getTracesByThreadId: protectedProcedure
-    .input(z.object({ projectId: z.string(), threadId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+  getTracesByThreadId: publicProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        threadId: z.string(),
+        traceId: z.string(),
+      })
+    )
+    .use(
+      checkPermissionOrPubliclyShared(
+        checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW),
+        {
+          resourceType: PublicShareResourceTypes.TRACE,
+          resourceParam: "traceId",
+        }
+      )
+    )
     .query(async ({ input, ctx }) => {
       const { projectId, threadId } = input;
+
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
       });
 
-      return getTracesGroupedByThreadId({
+      const tracesGrouped = await getTracesGroupedByThreadId({
         connConfig: { projectId },
         threadId,
         protections,
       });
+
+      if (!ctx.publiclyShared) {
+        return tracesGrouped;
+      }
+
+      const publicSharedTraces = await ctx.prisma.publicShare.findMany({
+        where: {
+          projectId: projectId,
+          resourceType: PublicShareResourceTypes.TRACE,
+          resourceId: {
+            in: tracesGrouped.map((trace) => trace.trace_id),
+          },
+        },
+      });
+
+      const filteredTraces = tracesGrouped.filter((trace) =>
+        publicSharedTraces.some(
+          (publicShare) => publicShare.resourceId === trace.trace_id
+        )
+      );
+
+      return filteredTraces;
     }),
 
   getTracesWithSpans: protectedProcedure
