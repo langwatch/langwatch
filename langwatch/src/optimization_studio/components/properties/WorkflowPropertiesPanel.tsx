@@ -51,10 +51,13 @@ export const WorkflowPropertiesPanel = () => {
   };
 
   useEffect(() => {
-    if (workflow.workflow_type) {
+    if (
+      workflow.workflow_type &&
+      workflow.workflow_type !== (isEvaluator ? "evaluator" : "workflow")
+    ) {
       updateNode(workflow.workflow_type);
     }
-  }, [workflow.workflow_type]);
+  }, [workflow.workflow_type, isEvaluator]);
 
   const updateNode = (workflowType: WorkflowTypes) => {
     if (!endNode) return;

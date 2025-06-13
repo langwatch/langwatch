@@ -95,6 +95,11 @@ const configSchemaV1_0 = z.object({
     temperature: z.number().optional(),
     max_tokens: z.number().optional(),
     demonstrations: demonstrationsSchema,
+    prompting_technique: z
+      .object({
+        ref: z.string().optional(),
+      })
+      .optional(),
   }),
 });
 

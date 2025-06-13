@@ -56,6 +56,14 @@ def setup(
     if debug:
         logger.info("Setting up LangWatch client...")
 
+    # TODO: get rid of this
+    changed_api_key = False
+    if get_instance() is not None and api_key != get_instance().api_key:
+        logger.warning("LangWatch was already setup before, and now it is being setup with a new API key. This will nuke the previous tracing providers. This is not recommended.")
+        # Set the new API key on the current client to make sure, triggering a nuke of the previous tracing providers too
+        get_instance().api_key = api_key
+        changed_api_key = True
+
     client = Client(
         api_key=api_key,
         endpoint_url=endpoint_url,
@@ -64,6 +72,7 @@ def setup(
         instrumentors=instrumentors,
         debug=debug,
         span_exclude_rules=span_exclude_rules,
+        ignore_global_tracer_provider_override_warning=changed_api_key,
     )
 
     if debug:

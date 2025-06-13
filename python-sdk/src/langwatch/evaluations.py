@@ -10,7 +10,7 @@ from langwatch.domain import SpanTimestamps
 import nanoid
 from langwatch.telemetry.span import LangWatchSpan
 from langwatch.telemetry.context import get_current_span
-from langwatch.state import get_api_key, get_endpoint
+from langwatch.state import get_api_key, get_endpoint, get_instance
 from langwatch.attributes import AttributeKey
 from pydantic import BaseModel
 
@@ -253,18 +253,28 @@ def _prepare_data(
             params=settings,  # type: ignore
         )
 
+    client = get_instance()
+
     return {
         "url": get_endpoint() + f"/api/evaluations/{slug}/evaluate",
         "json": {
             "trace_id": (
-                format(span_ctx.trace_id, "x")
-                if span_ctx and span_ctx.is_valid
-                else None
+                None
+                if client and client.disable_sending
+                else (
+                    format(span_ctx.trace_id, "x")
+                    if span_ctx and span_ctx.is_valid
+                    else None
+                )
             ),
             "span_id": (
-                format(span_ctx.span_id, "x")
-                if span_ctx and span_ctx.is_valid
-                else None
+                None
+                if client and client.disable_sending
+                else (
+                    format(span_ctx.span_id, "x")
+                    if span_ctx and span_ctx.is_valid
+                    else None
+                )
             ),
             "name": name,
             "data": dataDict,
