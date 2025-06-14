@@ -377,6 +377,25 @@ class LangWatchDSPy:
 langwatch_dspy = LangWatchDSPy()
 
 
+def init(
+    experiment: str,
+    optimizer: Optional[Teleprompter],
+    run_id: Optional[str] = None,
+    slug: Optional[str] = None,
+    workflow_id: Optional[str] = None,
+    workflow_version_id: Optional[str] = None,
+):
+    langwatch_dspy.init(
+        experiment, optimizer, run_id, slug, workflow_id, workflow_version_id
+    )
+
+
+def track_metric(
+    metric_fn: Callable[[Example, Prediction, Optional[List[Any]]], Union[bool, float]],
+):
+    langwatch_dspy.track_metric(metric_fn)
+
+
 class LangWatchTrackedBootstrapFewShot(BootstrapFewShot):
     last_step: int = 0
     last_round_idx: int = 0

@@ -35,7 +35,8 @@ export function RunningStatus({ isLoading }: { isLoading?: boolean }) {
         </HStack>
       ) : isWaiting ? (
         <HStack>
-          <Text fontSize="13px">Waiting...</Text>
+          <Spinner size="xs" />
+          <Text fontSize="13px">Waiting for runtime...</Text>
         </HStack>
       ) : null}
     </Box>
