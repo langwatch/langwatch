@@ -8,7 +8,7 @@ from langwatch_nlp.studio.types.dsl import (
     NodeRef,
 )
 import dspy
-
+from pydantic import BaseModel
 from langwatch_nlp.studio.utils import SerializableWithPydanticAndPredictEncoder
 
 
@@ -61,6 +61,12 @@ def autoparse_field_value(field: Field, value: Optional[Any]) -> Optional[Any]:
                 Field(identifier=field.identifier, type=FieldType.str), value
             )
         ]
+    if field.type == FieldType.dict and isinstance(value, BaseModel):
+        return json.loads(
+            json.dumps(
+                value.model_dump(), cls=SerializableWithPydanticAndPredictEncoder
+            )
+        )
     if field.type == FieldType.llm:
         return LLMConfig.model_validate(value)
     if field.type == FieldType.prompting_technique:

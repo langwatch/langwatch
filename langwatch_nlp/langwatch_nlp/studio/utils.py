@@ -11,7 +11,7 @@ import threading
 import random
 import enum
 
-from typing import Any, Dict, List, cast
+from typing import Any, Dict, Iterator, List, cast
 from joblib.memory import MemorizedFunc, AsyncMemorizedFunc
 import langwatch
 import litellm
@@ -296,6 +296,8 @@ class SerializableWithPydanticAndPredictEncoder(json.JSONEncoder):
             return o.model_dump()
         if isinstance(o, enum.Enum):
             return o.value
+        if isinstance(o, Iterator):
+            return list(o)
         return super().default(o)
 
 
