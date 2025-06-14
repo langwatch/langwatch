@@ -4,6 +4,7 @@ import {
   Center,
   Flex,
   HStack,
+  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -220,7 +221,7 @@ export default function OptimizationStudio() {
                   )}
                 </HStack>
                 <HStack width="full" justify="center">
-                  <Text lineClamp={1} fontSize="15px">
+                  <Text lineClamp={1} fontSize="15px" wordBreak="break-all">
                     Optimization Studio - {name}
                   </Text>
                   <StatusCircle
@@ -413,20 +414,28 @@ function StatusCircle({
 }) {
   return (
     <Tooltip content={tooltip}>
-      <Box
-        minWidth="12px"
-        maxWidth="12px"
-        minHeight="12px"
-        maxHeight="12px"
-        background={
-          status === "connected"
-            ? "green.500"
-            : status === "disconnected"
-            ? "red.300"
-            : "yellow.500"
-        }
-        borderRadius="full"
-      />
+      <HStack>
+        <Box
+          minWidth="12px"
+          maxWidth="12px"
+          minHeight="12px"
+          maxHeight="12px"
+          background={
+            status === "connected"
+              ? "green.500"
+              : status === "disconnected"
+              ? "red.300"
+              : "yellow.500"
+          }
+          borderRadius="full"
+        />
+        {status !== "connected" && status != "disconnected" && (
+          <HStack>
+            <Text>Connecting...</Text>
+            <Spinner size="sm" />
+          </HStack>
+        )}
+      </HStack>
     </Tooltip>
   );
 }
