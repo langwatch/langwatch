@@ -9,6 +9,7 @@ import re
 import sys
 import threading
 import random
+import enum
 
 from typing import Any, Dict, List, cast
 from joblib.memory import MemorizedFunc, AsyncMemorizedFunc
@@ -293,6 +294,8 @@ class SerializableWithPydanticAndPredictEncoder(json.JSONEncoder):
             return o.toDict()
         if isinstance(o, BaseModel):
             return o.model_dump()
+        if isinstance(o, enum.Enum):
+            return o.value
         return super().default(o)
 
 
