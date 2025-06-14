@@ -6,12 +6,11 @@ import { z } from "zod";
 import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger";
-import { loggerMiddleware } from "../../hono-middleware/logger";
+import { loggerMiddleware } from "../../middleware/logger";
+import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import {
-  badRequestSchema,
   llmPromptConfigSchema,
   promptOutputSchema,
-  successSchema,
   versionInputSchema,
   versionOutputSchema,
 } from "./schemas";
@@ -19,12 +18,12 @@ import {
   authMiddleware,
   repositoryMiddleware,
   errorMiddleware,
-} from "./middleware";
+} from "../../middleware";
 import {
   buildStandardSuccessResponse,
   getOutputsToResponseFormat,
 } from "./utils";
-import { baseResponses } from "./constants";
+import { baseResponses } from "../../shared/base-responses";
 
 const logger = createLogger("langwatch:api:prompts");
 

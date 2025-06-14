@@ -1,0 +1,10 @@
+---
+description: 
+globs: *.tsx
+alwaysApply: false
+---
+Typescript Development Guidelines:
+
+1. Documentation
+   - Add TSDoc style documentation when write functions and components.
+   - Always include "Single Responsibility" in the description

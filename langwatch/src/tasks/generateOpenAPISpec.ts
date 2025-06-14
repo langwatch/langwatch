@@ -1,6 +1,7 @@
 import { generateSpecs } from "hono-openapi";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
+import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import deepmerge from "deepmerge";
 import currentSpec from "../app/api/openapiLangWatch.json";
 import fs from "fs";
@@ -31,10 +32,18 @@ export default async function execute() {
   const datasetSpec = await generateSpecs(datasetApp);
   console.log("Building llm configs spec...");
   const llmConfigsSpec = await generateSpecs(llmConfigsApp);
+  console.log("Building scenario events spec...");
+  const scenarioEventsSpec = await generateSpecs(scenarioEventsApp);
   console.log("Merging specs...");
   const mergedSpec = deepmerge.all(
     // Merges this way ==>
-    [currentSpec, datasetSpec, llmConfigsSpec, langwatchSpec],
+    [
+      currentSpec,
+      datasetSpec,
+      llmConfigsSpec,
+      scenarioEventsSpec,
+      langwatchSpec,
+    ],
     {
       arrayMerge: overwriteMerge,
     }

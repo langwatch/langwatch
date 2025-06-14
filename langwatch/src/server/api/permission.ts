@@ -53,6 +53,12 @@ export const teamRolePermissionMapping = {
   TEAM_MEMBERS_MANAGE: [TeamUserRole.ADMIN],
   TEAM_CREATE_NEW_PROJECTS: [TeamUserRole.ADMIN],
   PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY: [TeamUserRole.ADMIN],
+  SCENARIOS_VIEW: [
+    TeamUserRole.ADMIN,
+    TeamUserRole.MEMBER,
+    TeamUserRole.VIEWER,
+  ],
+  SCENARIOS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
 };
 
 export const organizationRolePermissionMapping = {
@@ -96,7 +102,8 @@ export const isDemoProject = (
       roleGroup === TeamRoleGroup.PROJECT_VIEW ||
       roleGroup === TeamRoleGroup.EXPERIMENTS_VIEW ||
       roleGroup === TeamRoleGroup.WORKFLOWS_VIEW ||
-      roleGroup === TeamRoleGroup.PROMPTS_VIEW)
+      roleGroup === TeamRoleGroup.PROMPTS_VIEW ||
+      roleGroup === TeamRoleGroup.SCENARIOS_VIEW)
   ) {
     return true;
   }
