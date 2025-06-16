@@ -23,13 +23,25 @@ class LLMNode(dspy.Module):
         nested_predict: dspy.Predict = (
             predict._predict if hasattr(predict, "_predict") else predict  # type: ignore
         )
-        nested_predict.__class__ = PredictWithMetadata
 
+        signature = (
+            nested_predict.signature if hasattr(nested_predict, "signature") else None
+        )
+
+        # Create a new PredictWithMetadata instance with the signature
+        if signature:
+            self.predict = PredictWithMetadata(signature)
+        else:
+            # If no signature found, use the original predict
+            self.predict = predict
+
+        # Set LM if provided
         if lm is not None:
-            nested_predict.set_lm(lm=lm)
-        nested_predict.demos = demos
+            self.predict.set_lm(lm=lm)
+        # Set demos
+        setattr(self.predict, "demos", demos)
         # LabeledFewShot patch
-        nested_predict._node_id = node_id  # type: ignore
+        self.predict._node_id = node_id  # type: ignore
 
     def forward(self, **kwargs) -> Any:
         try:
