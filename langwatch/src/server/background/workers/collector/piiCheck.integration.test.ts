@@ -16,6 +16,7 @@ describe("PIICheck", () => {
         inserted_at: Date.now(),
         updated_at: Date.now(),
       },
+      spans: [],
     };
     await cleanupPIIs(sampleTrace, [], {
       piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
@@ -37,6 +38,7 @@ describe("PIICheck", () => {
         inserted_at: Date.now(),
         updated_at: Date.now(),
       },
+      spans: [],
     };
 
     await cleanupPIIs(samplePIITrace, [], {
@@ -61,6 +63,7 @@ describe("PIICheck", () => {
         inserted_at: Date.now(),
         updated_at: Date.now(),
       },
+      spans: [],
     };
     await cleanupPIIs(sampleTrace, [], {
       piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
@@ -82,6 +85,7 @@ describe("PIICheck", () => {
         inserted_at: Date.now(),
         updated_at: Date.now(),
       },
+      spans: [],
     };
 
     await cleanupPIIs(samplePIITrace, [], {

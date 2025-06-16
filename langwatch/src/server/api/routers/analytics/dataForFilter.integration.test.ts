@@ -37,6 +37,7 @@ describe("Data For Filter Integration Tests", () => {
       input: {
         value: "",
       },
+      spans: [],
       events: [
         {
           trace_id: traceId,
@@ -59,8 +60,7 @@ describe("Data For Filter Integration Tests", () => {
       ],
       evaluations: [
         {
-          trace_id: `test-trace-id-${nanoid()}`,
-          project_id: "test-project-id",
+          evaluation_id: nanoid(),
           evaluator_id: `test-check-id-faithfulness`,
           type: "faithfulness",
           name: "Faithfulness",
@@ -91,6 +91,7 @@ describe("Data For Filter Integration Tests", () => {
         updated_at: new Date().getTime(),
       },
       metrics: {},
+      spans: [],
       events: [
         {
           trace_id: traceId2,
@@ -113,8 +114,7 @@ describe("Data For Filter Integration Tests", () => {
       ],
       evaluations: [
         {
-          trace_id: traceId2,
-          project_id: "test-project-id",
+          evaluation_id: nanoid(),
           evaluator_id: `test-check-id-faithfulness`,
           type: "faithfulness",
           name: "Faithfulness2",
@@ -127,8 +127,7 @@ describe("Data For Filter Integration Tests", () => {
           },
         },
         {
-          trace_id: traceId2,
-          project_id: "test-project-id",
+          evaluation_id: nanoid(),
           evaluator_id: `test-check-id-consistency`,
           type: "consistency",
           name: "Consistency",
@@ -159,6 +158,7 @@ describe("Data For Filter Integration Tests", () => {
         updated_at: new Date().getTime(),
       },
       metrics: {},
+      spans: [],
       events: [
         {
           trace_id: traceId3,
@@ -208,7 +208,7 @@ describe("Data For Filter Integration Tests", () => {
   afterAll(async () => {
     const client = await esClient({ test: true });
     await client.deleteByQuery({
-      index: TRACES_PIVOT_INDEX,
+      index: TRACES_PIVOT_INDEX.base,
       body: {
         query: {
           terms: {

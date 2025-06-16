@@ -20,6 +20,7 @@ describe("Satisfaction Scoring Integration Test", () => {
     },
     metrics: {},
     metadata: {},
+    spans: [],
   };
 
   beforeAll(async () => {

@@ -34,6 +34,7 @@ describe("Timeseries Graph Integration Tests", () => {
         updated_at: new Date().getTime(),
       },
       metrics: {},
+      spans: [],
       events: [
         {
           trace_id: traceId,
@@ -72,6 +73,7 @@ describe("Timeseries Graph Integration Tests", () => {
         updated_at: new Date().getTime(),
       },
       metrics: {},
+      spans: [],
       events: [
         {
           trace_id: traceId2,
@@ -110,6 +112,7 @@ describe("Timeseries Graph Integration Tests", () => {
         updated_at: new Date().getTime(),
       },
       metrics: {},
+      spans: [],
       events: [
         {
           trace_id: traceId3,
@@ -149,6 +152,7 @@ describe("Timeseries Graph Integration Tests", () => {
         updated_at: new Date().getTime() - 24 * 60 * 60 * 1000 * 2,
       },
       metrics: {},
+      spans: [],
     },
   ];
 
@@ -177,7 +181,7 @@ describe("Timeseries Graph Integration Tests", () => {
 
     const client = await esClient({ test: true });
     await client.bulk({
-      index: TRACES_PIVOT_INDEX,
+      index: TRACES_PIVOT_INDEX.base,
       body: traceEntries.flatMap((trace) => [
         {
           index: {
@@ -196,7 +200,7 @@ describe("Timeseries Graph Integration Tests", () => {
   afterAll(async () => {
     const client = await esClient({ test: true });
     await client.deleteByQuery({
-      index: TRACES_PIVOT_INDEX,
+      index: TRACES_PIVOT_INDEX.base,
       body: {
         query: {
           terms: {
@@ -240,6 +244,7 @@ describe("Timeseries Graph Integration Tests", () => {
         { metric: "sentiment.thumbs_up_down", aggregation: "sum" },
         { metric: "sentiment.thumbs_up_down", aggregation: "min" },
       ],
+      timeZone: "UTC",
     });
 
     expect(response.currentPeriod[1]).toEqual({
@@ -290,6 +295,7 @@ describe("Timeseries Graph Integration Tests", () => {
         { metric: "sentiment.thumbs_up_down", aggregation: "min" },
       ],
       groupBy: "topics.topics",
+      timeZone: "UTC",
     });
 
     expect(response.currentPeriod[1]).toEqual({
@@ -350,6 +356,7 @@ describe("Timeseries Graph Integration Tests", () => {
       ],
       groupBy: "topics.topics",
       timeScale: "full",
+      timeZone: "UTC",
     });
 
     expect(response.currentPeriod).toEqual([
@@ -412,6 +419,7 @@ describe("Timeseries Graph Integration Tests", () => {
       ],
       groupBy: "topics.topics",
       timeScale: 7,
+      timeZone: "UTC",
     });
 
     expect(response).toEqual({

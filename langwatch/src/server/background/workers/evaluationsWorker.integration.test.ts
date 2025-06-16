@@ -9,7 +9,7 @@ import {
   it,
   vi,
 } from "vitest";
-import { TRACE_CHECKS_INDEX, esClient } from "../../elasticsearch";
+import { esClient } from "../../elasticsearch";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
 import {
   scheduleEvaluation,
@@ -21,11 +21,15 @@ import type { EvaluationJob } from "~/server/background/types";
 import type {
   EvaluatorTypes,
   SingleEvaluationResult,
-} from "../../../evaluations/evaluators.generated";
+} from "~/server/evaluations/evaluators.generated";
 
 const mocks = vi.hoisted(() => {
   return {
-    runEvaluation: vi.fn<any, Promise<SingleEvaluationResult>>(),
+    runEvaluation: vi.fn().mockResolvedValue({
+      raw_result: { result: "test" },
+      score: 1,
+      status: "processed",
+    } as SingleEvaluationResult),
   };
 });
 
@@ -36,7 +40,7 @@ const getTraceCheck = async (
 ) => {
   const client = await esClient({ test: true });
   return await client.search({
-    index: TRACE_CHECKS_INDEX,
+    index: "search-trace-checks",
     body: {
       query: {
         match: {
@@ -54,7 +58,8 @@ describe("Check Queue Integration Tests", () => {
   const trace_id_failed = `test-trace-id-failure-${nanoid()}`;
   const trace_id_error = `test-trace-id-error-${nanoid()}`;
   const check: EvaluationJob["check"] = {
-    id: "check_123",
+    evaluation_id: nanoid(),
+    evaluator_id: "check_123",
     type: "langevals/basic",
     name: "My Custom Check",
   };
@@ -77,7 +82,7 @@ describe("Check Queue Integration Tests", () => {
     // Delete test documents
     const client = await esClient({ test: true });
     await client.deleteByQuery({
-      index: TRACE_CHECKS_INDEX,
+      index: "search-trace-checks",
       body: {
         query: {
           // starts with test-trace
@@ -111,7 +116,7 @@ describe("Check Queue Integration Tests", () => {
     // Query ES to verify the status is "scheduled"
     const client = await esClient({ test: true });
     const response = await client.search<ElasticSearchEvaluation>({
-      index: TRACE_CHECKS_INDEX,
+      index: "search-trace-checks",
       query: {
         term: { trace_id: trace.trace_id },
       },
@@ -124,7 +129,7 @@ describe("Check Queue Integration Tests", () => {
 
     expect(traceCheck).toMatchObject({
       evaluation_id: expect.any(String),
-      evaluator_id: check.id,
+      evaluator_id: check.evaluator_id,
       name: check.name,
       type: check.type,
       trace_id: trace.trace_id,
@@ -161,7 +166,7 @@ describe("Check Queue Integration Tests", () => {
     // Query ES to verify the status is "processed"
     const client = await esClient({ test: true });
     const response = await client.search<ElasticSearchEvaluation>({
-      index: TRACE_CHECKS_INDEX,
+      index: "search-trace-checks",
       query: {
         term: { trace_id: trace.trace_id },
       },
@@ -199,7 +204,7 @@ describe("Check Queue Integration Tests", () => {
     // Query ES to verify the status is "processed"
     const client = await esClient({ test: true });
     const response = await client.search<ElasticSearchEvaluation>({
-      index: TRACE_CHECKS_INDEX,
+      index: "search-trace-checks",
       query: {
         term: { trace_id: trace.trace_id },
       },
@@ -228,7 +233,7 @@ describe("Check Queue Integration Tests", () => {
     // Query ES to verify the status is "processed"
     const client = await esClient({ test: true });
     const response = await client.search<ElasticSearchEvaluation>({
-      index: TRACE_CHECKS_INDEX,
+      index: "search-trace-checks",
       query: {
         term: { trace_id: trace.trace_id },
       },
@@ -264,7 +269,7 @@ describe("Check Queue Integration Tests", () => {
     // Query ES to verify the status is "processed"
     const client = await esClient({ test: true });
     let response = await client.search<ElasticSearchEvaluation>({
-      index: TRACE_CHECKS_INDEX,
+      index: "search-trace-checks",
       query: {
         term: { trace_id: trace.trace_id },
       },
@@ -279,7 +284,7 @@ describe("Check Queue Integration Tests", () => {
 
     // Query ES to verify the status is "scheduled"
     response = await client.search<ElasticSearchEvaluation>({
-      index: TRACE_CHECKS_INDEX,
+      index: "search-trace-checks",
       query: {
         term: { trace_id: trace.trace_id },
       },
@@ -297,7 +302,7 @@ describe("Check Queue Integration Tests", () => {
 
     // Query ES to verify the status is "processed"
     response = await client.search<ElasticSearchEvaluation>({
-      index: TRACE_CHECKS_INDEX,
+      index: "search-trace-checks",
       query: {
         term: { trace_id: trace.trace_id },
       },
@@ -313,7 +318,8 @@ describe("updateCheckStatusInES", () => {
   const traceId = `test-trace-id-${nanoid()}`;
   const projectId = "test-project-id";
   const check: EvaluationJob["check"] = {
-    id: "check_123",
+    evaluation_id: nanoid(),
+    evaluator_id: "check_123",
     type: "langevals/basic",
     name: "My Custom Check",
   };
@@ -324,7 +330,7 @@ describe("updateCheckStatusInES", () => {
     // Delete test documents to not polute the db
     const client = await esClient({ test: true });
     await client.deleteByQuery({
-      index: TRACE_CHECKS_INDEX,
+      index: "search-trace-checks",
       body: {
         query: {
           match: { project_id: projectId },
@@ -343,12 +349,16 @@ describe("updateCheckStatusInES", () => {
       status: "scheduled",
     });
 
-    const response = await getTraceCheck(traceId, check.id, projectId);
+    const response = await getTraceCheck(
+      traceId,
+      check.evaluator_id,
+      projectId
+    );
     expect((response.hits.total as any).value).toBeGreaterThan(0);
     const traceCheck = response.hits.hits[0]?._source;
     expect(traceCheck).toMatchObject({
       evaluation_id: expect.any(String),
-      evaluator_id: check.id,
+      evaluator_id: check.evaluator_id,
       name: check.name,
       type: check.type,
       trace_id: traceId,
@@ -378,12 +388,16 @@ describe("updateCheckStatusInES", () => {
       status: "in_progress",
     });
 
-    const response = await getTraceCheck(traceId, check.id, projectId);
+    const response = await getTraceCheck(
+      traceId,
+      check.evaluator_id,
+      projectId
+    );
     expect((response.hits.total as any).value).toBeGreaterThan(0);
     const traceCheck = response.hits.hits[0]?._source;
     expect(traceCheck).toMatchObject({
       evaluation_id: expect.any(String),
-      evaluator_id: check.id,
+      evaluator_id: check.evaluator_id,
       name: check.name,
       type: check.type,
       trace_id: traceId,
