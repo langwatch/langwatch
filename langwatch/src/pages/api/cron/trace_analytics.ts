@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "~/server/db";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
-import { AnalyticsKey } from "@prisma/client";
+import { AnalyticsKey, type Prisma } from "@prisma/client";
 
 export default async function handler(
   req: NextApiRequest,
@@ -28,50 +28,84 @@ export default async function handler(
   });
 
   const client = await esClient({ test: true });
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
 
-  // For each project, count traces and store in Analytics
-  for (const project of projects) {
-    const queryBody = {
+  // Calculate yesterday's date range
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(0, 0, 0, 0);
+  const yesterdayEnd = new Date(yesterday);
+  yesterdayEnd.setDate(yesterdayEnd.getDate() + 1);
+
+  console.log(`Counting traces for ${yesterday.toISOString().split("T")[0]}`);
+
+  // Create a multi-search query for all projects
+  const msearchBody = projects.flatMap((project) => [
+    { index: TRACE_INDEX.alias },
+    {
+      size: 0,
       query: {
         bool: {
           must: [
             { term: { "metadata.project_id": project.id } },
             {
               range: {
-                "@timestamp": {
-                  gte: today.toISOString(),
-                  lt: new Date(
-                    today.getTime() + 24 * 60 * 60 * 1000
-                  ).toISOString(),
+                "timestamps.started_at": {
+                  gte: yesterday.getTime(),
+                  lt: yesterdayEnd.getTime(),
                 },
               },
             },
           ],
         },
       },
-    };
+    },
+  ]);
 
-    const result = (await client.search({
-      index: TRACE_INDEX.alias,
-      body: queryBody,
-    })) as any;
+  // Execute multi-search to get counts for all projects in one request
+  const msearchResult = await client.msearch({
+    body: msearchBody,
+  });
 
-    const traceCount = result.hits.total.value;
-
-    // Store the count in Analytics
-    await prisma.analytics.create({
-      data: {
-        projectId: project.id,
+  // Prepare analytics entries to create
+  const analyticsToCreate = msearchResult.responses
+    .map((response: any, index: number) => {
+      const traceCount = response?.hits?.total?.value ?? 0;
+      if (traceCount === 0) {
+        console.log(
+          `No traces found for project ${projects[index]?.id} on ${
+            yesterday.toISOString().split("T")[0]
+          }`
+        );
+        return null;
+      }
+      return {
+        projectId: projects[index]?.id,
         key: AnalyticsKey.PROJECT_TRACE_COUNT_PER_DAY,
         numericValue: traceCount,
-        value: {
-          date: today.toISOString(),
-          count: traceCount,
-        },
-      },
+        createdAt: yesterday, // Use yesterday's date for the analytics entry
+      } as Prisma.AnalyticsCreateManyInput;
+    })
+    .filter(
+      (entry): entry is Prisma.AnalyticsCreateManyInput => entry !== null
+    );
+
+  if (analyticsToCreate.length > 0) {
+    // Batch create all analytics entries in one database operation
+    await prisma.analytics.createMany({
+      data: analyticsToCreate,
+      skipDuplicates: true,
     });
+    console.log(
+      `Created ${analyticsToCreate.length} analytics entries for ${
+        yesterday.toISOString().split("T")[0]
+      }`
+    );
+  } else {
+    console.log(
+      `No analytics entries to create for ${
+        yesterday.toISOString().split("T")[0]
+      }`
+    );
   }
 
   return res.status(200).json({ success: true });

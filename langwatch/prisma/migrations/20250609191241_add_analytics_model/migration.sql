@@ -7,7 +7,7 @@ CREATE TABLE "Analytics" (
     "id" TEXT NOT NULL,
     "projectId" TEXT NOT NULL,
     "key" "AnalyticsKey" NOT NULL,
-    "value" JSONB NOT NULL,
+    "value" JSONB,
     "numericValue" DOUBLE PRECISION,
     "stringValue" TEXT,
     "boolValue" BOOLEAN,

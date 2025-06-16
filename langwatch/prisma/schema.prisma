@@ -768,7 +768,7 @@ model Analytics {
     projectId    String
     project      Project      @relation(fields: [projectId], references: [id])
     key          AnalyticsKey
-    value        Json // For complex/metadata
+    value        Json? // For complex/metadata
     numericValue Float? // For metrics that need aggregation
     stringValue  String? // For categorical data
     boolValue    Boolean? // For true/false metrics
