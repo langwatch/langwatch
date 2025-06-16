@@ -4,7 +4,6 @@ on:
   pull_request:
     paths-ignore:
       - "langwatch/**"
-      - ".github/workflows/langwatch-app-ci.yml"
 
 jobs:
   test:

@@ -7,7 +7,6 @@ on:
   pull_request:
     paths:
       - "langwatch/**"
-      - ".github/workflows/langwatch-app-ci.yml"
   workflow_dispatch:
 
 jobs:
@@ -139,7 +138,7 @@ jobs:
         working-directory: langwatch
         run: npm run test:integration -- --run --bail=1 --poolOptions.forks.singleFork
 
-   build:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
