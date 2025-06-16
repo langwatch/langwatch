@@ -9,13 +9,12 @@ import {
   it,
   vi,
 } from "vitest";
-import { esClient } from "../../elasticsearch";
-import type { ElasticSearchEvaluation } from "../../tracer/types";
+import { esClient, TRACE_INDEX } from "../../elasticsearch";
+import type { ElasticSearchTrace } from "../../tracer/types";
 import {
   scheduleEvaluation,
   updateEvaluationStatusInES,
 } from "../queues/evaluationsQueue";
-import { traceCheckIndexId } from "~/server/elasticsearch";
 import * as traceChecksWorker from "../worker";
 import type { EvaluationJob } from "~/server/background/types";
 import type {
@@ -39,15 +38,29 @@ const getTraceCheck = async (
   projectId: string
 ) => {
   const client = await esClient({ test: true });
-  return await client.search({
-    index: "search-trace-checks",
+  return await client.search<ElasticSearchTrace>({
+    index: TRACE_INDEX.alias,
     body: {
       query: {
-        match: {
-          id: traceCheckIndexId({ traceId, checkId, projectId }),
+        bool: {
+          filter: [
+            { term: { trace_id: traceId } },
+            { term: { project_id: projectId } },
+            {
+              nested: {
+                path: "evaluations",
+                query: {
+                  term: {
+                    "evaluations.evaluator_id": checkId,
+                  },
+                },
+              },
+            },
+          ],
         },
       },
     },
+    _source: ["trace_id", "project_id", "evaluations"],
   });
 };
 
@@ -82,7 +95,7 @@ describe("Check Queue Integration Tests", () => {
     // Delete test documents
     const client = await esClient({ test: true });
     await client.deleteByQuery({
-      index: "search-trace-checks",
+      index: TRACE_INDEX.alias,
       body: {
         query: {
           // starts with test-trace
@@ -115,23 +128,43 @@ describe("Check Queue Integration Tests", () => {
 
     // Query ES to verify the status is "scheduled"
     const client = await esClient({ test: true });
-    const response = await client.search<ElasticSearchEvaluation>({
-      index: "search-trace-checks",
+    const response = await client.search<ElasticSearchTrace>({
+      index: TRACE_INDEX.alias,
       query: {
-        term: { trace_id: trace.trace_id },
+        bool: {
+          filter: [
+            { term: { trace_id: trace.trace_id } },
+            { term: { project_id: "test-project-id" } },
+          ],
+        },
       },
+      _source: [
+        "trace_id",
+        "project_id",
+        "evaluations",
+        "user_id",
+        "thread_id",
+        "customer_id",
+        "labels",
+      ],
     });
 
     expect(response.hits.hits).toHaveLength(1);
 
-    const traceCheck = response.hits.hits[0]?._source;
-    expect(traceCheck?.status).toBe("scheduled");
+    const traceDoc = response.hits.hits[0]?._source;
+    const evaluation = traceDoc?.evaluations?.find(
+      (e) => e.evaluator_id === check.evaluator_id
+    );
+    expect(evaluation?.status).toBe("scheduled");
 
-    expect(traceCheck).toMatchObject({
+    expect(evaluation).toMatchObject({
       evaluation_id: expect.any(String),
       evaluator_id: check.evaluator_id,
       name: check.name,
       type: check.type,
+    });
+
+    expect(traceDoc).toMatchObject({
       trace_id: trace.trace_id,
       project_id: "test-project-id",
       user_id: "test_user_123",
@@ -165,16 +198,26 @@ describe("Check Queue Integration Tests", () => {
 
     // Query ES to verify the status is "processed"
     const client = await esClient({ test: true });
-    const response = await client.search<ElasticSearchEvaluation>({
-      index: "search-trace-checks",
+    const response = await client.search<ElasticSearchTrace>({
+      index: TRACE_INDEX.alias,
       query: {
-        term: { trace_id: trace.trace_id },
+        bool: {
+          filter: [
+            { term: { trace_id: trace.trace_id } },
+            { term: { project_id: "test-project-id" } },
+          ],
+        },
       },
+      _source: ["trace_id", "project_id", "evaluations"],
     });
 
     expect(response.hits.hits).toHaveLength(1);
-    expect(response.hits.hits[0]?._source?.status).toBe("processed");
-    expect(response.hits.hits[0]?._source?.score).toBe(1);
+    const traceDoc = response.hits.hits[0]?._source;
+    const evaluation = traceDoc?.evaluations?.find(
+      (e) => e.evaluator_id === check.evaluator_id
+    );
+    expect(evaluation?.status).toBe("processed");
+    expect(evaluation?.score).toBe(1);
     expect(mocks.runEvaluation).toHaveBeenCalled();
   });
 
@@ -203,17 +246,27 @@ describe("Check Queue Integration Tests", () => {
 
     // Query ES to verify the status is "processed"
     const client = await esClient({ test: true });
-    const response = await client.search<ElasticSearchEvaluation>({
-      index: "search-trace-checks",
+    const response = await client.search<ElasticSearchTrace>({
+      index: TRACE_INDEX.alias,
       query: {
-        term: { trace_id: trace.trace_id },
+        bool: {
+          filter: [
+            { term: { trace_id: trace.trace_id } },
+            { term: { project_id: "test-project-id" } },
+          ],
+        },
       },
+      _source: ["trace_id", "project_id", "evaluations"],
     });
 
     expect(response.hits.hits).toHaveLength(1);
-    expect(response.hits.hits[0]?._source?.status).toBe("processed");
-    expect(response.hits.hits[0]?._source?.score).toBe(1);
-    expect(response.hits.hits[0]?._source?.passed).toBe(false);
+    const traceDoc = response.hits.hits[0]?._source;
+    const evaluation = traceDoc?.evaluations?.find(
+      (e) => e.evaluator_id === check.evaluator_id
+    );
+    expect(evaluation?.status).toBe("processed");
+    expect(evaluation?.score).toBe(1);
+    expect(evaluation?.passed).toBe(false);
     expect(mocks.runEvaluation).toHaveBeenCalled();
   });
 
@@ -232,15 +285,25 @@ describe("Check Queue Integration Tests", () => {
 
     // Query ES to verify the status is "processed"
     const client = await esClient({ test: true });
-    const response = await client.search<ElasticSearchEvaluation>({
-      index: "search-trace-checks",
+    const response = await client.search<ElasticSearchTrace>({
+      index: TRACE_INDEX.alias,
       query: {
-        term: { trace_id: trace.trace_id },
+        bool: {
+          filter: [
+            { term: { trace_id: trace.trace_id } },
+            { term: { project_id: "test-project-id" } },
+          ],
+        },
       },
+      _source: ["trace_id", "project_id", "evaluations"],
     });
 
     expect(response.hits.hits).toHaveLength(1);
-    expect(response.hits.hits[0]?._source?.status).toBe("error");
+    const traceDoc = response.hits.hits[0]?._source;
+    const evaluation = traceDoc?.evaluations?.find(
+      (e) => e.evaluator_id === check.evaluator_id
+    );
+    expect(evaluation?.status).toBe("error");
     expect(mocks.runEvaluation).toHaveBeenCalled();
   });
 
@@ -268,29 +331,49 @@ describe("Check Queue Integration Tests", () => {
 
     // Query ES to verify the status is "processed"
     const client = await esClient({ test: true });
-    let response = await client.search<ElasticSearchEvaluation>({
-      index: "search-trace-checks",
+    let response = await client.search<ElasticSearchTrace>({
+      index: TRACE_INDEX.alias,
       query: {
-        term: { trace_id: trace.trace_id },
+        bool: {
+          filter: [
+            { term: { trace_id: trace.trace_id } },
+            { term: { project_id: "test-project-id" } },
+          ],
+        },
       },
+      _source: ["trace_id", "project_id", "evaluations"],
     });
 
-    expect(response.hits.hits[0]?._source?.status).toBe("processed");
-    expect(response.hits.hits[0]?._source?.score).toBe(1);
+    let traceDoc = response.hits.hits[0]?._source;
+    let evaluation = traceDoc?.evaluations?.find(
+      (e) => e.evaluator_id === check.evaluator_id
+    );
+    expect(evaluation?.status).toBe("processed");
+    expect(evaluation?.score).toBe(1);
     expect(mocks.runEvaluation).toHaveBeenCalled();
 
     // Process the job again
     await scheduleEvaluation({ check, trace, delay: 0 });
 
     // Query ES to verify the status is "scheduled"
-    response = await client.search<ElasticSearchEvaluation>({
-      index: "search-trace-checks",
+    response = await client.search<ElasticSearchTrace>({
+      index: TRACE_INDEX.alias,
       query: {
-        term: { trace_id: trace.trace_id },
+        bool: {
+          filter: [
+            { term: { trace_id: trace.trace_id } },
+            { term: { project_id: "test-project-id" } },
+          ],
+        },
       },
+      _source: ["trace_id", "project_id", "evaluations"],
     });
 
-    expect(response.hits.hits[0]?._source?.status).toBe("scheduled");
+    traceDoc = response.hits.hits[0]?._source;
+    evaluation = traceDoc?.evaluations?.find(
+      (e) => e.evaluator_id === check.evaluator_id
+    );
+    expect(evaluation?.status).toBe("scheduled");
 
     // Wait for the job to be completed
     await new Promise<void>(
@@ -301,15 +384,25 @@ describe("Check Queue Integration Tests", () => {
     );
 
     // Query ES to verify the status is "processed"
-    response = await client.search<ElasticSearchEvaluation>({
-      index: "search-trace-checks",
+    response = await client.search<ElasticSearchTrace>({
+      index: TRACE_INDEX.alias,
       query: {
-        term: { trace_id: trace.trace_id },
+        bool: {
+          filter: [
+            { term: { trace_id: trace.trace_id } },
+            { term: { project_id: "test-project-id" } },
+          ],
+        },
       },
+      _source: ["trace_id", "project_id", "evaluations"],
     });
 
-    expect(response.hits.hits[0]?._source?.status).toBe("processed");
-    expect(response.hits.hits[0]?._source?.score).toBe(1);
+    traceDoc = response.hits.hits[0]?._source;
+    evaluation = traceDoc?.evaluations?.find(
+      (e) => e.evaluator_id === check.evaluator_id
+    );
+    expect(evaluation?.status).toBe("processed");
+    expect(evaluation?.score).toBe(1);
     expect(mocks.runEvaluation).toHaveBeenCalled();
   });
 });
@@ -327,10 +420,10 @@ describe("updateCheckStatusInES", () => {
   afterAll(async () => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    // Delete test documents to not polute the db
+    // Delete test documents to not pollute the db
     const client = await esClient({ test: true });
     await client.deleteByQuery({
-      index: "search-trace-checks",
+      index: TRACE_INDEX.alias,
       body: {
         query: {
           match: { project_id: projectId },
@@ -355,14 +448,19 @@ describe("updateCheckStatusInES", () => {
       projectId
     );
     expect((response.hits.total as any).value).toBeGreaterThan(0);
-    const traceCheck = response.hits.hits[0]?._source;
-    expect(traceCheck).toMatchObject({
+    const traceDoc = response.hits.hits[0]?._source;
+    const evaluation = traceDoc?.evaluations?.find(
+      (e) => e.evaluator_id === check.evaluator_id
+    );
+    expect(evaluation).toMatchObject({
       evaluation_id: expect.any(String),
       evaluator_id: check.evaluator_id,
       name: check.name,
       type: check.type,
-      trace_id: traceId,
       status: "scheduled",
+    });
+    expect(traceDoc).toMatchObject({
+      trace_id: traceId,
       project_id: projectId,
     });
   });
@@ -394,15 +492,20 @@ describe("updateCheckStatusInES", () => {
       projectId
     );
     expect((response.hits.total as any).value).toBeGreaterThan(0);
-    const traceCheck = response.hits.hits[0]?._source;
-    expect(traceCheck).toMatchObject({
+    const traceDoc = response.hits.hits[0]?._source;
+    const evaluation = traceDoc?.evaluations?.find(
+      (e) => e.evaluator_id === check.evaluator_id
+    );
+    expect(evaluation).toMatchObject({
       evaluation_id: expect.any(String),
       evaluator_id: check.evaluator_id,
       name: check.name,
       type: check.type,
+      status: "in_progress",
+    });
+    expect(traceDoc).toMatchObject({
       trace_id: traceId,
       project_id: projectId,
-      status: "in_progress",
     });
   });
 });
