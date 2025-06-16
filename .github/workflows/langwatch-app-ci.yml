@@ -42,14 +42,14 @@ jobs:
 
   test-unit:
     env:
-      # Required environment variables for build-time validation
-      # These are dummy values to satisfy the schema during CI
-      DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+      # Required environment variables for integration tests
+      DATABASE_URL: "postgresql://dummy:dummy@postgres:5432/dummy"
       BASE_HOST: "localhost:3000"
       NEXTAUTH_SECRET: "dummy-secret-for-ci"
       NEXTAUTH_URL: "http://localhost:3000"
       API_TOKEN_JWT_SECRET: "dummy-jwt-secret-for-ci"
       ELASTICSEARCH_NODE_URL: "http://localhost:9200"
+      REDIS_URL: "redis://localhost:6379"
       BUILD_TIME: "true"
 
     runs-on: ubuntu-latest
@@ -79,7 +79,7 @@ jobs:
   test-integration:
     env:
       # Required environment variables for integration tests
-      DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+      DATABASE_URL: "postgresql://dummy:dummy@postgres:5432/dummy"
       BASE_HOST: "localhost:3000"
       NEXTAUTH_SECRET: "dummy-secret-for-ci"
       NEXTAUTH_URL: "http://localhost:3000"
@@ -115,6 +115,20 @@ jobs:
           --health-timeout 10s
           --health-retries 5
 
+      postgres:
+        image: postgres:16
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: dummy
+          POSTGRES_PASSWORD: dummy
+          POSTGRES_DB: dummy
+        options: >-
+          --health-cmd "pg_isready -U dummy"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -130,9 +144,17 @@ jobs:
         working-directory: langwatch
         run: npm ci --prefer-offline --no-audit --no-fund --progress=false
 
-      - name: Prepare files
+     - name: Prepare files
         working-directory: langwatch
         run: npm run start:prepare:files
+
+      - name: Setup database
+        working-directory: langwatch
+        run: npm run prisma:migrate
+
+      - name: Setup Elasticsearch
+        working-directory: langwatch
+        run: npm run elastic:migrate
 
       - name: Run integration tests
         working-directory: langwatch
