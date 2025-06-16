@@ -7,7 +7,11 @@ on:
   pull_request:
     paths:
       - "langwatch/**"
+      - ".github/workflows/langwatch-app-ci.yml"
   workflow_dispatch:
+
+env:
+  NODE_ENV: "test"
 
 jobs:
   typecheck:
@@ -43,11 +47,11 @@ jobs:
   test-unit:
     env:
       # Required environment variables for integration tests
-      DATABASE_URL: "postgresql://dummy:dummy@postgres:5432/dummy"
+      DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
       BASE_HOST: "localhost:3000"
-      NEXTAUTH_SECRET: "dummy-secret-for-ci"
+      NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
       NEXTAUTH_URL: "http://localhost:3000"
-      API_TOKEN_JWT_SECRET: "dummy-jwt-secret-for-ci"
+      API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
       ELASTICSEARCH_NODE_URL: "http://localhost:9200"
       REDIS_URL: "redis://localhost:6379"
       BUILD_TIME: "true"
@@ -79,11 +83,11 @@ jobs:
   test-integration:
     env:
       # Required environment variables for integration tests
-      DATABASE_URL: "postgresql://dummy:dummy@postgres:5432/dummy"
+      DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
       BASE_HOST: "localhost:3000"
-      NEXTAUTH_SECRET: "dummy-secret-for-ci"
+      NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
       NEXTAUTH_URL: "http://localhost:3000"
-      API_TOKEN_JWT_SECRET: "dummy-jwt-secret-for-ci"
+      API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
       ELASTICSEARCH_NODE_URL: "http://localhost:9200"
       REDIS_URL: "redis://localhost:6379"
       BUILD_TIME: "true"
@@ -120,11 +124,11 @@ jobs:
         ports:
           - 5432:5432
         env:
-          POSTGRES_USER: dummy
-          POSTGRES_PASSWORD: dummy
-          POSTGRES_DB: dummy
+          POSTGRES_USER: langwatch_ci
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: langwatch_test
         options: >-
-          --health-cmd "pg_isready -U dummy"
+          --health-cmd "pg_isready -U langwatch_ci"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -144,7 +148,7 @@ jobs:
         working-directory: langwatch
         run: npm ci --prefer-offline --no-audit --no-fund --progress=false
 
-     - name: Prepare files
+      - name: Prepare files
         working-directory: langwatch
         run: npm run start:prepare:files
 
