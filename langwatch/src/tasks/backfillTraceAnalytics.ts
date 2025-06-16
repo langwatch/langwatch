@@ -19,31 +19,9 @@ export default async function execute() {
     },
   });
 
-  console.log(`Found ${projects.length} projects to process`);
-
   const client = await esClient({ test: true });
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
-  // First, let's check if we can find any traces at all
-  const testQuery = {
-    size: 1, // Get just one trace to examine
-    query: {
-      match_all: {},
-    },
-  };
-
-  console.log("Testing Elasticsearch connection...");
-  const testResult = await client.search({
-    index: TRACE_INDEX.alias,
-    body: testQuery,
-  });
-
-  console.log("\nFound traces in Elasticsearch:");
-  console.log("Total hits:", testResult.hits.total);
-  console.log("\nSample trace document:");
-  const sampleTrace = testResult.hits.hits[0]?._source;
-  console.log(JSON.stringify(sampleTrace, null, 2));
 
   // For each project, backfill from creation date to today
   for (const project of projects) {
