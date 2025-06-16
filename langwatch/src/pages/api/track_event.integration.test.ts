@@ -15,6 +15,7 @@ import {
 import type { ElasticSearchTrace, Trace } from "../../server/tracer/types";
 import { getTestProject, waitForResult } from "../../utils/testUtils";
 import handler from "./track_event";
+import type { NextApiRequest, NextApiResponse } from "next";
 
 describe("/api/track_event", () => {
   let worker: Worker<TrackEventJob, void, string> | undefined;
@@ -56,7 +57,7 @@ describe("/api/track_event", () => {
   });
 
   it("should store a valid event in ElasticSearch", async () => {
-    const { req, res } = createMocks({
+    const { res, req } = createMocks<NextApiRequest, NextApiResponse>({
       method: "POST",
       headers: {
         "x-auth-token": project.apiKey,
@@ -100,6 +101,7 @@ describe("/api/track_event", () => {
         labels: ["test-label"],
       },
       metrics: {},
+      spans: [],
     };
 
     const client = await esClient({ test: true });
@@ -156,7 +158,7 @@ describe("/api/track_event", () => {
 
   it("should return an error for invalid event data", async () => {
     const namespaces = debug.disable();
-    const { req, res } = createMocks({
+    const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
       method: "POST",
       headers: {
         "x-auth-token": project.apiKey,
@@ -177,7 +179,7 @@ describe("/api/track_event", () => {
   });
 
   it("should return an error for unauthorized access", async () => {
-    const { req, res } = createMocks({
+    const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
       method: "POST",
       body: {
         trace_id: "trace_123",

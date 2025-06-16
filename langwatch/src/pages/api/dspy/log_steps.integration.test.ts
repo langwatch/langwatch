@@ -141,7 +141,7 @@ describe("Log Steps API Endpoint", () => {
         projectId: {
           in: allProjects.map((p) => p.id),
         },
-        slug: sampleDSPyStep.experiment_slug,
+        slug: sampleDSPyStep.experiment_slug ?? undefined,
       },
     });
 
@@ -158,7 +158,7 @@ describe("Log Steps API Endpoint", () => {
 
   test("should create experiment and insert DSPyStep into Elasticsearch, appending the examples and llm_calls together, without duplication, and updating the score", async () => {
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks({
+      createMocks<NextApiRequest, NextApiResponse>({
         method: "POST",
         headers: {
           "X-Auth-Token": project.apiKey,
@@ -177,7 +177,7 @@ describe("Log Steps API Endpoint", () => {
       where: {
         projectId_slug: {
           projectId: project.id,
-          slug: sampleDSPyStep.experiment_slug,
+          slug: sampleDSPyStep.experiment_slug as string,
         },
       },
     });

@@ -1,23 +1,23 @@
-import type { Check, Project } from "@prisma/client";
+import type { Monitor, Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { createMocks } from "node-mocks-http";
 import { beforeAll, describe, expect, test } from "vitest";
 import { prisma } from "../../../../../server/db";
-import type { EvaluatorTypes } from "../../../../../evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import handler from "./evaluate";
 import { getTestProject } from "../../../../../utils/testUtils";
 
 describe("Guardrail API Endpoint", () => {
   let project: Project | undefined;
-  let check: Check | undefined;
+  let monitor: Monitor | undefined;
 
   beforeAll(async () => {
     project = await getTestProject("evaluate-endpoint");
     await prisma.monitor.deleteMany({
       where: { projectId: project.id },
     });
-    check = await prisma.monitor.create({
+    monitor = await prisma.monitor.create({
       data: {
         id: `check_${nanoid()}`,
         projectId: project.id,
@@ -28,14 +28,14 @@ describe("Guardrail API Endpoint", () => {
         parameters: {},
         sample: 0.5,
         enabled: true,
-        isGuardrail: true,
+        executionMode: "AS_GUARDRAIL",
       },
     });
   });
 
   test("runs an stored evaluator for the given data", async () => {
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks({
+      createMocks<NextApiRequest, NextApiResponse>({
         method: "POST",
         headers: {
           "X-Auth-Token": project?.apiKey,
@@ -47,7 +47,7 @@ describe("Guardrail API Endpoint", () => {
           },
         },
         query: {
-          evaluator: check!.slug,
+          evaluator: monitor!.slug,
         },
       });
 
@@ -64,7 +64,7 @@ describe("Guardrail API Endpoint", () => {
 
   test("runs an stored evaluator as guardrail, passing even if skipped", async () => {
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks({
+      createMocks<NextApiRequest, NextApiResponse>({
         method: "POST",
         headers: {
           "X-Auth-Token": project?.apiKey,
@@ -77,7 +77,7 @@ describe("Guardrail API Endpoint", () => {
           as_guardrail: true,
         },
         query: {
-          evaluator: check!.slug,
+          evaluator: monitor!.slug,
         },
       });
 
@@ -92,7 +92,7 @@ describe("Guardrail API Endpoint", () => {
 
   test("runs arbitrary evaluators with arbitrary settings", async () => {
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks({
+      createMocks<NextApiRequest, NextApiResponse>({
         method: "POST",
         headers: {
           "X-Auth-Token": project?.apiKey,
