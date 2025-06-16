@@ -35,6 +35,7 @@ import {
   addLLMTokensCount,
   computeTraceMetrics,
 } from "./collector/metrics";
+import { cleanupPIIs } from "./collector/piiCheck";
 import { addInputAndOutputForRAGs } from "./collector/rag";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 import {
@@ -354,6 +355,17 @@ const processCollectorJob_ = async (
       .slice(0, 10)
       .reverse(),
   };
+
+  if (
+    !process.env.DISABLE_PII_REDACTION &&
+    project.piiRedactionLevel !== "DISABLED"
+  ) {
+    const piiEnforced = env.NODE_ENV === "production";
+    await cleanupPIIs(trace, esSpans, {
+      piiRedactionLevel: project.piiRedactionLevel,
+      enforced: piiEnforced,
+    });
+  }
 
   await Sentry.startSpan({ name: "updateTrace" }, async () => {
     await updateTrace(trace, esSpans, evaluations);
