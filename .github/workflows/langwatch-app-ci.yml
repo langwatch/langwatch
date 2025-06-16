@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  test-unit:
     env:
       # Required environment variables for build-time validation
       # These are dummy values to satisfy the schema during CI
@@ -42,9 +42,78 @@ jobs:
         working-directory: langwatch
         run: npm run start:prepare:files
 
-      - name: Run tests
+      - name: Run unit tests
         working-directory: langwatch
-        run: npm run test
+        run: npm run test:unit -- --run --bail=1
+
+  test-integration:
+    env:
+      # Required environment variables for integration tests
+      DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+      BASE_HOST: "localhost:3000"
+      NEXTAUTH_SECRET: "dummy-secret-for-ci"
+      NEXTAUTH_URL: "http://localhost:3000"
+      API_TOKEN_JWT_SECRET: "dummy-jwt-secret-for-ci"
+      ELASTICSEARCH_NODE_URL: "http://localhost:9200"
+      REDIS_URL: "redis://localhost:6379"
+      BUILD_TIME: "true"
+
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+        ports:
+          - 9200:9200
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: false
+          ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+        options: >-
+          --health-cmd "curl -f http://localhost:9200/_cluster/health || exit 1"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: "langwatch/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: langwatch
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+
+      - name: Prepare files
+        working-directory: langwatch
+        run: npm run start:prepare:files
+
+      - name: Wait for services
+        run: |
+          # Wait for Redis
+          timeout 30 bash -c 'until redis-cli -h localhost ping; do sleep 1; done'
+          # Wait for Elasticsearch
+          timeout 60 bash -c 'until curl -f http://localhost:9200/_cluster/health; do sleep 2; done'
+
+      - name: Run integration tests
+        working-directory: langwatch
+        run: npm run test:integration -- --run --bail=1 --poolOptions.forks.singleFork
 
   typecheck:
     runs-on: ubuntu-latest
