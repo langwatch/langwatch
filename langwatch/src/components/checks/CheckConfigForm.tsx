@@ -256,7 +256,6 @@ export default function CheckConfigForm({
   return (
     <FormProvider {...form}>
       <form
-        // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onSubmit={handleSubmit((data) => {
           return onSubmit(data);
         })}
