@@ -202,6 +202,7 @@
     "@types/ws": "^8.5.12",
     "@typescript-eslint/eslint-plugin": "^6.3.0",
     "@typescript-eslint/parser": "^6.3.0",
+    "@typescript/native-preview": "^7.0.0-dev.20250616.1",
     "encoding": "^0.1.13",
     "eslint": "^8.47.0",
     "eslint-config-next": "15.1.5",
