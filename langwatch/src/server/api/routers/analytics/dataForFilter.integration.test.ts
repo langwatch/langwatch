@@ -1,11 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { nanoid } from "nanoid";
-import {
-  esClient,
-  TRACE_INDEX,
-  traceIndexId,
-  TRACES_PIVOT_INDEX,
-} from "../../../elasticsearch";
+import { esClient, TRACE_INDEX, traceIndexId } from "../../../elasticsearch";
 import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
@@ -202,20 +197,6 @@ describe("Data For Filter Integration Tests", () => {
         trace,
       ]),
       refresh: true,
-    });
-  });
-
-  afterAll(async () => {
-    const client = await esClient({ test: true });
-    await client.deleteByQuery({
-      index: TRACES_PIVOT_INDEX.base,
-      body: {
-        query: {
-          terms: {
-            "metadata.labels": ["test-messages"],
-          },
-        },
-      },
     });
   });
 

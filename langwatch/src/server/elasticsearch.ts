@@ -18,11 +18,6 @@ export const TRACE_INDEX: IndexSpec = {
   alias: "search-traces-alias",
 };
 
-export const TRACES_PIVOT_INDEX: IndexSpec = {
-  base: "search-traces-pivot",
-  alias: "search-traces-pivot-alias",
-};
-
 export const DSPY_STEPS_INDEX: IndexSpec = {
   base: "search-dspy-steps",
   alias: "search-dspy-steps-alias",
