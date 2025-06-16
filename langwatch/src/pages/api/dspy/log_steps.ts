@@ -1,7 +1,6 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { prisma } from "../../../server/db";
-
 import { createLogger } from "../../../utils/logger";
 
 import { ExperimentType, type Project } from "@prisma/client";
@@ -74,7 +73,10 @@ export default async function handler(
   try {
     params = z.array(dSPyStepRESTParamsSchema).parse(req.body);
   } catch (error) {
-    logger.error({ error, body: req.body, projectId: project.id }, 'invalid log_steps data received');
+    logger.error(
+      { error, body: req.body, projectId: project.id },
+      "invalid log_steps data received"
+    );
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
     Sentry.captureException(error, { extra: { projectId: project.id } });
 
@@ -87,7 +89,10 @@ export default async function handler(
       param.timestamps.created_at &&
       param.timestamps.created_at.toString().length === 10
     ) {
-      logger.error({ param, projectId: project.id }, 'timestamps not in milliseconds for step');
+      logger.error(
+        { param, projectId: project.id },
+        "timestamps not in milliseconds for step"
+      );
       return res.status(400).json({
         error:
           "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
@@ -100,7 +105,10 @@ export default async function handler(
       await processDSPyStep(project, param);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        logger.error({ error, body: param, projectId: project.id }, 'failed to validate data for DSPy step');
+        logger.error(
+          { error, body: param, projectId: project.id },
+          "failed to validate data for DSPy step"
+        );
         Sentry.captureException(error, {
           extra: { projectId: project.id, param },
         });
@@ -108,7 +116,10 @@ export default async function handler(
         const validationError = fromZodError(error as ZodError);
         return res.status(400).json({ error: validationError.message });
       } else {
-        logger.error({ error, body: param, projectId: project.id }, 'internal server error processing DSPy step');
+        logger.error(
+          { error, body: param, projectId: project.id },
+          "internal server error processing DSPy step"
+        );
         Sentry.captureException(error, {
           extra: { projectId: project.id, param },
         });

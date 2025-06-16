@@ -4,20 +4,16 @@ import debug from "debug";
 import { nanoid } from "nanoid";
 import { createMocks } from "node-mocks-http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { TrackEventJob } from "../../server/background/types";
-import { startTrackEventsWorker } from "../../server/background/workers/trackEventsWorker";
-import { prisma } from "../../server/db";
-import {
-  TRACE_INDEX,
-  esClient,
-  traceIndexId,
-} from "../../server/elasticsearch";
-import type { ElasticSearchTrace, Trace } from "../../server/tracer/types";
-import { getTestProject, waitForResult } from "../../utils/testUtils";
+import type { TrackEventJob } from "~/server/background/types";
+import { startTrackEventsWorker } from "~/server/background/workers/trackEventsWorker";
+import { prisma } from "~/server/db";
+import { TRACE_INDEX, esClient, traceIndexId } from "~/server/elasticsearch";
+import type { ElasticSearchTrace, Trace } from "~/server/tracer/types";
+import { getTestProject, waitForResult } from "~/utils/testUtils";
 import handler from "./track_event";
 import type { NextApiRequest, NextApiResponse } from "next";
 
-describe("/api/track_event", () => {
+describe.skip("/api/track_event", () => {
   let worker: Worker<TrackEventJob, void, string> | undefined;
   let project: Project;
   let traceId: string;

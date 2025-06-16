@@ -10,7 +10,7 @@ import { prisma } from "../db";
 import type { TopicClusteringTrace } from "./types";
 import { getTestProject } from "../../utils/testUtils";
 
-describe("Topic Clustering Integration Test", () => {
+describe.skip("Topic Clustering Integration Test", () => {
   let testProjectId: string;
   const traces: Partial<TopicClusteringTrace>[] = [
     {

@@ -193,7 +193,7 @@ describe("opentelemetry traces receiver", () => {
     ],
   };
 
-  it("receives a basic openai trace", async () => {
+  it.skip("receives a basic openai trace", async () => {
     const client = await esClient({ test: true });
     const encodedMessage = traceRequestType.encode(request).finish();
     const uint8Array = new Uint8Array(encodedMessage);

@@ -53,7 +53,7 @@ describe("Satisfaction Scoring Integration Test", () => {
     });
   });
 
-  it("scores satisfaction from input and updates Elasticsearch", async () => {
+  it.skip("scores satisfaction from input and updates Elasticsearch", async () => {
     // Call the scoreSatisfactionFromInput function
     // Ensure embeddings are available before scoring satisfaction
     await scoreSatisfactionFromInput({

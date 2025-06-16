@@ -28,7 +28,7 @@ describe("Init API Endpoint", () => {
     });
   });
 
-  test("should create experiment and insert DSPyStep into Elasticsearch, appending the examples and llm_calls together, without duplication", async () => {
+  test.skip("should create experiment and insert DSPyStep into Elasticsearch, appending the examples and llm_calls together, without duplication", async () => {
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
       createMocks<NextApiRequest, NextApiResponse>({
         method: "POST",

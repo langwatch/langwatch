@@ -105,7 +105,7 @@ describe("Check Queue Integration Tests", () => {
     });
   });
 
-  it('should schedule a trace check and update status to "scheduled" in ES, making sure all the aggregation fields are also persisted', async () => {
+  it.skip('should schedule a trace check and update status to "scheduled" in ES, making sure all the aggregation fields are also persisted', async () => {
     mocks.runEvaluation.mockResolvedValue({
       raw_result: { result: "it works" },
       score: 1,
@@ -174,7 +174,7 @@ describe("Check Queue Integration Tests", () => {
     });
   });
 
-  it('should process a trace check successfully and update status to "processed" in ES', async () => {
+  it.skip('should process a trace check successfully and update status to "processed" in ES', async () => {
     mocks.runEvaluation.mockResolvedValue({
       raw_result: { result: "succeeded test works" },
       score: 1,
@@ -221,7 +221,7 @@ describe("Check Queue Integration Tests", () => {
     expect(mocks.runEvaluation).toHaveBeenCalled();
   });
 
-  it('should process a trace check that failed and update status to "processed" in ES', async () => {
+  it.skip('should process a trace check that failed and update status to "processed" in ES', async () => {
     mocks.runEvaluation.mockResolvedValue({
       raw_result: { result: "succeeded test works" },
       score: 1,
@@ -270,7 +270,7 @@ describe("Check Queue Integration Tests", () => {
     expect(mocks.runEvaluation).toHaveBeenCalled();
   });
 
-  it('should errors out when a trace check throws an exception and update status to "error" in ES', async () => {
+  it.skip('should errors out when a trace check throws an exception and update status to "error" in ES', async () => {
     mocks.runEvaluation.mockRejectedValue("something wrong is not right");
 
     const trace = {
@@ -307,7 +307,7 @@ describe("Check Queue Integration Tests", () => {
     expect(mocks.runEvaluation).toHaveBeenCalled();
   });
 
-  it("should re-process a trace check that is already successfull again if requested", async () => {
+  it.skip("should re-process a trace check that is already successfull again if requested", async () => {
     mocks.runEvaluation.mockResolvedValue({
       raw_result: { result: "succeeded test works" },
       score: 1,

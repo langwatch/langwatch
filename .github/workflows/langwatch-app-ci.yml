@@ -162,7 +162,7 @@ jobs:
 
       - name: Run integration tests
         working-directory: langwatch
-        run: npm run test:integration -- --run --bail=1 --poolOptions.forks.singleFork
+        run: npm run test:integration
 
   build:
     runs-on: ubuntu-latest

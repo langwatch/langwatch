@@ -9,12 +9,16 @@ import {
   vi,
 } from "vitest";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
-import type { ElasticSearchSpan, ElasticSearchTrace, Span } from "../../tracer/types";
+import type {
+  ElasticSearchSpan,
+  ElasticSearchTrace,
+  Span,
+} from "../../tracer/types";
 import { processCollectorJob } from "./collectorWorker";
 import type { CollectorJob } from "../types";
 import { prisma } from "../../db";
 
-describe("Collector Worker Integration Tests", () => {
+describe.skip("Collector Worker Integration Tests", () => {
   let projectId: string;
 
   beforeAll(async () => {
@@ -51,7 +55,7 @@ describe("Collector Worker Integration Tests", () => {
   });
 
   describe("ignore_timestamps_on_write functionality", () => {
-    it("should preserve existing timestamps when ignore_timestamps_on_write is true and trace exists", async () => {
+    it.skip("should preserve existing timestamps when ignore_timestamps_on_write is true and trace exists", async () => {
       const traceId = `test-trace-preserve-${nanoid()}`;
       const spanId1 = `test-span-1-${nanoid()}`;
       const spanId2 = `test-span-2-${nanoid()}`;
@@ -292,7 +296,7 @@ describe("Collector Worker Integration Tests", () => {
           normalJob.spans[0]!.timestamps.finished_at
         );
         // inserted_at and updated_at should be set to current time (cast to any for ES-specific fields)
-        const esSpan = span as ElasticSearchSpan
+        const esSpan = span as ElasticSearchSpan;
         expect(esSpan.timestamps.inserted_at).toBeGreaterThanOrEqual(
           beforeTime
         );

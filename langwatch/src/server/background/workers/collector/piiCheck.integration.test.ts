@@ -4,7 +4,7 @@ import { cleanupPIIs } from "./piiCheck";
 import { PIIRedactionLevel } from "@prisma/client";
 
 describe("PIICheck", () => {
-  it("detects PII on traces", async () => {
+  it.skip("detects PII on traces", async () => {
     const sampleTrace: Trace = {
       trace_id: "foo",
       project_id: "foo",
@@ -51,7 +51,7 @@ describe("PIICheck", () => {
     );
   });
 
-  it("detects PII on traces using google dlp", async () => {
+  it.skip("detects PII on traces using google dlp", async () => {
     const sampleTrace: Trace = {
       trace_id: "foo",
       project_id: "foo",

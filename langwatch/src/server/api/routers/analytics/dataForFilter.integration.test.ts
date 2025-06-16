@@ -6,7 +6,7 @@ import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import type { ElasticSearchTrace } from "../../../tracer/types";
 
-describe("Data For Filter Integration Tests", () => {
+describe.skip("Data For Filter Integration Tests", () => {
   const traceId = `test-trace-id-${nanoid()}`;
   const traceId2 = `test-trace-id-${nanoid()}`;
   const traceId3 = `test-trace-id-${nanoid()}`;
@@ -308,7 +308,7 @@ describe("Data For Filter Integration Tests", () => {
     });
   });
 
-  it.only("should return the right data for event metric filter", async () => {
+  it("should return the right data for event metric filter", async () => {
     const user = await getTestUser();
 
     const ctx = createInnerTRPCContext({

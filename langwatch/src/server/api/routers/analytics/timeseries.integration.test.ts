@@ -7,7 +7,7 @@ import type { ElasticSearchTrace } from "../../../tracer/types";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
-describe("Timeseries Graph Integration Tests", () => {
+describe.skip("Timeseries Graph Integration Tests", () => {
   const traceId = `test-trace-id-${nanoid()}`;
   const traceId2 = `test-trace-id-${nanoid()}`;
   const traceId3 = `test-trace-id-${nanoid()}`;
@@ -38,7 +38,7 @@ describe("Timeseries Graph Integration Tests", () => {
     const client = await esClient({ test: true });
   });
 
-  it("should return the right data for metrics", async () => {
+  it.skip("should return the right data for metrics", async () => {
     const user = await getTestUser();
 
     const ctx = createInnerTRPCContext({

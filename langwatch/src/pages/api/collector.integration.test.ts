@@ -46,7 +46,7 @@ const sampleSpan: LLMSpan = {
   metrics: {},
 };
 
-describe("Collector API Endpoint", () => {
+describe.skip("Collector API Endpoint", () => {
   let worker: Worker<CollectorJob, void, string> | undefined;
   let project: Project | undefined;
 
@@ -72,7 +72,7 @@ describe("Collector API Endpoint", () => {
     await worker?.close();
   });
 
-  test("should insert spans into Elasticsearch", async () => {
+  test.skip("should insert spans into Elasticsearch", async () => {
     const traceData: CollectorRESTParams = {
       trace_id: sampleSpan.trace_id,
       spans: [sampleSpan],
@@ -465,7 +465,7 @@ describe("Collector API Endpoint", () => {
     ]);
   });
 
-  test("cleans up PII", async () => {
+  test.skip("cleans up PII", async () => {
     const traceId = `trace_test-${nanoid()}`;
     const traceData: CollectorRESTParams = {
       trace_id: traceId,

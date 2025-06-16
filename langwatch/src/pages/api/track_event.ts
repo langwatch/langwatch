@@ -3,9 +3,9 @@ import { nanoid } from "nanoid";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { type ZodError, z } from "zod";
 import { trackEventsQueue } from "../../server/background/queues/trackEventsQueue";
-import { prisma } from "../../server/db"; // Adjust the import based on your setup
-import { type TrackEventRESTParamsValidator } from "../../server/tracer/types";
-import { trackEventRESTParamsValidatorSchema } from "../../server/tracer/types.generated";
+import { prisma } from "../../../src/server/db"; // Adjust the import based on your setup
+import { type TrackEventRESTParamsValidator } from "../../../src/server/tracer/types";
+import { trackEventRESTParamsValidatorSchema } from "../../../src/server/tracer/types.generated";
 import { createLogger } from "../../utils/logger";
 import { fromZodError } from "zod-validation-error";
 
