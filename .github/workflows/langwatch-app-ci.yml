@@ -11,6 +11,17 @@ on:
 
 jobs:
   test:
+    env:
+      # Required environment variables for build-time validation
+      # These are dummy values to satisfy the schema during CI
+      DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+      BASE_HOST: "localhost:3000"
+      NEXTAUTH_SECRET: "dummy-secret-for-ci"
+      NEXTAUTH_URL: "http://localhost:3000"
+      API_TOKEN_JWT_SECRET: "dummy-jwt-secret-for-ci"
+      ELASTICSEARCH_NODE_URL: "http://localhost:9200"
+      BUILD_TIME: "true"
+
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
