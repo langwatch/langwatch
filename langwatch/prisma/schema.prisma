@@ -216,7 +216,7 @@ model Project {
     s3SecretAccessKey        String?
     s3Bucket                 String?
     llmPromptConfigs         LlmPromptConfig[]
-    Analytics                Analytics[]
+    analytics                Analytics[]
 
     @@index([teamId])
 }
