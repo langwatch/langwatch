@@ -10,6 +10,36 @@ on:
   workflow_dispatch:
 
 jobs:
+ typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: "langwatch/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: langwatch
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+
+      - name: Prepare files
+        working-directory: langwatch
+        run: npm run start:prepare:files
+
+      - name: Install TypeScript Native Preview
+        working-directory: langwatch
+        run: npm install -D @typescript/native-preview
+
+      - name: Run typecheck
+        working-directory: langwatch
+        # TODO: Use tsgo once it's out of preview
+        run: ./node_modules/.bin/tsc --noEmit --project ./tsconfig.json
+
   test-unit:
     env:
       # Required environment variables for build-time validation
@@ -115,37 +145,7 @@ jobs:
         working-directory: langwatch
         run: npm run test:integration -- --run --bail=1 --poolOptions.forks.singleFork
 
-  typecheck:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "npm"
-          cache-dependency-path: "langwatch/package-lock.json"
-
-      - name: Install dependencies
-        working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
-
-      - name: Prepare files
-        working-directory: langwatch
-        run: npm run start:prepare:files
-
-      - name: Install TypeScript Native Preview
-        working-directory: langwatch
-        run: npm install -D @typescript/native-preview
-
-      - name: Run typecheck
-        working-directory: langwatch
-        # TODO: Use tsgo once it's out of preview
-        run: ./node_modules/.bin/tsc --noEmit --project ./tsconfig.json
-
-  build:
+   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
