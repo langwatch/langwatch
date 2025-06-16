@@ -7,10 +7,11 @@ on:
   pull_request:
     paths:
       - "langwatch/**"
+      - ".github/workflows/langwatch-app-ci.yml"
   workflow_dispatch:
 
 jobs:
- typecheck:
+  typecheck:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -133,13 +134,6 @@ jobs:
       - name: Prepare files
         working-directory: langwatch
         run: npm run start:prepare:files
-
-      - name: Wait for services
-        run: |
-          # Wait for Redis
-          timeout 30 bash -c 'until redis-cli -h localhost ping; do sleep 1; done'
-          # Wait for Elasticsearch
-          timeout 60 bash -c 'until curl -f http://localhost:9200/_cluster/health; do sleep 2; done'
 
       - name: Run integration tests
         working-directory: langwatch
