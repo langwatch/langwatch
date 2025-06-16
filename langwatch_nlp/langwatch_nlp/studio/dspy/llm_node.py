@@ -31,13 +31,6 @@ class LLMNode(dspy.Module):
         # Create a new PredictWithMetadata instance with the signature
         if signature:
             self.predict = PredictWithMetadata(signature)
-            # Transfer LM and other attributes
-            if hasattr(nested_predict, "lm"):
-                self.predict.lm = nested_predict.lm
-            if hasattr(nested_predict, "demos"):
-                self.predict.demos = nested_predict.demos
-            if hasattr(nested_predict, "_node_id"):
-                self.predict._node_id = getattr(nested_predict, "_node_id", None)
         else:
             # If no signature found, use the original predict
             self.predict = predict
