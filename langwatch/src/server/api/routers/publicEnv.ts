@@ -21,6 +21,8 @@ export const publicEnvRouter = publicProcedure
       IS_ATLA_DEFAULT_JUDGE: shouldUseAtlaModelForJudges(),
       POSTHOG_KEY: env.POSTHOG_KEY,
       POSTHOG_HOST: env.POSTHOG_HOST,
+      LANGWATCH_NLP_SERVICE: !!env.LANGWATCH_NLP_SERVICE,
+      LANGEVALS_ENDPOINT: !!env.LANGEVALS_ENDPOINT,
     };
 
     return publicEnvVars;

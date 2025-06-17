@@ -327,6 +327,29 @@ export const DashboardLayout = ({
         background="gray.100"
         {...props}
       >
+        {(!publicEnv.data?.LANGWATCH_NLP_SERVICE ||
+          !publicEnv.data?.LANGEVALS_ENDPOINT) && (
+          <Alert.Root
+            status="warning"
+            width="full"
+            borderBottom="1px solid"
+            borderBottomColor="yellow.300"
+          >
+            <Alert.Indicator />
+            <Alert.Content>
+              <Text>
+                Please check your environment variables, the following variables
+                are not set which are required for evaluations and workflows:
+              </Text>
+              {!publicEnv.data?.LANGWATCH_NLP_SERVICE && (
+                <Text>LANGWATCH_NLP_SERVICE</Text>
+              )}
+              {!publicEnv.data?.LANGEVALS_ENDPOINT && (
+                <Text>LANGEVALS_ENDPOINT</Text>
+              )}
+            </Alert.Content>
+          </Alert.Root>
+        )}
         {usage.data &&
           usage.data.currentMonthMessagesCount >=
             usage.data.activePlan.maxMessagesPerMonth && (
