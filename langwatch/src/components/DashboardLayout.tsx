@@ -328,8 +328,8 @@ export const DashboardLayout = ({
         {...props}
       >
         {publicEnv.data &&
-          (!publicEnv.data?.LANGWATCH_NLP_SERVICE ||
-            !publicEnv.data?.LANGEVALS_ENDPOINT) && (
+          (publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE ||
+            publicEnv.data?.HAS_LANGEVALS_ENDPOINT) && (
             <Alert.Root
               status="warning"
               width="full"
@@ -343,10 +343,10 @@ export const DashboardLayout = ({
                   variables are not set which are required for evaluations and
                   workflows:
                 </Text>
-                {!publicEnv.data?.LANGWATCH_NLP_SERVICE && (
+                {!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE && (
                   <Text>LANGWATCH_NLP_SERVICE</Text>
                 )}
-                {!publicEnv.data?.LANGEVALS_ENDPOINT && (
+                {!publicEnv.data?.HAS_LANGEVALS_ENDPOINT && (
                   <Text>LANGEVALS_ENDPOINT</Text>
                 )}
               </Alert.Content>
