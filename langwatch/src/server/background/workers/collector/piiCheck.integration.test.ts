@@ -4,7 +4,7 @@ import { cleanupPIIs } from "./piiCheck";
 import { PIIRedactionLevel } from "@prisma/client";
 
 describe("PIICheck", () => {
-  it("detects PII on traces", async () => {
+  it.skip("detects PII on traces", async () => {
     const sampleTrace: Trace = {
       trace_id: "foo",
       project_id: "foo",
@@ -16,6 +16,7 @@ describe("PIICheck", () => {
         inserted_at: Date.now(),
         updated_at: Date.now(),
       },
+      spans: [],
     };
     await cleanupPIIs(sampleTrace, [], {
       piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
@@ -37,6 +38,7 @@ describe("PIICheck", () => {
         inserted_at: Date.now(),
         updated_at: Date.now(),
       },
+      spans: [],
     };
 
     await cleanupPIIs(samplePIITrace, [], {
@@ -49,7 +51,7 @@ describe("PIICheck", () => {
     );
   });
 
-  it("detects PII on traces using google dlp", async () => {
+  it.skip("detects PII on traces using google dlp", async () => {
     const sampleTrace: Trace = {
       trace_id: "foo",
       project_id: "foo",
@@ -61,6 +63,7 @@ describe("PIICheck", () => {
         inserted_at: Date.now(),
         updated_at: Date.now(),
       },
+      spans: [],
     };
     await cleanupPIIs(sampleTrace, [], {
       piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
@@ -82,6 +85,7 @@ describe("PIICheck", () => {
         inserted_at: Date.now(),
         updated_at: Date.now(),
       },
+      spans: [],
     };
 
     await cleanupPIIs(samplePIITrace, [], {

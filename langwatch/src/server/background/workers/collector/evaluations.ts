@@ -1,7 +1,7 @@
 import { EvaluationExecutionMode } from "@prisma/client";
 import crypto from "crypto";
 import { slugify } from "../../../../utils/slugify";
-import type { EvaluatorTypes } from "../../../../server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import {
   evaluatePreconditions,
   type PreconditionTrace,

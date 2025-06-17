@@ -3,9 +3,9 @@ import { nanoid } from "nanoid";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { type ZodError, z } from "zod";
 import { trackEventsQueue } from "../../server/background/queues/trackEventsQueue";
-import { prisma } from "../../server/db"; // Adjust the import based on your setup
-import { type TrackEventRESTParamsValidator } from "../../server/tracer/types";
-import { trackEventRESTParamsValidatorSchema } from "../../server/tracer/types.generated";
+import { prisma } from "../../../src/server/db"; // Adjust the import based on your setup
+import { type TrackEventRESTParamsValidator } from "../../../src/server/tracer/types";
+import { trackEventRESTParamsValidatorSchema } from "../../../src/server/tracer/types.generated";
 import { createLogger } from "../../utils/logger";
 import { fromZodError } from "zod-validation-error";
 
@@ -82,7 +82,10 @@ export default async function handler(
   try {
     body = trackEventRESTParamsValidatorSchema.parse(req.body);
   } catch (error) {
-    logger.error({ error, body: req.body, projectId: project.id }, 'invalid event received');
+    logger.error(
+      { error, body: req.body, projectId: project.id },
+      "invalid event received"
+    );
     Sentry.captureException(error);
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
@@ -92,7 +95,10 @@ export default async function handler(
     try {
       predefinedEventsSchemas.parse(req.body);
     } catch (error) {
-      logger.error({ error, body: req.body, projectId: project.id }, 'invalid event received');
+      logger.error(
+        { error, body: req.body, projectId: project.id },
+        "invalid event received"
+      );
       Sentry.captureException(error);
       const validationError = fromZodError(error as ZodError);
       return res.status(400).json({ error: validationError.message });

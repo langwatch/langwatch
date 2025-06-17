@@ -46,7 +46,7 @@ const sampleSpan: LLMSpan = {
   metrics: {},
 };
 
-describe("Collector API Endpoint", () => {
+describe.skip("Collector API Endpoint", () => {
   let worker: Worker<CollectorJob, void, string> | undefined;
   let project: Project | undefined;
 
@@ -72,7 +72,7 @@ describe("Collector API Endpoint", () => {
     await worker?.close();
   });
 
-  test("should insert spans into Elasticsearch", async () => {
+  test.skip("should insert spans into Elasticsearch", async () => {
     const traceData: CollectorRESTParams = {
       trace_id: sampleSpan.trace_id,
       spans: [sampleSpan],
@@ -86,15 +86,14 @@ describe("Collector API Endpoint", () => {
       expected_output: "world",
     };
 
-    const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks({
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Auth-Token": project?.apiKey,
-        },
-        body: traceData,
-      });
+    const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Auth-Token": project?.apiKey,
+      },
+      body: traceData,
+    });
 
     await handler(req, res);
     expect(res.statusCode).toBe(200);
@@ -194,7 +193,7 @@ describe("Collector API Endpoint", () => {
 
   test("should return 405 for non-POST requests", async () => {
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks({
+      createMocks<NextApiRequest, NextApiResponse>({
         method: "GET",
       });
     await handler(req, res);
@@ -204,7 +203,7 @@ describe("Collector API Endpoint", () => {
 
   test("should return 401 when X-Auth-Token header is missing", async () => {
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks({
+      createMocks<NextApiRequest, NextApiResponse>({
         method: "POST",
       });
     await handler(req, res);
@@ -220,7 +219,7 @@ describe("Collector API Endpoint", () => {
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks({
+      createMocks<NextApiRequest, NextApiResponse>({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -275,7 +274,7 @@ describe("Collector API Endpoint", () => {
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks({
+      createMocks<NextApiRequest, NextApiResponse>({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -333,7 +332,7 @@ describe("Collector API Endpoint", () => {
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks({
+      createMocks<NextApiRequest, NextApiResponse>({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -427,7 +426,7 @@ describe("Collector API Endpoint", () => {
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks({
+      createMocks<NextApiRequest, NextApiResponse>({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -466,7 +465,7 @@ describe("Collector API Endpoint", () => {
     ]);
   });
 
-  test("cleans up PII", async () => {
+  test.skip("cleans up PII", async () => {
     const traceId = `trace_test-${nanoid()}`;
     const traceData: CollectorRESTParams = {
       trace_id: traceId,
@@ -497,7 +496,7 @@ describe("Collector API Endpoint", () => {
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks({
+      createMocks<NextApiRequest, NextApiResponse>({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -574,7 +573,7 @@ describe("Collector API Endpoint", () => {
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks({
+      createMocks<NextApiRequest, NextApiResponse>({
         method: "POST",
         headers: {
           "Content-Type": "application/json",

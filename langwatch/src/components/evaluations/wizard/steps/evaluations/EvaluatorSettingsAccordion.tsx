@@ -10,7 +10,7 @@ import type { Field } from "../../../../../optimization_studio/types/dsl";
 import { StepAccordion } from "../../components/StepAccordion";
 import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
 import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
-import type { EvaluatorTypes } from "../../../../../server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { usePublicEnv } from "../../../../../hooks/usePublicEnv";
 
 export const EvaluatorSettingsAccordion = () => {
