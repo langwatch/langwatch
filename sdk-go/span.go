@@ -56,55 +56,6 @@ type Span struct {
 	trace.Span
 }
 
-func (s *Span) RecordInput(input any) {
-	jsonStr, err := json.Marshal(typeWrapper{
-		Type:  typeWrapperTypeJSON,
-		Value: input,
-	})
-	if err != nil {
-		log.Default().Printf("error marshalling input: %v", err)
-		return
-	}
-
-	s.SetAttributes(AttributeLangWatchInput.String(string(jsonStr)))
-}
-
-func (s *Span) RecordInputString(input string) {
-	jsonStr, err := json.Marshal(typeWrapper{
-		Type:  typeWrapperTypeText,
-		Value: input,
-	})
-	if err != nil {
-		log.Default().Printf("error marshalling input: %v", err)
-	}
-
-	s.SetAttributes(AttributeLangWatchInput.String(string(jsonStr)))
-}
-
-func (s *Span) RecordOutput(output any) {
-	jsonStr, err := json.Marshal(typeWrapper{
-		Type:  typeWrapperTypeJSON,
-		Value: output,
-	})
-	if err != nil {
-		log.Default().Printf("error marshalling output: %v", err)
-	}
-
-	s.SetAttributes(AttributeLangWatchOutput.String(string(jsonStr)))
-}
-
-func (s *Span) RecordOutputString(output string) {
-	jsonStr, err := json.Marshal(typeWrapper{
-		Type:  typeWrapperTypeText,
-		Value: output,
-	})
-	if err != nil {
-		log.Default().Printf("error marshalling output: %v", err)
-	}
-
-	s.SetAttributes(AttributeLangWatchOutput.String(string(jsonStr)))
-}
-
 func (s *Span) SetType(spanType SpanType) {
 	s.SetAttributes(AttributeLangWatchSpanType.String(string(spanType)))
 }
