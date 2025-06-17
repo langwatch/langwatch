@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "~/server/db";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
-import { AnalyticsKey, type Prisma } from "@prisma/client";
+import { type Prisma } from "@prisma/client";
+import { ANALYTICS_KEYS } from "~/types";
 
 export default async function handler(
   req: NextApiRequest,
@@ -103,7 +104,7 @@ export default async function handler(
         }
         return {
           projectId: projects[index]?.id,
-          key: AnalyticsKey.PROJECT_TRACE_COUNT_PER_DAY,
+          key: ANALYTICS_KEYS.PROJECT_TRACE_COUNT_PER_DAY,
           numericValue: traceCount,
           createdAt: yesterday,
         } as Prisma.AnalyticsCreateManyInput;
@@ -117,7 +118,7 @@ export default async function handler(
       const existingEntries = await prisma.analytics.findMany({
         where: {
           projectId: { in: analyticsToCreate.map((entry) => entry.projectId) },
-          key: AnalyticsKey.PROJECT_TRACE_COUNT_PER_DAY,
+          key: ANALYTICS_KEYS.PROJECT_TRACE_COUNT_PER_DAY,
           createdAt: {
             gte: yesterday,
             lt: yesterdayEnd,

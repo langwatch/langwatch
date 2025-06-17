@@ -28,3 +28,8 @@ export const LlmConfigOutputTypes = [
   "json_schema",
 ] as const;
 export type LlmConfigOutputType = (typeof LlmConfigOutputTypes)[number];
+
+export const ANALYTICS_KEYS = {
+  PROJECT_ACTIVE_TODAY: "PROJECT_ACTIVE_TODAY",
+  PROJECT_TRACE_COUNT_PER_DAY: "PROJECT_TRACE_COUNT_PER_DAY",
+};

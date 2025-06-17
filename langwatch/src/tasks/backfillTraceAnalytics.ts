@@ -1,7 +1,7 @@
 import { prisma } from "~/server/db";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
-import { AnalyticsKey } from "@prisma/client";
 import type { AggregationsCalendarInterval } from "@elastic/elasticsearch/lib/api/types";
+import { ANALYTICS_KEYS } from "~/types";
 
 interface DateHistogramBucket {
   key_as_string: string;
@@ -84,7 +84,7 @@ export default async function execute() {
     const existingAnalytics = await prisma.analytics.findMany({
       where: {
         projectId: project.id,
-        key: AnalyticsKey.PROJECT_TRACE_COUNT_PER_DAY,
+        key: ANALYTICS_KEYS.PROJECT_TRACE_COUNT_PER_DAY,
         createdAt: {
           gte: startDate,
           lt: today,
@@ -108,7 +108,7 @@ export default async function execute() {
       )
       .map((bucket) => ({
         projectId: project.id,
-        key: AnalyticsKey.PROJECT_TRACE_COUNT_PER_DAY,
+        key: ANALYTICS_KEYS.PROJECT_TRACE_COUNT_PER_DAY,
         numericValue: bucket.doc_count,
         createdAt: new Date(bucket.key_as_string),
       }));
