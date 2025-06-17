@@ -66,6 +66,7 @@ export const env = createEnv({
     POSTHOG_KEY: z.string().optional(),
     POSTHOG_HOST: z.string().optional(),
     DISABLE_USAGE_STATS: z.boolean().optional(),
+    LANGWATCH_NLP_LAMBDA_CONFIG: z.string().optional(),
   },
 
   /**
@@ -144,6 +145,7 @@ export const env = createEnv({
     DISABLE_USAGE_STATS:
       process.env.DISABLE_USAGE_STATS === "1" ||
       process.env.DISABLE_USAGE_STATS?.toLowerCase() === "true",
+    LANGWATCH_NLP_LAMBDA_CONFIG: process.env.LANGWATCH_NLP_LAMBDA_CONFIG,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
