@@ -41,8 +41,7 @@ jobs:
 
       - name: Run typecheck
         working-directory: langwatch
-        # TODO: Use tsgo once it's out of preview
-        run: ./node_modules/.bin/tsc --noEmit --project ./tsconfig.json
+        run: npm run typecheck
 
   test-unit:
     env:

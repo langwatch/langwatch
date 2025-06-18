@@ -13,6 +13,7 @@
     "start:prepare:files": "npm run copy:langevals-types && npm run copy:llm-model-costs && npm run types:zod:generate && npm run prisma:generate:typescript",
     "start:prepare:db": "npm run prisma:migrate && npm run elastic:migrate",
     "start:workers": "tsx --tsconfig tsconfig.workers.json src/workers.ts",
+    "typecheck": "tsc --noEmit --project ./tsconfig.json",
     "test:unit": "DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true vitest",
     "test:integration": "NODE_ENV=test DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true vitest -c vitest.integration.config.ts --watch=false",
     "test:stress": "DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true vitest -c vitest.stress.config.ts",
