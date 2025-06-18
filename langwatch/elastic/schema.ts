@@ -83,6 +83,7 @@ const spanMapping: ElasticSearchMappingFrom<ElasticSearchSpan> = {
       first_token_at: { type: "date" },
       finished_at: { type: "date" },
       updated_at: { type: "date" },
+      ignore_timestamps_on_write: { type: "boolean" },
     },
   },
   vendor: { type: "keyword" },
@@ -133,6 +134,7 @@ const evaluationsMapping: ElasticSearchMappingFrom<ElasticSearchEvaluation> = {
       finished_at: { type: "date" },
       inserted_at: { type: "date" },
       updated_at: { type: "date" },
+      ignore_timestamps_on_write: { type: "boolean" },
     },
   },
 };

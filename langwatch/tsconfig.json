@@ -36,6 +36,7 @@
     ]
   },
   "include": [
+    // "./src/**/*"
     ".eslintrc.cjs",
     "next-env.d.ts",
     "**/*.ts",
@@ -45,5 +46,5 @@
     ".next/types/**/*.ts",
     ".next-saas/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "saas-src/**/*"]
+  "exclude": ["node_modules", "saas-src/**/*", ".next", ".next-saas"]
 }

@@ -31,7 +31,7 @@ const springAICompleteChatRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353030869334708",
               body: {
                 stringValue: `Chat Model Prompt Content:
-{"messages":[{"role":"user","content":"Hello, how are you?"}],"model":"gpt-4o-mini","temperature":0.7}`
+{"messages":[{"role":"user","content":"Hello, how are you?"}],"model":"gpt-4o-mini","temperature":0.7}`,
               },
             },
           ],
@@ -47,7 +47,7 @@ const springAICompleteChatRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353033397302125",
               body: {
                 stringValue: `Chat Model Completion:
-{"choices":[{"message":{"role":"assistant","content":"Hello! I'm doing well, thank you for asking. How can I assist you today?"},"finish_reason":"stop"}],"model":"gpt-4o-mini-2024-07-18","usage":{"prompt_tokens":11,"completion_tokens":17,"total_tokens":28}}`
+{"choices":[{"message":{"role":"assistant","content":"Hello! I'm doing well, thank you for asking. How can I assist you today?"},"finish_reason":"stop"}],"model":"gpt-4o-mini-2024-07-18","usage":{"prompt_tokens":11,"completion_tokens":17,"total_tokens":28}}`,
               },
             },
           ],
@@ -82,7 +82,7 @@ const springAIPromptOnlyRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353030869334708",
               body: {
                 stringValue: `Chat Model Prompt Content:
-{"messages":[{"role":"system","content":"You are a helpful assistant."},{"role":"user","content":"What is the weather like?"}],"model":"gpt-3.5-turbo","temperature":0.5}`
+{"messages":[{"role":"system","content":"You are a helpful assistant."},{"role":"user","content":"What is the weather like?"}],"model":"gpt-3.5-turbo","temperature":0.5}`,
               },
             },
           ],
@@ -117,7 +117,7 @@ const springAICompletionOnlyRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353033397302125",
               body: {
                 stringValue: `Chat Model Completion:
-{"choices":[{"message":{"role":"assistant","content":"I don't have access to real-time weather data. Please check a weather service for current conditions."},"finish_reason":"stop"}],"model":"gpt-3.5-turbo-2024-01-25","usage":{"prompt_tokens":25,"completion_tokens":23,"total_tokens":48}}`
+{"choices":[{"message":{"role":"assistant","content":"I don't have access to real-time weather data. Please check a weather service for current conditions."},"finish_reason":"stop"}],"model":"gpt-3.5-turbo-2024-01-25","usage":{"prompt_tokens":25,"completion_tokens":23,"total_tokens":48}}`,
               },
             },
           ],
@@ -152,7 +152,7 @@ const multipleSpansRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353030000000000",
               body: {
                 stringValue: `Chat Model Prompt Content:
-{"messages":[{"role":"user","content":"First question"}],"model":"gpt-4o-mini"}`
+{"messages":[{"role":"user","content":"First question"}],"model":"gpt-4o-mini"}`,
               },
             },
             {
@@ -161,7 +161,7 @@ const multipleSpansRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353031000000000",
               body: {
                 stringValue: `Chat Model Prompt Content:
-{"messages":[{"role":"user","content":"Second question"}],"model":"gpt-4o-mini"}`
+{"messages":[{"role":"user","content":"Second question"}],"model":"gpt-4o-mini"}`,
               },
             },
           ],
@@ -177,7 +177,7 @@ const multipleSpansRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353032000000000",
               body: {
                 stringValue: `Chat Model Completion:
-{"choices":[{"message":{"role":"assistant","content":"First answer"},"finish_reason":"stop"}],"model":"gpt-4o-mini-2024-07-18"}`
+{"choices":[{"message":{"role":"assistant","content":"First answer"},"finish_reason":"stop"}],"model":"gpt-4o-mini-2024-07-18"}`,
               },
             },
             {
@@ -186,7 +186,7 @@ const multipleSpansRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353033000000000",
               body: {
                 stringValue: `Chat Model Completion:
-{"choices":[{"message":{"role":"assistant","content":"Second answer"},"finish_reason":"stop"}],"model":"gpt-4o-mini-2024-07-18"}`
+{"choices":[{"message":{"role":"assistant","content":"Second answer"},"finish_reason":"stop"}],"model":"gpt-4o-mini-2024-07-18"}`,
               },
             },
           ],
@@ -221,7 +221,7 @@ const unsupportedScopeRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353030869334708",
               body: {
                 stringValue: `Some Other Content:
-{"data":"should be ignored"}`
+{"data":"should be ignored"}`,
               },
             },
           ],
@@ -249,7 +249,7 @@ const invalidJsonRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353030869334708",
               body: {
                 stringValue: `Chat Model Prompt Content:
-{invalid json content here}`
+{invalid json content here}`,
               },
             },
           ],
@@ -304,7 +304,8 @@ describe("opentelemetry logs receiver", () => {
                 {
                   message: {
                     role: "assistant",
-                    content: "Hello! I'm doing well, thank you for asking. How can I assist you today?",
+                    content:
+                      "Hello! I'm doing well, thank you for asking. How can I assist you today?",
                   },
                   finish_reason: "stop",
                 },
@@ -413,7 +414,8 @@ describe("opentelemetry logs receiver", () => {
                 {
                   message: {
                     role: "assistant",
-                    content: "I don't have access to real-time weather data. Please check a weather service for current conditions.",
+                    content:
+                      "I don't have access to real-time weather data. Please check a weather service for current conditions.",
                   },
                   finish_reason: "stop",
                 },
@@ -440,9 +442,8 @@ describe("opentelemetry logs receiver", () => {
   });
 
   it("receives multiple spans in the same trace", async () => {
-    const traces = openTelemetryLogsRequestToTracesForCollection(
-      multipleSpansRequest
-    );
+    const traces =
+      openTelemetryLogsRequestToTracesForCollection(multipleSpansRequest);
 
     expect(traces).toHaveLength(1);
 
@@ -458,9 +459,11 @@ describe("opentelemetry logs receiver", () => {
     }
 
     expect(trace!.spans).toHaveLength(2);
-    
+
     // Check first span
-    const span1 = trace!.spans.find(s => s.span_id === "span1111111111111111");
+    const span1 = trace!.spans.find(
+      (s) => s.span_id === "span1111111111111111"
+    );
     expect(span1).toBeDefined();
     expect(span1?.input?.value).toEqual({
       messages: [{ role: "user", content: "First question" }],
@@ -477,7 +480,9 @@ describe("opentelemetry logs receiver", () => {
     });
 
     // Check second span
-    const span2 = trace!.spans.find(s => s.span_id === "span2222222222222222");
+    const span2 = trace!.spans.find(
+      (s) => s.span_id === "span2222222222222222"
+    );
     expect(span2).toBeDefined();
     expect(span2?.input?.value).toEqual({
       messages: [{ role: "user", content: "Second question" }],
@@ -502,18 +507,22 @@ describe("opentelemetry logs receiver", () => {
     expect(traces).toHaveLength(0);
   });
 
-  it("ignores logs with invalid JSON content", async () => {
-    const traces = openTelemetryLogsRequestToTracesForCollection(
-      invalidJsonRequest
-    );
+  it("handles logs with invalid JSON content by falling back to string array", async () => {
+    const traces =
+      openTelemetryLogsRequestToTracesForCollection(invalidJsonRequest);
 
-    expect(traces).toHaveLength(0);
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0];
+    expect(trace?.spans).toHaveLength(1);
+
+    const span = trace?.spans[0];
+    expect(span?.input?.value).toEqual(["{invalid json content here}"]);
   });
 
   it("handles empty logs request", async () => {
-    const traces = openTelemetryLogsRequestToTracesForCollection(
-      emptyLogsRequest
-    );
+    const traces =
+      openTelemetryLogsRequestToTracesForCollection(emptyLogsRequest);
 
     expect(traces).toHaveLength(0);
   });
@@ -534,7 +543,7 @@ describe("opentelemetry logs receiver", () => {
                   timeUnixNano: "1748353030869334708",
                   body: {
                     stringValue: `Chat Model Prompt Content:
-{"messages":[{"role":"user","content":"test"}]}`
+{"messages":[{"role":"user","content":"test"}]}`,
                   },
                 },
               ],
@@ -544,9 +553,8 @@ describe("opentelemetry logs receiver", () => {
       ],
     };
 
-    const traces = openTelemetryLogsRequestToTracesForCollection(
-      invalidIdsRequest
-    );
+    const traces =
+      openTelemetryLogsRequestToTracesForCollection(invalidIdsRequest);
 
     expect(traces).toHaveLength(0);
   });
@@ -575,9 +583,7 @@ describe("opentelemetry logs receiver", () => {
       ],
     };
 
-    const traces = openTelemetryLogsRequestToTracesForCollection(
-      noBodyRequest
-    );
+    const traces = openTelemetryLogsRequestToTracesForCollection(noBodyRequest);
 
     expect(traces).toHaveLength(0);
   });
@@ -598,7 +604,7 @@ describe("opentelemetry logs receiver", () => {
                   spanId: "0dedf6826df097a9",
                   timeUnixNano: "1748353030869334708",
                   body: {
-                    stringValue: "MalformedContent" // No newline separator
+                    stringValue: "MalformedContent", // No newline separator
                   },
                 },
               ],
@@ -608,10 +614,9 @@ describe("opentelemetry logs receiver", () => {
       ],
     };
 
-    const traces = openTelemetryLogsRequestToTracesForCollection(
-      malformedRequest
-    );
+    const traces =
+      openTelemetryLogsRequestToTracesForCollection(malformedRequest);
 
     expect(traces).toHaveLength(0);
   });
-}); 
+});

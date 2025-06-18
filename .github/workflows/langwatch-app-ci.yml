@@ -7,34 +7,13 @@ on:
   pull_request:
     paths:
       - "langwatch/**"
+      - ".github/workflows/langwatch-app-ci.yml"
   workflow_dispatch:
 
+env:
+  NODE_ENV: "test"
+
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "npm"
-          cache-dependency-path: "langwatch/package-lock.json"
-
-      - name: Install dependencies
-        working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
-
-      - name: Prepare files
-        working-directory: langwatch
-        run: npm run start:prepare:files
-
-      - name: Run tests
-        working-directory: langwatch
-        run: npm run test
-
   typecheck:
     runs-on: ubuntu-latest
     steps:
@@ -62,7 +41,128 @@ jobs:
 
       - name: Run typecheck
         working-directory: langwatch
-        run: ./node_modules/.bin/tsgo --noEmit --project ./tsconfig.json
+        # TODO: Use tsgo once it's out of preview
+        run: ./node_modules/.bin/tsc --noEmit --project ./tsconfig.json
+
+  test-unit:
+    env:
+      # Required environment variables for integration tests
+      DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
+      BASE_HOST: "localhost:3000"
+      NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
+      NEXTAUTH_URL: "http://localhost:3000"
+      API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
+      ELASTICSEARCH_NODE_URL: "http://localhost:9200"
+      REDIS_URL: "redis://localhost:6379"
+      BUILD_TIME: "true"
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: "langwatch/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: langwatch
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+
+      - name: Prepare files
+        working-directory: langwatch
+        run: npm run start:prepare:files
+
+      - name: Run unit tests
+        working-directory: langwatch
+        run: npm run test:unit -- --run --bail=1
+
+  test-integration:
+    env:
+      # Required environment variables for integration tests
+      DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
+      BASE_HOST: "localhost:3000"
+      NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
+      NEXTAUTH_URL: "http://localhost:3000"
+      API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
+      ELASTICSEARCH_NODE_URL: "http://localhost:9200"
+      REDIS_URL: "redis://localhost:6379"
+      BUILD_TIME: "true"
+
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+        ports:
+          - 9200:9200
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: false
+          ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+        options: >-
+          --health-cmd "curl -f http://localhost:9200/_cluster/health || exit 1"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 5
+
+      postgres:
+        image: postgres:16
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: langwatch_ci
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: langwatch_test
+        options: >-
+          --health-cmd "pg_isready -U langwatch_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: "langwatch/package-lock.json"
+
+      - name: Install dependencies
+        working-directory: langwatch
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+
+      - name: Prepare files
+        working-directory: langwatch
+        run: npm run start:prepare:files
+
+      - name: Setup database
+        working-directory: langwatch
+        run: npm run prisma:migrate
+
+      - name: Setup Elasticsearch
+        working-directory: langwatch
+        run: npm run elastic:migrate
+
+      - name: Run integration tests
+        working-directory: langwatch
+        run: npm run test:integration
 
   build:
     runs-on: ubuntu-latest

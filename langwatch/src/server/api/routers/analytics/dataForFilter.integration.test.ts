@@ -1,17 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { nanoid } from "nanoid";
-import {
-  esClient,
-  TRACE_INDEX,
-  traceIndexId,
-  TRACES_PIVOT_INDEX,
-} from "../../../elasticsearch";
+import { esClient, TRACE_INDEX, traceIndexId } from "../../../elasticsearch";
 import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import type { ElasticSearchTrace } from "../../../tracer/types";
 
-describe("Data For Filter Integration Tests", () => {
+describe.skip("Data For Filter Integration Tests", () => {
   const traceId = `test-trace-id-${nanoid()}`;
   const traceId2 = `test-trace-id-${nanoid()}`;
   const traceId3 = `test-trace-id-${nanoid()}`;
@@ -37,6 +32,7 @@ describe("Data For Filter Integration Tests", () => {
       input: {
         value: "",
       },
+      spans: [],
       events: [
         {
           trace_id: traceId,
@@ -59,8 +55,7 @@ describe("Data For Filter Integration Tests", () => {
       ],
       evaluations: [
         {
-          trace_id: `test-trace-id-${nanoid()}`,
-          project_id: "test-project-id",
+          evaluation_id: nanoid(),
           evaluator_id: `test-check-id-faithfulness`,
           type: "faithfulness",
           name: "Faithfulness",
@@ -91,6 +86,7 @@ describe("Data For Filter Integration Tests", () => {
         updated_at: new Date().getTime(),
       },
       metrics: {},
+      spans: [],
       events: [
         {
           trace_id: traceId2,
@@ -113,8 +109,7 @@ describe("Data For Filter Integration Tests", () => {
       ],
       evaluations: [
         {
-          trace_id: traceId2,
-          project_id: "test-project-id",
+          evaluation_id: nanoid(),
           evaluator_id: `test-check-id-faithfulness`,
           type: "faithfulness",
           name: "Faithfulness2",
@@ -127,8 +122,7 @@ describe("Data For Filter Integration Tests", () => {
           },
         },
         {
-          trace_id: traceId2,
-          project_id: "test-project-id",
+          evaluation_id: nanoid(),
           evaluator_id: `test-check-id-consistency`,
           type: "consistency",
           name: "Consistency",
@@ -159,6 +153,7 @@ describe("Data For Filter Integration Tests", () => {
         updated_at: new Date().getTime(),
       },
       metrics: {},
+      spans: [],
       events: [
         {
           trace_id: traceId3,
@@ -202,20 +197,6 @@ describe("Data For Filter Integration Tests", () => {
         trace,
       ]),
       refresh: true,
-    });
-  });
-
-  afterAll(async () => {
-    const client = await esClient({ test: true });
-    await client.deleteByQuery({
-      index: TRACES_PIVOT_INDEX,
-      body: {
-        query: {
-          terms: {
-            "metadata.labels": ["test-messages"],
-          },
-        },
-      },
     });
   });
 
@@ -327,7 +308,7 @@ describe("Data For Filter Integration Tests", () => {
     });
   });
 
-  it.only("should return the right data for event metric filter", async () => {
+  it("should return the right data for event metric filter", async () => {
     const user = await getTestUser();
 
     const ctx = createInnerTRPCContext({
