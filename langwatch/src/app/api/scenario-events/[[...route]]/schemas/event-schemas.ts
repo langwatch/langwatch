@@ -5,6 +5,22 @@
 import { EventType, MessagesSnapshotEventSchema } from "@ag-ui/core";
 import { z } from "zod";
 import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../enums";
+import { parse } from "ksuid";
+
+/**
+ * Safely parses a xksuid string.
+ * @param id - The xksuid string to parse.
+ * @returns True if the xksuid string is valid, false otherwise.
+ */
+export const safeParseXKsuid = (id: string | undefined) => {
+  try {
+    if (!id) return false;
+    parse(id);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 /**
  * AG-UI Base Event Schema
@@ -18,36 +34,36 @@ const baseEventSchema = z.object({
 
 /**
  * Batch Run ID Schema
- * Validates batch run identifiers that must start with 'batch-run-' followed by a UUID.
+ * Validates batch run identifiers that must start with 'scenario_batch_run_'
  * Used to group multiple scenario runs together in a single execution batch.
  */
 export const batchRunIdSchema = z.string().refine(
   (val) => {
-    const uuid = val.replace("batch-run-", "");
-    return (
-      val.startsWith("batch-run-") && z.string().uuid().safeParse(uuid).success
-    );
+    const prefix = "scenario_batch_run_";
+    if (!val.startsWith(prefix)) return false;
+    const id = val.slice(prefix.length);
+    return safeParseXKsuid(id);
   },
   {
-    message: "ID must start with 'batch-run-' followed by a valid UUID",
+    message:
+      "ID must be a valid ksuid, with the resource 'scenario_batch_run_'",
   }
 );
 
 /**
  * Scenario Run ID Schema
- * Validates scenario run identifiers that must start with 'scenario-run-' followed by a UUID.
+ * Validates scenario run identifiers that must start with 'scenario_run_' followed by a ksuid.
  * Each scenario run represents a single execution of a scenario within a batch.
  */
 export const scenarioRunIdSchema = z.string().refine(
   (val) => {
-    const uuid = val.replace("scenario-run-", "");
-    return (
-      val.startsWith("scenario-run-") &&
-      z.string().uuid().safeParse(uuid).success
-    );
+    const prefix = "scenario_run_";
+    if (!val.startsWith(prefix)) return false;
+    const id = val.slice(prefix.length);
+    return safeParseXKsuid(id);
   },
   {
-    message: "ID must start with 'scenario-run-' followed by a valid UUID",
+    message: "ID must be a valid ksuid, with the resource 'scenario_run_'",
   }
 );
 
@@ -55,7 +71,15 @@ export const scenarioRunIdSchema = z.string().refine(
  * Scenario ID Schema
  * Simple string identifier for scenarios. Used to reference specific test scenarios.
  */
-export const scenarioIdSchema = z.string();
+export const scenarioIdSchema = z.string().refine(
+  (val) => {
+    const [resource, id] = val.split("_");
+    return resource === "scenario" && safeParseXKsuid(id);
+  },
+  {
+    message: "ID must be a valid ksuid, with the resource 'scenario_run_'",
+  }
+);
 
 /**
  * Base Scenario Event Schema
