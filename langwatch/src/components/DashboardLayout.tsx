@@ -328,8 +328,8 @@ export const DashboardLayout = ({
         {...props}
       >
         {publicEnv.data &&
-          (publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE ||
-            publicEnv.data?.HAS_LANGEVALS_ENDPOINT) && (
+          (!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE ||
+            !publicEnv.data?.HAS_LANGEVALS_ENDPOINT) && (
             <Alert.Root
               status="warning"
               width="full"
