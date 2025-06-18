@@ -52,7 +52,7 @@ export const TeamForm = ({
 }: {
   organizationId: string;
   team?: TeamWithProjectsAndMembersAndUsers;
-  form: UseFormReturn<TeamFormData, any, undefined>;
+  form: UseFormReturn<TeamFormData, any, TeamFormData>;
   onSubmit: SubmitHandler<TeamFormData>;
   isLoading: boolean;
 }) => {

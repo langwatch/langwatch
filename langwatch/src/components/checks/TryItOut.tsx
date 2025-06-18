@@ -44,12 +44,11 @@ import { evaluationStatusColor } from "./EvaluationStatus";
 import { toaster } from "../../components/ui/toaster";
 import { InputGroup } from "../ui/input-group";
 import { RedactedField } from "../ui/RedactedField";
-import { getUserProtectionsForProject } from "~/server/api/utils";
 
 export function TryItOut({
   form,
 }: {
-  form: UseFormReturn<CheckConfigFormData, any, undefined>;
+  form: UseFormReturn<CheckConfigFormData, any, CheckConfigFormData>;
 }) {
   const { project } = useOrganizationTeamProject();
   const { watch } = form;
