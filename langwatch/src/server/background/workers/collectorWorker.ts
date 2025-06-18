@@ -247,7 +247,9 @@ const processCollectorJob_ = async (
         ...span.timestamps,
         // If ignore_timestamps_on_write is set, we'll preserve existing timestamps in the ES update script
         // For now, set the required fields but they may be overridden during update
-        inserted_at: span.timestamps.ignore_timestamps_on_write ? (existingTrace?.inserted_at ?? currentTime) : currentTime,
+        inserted_at: span.timestamps.ignore_timestamps_on_write
+          ? existingTrace?.inserted_at ?? currentTime
+          : currentTime,
         updated_at: currentTime,
       },
     };
@@ -304,8 +306,10 @@ const processCollectorJob_ = async (
   }
 
   // Check if any spans have ignore_timestamps_on_write flag
-  const hasIgnoreTimestamps = spans.some((span) => span.timestamps.ignore_timestamps_on_write);
-  
+  const hasIgnoreTimestamps = spans.some(
+    (span) => span.timestamps.ignore_timestamps_on_write
+  );
+
   // Create the trace
   const trace: Omit<ElasticSearchTrace, "spans"> = {
     trace_id: traceId,
@@ -329,12 +333,15 @@ const processCollectorJob_ = async (
     },
     timestamps: {
       // If any span has ignore_timestamps_on_write, preserve existing trace timestamps where possible
-      started_at: hasIgnoreTimestamps && existingTrace?.inserted_at
-        ? (existingSpans.length > 0 
-            ? Math.min(...existingSpans.map((span) => span.timestamps.started_at))
+      started_at:
+        hasIgnoreTimestamps && existingTrace?.inserted_at
+          ? existingSpans.length > 0
+            ? Math.min(
+                ...existingSpans.map((span) => span.timestamps.started_at)
+              )
             : Math.min(...allSpans.map((span) => span.timestamps.started_at))
-          )
-        : Math.min(...allSpans.map((span) => span.timestamps.started_at)) ?? Date.now(),
+          : Math.min(...allSpans.map((span) => span.timestamps.started_at)) ??
+            Date.now(),
       inserted_at: existingTrace?.inserted_at ?? Date.now(),
       updated_at: Date.now(),
     } as ElasticSearchTrace["timestamps"],
