@@ -10,6 +10,11 @@ import type {
 import { Client as ElasticClient } from "@elastic/elasticsearch";
 import { z } from "zod";
 import { esClient } from "~/server/elasticsearch";
+import {
+  transformToElasticsearch,
+  transformFromElasticsearch,
+  ES_FIELDS,
+} from "./utils/elastic-search-transformers";
 
 const projectIdSchema = z.string();
 const scenarioRunIdSchema = z.string();
@@ -47,13 +52,16 @@ export class ScenarioEventRepository {
 
     const client = await this.getClient();
 
+    // Transform to Elasticsearch format before saving
+    const elasticsearchEvent = transformToElasticsearch({
+      ...validatedEvent,
+      projectId: validatedProjectId,
+      timestamp: validatedEvent.timestamp || Date.now(),
+    });
+
     await client.index({
       index: this.indexName,
-      body: {
-        ...validatedEvent,
-        projectId: validatedProjectId,
-        timestamp: validatedEvent.timestamp || Date.now(),
-      },
+      body: elasticsearchEvent,
     });
   }
 
@@ -84,8 +92,8 @@ export class ScenarioEventRepository {
         query: {
           bool: {
             must: [
-              { term: { projectId: validatedProjectId } },
-              { term: { scenarioRunId: validatedScenarioRunId } },
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { term: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunId } },
               { term: { type: ScenarioEventType.MESSAGE_SNAPSHOT } },
             ],
           },
@@ -95,7 +103,13 @@ export class ScenarioEventRepository {
       },
     });
 
-    return response.hits.hits[0]?._source as ScenarioMessageSnapshotEvent;
+    const rawResult = response.hits.hits[0]?._source as
+      | Record<string, unknown>
+      | undefined;
+
+    return rawResult
+      ? (transformFromElasticsearch(rawResult) as ScenarioMessageSnapshotEvent)
+      : undefined;
   }
 
   /**
@@ -125,8 +139,8 @@ export class ScenarioEventRepository {
         query: {
           bool: {
             must: [
-              { term: { projectId: validatedProjectId } },
-              { term: { scenarioRunId: validatedScenarioRunId } },
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { term: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunId } },
               { term: { type: ScenarioEventType.RUN_FINISHED } },
             ],
           },
@@ -136,7 +150,10 @@ export class ScenarioEventRepository {
       },
     });
 
-    return response.hits.hits[0]?._source as ScenarioRunFinishedEvent;
+    const rawResult = response.hits.hits[0]?._source;
+    return rawResult
+      ? (transformFromElasticsearch(rawResult) as ScenarioRunFinishedEvent)
+      : undefined;
   }
 
   /**
@@ -154,7 +171,7 @@ export class ScenarioEventRepository {
       index: this.indexName,
       body: {
         query: {
-          term: { projectId: validatedProjectId },
+          term: { [ES_FIELDS.projectId]: validatedProjectId },
         },
       },
     });
@@ -187,15 +204,16 @@ export class ScenarioEventRepository {
         query: {
           bool: {
             must: [
-              { term: { projectId: validatedProjectId } },
-              { term: { scenarioId: validatedScenarioId } },
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { term: { [ES_FIELDS.scenarioId]: validatedScenarioId } },
             ],
           },
         },
         aggs: {
           unique_runs: {
             terms: {
-              field: "scenarioRunId",
+              field: ES_FIELDS.scenarioRunId,
+              size: 10000,
             },
           },
         },
@@ -252,8 +270,8 @@ export class ScenarioEventRepository {
         query: {
           bool: {
             must: [
-              { term: { projectId: validatedProjectId } },
-              { exists: { field: "scenarioSetId" } }, // Only events that are part of a scenario set
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { exists: { field: ES_FIELDS.scenarioSetId } }, // Only events that are part of a scenario set
             ],
           },
         },
@@ -261,14 +279,14 @@ export class ScenarioEventRepository {
           // Group by scenario set ID to get each unique set
           scenario_sets: {
             terms: {
-              field: "scenarioSetId",
+              field: ES_FIELDS.scenarioSetId,
               size: 1000, // Reasonable limit for scenario sets per project
             },
             aggs: {
               // Count unique scenarios within each set
               unique_scenario_count: {
                 cardinality: {
-                  field: "scenarioId",
+                  field: ES_FIELDS.scenarioId,
                 },
               },
               // Get the latest timestamp across all events in this set
@@ -285,7 +303,7 @@ export class ScenarioEventRepository {
                 aggs: {
                   total_runs: {
                     value_count: {
-                      field: "scenarioRunId",
+                      field: ES_FIELDS.scenarioRunId,
                     },
                   },
                   successful_runs: {
@@ -352,16 +370,16 @@ export class ScenarioEventRepository {
         query: {
           bool: {
             must: [
-              { term: { projectId: validatedProjectId } },
-              { term: { scenarioSetId: validatedScenarioSetId } },
-              { exists: { field: "batchRunId" } },
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
+              { exists: { field: ES_FIELDS.batchRunId } },
             ],
           },
         },
         aggs: {
           unique_batch_runs: {
             terms: {
-              field: "batchRunId",
+              field: ES_FIELDS.batchRunId,
               size: 10000,
               // Sort by latest timestamp to get most recent batch runs first
               order: {
@@ -418,16 +436,16 @@ export class ScenarioEventRepository {
         query: {
           bool: {
             must: [
-              { term: { projectId } },
-              { terms: { batchRunId: batchRunIds } },
-              { exists: { field: "scenarioRunId" } },
+              { term: { [ES_FIELDS.projectId]: projectId } },
+              { terms: { [ES_FIELDS.batchRunId]: batchRunIds } },
+              { exists: { field: ES_FIELDS.scenarioRunId } },
             ],
           },
         },
         aggs: {
           unique_scenario_runs: {
             terms: {
-              field: "scenarioRunId",
+              field: ES_FIELDS.scenarioRunId,
               size: 10000,
             },
           },
@@ -472,8 +490,8 @@ export class ScenarioEventRepository {
         query: {
           bool: {
             must: [
-              { term: { projectId: validatedProjectId } },
-              { term: { scenarioRunId: validatedScenarioRunId } },
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { term: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunId } },
               { term: { type: ScenarioEventType.RUN_STARTED } },
             ],
           },
@@ -483,7 +501,13 @@ export class ScenarioEventRepository {
       },
     });
 
-    return response.hits.hits[0]?._source as ScenarioRunStartedEvent;
+    const rawResult = response.hits.hits[0]?._source as
+      | Record<string, unknown>
+      | undefined;
+
+    return rawResult
+      ? (transformFromElasticsearch(rawResult) as ScenarioRunStartedEvent)
+      : undefined;
   }
 
   /**
