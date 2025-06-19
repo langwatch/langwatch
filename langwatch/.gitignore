@@ -65,3 +65,6 @@ node_modules/
 /blob-report/
 /playwright/.cache/
 /e2e/auth.json
+
+# vscode
+.vscode/
