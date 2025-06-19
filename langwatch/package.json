@@ -35,6 +35,8 @@
     "@ag-grid-community/core": "^32.3.3",
     "@ag-grid-community/react": "^32.3.3",
     "@ag-grid-community/styles": "^32.3.3",
+    "@ag-ui/client": "^0.0.28",
+    "@ag-ui/core": "^0.0.28",
     "@ai-sdk/amazon-bedrock": "^1.0.6",
     "@ai-sdk/azure": "^1.0.5",
     "@ai-sdk/google": "^1.0.3",
@@ -160,6 +162,7 @@
     "react-spinners": "^0.14.1",
     "recharts": "^2.15.1",
     "remark-gfm": "^4.0.0",
+    "rxjs": "^7.8.2",
     "safe-regex2": "^4.0.1",
     "sass": "^1.79.0",
     "slugify": "^1.6.6",
@@ -235,5 +238,8 @@
   },
   "workspaces": [
     "saas-src/*"
-  ]
+  ],
+  "resolutions": {
+    "rxjs": "7.8.1"
+  }
 }
