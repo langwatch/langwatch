@@ -150,7 +150,10 @@ export class ScenarioEventRepository {
       },
     });
 
-    const rawResult = response.hits.hits[0]?._source;
+    const rawResult = response.hits.hits[0]?._source as
+      | Record<string, unknown>
+      | undefined;
+
     return rawResult
       ? (transformFromElasticsearch(rawResult) as ScenarioRunFinishedEvent)
       : undefined;

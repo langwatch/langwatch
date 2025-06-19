@@ -2135,6 +2135,14 @@
                             "columns",
                             "rows"
                           ]
+                        },
+                        "prompting_technique": {
+                          "type": "object",
+                          "properties": {
+                            "ref": {
+                              "type": "string"
+                            }
+                          }
                         }
                       },
                       "required": [
@@ -2483,6 +2491,14 @@
                             "columns",
                             "rows"
                           ]
+                        },
+                        "prompting_technique": {
+                          "type": "object",
+                          "properties": {
+                            "ref": {
+                              "type": "string"
+                            }
+                          }
                         }
                       },
                       "required": [
@@ -2823,6 +2839,14 @@
                         "required": [
                           "columns"
                         ]
+                      },
+                      "prompting_technique": {
+                        "type": "object",
+                        "properties": {
+                          "ref": {
+                            "type": "string"
+                          }
+                        }
                       }
                     },
                     "required": [
@@ -3171,6 +3195,7 @@
                     },
                     "required": [
                       "type",
+                      "timestamp",
                       "batchRunId",
                       "scenarioId",
                       "scenarioRunId",
@@ -3240,6 +3265,9 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "error": {
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -3251,6 +3279,7 @@
                     },
                     "required": [
                       "type",
+                      "timestamp",
                       "batchRunId",
                       "scenarioId",
                       "scenarioRunId",
@@ -3441,6 +3470,7 @@
                     },
                     "required": [
                       "type",
+                      "timestamp",
                       "messages",
                       "batchRunId",
                       "scenarioId",
