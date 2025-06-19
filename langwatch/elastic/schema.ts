@@ -14,19 +14,36 @@ import {
   type ElasticSearchEvaluation,
 } from "../src/server/tracer/types";
 
-type NonNestedMappingProperty =
+export type NonNestedMappingProperty =
   | Omit<MappingProperty, "properties">
   | MappingDenseVectorProperty
   | { type: "knn_vector"; [key: string]: any };
 
-type ElasticSearchMappingFrom<T> = NonNullable<T> extends (infer U)[]
+// Helper type to convert camelCase to snake_case at the type level
+type CamelToSnakeCase<S extends string> = S extends `${infer T}${infer U}`
+  ? `${T extends Capitalize<T> ? "_" : ""}${Lowercase<T>}${CamelToSnakeCase<U>}`
+  : S;
+
+// Remove leading underscore if present and handle existing underscores
+type RemoveLeadingUnderscore<S extends string> = S extends `_${infer U}`
+  ? U
+  : S;
+
+// Final snake_case conversion - preserve existing underscores
+type ToSnakeCase<S extends string> = S extends `${infer Start}_${infer End}`
+  ? S // Already snake_case, keep as is
+  : RemoveLeadingUnderscore<CamelToSnakeCase<S>>;
+
+export type ElasticSearchMappingFrom<T> = NonNullable<T> extends (infer U)[]
   ? {
       type?: "nested";
       include_in_parent?: boolean;
       properties: ElasticSearchMappingFrom<U>;
     }
   : {
-      [K in keyof Required<T>]: NonNullable<T[K]> extends string[] | number[]
+      [K in keyof Required<T> as ToSnakeCase<string & K>]: NonNullable<
+        T[K]
+      > extends string[] | number[]
         ? NonNestedMappingProperty
         : NonNullable<T[K]> extends object[]
         ? ElasticSearchMappingFrom<T[K]>

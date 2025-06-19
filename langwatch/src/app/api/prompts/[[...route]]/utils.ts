@@ -3,7 +3,7 @@ import type { z } from "zod";
 import { responseFormatSchema } from "./schemas";
 import { llmOutputFieldToJsonSchemaTypeMap } from "./constants";
 import { resolver } from "hono-openapi/zod";
-import type { RouteResponse } from "./types";
+import type { RouteResponse } from "../../shared/types";
 
 export const getOutputsToResponseFormat = (
   config: LlmConfigWithLatestVersion

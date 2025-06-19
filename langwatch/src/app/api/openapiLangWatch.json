@@ -2135,6 +2135,14 @@
                             "columns",
                             "rows"
                           ]
+                        },
+                        "prompting_technique": {
+                          "type": "object",
+                          "properties": {
+                            "ref": {
+                              "type": "string"
+                            }
+                          }
                         }
                       },
                       "required": [
@@ -2483,6 +2491,14 @@
                             "columns",
                             "rows"
                           ]
+                        },
+                        "prompting_technique": {
+                          "type": "object",
+                          "properties": {
+                            "ref": {
+                              "type": "string"
+                            }
+                          }
                         }
                       },
                       "required": [
@@ -2823,6 +2839,14 @@
                         "required": [
                           "columns"
                         ]
+                      },
+                      "prompting_technique": {
+                        "type": "object",
+                        "properties": {
+                          "ref": {
+                            "type": "string"
+                          }
+                        }
                       }
                     },
                     "required": [
@@ -2954,7 +2978,7 @@
             }
           },
           "404": {
-            "description": "Prompt not found",
+            "description": "Dataset not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -3041,6 +3065,508 @@
           }
         ],
         "description": "Get a dataset by its slug or id."
+      }
+    },
+    "/api/scenario-events": {
+      "post": {
+        "responses": {
+          "201": {
+            "description": "Event created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "url": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid event data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiScenario-events",
+        "parameters": [],
+        "description": "Create a new scenario event",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "SCENARIO_RUN_STARTED"
+                      },
+                      "timestamp": {
+                        "type": "number"
+                      },
+                      "rawEvent": {},
+                      "batchRunId": {
+                        "type": "string"
+                      },
+                      "scenarioId": {
+                        "type": "string"
+                      },
+                      "scenarioRunId": {
+                        "type": "string"
+                      },
+                      "scenarioSetId": {
+                        "type": "string",
+                        "default": "default"
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "timestamp",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId",
+                      "metadata"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "SCENARIO_RUN_FINISHED"
+                      },
+                      "timestamp": {
+                        "type": "number"
+                      },
+                      "rawEvent": {},
+                      "batchRunId": {
+                        "type": "string"
+                      },
+                      "scenarioId": {
+                        "type": "string"
+                      },
+                      "scenarioRunId": {
+                        "type": "string"
+                      },
+                      "scenarioSetId": {
+                        "type": "string",
+                        "default": "default"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "SUCCESS",
+                          "ERROR",
+                          "CANCELLED",
+                          "IN_PROGRESS",
+                          "PENDING",
+                          "FAILED"
+                        ]
+                      },
+                      "results": {
+                        "type": [
+                          "object",
+                          "null"
+                        ],
+                        "properties": {
+                          "verdict": {
+                            "type": "string",
+                            "enum": [
+                              "success",
+                              "failure",
+                              "inconclusive"
+                            ]
+                          },
+                          "reasoning": {
+                            "type": "string"
+                          },
+                          "metCriteria": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "unmetCriteria": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "error": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "verdict",
+                          "metCriteria",
+                          "unmetCriteria"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "timestamp",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId",
+                      "status"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "SCENARIO_MESSAGE_SNAPSHOT"
+                      },
+                      "timestamp": {
+                        "type": "number"
+                      },
+                      "rawEvent": {},
+                      "messages": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "role": {
+                                  "type": "string",
+                                  "const": "developer"
+                                },
+                                "content": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "role",
+                                "content"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "role": {
+                                  "type": "string",
+                                  "const": "system"
+                                },
+                                "content": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "role",
+                                "content"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "role": {
+                                  "type": "string",
+                                  "const": "assistant"
+                                },
+                                "content": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "toolCalls": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "type": {
+                                        "type": "string",
+                                        "const": "function"
+                                      },
+                                      "function": {
+                                        "type": "object",
+                                        "properties": {
+                                          "name": {
+                                            "type": "string"
+                                          },
+                                          "arguments": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "name",
+                                          "arguments"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "type",
+                                      "function"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "role"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "role": {
+                                  "type": "string",
+                                  "const": "user"
+                                },
+                                "content": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "role",
+                                "content"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "content": {
+                                  "type": "string"
+                                },
+                                "role": {
+                                  "type": "string",
+                                  "const": "tool"
+                                },
+                                "toolCallId": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "content",
+                                "role",
+                                "toolCallId"
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      "batchRunId": {
+                        "type": "string"
+                      },
+                      "scenarioId": {
+                        "type": "string"
+                      },
+                      "scenarioRunId": {
+                        "type": "string"
+                      },
+                      "scenarioSetId": {
+                        "type": "string",
+                        "default": "default"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "timestamp",
+                      "messages",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "responses": {
+          "200": {
+            "description": "Events deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "url": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "deleteApiScenario-events",
+        "parameters": [],
+        "description": "Delete all events"
       }
     }
   },

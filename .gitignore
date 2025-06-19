@@ -11,3 +11,6 @@ dist/
 
 langwatch_server/
 .DS_Store
+
+# vscode
+.vscode/
