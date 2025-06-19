@@ -12,7 +12,7 @@ import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../enums";
  */
 const baseEventSchema = z.object({
   type: z.nativeEnum(EventType),
-  timestamp: z.number().optional(),
+  timestamp: z.number(),
   rawEvent: z.any().optional(),
 });
 
@@ -66,6 +66,7 @@ export const scenarioResultsSchema = z.object({
   reasoning: z.string().optional(),
   metCriteria: z.array(z.string()),
   unmetCriteria: z.array(z.string()),
+  error: z.string().optional(),
 });
 export type ScenarioResults = z.infer<typeof scenarioResultsSchema>;
 
@@ -83,7 +84,7 @@ export const scenarioRunFinishedSchema = baseScenarioEventSchema.extend({
 /**
  * Scenario Message Snapshot Event Schema
  * Captures the conversation state at a specific point during scenario execution.
- * Merges AG-UI's message snapshot schema with scenario-specific fields for tracking conversation flow.
+ * Includes searchable_content and payload for full message functionality.
  */
 export const scenarioMessageSnapshotSchema = MessagesSnapshotEventSchema.merge(
   baseScenarioEventSchema.extend({
