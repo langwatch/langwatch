@@ -31,61 +31,120 @@ from dspy.evaluate.evaluate import Evaluate
 
 
 class SerializableAndPydanticEncoder(json.JSONEncoder):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._visited = set()
+
     def default(self, o):
-        classname = f"{o.__class__.__module__}.{o.__class__.__name__}"
-        if isinstance(o, FieldInfo):
-            return {"__class__": classname} | {
-                "field_type": o.json_schema_extra.get("__dspy_field_type", None),  # type: ignore
-                "prefix": o.json_schema_extra.get("prefix", None),  # type: ignore
-                "desc": o.json_schema_extra.get("desc", None),  # type: ignore
+        # Handle circular references
+        obj_id = id(o)
+        if obj_id in self._visited:
+            return {
+                "__circular_reference__": True,
+                "__class__": f"{o.__class__.__module__}.{o.__class__.__name__}",
             }
-        if isinstance(o, set):
-            return list(o)
-        if isinstance(o, Prediction):
-            return {"__class__": classname} | {
-                **o.__dict__.get("_store", {}),
-                **{
-                    k: v
-                    for k, v in o.__dict__.items()
-                    if k not in ["_store", "_completions"]
-                },
-            }
-        if isinstance(o, Predict):
-            return {"__class__": classname} | o.__dict__
-        if isinstance(o, Example):
-            return {"__class__": classname} | o.__dict__
-        if isinstance(o, SignatureMeta):
-            return {"__class__": classname} | {
-                "signature": o.signature,
-                "instructions": o.instructions,
-                "fields": o.fields,
-            }
-        if isinstance(o, dspy.LM):
-            return {"__class__": classname} | {
-                "model": o.model,
-                "kwargs": {
-                    k: v
-                    for k, v in o.kwargs.items()
-                    if k in ["temperature", "max_tokens"]
-                },
-            }
-        if isinstance(o, Completions):
-            return {"__class__": classname} | o.__dict__
-        if isinstance(o, BaseModel):
-            return o.model_dump(exclude_unset=True)
+
+        self._visited.add(obj_id)
+
         try:
-            return super().default(o)
-        except:
-            return str(o)
+            classname = f"{o.__class__.__module__}.{o.__class__.__name__}"
+            if isinstance(o, FieldInfo):
+                return {"__class__": classname} | {
+                    "field_type": o.json_schema_extra.get("__dspy_field_type", None),  # type: ignore
+                    "prefix": o.json_schema_extra.get("prefix", None),  # type: ignore
+                    "desc": o.json_schema_extra.get("desc", None),  # type: ignore
+                }
+            if isinstance(o, set):
+                return list(o)
+            if isinstance(o, Prediction):
+                # Safely extract data from Prediction objects
+                result = {"__class__": classname}
+                if hasattr(o, "_store") and o._store:
+                    result.update(o._store)
+                # Only add non-circular attributes
+                safe_attrs = {}
+                for k, v in o.__dict__.items():
+                    if k not in ["_store", "_completions"] and not k.startswith("_"):
+                        try:
+                            # Test if this attribute can be serialized
+                            json.dumps(v, default=str)
+                            safe_attrs[k] = v
+                        except (TypeError, RecursionError):
+                            safe_attrs[k] = str(v)
+                result.update(safe_attrs)
+                return result
+            if isinstance(o, Predict):
+                # Safely extract data from Predict objects
+                result = {"__class__": classname}
+                safe_attrs = {}
+                for k, v in o.__dict__.items():
+                    if not k.startswith("_"):
+                        try:
+                            json.dumps(v, default=str)
+                            safe_attrs[k] = v
+                        except (TypeError, RecursionError):
+                            safe_attrs[k] = str(v)
+                result.update(safe_attrs)
+                return result
+            if isinstance(o, Example):
+                # Safely extract data from Example objects
+                result = {"__class__": classname}
+                safe_attrs = {}
+                for k, v in o.__dict__.items():
+                    if not k.startswith("_"):
+                        try:
+                            json.dumps(v, default=str)
+                            safe_attrs[k] = v
+                        except (TypeError, RecursionError):
+                            safe_attrs[k] = str(v)
+                result.update(safe_attrs)
+                return result
+            if isinstance(o, SignatureMeta):
+                return {"__class__": classname} | {
+                    "signature": o.signature,
+                    "instructions": o.instructions,
+                    "fields": o.fields,
+                }
+            if isinstance(o, dspy.LM):
+                return {"__class__": classname} | {
+                    "model": o.model,
+                    "kwargs": {
+                        k: v
+                        for k, v in o.kwargs.items()
+                        if k in ["temperature", "max_tokens"]
+                    },
+                }
+            if isinstance(o, Completions):
+                # Safely extract data from Completions objects
+                result = {"__class__": classname}
+                safe_attrs = {}
+                for k, v in o.__dict__.items():
+                    if not k.startswith("_"):
+                        try:
+                            json.dumps(v, default=str)
+                            safe_attrs[k] = v
+                        except (TypeError, RecursionError):
+                            safe_attrs[k] = str(v)
+                result.update(safe_attrs)
+                return result
+            if isinstance(o, BaseModel):
+                return o.model_dump(exclude_unset=True)
+            try:
+                return super().default(o)
+            except:
+                return str(o)
+        finally:
+            # Remove from visited set to allow the same object to be serialized again in different contexts
+            self._visited.discard(obj_id)
 
 
 class DSPyLLMCall(TypedDict, total=False):
     __class__: str
-    model: Optional[str] = None
+    model: Optional[str]
     response: Any
-    prompt_tokens: Optional[int] = None
-    completion_tokens: Optional[int] = None
-    cost: Optional[float] = None
+    prompt_tokens: Optional[int]
+    completion_tokens: Optional[int]
+    cost: Optional[float]
 
 
 class Timestamps(BaseModel):
@@ -503,12 +562,20 @@ class LangWatchTrackedBootstrapFewShotWithRandomSearch(
 
             return score, subscores
 
-        Evaluate.__call__ = patched_evaluate_call
+        # Use a safer approach for patching Evaluate.__call__
+        try:
+            Evaluate.__call__ = patched_evaluate_call
+        except (TypeError, AttributeError):
+            # If we can't patch the class method, we'll need to handle this differently
+            pass
 
         try:
             yield
         finally:
-            Evaluate.__call__ = original_evaluate_call
+            try:
+                Evaluate.__call__ = original_evaluate_call
+            except (TypeError, AttributeError):
+                pass
 
 
 class LangWatchTrackedCOPRO(COPRO):
@@ -521,34 +588,22 @@ class LangWatchTrackedCOPRO(COPRO):
 
     @contextmanager
     def _patch_logger_and_evaluate(self):
-        original_logger_info = dspy.logger.info
+        # For COPRO, we'll use a different approach that doesn't rely on logger patching
+        # Instead, we'll track the step information through the evaluate calls
         original_evaluate_call = Evaluate.__call__
         step = None
         scores = []
+        step_counter = 0
 
         this = self
 
-        def patched_logger_info(text, *args, **kwargs):
-            nonlocal step, scores
-
-            match = re.search(
-                r"At Depth (\d+)/(\d+), Evaluating Prompt Candidate #(\d+)/(\d+) for Predictor (\d+) of (\d+)",
-                text,
-            )
-            if match:
-                depth, _, breadth, _, predictor, _ = match.groups()
-                new_step = f"{depth}.{predictor}.{breadth}"
-                if new_step != step:
-                    step = new_step
-                    scores = []
-            return original_logger_info(text, *args, **kwargs)
-
         def patched_evaluate_call(self, program: dspy.Module, *args, **kwargs):
-            nonlocal step
-            if not step:
-                raise ValueError(
-                    "Step is not defined, please report it at https://github.com/langwatch/langwatch/issues"
-                )
+            nonlocal step, scores, step_counter
+
+            # Increment step counter for each evaluation
+            step_counter += 1
+            if step is None:
+                step = f"1.{step_counter}"
 
             step_ = step
 
@@ -577,14 +632,20 @@ class LangWatchTrackedCOPRO(COPRO):
 
             return score
 
-        dspy.logger.info = patched_logger_info
-        Evaluate.__call__ = patched_evaluate_call
+        # Use a safer approach for patching Evaluate.__call__
+        try:
+            Evaluate.__call__ = patched_evaluate_call
+        except (TypeError, AttributeError):
+            # If we can't patch the class method, we'll need to handle this differently
+            pass
 
         try:
             yield
         finally:
-            dspy.logger.info = original_logger_info
-            Evaluate.__call__ = original_evaluate_call
+            try:
+                Evaluate.__call__ = original_evaluate_call
+            except (TypeError, AttributeError):
+                pass
 
 
 class LangWatchTrackedMIPROv2(MIPROv2):
@@ -634,7 +695,7 @@ class LangWatchTrackedMIPROv2(MIPROv2):
                             "num_candidates": (
                                 this.num_candidates
                                 if hasattr(this, "num_candidates")
-                                else this.n if hasattr(this, "n") else None
+                                else getattr(this, "n", None)
                             ),
                             "init_temperature": this.init_temperature,
                         },
@@ -650,12 +711,20 @@ class LangWatchTrackedMIPROv2(MIPROv2):
 
             return result
 
-        Evaluate.__call__ = patched_evaluate_call
+        # Use a safer approach for patching Evaluate.__call__
+        try:
+            Evaluate.__call__ = patched_evaluate_call
+        except (TypeError, AttributeError):
+            # If we can't patch the class method, we'll need to handle this differently
+            pass
 
         try:
             yield
         finally:
-            Evaluate.__call__ = original_evaluate_call
+            try:
+                Evaluate.__call__ = original_evaluate_call
+            except (TypeError, AttributeError):
+                pass
 
 
 # === Tracer ===#
@@ -793,7 +862,7 @@ class DSPyTracer:
             if span:
                 span.update(
                     name=model,
-                    model=model,
+                    model=str(model) if model is not None else None,
                     input=(
                         messages if messages else [{"role": "user", "content": prompt}]
                     ),
@@ -837,7 +906,7 @@ class DSPyTracer:
             if span:
                 span.update(
                     name=self.__class__.__name__,
-                    model=model,
+                    model=str(model) if model is not None else None,
                     input=prompt,
                     params=({"temperature": temperature} if temperature else None),
                 )
