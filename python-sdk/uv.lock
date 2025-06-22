@@ -2252,6 +2252,7 @@ version = "0.2.3"
 source = { editable = "." }
 dependencies = [
     { name = "coolname" },
+    { name = "deprecated" },
     { name = "dspy-ai" },
     { name = "httpx" },
     { name = "litellm" },
@@ -2320,6 +2321,7 @@ tests = [
 [package.metadata]
 requires-dist = [
     { name = "coolname", specifier = ">=2.2.0" },
+    { name = "deprecated", specifier = ">=1.2.18" },
     { name = "dspy-ai", specifier = ">=2.5.2,<3.0.0" },
     { name = "dspy-ai", marker = "extra == 'dspy'", specifier = ">=2.5.2,<3.0.0" },
     { name = "httpx", specifier = ">=0.27.0" },
