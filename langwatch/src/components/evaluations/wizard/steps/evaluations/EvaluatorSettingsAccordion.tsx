@@ -93,7 +93,14 @@ export const EvaluatorSettingsAccordion = () => {
     form.reset({
       settings: defaultSettings,
     });
-    onSubmit({ settings: defaultSettings });
+
+    // Only call onSubmit if we're setting NEW default settings (not existing parameters)
+    const hasExistingParameters =
+      Object.keys(settingsFromParameters).length > 0;
+    if (!hasExistingParameters) {
+      onSubmit({ settings: defaultSettings });
+    }
+    // Remove the automatic onSubmit call to prevent interference with mapping
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evaluatorType]);
 
