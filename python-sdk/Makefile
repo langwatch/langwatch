@@ -15,6 +15,10 @@ install:
 	fi
 	uv sync --all-groups --all-extras
 
+build:
+	uv pip install build
+	uv run python -m build
+
 example:
 	@args="$(filter-out $@,$(MAKECMDGOALS))"; \
 	uv pip install strands-agents; \
