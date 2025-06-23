@@ -226,3 +226,8 @@ div input[type="number"] {
     scale: 1;
   }
 }
+
+.copilotKitChat,
+.copilotKitMessages {
+  overflow: unset !important;
+}

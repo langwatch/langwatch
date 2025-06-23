@@ -92,6 +92,17 @@ export const MainMenu = React.memo(function MainMenu() {
             isActive={router.pathname.includes("/messages")}
           />
 
+          {(process.env.NODE_ENV === "development" ||
+            router.pathname.includes("/simulations")) && (
+            <PageMenuLink
+              path={projectRoutes.simulations.path}
+              icon={PlayCircle}
+              label={projectRoutes.simulations.title}
+              project={project}
+              isActive={router.pathname.includes("/simulations")}
+            />
+          )}
+
           <PageMenuLink
             path={projectRoutes.evaluations.path}
             icon={CheckSquare}
@@ -118,16 +129,6 @@ export const MainMenu = React.memo(function MainMenu() {
             project={project}
             isActive={router.pathname.includes("/prompt-configs")}
           />
-
-          {process.env.NODE_ENV === "development" && (
-            <PageMenuLink
-              path={projectRoutes.simulations.path}
-              icon={PlayCircle}
-              label={projectRoutes.simulations.title}
-              project={project}
-              isActive={router.pathname.includes("/simulations")}
-            />
-          )}
 
           <PageMenuLink
             path={projectRoutes.datasets.path}

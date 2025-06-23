@@ -234,29 +234,28 @@ export default function IndividualScenarioRunPage() {
                     </HStack>
                   </Box>
                   {/* Conversation Area - Scrollable */}
-                  <Box flex="1" w="100%" p={6} overflow="auto" maxHeight="100%">
-                    <Box position="relative" height="100%" width="100%">
+                  <Box w="100%" p={6} overflow="auto" maxHeight="100%">
+                    <VStack>
                       <CustomCopilotKitChat
                         messages={scenarioState?.messages ?? []}
                       />
-                      <SimulationChatFadeOverlay />
-                    </Box>
-                  </Box>
-
-                  {/* Console Area - Fixed at bottom */}
-                  <Box
-                    w="100%"
-                    p={6}
-                    pt={0}
-                    borderTop="1px"
-                    borderColor="gray.100"
-                  >
-                    <SimulationConsole
-                      results={results}
-                      scenarioName={scenarioState?.name ?? undefined}
-                      status={scenarioState?.status}
-                      durationInMs={scenarioState?.durationInMs}
-                    />
+                      {/* Console Area */}
+                      <Box
+                        w="100%"
+                        p={6}
+                        pt={0}
+                        borderTop="1px"
+                        borderColor="gray.100"
+                        flex="1"
+                      >
+                        <SimulationConsole
+                          results={results}
+                          scenarioName={scenarioState?.name ?? undefined}
+                          status={scenarioState?.status}
+                          durationInMs={scenarioState?.durationInMs}
+                        />
+                      </Box>
+                    </VStack>
                   </Box>
                 </VStack>
 
