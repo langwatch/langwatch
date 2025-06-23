@@ -9,7 +9,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import React from "react";
+import React, { useMemo } from "react";
 import { Info, Plus, Trash2, X } from "react-feather";
 import {
   Controller,
@@ -64,8 +64,8 @@ const ArrayField = <T extends EvaluatorTypes>({
   // Cast to ZodArray to access element property
   const arraySchema = fieldSchema as z.ZodArray<any>;
 
-  const defaultValues =
-    arraySchema.element instanceof z.ZodObject
+  const defaultValues = useMemo(() => {
+    return arraySchema.element instanceof z.ZodObject
       ? Object.fromEntries(
           Object.entries(arraySchema.element.shape).flatMap(([key, value]) => {
             if (value instanceof z.ZodUnion && value.options.length > 0) {
@@ -77,6 +77,7 @@ const ArrayField = <T extends EvaluatorTypes>({
           })
         )
       : {};
+  }, [arraySchema.element]);
 
   return (
     <VStack align="start" width="full">
