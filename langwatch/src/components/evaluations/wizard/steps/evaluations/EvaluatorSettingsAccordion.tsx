@@ -96,16 +96,18 @@ export const EvaluatorSettingsAccordion = () => {
     }, 300);
   }, [evaluatorType]);
 
-  useEffect(() => {
-    const watcher = form.watch(() => {
-      if (!formRenderedFor.current) return;
-      void form.handleSubmit(onSubmit)();
-    });
-    return () => {
-      watcher.unsubscribe();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Handle form changes and trigger submit
+  const handleFormChange = useCallback(() => {
+    if (!formRenderedFor.current) return;
+    const formValues = form.getValues();
+    onSubmit({ settings: formValues.settings });
   }, [form, onSubmit]);
+
+  // Set up form change listener
+  useEffect(() => {
+    const subscription = form.watch(handleFormChange);
+    return () => subscription.unsubscribe();
+  }, [form, handleFormChange]);
 
   return (
     <StepAccordion
