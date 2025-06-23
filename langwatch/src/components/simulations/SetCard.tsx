@@ -1,4 +1,4 @@
-import { Card, VStack, Text } from "@chakra-ui/react";
+import { Card, VStack, Text, HStack } from "@chakra-ui/react";
 import type { ScenarioSetData } from "~/app/api/scenario-events/[[...route]]/types";
 
 export interface SetCardProps extends ScenarioSetData {
@@ -39,20 +39,19 @@ export function SetCard({
       position="relative"
     >
       <VStack align="stretch" gap="4">
-        {/* Scenarios count */}
-        <Text fontSize="lg" fontWeight="600" color="gray.900">
-          {scenarioCount} scenarios
+        <Text fontSize="xl" fontWeight="700" color="gray.900">
+          {scenarioSetId}
         </Text>
 
-        {/* Last run timestamp */}
-        <Text fontSize="sm" color="gray.500">
-          Last run: {formatDate(lastRunAt)}
-        </Text>
-
-        {/* Scenario set ID */}
-        <Text fontSize="xs" color="gray.500">
-          Scenario set ID: {scenarioSetId}
-        </Text>
+        {/* Scenarios count and last run in a row */}
+        <HStack justify="space-between" align="center">
+          <Text fontSize="md" fontWeight="600" color="gray.700">
+            {scenarioCount} scenarios
+          </Text>
+          <Text fontSize="sm" color="gray.500">
+            Last run: {formatDate(lastRunAt)}
+          </Text>
+        </HStack>
       </VStack>
     </Card.Root>
   );
