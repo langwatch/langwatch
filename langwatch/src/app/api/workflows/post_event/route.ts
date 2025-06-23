@@ -18,7 +18,7 @@ import {
 import { createLogger } from "../../../../utils/logger";
 import type { NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { loggerMiddleware } from "../../hono-middleware/logger";
+import { loggerMiddleware } from "../../middleware/logger";
 
 const logger = createLogger("langwatch:post_message");
 
@@ -36,7 +36,7 @@ app.post(
   ),
   async (c) => {
     const { event: eventWithoutEnvs, projectId } = await c.req.json();
-    logger.info({ event: eventWithoutEnvs.type, projectId }, 'post_event');
+    logger.info({ event: eventWithoutEnvs.type, projectId }, "post_event");
 
     const session = await getServerSession(
       authOptions(c.req.raw as NextRequest)
@@ -67,16 +67,13 @@ app.post(
         projectId
       );
     } catch (error) {
-      logger.error({ error, projectId }, 'error');
+      logger.error({ error, projectId }, "error");
       Sentry.captureException(error, {
         extra: {
           projectId,
         },
       });
-      return c.json(
-        { error: (error as Error).message },
-        { status: 500 }
-      );
+      return c.json({ error: (error as Error).message }, { status: 500 });
     }
     // Use streamSSE to create an SSE stream response
     return streamSSE(c, async (stream) => {
@@ -99,7 +96,7 @@ app.post(
             }
           },
         }).catch((error) => {
-          logger.error({ error, projectId }, 'error');
+          logger.error({ error, projectId }, "error");
           Sentry.captureException(error, {
             extra: {
               projectId,

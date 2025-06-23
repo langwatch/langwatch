@@ -19,6 +19,13 @@ interface ContainerProps extends ChakraContainerProps {
   sidebarWidth?: number;
 }
 
+/**
+ * Container component
+ * @param children - The children to render inside the container
+ * @param sidebarWidth - The width of the sidebar - defaults to 200px and will be used to calculate the max width of the container
+ * @param props - The props to pass to the container
+ * @returns A container component with a max width based on the sidebar width
+ */
 function Container({
   children,
   sidebarWidth = 200,

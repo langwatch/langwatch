@@ -7,6 +7,8 @@ import {
 } from "@prisma/client";
 import { prisma } from "../server/db";
 import { nanoid } from "nanoid";
+import { createMocks, type RequestMethod } from "node-mocks-http";
+import type { NextApiRequest, NextApiResponse } from "next";
 
 export async function getTestUser() {
   // Ensure a user exists
@@ -158,8 +160,10 @@ export async function getTestProject(namespace: string): Promise<Project> {
         apiKey: `test-auth-token-${nanoid()}`,
         teamId: team.id,
         piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
-        capturedInputVisibility: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-        capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+        capturedInputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+        capturedOutputVisibility:
+          ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
       },
     });
   }
@@ -185,4 +189,30 @@ export const waitForResult = async <T>(
   throw new Error(
     `Result not found after multiple retries. Last error: ${lastError?.message}`
   );
+};
+
+/**
+ * Creates a mock request and response for a Next.js API route.
+ * @param param0 - The request method, headers, and body.
+ * @returns A mock request and response.
+ */
+export const createNextApiMocks = ({
+  method,
+  headers,
+  body,
+}: {
+  method: RequestMethod;
+  headers?: Record<string, string | undefined>;
+  body?: any;
+}) => {
+  const { req, res } = createMocks({
+    method,
+    headers,
+    body,
+  });
+
+  return { req, res } as unknown as {
+    req: NextApiRequest;
+    res: NextApiResponse;
+  };
 };

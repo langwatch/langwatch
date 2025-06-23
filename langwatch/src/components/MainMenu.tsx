@@ -17,6 +17,7 @@ import {
   Edit,
   GitHub,
   MessageSquare,
+  PlayCircle,
   Settings,
   Table,
   TrendingUp,
@@ -40,6 +41,7 @@ import { api } from "../utils/api";
 export const MENU_WIDTH = "88px";
 
 export const MainMenu = React.memo(function MainMenu() {
+  const router = useRouter();
   const { project, hasOrganizationPermission, isPublicRoute } =
     useOrganizationTeamProject();
 
@@ -80,12 +82,14 @@ export const MainMenu = React.memo(function MainMenu() {
             icon={TrendingUp}
             label={projectRoutes.home.title}
             project={project}
+            isActive={router.pathname.includes("/analytics")}
           />
           <PageMenuLink
             path={projectRoutes.messages.path}
             icon={MessageSquare}
             label={projectRoutes.messages.title}
             project={project}
+            isActive={router.pathname.includes("/messages")}
           />
 
           <PageMenuLink
@@ -93,6 +97,10 @@ export const MainMenu = React.memo(function MainMenu() {
             icon={CheckSquare}
             label={projectRoutes.evaluations.title}
             project={project}
+            isActive={
+              router.pathname.includes("/evaluations") &&
+              !router.pathname.includes("/analytics")
+            }
           />
 
           <PageMenuLink
@@ -100,6 +108,7 @@ export const MainMenu = React.memo(function MainMenu() {
             icon={PuzzleIcon}
             label={projectRoutes.workflows.title}
             project={project}
+            isActive={router.pathname.includes("/workflows")}
           />
 
           <PageMenuLink
@@ -107,13 +116,25 @@ export const MainMenu = React.memo(function MainMenu() {
             icon={Book}
             label={projectRoutes.promptConfigs.title}
             project={project}
+            isActive={router.pathname.includes("/prompt-configs")}
           />
+
+          {process.env.NODE_ENV === "development" && (
+            <PageMenuLink
+              path={projectRoutes.simulations.path}
+              icon={PlayCircle}
+              label={projectRoutes.simulations.title}
+              project={project}
+              isActive={router.pathname.includes("/simulations")}
+            />
+          )}
 
           <PageMenuLink
             path={projectRoutes.datasets.path}
             icon={Table}
             label={projectRoutes.datasets.title}
             project={project}
+            isActive={router.pathname.includes("/datasets")}
           />
           <PageMenuLink
             path={projectRoutes.annotations.path}
@@ -122,6 +143,7 @@ export const MainMenu = React.memo(function MainMenu() {
             project={project}
             badgeNumber={pendingItemsCount.data}
             iconStyle={{ marginLeft: "1px" }}
+            isActive={router.pathname.includes("/annotations")}
           />
 
           {(!!hasOrganizationPermission(
@@ -133,6 +155,7 @@ export const MainMenu = React.memo(function MainMenu() {
               icon={Settings}
               label={projectRoutes.settings.title}
               project={project}
+              isActive={router.pathname.includes("/settings")}
             />
           )}
 
@@ -237,6 +260,7 @@ const PageMenuLink = ({
   project,
   badgeNumber,
   iconStyle,
+  isActive,
 }: {
   icon: React.ComponentType<{ size?: string | number; color?: string }>;
   label: string;
@@ -244,28 +268,9 @@ const PageMenuLink = ({
   project?: Project;
   badgeNumber?: number;
   iconStyle?: React.CSSProperties;
+  isActive: boolean;
 }) => {
-  const router = useRouter();
-  const currentRoute = findCurrentRoute(router.pathname);
   const { isTableView } = useTableView();
-
-  const isActive =
-    !!currentRoute?.path &&
-    !!path &&
-    (currentRoute.path === path ||
-      (path.includes("/messages") && router.pathname.includes("/messages")) ||
-      (path.includes("/evaluations") &&
-        router.pathname.includes("/evaluations") &&
-        !router.pathname.includes("/analytics")) ||
-      (path.includes("/datasets") && router.pathname.includes("/datasets")) ||
-      (path.includes("/experiments") &&
-        router.pathname.includes("/experiments")) ||
-      (path.includes("/playground") &&
-        router.pathname.includes("/playground")) ||
-      (path === "/[project]" && router.pathname.includes("/analytics")) ||
-      (path.includes("/annotations") &&
-        router.pathname.includes("/annotations")) ||
-      (path.includes("/settings") && router.pathname.includes("/settings")));
 
   const viewModeQuery = path.includes("/messages")
     ? isTableView

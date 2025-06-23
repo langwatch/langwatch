@@ -1,7 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 import { createLogger } from "~/utils/logger";
 
-const logger = createLogger("langwatch:api:prompts");
+const logger = createLogger("langwatch:api:errors");
 
 /**
  * Error handling middleware that catches errors and formats responses
@@ -39,6 +39,14 @@ export const errorMiddleware: MiddlewareHandler = async (c, next) => {
     }
 
     // Otherwise treat as server error
-    return c.json({ error: "Internal server error" }, 500);
+    return c.json(
+      {
+        error: "Internal server error",
+        ...(process.env.NODE_ENV === "development" && {
+          message: error.message,
+        }),
+      },
+      500
+    );
   }
 };

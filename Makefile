@@ -19,4 +19,10 @@ start/postgres:
 
 tsc-watch:
 	cd langwatch && npm run tsc-watch
-	
+
+quickstart: 
+	@echo "Starting Langwatch..."
+	@docker compose up redis postgres opensearch -d
+	make install
+	make start
+	open http://localhost:5560

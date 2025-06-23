@@ -20,6 +20,7 @@ import {
 import { getTestProject, waitForResult } from "../../utils/testUtils";
 import handler from "./collector";
 import { DEFAULT_EMBEDDINGS_MODEL } from "~/utils/constants";
+import { createNextApiMocks } from "../../utils/testUtils";
 
 const sampleSpan: LLMSpan = {
   type: "llm",
@@ -86,7 +87,7 @@ describe.skip("Collector API Endpoint", () => {
       expected_output: "world",
     };
 
-    const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
+    const { req, res } = createNextApiMocks({
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -193,7 +194,7 @@ describe.skip("Collector API Endpoint", () => {
 
   test("should return 405 for non-POST requests", async () => {
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks<NextApiRequest, NextApiResponse>({
+      createNextApiMocks({
         method: "GET",
       });
     await handler(req, res);
@@ -203,7 +204,7 @@ describe.skip("Collector API Endpoint", () => {
 
   test("should return 401 when X-Auth-Token header is missing", async () => {
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks<NextApiRequest, NextApiResponse>({
+      createNextApiMocks({
         method: "POST",
       });
     await handler(req, res);
@@ -219,7 +220,7 @@ describe.skip("Collector API Endpoint", () => {
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks<NextApiRequest, NextApiResponse>({
+      createNextApiMocks({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -274,7 +275,7 @@ describe.skip("Collector API Endpoint", () => {
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks<NextApiRequest, NextApiResponse>({
+      createNextApiMocks({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -332,7 +333,7 @@ describe.skip("Collector API Endpoint", () => {
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks<NextApiRequest, NextApiResponse>({
+      createNextApiMocks({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -426,7 +427,7 @@ describe.skip("Collector API Endpoint", () => {
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks<NextApiRequest, NextApiResponse>({
+      createNextApiMocks({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -496,7 +497,7 @@ describe.skip("Collector API Endpoint", () => {
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks<NextApiRequest, NextApiResponse>({
+      createNextApiMocks({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -573,7 +574,7 @@ describe.skip("Collector API Endpoint", () => {
     };
 
     const { req, res }: { req: NextApiRequest; res: NextApiResponse } =
-      createMocks<NextApiRequest, NextApiResponse>({
+      createNextApiMocks({
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -1,6 +1,6 @@
 [project]
 name = "langwatch"
-version = "0.2.3" # remember to also update it in src/langwatch/__version__.py
+version = "0.2.4" # remember to also update it in src/langwatch/__version__.py
 description = "LangWatch Python SDK, for monitoring your LLMs"
 authors = [{ name = "Langwatch Engineers", email = "engineering@langwatch.ai" }]
 requires-python = ">=3.9,<3.13,!=3.9.7"
@@ -34,6 +34,7 @@ dependencies = [
     "opentelemetry-sdk>=1.32.1",
     "retry>=0.9.2",
     "termcolor>=3.0.1",
+    "deprecated>=1.2.18",
 ]
 
 [project.optional-dependencies]
