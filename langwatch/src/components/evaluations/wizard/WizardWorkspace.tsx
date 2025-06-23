@@ -33,7 +33,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
     hasCodeImplementation,
     setDatasetGridRef,
     dataSource,
-    setDatasetId,
+    handleDatasetUpdate,
   } = useEvaluationWizardStore(
     useShallow((state) => ({
       dataSource: state.wizardState.dataSource,
@@ -51,7 +51,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
         (state.wizardState.executionMethod === "realtime_guardrail" ||
           state.wizardState.executionMethod === "realtime_manually"),
       setDatasetGridRef: state.setDatasetGridRef,
-      setDatasetId: state.setDatasetId,
+      handleDatasetUpdate: state.handleDatasetUpdate,
     }))
   );
 
@@ -172,18 +172,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
                       datasetId={getDatasetId()}
                       insideWizard
                       gridRef={datasetGridRef}
-                      onUpdateDataset={(updatedDataset) => {
-                        // Update the wizard state when dataset is modified
-                        if (
-                          updatedDataset.datasetId &&
-                          updatedDataset.columnTypes
-                        ) {
-                          setDatasetId(
-                            updatedDataset.datasetId,
-                            updatedDataset.columnTypes
-                          );
-                        }
-                      }}
+                      onUpdateDataset={handleDatasetUpdate}
                     />
                   </Box>
                 </Card.Body>

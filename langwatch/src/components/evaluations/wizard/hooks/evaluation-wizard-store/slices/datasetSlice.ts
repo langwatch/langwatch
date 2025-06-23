@@ -24,6 +24,15 @@ export interface DatasetSlice {
   setDatasetId: (datasetId: string, columnTypes: DatasetColumns) => void;
 
   /**
+   * Handle dataset updates from the DatasetTable component
+   * @param updatedDataset The updated dataset information
+   */
+  handleDatasetUpdate: (updatedDataset: {
+    datasetId?: string;
+    columnTypes?: DatasetColumns;
+  }) => void;
+
+  /**
    * Get the current dataset ID from the workflow
    * @deprecated Use `getEntryNodeDatasetId` instead
    * @returns The dataset ID or undefined if not set
@@ -155,6 +164,16 @@ export const createDatasetSlice: StateCreator<
           edges: newEdges,
         };
       });
+    },
+
+    handleDatasetUpdate: (updatedDataset) => {
+      // Update the wizard state when dataset is modified
+      if (updatedDataset.datasetId && updatedDataset.columnTypes) {
+        get().setDatasetId(
+          updatedDataset.datasetId,
+          updatedDataset.columnTypes
+        );
+      }
     },
 
     getDatasetId: () => {
