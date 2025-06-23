@@ -35,6 +35,110 @@ import type { CheckConfigFormData } from "./CheckConfigForm";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL } from "../../utils/constants";
 
+// Separate component for array fields to handle useFieldArray hook
+const ArrayField = <T extends EvaluatorTypes>({
+  fieldSchema,
+  fieldName,
+  evaluator,
+  variant = "default",
+  renderField,
+}: {
+  fieldSchema: ZodType;
+  fieldName: string;
+  evaluator: EvaluatorDefinition<T> | undefined;
+  variant?: "default" | "studio";
+  renderField: <T extends EvaluatorTypes>(
+    fieldSchema: ZodType,
+    fieldName: string,
+    evaluator: EvaluatorDefinition<T> | undefined
+  ) => React.JSX.Element | null;
+}) => {
+  const { control } = useFormContext();
+  const fullPath = fieldName;
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: fullPath,
+  });
+
+  // Cast to ZodArray to access element property
+  const arraySchema = fieldSchema as z.ZodArray<any>;
+
+  const defaultValues =
+    arraySchema.element instanceof z.ZodObject
+      ? Object.fromEntries(
+          Object.entries(arraySchema.element.shape).flatMap(([key, value]) => {
+            if (value instanceof z.ZodUnion) {
+              const defaultValue = value.options[0].value;
+              return [[key, defaultValue]];
+            }
+
+            return [];
+          })
+        )
+      : {};
+
+  return (
+    <VStack align="start" width="full">
+      {variant === "studio" && (
+        <Button
+          position="absolute"
+          right={0}
+          top="-36px"
+          padding={0}
+          size="sm"
+          variant="ghost"
+          onClick={() => append(defaultValues)}
+        >
+          <Plus size={16} />
+        </Button>
+      )}
+      {fields.map((field, index) => (
+        <Box
+          key={field.id}
+          borderLeft={
+            arraySchema.element instanceof z.ZodObject ? "4px solid" : undefined
+          }
+          borderLeftColor={variant === "studio" ? "gray.200" : "orange.400"}
+          width="full"
+        >
+          <HStack
+            borderLeftColor="reset"
+            padding={arraySchema.element instanceof z.ZodObject ? 3 : 0}
+            paddingRight={variant === "studio" ? 0 : 3}
+            width="full"
+            align="start"
+            position="relative"
+          >
+            <Button
+              position="absolute"
+              right={0}
+              top={0}
+              padding={0}
+              size="sm"
+              variant="ghost"
+              onClick={() => remove(index)}
+              color="gray.400"
+            >
+              {variant === "studio" ? <Trash2 size={14} /> : <X size={18} />}
+            </Button>
+            <Box width={variant === "studio" ? "100%" : "95%"}>
+              {renderField(
+                arraySchema.element,
+                `${fieldName}.${index}`,
+                evaluator
+              )}
+            </Box>
+          </HStack>
+        </Box>
+      ))}
+      {variant !== "studio" && (
+        <Button onClick={() => append(defaultValues)}>Add</Button>
+      )}
+    </VStack>
+  );
+};
+
 const DynamicZodForm = ({
   schema,
   evaluatorType,
@@ -220,92 +324,14 @@ const DynamicZodForm = ({
         />
       );
     } else if (fieldSchema_ instanceof z.ZodArray) {
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      const { fields, append, remove } = useFieldArray({
-        control,
-        name: fullPath,
-      });
-
-      const defaultValues =
-        fieldSchema_.element instanceof z.ZodObject
-          ? Object.fromEntries(
-              Object.entries(fieldSchema_.element.shape).flatMap(
-                ([key, value]) => {
-                  if (value instanceof z.ZodUnion) {
-                    const defaultValue = value.options[0].value;
-                    return [[key, defaultValue]];
-                  }
-
-                  return [];
-                }
-              )
-            )
-          : {};
-
       return (
-        <VStack align="start" width="full">
-          {variant === "studio" && (
-            <Button
-              position="absolute"
-              right={0}
-              top="-36px"
-              padding={0}
-              size="sm"
-              variant="ghost"
-              onClick={() => append(defaultValues)}
-            >
-              <Plus size={16} />
-            </Button>
-          )}
-          {fields.map((field, index) => (
-            <Box
-              key={field.id}
-              borderLeft={
-                fieldSchema_.element instanceof z.ZodObject
-                  ? "4px solid"
-                  : undefined
-              }
-              borderLeftColor={variant === "studio" ? "gray.200" : "orange.400"}
-              width="full"
-            >
-              <HStack
-                borderLeftColor="reset"
-                padding={fieldSchema_.element instanceof z.ZodObject ? 3 : 0}
-                paddingRight={variant === "studio" ? 0 : 3}
-                width="full"
-                align="start"
-                position="relative"
-              >
-                <Button
-                  position="absolute"
-                  right={0}
-                  top={0}
-                  padding={0}
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => remove(index)}
-                  color="gray.400"
-                >
-                  {variant === "studio" ? (
-                    <Trash2 size={14} />
-                  ) : (
-                    <X size={18} />
-                  )}
-                </Button>
-                <Box width={variant === "studio" ? "100%" : "95%"}>
-                  {renderField(
-                    fieldSchema_.element,
-                    `${fieldName}.${index}`,
-                    evaluator
-                  )}
-                </Box>
-              </HStack>
-            </Box>
-          ))}
-          {variant !== "studio" && (
-            <Button onClick={() => append(defaultValues)}>Add</Button>
-          )}
-        </VStack>
+        <ArrayField
+          fieldSchema={fieldSchema_}
+          fieldName={fullPath}
+          evaluator={evaluator}
+          variant={variant}
+          renderField={renderField}
+        />
       );
     } else if (fieldSchema_ instanceof z.ZodObject) {
       return (
