@@ -91,7 +91,7 @@ const ScenarioInfoCard: React.FC = () => (
     </VStack>
     <VStack align="center" w="full" mt={5} mb={0} gap={4}>
       <Text fontSize="lg" color="gray.700" fontWeight="semibold" textAlign="center">
-        Your simulations will appear here once you start the through Scenario
+        Your simulations will appear here once you start running Scenario
       </Text>
       <Spinner borderWidth="3px" animationDuration="0.8s" opacity={0.6} />
     </VStack>
