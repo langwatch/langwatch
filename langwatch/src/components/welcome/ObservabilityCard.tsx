@@ -3,7 +3,6 @@ import {
   Heading,
   VStack,
   HStack,
-  Circle,
   Text,
   Link as ChakraLink,
 } from "@chakra-ui/react";

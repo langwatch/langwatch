@@ -1,5 +1,4 @@
-import { Button, EmptyState, Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { ButtonGroup } from "@chakra-ui/react";
+import { Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { SetCard } from "~/components/simulations";
@@ -32,7 +31,6 @@ export default function SimulationsPage() {
     data: scenarioSetsData,
     isLoading,
     error,
-    refetch,
   } = api.scenarios.getScenarioSetsData.useQuery(
     { projectId: project?.id ?? "" },
     {
