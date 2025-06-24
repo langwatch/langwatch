@@ -1,6 +1,6 @@
 import { MessagesTable } from "~/components/messages/MessagesTable";
 import { DashboardLayout } from "../../components/DashboardLayout";
-import { ProjectIntegration } from "../../components/ProjectIntegration";
+import WelcomeLayout from "../../components/welcome/WelcomeLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { MessagesList } from "../../components/messages/MessagesList";
 import { useTableView } from "../../components/messages/HeaderButtons";
@@ -43,7 +43,11 @@ export default function MessagesOrIntegrationGuide() {
   }, [project, traces.data, waitingForFirstMessage]);
 
   if (project && (!project.firstMessage || waitingForFirstMessage)) {
-    return <ProjectIntegration />;
+    return (
+      <DashboardLayout>
+        <WelcomeLayout />
+      </DashboardLayout>
+    );
   }
 
   if (isTableView) {
