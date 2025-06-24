@@ -66,25 +66,25 @@ const AgentSimulationTesting: React.FC = () => {
       align="stretch"
       style={{
         background: `
+          radial-gradient(ellipse 70% 60% at 60% 95%, rgba(180,255,236,0.38) 0%, transparent 85%),
           radial-gradient(ellipse 60% 80% at 20% 30%, rgba(255,229,180,0.35) 0%, transparent 85%),
-          radial-gradient(ellipse 50% 60% at 80% 20%, rgba(224,215,255,0.32) 0%, transparent 85%),
+          radial-gradient(ellipse 50% 60% at 60% 20%, rgba(224,215,255,0.48) 0%, transparent 85%),
           radial-gradient(ellipse 80% 100% at 50% 80%, rgba(255,255,255,0.85) 0%, transparent 90%)
         `
       }}
     >
       <VStack mb={1} align="start">
         <HStack gap={2}>
-          <Icon color="orange.500" boxSize={5}><LuBot /></Icon>
+          <Icon color="orange.500" boxSize={4}><LuBot /></Icon>
           <Heading size="md" fontWeight="bold" textAlign="left">
-            Agent Simulations
+            Introducing Scenario: Agentic Simulations
           </Heading>
           <Badge size="md" colorPalette="orange" variant="subtle" borderRadius="2xl">
             New
           </Badge>
         </HStack>
-        <Text fontSize="xs" color="gray.500" textAlign="left">
-          Test your AI agents with realistic scenarios and conversations. Create simulated
-          interactions to evaluate performance before deployment.
+        <Text fontSize="xs" color="GrayText" textAlign="left">
+          Test agents in simulated realities. Catch edge cases before users do
         </Text>
       </VStack>
       <VStack w="full" align="stretch" gap={4} mt={2}>

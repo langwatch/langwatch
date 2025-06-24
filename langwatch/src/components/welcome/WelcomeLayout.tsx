@@ -52,13 +52,6 @@ const WelcomeLayout = () => {
             >
               <APICard />
               <Box mb={2} display={{ base: 'block', md: 'none', lg: 'block' }}>
-                <Heading size={{ base: "md", md: "md" }} fontWeight="extrabold">
-                  Introducing Scenario
-                </Heading>
-                <Text color="gray.500" fontSize={{ base: "sm", md: "sm" }}>
-                  A new way to test and optimize your AI agents
-                </Text>
-                <Box mb={4} display={{ base: 'none', md: 'none', lg: 'block' }}></Box>
                 <AgentSimulationTesting />
               </Box>
             </Box>
