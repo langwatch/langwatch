@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
-import React, { useMemo } from "react";
+import React from "react";
 import {
   Book,
   BookOpen,
@@ -22,10 +22,9 @@ import {
   Table,
   TrendingUp,
 } from "react-feather";
-import { useAnnotationQueues } from "../hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { OrganizationRoleGroup } from "../server/api/permission";
-import { findCurrentRoute, projectRoutes } from "../utils/routes";
+import { projectRoutes } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { ChatBalloonIcon } from "./icons/ChatBalloon";
 import { DiscordOutlineIcon } from "./icons/DiscordOutline";
@@ -91,18 +90,13 @@ export const MainMenu = React.memo(function MainMenu() {
             project={project}
             isActive={router.pathname.includes("/messages")}
           />
-
-          {(process.env.NODE_ENV === "development" ||
-            router.pathname.includes("/simulations")) && (
-            <PageMenuLink
-              path={projectRoutes.simulations.path}
-              icon={PlayCircle}
-              label={projectRoutes.simulations.title}
-              project={project}
-              isActive={router.pathname.includes("/simulations")}
-            />
-          )}
-
+          <PageMenuLink
+            path={projectRoutes.simulations.path}
+            icon={PlayCircle}
+            label={projectRoutes.simulations.title}
+            project={project}
+            isActive={router.pathname.includes("/simulations")}
+          />
           <PageMenuLink
             path={projectRoutes.evaluations.path}
             icon={CheckSquare}
