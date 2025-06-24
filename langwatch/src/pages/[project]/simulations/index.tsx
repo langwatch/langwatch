@@ -54,9 +54,11 @@ export default function SimulationsPage() {
         marginTop={8}
       >
         <PageLayout.Header>
+          {!isLoading && scenarioSetsData && scenarioSetsData.length > 0 && (
             <HStack justify="space-between" align="center" w="full">
               <PageLayout.Heading>Simulation Sets</PageLayout.Heading>
             </HStack>
+          )}
         </PageLayout.Header>
 
         {/* Show loading state */}
@@ -80,14 +82,7 @@ export default function SimulationsPage() {
         {!isLoading &&
           !error &&
           (!scenarioSetsData || scenarioSetsData.length === 0) && (
-            <VStack gap={4} align="center" py={8}>
-              <Text fontSize="lg" color="gray.600">
-                No simulation batches found
-              </Text>
-              <Text fontSize="sm" color="gray.500">
-                Start creating simulations to see them here
-              </Text>
-            </VStack>
+            <ScenarioInfoCard />
           )}
 
         {/* Render based on view mode */}
