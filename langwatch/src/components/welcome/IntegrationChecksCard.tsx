@@ -99,7 +99,7 @@ const IntegrationCheckItem: React.FC<IntegrationCheckItemProps> = ({ check, done
     aria-label={check.label + (check.isExternal ? ' (opens in a new tab)' : '')}
     title={tooltip}
   >
-    <Icon as={done ? LuCheckCheck : LuCircleDashed} color={done ? "green.500" : "gray.300"} boxSize={4} />
+    <Icon as={done ? LuCheckCheck : LuCircleDashed} color={done ? "green.500" : "gray.600"} boxSize={4} />
     <Text
       as="span"
       fontWeight={done ? "medium" : "normal"}
@@ -122,15 +122,15 @@ const IntegrationChecksCard: React.FC = () => {
 
   return (
     <Box minH="160px" boxShadow="sm" borderRadius="xl" bg="white" p={4}>
-      <HStack mb={3} gap={2} alignItems="flex-start" justifyContent="flex-start">
+      <HStack mb={3} gap={1} alignItems="flex-start" justifyContent="flex-start">
         <Heading size="md" fontWeight="bold" textAlign="left">
           Integration checks
         </Heading>
       </HStack>
-      <VStack align="start" gap={1} fontSize="sm">
+      <VStack align="start" gap={"5px"} fontSize="sm">
         <HStack align="center" gap={2}>
           <span style={{ fontSize: "16px" }} role="img" aria-label="party popper">🎉</span>
-          <Text fontWeight="medium" fontSize="sm" as="span">Create your new project</Text>
+          <Text fontWeight="semibold" fontSize="sm" as="span">Create your new project</Text>
         </HStack>
         {checks.map((check) => {
           const done = Boolean(integrationChecks.data?.[check.key as keyof typeof integrationChecks.data]);
