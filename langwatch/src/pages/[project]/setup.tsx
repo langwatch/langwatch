@@ -1,5 +1,10 @@
-import { ProjectIntegration } from "../../components/ProjectIntegration";
+import { DashboardLayout } from "~/components/DashboardLayout";
+import WelcomeLayout from "../../components/welcome/WelcomeLayout";
 
 export default function SetupGuide() {
-  return <ProjectIntegration />;
+  return (
+    <DashboardLayout>
+      <WelcomeLayout />
+    </DashboardLayout>
+  );
 }
