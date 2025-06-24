@@ -1,24 +1,42 @@
-import { Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Button, EmptyState, Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { ButtonGroup } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { SetCard } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import ScenarioInfoCard from "~/components/simulations/ScenarioInfoCard";
+import React, { useEffect, useState } from "react";
 
 export default function SimulationsPage() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
+  const [refetchInterval, setRefetchInterval] = useState(4000);
+
+  // Refetch interval is set to 4 seconds when the window is focused and 30 seconds when the window is blurred.
+  useEffect(() => {
+    const onFocus = () => setRefetchInterval(4000);
+    const onBlur = () => setRefetchInterval(30000);
+
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("blur", onBlur);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, []);
 
   const {
     data: scenarioSetsData,
     isLoading,
     error,
+    refetch,
   } = api.scenarios.getScenarioSetsData.useQuery(
     { projectId: project?.id ?? "" },
     {
-      refetchInterval: 5000,
+      refetchInterval,
       enabled: !!project,
     }
   );
@@ -36,9 +54,9 @@ export default function SimulationsPage() {
         marginTop={8}
       >
         <PageLayout.Header>
-          <HStack justify="space-between" align="center" w="full">
-            <PageLayout.Heading>Simulation Sets</PageLayout.Heading>
-          </HStack>
+            <HStack justify="space-between" align="center" w="full">
+              <PageLayout.Heading>Simulation Sets</PageLayout.Heading>
+            </HStack>
         </PageLayout.Header>
 
         {/* Show loading state */}
