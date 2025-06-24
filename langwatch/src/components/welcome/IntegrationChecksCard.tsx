@@ -21,6 +21,7 @@ interface IntegrationCheck {
   event: string;
   isExternal?: boolean;
   icon: React.ElementType;
+  tooltip?: string;
 }
 
 const checks: IntegrationCheck[] = [
@@ -30,6 +31,7 @@ const checks: IntegrationCheck[] = [
     href: (slug: string) => `/${slug}/messages`,
     event: "integration_checks_first_message",
     icon: LuMessageCircle,
+    tooltip: "View messages observed by the LangWatch platform",
   },
   {
     key: "workflows",
@@ -37,6 +39,7 @@ const checks: IntegrationCheck[] = [
     href: (slug: string) => `/${slug}/workflows`,
     event: "integration_checks_first_workflow",
     icon: LuWorkflow,
+    tooltip: "Create your first workflow to start monitoring your AI applications and workflows",
   },
   {
     key: "simulations",
@@ -44,6 +47,7 @@ const checks: IntegrationCheck[] = [
     href: (slug: string) => `/${slug}/simulations`,
     event: "integration_checks_first_simulation",
     icon: LuBot,
+    tooltip: "Create your first agent simulation to start monitoring your AI applications",
   },
   {
     key: "evaluations",
@@ -51,6 +55,7 @@ const checks: IntegrationCheck[] = [
     href: (slug: string) => `/${slug}/evaluations`,
     event: "integration_checks_first_evaluation",
     icon: LuWeight,
+    tooltip: "Set up your first evaluation to start monitoring your AI applications",
   },
   {
     key: "triggers",
@@ -59,6 +64,7 @@ const checks: IntegrationCheck[] = [
     event: "integration_checks_first_alert",
     isExternal: true,
     icon: LuBell,
+    tooltip: "Set up alerts based on events from your AI applications",
   },
   {
     key: "datasets",
@@ -67,6 +73,7 @@ const checks: IntegrationCheck[] = [
     event: "integration_checks_first_dataset",
     isExternal: true,
     icon: LuDatabase,
+    tooltip: "Create or edit a dataset managed by the LangWatch platform",
   },
 ];
 
@@ -75,9 +82,10 @@ interface IntegrationCheckItemProps {
   done: boolean;
   href: string;
   onClick: () => void;
+  tooltip?: string;
 }
 
-const IntegrationCheckItem: React.FC<IntegrationCheckItemProps> = ({ check, done, href, onClick }) => (
+const IntegrationCheckItem: React.FC<IntegrationCheckItemProps> = ({ check, done, href, onClick, tooltip }) => (
   <ChakraLink
     as={check.isExternal ? "a" : NextLink}
     href={href}
@@ -89,6 +97,7 @@ const IntegrationCheckItem: React.FC<IntegrationCheckItemProps> = ({ check, done
     color={done ? "gray.900" : "gray.700"}
     onClick={onClick}
     aria-label={check.label + (check.isExternal ? ' (opens in a new tab)' : '')}
+    title={tooltip}
   >
     <Icon as={done ? LuCheckCheck : LuCircleDashed} color={done ? "green.500" : "gray.300"} boxSize={4} />
     <Text
@@ -132,6 +141,7 @@ const IntegrationChecksCard: React.FC = () => {
               check={check}
               done={done}
               href={href}
+              tooltip={check.tooltip}
               onClick={() => {
                 if (check.event && project?.id) {
                   trackEventOnce(check.event, { project_id: project.id });
