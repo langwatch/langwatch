@@ -4,7 +4,7 @@ import APICard from "./APICard";
 import ObservabilityCard from "./ObservabilityCard";
 import ResourcesCard from "./ResourcesCard";
 import { useColorModeValue } from "../ui/color-mode";
-import AITestingSimulationCard from "./AITestingSimulationCard";
+import AgentSimulationTesting from "./AgentSimulationTesting";
 
 const WelcomeLayout = () => {
   const bg = useColorModeValue("gray.50", "gray.900");
@@ -27,6 +27,7 @@ const WelcomeLayout = () => {
           <Grid
             templateColumns={{ base: "1fr", lg: "minmax(0, 0.8fr) minmax(0, 1fr)" }}
             gap={{ base: 4, md: 8 }}
+            w="full"
           >
             {/* Left column (desktop) */}
             <Box
@@ -34,7 +35,7 @@ const WelcomeLayout = () => {
               flexDirection="column"
               gap={{ base: 4, md: 8 }}
               order={{ base: 2, md: 2, lg: 1 }}
-              w="100%"
+              w="full"
             >
               <IntegrationChecksCard />
               <ObservabilityCard />
@@ -47,18 +48,18 @@ const WelcomeLayout = () => {
               flexDirection="column"
               gap={{ base: 4, md: 8 }}
               order={{ base: 2, md: 1, lg: 2 }}
-              w="100%"
+              w="full"
             >
               <APICard />
               <Box mb={2} display={{ base: 'block', md: 'none', lg: 'block' }}>
-                <Heading size={{ base: "md", md: "lg" }} fontWeight="extrabold">
+                <Heading size={{ base: "md", md: "md" }} fontWeight="extrabold">
                   Introducing Scenario
                 </Heading>
-                <Text color="gray.500" fontSize={{ base: "sm", md: "md" }}>
+                <Text color="gray.500" fontSize={{ base: "sm", md: "sm" }}>
                   A new way to test and optimize your AI agents
                 </Text>
                 <Box mb={4} display={{ base: 'none', md: 'none', lg: 'block' }}></Box>
-                <AITestingSimulationCard />
+                <AgentSimulationTesting />
               </Box>
             </Box>
           </Grid>

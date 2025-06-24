@@ -4,9 +4,14 @@ import { CopyInput } from "../CopyInput";
 import { trackEvent } from "../../utils/tracking";
 import { useIntegrationChecks } from "../IntegrationChecks";
 import { LuCheckCheck } from "react-icons/lu";
+import React from "react";
 
+const getLangWatchEndpoint = () => {
+  if (typeof window === "undefined") return "";
+  return `${window.location.protocol}//${window.location.host}`;
+};
 
-const APICard = () => {
+const APICard: React.FC = () => {
   const { project } = useOrganizationTeamProject();
   const { hostname } = typeof window !== "undefined" ? window.location : { hostname: "" };
   const integrationChecks = useIntegrationChecks();
@@ -15,7 +20,6 @@ const APICard = () => {
   return (
     <VStack
       minH="80px"
-      w="100%"
       boxShadow="sm"
       borderRadius="xl"
       bg="white"
@@ -30,30 +34,28 @@ const APICard = () => {
         </Text>
       </Box>
       <VStack align="start" gap={1} fontSize="sm" w="full" mb={1}>
-        <Text fontSize="sm" color="gray.900" textAlign="left" fontWeight="medium">
-          API key
-        </Text>
-        <Text fontSize="xs" color="gray.500" textAlign="left" fontWeight="normal" mt={-1}>
-          Keep it secret, keep it safe. Don't let it this key fall into prying eyes.
+        <Text fontSize="sm" color="gray.900" fontWeight="medium">API key</Text>
+        <Text fontSize="xs" color="gray.500" fontWeight="normal" mt={-1}>
+          Keep it secret, keep it safe. Don't let this key fall into prying eyes.
         </Text>
         <CopyInput
           value={project?.apiKey ?? ""}
           secureMode
           label="API key"
+          aria-label="Copy API key"
           onClick={() => trackEvent("api_key_copy", { project_id: project?.id })}
         />
       </VStack>
       {hostname !== "app.langwatch.ai" && (
         <VStack align="start" gap={1} fontSize="sm" w="full" mb={1}>
-          <Text fontSize="sm" color="gray.900" textAlign="left" fontWeight="medium">
-            Endpoint
-          </Text>
-          <Text fontSize="xs" color="gray.500" textAlign="left" fontWeight="normal" mt={-1}>
+          <Text fontSize="sm" color="gray.900" fontWeight="medium">Endpoint</Text>
+          <Text fontSize="xs" color="gray.500" fontWeight="normal" mt={-1}>
             This is the endpoint you should configure in your SDK to send data to LangWatch.
           </Text>
           <CopyInput
             value={getLangWatchEndpoint()}
             label="Endpoint"
+            aria-label="Copy endpoint URL"
             onClick={() => trackEvent("endpoint_copy", { project_id: project?.id })}
           />
         </VStack>
@@ -64,30 +66,26 @@ const APICard = () => {
             size="sm"
             borderStartWidth="3px"
             borderStartColor="green.500"
-            colorPalette={"green"}
+            colorPalette="green"
             title="Integration configured"
           >
             <Alert.Indicator>
               <LuCheckCheck color="green.500" size={16} />
             </Alert.Indicator>
-            <Alert.Title>
-              Integration configured
-            </Alert.Title>
+            <Alert.Title>Integration configured</Alert.Title>
           </Alert.Root>
         ) : (
           <Alert.Root
             size="sm"
             borderStartWidth="3px"
             borderStartColor="colorPalette.600"
-            colorPalette={"gray"}
+            colorPalette="gray"
             title="Waiting for messages to arrive..."
           >
             <Alert.Indicator>
               <Spinner size="sm" />
             </Alert.Indicator>
-            <Alert.Title>
-              Waiting for messages to arrive... 
-            </Alert.Title>
+            <Alert.Title>Waiting for messages to arrive...</Alert.Title>
           </Alert.Root>
         )}
       </Box>
@@ -95,11 +93,4 @@ const APICard = () => {
   );
 };
 
-export default APICard; 
-
-function getLangWatchEndpoint() {
-  if (typeof window === "undefined") {
-    return "";
-  }
-  return `${window.location.protocol}//${window.location.host}`;
-}
+export default APICard;

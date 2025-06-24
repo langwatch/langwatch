@@ -3,7 +3,6 @@ import {
   Heading,
   VStack,
   HStack,
-  Circle,
   Text,
   Link as ChakraLink,
   Icon,
@@ -13,15 +12,15 @@ import { useIntegrationChecks } from "../IntegrationChecks";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { trackEventOnce } from "../../utils/tracking";
 import NextLink from "next/link";
-import type { IconType } from "react-icons/lib";
+import React from "react";
 
 interface IntegrationCheck {
   key: string;
-  label: string | React.ReactNode;
+  label: string;
   href: (slug: string) => string;
   event: string;
   isExternal?: boolean;
-  icon?: IconType;
+  icon: React.ElementType;
 }
 
 const checks: IntegrationCheck[] = [
@@ -71,76 +70,74 @@ const checks: IntegrationCheck[] = [
   },
 ];
 
-const IntegrationChecksCard = () => {
+interface IntegrationCheckItemProps {
+  check: IntegrationCheck;
+  done: boolean;
+  href: string;
+  onClick: () => void;
+}
+
+const IntegrationCheckItem: React.FC<IntegrationCheckItemProps> = ({ check, done, href, onClick }) => (
+  <ChakraLink
+    as={check.isExternal ? "a" : NextLink}
+    href={href}
+    target={check.isExternal ? "_blank" : undefined}
+    rel={check.isExternal ? "noopener noreferrer" : undefined}
+    display="flex"
+    alignItems="center"
+    gap={2}
+    color={done ? "gray.900" : "gray.700"}
+    onClick={onClick}
+    aria-label={check.label + (check.isExternal ? ' (opens in a new tab)' : '')}
+  >
+    <Icon as={done ? LuCheckCheck : LuCircleDashed} color={done ? "green.500" : "gray.300"} boxSize={4} />
+    <Text
+      as="span"
+      fontWeight={done ? "medium" : "normal"}
+      fontSize="sm"
+      textDecoration={done ? "none" : "underline"}
+      textUnderlineOffset="2px"
+      textDecorationThickness="1px"
+      textDecorationStyle={done ? "solid" : "dashed"}
+      textDecorationColor={done ? "gray.500" : "gray.700"}
+    >
+      {check.label}
+    </Text>
+  </ChakraLink>
+);
+
+const IntegrationChecksCard: React.FC = () => {
   const { project } = useOrganizationTeamProject();
   const integrationChecks = useIntegrationChecks();
   const slug = project?.slug ?? "";
 
   return (
-    <Box
-      minH="160px"
-      boxShadow="sm"
-      borderRadius="xl"
-      bg="white"
-      p={4}
-    >
-      <HStack
-        mb={3}
-        gap={2}
-        alignItems="flex-start"
-        justifyContent="flex-start"
-      >
+    <Box minH="160px" boxShadow="sm" borderRadius="xl" bg="white" p={4}>
+      <HStack mb={3} gap={2} alignItems="flex-start" justifyContent="flex-start">
         <Heading size="md" fontWeight="bold" textAlign="left">
           Integration checks
         </Heading>
       </HStack>
       <VStack align="start" gap={1} fontSize="sm">
         <HStack align="center" gap={2}>
-          <span style={{ fontSize: "16px" }}>🎉</span>
+          <span style={{ fontSize: "16px" }} role="img" aria-label="party popper">🎉</span>
           <Text fontWeight="medium" fontSize="sm" as="span">Create your new project</Text>
         </HStack>
-
         {checks.map((check) => {
           const done = Boolean(integrationChecks.data?.[check.key as keyof typeof integrationChecks.data]);
           const href = check.href(slug);
-
           return (
-            <ChakraLink
-              as={check.isExternal ? "a" : NextLink}
-              href={href}
-              target={check.isExternal ? "_blank" : void 0}
-              rel={check.isExternal ? "noopener noreferrer" : void 0}
+            <IntegrationCheckItem
               key={check.key}
-              display="flex"
-              alignItems="center"
-              gap={2}
-              color={done ? "gray.900" : "gray.700"}
+              check={check}
+              done={done}
+              href={href}
               onClick={() => {
                 if (check.event && project?.id) {
                   trackEventOnce(check.event, { project_id: project.id });
                 }
               }}
-            >
-              <Text as="span">
-                {done ? (
-                  <LuCheckCheck color="#22c55e" size={16} />
-                ) : (
-                  <LuCircleDashed color="#d1d5db" size={16} />
-                )}
-              </Text>
-              <Text
-                as="span"
-                fontWeight={done ? "medium" : "normal"}
-                fontSize="sm"
-                textDecoration={done ? "none" : "underline"}
-                textUnderlineOffset="2px"
-                textDecorationThickness="1px"
-                textDecorationStyle={done ? "solid" : "dashed"}
-                textDecorationColor={done ? "gray.500" : "gray.700"}
-              >
-                {check.label}
-              </Text>
-            </ChakraLink>
+            />
           );
         })}
       </VStack>
