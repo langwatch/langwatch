@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Text, useDisclosure } from "@chakra-ui/react";
+import { Box, Button, Flex, HStack, Text, useDisclosure } from "@chakra-ui/react";
 import { DashboardLayout } from "../DashboardLayout";
 import { SetRunHistorySidebar } from "./set-run-history-sidebar";
 import { useSimulationRouter } from "~/hooks/simulations";
@@ -68,7 +68,13 @@ const Header = ({
             <LuPanelLeftOpen size={18} />
           )}
         </Button>
-        <Text fontWeight="semibold">{scenarioSetId}</Text>
+        <Flex alignItems="center" gap={1}>
+          <Text fontWeight="semibold">
+            <Text fontSize={"xs"} color={"GrayText"} as="span">Scenario Set ID:</Text>
+            {" "}
+            <code>{scenarioSetId ?? "unknown"}</code>
+          </Text>
+        </Flex>
       </HStack>
     </Box>
   );
