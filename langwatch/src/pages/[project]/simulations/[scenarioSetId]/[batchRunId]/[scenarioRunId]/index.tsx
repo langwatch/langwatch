@@ -255,7 +255,7 @@ export default function IndividualScenarioRunPage() {
                   >
                     {/* Header with Back Button and Title */}
                     <Box
-                      p={6}
+                      p={5}
                       borderBottom="1px"
                       borderColor="gray.200"
                       w="100%"
@@ -276,14 +276,14 @@ export default function IndividualScenarioRunPage() {
                               </Text>
                             </HStack>
                             <Text fontSize="sm" color="gray.500" ml={5}>
-                              ID: {scenarioId}
+                              Scenario ID: {scenarioId}
                             </Text>
                           </VStack>
                         </VStack>
                       </HStack>
                     </Box>
                     {/* Conversation Area - Scrollable */}
-                    <Box w="100%" p={6} overflow="auto" maxHeight="100%">
+                    <Box w="100%" p={4} overflow="auto" maxHeight="100%">
                       <VStack>
                         <CustomCopilotKitChat
                           messages={scenarioState?.messages ?? []}
@@ -291,8 +291,6 @@ export default function IndividualScenarioRunPage() {
                         {/* Console Area */}
                         <Box
                           w="100%"
-                          p={6}
-                          pt={0}
                           borderTop="1px"
                           borderColor="gray.100"
                           flex="1"
