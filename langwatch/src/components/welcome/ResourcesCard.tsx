@@ -27,7 +27,7 @@ const resources: Resource[] = [
   {
     icon: <LuBot size={14} color="orange" />,
     label: "Demo Account",
-    description: "View our demo account to see how LangWatch works with a sample chatbot",
+    description: "View a real-world example of how LangWatch works with a sample chatbot",
     href: "https://app.langwatch.ai/demo",
     event: "demo_account_click",
     buttonText: "View Demo",
@@ -37,7 +37,7 @@ const resources: Resource[] = [
   {
     icon: <LuBookOpen size={14} color="blue" />,
     label: "Documentation",
-    description: "Comprehensive guides, API references, and best practices for LangWatch integration",
+    description: "Everything you need to get the most out of LangWatch",
     href: "https://docs.langwatch.ai",
     event: "documentation_click",
     buttonText: "Browse LangWatch Docs",
@@ -80,6 +80,7 @@ const ResourceButton: React.FC<ResourceButtonProps> = ({ resource, onClick }) =>
     _hover={{ textDecoration: "none" }}
     transition="all 0.2s"
     aria-label={resource.buttonText + ' (opens in a new tab)'}
+    title={resource.buttonText}
   >
     <a
       href={resource.href}
