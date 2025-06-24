@@ -7,6 +7,7 @@ import {
   Button,
 } from "@chakra-ui/react";
 import { LuBot, LuBookOpen, LuUsers, LuExternalLink } from "react-icons/lu";
+import { FaDiscord } from "react-icons/fa6";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { trackEvent } from "../../utils/tracking";
 import React from "react";
@@ -26,7 +27,7 @@ const resources: Resource[] = [
   {
     icon: <LuBot size={14} color="orange" />,
     label: "Demo Account",
-    description: "View our demo account to see how LangWatch works with a sample chatbot.",
+    description: "View our demo account to see how LangWatch works with a sample chatbot",
     href: "https://app.langwatch.ai/demo",
     event: "demo_account_click",
     buttonText: "View Demo",
@@ -36,22 +37,22 @@ const resources: Resource[] = [
   {
     icon: <LuBookOpen size={14} color="blue" />,
     label: "Documentation",
-    description: "Comprehensive guides, API references, and best practices for LangWatch integration.",
+    description: "Comprehensive guides, API references, and best practices for LangWatch integration",
     href: "https://docs.langwatch.ai",
     event: "documentation_click",
-    buttonText: "Browse Docs",
+    buttonText: "Browse LangWatch Docs",
     colorScheme: "blue",
     bg: "blue.100",
   },
   {
-    icon: <LuUsers size={14} color="green" />,
+    icon: <FaDiscord size={14} color="#5865F2" />,
     label: "Community",
-    description: "Join our community to share experiences, get help, and stay updated with the latest features.",
+    description: "Join our community to share experiences, get help, and stay updated with the latest features",
     href: "https://discord.gg/langwatch",
     event: "community_click",
     buttonText: "Join Discord",
-    colorScheme: "green",
-    bg: "green.100",
+    colorScheme: "blue",
+    bg: "purple.200",
   },
 ];
 
