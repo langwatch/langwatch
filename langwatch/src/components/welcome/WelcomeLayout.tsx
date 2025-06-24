@@ -1,10 +1,13 @@
 import { Box, Container, Grid, Heading, VStack, Text } from "@chakra-ui/react";
+import { Alert } from "@chakra-ui/react";
 import IntegrationChecksCard from "./IntegrationChecksCard";
 import APICard from "./APICard";
 import ObservabilityCard from "./ObservabilityCard";
 import ResourcesCard from "./ResourcesCard";
 import { useColorModeValue } from "../ui/color-mode";
 import AgentSimulationTesting from "./AgentSimulationTesting";
+import { Link } from "../ui/link";
+import { LuExternalLink } from "react-icons/lu";
 
 const WelcomeLayout = () => {
   const bg = useColorModeValue("gray.50", "gray.900");
@@ -51,11 +54,21 @@ const WelcomeLayout = () => {
               w="full"
             >
               <APICard />
-              <Box mb={2} display={{ base: 'block', md: 'none', lg: 'block' }}>
+              <Box display={{ base: 'block', md: 'none', lg: 'block' }}>
                 <AgentSimulationTesting />
               </Box>
             </Box>
           </Grid>
+          <Alert.Root status="info" borderRadius="md">
+            <Alert.Indicator />
+            <Alert.Title>
+                Having issues getting started? Messages not visible yet? Check out our
+                <Link href="https://docs.langwatch.ai/support" isExternal ml={1} textDecoration="underline" textDecorationStyle={"dashed"}>
+                  Troubleshooting & Support guide
+                  <LuExternalLink />
+                </Link>
+            </Alert.Title>
+          </Alert.Root>
         </VStack>
       </Container>
     </Box>
