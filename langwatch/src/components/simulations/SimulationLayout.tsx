@@ -2,7 +2,6 @@ import { Box, Button, HStack, Text, useDisclosure } from "@chakra-ui/react";
 import { DashboardLayout } from "../DashboardLayout";
 import { SetRunHistorySidebar } from "./set-run-history-sidebar";
 import { useSimulationRouter } from "~/hooks/simulations";
-import { HistoryIcon } from "../icons/History";
 import { LuPanelLeftClose, LuPanelLeftOpen } from "react-icons/lu";
 
 // TODO: This file could be better organized.
@@ -63,7 +62,11 @@ const Header = ({
           onClick={() => onHistorySidebarOpenChange(!isHistorySidebarOpen)}
           title={isHistorySidebarOpen ? "Close History" : "Open History"}
         >
-          {isHistorySidebarOpen ? <LuPanelLeftClose size={18} /> : <LuPanelLeftOpen size={18} />}
+          {isHistorySidebarOpen ? (
+            <LuPanelLeftClose size={18} />
+          ) : (
+            <LuPanelLeftOpen size={18} />
+          )}
         </Button>
         <Text fontWeight="semibold">{scenarioSetId}</Text>
       </HStack>
