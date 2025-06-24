@@ -26,7 +26,7 @@ interface Guide {
 const guides: Guide[] = [
   {
     icon: <FaPython size={16} color="#4584b6" />,
-    label: "Python Guide",
+    label: "Get started using our Python SDK",
     href: "https://docs.langwatch.ai/integration/python/guide",
     event: "integration_guide_click",
     language: "python",
@@ -34,7 +34,7 @@ const guides: Guide[] = [
   },
   {
     icon: <FaJs size={16} color="#2563eb" />,
-    label: "TypeScript Guide",
+    label: "Follow the TypeScript guide",
     href: "https://docs.langwatch.ai/integration/typescript/guide",
     event: "integration_guide_click",
     language: "typescript",
@@ -42,7 +42,7 @@ const guides: Guide[] = [
   },
   {
     icon: <FaGolang size={16} color="#00ADD8" />,
-    label: "Golang SDK",
+    label: "Get going with our Golang SDK",
     href: "https://github.com/langwatch/langwatch/tree/main/sdk-go",
     event: "integration_guide_click",
     language: "golang",
@@ -50,7 +50,7 @@ const guides: Guide[] = [
   },
   {
     icon: <MdHttp size={16} color="grey.500" />,
-    label: "REST API Guide",
+    label: "Integrate directly with the LangWatch API",
     href: "https://docs.langwatch.ai/integration/rest-api",
     event: "integration_guide_click",
     language: "rest",
@@ -82,7 +82,7 @@ const GuideLink: React.FC<GuideLinkProps> = ({ guide, onClick }) => (
     onClick={onClick}
     aria-label={guide.label + ' (opens in a new tab)'}
   >
-    <Circle size="24px" bg={guide.bg}>{guide.icon}</Circle>
+    {guide.icon}
     <Text fontWeight="medium" flex={1} textAlign="left">{guide.label}</Text>
     <Box as="span" color="gray.400" ml={1} display="flex" alignItems="center">
       <LuExternalLink size={16} />
