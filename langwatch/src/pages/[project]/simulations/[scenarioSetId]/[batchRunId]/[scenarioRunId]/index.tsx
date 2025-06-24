@@ -7,7 +7,8 @@ import {
   VStack,
   Badge,
   Flex,
-  Spinner,
+  Skeleton,
+  EmptyState,
 } from "@chakra-ui/react";
 import { ArrowLeft, Clock, Check, X } from "react-feather";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -15,13 +16,13 @@ import "@copilotkit/react-ui/styles.css";
 import "../../../simulations.css";
 import {
   CustomCopilotKitChat,
-  SimulationChatFadeOverlay,
   SimulationConsole,
 } from "~/components/simulations";
 import { useSimulationRouter } from "~/hooks/simulations";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { SimulationLayout } from "~/components/simulations/SimulationLayout";
+import { LuCircleOff } from "react-icons/lu";
 
 // Previous Runs List Component
 function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
@@ -42,7 +43,34 @@ function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
 
   return (
     <VStack gap={3} align="stretch">
-      {scenarioRunData?.data?.map((run, index) => (
+
+      {isLoading && (
+        <Box p={4} w="100%">
+          <VStack gap={4} align="start" w="100%">
+            <Skeleton height="32px" width="60%" />
+            <Skeleton height="24px" width="40%" />
+            <Skeleton height="200px" width="100%" borderRadius="md" />
+          </VStack>
+        </Box>
+      )}
+
+      {!isLoading && scenarioRunData?.data?.length === 0 && (
+        <EmptyState.Root size={"md"}>
+          <EmptyState.Content>
+            <EmptyState.Indicator>
+              <LuCircleOff />
+            </EmptyState.Indicator>
+            <VStack textAlign="center">
+              <EmptyState.Title>No previous runs found</EmptyState.Title>
+              <EmptyState.Description>
+                There are no simulations for this scenario yet
+              </EmptyState.Description>
+            </VStack>
+          </EmptyState.Content>
+        </EmptyState.Root>
+      )}
+
+      {scenarioRunData?.data?.map((run) => (
         <Box
           key={run.scenarioRunId}
           p={4}
@@ -198,97 +226,119 @@ export default function IndividualScenarioRunPage() {
             w="full"
           >
             <VStack gap={0} height="100%" w="full">
-              {/* Content Area */}
-              <HStack align="start" gap={0} flex="1" w="100%" overflow="hidden">
-                {/* Main Content Area */}
-                <VStack
+              {!scenarioState && (
+                <Box p={6} w="100%">
+                  <VStack gap={4} align="start" w="100%">
+                    <Skeleton height="32px" width="60%" />
+                    <Skeleton height="24px" width="40%" />
+                    <Skeleton height="200px" width="100%" borderRadius="md" />
+                  </VStack>
+                </Box>
+              )}
+
+              {scenarioState && (
+                <HStack
+                  align="start"
                   gap={0}
-                  height="100%"
                   flex="1"
-                  w={showPreviousRuns ? "calc(100% - 320px)" : "100%"}
-                  transition="width 0.2s"
+                  w="100%"
                   overflow="hidden"
                 >
-                  {/* Header with Back Button and Title */}
-                  <Box p={6} borderBottom="1px" borderColor="gray.200" w="100%">
-                    <HStack justify="space-between" align="center">
-                      <VStack gap={4}>
-                        <VStack align="space-between" gap={0}>
-                          <HStack>
-                            {scenarioState?.status === "SUCCESS" ? (
-                              <Check size={12} color="green" />
-                            ) : scenarioState?.status === "FAILED" ? (
-                              <X size={12} color="red" />
-                            ) : (
-                              <Clock size={12} color="orange" />
-                            )}
-                            <Text fontSize="lg" fontWeight="semibold">
-                              {scenarioState?.name}
-                            </Text>
-                          </HStack>
-                          <Text fontSize="sm" color="gray.500" ml={5}>
-                            ID: {scenarioId}
-                          </Text>
-                        </VStack>
-                      </VStack>
-                    </HStack>
-                  </Box>
-                  {/* Conversation Area - Scrollable */}
-                  <Box w="100%" p={6} overflow="auto" maxHeight="100%">
-                    <VStack>
-                      <CustomCopilotKitChat
-                        messages={scenarioState?.messages ?? []}
-                      />
-                      {/* Console Area */}
-                      <Box
-                        w="100%"
-                        p={6}
-                        pt={0}
-                        borderTop="1px"
-                        borderColor="gray.100"
-                        flex="1"
-                      >
-                        <SimulationConsole
-                          results={results}
-                          scenarioName={scenarioState?.name ?? undefined}
-                          status={scenarioState?.status}
-                          durationInMs={scenarioState?.durationInMs}
-                        />
-                      </Box>
-                    </VStack>
-                  </Box>
-                </VStack>
-
-                {/* Previous Runs Sidebar - Scrollable */}
-                {showPreviousRuns && (
-                  <Box
-                    w="250px"
+                  {/* Main Content Area */}
+                  <VStack
+                    gap={0}
                     height="100%"
-                    borderLeft="1px"
-                    borderColor="gray.200"
-                    borderStyle="solid"
-                    borderTopRightRadius="lg"
-                    borderBottomRightRadius="lg"
+                    flex="1"
+                    w={showPreviousRuns ? "calc(100% - 320px)" : "100%"}
+                    transition="width 0.2s"
                     overflow="hidden"
-                    display="flex"
-                    flexDirection="column"
                   >
+                    {/* Header with Back Button and Title */}
                     <Box
                       p={6}
                       borderBottom="1px"
                       borderColor="gray.200"
-                      borderStyle="solid"
+                      w="100%"
                     >
-                      <Text fontSize="md" fontWeight="semibold">
-                        Previous Runs
-                      </Text>
+                      <HStack justify="space-between" align="center">
+                        <VStack gap={4}>
+                          <VStack align="space-between" gap={0}>
+                            <HStack>
+                              {scenarioState?.status === "SUCCESS" ? (
+                                <Check size={12} color="green" />
+                              ) : scenarioState?.status === "FAILED" ? (
+                                <X size={12} color="red" />
+                              ) : (
+                                <Clock size={12} color="orange" />
+                              )}
+                              <Text fontSize="lg" fontWeight="semibold">
+                                {scenarioState?.name}
+                              </Text>
+                            </HStack>
+                            <Text fontSize="sm" color="gray.500" ml={5}>
+                              ID: {scenarioId}
+                            </Text>
+                          </VStack>
+                        </VStack>
+                      </HStack>
                     </Box>
-                    <Box flex="1" overflow="auto" p={4} pt={3}>
-                      <PreviousRunsList scenarioId={scenarioId} />
+                    {/* Conversation Area - Scrollable */}
+                    <Box w="100%" p={6} overflow="auto" maxHeight="100%">
+                      <VStack>
+                        <CustomCopilotKitChat
+                          messages={scenarioState?.messages ?? []}
+                        />
+                        {/* Console Area */}
+                        <Box
+                          w="100%"
+                          p={6}
+                          pt={0}
+                          borderTop="1px"
+                          borderColor="gray.100"
+                          flex="1"
+                        >
+                          <SimulationConsole
+                            results={results}
+                            scenarioName={scenarioState?.name ?? undefined}
+                            status={scenarioState?.status}
+                            durationInMs={scenarioState?.durationInMs}
+                          />
+                        </Box>
+                      </VStack>
                     </Box>
-                  </Box>
-                )}
-              </HStack>
+                  </VStack>
+
+                  {/* Previous Runs Sidebar - Scrollable */}
+                  {showPreviousRuns && (
+                    <Box
+                      w="250px"
+                      height="100%"
+                      borderLeft="1px"
+                      borderColor="gray.200"
+                      borderStyle="solid"
+                      borderTopRightRadius="lg"
+                      borderBottomRightRadius="lg"
+                      overflow="hidden"
+                      display="flex"
+                      flexDirection="column"
+                    >
+                      <Box
+                        p={6}
+                        borderBottom="1px"
+                        borderColor="gray.200"
+                        borderStyle="solid"
+                      >
+                        <Text fontSize="md" fontWeight="semibold">
+                          Previous Runs
+                        </Text>
+                      </Box>
+                      <Box flex="1" overflow="auto" p={4} pt={3}>
+                        <PreviousRunsList scenarioId={scenarioId} />
+                      </Box>
+                    </Box>
+                  )}
+                </HStack>
+              )}
             </VStack>
           </Box>
         </VStack>
