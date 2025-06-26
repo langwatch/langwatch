@@ -1,24 +1,15 @@
 import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 import { useRequiredSession } from "./useRequiredSession";
+import { useMemo } from "react";
 
 export function useAnnotationQueues() {
   const { project } = useOrganizationTeamProject();
-
   const { data: session } = useRequiredSession();
-
   const user = session?.user;
 
-  const queues = api.annotation.getQueues.useQuery(
-    {
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project,
-    }
-  );
-
-  const queueItems = api.annotation.getQueueItems.useQuery(
+  // Use the new optimized endpoint that consolidates all data fetching
+  const optimizedData = api.annotation.getOptimizedAnnotationQueues.useQuery(
     {
       projectId: project?.id ?? "",
     },
@@ -28,86 +19,7 @@ export function useAnnotationQueues() {
     }
   );
 
-  const doneQueueItems = queueItems.data?.filter(
-    (item) => item.doneAt !== null
-  );
-
-  const doneQueueItemsFiltered = doneQueueItems?.filter(
-    (item) =>
-      item.userId === user?.id ||
-      item.annotationQueue?.members.some((member) => member.userId === user?.id)
-  );
-
-  const assignedQueueItems = queueItems.data?.filter(
-    (item) => item.userId === user?.id
-  );
-
-  const memberAccessibleQueues = queues.data?.filter((queue) =>
-    queue.members.some((member) => member.userId === user?.id)
-  );
-  const memberAccessibleQueueItems = memberAccessibleQueues?.flatMap(
-    (queue) => queue.AnnotationQueueItems
-  );
-
-  const annotations = api.annotation.getAll.useQuery(
-    {
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project?.id,
-      refetchOnWindowFocus: false,
-    }
-  );
-
-  const assignedQueueItemsWithTraces = assignedQueueItems?.map((item) => ({
-    ...item,
-    annotations: annotations.data?.filter(
-      (annotation) => annotation.traceId === item.traceId
-    ),
-    scoreOptions: annotations.data
-      ?.filter((annotation) => annotation.traceId === item.traceId)
-      ?.flatMap((annotation) =>
-        annotation.scoreOptions ? Object.keys(annotation.scoreOptions) : []
-      ),
-  }));
-
-  const memberAccessibleQueueItemsWithTraces = memberAccessibleQueueItems?.map(
-    (item) => {
-      const relevantAnnotations = annotations.data?.filter(
-        (annotation) => annotation.traceId === item.traceId
-      );
-
-      const queue = memberAccessibleQueues?.find(
-        (queue) => queue.id === item.annotationQueueId
-      );
-
-      return {
-        ...item,
-        annotations: relevantAnnotations,
-        members: queue?.members.map((member) => ({
-          ...member,
-          user: member.user,
-        })),
-        queueName: queue?.name,
-        scoreOptions: relevantAnnotations?.flatMap((annotation) =>
-          annotation.scoreOptions ? Object.keys(annotation.scoreOptions) : []
-        ),
-      };
-    }
-  );
-
-  const doneQueueItemsWithTraces = doneQueueItemsFiltered?.map((item) => ({
-    ...item,
-    annotations: annotations.data?.filter(
-      (annotation) => annotation.traceId === item.traceId
-    ),
-    scoreOptions: annotations.data
-      ?.filter((annotation) => annotation.traceId === item.traceId)
-      ?.flatMap((annotation) =>
-        annotation.scoreOptions ? Object.keys(annotation.scoreOptions) : []
-      ),
-  }));
-
+  // Get score options (this is still needed separately as it's used across the app)
   const scoreOptions = api.annotationScore.getAll.useQuery(
     { projectId: project?.id ?? "" },
     {
@@ -115,14 +27,46 @@ export function useAnnotationQueues() {
     }
   );
 
+  // Memoize derived data to prevent unnecessary recalculations
+  const derivedData = useMemo(() => {
+    if (!optimizedData.data) {
+      return {
+        assignedQueueItems: [],
+        memberAccessibleQueueItems: [],
+        doneQueueItems: [],
+        memberAccessibleQueues: [],
+      };
+    }
+
+    const {
+      assignedQueueItems,
+      memberAccessibleQueueItems,
+      doneQueueItems,
+      memberAccessibleQueues,
+    } = optimizedData.data;
+
+    return {
+      assignedQueueItems,
+      memberAccessibleQueueItems,
+      doneQueueItems,
+      memberAccessibleQueues,
+    };
+  }, [optimizedData.data]);
+
   return {
-    assignedQueueItems,
-    memberAccessibleQueueItems,
-    assignedQueueItemsWithTraces,
-    memberAccessibleQueueItemsWithTraces,
-    doneQueueItemsWithTraces,
-    memberAccessibleQueues,
+    // Direct data from optimized endpoint
+    assignedQueueItems: derivedData.assignedQueueItems,
+    memberAccessibleQueueItems: derivedData.memberAccessibleQueueItems,
+    doneQueueItems: derivedData.doneQueueItems,
+    memberAccessibleQueues: derivedData.memberAccessibleQueues,
+
+    // Legacy compatibility - these are now the same as the optimized versions
+    assignedQueueItemsWithTraces: derivedData.assignedQueueItems,
+    memberAccessibleQueueItemsWithTraces:
+      derivedData.memberAccessibleQueueItems,
+    doneQueueItemsWithTraces: derivedData.doneQueueItems,
+
     scoreOptions,
-    queuesLoading: queues.isLoading || queueItems.isLoading,
+    queuesLoading: optimizedData.isLoading,
   };
 }

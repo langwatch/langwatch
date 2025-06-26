@@ -6,19 +6,7 @@ import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 
 export default function Annotations() {
-  const session = useSession();
-
-  const {
-    assignedQueueItemsWithTraces,
-
-    queuesLoading,
-  } = useAnnotationQueues();
-
-  const allQueueItems = [
-    ...(assignedQueueItemsWithTraces?.filter(
-      (item) => item.userId === session.data?.user.id
-    ) ?? []),
-  ];
+  const { assignedQueueItemsWithTraces, queuesLoading } = useAnnotationQueues();
 
   return (
     <AnnotationsLayout>
@@ -29,7 +17,7 @@ export default function Annotations() {
         backgroundColor="white"
       >
         <AnnotationsTable
-          allQueueItems={allQueueItems}
+          allQueueItems={assignedQueueItemsWithTraces}
           queuesLoading={queuesLoading}
           noDataTitle="No queued annotations for you"
           noDataDescription="You have no annotations assigned to you."

@@ -143,7 +143,7 @@ export const AddAnnotationQueueDrawer = ({
       },
       {
         onSuccess: (data) => {
-          void queryClient.annotation.getQueues.invalidate();
+          void queryClient.annotation.getOptimizedAnnotationQueues.invalidate();
           void queryClient.annotation.getQueueBySlugOrId.invalidate();
           toaster.create({
             title: `Annotation Queue ${queueId ? "Updated" : "Created"}`,
