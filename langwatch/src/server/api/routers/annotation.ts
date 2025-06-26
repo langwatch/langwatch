@@ -44,6 +44,9 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
         in: traceIds,
       },
     },
+    include: {
+      user: true,
+    },
     orderBy: {
       createdAt: "desc",
     },
