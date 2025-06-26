@@ -320,8 +320,6 @@ export const annotationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
-      const userId = ctx.session.user.id;
-
       // Get user protections for all trace fetching
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
