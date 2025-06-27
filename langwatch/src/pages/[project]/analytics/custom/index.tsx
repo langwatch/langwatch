@@ -1225,6 +1225,8 @@ function GraphTypeField({
     })),
   });
 
+  const selectedValue = form.watch("graphType");
+
   return (
     <Controller
       control={form.control}
@@ -1244,17 +1246,16 @@ function GraphTypeField({
         >
           <Select.Trigger>
             <Select.ValueText>
-              {(items) => {
-                if (items.length === 0) {
-                  return <Text>Select graph type</Text>;
-                }
-                return (
+              {() =>
+                selectedValue ? (
                   <HStack gap={2}>
-                    {items[0].icon}
-                    <Text>{items[0].label}</Text>
+                    {selectedValue.icon}
+                    <Text>{selectedValue.label}</Text>
                   </HStack>
-                );
-              }}
+                ) : (
+                  <Text>Select graph type</Text>
+                )
+              }
             </Select.ValueText>
           </Select.Trigger>
           <Select.Content>
