@@ -46,6 +46,7 @@ images:
     tag: latest
     pullPolicy: IfNotPresent
 
+
 # Service configurations
 app:
   replicaCount: 1
