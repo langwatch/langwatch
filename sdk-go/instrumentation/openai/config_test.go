@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/langwatch/langwatch/sdk-go/instrumentation/openai/events"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/propagation"
@@ -34,10 +35,9 @@ func TestOptions(t *testing.T) {
 			name: "Default config",
 			opts: []Option{},
 			expectedConf: config{
-				tracerProvider: nil,
-				propagators:    nil,
-				recordInput:    false,
-				recordOutput:   false,
+				tracerProvider:      nil,
+				propagators:         nil,
+				contentRecordPolicy: nil,
 			},
 		},
 		{
@@ -55,17 +55,41 @@ func TestOptions(t *testing.T) {
 			},
 		},
 		{
-			name: "With Input Content",
-			opts: []Option{WithCaptureInput()},
+			name: "With Capture All Input",
+			opts: []Option{WithCaptureAllInput()},
 			expectedConf: config{
-				recordInput: true,
+				contentRecordPolicy: &events.RecordPolicyConfig{
+					RecordSystemInputContent: true,
+					RecordUserInputContent:   true,
+					RecordOutputContent:      false,
+				},
+			},
+		},
+		{
+			name: "With System Input Content",
+			opts: []Option{WithCaptureSystemInput()},
+			expectedConf: config{
+				contentRecordPolicy: &events.RecordPolicyConfig{
+					RecordSystemInputContent: true,
+				},
+			},
+		},
+		{
+			name: "With User Input Content",
+			opts: []Option{WithCaptureUserInput()},
+			expectedConf: config{
+				contentRecordPolicy: &events.RecordPolicyConfig{
+					RecordUserInputContent: true,
+				},
 			},
 		},
 		{
 			name: "With Output Content",
 			opts: []Option{WithCaptureOutput()},
 			expectedConf: config{
-				recordOutput: true,
+				contentRecordPolicy: &events.RecordPolicyConfig{
+					RecordOutputContent: true,
+				},
 			},
 		},
 		{
@@ -87,16 +111,20 @@ func TestOptions(t *testing.T) {
 			opts: []Option{
 				WithTracerProvider(traceProvider),
 				WithPropagators(propagators),
-				WithCaptureInput(),
+				WithCaptureSystemInput(),
+				WithCaptureUserInput(),
 				WithCaptureOutput(),
 				WithGenAISystem(semconv.GenAISystemGroq),
 			},
 			expectedConf: config{
 				tracerProvider: traceProvider,
 				propagators:    propagators,
-				recordInput:    true,
-				recordOutput:   true,
-				genAISystem:    semconv.GenAISystemGroq,
+				contentRecordPolicy: &events.RecordPolicyConfig{
+					RecordSystemInputContent: true,
+					RecordUserInputContent:   true,
+					RecordOutputContent:      true,
+				},
+				genAISystem: semconv.GenAISystemGroq,
 			},
 		},
 	}
@@ -110,8 +138,8 @@ func TestOptions(t *testing.T) {
 
 			require.Equal(t, tt.expectedConf.tracerProvider, cfg.tracerProvider)
 			require.Equal(t, tt.expectedConf.propagators, cfg.propagators)
-			assert.Equal(t, tt.expectedConf.recordInput, cfg.recordInput)
-			assert.Equal(t, tt.expectedConf.recordOutput, cfg.recordOutput)
+			assert.Equal(t, tt.expectedConf.contentRecordPolicy, cfg.contentRecordPolicy)
+			assert.Equal(t, tt.expectedConf.genAISystem, cfg.genAISystem)
 		})
 	}
 }
