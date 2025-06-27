@@ -151,6 +151,11 @@ class LangWatchTrace:
                 "params": params,
                 "metrics": metrics,
                 "evaluations": evaluations,
+                "attributes": {
+                    "metadata": json.dumps(
+                        metadata, cls=SerializableWithStringFallback
+                    ),
+                },
             }
             if not skip_root_span
             else None
