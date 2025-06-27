@@ -12,6 +12,9 @@ import { addEnvs, getS3CacheKey } from "./addEnvs";
 import { loadDatasets } from "./loadDatasets";
 import * as Sentry from "@sentry/node";
 import { invokeLambda } from "./lambda";
+import { createLogger } from "../../utils/logger";
+
+const logger = createLogger("langwatch:socketServer");
 
 const wss = new WebSocketServer({ noServer: true });
 
@@ -25,7 +28,7 @@ const handleConnection = (
       const parsedMessage: StudioClientEvent = JSON.parse(message);
       void handleClientMessage(ws, parsedMessage, projectId);
     } catch (error) {
-      console.error("Error processing message:", error);
+      logger.error({ error }, "Error processing message");
       sendErrorToClient(ws, "Invalid message format");
     }
   });
@@ -67,7 +70,7 @@ const handleClientMessage = async (
         sendErrorToClient(ws, `Unknown event type on server: ${message.type}`);
     }
   } catch (error) {
-    console.error("Error handling message:", error);
+    logger.error({ error }, "Error handling message");
     if (
       "node_id" in messageWithoutEnvs.payload &&
       messageWithoutEnvs.payload.node_id
@@ -150,10 +153,9 @@ export const studioBackendPostEvent = async ({
               return;
             }
           } catch (error) {
-            console.error(
-              "Failed to parse event:",
-              error,
-              JSON.stringify(event, undefined, 2)
+            logger.error(
+              { error, event },
+              "Failed to parse event"
             );
             const error_ = new Error(
               `Failed to parse server event, please contact support`
@@ -183,10 +185,13 @@ export const studioBackendPostEvent = async ({
       }
     }
     if (events === 0) {
-      console.error(`Studio invalid response: ${chunksBuffer}`);
+      logger.error(
+        { chunksBuffer },
+        `Studio invalid response: ${chunksBuffer}`
+      );
     }
   } catch (error) {
-    console.error("Error reading stream:", error);
+    logger.error({ error }, "Error reading stream");
     const node_id =
       "node_id" in message.payload ? message.payload.node_id : undefined;
 
