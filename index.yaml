@@ -3,6 +3,16 @@ entries:
   langwatch-helm:
   - apiVersion: v2
     appVersion: 1.0.0
+    created: "2025-06-27T22:38:05.494095393Z"
+    description: Helm chart for LangWatch application
+    digest: 40163a55b5d82c1a794190fc5ec40acf52ca8e6619c3fe02aa0472296e346f30
+    name: langwatch-helm
+    type: application
+    urls:
+    - https://github.com/langwatch/langwatch/releases/download/langwatch-helm-0.1.4/langwatch-helm-0.1.4.tgz
+    version: 0.1.4
+  - apiVersion: v2
+    appVersion: 1.0.0
     created: "2025-05-30T14:24:32.930854199Z"
     description: Helm chart for LangWatch application
     digest: 359bc977bd92ca55d3a28181b9438c0e9a1175b5f2ed87d61437806b3c1c4a0a
@@ -21,4 +31,4 @@ entries:
     urls:
     - https://github.com/langwatch/langwatch/releases/download/langwatch-helm-0.1.2/langwatch-helm-0.1.2.tgz
     version: 0.1.2
-generated: "2025-05-30T14:24:32.930861894Z"
+generated: "2025-06-27T22:38:05.494107976Z"
