@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
-import { PublicShareResourceTypes } from "@prisma/client";
+import {
+  PrismaClient,
+  PublicShareResourceTypes,
+  type AnnotationQueueItem,
+} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { slugify } from "~/utils/slugify";
@@ -14,6 +18,9 @@ import { getTracesWithSpans } from "./traces";
 import { getUserProtectionsForProject } from "../utils";
 import { createLogger } from "../../../utils/logger";
 import { TRACE_INDEX, esClient, traceIndexId } from "~/server/elasticsearch";
+import type { Protections } from "../../elasticsearch/protections";
+import type { Session } from "next-auth";
+
 const scoreOptionSchema = z.object({
   value: z
     .union([z.string(), z.array(z.string())])
@@ -28,10 +35,10 @@ const scoreOptions = z.record(z.string(), scoreOptionSchema);
 
 // Helper function to fetch and enrich queue items with traces and annotations
 const enrichQueueItemsWithTracesAndAnnotations = async (
-  ctx: any,
+  ctx: { prisma: PrismaClient; session: Session | null },
   projectId: string,
-  queueItems: any[],
-  protections: any
+  queueItems: AnnotationQueueItem[],
+  protections: Protections
 ) => {
   // Get all unique trace IDs from queue items
   const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
@@ -62,7 +69,10 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
     if (!annotationMap.has(annotation.traceId)) {
       annotationMap.set(annotation.traceId, []);
     }
-    annotationMap.get(annotation.traceId)!.push(annotation);
+    const annotationArray = annotationMap.get(annotation.traceId);
+    if (annotationArray) {
+      annotationArray.push(annotation);
+    }
   });
 
   // Enrich queue items with traces and annotations
@@ -75,6 +85,16 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
         annotation.scoreOptions ? Object.keys(annotation.scoreOptions) : []
     ),
   }));
+};
+
+// Helper function to safely get enriched items
+const getEnrichedItems = <T extends { id: string }>(
+  queueItems: T[],
+  enrichedItemMap: Map<string, any>
+) => {
+  return queueItems
+    .map((item) => enrichedItemMap.get(item.id))
+    .filter((item): item is NonNullable<typeof item> => item !== undefined);
 };
 
 export const annotationRouter = createTRPCRouter({
@@ -422,8 +442,9 @@ export const annotationRouter = createTRPCRouter({
       // Process queues and enrich with traces and annotations
       const processedQueues = queues.map((queue) => ({
         ...queue,
-        AnnotationQueueItems: queue.AnnotationQueueItems.map(
-          (item) => enrichedItemMap.get(item.id)!
+        AnnotationQueueItems: getEnrichedItems(
+          queue.AnnotationQueueItems,
+          enrichedItemMap
         ),
       }));
 
@@ -606,8 +627,9 @@ export const annotationRouter = createTRPCRouter({
       // Process queues and enrich with traces and annotations
       const processedQueues = queues.map((queue) => ({
         ...queue,
-        AnnotationQueueItems: queue.AnnotationQueueItems.map(
-          (item) => enrichedItemMap.get(item.id)!
+        AnnotationQueueItems: getEnrichedItems(
+          queue.AnnotationQueueItems,
+          enrichedItemMap
         ),
       }));
 
