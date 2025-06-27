@@ -376,14 +376,15 @@ export const AnnotationsTable = ({
                                       .map(
                                         (a: {
                                           user: { name: string | null };
-                                        }) => a.user.name
+                                        }) => a.user?.name
                                       )
                                       .filter(
                                         (
-                                          name: string,
+                                          name: string | null | undefined,
                                           index: number,
-                                          self: string[]
-                                        ) => self.indexOf(name) === index
+                                          self: (string | null | undefined)[]
+                                        ) =>
+                                          name && self.indexOf(name) === index
                                       )
                                       .map((name: string) => (
                                         <Text key={name}>{name}</Text>
@@ -402,16 +403,21 @@ export const AnnotationsTable = ({
                                             ],
                                           ]
                                         : []),
-                                      ...item.annotations.map(
-                                        (
-                                          annotation: Annotation & {
-                                            user: {
-                                              name: string | null;
-                                              id: string;
-                                            };
-                                          }
-                                        ) => [annotation.user.id, annotation]
-                                      ),
+                                      ...item.annotations
+                                        .map(
+                                          (
+                                            annotation: Annotation & {
+                                              user?: {
+                                                name: string | null;
+                                                id: string;
+                                              };
+                                            }
+                                          ) =>
+                                            annotation.user
+                                              ? [annotation.user.id, annotation]
+                                              : null
+                                        )
+                                        .filter(Boolean),
                                     ]).values() as Iterable<
                                       | {
                                           user: {
@@ -420,14 +426,14 @@ export const AnnotationsTable = ({
                                           };
                                         }
                                       | (Annotation & {
-                                          user: { name: string | null };
+                                          user?: { name: string | null };
                                         })
                                     >),
                                   ].map((item, index) => (
                                     <RandomColorAvatar
                                       key={index}
                                       size="2xs"
-                                      name={item.user.name ?? ""}
+                                      name={item.user?.name ?? ""}
                                       css={{
                                         border: "2px solid white",
                                         "&:not(:first-of-type)": {
@@ -456,7 +462,11 @@ export const AnnotationsTable = ({
 
                             <Table.Cell minWidth={350}>
                               <RedactedField field="input">
-                                <Tooltip content={item.trace?.input?.value ?? "<empty>"}>
+                                <Tooltip
+                                  content={
+                                    item.trace?.input?.value ?? "<empty>"
+                                  }
+                                >
                                   <Text
                                     lineClamp={2}
                                     maxWidth="350px"
@@ -470,7 +480,11 @@ export const AnnotationsTable = ({
                             </Table.Cell>
                             <Table.Cell minWidth={350}>
                               <RedactedField field="output">
-                                <Tooltip content={item.trace?.output?.value ?? "<empty>"}>
+                                <Tooltip
+                                  content={
+                                    item.trace?.output?.value ?? "<empty>"
+                                  }
+                                >
                                   <Text
                                     lineClamp={2}
                                     maxWidth="350px"

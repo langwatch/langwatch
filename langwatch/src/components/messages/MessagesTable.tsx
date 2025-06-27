@@ -869,21 +869,18 @@ export function MessagesTable({
           dialog.onClose();
           toaster.create({
             title: "Trace added to annotation queue",
-            description: (
-              <>
-                <Link
-                  href={`/${project?.slug}/annotations/`}
-                  textDecoration="underline"
-                >
-                  View Queues
-                </Link>
-              </>
-            ),
+            description: "Successfully added traces to annotation queue",
             type: "success",
             meta: {
               closable: true,
             },
             placement: "top-end",
+            action: {
+              label: "View Queues",
+              onClick: () => {
+                void router.push(`/${project?.slug}/annotations/`);
+              },
+            },
           });
         },
       }

@@ -474,6 +474,7 @@ model Annotation {
     @@index([projectId])
     @@index([traceId])
     @@index([userId])
+    @@index([projectId, traceId])
 }
 
 model ModelProvider {
@@ -553,6 +554,7 @@ model AnnotationQueue {
     AnnotationQueueItems  AnnotationQueueItem[]
 
     @@unique([projectId, slug])
+    @@index([projectId])
 }
 
 model AnnotationQueueMembers {
@@ -597,6 +599,9 @@ model AnnotationQueueItem {
     @@index([annotationQueueId])
     @@index([userId])
     @@index([projectId])
+    @@index([projectId, doneAt])
+    @@index([projectId, userId, doneAt])
+    @@index([annotationQueueId, doneAt])
 }
 
 model PublicShare {
