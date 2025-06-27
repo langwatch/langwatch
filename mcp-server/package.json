@@ -43,7 +43,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.7.0",
     "date-fns": "^4.1.0",
-    "langwatch": "^0.1.6",
+    "langwatch": "^0.2.0",
     "yargs": "^17.7.2",
     "zod": "^3.22.4",
     "zod-validation-error": "^3.3.0"
