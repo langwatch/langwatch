@@ -48,6 +48,7 @@ export function TraceDetails(props: {
   const { project, hasTeamPermission } = useOrganizationTeamProject();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const router = useRouter();
+  const queryClient = api.useContext();
 
   const canViewMessages = true;
 
@@ -144,7 +145,12 @@ export function TraceDetails(props: {
         annotators: annotators.map((p) => p.id),
       },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
+          // Invalidate count queries to update sidebar counts
+          await queryClient.annotation.getPendingItemsCount.invalidate();
+          await queryClient.annotation.getAssignedItemsCount.invalidate();
+          await queryClient.annotation.getQueueItemsCounts.invalidate();
+
           setOpen(false);
           toaster.create({
             title: "Trace added to annotation queue",

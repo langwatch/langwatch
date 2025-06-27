@@ -28,9 +28,12 @@ import { NoDataInfoBlock } from "../NoDataInfoBlock";
 import { RandomColorAvatar } from "../RandomColorAvatar";
 import { RedactedField } from "../ui/RedactedField";
 
+import {
+  MessagesNavigationFooter,
+  useMessagesNavigationFooter,
+} from "../messages/MessagesNavigationFooter";
+
 export const AnnotationsTable = ({
-  allQueueItems,
-  queuesLoading,
   isDone,
   noDataTitle,
   noDataDescription,
@@ -38,8 +41,6 @@ export const AnnotationsTable = ({
   tableHeader,
   queueId,
 }: {
-  allQueueItems: any[];
-  queuesLoading: boolean;
   isDone?: boolean;
   noDataTitle?: string;
   noDataDescription?: string;
@@ -51,6 +52,42 @@ export const AnnotationsTable = ({
   const { project } = useOrganizationTeamProject();
   const { scoreOptions } = useAnnotationQueues();
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
+
+  const navigationFooter = useMessagesNavigationFooter();
+
+  const [selectedAnnotations, setSelectedAnnotations] =
+    useState<string>("pending");
+
+  console.log(navigationFooter.pageSize);
+
+  const {
+    assignedQueueItemsWithTraces,
+    memberAccessibleQueueItemsWithTraces,
+    queuesLoading,
+  } = useAnnotationQueues(
+    selectedAnnotations,
+    navigationFooter.pageSize,
+    navigationFooter.pageOffset,
+    queueId
+  );
+
+  // const allQueueItems = [
+  //   ...(assignedQueueItemsWithTraces ?? []),
+  //   ...(memberAccessibleQueueItemsWithTraces ?? []),
+  // ];
+
+  const allQueueItems = queueId
+    ? memberAccessibleQueueItemsWithTraces
+    : assignedQueueItemsWithTraces;
+
+  console.log("allQueueItems", allQueueItems);
+  console.log("navigationFooter.pageSize", navigationFooter.pageSize);
+  console.log("navigationFooter.pageOffset", navigationFooter.pageOffset);
+  console.log("assignedQueueItemsWithTraces", assignedQueueItemsWithTraces);
+  console.log(
+    "memberAccessibleQueueItemsWithTraces",
+    memberAccessibleQueueItemsWithTraces
+  );
 
   const openAnnotationQueue = (queueItemId: string) => {
     void router.push(
@@ -91,10 +128,6 @@ export const AnnotationsTable = ({
       reason?: string | null;
     }
   >;
-
-  const [selectedAnnotations, setSelectedAnnotations] = useState<string[]>([
-    "pending",
-  ]);
 
   const annotationScoreValues = (
     annotations: Record<string, ScoreOption>[],
@@ -147,18 +180,21 @@ export const AnnotationsTable = ({
     });
   };
 
-  const queueItemsFiltered = allQueueItems.filter((item) => {
-    if (selectedAnnotations.includes("all")) {
-      return true;
-    }
-    if (selectedAnnotations.includes("completed")) {
-      return item.doneAt;
-    }
-    if (selectedAnnotations.includes("pending")) {
-      return !item.doneAt;
-    }
-    return true;
-  });
+  const queueItemsFiltered = queueId
+    ? allQueueItems.filter((item) => item.annotationQueueId === queueId)
+    : allQueueItems.filter((item) => {
+        if (selectedAnnotations.includes("all")) {
+          return true;
+        }
+        if (selectedAnnotations.includes("completed")) {
+          return item.doneAt;
+        }
+        if (selectedAnnotations.includes("pending")) {
+          return !item.doneAt;
+        }
+
+        return true;
+      });
 
   const hasExpectedOutput = () => {
     return queueItemsFiltered.some((item) =>
@@ -190,7 +226,13 @@ export const AnnotationsTable = ({
 
   if (queuesLoading) {
     return (
-      <VStack align="start" marginTop={4} width="full" padding={6}>
+      <VStack
+        align="start"
+        marginTop={4}
+        width="full"
+        padding={6}
+        maxHeight="100%"
+      >
         <HStack width="full" paddingBottom={4} alignItems="flex-end">
           <Skeleton height="32px" width="200px" />
           <Spacer />
@@ -252,14 +294,15 @@ export const AnnotationsTable = ({
               <Menu.Content>
                 <RadioGroup
                   defaultValue="pending"
+                  value={selectedAnnotations}
                   onValueChange={(change) =>
-                    setSelectedAnnotations([change.value])
+                    setSelectedAnnotations(change.value)
                   }
                 >
                   <VStack align="start" padding={3} gap={3}>
                     <Radio value="pending">Pending</Radio>
                     <Radio value="completed">Completed</Radio>
-                    <Radio value="all">All Annotations</Radio>
+                    <Radio value="all">All</Radio>
                   </VStack>
                 </RadioGroup>
               </Menu.Content>
@@ -569,6 +612,14 @@ export const AnnotationsTable = ({
             )}
           </Box>
         </HStack>
+        <MessagesNavigationFooter
+          totalHits={queueItemsFiltered.length}
+          pageOffset={navigationFooter.pageOffset}
+          pageSize={navigationFooter.pageSize}
+          nextPage={navigationFooter.nextPage}
+          prevPage={navigationFooter.prevPage}
+          changePageSize={navigationFooter.changePageSize}
+        />
       </VStack>
     );
   }

@@ -65,6 +65,7 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
   // Create lookup maps for O(1) access
   const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
   const annotationMap = new Map<string, any[]>();
+
   annotations.forEach((annotation: any) => {
     if (!annotationMap.has(annotation.traceId)) {
       annotationMap.set(annotation.traceId, []);
@@ -510,6 +511,62 @@ export const annotationRouter = createTRPCRouter({
         },
       });
     }),
+  getAssignedItemsCount: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.annotationQueueItem.count({
+        where: {
+          projectId: input.projectId,
+          doneAt: null,
+          userId: ctx.session.user.id,
+        },
+      });
+    }),
+  getQueueItemsCounts: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+
+      // Get queues where user is a member
+      const memberQueues = await ctx.prisma.annotationQueue.findMany({
+        where: {
+          projectId: input.projectId,
+          members: {
+            some: {
+              userId: userId,
+            },
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
+      });
+
+      // Get counts for each queue
+      const queueCounts = await Promise.all(
+        memberQueues.map(async (queue) => {
+          const count = await ctx.prisma.annotationQueueItem.count({
+            where: {
+              projectId: input.projectId,
+              annotationQueueId: queue.id,
+              doneAt: null,
+            },
+          });
+          return {
+            id: queue.id,
+            name: queue.name,
+            slug: queue.slug,
+            pendingCount: count,
+          };
+        })
+      );
+
+      return queueCounts;
+    }),
   createQueueItem: protectedProcedure
     .input(
       z.object({
@@ -570,7 +627,15 @@ export const annotationRouter = createTRPCRouter({
       });
     }),
   getOptimizedAnnotationQueues: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        selectedAnnotations: z.string(),
+        pageSize: z.number(),
+        pageOffset: z.number(),
+        queueId: z.string().optional(),
+      })
+    )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
@@ -580,9 +645,62 @@ export const annotationRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      // Get all queues with their items and members in a single query
+      console.log(input.pageSize, input.pageOffset, input.queueId);
+
+      // Get paginated queue items first
+      const queueItems = await ctx.prisma.annotationQueueItem.findMany({
+        where: {
+          projectId: input.projectId,
+          //   annotationQueueId: input.queueId ?? "",
+          //userId: input.queueId ? undefined : userId,
+          doneAt:
+            input.selectedAnnotations === "pending"
+              ? null
+              : input.selectedAnnotations === "completed"
+              ? { not: null }
+              : undefined,
+        },
+        take: input.pageSize,
+        skip: input.pageOffset,
+        include: {
+          user: true,
+          annotationQueue: {
+            include: {
+              members: {
+                include: {
+                  user: true,
+                },
+              },
+              AnnotationQueueScores: {
+                include: {
+                  annotationScore: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      console.log("length", queueItems.length);
+
+      // Get unique queue IDs from the items
+      const queueIds = [
+        ...new Set(
+          queueItems
+            .map((item) => item.annotationQueueId)
+            .filter((id): id is string => id !== null)
+        ),
+      ];
+
+      // Get the full queue data for these queues
       const queues = await ctx.prisma.annotationQueue.findMany({
-        where: { projectId: input.projectId },
+        where: {
+          id: { in: queueIds },
+          projectId: input.projectId,
+        },
         include: {
           members: {
             include: {
@@ -606,16 +724,11 @@ export const annotationRouter = createTRPCRouter({
         },
       });
 
-      // Get all queue items from all queues
-      const allQueueItems = queues.flatMap(
-        (queue) => queue.AnnotationQueueItems
-      );
-
-      // Enrich queue items with traces and annotations
+      // Enrich the paginated queue items with traces and annotations
       const enrichedQueueItems = await enrichQueueItemsWithTracesAndAnnotations(
         ctx,
         input.projectId,
-        allQueueItems,
+        queueItems,
         protections
       );
 
@@ -699,11 +812,13 @@ export const annotationRouter = createTRPCRouter({
         });
 
       return {
-        assignedQueueItems: enrichedAssignedQueueItems,
+        assignedQueueItems: enrichedQueueItems,
         memberAccessibleQueueItems,
         doneQueueItems,
         memberAccessibleQueues,
         queues: processedQueues,
+        // // Add the paginated items as the main result
+        // paginatedQueueItems: enrichedQueueItems,
       };
     }),
 });

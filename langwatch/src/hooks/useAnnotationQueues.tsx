@@ -3,7 +3,12 @@ import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 import { useRequiredSession } from "./useRequiredSession";
 import { useMemo } from "react";
 
-export function useAnnotationQueues() {
+export function useAnnotationQueues(
+  selectedAnnotations?: string,
+  pageSize?: number,
+  pageOffset?: number,
+  queueId?: string
+) {
   const { project } = useOrganizationTeamProject();
   const { data: session } = useRequiredSession();
   const user = session?.user;
@@ -12,12 +17,18 @@ export function useAnnotationQueues() {
   const optimizedData = api.annotation.getOptimizedAnnotationQueues.useQuery(
     {
       projectId: project?.id ?? "",
+      selectedAnnotations: selectedAnnotations ?? "pending",
+      pageSize: pageSize ?? 25,
+      pageOffset: pageOffset ?? 0,
+      queueId: queueId ?? "",
     },
     {
       enabled: !!project,
       refetchOnWindowFocus: false,
     }
   );
+
+  console.log("optimizedData", optimizedData.data);
 
   // Get score options (this is still needed separately as it's used across the app)
   const scoreOptions = api.annotationScore.getAll.useQuery(

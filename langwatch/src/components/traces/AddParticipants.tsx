@@ -40,12 +40,17 @@ export const AddParticipants = ({
 }) => {
   const { organization, project } = useOrganizationTeamProject();
 
-  const annotationQueues = api.annotation.getOptimizedAnnotationQueues.useQuery(
-    { projectId: project?.id ?? "" },
-    {
-      enabled: !!project,
-    }
-  );
+  // const annotationQueues = api.annotation.getOptimizedAnnotationQueues.useQuery(
+  //   {
+  //     projectId: project?.id ?? "",
+  //     pageSize: 10,
+  //     pageOffset: 0,
+  //     selectedAnnotations: "pending",
+  //   },
+  //   {
+  //     enabled: !!project,
+  //   }
+  // );
 
   const selectedValues = annotators.map((a) => a.id);
 
