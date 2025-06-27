@@ -73,6 +73,7 @@ app:
     NEXTAUTH_URL: "http://localhost:5560"
     NEXTAUTH_SECRET: "" # Users must provide this values
     API_TOKEN_JWT_SECRET: "" # Users must provide this values
+    CRON_API_KEY: "" # Users must provide this value for cronjob authentication
     # SENDGRID_API_KEY: ""  # Optional
 
 langwatch_nlp:
@@ -180,6 +181,39 @@ opensearch:
     nofile:
       soft: 65536
       hard: 65536
+
+# CronJobs configuration
+cronjobs:
+  enabled: true
+  # Global cronjob configuration
+  image:
+    repository: curlimages/curl
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+  # Individual cronjob configurations
+  jobs:
+    topicClustering:
+      enabled: true
+      schedule: "0 0 * * *"  # At midnight every day
+      endpoint: "/api/cron/schedule_topic_clustering"
+
+    alertTriggers:
+      enabled: true
+      schedule: "*/3 * * * *"  # Every 3 minutes
+      endpoint: "/api/cron/triggers"
+
+    tracesRetentionCleanup:
+      enabled: true
+      schedule: "0 1 * * *"  # At 1 AM every day
+      endpoint: "/api/cron/traces_retention_period_cleanup"
 
 # Ingress configuration
 ingress:
