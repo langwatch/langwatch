@@ -19,6 +19,14 @@ spec:
         app.kubernetes.io/name: {{ .Release.Name }}-postgres
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      # Init container to clean up lost+found directory that prevents PostgreSQL initialization
+      initContainers:
+        - name: cleanup-lost-found
+          image: busybox
+          command: ['sh', '-c', 'rm -rf /var/lib/postgresql/data/lost+found']
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
       containers:
         - name: {{ .Chart.Name }}-postgres
           image: "{{ .Values.images.postgres.repository }}:{{ .Values.images.postgres.tag }}"

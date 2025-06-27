@@ -19,6 +19,13 @@ spec:
         app.kubernetes.io/name: {{ .Release.Name }}-redis
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      initContainers:
+          - name: cleanup-lost-found
+            image: busybox
+            command: ['sh', '-c', 'rm -rf /data/lost+found']
+            volumeMounts:
+              - name: data
+                mountPath: /data
       containers:
         - name: {{ .Chart.Name }}-redis
           image: "{{ .Values.images.redis.repository }}:{{ .Values.images.redis.tag }}"
