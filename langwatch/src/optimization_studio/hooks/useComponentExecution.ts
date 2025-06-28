@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { useSocketClient } from "./useSocketClient";
 import { useWorkflowStore } from "./useWorkflowStore";
 import type { StudioClientEvent } from "../types/events";
 import type { Node } from "@xyflow/react";
@@ -7,9 +6,10 @@ import type { BaseComponent, Component, Field } from "../types/dsl";
 import { nanoid } from "nanoid";
 import { toaster } from "../../components/ui/toaster";
 import { useAlertOnComponent } from "./useAlertOnComponent";
+import { usePostEvent } from "./usePostEvent";
 
 export const useComponentExecution = () => {
-  const { sendMessage, socketStatus } = useSocketClient();
+  const { postEvent, socketStatus } = usePostEvent();
 
   const [triggerTimeout, setTriggerTimeout] = useState<{
     component_id: string;
@@ -110,7 +110,7 @@ export const useComponentExecution = () => {
         },
       };
 
-      sendMessage(payload);
+      postEvent(payload);
 
       setTimeout(() => {
         setTriggerTimeout({
@@ -124,7 +124,7 @@ export const useComponentExecution = () => {
       socketAvailable,
       setComponentExecutionState,
       getWorkflow,
-      sendMessage,
+      postEvent,
       setSelectedNode,
       setPropertiesExpanded,
       setTriggerValidation,
@@ -157,7 +157,7 @@ export const useComponentExecution = () => {
         type: "stop_execution",
         payload: { trace_id, node_id },
       };
-      sendMessage(payload);
+      postEvent(payload);
 
       setTimeout(() => {
         setTriggerTimeout({
@@ -167,7 +167,7 @@ export const useComponentExecution = () => {
         });
       }, 2_000);
     },
-    [socketAvailable, sendMessage, setComponentExecutionState]
+    [socketAvailable, postEvent, setComponentExecutionState]
   );
 
   return {

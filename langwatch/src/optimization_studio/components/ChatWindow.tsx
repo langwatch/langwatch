@@ -17,11 +17,11 @@ import { InputGroup } from "~/components/ui/input-group";
 import { Tooltip } from "~/components/ui/tooltip";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useSocketClient } from "../hooks/useSocketClient";
 import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { getEntryInputs } from "../utils/nodeUtils";
 import { RunningStatus } from "./ExecutionState";
+import { usePostEvent } from "../hooks/usePostEvent";
 
 interface ChatWindowProps {
   open: boolean;
@@ -42,7 +42,7 @@ export const PlaygroundButton = ({
   edges: Edge[];
   executionStatus: string;
 }) => {
-  const { socketStatus } = useSocketClient();
+  const { socketStatus } = usePostEvent();
   const isDisabled = socketStatus !== "connected";
   const { playgroundOpen, setPlaygroundOpen } = useWorkflowStore((state) => ({
     playgroundOpen: state.playgroundOpen,
