@@ -161,7 +161,7 @@ opensearch:
   env:
     discovery.type: single-node
     DISABLE_SECURITY_PLUGIN: "true"
-    _JAVA_OPTIONS: "-XX:UseSVE=0"
+    # _JAVA_OPTIONS: "-XX:UseSVE=0"
     OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m -XX:+UseG1GC -XX:-UseSerialGC -XX:G1ReservePercent=25 -XX:+AlwaysPreTouch -XX:InitiatingHeapOccupancyPercent=30"
     cluster.routing.allocation.disk.threshold_enabled: "false"
     bootstrap.memory_lock: "false"
