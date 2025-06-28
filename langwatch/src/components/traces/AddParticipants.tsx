@@ -40,17 +40,14 @@ export const AddParticipants = ({
 }) => {
   const { organization, project } = useOrganizationTeamProject();
 
-  // const annotationQueues = api.annotation.getOptimizedAnnotationQueues.useQuery(
-  //   {
-  //     projectId: project?.id ?? "",
-  //     pageSize: 10,
-  //     pageOffset: 0,
-  //     selectedAnnotations: "pending",
-  //   },
-  //   {
-  //     enabled: !!project,
-  //   }
-  // );
+  const annotationQueues = api.annotation.getQueues.useQuery(
+    {
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project,
+    }
+  );
 
   const selectedValues = annotators.map((a) => a.id);
 
@@ -69,7 +66,7 @@ export const AddParticipants = ({
     value: `user-${member.user.id}`,
   }));
 
-  const queueOptions = annotationQueues.data?.queues?.map((queue) => ({
+  const queueOptions = annotationQueues.data?.map((queue) => ({
     label: queue.name ?? "",
     value: `queue-${queue.id}`,
   }));

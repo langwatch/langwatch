@@ -15,20 +15,15 @@ import { Conversation } from "../../../components/messages/Conversation";
 export default function TraceAnnotations() {
   const router = useRouter();
   const { "queue-item": queueItem } = router.query;
-  const {
-    assignedQueueItemsWithTraces,
-    memberAccessibleQueueItemsWithTraces,
-    queuesLoading,
-  } = useAnnotationQueues();
+  const { assignedQueueItems, queuesLoading } = useAnnotationQueues({
+    showQueueAndUser: true,
+  });
   const { project } = useOrganizationTeamProject();
 
   const allQueueItems = useMemo(() => {
-    const items = [
-      ...(assignedQueueItemsWithTraces ?? []),
-      ...(memberAccessibleQueueItemsWithTraces ?? []),
-    ];
+    const items = [...(assignedQueueItems ?? [])];
     return items.filter((item) => !item.doneAt);
-  }, [assignedQueueItemsWithTraces, memberAccessibleQueueItemsWithTraces]);
+  }, [assignedQueueItems]);
 
   let currentQueueItem = allQueueItems
     .filter((item) => !item.doneAt)

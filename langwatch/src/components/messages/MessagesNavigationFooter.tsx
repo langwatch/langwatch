@@ -12,22 +12,34 @@ export const useMessagesNavigationFooter = () => {
   const router = useRouter();
 
   const [totalHits, setTotalHits] = useState<number>(0);
-  const [pageOffset, setPageOffset] = useState<number>(0);
-  const [pageSize, setPageSize] = useState<number>(25);
+
+  // Get pagination from URL parameters with defaults
+  const pageOffset = parseInt(router.query.pageOffset as string) || 0;
+  const pageSize = parseInt(router.query.pageSize as string) || 25;
 
   const nextPage = () => {
-    setPageOffset(pageOffset + pageSize);
+    const newOffset = pageOffset + pageSize;
+    void router.push({
+      pathname: router.pathname,
+      query: { ...router.query, pageOffset: newOffset.toString() },
+    });
   };
 
   const prevPage = () => {
     if (pageOffset > 0) {
-      setPageOffset(pageOffset - pageSize);
+      const newOffset = pageOffset - pageSize;
+      void router.push({
+        pathname: router.pathname,
+        query: { ...router.query, pageOffset: newOffset.toString() },
+      });
     }
   };
 
   const changePageSize = (size: number) => {
-    setPageSize(size);
-    setPageOffset(0);
+    void router.push({
+      pathname: router.pathname,
+      query: { ...router.query, pageSize: size.toString(), pageOffset: "0" },
+    });
   };
 
   const useUpdateTotalHits = (
@@ -46,7 +58,10 @@ export const useMessagesNavigationFooter = () => {
   };
 
   useEffect(() => {
-    setPageOffset(0);
+    void router.push({
+      pathname: router.pathname,
+      query: { ...router.query, pageOffset: "0", pageSize: "25" },
+    });
   }, [router.query.query]);
 
   return {
@@ -87,6 +102,7 @@ export function MessagesNavigationFooter({
               onChange={(e) => changePageSize(parseInt(e.target.value))}
               borderColor="black"
               borderRadius="lg"
+              value={pageSize.toString()}
             >
               <option value="10">10</option>
               <option value="25">25</option>

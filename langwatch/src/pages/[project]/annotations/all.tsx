@@ -129,6 +129,7 @@ export default function Annotations() {
       }, {})
     );
   };
+  console.log("annotations.data", annotations.data);
 
   const groupedAnnotations = groupByTraceId(annotations.data ?? []);
 
@@ -208,12 +209,12 @@ export default function Annotations() {
         backgroundColor="white"
       >
         <AnnotationsTable
-          allQueueItems={groupedAnnotations}
-          queuesLoading={annotations.isLoading}
+          groupedAnnotations={groupedAnnotations as unknown as Annotation[]}
+          allAnnotationsLoading={annotations.isLoading || traces.isLoading}
           heading="Annotations"
           isDone={true}
           tableHeader={tableHeader}
-          noDataTitle="No annotations yet"
+          noDataTitle="No recent annotations yet, change the date range to see more or annotate your messages"
           noDataDescription="Annotate your messages to add more context and improve your analysis."
         />
       </Container>

@@ -40,6 +40,9 @@ export const AnnotationsTable = ({
   heading,
   tableHeader,
   queueId,
+  showQueueAndUser,
+  groupedAnnotations,
+  allAnnotationsLoading,
 }: {
   isDone?: boolean;
   noDataTitle?: string;
@@ -47,47 +50,33 @@ export const AnnotationsTable = ({
   heading?: string;
   tableHeader?: React.ReactNode;
   queueId?: string;
+  showQueueAndUser?: boolean;
+  groupedAnnotations?: Annotation[];
+  allAnnotationsLoading?: boolean;
 }) => {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const { scoreOptions } = useAnnotationQueues();
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
 
+  console.log("scoreOptions", scoreOptions.data);
+
   const navigationFooter = useMessagesNavigationFooter();
 
   const [selectedAnnotations, setSelectedAnnotations] =
     useState<string>("pending");
 
-  console.log(navigationFooter.pageSize);
-
-  const {
-    assignedQueueItemsWithTraces,
-    memberAccessibleQueueItemsWithTraces,
-    queuesLoading,
-  } = useAnnotationQueues(
-    selectedAnnotations,
-    navigationFooter.pageSize,
-    navigationFooter.pageOffset,
-    queueId
+  const { assignedQueueItems, queuesLoading, totalCount } = useAnnotationQueues(
+    {
+      selectedAnnotations,
+      queueId,
+      showQueueAndUser,
+    }
   );
 
-  // const allQueueItems = [
-  //   ...(assignedQueueItemsWithTraces ?? []),
-  //   ...(memberAccessibleQueueItemsWithTraces ?? []),
-  // ];
-
-  const allQueueItems = queueId
-    ? memberAccessibleQueueItemsWithTraces
-    : assignedQueueItemsWithTraces;
-
-  console.log("allQueueItems", allQueueItems);
-  console.log("navigationFooter.pageSize", navigationFooter.pageSize);
-  console.log("navigationFooter.pageOffset", navigationFooter.pageOffset);
-  console.log("assignedQueueItemsWithTraces", assignedQueueItemsWithTraces);
-  console.log(
-    "memberAccessibleQueueItemsWithTraces",
-    memberAccessibleQueueItemsWithTraces
-  );
+  const allQueueItems = groupedAnnotations
+    ? groupedAnnotations
+    : assignedQueueItems;
 
   const openAnnotationQueue = (queueItemId: string) => {
     void router.push(
@@ -180,33 +169,23 @@ export const AnnotationsTable = ({
     });
   };
 
-  const queueItemsFiltered = queueId
-    ? allQueueItems.filter((item) => item.annotationQueueId === queueId)
-    : allQueueItems.filter((item) => {
-        if (selectedAnnotations.includes("all")) {
-          return true;
-        }
-        if (selectedAnnotations.includes("completed")) {
-          return item.doneAt;
-        }
-        if (selectedAnnotations.includes("pending")) {
-          return !item.doneAt;
-        }
-
-        return true;
-      });
-
   const hasExpectedOutput = () => {
-    return queueItemsFiltered.some((item) =>
-      item.annotations.some(
-        (annotation: Annotation) => annotation.expectedOutput
-      )
+    if (groupedAnnotations) {
+      return groupedAnnotations.some((annotation) => annotation.expectedOutput);
+    }
+    return allQueueItems.some(
+      (item: any) =>
+        item.annotations?.some((annotation: any) => annotation.expectedOutput)
     );
   };
 
   const hasComments = () => {
-    return queueItemsFiltered.some((item) =>
-      item.annotations.some((annotation: Annotation) => annotation.comment)
+    if (groupedAnnotations?.some((annotation) => annotation.comment)) {
+      return true;
+    }
+    return allQueueItems.some(
+      (item: any) =>
+        item.annotations?.some((annotation: any) => annotation.comment)
     );
   };
 
@@ -215,16 +194,40 @@ export const AnnotationsTable = ({
       return false;
     }
 
-    return queueItemsFiltered.some((item) =>
-      item.annotations.some(
-        (annotation: Annotation) =>
+    // Check if there are any active score options
+    const activeScoreOptions = scoreOptions.data.filter(
+      (option) => option.active === true
+    );
+    if (activeScoreOptions.length > 0) {
+      return true;
+    }
+
+    if (activeScoreOptions.length === 0) {
+      return false;
+    }
+
+    if (groupedAnnotations) {
+      const hasOptions = groupedAnnotations.some((annotation) => {
+        return (
           annotation.scoreOptions &&
           Object.keys(annotation.scoreOptions).length > 0
-      )
-    );
+        );
+      });
+      return hasOptions;
+    }
+
+    const hasOptions = allQueueItems.some((item: any) => {
+      return item.annotations?.some((annotation: any) => {
+        return (
+          annotation.scoreOptions &&
+          Object.keys(annotation.scoreOptions).length > 0
+        );
+      });
+    });
+    return hasOptions;
   };
 
-  if (queuesLoading) {
+  if (queuesLoading || allAnnotationsLoading) {
     return (
       <VStack
         align="start"
@@ -268,6 +271,7 @@ export const AnnotationsTable = ({
       </VStack>
     );
   } else {
+    console.log("loading", hasScoreOptions());
     return (
       <VStack align="start" marginTop={4} width="full">
         <HStack
@@ -388,8 +392,8 @@ export const AnnotationsTable = ({
                           ))}
                         </Table.Row>
                       ))
-                    ) : queueItemsFiltered.length > 0 ? (
-                      queueItemsFiltered.map((item) => {
+                    ) : allQueueItems.length > 0 ? (
+                      allQueueItems.map((item: any) => {
                         return (
                           <Table.Row
                             cursor="pointer"
@@ -613,7 +617,7 @@ export const AnnotationsTable = ({
           </Box>
         </HStack>
         <MessagesNavigationFooter
-          totalHits={queueItemsFiltered.length}
+          totalHits={totalCount}
           pageOffset={navigationFooter.pageOffset}
           pageSize={navigationFooter.pageSize}
           nextPage={navigationFooter.nextPage}

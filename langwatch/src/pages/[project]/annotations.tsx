@@ -8,6 +8,7 @@ export default function Annotations() {
     <AnnotationsLayout>
       <Box backgroundColor="white" width="full" overflowX="auto">
         <AnnotationsTable
+          showQueueAndUser={true}
           heading="Inbox"
           noDataTitle="Your inbox is empty"
           noDataDescription="Send messages to your annotation queue to get started."

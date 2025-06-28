@@ -1,17 +1,28 @@
+import { useRouter } from "next/router";
 import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 import { useRequiredSession } from "./useRequiredSession";
 import { useMemo } from "react";
 
 export function useAnnotationQueues(
-  selectedAnnotations?: string,
-  pageSize?: number,
-  pageOffset?: number,
-  queueId?: string
+  {
+    selectedAnnotations,
+    queueId,
+    showQueueAndUser,
+  }: {
+    selectedAnnotations?: string;
+    queueId?: string;
+    showQueueAndUser?: boolean;
+  } = {
+    selectedAnnotations: "pending",
+    showQueueAndUser: false,
+  }
 ) {
   const { project } = useOrganizationTeamProject();
-  const { data: session } = useRequiredSession();
-  const user = session?.user;
+
+  const router = useRouter();
+  const pageOffset = parseInt(router.query.pageOffset as string) || 0;
+  const pageSize = parseInt(router.query.pageSize as string) || 25;
 
   // Use the new optimized endpoint that consolidates all data fetching
   const optimizedData = api.annotation.getOptimizedAnnotationQueues.useQuery(
@@ -21,14 +32,13 @@ export function useAnnotationQueues(
       pageSize: pageSize ?? 25,
       pageOffset: pageOffset ?? 0,
       queueId: queueId ?? "",
+      showQueueAndUser: showQueueAndUser ?? false,
     },
     {
       enabled: !!project,
       refetchOnWindowFocus: false,
     }
   );
-
-  console.log("optimizedData", optimizedData.data);
 
   // Get score options (this is still needed separately as it's used across the app)
   const scoreOptions = api.annotationScore.getAll.useQuery(
@@ -43,40 +53,22 @@ export function useAnnotationQueues(
     if (!optimizedData.data) {
       return {
         assignedQueueItems: [],
-        memberAccessibleQueueItems: [],
-        doneQueueItems: [],
-        memberAccessibleQueues: [],
+        totalCount: 0,
       };
     }
 
-    const {
-      assignedQueueItems,
-      memberAccessibleQueueItems,
-      doneQueueItems,
-      memberAccessibleQueues,
-    } = optimizedData.data;
+    const { assignedQueueItems, totalCount } = optimizedData.data;
 
     return {
       assignedQueueItems,
-      memberAccessibleQueueItems,
-      doneQueueItems,
-      memberAccessibleQueues,
+      totalCount,
     };
   }, [optimizedData.data]);
 
   return {
     // Direct data from optimized endpoint
     assignedQueueItems: derivedData.assignedQueueItems,
-    memberAccessibleQueueItems: derivedData.memberAccessibleQueueItems,
-    doneQueueItems: derivedData.doneQueueItems,
-    memberAccessibleQueues: derivedData.memberAccessibleQueues,
-
-    // Legacy compatibility - these are now the same as the optimized versions
-    assignedQueueItemsWithTraces: derivedData.assignedQueueItems,
-    memberAccessibleQueueItemsWithTraces:
-      derivedData.memberAccessibleQueueItems,
-    doneQueueItemsWithTraces: derivedData.doneQueueItems,
-
+    totalCount: derivedData.totalCount,
     scoreOptions,
     queuesLoading: optimizedData.isLoading,
   };

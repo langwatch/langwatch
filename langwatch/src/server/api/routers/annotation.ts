@@ -413,6 +413,7 @@ export const annotationRouter = createTRPCRouter({
           AnnotationQueueItems: {
             include: {
               user: true,
+              createdByUser: true,
               annotationQueue: true,
             },
           },
@@ -458,12 +459,13 @@ export const annotationRouter = createTRPCRouter({
       const queueItems = await ctx.prisma.annotationQueueItem.findMany({
         where: { projectId: input.projectId },
         include: {
+          user: true,
+          createdByUser: true,
           annotationQueue: {
             include: {
               members: true,
             },
           },
-          createdByUser: true,
         },
         orderBy: {
           createdAt: "desc",
@@ -634,36 +636,88 @@ export const annotationRouter = createTRPCRouter({
         pageSize: z.number(),
         pageOffset: z.number(),
         queueId: z.string().optional(),
+        showQueueAndUser: z.boolean().optional(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
-      const userId = ctx.session.user.id;
+      let userId = ctx.session.user.id;
+      let userQueueIds: string[] = [];
+
+      if (input.queueId) {
+        userId = "";
+      } else if (input.showQueueAndUser) {
+        const queues = await ctx.prisma.annotationQueue.findMany({
+          where: {
+            projectId: input.projectId,
+            members: {
+              some: {
+                userId: userId,
+              },
+            },
+          },
+        });
+        userQueueIds = queues.map((queue) => queue.id);
+      }
 
       // Get user protections for all trace fetching
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
       });
 
-      console.log(input.pageSize, input.pageOffset, input.queueId);
+      // Build the where condition based on the scenario
+      let whereCondition: any = {
+        projectId: input.projectId,
+        doneAt:
+          input.selectedAnnotations === "pending"
+            ? null
+            : input.selectedAnnotations === "completed"
+            ? { not: null }
+            : undefined,
+      };
+
+      if (input.queueId) {
+        // Specific queue selected
+        whereCondition.OR = [
+          {
+            annotationQueueId: input.queueId,
+          },
+          {
+            userId: userId,
+          },
+        ];
+      } else if (userQueueIds.length > 0) {
+        // All annotations - check if annotationQueueId is in user's queue IDs
+        whereCondition.OR = [
+          {
+            annotationQueueId: {
+              in: userQueueIds,
+            },
+          },
+          {
+            userId: userId,
+          },
+        ];
+      } else {
+        // Default case - just user's items
+        console.log("userId", userId);
+        whereCondition.userId = userId;
+      }
+
+      // Get total count for pagination
+      const totalCount = await ctx.prisma.annotationQueueItem.count({
+        where: whereCondition,
+      });
 
       // Get paginated queue items first
       const queueItems = await ctx.prisma.annotationQueueItem.findMany({
-        where: {
-          projectId: input.projectId,
-          //   annotationQueueId: input.queueId ?? "",
-          //userId: input.queueId ? undefined : userId,
-          doneAt:
-            input.selectedAnnotations === "pending"
-              ? null
-              : input.selectedAnnotations === "completed"
-              ? { not: null }
-              : undefined,
-        },
+        where: whereCondition,
         take: input.pageSize,
         skip: input.pageOffset,
         include: {
           user: true,
+          createdByUser: true,
+
           annotationQueue: {
             include: {
               members: {
@@ -683,8 +737,6 @@ export const annotationRouter = createTRPCRouter({
           createdAt: "desc",
         },
       });
-
-      console.log("length", queueItems.length);
 
       // Get unique queue IDs from the items
       const queueIds = [
@@ -746,79 +798,10 @@ export const annotationRouter = createTRPCRouter({
         ),
       }));
 
-      const assignedQueueItems = await ctx.prisma.annotationQueueItem.findMany({
-        where: {
-          projectId: input.projectId,
-          userId: userId,
-        },
-        include: {
-          user: true,
-          annotationQueue: true,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
-
-      // Enrich assignedQueueItems with traces and annotations
-      const enrichedAssignedQueueItems =
-        await enrichQueueItemsWithTracesAndAnnotations(
-          ctx,
-          input.projectId,
-          assignedQueueItems,
-          protections
-        );
-
-      // memberAccessibleQueues: queues where user is a member
-      const memberAccessibleQueues = processedQueues.filter((queue) =>
-        queue.members.some((member) => member.userId === userId)
-      );
-
-      // memberAccessibleQueueItems: items from queues where user is a member (but not directly assigned to the user)
-      const memberAccessibleQueueItems = memberAccessibleQueues
-        .flatMap((queue) => queue.AnnotationQueueItems)
-        .filter((item) => item.userId !== userId) // Exclude directly assigned items
-        .map((item) => {
-          const queue = memberAccessibleQueues.find(
-            (q) => q.id === item.annotationQueueId
-          );
-          return {
-            ...item,
-            annotationQueue: queue, // Include the full queue object like the legacy endpoint
-            members: queue?.members.map((member: any) => ({
-              ...member,
-              user: member.user,
-            })),
-            queueName: queue?.name,
-          };
-        });
-
-      // doneQueueItems: completed items that user has access to
-      const doneQueueItems = processedQueues
-        .flatMap((queue) => queue.AnnotationQueueItems)
-        .filter((item) => item.doneAt !== null)
-        .filter((item) => {
-          // Check if user is directly assigned
-          if (item.userId === userId) {
-            return true;
-          }
-          // Check if user is a member of the queue
-          const queue = processedQueues.find(
-            (q) => q.id === item.annotationQueueId
-          );
-          return (
-            queue?.members.some((member) => member.userId === userId) ?? false
-          );
-        });
-
       return {
         assignedQueueItems: enrichedQueueItems,
-        memberAccessibleQueueItems,
-        doneQueueItems,
-        memberAccessibleQueues,
         queues: processedQueues,
-        // // Add the paginated items as the main result
-        // paginatedQueueItems: enrichedQueueItems,
+        totalCount,
       };
     }),
 });
