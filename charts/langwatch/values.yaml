@@ -84,11 +84,11 @@ langwatch_nlp:
     port: 5561
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
       cpu: 500m
-      memory: 512Mi
+      memory: 1024Mi
+    limits:
+      cpu: 1000m
+      memory: 2048Mi
   env:
     LANGWATCH_ENDPOINT: "http://{{ .Release.Name }}-app:5560"
     # For when running on minikube on Mac OS
