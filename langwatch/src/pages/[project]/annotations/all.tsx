@@ -208,7 +208,7 @@ export default function Annotations() {
         backgroundColor="white"
       >
         <AnnotationsTable
-          groupedAnnotations={groupedAnnotations as unknown as Annotation[]}
+          groupedAnnotations={groupedAnnotations}
           allAnnotationsLoading={annotations.isLoading || traces.isLoading}
           heading="Annotations"
           isDone={true}
