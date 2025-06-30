@@ -548,26 +548,43 @@ export const annotationRouter = createTRPCRouter({
         },
       });
 
-      // Get counts for each queue
-      const queueCounts = await Promise.all(
-        memberQueues.map(async (queue) => {
-          const count = await ctx.prisma.annotationQueueItem.count({
-            where: {
-              projectId: input.projectId,
-              annotationQueueId: queue.id,
-              doneAt: null,
-            },
-          });
-          return {
-            id: queue.id,
-            name: queue.name,
-            slug: queue.slug,
-            pendingCount: count,
-          };
-        })
+      // Get queue IDs for the IN clause
+      const queueIds = memberQueues.map((queue) => queue.id);
+
+      if (queueIds.length === 0) {
+        return [];
+      }
+
+      // Get counts for all queues in a single query using groupBy
+      const queueCounts = await ctx.prisma.annotationQueueItem.groupBy({
+        by: ["annotationQueueId"],
+        where: {
+          projectId: input.projectId,
+          annotationQueueId: {
+            in: queueIds,
+          },
+          doneAt: null,
+        },
+        _count: {
+          annotationQueueId: true,
+        },
+      });
+
+      // Create a map for O(1) lookup
+      const countMap = new Map(
+        queueCounts.map((item) => [
+          item.annotationQueueId,
+          item._count.annotationQueueId,
+        ])
       );
 
-      return queueCounts;
+      // Return the result with counts mapped to queue data
+      return memberQueues.map((queue) => ({
+        id: queue.id,
+        name: queue.name,
+        slug: queue.slug,
+        pendingCount: countMap.get(queue.id) ?? 0,
+      }));
     }),
   createQueueItem: protectedProcedure
     .input(
