@@ -33,6 +33,7 @@ import {
   useMessagesNavigationFooter,
 } from "../messages/MessagesNavigationFooter";
 import type { Trace } from "~/server/tracer/types";
+import UserAvatarGroup from "./AvatarGroup";
 
 type ScoreOption = Record<
   string,
@@ -42,7 +43,7 @@ type ScoreOption = Record<
   }
 >;
 
-type AnnotationWithUser = Annotation & {
+export type AnnotationWithUser = Annotation & {
   user?: {
     name: string | null;
     id: string;
@@ -56,7 +57,7 @@ type GroupedAnnotation = {
   scoreOptions?: ScoreOption;
 };
 
-type UnifiedQueueItem = {
+export type UnifiedQueueItem = {
   id: string;
   doneAt: Date | null;
   createdByUser: { name: string | null; id: string } | null;
@@ -497,46 +498,10 @@ export const AnnotationsTable = ({
                                 }
                               >
                                 <HStack>
-                                  {(() => {
-                                    const userMap = new Map<
-                                      string,
-                                      { name: string | null; id: string }
-                                    >();
-
-                                    // Add createdByUser if exists
-                                    if (item.createdByUser) {
-                                      userMap.set(
-                                        item.createdByUser.id,
-                                        item.createdByUser
-                                      );
-                                    }
-
-                                    // Add annotation users
-                                    item.annotations.forEach((annotation) => {
-                                      if (annotation.user) {
-                                        userMap.set(
-                                          annotation.user.id,
-                                          annotation.user
-                                        );
-                                      }
-                                    });
-
-                                    return Array.from(userMap.values()).map(
-                                      (user, index) => (
-                                        <RandomColorAvatar
-                                          key={index}
-                                          size="2xs"
-                                          name={user.name ?? ""}
-                                          css={{
-                                            border: "2px solid white",
-                                            "&:not(:first-of-type)": {
-                                              marginLeft: "-20px",
-                                            },
-                                          }}
-                                        />
-                                      )
-                                    );
-                                  })()}
+                                  <UserAvatarGroup
+                                    createdByUser={item.createdByUser}
+                                    annotations={item.annotations}
+                                  />
                                 </HStack>
                               </Tooltip>
                             </Table.Cell>
