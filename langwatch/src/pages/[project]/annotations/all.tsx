@@ -7,10 +7,7 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "next/router";
 import { Download } from "react-feather";
-import {
-  AnnotationsTable,
-  type AnnotationWithUser,
-} from "~/components/annotations/AnnotationsTable";
+import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
 import { useFilterParams } from "~/hooks/useFilterParams";
@@ -86,16 +83,27 @@ export default function Annotations() {
       refetchOnWindowFocus: false,
     }
   );
+  type GroupedAnnotations = Record<
+    string,
+    {
+      traceId: string;
+      trace?: Trace;
+      annotations: Array<{
+        comment: string | null;
+        scoreOptions: Record<
+          string,
+          { value: string | string[]; reason: string }
+        >;
+        createdAt: Date;
+        user: User;
+        expectedOutput: string | null;
+      }>;
+    }
+  >;
 
-  type GroupedAnnotation = {
-    traceId: string;
-    trace?: Trace;
-    annotations: AnnotationWithUser[];
-  };
-
-  const groupByTraceId = (dataArray: Annotation[]): GroupedAnnotation[] => {
-    const grouped = dataArray.reduce(
-      (acc: Record<string, GroupedAnnotation>, item) => {
+  const groupByTraceId = (dataArray: Annotation[]) => {
+    return Object.values(
+      dataArray.reduce((acc: GroupedAnnotations, item) => {
         if (!acc[item.traceId]) {
           acc[item.traceId] = {
             traceId: item.traceId,
@@ -106,20 +114,20 @@ export default function Annotations() {
           };
         }
 
-        // Create a proper AnnotationWithUser object that includes all original annotation fields
-        const annotationWithUser: AnnotationWithUser = {
-          ...item, // Include all original annotation fields
-          user: (item as any).user, // Include the user data from the query
-        };
-
-        acc[item.traceId]!.annotations.push(annotationWithUser);
+        acc[item.traceId]!.annotations.push({
+          comment: item.comment,
+          expectedOutput: item.expectedOutput,
+          scoreOptions: item.scoreOptions as Record<
+            string,
+            { value: string | string[]; reason: string }
+          >,
+          user: (item as any).user,
+          createdAt: item.createdAt,
+        });
 
         return acc;
-      },
-      {}
+      }, {})
     );
-
-    return Object.values(grouped);
   };
 
   const groupedAnnotations = groupByTraceId(annotations.data ?? []);
