@@ -65,9 +65,9 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
 
   // Create lookup maps for O(1) access
   const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
-  const annotationMap = new Map<string, any[]>();
+  const annotationMap = new Map<string, Array<(typeof annotations)[number]>>();
 
-  annotations.forEach((annotation: any) => {
+  annotations.forEach((annotation) => {
     if (!annotationMap.has(annotation.traceId)) {
       annotationMap.set(annotation.traceId, []);
     }
