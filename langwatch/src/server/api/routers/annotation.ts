@@ -641,13 +641,11 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
     .query(async ({ ctx, input }) => {
-      let userId = ctx.session.user.id;
+      const userId = ctx.session.user.id;
       let userQueueIds: string[] = [];
 
       // If a queue is selected, we don't need to check for user queues
-      if (input.queueId) {
-        userId = "";
-      } else if (input.showQueueAndUser) {
+      if (input.showQueueAndUser) {
         const queues = await ctx.prisma.annotationQueue.findMany({
           where: {
             projectId: input.projectId,
@@ -678,15 +676,8 @@ export const annotationRouter = createTRPCRouter({
       };
 
       if (input.queueId) {
-        // Specific queue selected
-        whereCondition.OR = [
-          {
-            annotationQueueId: input.queueId,
-          },
-          {
-            userId: userId,
-          },
-        ];
+        // Specific queue selected - only filter by annotationQueueId
+        whereCondition.annotationQueueId = input.queueId;
       } else if (userQueueIds.length > 0) {
         // All annotations - check if annotationQueueId is in user's queue IDs
         whereCondition.OR = [
