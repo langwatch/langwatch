@@ -34,10 +34,18 @@ import {
 } from "../messages/MessagesNavigationFooter";
 import type { Trace } from "~/server/tracer/types";
 
+type ScoreOption = Record<
+  string,
+  {
+    value: string | string[];
+    reason?: string | null;
+  }
+>;
 type GroupedAnnotation = {
   traceId: string;
   trace?: Trace;
   annotations: Annotation[];
+  scoreOptions?: ScoreOption;
 };
 
 export const AnnotationsTable = ({
@@ -115,14 +123,6 @@ export const AnnotationsTable = ({
       .map((key) => key.id);
   }, [scoreOptions.data]);
 
-  type ScoreOption = Record<
-    string,
-    {
-      value: string | string[];
-      reason?: string | null;
-    }
-  >;
-
   const annotationScoreValues = (
     annotations: Record<string, ScoreOption>[],
     scoreOptionsIDArray: string[]
@@ -176,7 +176,9 @@ export const AnnotationsTable = ({
 
   const hasExpectedOutput = () => {
     if (groupedAnnotations) {
-      return groupedAnnotations.some((annotation) => annotation.expectedOutput);
+      return groupedAnnotations.some((annotation) =>
+        annotation.annotations.some((annotation) => annotation.expectedOutput)
+      );
     }
     return allQueueItems.some(
       (item: any) =>
@@ -185,7 +187,11 @@ export const AnnotationsTable = ({
   };
 
   const hasComments = () => {
-    if (groupedAnnotations?.some((annotation) => annotation.comment)) {
+    if (
+      groupedAnnotations?.some((annotation) =>
+        annotation.annotations.some((annotation) => annotation.comment)
+      )
+    ) {
       return true;
     }
     return allQueueItems.some(
