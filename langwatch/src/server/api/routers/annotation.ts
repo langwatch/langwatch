@@ -644,6 +644,7 @@ export const annotationRouter = createTRPCRouter({
       let userId = ctx.session.user.id;
       let userQueueIds: string[] = [];
 
+      // If a queue is selected, we don't need to check for user queues
       if (input.queueId) {
         userId = "";
       } else if (input.showQueueAndUser) {
