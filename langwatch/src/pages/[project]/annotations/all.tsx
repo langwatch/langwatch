@@ -112,7 +112,10 @@ export default function Annotations() {
           user: (item as any).user, // Include the user data from the query
         };
 
-        acc[item.traceId]!.annotations.push(annotationWithUser);
+        const groupedAnnotation = acc[item.traceId];
+        if (groupedAnnotation) {
+          groupedAnnotation.annotations.push(annotationWithUser);
+        }
 
         return acc;
       },
