@@ -106,6 +106,25 @@ export const AnnotationsTable = ({
     }
   );
 
+  // Transform assignedQueueItems to UnifiedQueueItem format with proper type safety
+  const transformToUnifiedQueueItems = (items: any[]): UnifiedQueueItem[] => {
+    return items.map((item) => ({
+      id: item.id,
+      doneAt: item.doneAt ? new Date(item.doneAt) : null,
+      createdByUser: item.createdByUser
+        ? {
+            name: item.createdByUser.name,
+            id: item.createdByUser.id,
+          }
+        : null,
+      createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+      traceId: item.traceId,
+      trace: item.trace || undefined,
+      annotations: item.annotations || [],
+      scoreOptions: item.scoreOptions || undefined,
+    }));
+  };
+
   const allQueueItems: UnifiedQueueItem[] = groupedAnnotations
     ? groupedAnnotations.map((item) => ({
         id: item.traceId,
@@ -119,7 +138,7 @@ export const AnnotationsTable = ({
         annotations: item.annotations,
         scoreOptions: item.scoreOptions,
       }))
-    : (assignedQueueItems as unknown as UnifiedQueueItem[]);
+    : transformToUnifiedQueueItems(assignedQueueItems || []);
 
   const openAnnotationQueue = (queueItemId: string) => {
     void router.push(
@@ -165,7 +184,7 @@ export const AnnotationsTable = ({
               const scoreOptions =
                 annotation.scoreOptions as ScoreOption | null;
               return scoreOptions?.[id]?.value ? (
-                <>
+                <Box key={annotation.id}>
                   <HStack gap={0}>
                     {Array.isArray(scoreOptions[id]?.value) ? (
                       <HStack gap={1} wrap="wrap">
@@ -184,7 +203,7 @@ export const AnnotationsTable = ({
                       </Tooltip>
                     )}
                   </HStack>
-                </>
+                </Box>
               ) : null;
             })}
           </VStack>
