@@ -28,29 +28,118 @@ import { NoDataInfoBlock } from "../NoDataInfoBlock";
 import { RandomColorAvatar } from "../RandomColorAvatar";
 import { RedactedField } from "../ui/RedactedField";
 
+import {
+  MessagesNavigationFooter,
+  useMessagesNavigationFooter,
+} from "../messages/MessagesNavigationFooter";
+import type { Trace } from "~/server/tracer/types";
+import UserAvatarGroup from "./AvatarGroup";
+
+type ScoreOption = Record<
+  string,
+  {
+    value: string | string[];
+    reason?: string | null;
+  }
+>;
+
+export type AnnotationWithUser = Annotation & {
+  user?: {
+    name: string | null;
+    id: string;
+  };
+};
+
+type GroupedAnnotation = {
+  traceId: string;
+  trace?: Trace;
+  annotations: AnnotationWithUser[];
+  scoreOptions?: ScoreOption;
+};
+
+export type UnifiedQueueItem = {
+  id: string;
+  doneAt: Date | null;
+  createdByUser: { name: string | null; id: string } | null;
+  createdAt: Date;
+  traceId: string;
+  trace?: Trace;
+  annotations: AnnotationWithUser[];
+  scoreOptions?: ScoreOption;
+};
+
 export const AnnotationsTable = ({
-  allQueueItems,
-  queuesLoading,
   isDone,
   noDataTitle,
   noDataDescription,
   heading,
   tableHeader,
   queueId,
+  showQueueAndUser,
+  groupedAnnotations,
+  allAnnotationsLoading,
 }: {
-  allQueueItems: any[];
-  queuesLoading: boolean;
   isDone?: boolean;
   noDataTitle?: string;
   noDataDescription?: string;
   heading?: string;
   tableHeader?: React.ReactNode;
   queueId?: string;
+  showQueueAndUser?: boolean;
+  groupedAnnotations?: GroupedAnnotation[];
+  allAnnotationsLoading?: boolean;
 }) => {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const { scoreOptions } = useAnnotationQueues();
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
+
+  const navigationFooter = useMessagesNavigationFooter();
+
+  const [selectedAnnotations, setSelectedAnnotations] =
+    useState<string>("pending");
+
+  const { assignedQueueItems, queuesLoading, totalCount } = useAnnotationQueues(
+    {
+      selectedAnnotations,
+      queueId,
+      showQueueAndUser,
+    }
+  );
+
+  // Transform assignedQueueItems to UnifiedQueueItem format with proper type safety
+  const transformToUnifiedQueueItems = (items: any[]): UnifiedQueueItem[] => {
+    return items.map((item) => ({
+      id: item.id,
+      doneAt: item.doneAt ? new Date(item.doneAt) : null,
+      createdByUser: item.createdByUser
+        ? {
+            name: item.createdByUser.name,
+            id: item.createdByUser.id,
+          }
+        : null,
+      createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+      traceId: item.traceId,
+      trace: item.trace || undefined,
+      annotations: item.annotations || [],
+      scoreOptions: item.scoreOptions || undefined,
+    }));
+  };
+
+  const allQueueItems: UnifiedQueueItem[] = groupedAnnotations
+    ? groupedAnnotations.map((item) => ({
+        id: item.traceId,
+        doneAt: null,
+        createdByUser: null,
+        createdAt: item.trace?.timestamps?.started_at
+          ? new Date(item.trace.timestamps.started_at)
+          : new Date(),
+        traceId: item.traceId,
+        trace: item.trace,
+        annotations: item.annotations,
+        scoreOptions: item.scoreOptions,
+      }))
+    : transformToUnifiedQueueItems(assignedQueueItems || []);
 
   const openAnnotationQueue = (queueItemId: string) => {
     void router.push(
@@ -84,50 +173,40 @@ export const AnnotationsTable = ({
       .map((key) => key.id);
   }, [scoreOptions.data]);
 
-  type ScoreOption = Record<
-    string,
-    {
-      value: string | string[];
-      reason?: string | null;
-    }
-  >;
-
-  const [selectedAnnotations, setSelectedAnnotations] = useState<string[]>([
-    "pending",
-  ]);
-
   const annotationScoreValues = (
-    annotations: Record<string, ScoreOption>[],
+    annotations: AnnotationWithUser[],
     scoreOptionsIDArray: string[]
   ) => {
     if (scoreOptionsIDArray.length > 0 && annotations.length > 0) {
       return scoreOptionsIDArray.map((id) => (
         <Table.Cell key={id} minWidth={200}>
           <VStack divideX="1px" width="full" align="start" gap={2}>
-            {annotations.map((annotation) =>
-              annotation.scoreOptions?.[id]?.value ? (
-                <>
+            {annotations.map((annotation) => {
+              const scoreOptions =
+                annotation.scoreOptions as ScoreOption | null;
+              return scoreOptions?.[id]?.value ? (
+                <Box key={annotation.id}>
                   <HStack gap={0}>
-                    {Array.isArray(annotation.scoreOptions?.[id]?.value) ? (
+                    {Array.isArray(scoreOptions[id]?.value) ? (
                       <HStack gap={1} wrap="wrap">
-                        {(annotation.scoreOptions?.[id]?.value as string[]).map(
+                        {(scoreOptions[id]?.value as string[]).map(
                           (val, index) => (
                             <Badge key={index}>{val}</Badge>
                           )
                         )}
                       </HStack>
                     ) : (
-                      <Badge>{annotation.scoreOptions?.[id]?.value}</Badge>
+                      <Badge>{scoreOptions[id]?.value}</Badge>
                     )}
-                    {annotation.scoreOptions?.[id]?.reason && (
-                      <Tooltip content={annotation.scoreOptions[id]?.reason}>
+                    {scoreOptions[id]?.reason && (
+                      <Tooltip content={scoreOptions[id]?.reason}>
                         <MessageCircle width={16} height={16} />
                       </Tooltip>
                     )}
                   </HStack>
-                </>
-              ) : null
-            )}
+                </Box>
+              ) : null;
+            })}
           </VStack>
         </Table.Cell>
       ));
@@ -147,30 +226,33 @@ export const AnnotationsTable = ({
     });
   };
 
-  const queueItemsFiltered = allQueueItems.filter((item) => {
-    if (selectedAnnotations.includes("all")) {
-      return true;
-    }
-    if (selectedAnnotations.includes("completed")) {
-      return item.doneAt;
-    }
-    if (selectedAnnotations.includes("pending")) {
-      return !item.doneAt;
-    }
-    return true;
-  });
-
   const hasExpectedOutput = () => {
-    return queueItemsFiltered.some((item) =>
-      item.annotations.some(
-        (annotation: Annotation) => annotation.expectedOutput
-      )
+    if (groupedAnnotations) {
+      return groupedAnnotations.some((annotation) =>
+        annotation.annotations.some((annotation) => annotation.expectedOutput)
+      );
+    }
+    return allQueueItems.some(
+      (item: UnifiedQueueItem) =>
+        item.annotations?.some(
+          (annotation: AnnotationWithUser) => annotation.expectedOutput
+        )
     );
   };
 
   const hasComments = () => {
-    return queueItemsFiltered.some((item) =>
-      item.annotations.some((annotation: Annotation) => annotation.comment)
+    if (
+      groupedAnnotations?.some((annotation) =>
+        annotation.annotations.some((annotation) => annotation.comment)
+      )
+    ) {
+      return true;
+    }
+    return allQueueItems.some(
+      (item: UnifiedQueueItem) =>
+        item.annotations?.some(
+          (annotation: AnnotationWithUser) => annotation.comment
+        )
     );
   };
 
@@ -179,18 +261,42 @@ export const AnnotationsTable = ({
       return false;
     }
 
-    return queueItemsFiltered.some((item) =>
-      item.annotations.some(
-        (annotation: Annotation) =>
+    // Check if there are any active score options
+    const activeScoreOptions = scoreOptions.data.filter(
+      (option) => option.active === true
+    );
+    if (activeScoreOptions.length === 0) {
+      return false;
+    }
+
+    if (groupedAnnotations) {
+      const hasOptions = groupedAnnotations.some((annotation) => {
+        return (
           annotation.scoreOptions &&
           Object.keys(annotation.scoreOptions).length > 0
-      )
-    );
+        );
+      });
+      return hasOptions;
+    }
+
+    const hasOptions = allQueueItems.some((item: UnifiedQueueItem) => {
+      return item.annotations?.some((annotation: AnnotationWithUser) => {
+        const scoreOptions = annotation.scoreOptions as ScoreOption | null;
+        return scoreOptions && Object.keys(scoreOptions).length > 0;
+      });
+    });
+    return hasOptions;
   };
 
-  if (queuesLoading) {
+  if (queuesLoading || allAnnotationsLoading) {
     return (
-      <VStack align="start" marginTop={4} width="full" padding={6}>
+      <VStack
+        align="start"
+        marginTop={4}
+        width="full"
+        padding={6}
+        maxHeight="100%"
+      >
         <HStack width="full" paddingBottom={4} alignItems="flex-end">
           <Skeleton height="32px" width="200px" />
           <Spacer />
@@ -252,14 +358,15 @@ export const AnnotationsTable = ({
               <Menu.Content>
                 <RadioGroup
                   defaultValue="pending"
+                  value={selectedAnnotations}
                   onValueChange={(change) =>
-                    setSelectedAnnotations([change.value])
+                    setSelectedAnnotations(change.value)
                   }
                 >
                   <VStack align="start" padding={3} gap={3}>
                     <Radio value="pending">Pending</Radio>
                     <Radio value="completed">Completed</Radio>
-                    <Radio value="all">All Annotations</Radio>
+                    <Radio value="all">All</Radio>
                   </VStack>
                 </RadioGroup>
               </Menu.Content>
@@ -345,8 +452,8 @@ export const AnnotationsTable = ({
                           ))}
                         </Table.Row>
                       ))
-                    ) : queueItemsFiltered.length > 0 ? (
-                      queueItemsFiltered.map((item) => {
+                    ) : allQueueItems.length > 0 ? (
+                      allQueueItems.map((item: UnifiedQueueItem) => {
                         return (
                           <Table.Row
                             cursor="pointer"
@@ -374,74 +481,27 @@ export const AnnotationsTable = ({
 
                                     {item.annotations
                                       .map(
-                                        (a: {
-                                          user: { name: string | null };
-                                        }) => a.user?.name
+                                        (a: AnnotationWithUser) => a.user?.name
                                       )
                                       .filter(
-                                        (
-                                          name: string | null | undefined,
-                                          index: number,
-                                          self: (string | null | undefined)[]
-                                        ) =>
-                                          name && self.indexOf(name) === index
+                                        (name): name is string =>
+                                          name !== null && name !== undefined
                                       )
-                                      .map((name: string) => (
+                                      .filter(
+                                        (name, index, self) =>
+                                          self.indexOf(name) === index
+                                      )
+                                      .map((name) => (
                                         <Text key={name}>{name}</Text>
                                       ))}
                                   </VStack>
                                 }
                               >
                                 <HStack>
-                                  {[
-                                    ...(new Map([
-                                      ...(item.createdByUser
-                                        ? [
-                                            [
-                                              item.createdByUser.id,
-                                              { user: item.createdByUser },
-                                            ],
-                                          ]
-                                        : []),
-                                      ...item.annotations
-                                        .map(
-                                          (
-                                            annotation: Annotation & {
-                                              user?: {
-                                                name: string | null;
-                                                id: string;
-                                              };
-                                            }
-                                          ) =>
-                                            annotation.user
-                                              ? [annotation.user.id, annotation]
-                                              : null
-                                        )
-                                        .filter(Boolean),
-                                    ]).values() as Iterable<
-                                      | {
-                                          user: {
-                                            name: string | null;
-                                            id: string;
-                                          };
-                                        }
-                                      | (Annotation & {
-                                          user?: { name: string | null };
-                                        })
-                                    >),
-                                  ].map((item, index) => (
-                                    <RandomColorAvatar
-                                      key={index}
-                                      size="2xs"
-                                      name={item.user?.name ?? ""}
-                                      css={{
-                                        border: "2px solid white",
-                                        "&:not(:first-of-type)": {
-                                          marginLeft: "-20px",
-                                        },
-                                      }}
-                                    />
-                                  ))}
+                                  <UserAvatarGroup
+                                    createdByUser={item.createdByUser}
+                                    annotations={item.annotations}
+                                  />
                                 </HStack>
                               </Tooltip>
                             </Table.Cell>
@@ -500,7 +560,7 @@ export const AnnotationsTable = ({
                               <Table.Cell minWidth={350}>
                                 <VStack align="start" gap={2} divideY="1px">
                                   {item.annotations.map(
-                                    (annotation: Annotation) =>
+                                    (annotation: AnnotationWithUser) =>
                                       annotation.expectedOutput ? (
                                         <Text
                                           key={annotation.id}
@@ -522,7 +582,7 @@ export const AnnotationsTable = ({
                               <Table.Cell minWidth={350}>
                                 <VStack align="start" gap={2} divideY="1px">
                                   {item.annotations.map(
-                                    (annotation: Annotation) =>
+                                    (annotation: AnnotationWithUser) =>
                                       annotation.comment ? (
                                         <Text
                                           key={annotation.id}
@@ -569,6 +629,14 @@ export const AnnotationsTable = ({
             )}
           </Box>
         </HStack>
+        <MessagesNavigationFooter
+          totalHits={totalCount}
+          pageOffset={navigationFooter.pageOffset}
+          pageSize={navigationFooter.pageSize}
+          nextPage={navigationFooter.nextPage}
+          prevPage={navigationFooter.prevPage}
+          changePageSize={navigationFooter.changePageSize}
+        />
       </VStack>
     );
   }

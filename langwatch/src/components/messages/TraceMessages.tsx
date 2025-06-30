@@ -148,7 +148,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
               <MessageHoverActions trace={trace} {...translationState} />
             )}
             {trace.metadata.thread_id && (
-              <Text textAlign="center" color="gray.400" fontSize="xs">
+              <Text color="gray.400" fontSize="xs">
                 Thread ID: {trace.metadata.thread_id}
               </Text>
             )}

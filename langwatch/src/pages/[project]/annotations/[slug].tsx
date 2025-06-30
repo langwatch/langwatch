@@ -12,7 +12,6 @@ import { useRouter } from "next/router";
 
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
-import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
@@ -29,18 +28,6 @@ export default function Annotations() {
     },
     { enabled: !!project?.id && typeof slug === "string" && !!slug }
   );
-
-  const {
-    memberAccessibleQueueItemsWithTraces,
-
-    queuesLoading,
-  } = useAnnotationQueues();
-
-  const allQueueItems = [
-    ...(memberAccessibleQueueItemsWithTraces?.filter(
-      (item) => item.annotationQueueId === queue.data?.id
-    ) ?? []),
-  ];
 
   const queueMembers = queue.data?.members?.map((member) => member.user);
 
@@ -74,8 +61,6 @@ export default function Annotations() {
         backgroundColor="white"
       >
         <AnnotationsTable
-          allQueueItems={allQueueItems}
-          queuesLoading={queuesLoading || queue.isLoading}
           noDataTitle="No queued annotations for this queue"
           noDataDescription="Add a message to this queue to get started."
           tableHeader={<QueueHeader />}
