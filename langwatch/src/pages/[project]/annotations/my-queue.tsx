@@ -15,24 +15,24 @@ import { Conversation } from "../../../components/messages/Conversation";
 export default function TraceAnnotations() {
   const router = useRouter();
   const { "queue-item": queueItem } = router.query;
-  const { assignedQueueItems, queuesLoading, memberAccessibleQueues } =
-    useAnnotationQueues({
-      showQueueAndUser: true,
-    });
+  const { assignedQueueItems, queuesLoading } = useAnnotationQueues({
+    showQueueAndUser: true,
+  });
   const { project } = useOrganizationTeamProject();
-
-  console.log("assignedQueueItems", assignedQueueItems);
-  console.log("memberAccessibleQueues", memberAccessibleQueues);
 
   const allQueueItems = useMemo(() => {
     const items = [...(assignedQueueItems ?? [])];
 
+    // Filter out done items
     return items.filter((item) => !item.doneAt);
   }, [assignedQueueItems]);
 
-  let currentQueueItem = allQueueItems
-    .filter((item) => !item.doneAt)
-    .find((item) => item.id === queueItem);
+  // Force re-render when items change by creating a key
+  const queueItemsKey = useMemo(() => {
+    return allQueueItems.map((item) => `${item.id}-${item.doneAt}`).join(",");
+  }, [allQueueItems]);
+
+  let currentQueueItem = allQueueItems.find((item) => item.id === queueItem);
 
   if (!currentQueueItem) {
     currentQueueItem = allQueueItems[0];
@@ -107,6 +107,7 @@ export default function TraceAnnotations() {
           backgroundColor="white"
         >
           <AnnotationQueuePicker
+            key={queueItemsKey}
             queueItems={allQueueItems}
             currentQueueItem={currentQueueItem}
             refetchQueueItems={refetchQueueItems}

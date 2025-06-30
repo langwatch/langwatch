@@ -40,8 +40,6 @@ export function useAnnotationQueues(
     }
   );
 
-  console.log("optimizedData", optimizedData.data);
-
   // Get score options (this is still needed separately as it's used across the app)
   const scoreOptions = api.annotationScore.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -56,7 +54,6 @@ export function useAnnotationQueues(
       return {
         assignedQueueItems: [],
         totalCount: 0,
-        memberAccessibleQueues: [],
       };
     }
 
@@ -65,14 +62,12 @@ export function useAnnotationQueues(
     return {
       assignedQueueItems,
       totalCount,
-      memberAccessibleQueues: queues,
     };
   }, [optimizedData.data]);
 
   return {
     // Direct data from optimized endpoint
     assignedQueueItems: derivedData.assignedQueueItems,
-    memberAccessibleQueues: derivedData.memberAccessibleQueues,
     totalCount: derivedData.totalCount,
     scoreOptions,
     queuesLoading: optimizedData.isLoading,
