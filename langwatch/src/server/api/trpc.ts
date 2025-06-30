@@ -221,11 +221,11 @@ export const loggerMiddleware = t.middleware(
         path,
         type,
         duration,
-        userId: ctx.session?.user?.id || null,
-        userAgent: ctx.req?.headers["user-agent"] || null,
-        statusCode: ctx.res?.statusCode,
-        projectId: (input as any)?.projectId,
-        organizationId: (input as any)?.organizationId,
+        userId: ctx.session?.user?.id ?? null,
+        userAgent: ctx.req?.headers["user-agent"] ?? null,
+        statusCode: ctx.res?.statusCode ?? null,
+        projectId: (input as any)?.projectId ?? null,
+        organizationId: (input as any)?.organizationId ?? null,
       };
 
       if (error) {

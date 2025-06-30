@@ -24,10 +24,10 @@ export const loggerMiddleware = () => {
         url,
         statusCode,
         duration,
-        userAgent: c.req.header("user-agent"),
-        userId: c.get("user")?.id,
-        projectId: c.get("project")?.id,
-        organizationId: c.get("organization")?.id,
+        userAgent: c.req.header("user-agent") ?? null,
+        userId: c.get("user")?.id ?? null,
+        projectId: c.get("project")?.id ?? null,
+        organizationId: c.get("organization")?.id ?? null,
       };
 
       if (error) {
