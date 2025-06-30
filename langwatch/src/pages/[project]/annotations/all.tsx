@@ -129,7 +129,6 @@ export default function Annotations() {
       }, {})
     );
   };
-  console.log("annotations.data", annotations.data);
 
   const groupedAnnotations = groupByTraceId(annotations.data ?? []);
 

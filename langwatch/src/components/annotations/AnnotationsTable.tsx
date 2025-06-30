@@ -59,8 +59,6 @@ export const AnnotationsTable = ({
   const { scoreOptions } = useAnnotationQueues();
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
 
-  console.log("scoreOptions", scoreOptions.data);
-
   const navigationFooter = useMessagesNavigationFooter();
 
   const [selectedAnnotations, setSelectedAnnotations] =
@@ -271,7 +269,6 @@ export const AnnotationsTable = ({
       </VStack>
     );
   } else {
-    console.log("loading", hasScoreOptions());
     return (
       <VStack align="start" marginTop={4} width="full">
         <HStack

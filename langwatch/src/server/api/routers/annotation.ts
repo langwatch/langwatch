@@ -700,7 +700,6 @@ export const annotationRouter = createTRPCRouter({
         ];
       } else {
         // Default case - just user's items
-        console.log("userId", userId);
         whereCondition.userId = userId;
       }
 
