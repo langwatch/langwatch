@@ -66,7 +66,7 @@ export const AddParticipants = ({
     value: `user-${member.user.id}`,
   }));
 
-  const queueOptions = annotationQueues.data?.map((queue) => ({
+  const queueOptions = annotationQueues.data?.queues?.map((queue) => ({
     label: queue.name ?? "",
     value: `queue-${queue.id}`,
   }));

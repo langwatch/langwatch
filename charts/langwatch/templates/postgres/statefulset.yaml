@@ -29,6 +29,8 @@ spec:
               protocol: TCP
           # Environment variables for PostgreSQL
           env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
             {{- range $key, $value := .Values.postgres.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}

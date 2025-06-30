@@ -15,13 +15,18 @@ import { Conversation } from "../../../components/messages/Conversation";
 export default function TraceAnnotations() {
   const router = useRouter();
   const { "queue-item": queueItem } = router.query;
-  const { assignedQueueItems, queuesLoading } = useAnnotationQueues({
-    showQueueAndUser: true,
-  });
+  const { assignedQueueItems, queuesLoading, memberAccessibleQueues } =
+    useAnnotationQueues({
+      showQueueAndUser: true,
+    });
   const { project } = useOrganizationTeamProject();
+
+  console.log("assignedQueueItems", assignedQueueItems);
+  console.log("memberAccessibleQueues", memberAccessibleQueues);
 
   const allQueueItems = useMemo(() => {
     const items = [...(assignedQueueItems ?? [])];
+
     return items.filter((item) => !item.doneAt);
   }, [assignedQueueItems]);
 
@@ -41,6 +46,8 @@ export default function TraceAnnotations() {
     await queryClient.annotation.getAssignedItemsCount.invalidate();
     await queryClient.annotation.getQueueItemsCounts.invalidate();
   };
+
+  console.log("currentQueueItem", currentQueueItem);
   const traceDetails = api.traces.getById.useQuery(
     {
       projectId: project?.id ?? "",

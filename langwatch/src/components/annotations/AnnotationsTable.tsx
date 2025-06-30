@@ -32,6 +32,13 @@ import {
   MessagesNavigationFooter,
   useMessagesNavigationFooter,
 } from "../messages/MessagesNavigationFooter";
+import type { Trace } from "~/server/tracer/types";
+
+type GroupedAnnotation = {
+  traceId: string;
+  trace?: Trace;
+  annotations: Annotation[];
+};
 
 export const AnnotationsTable = ({
   isDone,
@@ -51,7 +58,7 @@ export const AnnotationsTable = ({
   tableHeader?: React.ReactNode;
   queueId?: string;
   showQueueAndUser?: boolean;
-  groupedAnnotations?: Annotation[];
+  groupedAnnotations?: GroupedAnnotation[];
   allAnnotationsLoading?: boolean;
 }) => {
   const router = useRouter();

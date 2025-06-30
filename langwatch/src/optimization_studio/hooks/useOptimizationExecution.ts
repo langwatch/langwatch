@@ -1,13 +1,13 @@
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import type { StudioClientEvent } from "../types/events";
-import { useSocketClient } from "./useSocketClient";
 import { useWorkflowStore } from "./useWorkflowStore";
 import type { OPTIMIZERS } from "../types/optimizers";
 import { toaster } from "~/components/ui/toaster";
+import { usePostEvent } from "./usePostEvent";
 
 export const useOptimizationExecution = () => {
-  const { sendMessage, socketStatus } = useSocketClient();
+  const { postEvent, socketStatus } = usePostEvent();
 
   const [triggerTimeout, setTriggerTimeout] = useState<{
     run_id: string;
@@ -96,7 +96,7 @@ export const useOptimizationExecution = () => {
           params,
         },
       };
-      sendMessage(payload);
+      postEvent(payload);
 
       setTimeout(() => {
         setTriggerTimeout({ run_id, timeout_on_status: "waiting" });
@@ -107,7 +107,7 @@ export const useOptimizationExecution = () => {
       setOpenResultsPanelRequest,
       setOptimizationState,
       getWorkflow,
-      sendMessage,
+      postEvent,
     ]
   );
 
@@ -131,7 +131,7 @@ export const useOptimizationExecution = () => {
         type: "stop_optimization_execution",
         payload: { workflow: workflow, run_id },
       };
-      sendMessage(payload);
+      postEvent(payload);
 
       setTimeout(() => {
         setTriggerTimeout({
@@ -140,7 +140,7 @@ export const useOptimizationExecution = () => {
         });
       }, 10_000);
     },
-    [socketAvailable, setOptimizationState, sendMessage, getWorkflow]
+    [socketAvailable, setOptimizationState, postEvent, getWorkflow]
   );
 
   return {

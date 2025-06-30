@@ -46,6 +46,7 @@ images:
     tag: latest
     pullPolicy: IfNotPresent
 
+
 # Service configurations
 app:
   replicaCount: 1
@@ -73,6 +74,7 @@ app:
     NEXTAUTH_URL: "http://localhost:5560"
     NEXTAUTH_SECRET: "" # Users must provide this values
     API_TOKEN_JWT_SECRET: "" # Users must provide this values
+    CRON_API_KEY: "" # Users must provide this value for cronjob authentication
     # SENDGRID_API_KEY: ""  # Optional
 
 langwatch_nlp:
@@ -82,11 +84,11 @@ langwatch_nlp:
     port: 5561
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
       cpu: 500m
-      memory: 512Mi
+      memory: 1024Mi
+    limits:
+      cpu: 1000m
+      memory: 2048Mi
   env:
     LANGWATCH_ENDPOINT: "http://{{ .Release.Name }}-app:5560"
     # For when running on minikube on Mac OS
@@ -159,7 +161,7 @@ opensearch:
   env:
     discovery.type: single-node
     DISABLE_SECURITY_PLUGIN: "true"
-    _JAVA_OPTIONS: "-XX:UseSVE=0"
+    # _JAVA_OPTIONS: "-XX:UseSVE=0"
     OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m -XX:+UseG1GC -XX:-UseSerialGC -XX:G1ReservePercent=25 -XX:+AlwaysPreTouch -XX:InitiatingHeapOccupancyPercent=30"
     cluster.routing.allocation.disk.threshold_enabled: "false"
     bootstrap.memory_lock: "false"
@@ -180,6 +182,39 @@ opensearch:
     nofile:
       soft: 65536
       hard: 65536
+
+# CronJobs configuration
+cronjobs:
+  enabled: true
+  # Global cronjob configuration
+  image:
+    repository: curlimages/curl
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+  # Individual cronjob configurations
+  jobs:
+    topicClustering:
+      enabled: true
+      schedule: "0 0 * * *"  # At midnight every day
+      endpoint: "/api/cron/schedule_topic_clustering"
+
+    alertTriggers:
+      enabled: true
+      schedule: "*/3 * * * *"  # Every 3 minutes
+      endpoint: "/api/cron/triggers"
+
+    tracesRetentionCleanup:
+      enabled: true
+      schedule: "0 1 * * *"  # At 1 AM every day
+      endpoint: "/api/cron/traces_retention_period_cleanup"
 
 # Ingress configuration
 ingress:

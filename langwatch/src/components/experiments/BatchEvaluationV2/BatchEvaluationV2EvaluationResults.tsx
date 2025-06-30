@@ -10,7 +10,7 @@ import {
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
 import Parse from "papaparse";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Download, ExternalLink, MoreVertical } from "react-feather";
 import { Menu } from "../../../components/ui/menu";
 import { toaster } from "../../../components/ui/toaster";
@@ -33,6 +33,11 @@ export const useBatchEvaluationResults = ({
   isFinished: boolean;
 }) => {
   const [keepRefetching, setKeepRefetching] = useState(true);
+
+  const refetchingStartedAt = useMemo(
+    () => Date.now(),
+    [project.id, experiment.id, runId]
+  );
 
   const run = api.experiments.getExperimentBatchEvaluationRun.useQuery(
     {
@@ -73,11 +78,10 @@ export const useBatchEvaluationResults = ({
   );
 
   // Retrocompatibility with old evaluations
-  const isItJustEndNode = !Object.values(datasetByIndex ?? {}).every(
-    (value) =>
-      Object.values(value?.predicted ?? {}).every(
-        (v) => typeof v === "object" && !Array.isArray(v)
-      )
+  const isItJustEndNode = !Object.values(datasetByIndex ?? {}).every((value) =>
+    Object.values(value?.predicted ?? {}).every(
+      (v) => typeof v === "object" && !Array.isArray(v)
+    )
   );
   let entriesPredictions = Object.values(datasetByIndex ?? {})
     .map((value) => value.predicted!)
@@ -136,7 +140,10 @@ export const useBatchEvaluationResults = ({
   }
 
   return {
-    run,
+    run:
+      run.error && refetchingStartedAt > Date.now() - 5_000
+        ? { ...run, data: undefined, error: undefined, isLoading: true }
+        : run,
     datasetByIndex,
     datasetColumns,
     predictedColumns,

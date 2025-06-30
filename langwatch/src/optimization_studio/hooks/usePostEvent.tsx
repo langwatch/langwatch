@@ -1,128 +1,32 @@
-import { useCallback, useEffect, useRef } from "react";
-import { toaster } from "../../components/ui/toaster";
+import { useCallback, useEffect, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { createLogger } from "../../utils/logger";
-import type { BaseComponent } from "../types/dsl";
+import { type WorkflowStore, useWorkflowStore } from "./useWorkflowStore";
 import type { StudioClientEvent, StudioServerEvent } from "../types/events";
-import { useAlertOnComponent } from "./useAlertOnComponent";
-import { useWorkflowStore, type WorkflowStore } from "./useWorkflowStore";
+import { createLogger } from "../../utils/logger";
+import { toaster } from "../../components/ui/toaster";
+import { fetchSSE } from "~/utils/sse/fetchSSE";
+import type { BaseComponent } from "../types/dsl";
 
-const logger = createLogger("langwatch:studio:socket");
-
-let socketInstance: WebSocket | null = null;
+const logger = createLogger("langwatch:wizard:usePostEvent");
 let pythonDisconnectedTimeout: NodeJS.Timeout | null = null;
-let instances = 0;
-let lastIsAliveCallTimestamp = 0;
 
-export const useSocketClient = () => {
-  instances++;
-  const instanceId = instances;
-
+export const PostEventProvider = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
   const { project } = useOrganizationTeamProject();
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const workflowStore = useWorkflowStore();
-  const { socketStatus, setSocketStatus } = workflowStore;
-  const alertOnComponent = useAlertOnComponent();
-
-  const handleServerMessage = useHandleServerMessage({
-    workflowStore,
-    alertOnComponent,
-  });
-
-  const handleMessage = useCallback(
-    (event: MessageEvent) => {
-      const data: StudioServerEvent = JSON.parse(event.data);
-      logger.info({ event: data.type, payload: "payload" in data ? data.payload : undefined }, "received message");
-
-      handleServerMessage(data);
-    },
-    [handleServerMessage]
+  const { setSocketStatus, socketStatus } = useWorkflowStore(
+    useShallow((state) => ({
+      setSocketStatus: state.setSocketStatus,
+      socketStatus: state.socketStatus,
+    }))
   );
+  const { postEvent } = usePostEvent();
 
-  const connect = useCallback(() => {
+  useEffect(() => {
     if (!project) return;
-
-    if (socketInstance?.readyState === WebSocket.OPEN) return;
-
-    setSocketStatus("connecting-socket");
-    socketInstance = new WebSocket(
-      `${window.location.protocol === "https:" ? "wss" : "ws"}://${
-        window.location.host
-      }/api/studio/ws?projectId=${encodeURIComponent(project.id)}`
-    );
-
-    socketInstance.onopen = () => {
-      logger.info("socket opened, connecting to python");
-      setSocketStatus((socketStatus) => {
-        if (
-          socketStatus === "disconnected" ||
-          socketStatus === "connecting-socket"
-        ) {
-          lastIsAliveCallTimestamp = 0;
-          return "connecting-python";
-        }
-
-        return socketStatus;
-      });
-    };
-
-    socketInstance.onclose = () => {
-      if (socketInstance?.readyState === WebSocket.OPEN) return;
-      logger.info("socket closed, reconnecting");
-      setSocketStatus("disconnected");
-      scheduleReconnect();
-    };
-
-    socketInstance.onerror = (error) => {
-      logger.error("socket error, reconnecting", { error });
-      setSocketStatus("disconnected");
-      scheduleReconnect();
-    };
-
-    socketInstance.onmessage = handleMessage;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project, setSocketStatus]);
-
-  const disconnect = useCallback(() => {
-    logger.info("socket disconnect triggered, closing socket");
-    if (socketInstance) {
-      socketInstance.close();
-      socketInstance = null;
-    }
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
-    }
-    setSocketStatus("disconnected");
-  }, [setSocketStatus]);
-
-  const scheduleReconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) return;
-
-    reconnectTimeoutRef.current = setTimeout(() => {
-      reconnectTimeoutRef.current = null;
-      connect();
-    }, 5000); // Reconnect after 5 seconds
-  }, [connect]);
-
-  const sendMessage = useCallback((event: StudioClientEvent) => {
-    if (socketInstance?.readyState === WebSocket.OPEN) {
-      socketInstance.send(JSON.stringify(event));
-    } else {
-      console.error("Cannot send message: WebSocket is not connected");
-    }
-  }, []);
-
-  useEffect(() => {
-    if (instanceId !== instances) return;
-    if (socketInstance) {
-      socketInstance.onmessage = handleMessage;
-    }
-  }, [handleMessage, instanceId]);
-
-  useEffect(() => {
-    if (instanceId !== instances) return;
 
     const pythonReconnect = () => {
       pythonDisconnectedTimeout = setTimeout(() => {
@@ -131,9 +35,7 @@ export const useSocketClient = () => {
     };
 
     const isAlive = () => {
-      if (instanceId !== instances) return;
-      lastIsAliveCallTimestamp = Date.now();
-      sendMessage({ type: "is_alive", payload: {} });
+      postEvent({ type: "is_alive", payload: {} });
       if (socketStatus === "connected" && !pythonDisconnectedTimeout) {
         pythonReconnect();
       }
@@ -143,31 +45,108 @@ export const useSocketClient = () => {
       isAlive,
       socketStatus === "connecting-python" ? 5_000 : 30_000
     );
+
     // Make the first call
-    if (
-      socketStatus === "connecting-python" &&
-      Date.now() - lastIsAliveCallTimestamp > 5_000
-    ) {
-      isAlive();
-    }
+    setSocketStatus((socketStatus) => {
+      if (socketStatus === "disconnected") {
+        isAlive();
+        return "connecting-python";
+      }
+      return socketStatus;
+    });
 
     return () => {
       clearInterval(interval);
     };
-  }, [socketStatus, sendMessage, setSocketStatus, instanceId]);
+  }, [project]);
 
-  useEffect(() => {
-    return () => {
-      instances--;
-    };
-  }, []);
+  return <>{children}</>;
+};
 
-  return {
-    socketStatus,
-    sendMessage,
-    connect,
-    disconnect,
-  };
+export const usePostEvent = () => {
+  const { project } = useOrganizationTeamProject();
+  const workflowStore = useWorkflowStore();
+  const { socketStatus, setEvaluationState } = useWorkflowStore(
+    useShallow((state) => ({
+      socketStatus: state.socketStatus,
+      setEvaluationState: state.setEvaluationState,
+    }))
+  );
+
+  const handleServerMessage = useHandleServerMessage({
+    workflowStore,
+    alertOnComponent: () => void 0,
+  });
+
+  const [isLoading, setIsLoading] = useState(false);
+
+  const postEvent = useCallback(
+    (event: StudioClientEvent) => {
+      if (!project) return;
+
+      setIsLoading(true);
+
+      fetchSSE<StudioServerEvent>({
+        endpoint: "/api/workflows/post_event",
+        payload: { projectId: project.id, event },
+        timeout: 20000,
+
+        // Process each event
+        onEvent: (serverEvent) => {
+          // Log the event
+          logger.info({ serverEvent, event }, "received message");
+
+          // Handle the event with the workflow store
+          handleServerMessage(serverEvent);
+
+          // Handle evaluation errors
+          if (
+            serverEvent.type === "error" &&
+            event.type === "execute_evaluation"
+          ) {
+            setEvaluationState({
+              status: "error",
+              run_id: undefined,
+              error: serverEvent.payload.message,
+              timestamps: { finished_at: Date.now() },
+            });
+          }
+        },
+
+        // Stop processing on error
+        shouldStopProcessing: (serverEvent) => {
+          return serverEvent.type === "error";
+        },
+
+        // Handle stream errors
+        onError: (error) => {
+          // Show error to user
+          toaster.create({
+            title: "Failed to post message",
+            description: error.message || "Unknown error",
+            type: "error",
+            duration: 5000,
+            meta: { closable: true },
+          });
+
+          // Update evaluation state if relevant
+          if (event.type === "execute_evaluation") {
+            setEvaluationState({
+              status: "error",
+              run_id: undefined,
+              error: error.message,
+              timestamps: { finished_at: Date.now() },
+            });
+          }
+        },
+      }).finally(() => {
+        setIsLoading(false);
+      });
+    },
+    [handleServerMessage, project, setEvaluationState]
+  );
+
+  return { postEvent, isLoading, socketStatus };
 };
 
 export const useHandleServerMessage = ({

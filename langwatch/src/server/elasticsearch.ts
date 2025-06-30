@@ -28,6 +28,11 @@ export const BATCH_EVALUATION_INDEX: IndexSpec = {
   alias: "search-batch-evaluations-alias",
 };
 
+export const SCENARIO_EVENTS_INDEX: IndexSpec = {
+  base: "scenario-events",
+  alias: "scenario-events-alias",
+};
+
 const getOrgElasticsearchDetailsFromProject = async (projectId: string) => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -168,3 +173,5 @@ export const batchEvaluationId = ({
   experimentId: string;
   runId: string;
 }) => `${projectId}/${experimentId}/${runId}`;
+
+// TODO: scenario events index id

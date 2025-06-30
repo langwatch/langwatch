@@ -1,6 +1,5 @@
 import { Container } from "@chakra-ui/react";
 
-import { useSession } from "next-auth/react";
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 

@@ -6,6 +6,7 @@ import {
   PublicShareResourceTypes,
   type AnnotationQueueItem,
 } from "@prisma/client";
+
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { slugify } from "~/utils/slugify";
@@ -413,7 +414,6 @@ export const annotationRouter = createTRPCRouter({
           AnnotationQueueItems: {
             include: {
               user: true,
-              createdByUser: true,
               annotationQueue: true,
             },
           },
