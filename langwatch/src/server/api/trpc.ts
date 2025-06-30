@@ -222,6 +222,7 @@ export const loggerMiddleware = t.middleware(
         type,
         duration,
         userId: ctx.session?.user?.id || null,
+        userAgent: ctx.req?.headers["user-agent"] || null,
         statusCode: ctx.res?.statusCode,
         projectId: (input as any)?.projectId,
         organizationId: (input as any)?.organizationId,
