@@ -3,7 +3,7 @@ import re
 from typing import Any, Type, cast
 import dspy
 from dspy.signatures.signature import Signature, _default_instructions
-from dspy.adapters.types.image import try_expand_image_tags
+from dspy.adapters.types.base_type import split_message_content_for_custom_types
 
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import _get_structured_outputs_response_format
@@ -88,7 +88,7 @@ class TemplateAdapter(dspy.JSONAdapter):
             ]
         )
 
-        messages = try_expand_image_tags(messages)
+        messages = split_message_content_for_custom_types(messages)
 
         return messages
 

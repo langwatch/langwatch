@@ -634,7 +634,7 @@ wheels = [
 
 [[package]]
 name = "dspy"
-version = "2.6.22"
+version = "2.6.27"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -660,9 +660,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "ujson" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/05/81/a969e77c943e51414db3d65cb8340016f05b54c355109c1e67be33480418/dspy-2.6.22.tar.gz", hash = "sha256:debb411901636b3c2c31e75a323bf63769397c344485b0159ad7b6dcee832bd5", size = 213443 }
+sdist = { url = "https://files.pythonhosted.org/packages/38/8a/f7ff1a6d3b5294678f13d17ecfc596f49a59e494b190e4e30f7dea7df1dc/dspy-2.6.27.tar.gz", hash = "sha256:de1c4f6f6d127e0efed894e1915dac40f5d5623e7f1cf3d749c98d790066477a", size = 234604 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/48/53/e15cd0bb67da416a29f1a661c5776d75c37acf5fd312bb770864f2238ea9/dspy-2.6.22-py3-none-any.whl", hash = "sha256:543128f854e538358bbb1b15eea2a32d3af17c93350f336cb22d26e19f613bff", size = 270752 },
+    { url = "https://files.pythonhosted.org/packages/5a/bb/8a75d44bc1b54dea0fa0428eb52b13e7ee533b85841d2c53a53dfc360646/dspy-2.6.27-py3-none-any.whl", hash = "sha256:54e55fd6999b6a46e09b0e49e8c4b71be7dd56a881e66f7a60b8d657650c1a74", size = 297296 },
 ]
 
 [[package]]
@@ -1688,7 +1688,7 @@ requires-dist = [
     { name = "black", specifier = ">=25.1.0" },
     { name = "boto3", specifier = ">=1.34.34,<2" },
     { name = "datamodel-code-generator", specifier = ">=0.30.1" },
-    { name = "dspy", specifier = ">=2.6.18,<2.7" },
+    { name = "dspy", specifier = ">=2.6.27,<2.7" },
     { name = "fastapi", specifier = ">=0.111.1,<1" },
     { name = "google-cloud-aiplatform", specifier = ">=1.70.0,<2" },
     { name = "httpx", specifier = ">=0.27.0,<0.29" },
