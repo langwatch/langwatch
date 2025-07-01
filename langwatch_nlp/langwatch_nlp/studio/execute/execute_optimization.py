@@ -150,6 +150,7 @@ async def execute_optimization(
                     prompt_model=lm,
                     teacher_settings=dict(lm=lm),
                     num_threads=params.get("num_threads", 6),
+                    auto=None
                 )
             elif event.optimizer == "BootstrapFewShotWithRandomSearch":
                 optimizer = dspy.BootstrapFewShotWithRandomSearch(

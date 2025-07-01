@@ -47,18 +47,15 @@ export const PostEventProvider = ({
     );
 
     // Make the first call
-    setSocketStatus((socketStatus) => {
-      if (socketStatus === "disconnected") {
-        isAlive();
-        return "connecting-python";
-      }
-      return socketStatus;
-    });
+    if (socketStatus === "disconnected") {
+      isAlive();
+      setSocketStatus("connecting-python");
+    }
 
     return () => {
       clearInterval(interval);
     };
-  }, [project]);
+  }, [postEvent, project, setSocketStatus, socketStatus]);
 
   return <>{children}</>;
 };
@@ -86,7 +83,7 @@ export const usePostEvent = () => {
 
       setIsLoading(true);
 
-      fetchSSE<StudioServerEvent>({
+      void fetchSSE<StudioServerEvent>({
         endpoint: "/api/workflows/post_event",
         payload: { projectId: project.id, event },
         timeout: 20000,

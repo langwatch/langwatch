@@ -73,6 +73,8 @@ def autoparse_field_value(field: Field, value: Optional[Any]) -> Optional[Any]:
         return NodeRef.model_validate(value)
     if field.type == FieldType.dataset:
         return NodeDataset.model_validate(value)
+    if field.type == FieldType.image:
+        return dspy.Image.from_url(value)
     return value
 
 
@@ -131,6 +133,8 @@ def with_autoparsing(module: type[T]) -> type[T]:
             or str(annotation).startswith("List[")
         ):
             return FieldType.list
+        elif annotation is dspy.Image:
+            return FieldType.image
 
         return None  # Default to no type conversion
 
