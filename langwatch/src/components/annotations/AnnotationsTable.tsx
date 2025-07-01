@@ -256,38 +256,6 @@ export const AnnotationsTable = ({
     );
   };
 
-  const hasScoreOptions = () => {
-    if (!scoreOptions.data || scoreOptions.data.length === 0) {
-      return false;
-    }
-
-    // Check if there are any active score options
-    const activeScoreOptions = scoreOptions.data.filter(
-      (option) => option.active === true
-    );
-    if (activeScoreOptions.length === 0) {
-      return false;
-    }
-
-    if (groupedAnnotations) {
-      const hasOptions = groupedAnnotations.some((annotation) => {
-        return (
-          annotation.scoreOptions &&
-          Object.keys(annotation.scoreOptions).length > 0
-        );
-      });
-      return hasOptions;
-    }
-
-    const hasOptions = allQueueItems.some((item: UnifiedQueueItem) => {
-      return item.annotations?.some((annotation: AnnotationWithUser) => {
-        const scoreOptions = annotation.scoreOptions as ScoreOption | null;
-        return scoreOptions && Object.keys(scoreOptions).length > 0;
-      });
-    });
-    return hasOptions;
-  };
-
   if (queuesLoading || allAnnotationsLoading) {
     return (
       <VStack
@@ -428,7 +396,7 @@ export const AnnotationsTable = ({
                       {hasComments() && (
                         <Table.ColumnHeader>Comments</Table.ColumnHeader>
                       )}
-                      {hasScoreOptions() &&
+                      {scoreOptions.data &&
                         scoreOptions.data &&
                         scoreOptions.data.length > 0 &&
                         scoreOptions.data
@@ -600,8 +568,8 @@ export const AnnotationsTable = ({
                                 </VStack>
                               </Table.Cell>
                             )}
-
-                            {hasScoreOptions() &&
+                            {scoreOptions.data &&
+                              scoreOptions.data.length > 0 &&
                               annotationScoreValues(
                                 item.annotations,
                                 scoreOptionsIDArray
@@ -630,7 +598,9 @@ export const AnnotationsTable = ({
           </Box>
         </HStack>
         <MessagesNavigationFooter
-          totalHits={totalCount}
+          totalHits={
+            groupedAnnotations ? groupedAnnotations.length : totalCount
+          }
           pageOffset={navigationFooter.pageOffset}
           pageSize={navigationFooter.pageSize}
           nextPage={navigationFooter.nextPage}

@@ -194,6 +194,7 @@ export default function Annotations() {
       <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
     </HStack>
   );
+
   return (
     <AnnotationsLayout>
       <Container

@@ -27,7 +27,7 @@ const UserAvatarGroup = ({
   });
 
   return (
-    <HStack gap={0}>
+    <HStack gap={2}>
       {Array.from(userMap.values()).map((user, index) => (
         <RandomColorAvatar
           key={user.id}
