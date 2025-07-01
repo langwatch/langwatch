@@ -9,13 +9,16 @@ export function useAnnotationQueues(
     selectedAnnotations,
     queueId,
     showQueueAndUser,
+    allQueueItems,
   }: {
     selectedAnnotations?: string;
     queueId?: string;
     showQueueAndUser?: boolean;
+    allQueueItems?: boolean;
   } = {
     selectedAnnotations: "pending",
     showQueueAndUser: false,
+    allQueueItems: false,
   }
 ) {
   const { project } = useOrganizationTeamProject();
@@ -33,6 +36,7 @@ export function useAnnotationQueues(
       pageOffset: pageOffset ?? 0,
       queueId: queueId ?? "",
       showQueueAndUser: showQueueAndUser ?? false,
+      allQueueItems: allQueueItems ?? false,
     },
     {
       enabled: !!project,

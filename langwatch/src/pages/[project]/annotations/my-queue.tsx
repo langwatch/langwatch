@@ -17,6 +17,7 @@ export default function TraceAnnotations() {
   const { "queue-item": queueItem } = router.query;
   const { assignedQueueItems, queuesLoading } = useAnnotationQueues({
     showQueueAndUser: true,
+    allQueueItems: true,
   });
   const { project } = useOrganizationTeamProject();
 
