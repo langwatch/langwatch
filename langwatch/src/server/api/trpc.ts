@@ -29,11 +29,6 @@ import { prisma } from "~/server/db";
 import { type PermissionMiddleware } from "./permission";
 import { auditLog } from "../auditLog";
 import { createLogger } from "../../utils/logger";
-import {
-  createTrpcRedisLimiter,
-  defaultFingerPrint,
-} from "@trpc-limiter/redis";
-import { connection as redisConnection } from "../redis";
 
 const logger = createLogger("langwatch:trpc");
 
@@ -241,17 +236,6 @@ export const loggerMiddleware = t.middleware(
   }
 );
 
-const rateLimiterMiddleware = redisConnection
-  ? createTrpcRedisLimiter({
-      fingerprint: (ctx: any) => defaultFingerPrint(ctx.req),
-      message: (hitInfo: any) =>
-        `RATE_LIMIT_EXCEEDED: Too many requests, please try again later. ${hitInfo}`,
-      max: 50,
-      windowMs: 10_000,
-      redisClient: redisConnection,
-    })
-  : t.middleware(async ({ next }) => await next());
-
 /**
  * Protected (authenticated) procedure
  *
@@ -308,7 +292,6 @@ const permissionProcedureBuilder = <TParams extends ProcedureParams>(
     use: (middleware) => {
       return procedure
         .use(loggerMiddleware as any)
-        .use(rateLimiterMiddleware as any)
         .use(middleware as any)
         .use(enforcePermissionCheck as any)
         .use(auditLogMutations as any) as any;
