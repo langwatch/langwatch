@@ -101,17 +101,31 @@ const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
               {getTotalTokensDisplay(trace)}
             </SummaryItem>
           )}
-          {trace.metrics?.total_cost !== null &&
-            trace.metrics?.total_cost !== undefined && (
-              <SummaryItem
-                label="Total Cost"
-                tooltip={
-                  "Based on the number of input and output tokens for each LLM call"
-                }
-              >
-                {numeral(trace.metrics.total_cost).format("$0.00000a")}
-              </SummaryItem>
-            )}
+          {(trace.metrics?.total_cost !== null &&
+            trace.metrics?.total_cost !== undefined &&
+            trace.metrics.total_cost > 0) ||
+          trace.spans?.some(
+            (span) =>
+              span.metrics?.cost !== null &&
+              span.metrics?.cost !== undefined &&
+              span.metrics.cost > 0
+          ) ? (
+            <SummaryItem
+              label="Total Cost"
+              tooltip={
+                "Based on the number of input and output tokens for each LLM call"
+              }
+            >
+              {numeral(
+                trace.metrics?.total_cost ||
+                  trace.spans?.reduce(
+                    (total, span) => total + (span.metrics?.cost || 0),
+                    0
+                  ) ||
+                  0
+              ).format("$0.00000a")}
+            </SummaryItem>
+          ) : null}
           {!!trace.metrics?.first_token_ms && (
             <SummaryItem
               label="Time to First Token"
