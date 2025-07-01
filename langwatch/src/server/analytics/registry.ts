@@ -391,7 +391,7 @@ export const analyticsMetrics = {
         optional: true,
       },
       aggregation: (aggregation, key) => ({
-        [`event_type_${aggregation}`]: {
+        [`event_type_${aggregation}${key ? `_${key}` : ""}`]: {
           nested: {
             path: "events",
           },
@@ -415,8 +415,10 @@ export const analyticsMetrics = {
           },
         },
       }),
-      extractionPath: (aggregation: AggregationTypes) => {
-        return `event_type_${aggregation}>child>cardinality`;
+      extractionPath: (aggregation: AggregationTypes, key) => {
+        return `event_type_${aggregation}${
+          key ? `_${key}` : ""
+        }>child>cardinality`;
       },
       quickwitSupport: false,
     },
