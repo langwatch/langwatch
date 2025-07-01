@@ -7,7 +7,10 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "next/router";
 import { Download } from "react-feather";
-import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
+import {
+  AnnotationsTable,
+  type AnnotationWithUser,
+} from "~/components/annotations/AnnotationsTable";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
 import { useFilterParams } from "~/hooks/useFilterParams";
@@ -83,27 +86,16 @@ export default function Annotations() {
       refetchOnWindowFocus: false,
     }
   );
-  type GroupedAnnotations = Record<
-    string,
-    {
-      traceId: string;
-      trace?: Trace;
-      annotations: Array<{
-        comment: string | null;
-        scoreOptions: Record<
-          string,
-          { value: string | string[]; reason: string }
-        >;
-        createdAt: Date;
-        user: User;
-        expectedOutput: string | null;
-      }>;
-    }
-  >;
 
-  const groupByTraceId = (dataArray: Annotation[]) => {
-    return Object.values(
-      dataArray.reduce((acc: GroupedAnnotations, item) => {
+  type GroupedAnnotation = {
+    traceId: string;
+    trace?: Trace;
+    annotations: AnnotationWithUser[];
+  };
+
+  const groupByTraceId = (dataArray: Annotation[]): GroupedAnnotation[] => {
+    const grouped = dataArray.reduce(
+      (acc: Record<string, GroupedAnnotation>, item) => {
         if (!acc[item.traceId]) {
           acc[item.traceId] = {
             traceId: item.traceId,
@@ -114,20 +106,23 @@ export default function Annotations() {
           };
         }
 
-        acc[item.traceId]!.annotations.push({
-          comment: item.comment,
-          expectedOutput: item.expectedOutput,
-          scoreOptions: item.scoreOptions as Record<
-            string,
-            { value: string | string[]; reason: string }
-          >,
-          user: (item as any).user,
-          createdAt: item.createdAt,
-        });
+        // Create a proper AnnotationWithUser object that includes all original annotation fields
+        const annotationWithUser: AnnotationWithUser = {
+          ...item, // Include all original annotation fields
+          user: (item as any).user, // Include the user data from the query
+        };
+
+        const groupedAnnotation = acc[item.traceId];
+        if (groupedAnnotation) {
+          groupedAnnotation.annotations.push(annotationWithUser);
+        }
 
         return acc;
-      }, {})
+      },
+      {}
     );
+
+    return Object.values(grouped);
   };
 
   const groupedAnnotations = groupByTraceId(annotations.data ?? []);
@@ -208,12 +203,12 @@ export default function Annotations() {
         backgroundColor="white"
       >
         <AnnotationsTable
-          allQueueItems={groupedAnnotations}
-          queuesLoading={annotations.isLoading}
+          groupedAnnotations={groupedAnnotations}
+          allAnnotationsLoading={annotations.isLoading || traces.isLoading}
           heading="Annotations"
           isDone={true}
           tableHeader={tableHeader}
-          noDataTitle="No annotations yet"
+          noDataTitle="No recent annotations yet, change the date range to see more or annotate your messages"
           noDataDescription="Annotate your messages to add more context and improve your analysis."
         />
       </Container>

@@ -5,6 +5,7 @@ import {
   DSPY_STEPS_INDEX,
   esClient,
   MIGRATION_INDEX,
+  SCENARIO_EVENTS_INDEX,
   TRACE_INDEX,
 } from "../server/elasticsearch";
 import {
@@ -20,6 +21,7 @@ import { execSync } from "child_process";
 import { prisma } from "../server/db";
 import { Client as ElasticClient } from "@elastic/elasticsearch";
 import { migrations as importedMigrations } from "../../elastic/migrations";
+import { eventMapping } from "../../elastic/mappings/scenario-events";
 
 const migrations: { [key: string]: any } = importedMigrations;
 
@@ -109,6 +111,8 @@ const quickwitMigrate = async () => {
   createIndex("./elastic/quickwit/search-dspy-steps.yaml");
   createIndex("./elastic/quickwit/search-batch-evaluations.yaml");
   createIndex("./elastic/quickwit/search-traces.yaml");
+  // TODO: add scenario events index
+  // createIndex("./elastic/quickwit/search-scenario-events.yaml");
 };
 
 const getLastAppliedMigration = async (client: ElasticClient) => {
@@ -218,6 +222,33 @@ const createIndexes = async (lastMigration: string, client: ElasticClient) => {
   await client.indices.putAlias({
     index: batchEvaluationExists?.index ?? BATCH_EVALUATION_INDEX.base,
     name: BATCH_EVALUATION_INDEX.alias,
+    is_write_index: true,
+  });
+
+  // Scenario Events
+  const scenarioEventExists = await getLastIndexForBase(
+    SCENARIO_EVENTS_INDEX.base,
+    client
+  );
+  if (!scenarioEventExists) {
+    await client.indices.create({
+      index: SCENARIO_EVENTS_INDEX.base,
+      settings: {
+        number_of_shards: 4,
+        number_of_replicas: 0,
+      },
+      mappings: {
+        properties: eventMapping.properties as Record<string, MappingProperty>,
+      },
+    });
+  }
+  await client.indices.putMapping({
+    index: scenarioEventExists?.index ?? SCENARIO_EVENTS_INDEX.base,
+    properties: eventMapping.properties as Record<string, MappingProperty>,
+  });
+  await client.indices.putAlias({
+    index: scenarioEventExists?.index ?? SCENARIO_EVENTS_INDEX.base,
+    name: SCENARIO_EVENTS_INDEX.alias,
     is_write_index: true,
   });
 

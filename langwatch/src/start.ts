@@ -10,29 +10,6 @@ import { initializeBackgroundWorkers } from "./server/background/init";
 
 const logger = createLogger("langwatch:start");
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-let studioSocket = require("../build-websocket/socketServer");
-
-const reloadStudioSocket = () => {
-  delete require.cache[require.resolve("../build-websocket/socketServer")];
-  studioSocket = require("../build-websocket/socketServer");
-  logger.info("reloaded studioSocket module");
-};
-
-if (process.env.NODE_ENV !== "production") {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const watch = require("watch");
-  watch.createMonitor(
-    path.join(__dirname, "../build-websocket"),
-    { interval: 1 },
-    function (monitor: any) {
-      monitor.on("changed", function () {
-        reloadStudioSocket();
-      });
-    }
-  );
-}
-
 export const metricsMiddleware = promBundle({
   metricsPath: "/metrics",
   includeMethod: true,
@@ -150,8 +127,6 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
       // Pass hot module reloading requests to Next.js
       if (parsedUrl.pathname === "/_next/webpack-hmr") {
         void defaultHandler(req, socket, head);
-      } else if (parsedUrl.pathname?.startsWith("/api/studio/ws")) {
-        void studioSocket.handleUpgrade(req, socket, head, parsedUrl);
       } else {
         socket.destroy();
       }
@@ -178,7 +153,13 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
 
   server.listen(port, async () => {
     logger.info(
-      { hostname, port, fullUrl: `http://${hostname}:${port}` },
+      {
+        hostname,
+        port,
+        fullUrl: `http://${
+          hostname === "0.0.0.0" ? "localhost" : hostname
+        }:${port}`,
+      },
       "LangWatch is ready 🎉"
     );
 

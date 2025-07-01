@@ -31,12 +31,6 @@ else
  npm run start:prepare:db
 fi
 
-WATCH_WEBSOCKET_COMMAND=""
-if [ "$NODE_ENV" = "development" ]; then
-  WATCH_WEBSOCKET_COMMAND="npm run build:websocket -- --watch"
-fi
-
-
 COMMANDS=()
 if [ -n "$START_APP_COMMAND" ]; then
   COMMANDS+=("\"$RUNTIME_ENV $START_APP_COMMAND\"")
@@ -46,9 +40,6 @@ if [ -n "$START_WORKERS_COMMAND" ]; then
 fi
 if [ -n "$START_QUICKWIT_COMMAND" ]; then
   COMMANDS+=("\"$RUNTIME_ENV $START_QUICKWIT_COMMAND\"")
-fi
-if [ -n "$WATCH_WEBSOCKET_COMMAND" ]; then
-  COMMANDS+=("\"$RUNTIME_ENV $WATCH_WEBSOCKET_COMMAND\"")
 fi
 
 concurrently --restart-tries -1 "${COMMANDS[@]}"

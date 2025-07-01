@@ -4,9 +4,9 @@ import { type PropsWithChildren } from "react";
 import { Check, Edit, Inbox, Plus, Users } from "react-feather";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
-import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
+import { api } from "~/utils/api";
 import { useDrawer } from "./CurrentDrawer";
 import { RandomColorAvatar } from "./RandomColorAvatar";
 
@@ -18,16 +18,21 @@ export default function AnnotationsLayout({
   const user = session?.user;
   const { project } = useOrganizationTeamProject();
 
-  const {
-    assignedQueueItemsWithTraces,
-    memberAccessibleQueueItemsWithTraces,
-    memberAccessibleQueues,
-  } = useAnnotationQueues();
+  // Use optimized count endpoints instead of fetching full data
+  const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id }
+  );
 
-  const totalItems =
-    (assignedQueueItemsWithTraces?.filter((item) => !item.doneAt).length ?? 0) +
-    (memberAccessibleQueueItemsWithTraces?.filter((item) => !item.doneAt)
-      .length ?? 0);
+  const assignedItemsCount = api.annotation.getAssignedItemsCount.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id }
+  );
+
+  const queueItemsCounts = api.annotation.getQueueItemsCounts.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id }
+  );
 
   const menuItems = {
     inbox: <Inbox width={20} height={20} />,
@@ -78,7 +83,9 @@ export default function AnnotationsLayout({
             icon={menuItems.inbox}
             menuEnd={
               <Text fontSize="xs" fontWeight="500">
-                {totalItems > 0 ? totalItems : ""}
+                {pendingItemsCount.data && pendingItemsCount.data > 0
+                  ? pendingItemsCount.data
+                  : ""}
               </Text>
             }
             isSelectedAnnotation={router.pathname === "/[project]/annotations"}
@@ -93,12 +100,9 @@ export default function AnnotationsLayout({
             icon={menuItems.myQueues}
             menuEnd={
               <Text fontSize="xs" fontWeight="500">
-                {(() => {
-                  const count =
-                    assignedQueueItemsWithTraces?.filter((item) => !item.doneAt)
-                      .length ?? 0;
-                  return count > 0 ? count : "";
-                })()}
+                {assignedItemsCount.data && assignedItemsCount.data > 0
+                  ? assignedItemsCount.data
+                  : ""}
               </Text>
             }
           >
@@ -125,7 +129,7 @@ export default function AnnotationsLayout({
               cursor="pointer"
             />
           </HStack>
-          {memberAccessibleQueues?.map((queue) => (
+          {queueItemsCounts.data?.map((queue) => (
             <MenuLink
               key={queue.id}
               href={`/${project?.slug}/annotations/${queue.slug}`}
@@ -136,12 +140,7 @@ export default function AnnotationsLayout({
               icon={menuItems.queues}
               menuEnd={
                 <Text fontSize="xs" fontWeight="500">
-                  {(() => {
-                    const pendingCount = queue.AnnotationQueueItems.filter(
-                      (item) => !item.doneAt
-                    ).length;
-                    return pendingCount > 0 ? pendingCount : "";
-                  })()}
+                  {queue.pendingCount > 0 ? queue.pendingCount : ""}
                 </Text>
               }
             >

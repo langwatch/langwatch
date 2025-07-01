@@ -41,7 +41,9 @@ export const AddParticipants = ({
   const { organization, project } = useOrganizationTeamProject();
 
   const annotationQueues = api.annotation.getQueues.useQuery(
-    { projectId: project?.id ?? "" },
+    {
+      projectId: project?.id ?? "",
+    },
     {
       enabled: !!project,
     }

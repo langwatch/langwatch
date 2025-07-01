@@ -102,7 +102,7 @@ class LangWatchTrace:
             )
             set_api_key(api_key=api_key)
 
-        self.metadata = metadata
+        self.metadata = metadata or {}
         self.api_key = api_key
         self.max_string_length = max_string_length
         self._context_token = None
@@ -112,8 +112,6 @@ class LangWatchTrace:
             Type[LangWatchSpan], lambda **kwargs: LangWatchSpan(trace=self, **kwargs)
         )
 
-        if self.metadata is None:
-            self.metadata = {}
         if trace_id is not None:
             warn(
                 "trace_id is deprecated and will be removed in a future version. Future versions of the SDK will not support it. Until that happens, the `trace_id` will be mapped to `deprecated.trace_id` in the trace's metadata."
@@ -151,6 +149,11 @@ class LangWatchTrace:
                 "params": params,
                 "metrics": metrics,
                 "evaluations": evaluations,
+                "attributes": {
+                    "metadata": json.dumps(
+                        metadata, cls=SerializableWithStringFallback
+                    ),
+                },
             }
             if not skip_root_span
             else None
@@ -322,10 +325,12 @@ class LangWatchTrace:
 
         client = get_instance()
 
-        if metadata is None:
-            metadata = {}
+        self.metadata = {
+            **(self.metadata or {}),
+            **(metadata or {}),
+        }
         if trace_id is not None:
-            metadata[AttributeKey.DeprecatedTraceId] = str(trace_id)
+            self.metadata[AttributeKey.DeprecatedTraceId] = str(trace_id)
         if expected_output is not None:
             self._expected_output = expected_output
         if disable_sending is not None and client is not None:
@@ -336,7 +341,7 @@ class LangWatchTrace:
             self.root_span.set_attributes(
                 {
                     "metadata": json.dumps(
-                        metadata, cls=SerializableWithStringFallback
+                        self.metadata, cls=SerializableWithStringFallback
                     ),
                 }
             )

@@ -147,6 +147,11 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
             {showTools && (
               <MessageHoverActions trace={trace} {...translationState} />
             )}
+            {trace.metadata.thread_id && (
+              <Text color="gray.400" fontSize="xs">
+                Thread ID: {trace.metadata.thread_id}
+              </Text>
+            )}
             <Message
               author="Input"
               avatar={

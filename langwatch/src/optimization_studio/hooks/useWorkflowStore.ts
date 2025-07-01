@@ -32,7 +32,6 @@ import { nanoid } from "nanoid";
 
 export type SocketStatus =
   | "disconnected"
-  | "connecting-socket"
   | "connecting-python"
   | "connected";
 

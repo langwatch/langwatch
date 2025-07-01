@@ -86,6 +86,7 @@ export function MessagesTable({
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
+  const queryClient = api.useContext();
 
   const { filterParams, queryOpts } = useFilterParams();
   const [selectedTraceIds, setSelectedTraceIds] = useState<string[]>([]);
@@ -865,25 +866,27 @@ export function MessagesTable({
         annotators: annotators.map((p) => p.id),
       },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
+          // Invalidate count queries to update sidebar counts
+          await queryClient.annotation.getPendingItemsCount.invalidate();
+          await queryClient.annotation.getAssignedItemsCount.invalidate();
+          await queryClient.annotation.getQueueItemsCounts.invalidate();
+
           dialog.onClose();
           toaster.create({
             title: "Trace added to annotation queue",
-            description: (
-              <>
-                <Link
-                  href={`/${project?.slug}/annotations/`}
-                  textDecoration="underline"
-                >
-                  View Queues
-                </Link>
-              </>
-            ),
+            description: "Successfully added traces to annotation queue",
             type: "success",
             meta: {
               closable: true,
             },
             placement: "top-end",
+            action: {
+              label: "View Queues",
+              onClick: () => {
+                void router.push(`/${project?.slug}/annotations/`);
+              },
+            },
           });
         },
       }

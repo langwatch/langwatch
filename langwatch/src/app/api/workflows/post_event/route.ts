@@ -8,7 +8,7 @@ import { prisma } from "../../../../server/db";
 import { backendHasTeamProjectPermission } from "../../../../server/api/permission";
 import { authOptions } from "../../../../server/auth";
 import { getServerSession } from "next-auth";
-import { studioBackendPostEvent } from "../../../../optimization_studio/server/socketServer";
+import { studioBackendPostEvent } from "./post-event";
 import { streamSSE } from "hono/streaming";
 import {
   studioClientEventSchema,
@@ -75,6 +75,25 @@ app.post(
       });
       return c.json({ error: (error as Error).message }, { status: 500 });
     }
+
+    switch (message.type) {
+      case "is_alive":
+      case "stop_execution":
+      case "execute_component":
+      case "execute_flow":
+      case "execute_evaluation":
+      case "stop_evaluation_execution":
+      case "execute_optimization":
+      case "stop_optimization_execution":
+        break;
+      default:
+        return c.json(
+          //@ts-expect-error
+          { error: `Unknown event type on server: ${message.type}` },
+          { status: 400 }
+        );
+    }
+
     // Use streamSSE to create an SSE stream response
     return streamSSE(c, async (stream) => {
       // Create a promise that will resolve when the stream should end
@@ -96,19 +115,31 @@ app.post(
             }
           },
         }).catch((error) => {
-          logger.error({ error, projectId }, "error");
-          Sentry.captureException(error, {
-            extra: {
-              projectId,
-              message,
-            },
-          });
-          void stream.writeSSE({
-            data: JSON.stringify({
-              type: "error",
-              payload: { message: error.message },
-            }),
-          });
+          logger.error({ error }, "Error handling message");
+
+          // handle component error
+          if ("node_id" in message.payload && message.payload.node_id) {
+            void stream.writeSSE({
+              data: JSON.stringify({
+                type: "component_state_change",
+                payload: {
+                  component_id: message.payload.node_id,
+                  execution_state: {
+                    status: "error",
+                    error: error.message,
+                    timestamps: { finished_at: Date.now() },
+                  },
+                },
+              }),
+            });
+          } else {
+            void stream.writeSSE({
+              data: JSON.stringify({
+                type: "error",
+                payload: { message: error.message },
+              }),
+            });
+          }
         });
       });
 

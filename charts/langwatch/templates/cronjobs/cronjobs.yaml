@@ -1,0 +1,72 @@
+{{- if .Values.cronjobs.enabled }}
+{{- $root := . }}
+{{- range $jobName, $jobConfig := .Values.cronjobs.jobs }}
+{{- if $jobConfig.enabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $root.Release.Name }}-{{ $jobName | kebabcase }}
+  labels:
+    app.kubernetes.io/name: {{ $root.Release.Name }}-{{ $jobName | kebabcase }}
+    app.kubernetes.io/instance: {{ $root.Release.Name }}
+    {{- include "langwatch.labels" $root | nindent 4 }}
+spec:
+  schedule: {{ $jobConfig.schedule | quote }}
+  concurrencyPolicy: Replace
+  failedJobsHistoryLimit: 1
+  successfulJobsHistoryLimit: 1
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $root.Release.Name }}-{{ $jobName | kebabcase }}
+        app.kubernetes.io/instance: {{ $root.Release.Name }}
+    spec:
+      template:
+        metadata:
+          labels:
+            app: langwatch-cronjob
+            app.kubernetes.io/name: {{ $root.Release.Name }}-{{ $jobName | kebabcase }}
+            app.kubernetes.io/instance: {{ $root.Release.Name }}
+        spec:
+          # Pod security context
+          securityContext:
+            {{- toYaml $root.Values.global.podSecurityContext | nindent 12 }}
+          # Node selection
+          {{- with $root.Values.global.scheduling.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $root.Values.global.scheduling.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with $root.Values.global.scheduling.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: curl
+              securityContext:
+                {{- toYaml $root.Values.global.containerSecurityContext | nindent 16 }}
+              image: "{{ $root.Values.cronjobs.image.repository }}:{{ $root.Values.cronjobs.image.tag }}"
+              imagePullPolicy: {{ $root.Values.cronjobs.image.pullPolicy }}
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  curl -i \
+                    -H 'Authorization: Bearer {{ $root.Values.app.env.CRON_API_KEY }}' \
+                    -X GET \
+                    http://{{ $root.Release.Name }}-app:{{ $root.Values.app.service.port }}{{ $jobConfig.endpoint }}
+              resources:
+                {{- toYaml $root.Values.cronjobs.resources | nindent 16 }}
+              volumeMounts:
+                - name: tmp-dir
+                  mountPath: /tmp
+          volumes:
+            - name: tmp-dir
+              emptyDir: {}
+          restartPolicy: OnFailure
+{{- end }}
+{{- end }}
+{{- end }}

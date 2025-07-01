@@ -1,4 +1,8 @@
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
+import type {
+  AggregationsAggregate,
+  QueryDslBoolQuery,
+  SearchResponse,
+} from "@elastic/elasticsearch/lib/api/types";
 import { EvaluationExecutionMode, ExperimentType } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
@@ -624,16 +628,34 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       const client = await esClient({ projectId: input.projectId });
-      const batchEvaluationRun = await client.get<ESBatchEvaluation>({
-        index: BATCH_EVALUATION_INDEX.alias,
-        id: id,
-      });
+      let batchEvaluationRun: SearchResponse<
+        ESBatchEvaluation,
+        Record<string, AggregationsAggregate>
+      >;
+      let attempts = 0;
+      while (attempts < 3) {
+        batchEvaluationRun = await client.search<ESBatchEvaluation>({
+          index: BATCH_EVALUATION_INDEX.alias,
+          body: {
+            query: {
+              term: { _id: id },
+            },
+          },
+          size: 1,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 1_000));
+        attempts++;
+        if (batchEvaluationRun.hits.hits.length > 0) {
+          break;
+        }
+      }
 
-      const result = batchEvaluationRun._source;
+      const result = batchEvaluationRun!.hits.hits[0]?._source;
       if (!result) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Batch evaluation run not found",
+          message:
+            "Batch evaluation run not found",
         });
       }
 

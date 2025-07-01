@@ -2,11 +2,11 @@ import { toaster } from "../../components/ui/toaster";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import type { StudioClientEvent } from "../types/events";
-import { useSocketClient } from "./useSocketClient";
 import { useWorkflowStore } from "./useWorkflowStore";
+import { usePostEvent } from "./usePostEvent";
 
 export const useEvaluationExecution = () => {
-  const { sendMessage, socketStatus } = useSocketClient();
+  const { postEvent, socketStatus } = usePostEvent();
 
   const [triggerTimeout, setTriggerTimeout] = useState<{
     run_id: string;
@@ -96,7 +96,7 @@ export const useEvaluationExecution = () => {
           dataset_entry,
         },
       };
-      sendMessage(payload);
+      postEvent(payload);
 
       setTimeout(() => {
         setTriggerTimeout({ run_id, timeout_on_status: "waiting" });
@@ -107,7 +107,7 @@ export const useEvaluationExecution = () => {
       setOpenResultsPanelRequest,
       setEvaluationState,
       getWorkflow,
-      sendMessage,
+      postEvent,
     ]
   );
 
@@ -131,7 +131,7 @@ export const useEvaluationExecution = () => {
         type: "stop_evaluation_execution",
         payload: { workflow: workflow, run_id },
       };
-      sendMessage(payload);
+      postEvent(payload);
 
       setTimeout(() => {
         setTriggerTimeout({
@@ -140,7 +140,7 @@ export const useEvaluationExecution = () => {
         });
       }, 10_000);
     },
-    [socketAvailable, setEvaluationState, sendMessage, getWorkflow]
+    [socketAvailable, setEvaluationState, postEvent, getWorkflow]
   );
 
   return {

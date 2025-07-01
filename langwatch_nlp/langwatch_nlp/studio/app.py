@@ -42,7 +42,10 @@ from langwatch_nlp.studio.types.events import (
     component_error_event,
     get_trace_id,
 )
-from langwatch_nlp.studio.utils import SerializableWithPydanticAndPredictEncoder, shutdown_handler
+from langwatch_nlp.studio.utils import (
+    SerializableWithPydanticAndPredictEncoder,
+    shutdown_handler,
+)
 
 logger = get_logger(__name__)
 

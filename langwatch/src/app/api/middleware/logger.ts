@@ -17,13 +17,17 @@ export const loggerMiddleware = () => {
       const duration = Date.now() - start;
       const { method } = c.req;
       const url = c.req.url;
-      const status = c.res.status;
+      const statusCode = c.res.status;
 
       const logData: Record<string, unknown> = {
         method,
         url,
-        status,
+        statusCode,
         duration,
+        userAgent: c.req.header("user-agent") ?? null,
+        userId: c.get("user")?.id ?? null,
+        projectId: c.get("project")?.id ?? null,
+        organizationId: c.get("organization")?.id ?? null,
       };
 
       if (error) {

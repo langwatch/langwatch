@@ -200,37 +200,41 @@ const auditLogMutations = t.middleware(
   }
 );
 
-export const loggerMiddleware = t.middleware(async ({ path, type, input, ctx, next }) => {
-  const start = Date.now();
-  let error: unknown = null;
+export const loggerMiddleware = t.middleware(
+  async ({ path, type, input, ctx, next }) => {
+    const start = Date.now();
+    let error: unknown = null;
 
-  try {
-    return await next();
-  } catch (err) {
-    error = err;
-    throw err;
-  } finally {
-    const duration = Date.now() - start;
-    const logData: Record<string, any> = {
-      path,
-      type,
-      duration,
-      userId: (ctx.session?.user?.id) || null,
-      projectId: (input as any)?.projectId,
-      organizationId: (input as any)?.organizationId,
-    };
+    try {
+      return await next();
+    } catch (err) {
+      error = err;
+      throw err;
+    } finally {
+      const duration = Date.now() - start;
+      const logData: Record<string, any> = {
+        path,
+        type,
+        duration,
+        userId: ctx.session?.user?.id ?? null,
+        userAgent: ctx.req?.headers["user-agent"] ?? null,
+        statusCode: ctx.res?.statusCode ?? null,
+        projectId: (input as any)?.projectId ?? null,
+        organizationId: (input as any)?.organizationId ?? null,
+      };
 
-    if (error) {
-      logData.error = error instanceof Error ? error : JSON.stringify(error);
+      if (error) {
+        logData.error = error instanceof Error ? error : JSON.stringify(error);
 
-      Sentry.captureException(error);
+        Sentry.captureException(error);
 
-      logger.error(logData, "trpc error");
-    } else {
-      logger.info(logData, "trpc call");
+        logger.error(logData, "trpc error");
+      } else {
+        logger.info(logData, "trpc call");
+      }
     }
   }
-});
+);
 
 /**
  * Protected (authenticated) procedure

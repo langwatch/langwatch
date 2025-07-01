@@ -15,24 +15,24 @@ import { Conversation } from "../../../components/messages/Conversation";
 export default function TraceAnnotations() {
   const router = useRouter();
   const { "queue-item": queueItem } = router.query;
-  const {
-    assignedQueueItemsWithTraces,
-    memberAccessibleQueueItemsWithTraces,
-    queuesLoading,
-  } = useAnnotationQueues();
+  const { assignedQueueItems, queuesLoading } = useAnnotationQueues({
+    showQueueAndUser: true,
+  });
   const { project } = useOrganizationTeamProject();
 
   const allQueueItems = useMemo(() => {
-    const items = [
-      ...(assignedQueueItemsWithTraces ?? []),
-      ...(memberAccessibleQueueItemsWithTraces ?? []),
-    ];
-    return items.filter((item) => !item.doneAt);
-  }, [assignedQueueItemsWithTraces, memberAccessibleQueueItemsWithTraces]);
+    const items = [...(assignedQueueItems ?? [])];
 
-  let currentQueueItem = allQueueItems
-    .filter((item) => !item.doneAt)
-    .find((item) => item.id === queueItem);
+    // Filter out done items
+    return items.filter((item) => !item.doneAt);
+  }, [assignedQueueItems]);
+
+  // Force re-render when items change by creating a key
+  const queueItemsKey = useMemo(() => {
+    return allQueueItems.map((item) => `${item.id}-${item.doneAt}`).join(",");
+  }, [allQueueItems]);
+
+  let currentQueueItem = allQueueItems.find((item) => item.id === queueItem);
 
   if (!currentQueueItem) {
     currentQueueItem = allQueueItems[0];
@@ -41,9 +41,13 @@ export default function TraceAnnotations() {
   const queryClient = api.useContext();
 
   const refetchQueueItems = async () => {
-    await queryClient.annotation.getQueueItems.invalidate();
-    await queryClient.annotation.getQueues.invalidate();
+    await queryClient.annotation.getOptimizedAnnotationQueues.invalidate();
+    await queryClient.annotation.getPendingItemsCount.invalidate();
+    await queryClient.annotation.getAssignedItemsCount.invalidate();
+    await queryClient.annotation.getQueueItemsCounts.invalidate();
   };
+
+  console.log("currentQueueItem", currentQueueItem);
   const traceDetails = api.traces.getById.useQuery(
     {
       projectId: project?.id ?? "",
@@ -103,6 +107,7 @@ export default function TraceAnnotations() {
           backgroundColor="white"
         >
           <AnnotationQueuePicker
+            key={queueItemsKey}
             queueItems={allQueueItems}
             currentQueueItem={currentQueueItem}
             refetchQueueItems={refetchQueueItems}

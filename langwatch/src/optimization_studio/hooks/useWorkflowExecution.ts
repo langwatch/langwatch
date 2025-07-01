@@ -1,12 +1,12 @@
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import type { StudioClientEvent } from "../types/events";
-import { useSocketClient } from "./useSocketClient";
 import { useWorkflowStore } from "./useWorkflowStore";
 import { toaster } from "../../components/ui/toaster";
+import { usePostEvent } from "./usePostEvent";
 
 export const useWorkflowExecution = () => {
-  const { sendMessage, socketStatus } = useSocketClient();
+  const { postEvent, socketStatus } = usePostEvent();
 
   const [triggerTimeout, setTriggerTimeout] = useState<{
     trace_id: string;
@@ -92,13 +92,13 @@ export const useWorkflowExecution = () => {
           manual_execution_mode: true,
         },
       };
-      sendMessage(payload);
+      postEvent(payload);
 
       setTimeout(() => {
         setTriggerTimeout({ trace_id, timeout_on_status: "waiting" });
       }, 20_000);
     },
-    [socketAvailable, getWorkflow, sendMessage, setWorkflowExecutionState]
+    [socketAvailable, getWorkflow, postEvent, setWorkflowExecutionState]
   );
 
   const stopWorkflowExecution = useCallback(
@@ -121,7 +121,7 @@ export const useWorkflowExecution = () => {
         type: "stop_execution",
         payload: { trace_id },
       };
-      sendMessage(payload);
+      postEvent(payload);
 
       setTimeout(() => {
         setTriggerTimeout({
@@ -130,7 +130,7 @@ export const useWorkflowExecution = () => {
         });
       }, 10_000);
     },
-    [socketAvailable, setWorkflowExecutionState, sendMessage, getWorkflow]
+    [socketAvailable, setWorkflowExecutionState, postEvent, getWorkflow]
   );
 
   return {
