@@ -249,6 +249,7 @@ const CustomGraph_ = React.memo(
           series.aggregation,
           series.pipeline?.field,
           series.pipeline?.aggregation,
+          series.key,
         ]
           .filter((x) => x)
           .join("/");

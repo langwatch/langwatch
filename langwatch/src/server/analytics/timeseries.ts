@@ -342,13 +342,23 @@ const extractResult = (
   }
 
   const metric_ = getMetric(metric);
-  const paths = metric_.extractionPath(aggregation, key, subkey).split(">");
+  const extractionPath = metric_.extractionPath(aggregation, key, subkey);
+  const paths = extractionPath.split(">");
   if (pipeline) {
     const pipelinePath_ = pipelinePath(metric, aggregation, pipeline);
     return { [pipelinePath_]: current[pipelinePath_].value };
   }
 
   for (const path of paths) {
+    if (!current || !current[path]) {
+      // Include key in series name if it's provided and the metric supports it
+      const hasKeySupport = metric_.requiresKey !== undefined;
+      const seriesName =
+        key && hasKeySupport
+          ? `${metric}/${aggregation.replace("terms", "cardinality")}/${key}`
+          : `${metric}/${aggregation.replace("terms", "cardinality")}`;
+      return { [seriesName]: 0 };
+    }
     current = current[path];
   }
 
@@ -360,8 +370,15 @@ const extractResult = (
       value = current.buckets.length;
     }
   }
+  // Include key in series name if it's provided and the metric supports it
+  const hasKeySupport = metric_.requiresKey !== undefined;
+  const seriesName =
+    key && hasKeySupport
+      ? `${metric}/${aggregation.replace("terms", "cardinality")}/${key}`
+      : `${metric}/${aggregation.replace("terms", "cardinality")}`;
+
   return {
-    [`${metric}/${aggregation.replace("terms", "cardinality")}`]: value,
+    [seriesName]: value,
   };
 };
 
