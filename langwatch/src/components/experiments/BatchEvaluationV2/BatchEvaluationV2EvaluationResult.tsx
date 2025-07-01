@@ -6,7 +6,7 @@ import type { ESBatchEvaluation } from "../../../server/experiments/types";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
 import { useDrawer } from "../../CurrentDrawer";
-import { ExternalImage, isImageUrl } from "../../ExternalImage";
+import { ExternalImage, getImageUrl } from "../../ExternalImage";
 import { HoverableBigText } from "../../HoverableBigText";
 
 type RenderableRow = {
@@ -60,9 +60,9 @@ const evaluationResultsTableRow = (
     datasetColumns: Array.from(datasetColumns).map((column) => ({
       render: () => (
         <Table.Cell key={`dataset-${column}`} maxWidth="250px">
-          {datasetEntry && isImageUrl(datasetEntry.entry[column]) ? (
+          {datasetEntry && getImageUrl(datasetEntry.entry[column]) ? (
             <ExternalImage
-              src={datasetEntry.entry[column]}
+              src={getImageUrl(datasetEntry.entry[column])!}
               minWidth="24px"
               minHeight="24px"
               maxHeight="120px"
