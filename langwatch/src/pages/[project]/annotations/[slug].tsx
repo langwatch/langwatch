@@ -37,22 +37,15 @@ export default function Annotations() {
     return (
       <VStack width="full" align="start">
         <Heading size="lg">{queue.data?.name}</Heading>
-        <HStack position="relative" gap={2}>
+        <HStack>
           <Text fontSize="sm">Members: </Text>
           {queueMembers?.map((member) => {
             return (
-              <Box>
-                <Tooltip
-                  key={member.id}
-                  content={member.name}
-                  positioning={{ placement: "top-start", gutter: 8 }}
-                  showArrow
-                >
-                  <Avatar.Root size="xs">
-                    <Avatar.Fallback name={member.name ?? ""} />
-                  </Avatar.Root>
-                </Tooltip>
-              </Box>
+              <Tooltip key={member.id} content={member.name}>
+                <Avatar.Root size="xs">
+                  <Avatar.Fallback name={member.name ?? ""} />
+                </Avatar.Root>
+              </Tooltip>
             );
           })}
         </HStack>
