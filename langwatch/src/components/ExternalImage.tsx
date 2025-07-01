@@ -2,19 +2,27 @@ import { useEffect, useState } from "react";
 import { Box, Image, Text } from "@chakra-ui/react";
 import { Tooltip } from "../components/ui/tooltip";
 
-export const isImageUrl = (str: unknown): boolean => {
+export const getImageUrl = (str: unknown): string | null => {
   if (!str) {
-    return false;
+    return null;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-base-to-string
-  const str_ = str.toString();
+  const str_ = str.toString().trim();
+
+  // Check for markdown image format ![alt](url)
+  const markdownImageRegex = /^\!\[.*?\]\((.*?)\)$/;
+  const markdownMatch = str_.match(markdownImageRegex);
+  if (markdownMatch && markdownMatch[1]) {
+    // Extract the URL from markdown format and validate it recursively
+    return markdownMatch[1] ?? null;
+  }
 
   // Check for base64 image
   if (str_.startsWith("data:image/")) {
     const base64Regex =
       /^data:image\/(jpeg|jpg|gif|png|webp|svg\+xml|bmp);base64,/i;
-    return base64Regex.test(str_);
+    return str_.match(base64Regex)?.[0] ?? null;
   }
 
   try {
@@ -26,7 +34,7 @@ export const isImageUrl = (str: unknown): boolean => {
 
     // Check if URL contains an image file extension
     if (imageExtensionRegex.test(str_)) {
-      return true;
+      return str_;
     }
 
     // Check if url is from commonly used image hosting sites which don't end up in the imageExtensionRegex
@@ -34,12 +42,12 @@ export const isImageUrl = (str: unknown): boolean => {
       url_.hostname.endsWith("gstatic.com") ||
       url_.hostname.endsWith("googleusercontent.com")
     ) {
-      return true;
+      return str_;
     }
 
-    return false;
+    return null;
   } catch {
-    return false;
+    return null;
   }
 };
 
