@@ -654,6 +654,7 @@ export const annotationRouter = createTRPCRouter({
         pageOffset: z.number(),
         queueId: z.string().optional(),
         showQueueAndUser: z.boolean().optional(),
+        allQueueItems: z.boolean().optional(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
@@ -720,8 +721,8 @@ export const annotationRouter = createTRPCRouter({
       // Get paginated queue items first
       const queueItems = await ctx.prisma.annotationQueueItem.findMany({
         where: whereCondition,
-        take: input.pageSize,
-        skip: input.pageOffset,
+        take: input.allQueueItems ? undefined : input.pageSize,
+        skip: input.allQueueItems ? undefined : input.pageOffset,
         include: {
           user: true,
           createdByUser: true,
