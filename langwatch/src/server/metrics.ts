@@ -1,4 +1,4 @@
-import { Counter, Histogram, register, collectDefaultMetrics } from "prom-client";
+import { Counter, Histogram, register } from "prom-client";
 import { performance } from 'node:perf_hooks';
 
 type Endpoint =
@@ -10,7 +10,7 @@ type Endpoint =
   | "topic_clustering_batch"
   | "topic_clustering_incremental";
 
-// Histogram for event loop lap
+// Histogram for event loop lag
 register.removeSingleMetric("event_loop_lag_milliseconds");
 const eventLoopLag = new Histogram({
   name: "event_loop_lag_milliseconds",
