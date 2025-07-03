@@ -530,10 +530,6 @@ class LangWatchTrackedCOPRO(COPRO):
         this = self
 
         def patched_logger_info(text, *args, **kwargs):
-            print("text", text)
-            print("args", args)
-            print("kwargs", kwargs)
-
             nonlocal step, scores
 
             match = re.search(
