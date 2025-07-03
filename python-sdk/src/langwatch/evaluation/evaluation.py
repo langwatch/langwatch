@@ -93,10 +93,10 @@ class Evaluation:
     _current_index: int
     _current_item: Any
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, *, run_id: Optional[str] = None):
         self.name: str = name or generate_slug(3)
         self.experiment_slug: str = self.name
-        self.run_id: str = generate_slug(3)
+        self.run_id: str = run_id or generate_slug(3)
         self.total: int = 0
         self.progress: int = 0
         self.created_at_nano: int = int(time.time() * 1000)
