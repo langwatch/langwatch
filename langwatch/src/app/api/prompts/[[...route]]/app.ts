@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator, resolver } from "hono-openapi/zod";
 import { z } from "zod";
-import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
+import { type LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger";
 import { loggerMiddleware } from "../../middleware/logger";
@@ -24,6 +24,9 @@ import {
   getOutputsToResponseFormat,
 } from "./utils";
 import { baseResponses } from "../../shared/base-responses";
+import { TRPCError } from "@trpc/server";
+import { getHTTPStatusCodeFromError } from "@trpc/server/http";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 const logger = createLogger("langwatch:api:prompts");
 
@@ -104,40 +107,44 @@ app.get(
       "Getting prompt by ID"
     );
 
-    const config = await repository.getConfigByIdWithLatestVersions(
-      id,
-      project.id
-    );
+    try {
+      const config = await repository.getConfigByIdWithLatestVersions(
+        id,
+        project.id
+      );
+  
+      const response = {
+        id,
+        name: config.name,
+        version: config.latestVersion.version,
+        versionId: config.latestVersion.id ?? "",
+        versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
+        model: config.latestVersion.configData.model,
+        prompt: config.latestVersion.configData.prompt,
+        updatedAt: config.updatedAt,
+        messages: [
+          {
+            role: "system",
+            content: config.latestVersion.configData.prompt,
+          },
+          ...config.latestVersion.configData.messages,
+        ],
+        response_format: getOutputsToResponseFormat(config),
+      } satisfies z.infer<typeof promptOutputSchema>;
 
-    if (!config) {
-      return c.json({ error: "Prompt not found" }, 404);
+      return c.json(response);
+    } catch (error) {
+      if (error instanceof TRPCError) {
+        return c.json({ error: error.message }, getHTTPStatusCodeFromError(error) as ContentfulStatusCode);
+      }
+
+      logger.warn(
+        { projectId: project.id, promptId: id, error },
+        "Error retrieving prompt"
+      );
+
+      return c.json({ error: "internal server error" }, 500);
     }
-
-    const response = {
-      id,
-      name: config.name,
-      version: config.latestVersion.version,
-      versionId: config.latestVersion.id ?? "",
-      versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
-      model: config.latestVersion.configData.model,
-      prompt: config.latestVersion.configData.prompt,
-      updatedAt: config.updatedAt,
-      messages: [
-        {
-          role: "system",
-          content: config.latestVersion.configData.prompt,
-        },
-        ...config.latestVersion.configData.messages,
-      ],
-      response_format: getOutputsToResponseFormat(config),
-    } satisfies z.infer<typeof promptOutputSchema>;
-
-    logger.info(
-      { projectId: project.id, promptId: id, name: config.name },
-      "Successfully retrieved prompt"
-    );
-
-    return c.json(response);
   }
 );
 
