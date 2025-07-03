@@ -9,7 +9,6 @@ from langwatch.utils.transformation import truncate_object_recursively
 from langwatch.telemetry.tracing import LangWatchTrace
 from typing_extensions import TypedDict
 import langwatch
-from langwatch.state import get_api_key, get_endpoint
 import httpx
 import json
 from pydantic import BaseModel
@@ -21,7 +20,7 @@ from dspy.teleprompt import (
     COPRO,
     MIPROv2,
 )
-import COPRO_LOGGER from dspy.teleprompt.copro_optimizer
+from dspy.teleprompt.copro_optimizer import COPRO_LOGGER
 from dspy.signatures.signature import SignatureMeta
 from dspy.primitives.prediction import Prediction, Completions
 from dspy.primitives.example import Example
