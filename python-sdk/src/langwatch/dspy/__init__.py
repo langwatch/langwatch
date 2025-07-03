@@ -9,7 +9,6 @@ from langwatch.utils.transformation import truncate_object_recursively
 from langwatch.telemetry.tracing import LangWatchTrace
 from typing_extensions import TypedDict
 import langwatch
-from langwatch.state import get_api_key, get_endpoint
 import httpx
 import json
 from pydantic import BaseModel
@@ -21,6 +20,7 @@ from dspy.teleprompt import (
     COPRO,
     MIPROv2,
 )
+import dspy.teleprompt.copro_optimizer as copro_optimizer
 from dspy.signatures.signature import SignatureMeta
 from dspy.primitives.prediction import Prediction, Completions
 from dspy.primitives.example import Example
@@ -521,7 +521,15 @@ class LangWatchTrackedCOPRO(COPRO):
 
     @contextmanager
     def _patch_logger_and_evaluate(self):
-        original_logger_info = dspy.logger.info
+        legacy_logger = True
+        original_logger_info = None
+
+        if hasattr(copro_optimizer, "logger"):
+            legacy_logger = False
+            original_logger_info = copro_optimizer.logger.info
+        else:
+            original_logger_info = dspy.logger.info
+
         original_evaluate_call = Evaluate.__call__
         step = None
         scores = []
@@ -577,13 +585,20 @@ class LangWatchTrackedCOPRO(COPRO):
 
             return score
 
-        dspy.logger.info = patched_logger_info
+        if legacy_logger:
+            dspy.logger.info = patched_logger_info
+        else:
+            copro_optimizer.logger.info = patched_logger_info
+
         Evaluate.__call__ = patched_evaluate_call
 
         try:
             yield
         finally:
-            dspy.logger.info = original_logger_info
+            if legacy_logger:
+                dspy.logger.info = original_logger_info
+            else:
+                copro_optimizer.logger.info = original_logger_info
             Evaluate.__call__ = original_evaluate_call
 
 
