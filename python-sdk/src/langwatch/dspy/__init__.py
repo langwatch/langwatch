@@ -20,7 +20,7 @@ from dspy.teleprompt import (
     COPRO,
     MIPROv2,
 )
-from dspy.teleprompt.copro_optimizer import COPRO_LOGGER
+import dspy.teleprompt.copro_optimizer as copro_optimizer
 from dspy.signatures.signature import SignatureMeta
 from dspy.primitives.prediction import Prediction, Completions
 from dspy.primitives.example import Example
@@ -524,9 +524,9 @@ class LangWatchTrackedCOPRO(COPRO):
         legacy_logger = True
         original_logger_info = None
 
-        if hasattr(COPRO_LOGGER, "logger"):
+        if hasattr(copro_optimizer, "logger"):
             legacy_logger = False
-            original_logger_info = COPRO_LOGGER.logger.info
+            original_logger_info = copro_optimizer.logger.info
         else:
             original_logger_info = dspy.logger.info
 
@@ -588,7 +588,7 @@ class LangWatchTrackedCOPRO(COPRO):
         if legacy_logger:
             dspy.logger.info = patched_logger_info
         else:
-            COPRO_LOGGER.logger.info = patched_logger_info
+            copro_optimizer.logger.info = patched_logger_info
 
         Evaluate.__call__ = patched_evaluate_call
 
@@ -598,7 +598,7 @@ class LangWatchTrackedCOPRO(COPRO):
             if legacy_logger:
                 dspy.logger.info = original_logger_info
             else:
-                COPRO_LOGGER.logger.info = original_logger_info
+                copro_optimizer.logger.info = original_logger_info
             Evaluate.__call__ = original_evaluate_call
 
 
