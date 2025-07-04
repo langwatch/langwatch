@@ -570,6 +570,7 @@ function CustomGraphForm({
   const updateGraphById = api.graphs.updateById.useMutation();
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
+  const trpc = api.useContext();
 
   const addGraph = () => {
     const graphName = form.getValues("title");
@@ -586,6 +587,7 @@ function CustomGraphForm({
       },
       {
         onSuccess: () => {
+          void trpc.graphs.getById.invalidate();
           void router.push(`/${project?.slug}/analytics/reports`);
         },
       }
@@ -604,6 +606,7 @@ function CustomGraphForm({
       },
       {
         onSuccess: () => {
+          void trpc.graphs.getById.invalidate();
           void router.push(`/${project?.slug}/analytics/reports`);
         },
       }
@@ -1037,6 +1040,7 @@ function SeriesField({
                     emptyOption={
                       metric_.requiresKey!.optional ? "all" : undefined
                     }
+                    currentSelected={field.value}
                   />
                 )}
               />
@@ -1052,6 +1056,7 @@ function SeriesField({
                     field={field}
                     key_={key}
                     filter={metric_.requiresSubkey!.filter}
+                    currentSelected={field.value}
                   />
                 )}
               />
@@ -1114,11 +1119,13 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
   key_,
   filter,
   emptyOption,
+  currentSelected,
 }: {
   field: ControllerRenderProps<T, U>;
   key_?: string;
   filter: FilterField;
   emptyOption?: string;
+  currentSelected?: string;
 }) {
   const [query, setQuery] = useState("");
 
@@ -1146,6 +1153,13 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
       label,
     })) ?? []
   );
+
+  if (
+    currentSelected &&
+    !options.find((option) => option.value === currentSelected)
+  ) {
+    options.push({ value: currentSelected, label: currentSelected });
+  }
 
   const field_ = {
     ...field,

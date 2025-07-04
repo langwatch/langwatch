@@ -22,10 +22,14 @@ import {
   Table,
   TrendingUp,
 } from "react-feather";
+
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { dependencies } from "../injection/dependencies.client";
 import { OrganizationRoleGroup } from "../server/api/permission";
+import { api } from "../utils/api";
 import { projectRoutes } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
+
 import { ChatBalloonIcon } from "./icons/ChatBalloon";
 import { DiscordOutlineIcon } from "./icons/DiscordOutline";
 import { LogoIcon } from "./icons/LogoIcon";
@@ -35,7 +39,6 @@ import { useTableView } from "./messages/HeaderButtons";
 import { useColorRawValue } from "./ui/color-mode";
 import { Link } from "./ui/link";
 import { Tooltip } from "./ui/tooltip";
-import { api } from "../utils/api";
 
 export const MENU_WIDTH = "88px";
 
@@ -152,6 +155,18 @@ export const MainMenu = React.memo(function MainMenu() {
               project={project}
               isActive={router.pathname.includes("/settings")}
             />
+          )}
+
+          {dependencies.FrillToggleButton && (
+            <Box
+              width="full"
+              display="flex"
+              alignContent="center"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <dependencies.FrillToggleButton />
+            </Box>
           )}
 
           <Spacer />

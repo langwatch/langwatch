@@ -1,4 +1,5 @@
 import { Counter, Histogram, register } from "prom-client";
+import { performance } from 'node:perf_hooks';
 
 type Endpoint =
   | "collector"
@@ -8,6 +9,21 @@ type Endpoint =
   | "dataset_record"
   | "topic_clustering_batch"
   | "topic_clustering_incremental";
+
+// Histogram for event loop lag
+register.removeSingleMetric("event_loop_lag_milliseconds");
+const eventLoopLag = new Histogram({
+  name: "event_loop_lag_milliseconds",
+  help: "Event loop lag in milliseconds",
+  buckets: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000]
+});
+setInterval(() => {
+  const start = performance.now();
+  setImmediate(() => {
+    const lag = performance.now() - start;
+    eventLoopLag.observe(lag);
+  });
+}, 500);
 
 // Histogram for collector payload size (in bytes)
 register.removeSingleMetric("payload_size_bytes");
