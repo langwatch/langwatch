@@ -66,7 +66,7 @@ export function UserMetrics() {
     graphType: "line",
     series: [
       {
-        name: "Messages",
+        name: "Traces",
         metric: "metadata.trace_id",
         aggregation: "cardinality",
         colorSet: analyticsMetrics.metadata.trace_id.colorSet,

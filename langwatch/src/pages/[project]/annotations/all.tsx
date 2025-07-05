@@ -170,7 +170,7 @@ export default function Annotations() {
     link.href = url;
     const today = new Date();
     const formattedDate = today.toISOString().split("T")[0];
-    const fileName = `Messages - ${formattedDate}.csv`;
+    const fileName = `Traces - ${formattedDate}.csv`;
     link.setAttribute("download", fileName);
     document.body.appendChild(link);
     link.click();

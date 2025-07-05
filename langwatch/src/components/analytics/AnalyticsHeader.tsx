@@ -1,10 +1,10 @@
-import { Box, Button, HStack, Heading, Spacer } from "@chakra-ui/react";
-import { MessageSquare } from "react-feather";
+import { Button, HStack, Heading, Spacer } from "@chakra-ui/react";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { FilterToggle } from "../filters/FilterToggle";
 import { useRouter } from "next/router";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { Tooltip } from "../ui/tooltip";
+import { LuListTree } from "react-icons/lu";
 
 export function AnalyticsHeader({ title }: { title: string }) {
   const router = useRouter();
@@ -21,7 +21,7 @@ export function AnalyticsHeader({ title }: { title: string }) {
         <Heading as={"h1"} size="lg" paddingTop={1}>
           {title}
         </Heading>
-        <Tooltip content="Show messages behind those metrics">
+        <Tooltip content="Show traces behind those metrics">
           <Button
             variant="outline"
             minWidth={0}
@@ -41,7 +41,7 @@ export function AnalyticsHeader({ title }: { title: string }) {
               );
             }}
           >
-            <MessageSquare size="16" />
+            <LuListTree size="16" />
           </Button>
         </Tooltip>
       </HStack>

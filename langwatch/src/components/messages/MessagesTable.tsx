@@ -965,7 +965,7 @@ export function MessagesTable({
     link.href = url;
     const today = new Date();
     const formattedDate = today.toISOString().split("T")[0];
-    const fileName = `Messages - ${formattedDate}.csv`;
+    const fileName = `Traces - ${formattedDate}.csv`;
     link.setAttribute("download", fileName);
     document.body.appendChild(link);
     link.click();
@@ -990,7 +990,7 @@ export function MessagesTable({
         <HStack width="full" align="top" paddingBottom={6}>
           <HStack align="center" gap={6}>
             <Heading as="h1" size="lg" paddingTop={1}>
-              Messages
+              Traces
             </Heading>
             {!hideAnalyticsToggle && <ToggleAnalytics />}
             <Tooltip content="Refresh">
@@ -1058,7 +1058,7 @@ export function MessagesTable({
                 <Popover.Arrow />
                 <Popover.CloseTrigger />
                 <Popover.Header>
-                  <Heading size="sm">Filter Messages</Heading>
+                  <Heading size="sm">Filter Traces</Heading>
                 </Popover.Header>
                 <Popover.Body padding={4}>
                   <VStack align="start" gap={2}>

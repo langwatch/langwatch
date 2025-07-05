@@ -272,7 +272,7 @@ const CustomGraph_ = React.memo(
         ? uppercaseFirstLetter(groupName)
             .replace("Evaluation passed passed", "Evaluation Passed")
             .replace("Evaluation passed failed", "Evaluation Failed")
-            .replace("Contains error", "Messages")
+            .replace("Contains error", "Traces")
         : series?.name ?? aggKey;
     };
 
