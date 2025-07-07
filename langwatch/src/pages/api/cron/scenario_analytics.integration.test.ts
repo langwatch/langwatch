@@ -30,6 +30,35 @@ function createMockRequestResponse(
   return { req, res };
 }
 
+// Helper function to clean up scenario events for test projects
+async function cleanupScenarioEvents(
+  projectIds: string[],
+  context = "test cleanup"
+) {
+  try {
+    const client = await esClient({ test: true });
+    await client.deleteByQuery({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        query: {
+          bool: {
+            should: [
+              ...projectIds.map((id) => ({
+                term: { "metadata.project_id": id },
+              })),
+              ...projectIds.map((id) => ({ term: { project_id: id } })),
+            ],
+          },
+        },
+      },
+      conflicts: "proceed", // Ignore version conflicts
+    });
+  } catch (error) {
+    // Log but don't fail the test cleanup
+    console.warn(`Failed to clean up scenario events in ${context}:`, error);
+  }
+}
+
 // Mock the logger to avoid console noise in tests
 vi.mock("~/utils/logger", () => ({
   createLogger: () => ({
@@ -91,23 +120,7 @@ describe("Scenario Analytics Cron Job", () => {
 
     // Clean up test scenario events with error handling
     try {
-      const client = await esClient({ test: true });
-      await client.deleteByQuery({
-        index: SCENARIO_EVENTS_INDEX.alias,
-        body: {
-          query: {
-            bool: {
-              should: [
-                { term: { "metadata.project_id": project1.id } },
-                { term: { "metadata.project_id": project2.id } },
-                { term: { project_id: project1.id } },
-                { term: { project_id: project2.id } },
-              ],
-            },
-          },
-        },
-        conflicts: "proceed", // Ignore version conflicts
-      });
+      await cleanupScenarioEvents([project1.id, project2.id]);
     } catch (error) {
       // Log but don't fail the test cleanup
       console.warn("Failed to clean up scenario events:", error);
@@ -132,23 +145,7 @@ describe("Scenario Analytics Cron Job", () => {
 
     // Clear any existing scenario events for test projects
     try {
-      const client = await esClient({ test: true });
-      await client.deleteByQuery({
-        index: SCENARIO_EVENTS_INDEX.alias,
-        body: {
-          query: {
-            bool: {
-              should: [
-                { term: { "metadata.project_id": project1.id } },
-                { term: { "metadata.project_id": project2.id } },
-                { term: { project_id: project1.id } },
-                { term: { project_id: project2.id } },
-              ],
-            },
-          },
-        },
-        conflicts: "proceed", // Ignore version conflicts
-      });
+      await cleanupScenarioEvents([project1.id, project2.id], "beforeEach");
     } catch (error) {
       console.warn("Failed to clean up scenario events in beforeEach:", error);
     }
@@ -422,12 +419,6 @@ describe("Scenario Analytics Cron Job", () => {
         });
       }
     });
-
-    it("should handle Elasticsearch errors gracefully", async () => {
-      // This test is covered by the unit tests
-      // Integration tests with real ES client are more reliable
-      expect(true).toBe(true); // Placeholder - covered in unit tests
-    });
   });
 
   describe("Date Range Logic", () => {
@@ -470,20 +461,7 @@ describe("Scenario Analytics Cron Job", () => {
 
       // Clean up any existing scenario events for project1 from previous tests
       try {
-        await client.deleteByQuery({
-          index: SCENARIO_EVENTS_INDEX.alias,
-          body: {
-            query: {
-              bool: {
-                should: [
-                  { term: { "metadata.project_id": project1.id } },
-                  { term: { project_id: project1.id } },
-                ],
-              },
-            },
-          },
-          conflicts: "proceed", // Ignore version conflicts
-        });
+        await cleanupScenarioEvents([project1.id], "outside date range");
       } catch (error) {
         console.warn("Failed to clean up existing scenario events:", error);
       }
@@ -552,20 +530,7 @@ describe("Scenario Analytics Cron Job", () => {
 
       // Clean up the test events we created
       try {
-        await client.deleteByQuery({
-          index: SCENARIO_EVENTS_INDEX.alias,
-          body: {
-            query: {
-              bool: {
-                should: [
-                  { term: { scenario_id: "test-scenario-old" } },
-                  { term: { scenario_id: "test-scenario-future" } },
-                ],
-              },
-            },
-          },
-          conflicts: "proceed",
-        });
+        await cleanupScenarioEvents([project1.id], "outside date range");
       } catch (error) {
         console.warn("Failed to clean up test events:", error);
       }
