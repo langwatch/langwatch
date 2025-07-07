@@ -9,7 +9,7 @@ export const projectRoutes = {
   },
   messages: {
     path: "/[project]/messages",
-    title: "Messages",
+    title: "Traces",
   },
   analytics: {
     path: "/[project]/analytics",
@@ -50,7 +50,7 @@ export const projectRoutes = {
   },
   prompts: {
     path: "/[project]/prompts",
-    title: "Prompts DB",
+    title: "Prompts",
   },
   message: {
     path: "/[project]/messages/[trace]",

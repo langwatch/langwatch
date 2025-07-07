@@ -62,7 +62,7 @@ const WelcomeLayout = () => {
           <Alert.Root status="info" borderRadius="md">
             <Alert.Indicator />
             <Alert.Title>
-                Having issues getting started? Messages not visible yet? Check out our
+                Having issues getting started? Traces not visible yet? Check out our
                 <Link href="https://docs.langwatch.ai/support" isExternal ml={1} textDecoration="underline" textDecorationStyle={"dashed"}>
                   Troubleshooting & Support guide
                   <LuExternalLink />
@@ -75,4 +75,4 @@ const WelcomeLayout = () => {
   );
 };
 
-export default WelcomeLayout; 
+export default WelcomeLayout;

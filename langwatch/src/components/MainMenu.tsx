@@ -16,7 +16,6 @@ import {
   CheckSquare,
   Edit,
   GitHub,
-  MessageSquare,
   PlayCircle,
   Settings,
   Table,
@@ -39,6 +38,7 @@ import { useTableView } from "./messages/HeaderButtons";
 import { useColorRawValue } from "./ui/color-mode";
 import { Link } from "./ui/link";
 import { Tooltip } from "./ui/tooltip";
+import { LuListTree } from "react-icons/lu";
 
 export const MENU_WIDTH = "88px";
 
@@ -84,11 +84,14 @@ export const MainMenu = React.memo(function MainMenu() {
             icon={TrendingUp}
             label={projectRoutes.home.title}
             project={project}
-            isActive={router.pathname.includes("/analytics")}
+            isActive={
+              router.pathname == "/[project]" ||
+              router.pathname.includes("/analytics")
+            }
           />
           <PageMenuLink
             path={projectRoutes.messages.path}
-            icon={MessageSquare}
+            icon={LuListTree}
             label={projectRoutes.messages.title}
             project={project}
             isActive={router.pathname.includes("/messages")}
@@ -124,7 +127,7 @@ export const MainMenu = React.memo(function MainMenu() {
             icon={Book}
             label={projectRoutes.promptConfigs.title}
             project={project}
-            isActive={router.pathname.includes("/prompt-configs")}
+            isActive={router.pathname.includes("/prompts")}
           />
 
           <PageMenuLink

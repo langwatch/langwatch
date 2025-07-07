@@ -117,7 +117,7 @@ export function MessagesList() {
       <HStack width="full" align="top" paddingBottom={6}>
         <HStack align="center" gap={6}>
           <Heading as={"h1"} size="lg" paddingTop={1}>
-            Messages
+            Traces
           </Heading>
           <ToggleAnalytics />
           <Tooltip content="Refresh">

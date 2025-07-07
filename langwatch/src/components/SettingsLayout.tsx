@@ -26,8 +26,8 @@ export default function SettingsLayout({
           display={isSubscription ? "none" : "flex"}
         >
           <MenuLink href="/settings">General Settings</MenuLink>
-          <MenuLink href={`/${project?.slug}/setup`}>Setup</MenuLink>
-          <MenuLink href="/settings/model-providers">Model Providers</MenuLink>
+          <MenuLink href={`/${project?.slug}/setup`}>API Key & Setup</MenuLink>
+          <MenuLink href="/settings/model-providers">Model Connections</MenuLink>
           <MenuLink href="/settings/model-costs">Model Costs</MenuLink>
           <MenuLink href={`/${project?.slug}/triggers`}>Triggers</MenuLink>
           <MenuLink href="/settings/projects">Projects</MenuLink>
