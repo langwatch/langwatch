@@ -1,9 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "~/server/db";
-import { esClient, SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
+import { esClient } from "~/server/elasticsearch";
 import { type Prisma } from "@prisma/client";
 import { ANALYTICS_KEYS } from "~/types";
-import { ScenarioEventType } from "~/app/api/scenario-events/[[...route]]/enums";
+import { createScenarioAnalyticsQueriesForAllEventTypes } from "~/server/scenario-analytics";
 
 export default async function handler(
   req: NextApiRequest,
@@ -58,58 +58,23 @@ export default async function handler(
     0
   );
 
-  // Create multi-search queries for different event types
-  const createEventTypeQueries = (projectId: string, eventType: string) => [
-    { index: SCENARIO_EVENTS_INDEX.alias },
-    {
-      size: 0,
-      query: {
-        bool: {
-          must: [
-            {
-              bool: {
-                should: [
-                  { term: { "metadata.project_id": projectId } },
-                  { term: { project_id: projectId } },
-                ],
-                minimum_should_match: 1,
-              },
-            },
-            { term: { type: eventType } },
-            {
-              range: {
-                timestamp: {
-                  gte: startTimestamp,
-                  lt: endTimestamp,
-                },
-              },
-            },
-          ],
-        },
-      },
-    },
-  ];
-
   // Create queries for all event types for all projects
-  const msearchBody = projects.flatMap((project) => [
-    // Total scenario events
-    ...createEventTypeQueries(project.id, "*"),
-    // Message snapshots
-    ...createEventTypeQueries(project.id, ScenarioEventType.MESSAGE_SNAPSHOT),
-    // Run started events
-    ...createEventTypeQueries(project.id, ScenarioEventType.RUN_STARTED),
-    // Run finished events
-    ...createEventTypeQueries(project.id, ScenarioEventType.RUN_FINISHED),
-  ]);
+  const msearchBody = projects.flatMap((project) =>
+    createScenarioAnalyticsQueriesForAllEventTypes(
+      project.id,
+      startTimestamp,
+      endTimestamp
+    )
+  );
+
+  // Process results - each project has 4 queries (total, message_snapshot, run_started, run_finished)
+  const analyticsToCreate: Prisma.AnalyticsCreateManyInput[] = [];
 
   try {
     // Execute multi-search to get counts for all projects and event types
     const msearchResult = await client.msearch({
       body: msearchBody,
     });
-
-    // Process results - each project has 4 queries (total, message_snapshot, run_started, run_finished)
-    const analyticsToCreate: Prisma.AnalyticsCreateManyInput[] = [];
 
     for (let i = 0; i < projects.length; i++) {
       const project = projects[i];
@@ -246,7 +211,14 @@ export default async function handler(
     }
   } catch (error) {
     console.error("[Scenario Analytics] Error:", error);
+    return res
+      .status(500)
+      .json({ success: false, error: "Failed to process scenario analytics" });
   }
 
-  return res.status(200).json({ success: false });
+  return res.status(200).json({
+    success: true,
+    projectsProcessed: projects.length,
+    analyticsCreated: analyticsToCreate.length,
+  });
 }
