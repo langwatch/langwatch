@@ -21,7 +21,7 @@ class LLMNode(dspy.Module):
         self._name = name
 
         nested_predict: dspy.Predict = (
-            predict._predict if hasattr(predict, "_predict") else predict  # type: ignore
+            predict.predict if hasattr(predict, "predict") else predict  # type: ignore
         )
         nested_predict.__class__ = PredictWithMetadata
 
