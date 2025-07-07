@@ -9,9 +9,7 @@ import { createLogger } from "~/utils/logger";
 const logger = createLogger("langwatch:cron:scenario-analytics");
 
 interface DateRange {
-  startTimestamp: number;
-  endTimestamp: number;
-  yesterday: Date;
+  yesterdayStart: Date;
   yesterdayEnd: Date;
 }
 
@@ -40,37 +38,15 @@ function validateRequest(req: NextApiRequest): boolean {
  * Calculates yesterday's date range in UTC
  */
 function getYesterdayDateRange(): DateRange {
-  const yesterday = new Date();
-  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  yesterday.setUTCHours(0, 0, 0, 0);
+  const yesterdayStart = new Date();
+  yesterdayStart.setUTCDate(yesterdayStart.getUTCDate() - 1);
+  yesterdayStart.setUTCHours(0, 0, 0, 0);
 
-  const yesterdayEnd = new Date(yesterday);
+  const yesterdayEnd = new Date(yesterdayStart);
   yesterdayEnd.setUTCDate(yesterdayEnd.getUTCDate() + 1);
 
-  const startTimestamp = Date.UTC(
-    yesterday.getUTCFullYear(),
-    yesterday.getUTCMonth(),
-    yesterday.getUTCDate(),
-    0,
-    0,
-    0,
-    0
-  );
-
-  const endTimestamp = Date.UTC(
-    yesterdayEnd.getUTCFullYear(),
-    yesterdayEnd.getUTCMonth(),
-    yesterdayEnd.getUTCDate(),
-    0,
-    0,
-    0,
-    0
-  );
-
   return {
-    startTimestamp,
-    endTimestamp,
-    yesterday,
+    yesterdayStart,
     yesterdayEnd,
   };
 }
@@ -114,7 +90,7 @@ function getHitCount(msearchResult: any, index: number): number {
 /**
  * Creates analytics entries for a single project based on Elasticsearch results
  */
-function createAnalyticsForProject(
+function createAnalyticsEntriesForProject(
   project: { id: string },
   msearchResult: any,
   baseIndex: number,
@@ -122,39 +98,50 @@ function createAnalyticsForProject(
 ): Prisma.AnalyticsCreateManyInput[] {
   const analytics: Prisma.AnalyticsCreateManyInput[] = [];
 
-  const eventTypes = [
-    {
-      index: baseIndex,
-      key: ANALYTICS_KEYS.SCENARIO_EVENT_COUNT_PER_DAY,
-      description: "Total scenario events",
-    },
-    {
-      index: baseIndex + 1,
-      key: ANALYTICS_KEYS.SCENARIO_MESSAGE_SNAPSHOT_COUNT_PER_DAY,
-      description: "Message snapshot events",
-    },
-    {
-      index: baseIndex + 2,
-      key: ANALYTICS_KEYS.SCENARIO_RUN_STARTED_COUNT_PER_DAY,
-      description: "Run started events",
-    },
-    {
-      index: baseIndex + 3,
-      key: ANALYTICS_KEYS.SCENARIO_RUN_FINISHED_COUNT_PER_DAY,
-      description: "Run finished events",
-    },
-  ];
+  // Get counts for individual event types
+  const messageSnapshotCount = getHitCount(msearchResult, baseIndex);
+  const runStartedCount = getHitCount(msearchResult, baseIndex + 1);
+  const runFinishedCount = getHitCount(msearchResult, baseIndex + 2);
 
-  for (const eventType of eventTypes) {
-    const count = getHitCount(msearchResult, eventType.index);
-    if (count > 0) {
-      analytics.push({
-        projectId: project.id,
-        key: eventType.key,
-        numericValue: count,
-        createdAt: yesterday,
-      });
-    }
+  // Calculate total count
+  const totalCount = messageSnapshotCount + runStartedCount + runFinishedCount;
+
+  // Add analytics entries for each event type that has a count > 0
+  if (messageSnapshotCount > 0) {
+    analytics.push({
+      projectId: project.id,
+      key: ANALYTICS_KEYS.SCENARIO_MESSAGE_SNAPSHOT_COUNT_PER_DAY,
+      numericValue: messageSnapshotCount,
+      createdAt: yesterday,
+    });
+  }
+
+  if (runStartedCount > 0) {
+    analytics.push({
+      projectId: project.id,
+      key: ANALYTICS_KEYS.SCENARIO_RUN_STARTED_COUNT_PER_DAY,
+      numericValue: runStartedCount,
+      createdAt: yesterday,
+    });
+  }
+
+  if (runFinishedCount > 0) {
+    analytics.push({
+      projectId: project.id,
+      key: ANALYTICS_KEYS.SCENARIO_RUN_FINISHED_COUNT_PER_DAY,
+      numericValue: runFinishedCount,
+      createdAt: yesterday,
+    });
+  }
+
+  // Add total count if there are any events
+  if (totalCount > 0) {
+    analytics.push({
+      projectId: project.id,
+      key: ANALYTICS_KEYS.SCENARIO_EVENT_COUNT_PER_DAY,
+      numericValue: totalCount,
+      createdAt: yesterday,
+    });
   }
 
   return analytics;
@@ -174,8 +161,8 @@ function processElasticsearchResults(
     const project = projects[i];
     if (!project) continue;
 
-    const baseIndex = i * 4;
-    const projectAnalytics = createAnalyticsForProject(
+    const baseIndex = i * 3; // 3 queries per project (MESSAGE_SNAPSHOT, RUN_STARTED, RUN_FINISHED)
+    const projectAnalytics = createAnalyticsEntriesForProject(
       project,
       msearchResult,
       baseIndex,
@@ -195,6 +182,11 @@ async function filterExistingAnalytics(
   yesterday: Date,
   yesterdayEnd: Date
 ): Promise<Prisma.AnalyticsCreateManyInput[]> {
+  // If no analytics to create, return empty array
+  if (analyticsToCreate.length === 0) {
+    return [];
+  }
+
   const existingEntries = await prisma.analytics.findMany({
     where: {
       projectId: { in: analyticsToCreate.map((entry) => entry.projectId) },
@@ -270,8 +262,8 @@ async function processScenarioAnalytics(): Promise<AnalyticsResult> {
   const msearchBody = projects.flatMap((project) =>
     createScenarioAnalyticsQueriesForAllEventTypes({
       projectId: project.id,
-      startTime: dateRange.startTimestamp,
-      endTime: dateRange.endTimestamp,
+      startTime: dateRange.yesterdayStart.getTime(),
+      endTime: dateRange.yesterdayEnd.getTime(),
       includeDateHistogram: true,
       dateHistogramOptions: {
         calendarInterval: "day",
@@ -290,21 +282,21 @@ async function processScenarioAnalytics(): Promise<AnalyticsResult> {
   const analyticsToCreate = processElasticsearchResults(
     projects,
     msearchResult,
-    dateRange.yesterday
+    dateRange.yesterdayStart
   );
 
   if (analyticsToCreate.length > 0) {
     const newAnalyticsToCreate = await filterExistingAnalytics(
       analyticsToCreate,
-      dateRange.yesterday,
+      dateRange.yesterdayStart,
       dateRange.yesterdayEnd
     );
 
-    await saveAnalyticsAndLog(newAnalyticsToCreate, dateRange.yesterday);
+    await saveAnalyticsAndLog(newAnalyticsToCreate, dateRange.yesterdayStart);
   } else {
     logger.info(
       `[Scenario Analytics] No scenario events found for ${
-        dateRange.yesterday.toISOString().split("T")[0]
+        dateRange.yesterdayStart.toISOString().split("T")[0]
       }`
     );
   }

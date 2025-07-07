@@ -1,9 +1,11 @@
+import type { AggregationsCalendarInterval } from "@elastic/elasticsearch/lib/api/types";
 import { prisma } from "~/server/db";
 import { esClient } from "~/server/elasticsearch";
-import type { AggregationsCalendarInterval } from "@elastic/elasticsearch/lib/api/types";
-import { ANALYTICS_KEYS } from "~/types";
-import { ScenarioEventType } from "~/app/api/scenario-events/[[...route]]/enums";
 import { createScenarioAnalyticsQueriesForAllEventTypes } from "~/server/scenario-analytics";
+import { ANALYTICS_KEYS } from "~/types";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("langwatch:backfillScenarioAnalytics");
 
 interface DateHistogramBucket {
   key_as_string: string;
@@ -11,7 +13,7 @@ interface DateHistogramBucket {
 }
 
 export default async function execute() {
-  console.log("Starting backfillScenarioAnalytics...");
+  logger.info("Starting backfillScenarioAnalytics...");
 
   // Get all projects
   const projects = await prisma.project.findMany({
@@ -28,7 +30,7 @@ export default async function execute() {
   // For each project, backfill from creation date to today
   for (const project of projects) {
     try {
-      console.log(`\nProcessing project ${project.id}`);
+      logger.info({ projectId: project.id }, "Processing project");
       const startDate = new Date(project.createdAt);
       startDate.setHours(0, 0, 0, 0);
 
@@ -93,12 +95,16 @@ export default async function execute() {
       ];
 
       const totalDays = Math.max(...allCounts.map((c) => c.counts.length));
-      console.log(
-        `Found ${totalDays} days with scenario events for project ${project.id}`
+      logger.info(
+        { projectId: project.id, totalDays },
+        "Found days with scenario events for project"
       );
 
       if (totalDays === 0) {
-        console.log(`No scenario events found for project ${project.id}`);
+        logger.info(
+          { projectId: project.id },
+          "No scenario events found for project"
+        );
         continue;
       }
 
@@ -172,19 +178,29 @@ export default async function execute() {
           {} as Record<string, number>
         );
 
-        console.log(
-          `Created ${analyticsToCreate.length} analytics entries for project ${project.id}:`,
-          analyticsByType
+        logger.info(
+          {
+            projectId: project.id,
+            analyticsByType,
+            totalCreated: analyticsToCreate.length,
+          },
+          "Created analytics entries for project"
         );
       } else {
-        console.log(`No new analytics needed for project ${project.id}`);
+        logger.info(
+          { projectId: project.id },
+          "No new analytics needed for project"
+        );
       }
     } catch (error) {
-      console.error(`Error processing project ${project.id}:`, error);
-      console.log(`Continuing with next project...`);
+      logger.error(
+        { projectId: project.id, error },
+        "Error processing project"
+      );
+      logger.info("Continuing with next project...");
     }
   }
 
-  console.log("\nCompleted backfillScenarioAnalytics");
+  logger.info("Completed backfillScenarioAnalytics");
   return true;
 }
