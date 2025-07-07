@@ -1,7 +1,8 @@
 import { z } from "zod";
+
+import { env } from "../../../env.mjs";
 import { skipPermissionCheck } from "../permission";
 import { publicProcedure } from "../trpc";
-import { env } from "../../../env.mjs";
 
 export const publicEnvRouter = publicProcedure
   .input(z.object({}).passthrough())
@@ -24,6 +25,7 @@ export const publicEnvRouter = publicProcedure
       HAS_LANGWATCH_NLP_SERVICE:
         !!env.LANGWATCH_NLP_SERVICE || !!env.LANGWATCH_NLP_LAMBDA_CONFIG,
       HAS_LANGEVALS_ENDPOINT: !!env.LANGEVALS_ENDPOINT,
+      FRILL_KEY: env.FRILL_KEY,
     };
 
     return publicEnvVars;
