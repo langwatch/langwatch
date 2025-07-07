@@ -18,8 +18,11 @@ export interface FetchSSEOptions<T> {
   /** Function to determine if processing should stop */
   shouldStopProcessing?: (event: T) => boolean;
 
-  /** Timeout in milliseconds (default: 20000) */
+  /** Timeout in milliseconds (default: 10_000) */
   timeout?: number;
+
+  /** Timeout in milliseconds (default: 240_000) */
+  chunkTimeout?: number;
 
   /** Custom headers */
   headers?: Record<string, string>;
@@ -37,7 +40,8 @@ export async function fetchSSE<T>({
   payload,
   onEvent,
   shouldStopProcessing,
-  timeout = 20000,
+  timeout = 10_000,
+  chunkTimeout = 240_000,
   headers = {},
   onError,
 }: FetchSSEOptions<T>): Promise<void> {
@@ -49,12 +53,12 @@ export async function fetchSSE<T>({
     if (timeoutId) clearTimeout(timeoutId);
   };
 
-  const setResetableTimeout = () => {
+  const setResetableTimeout = (timeout: number) => {
     if (timeoutId) clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
       cleanup();
       const error = new FetchSSETimeoutError(
-        `fetchSSE timed out with timeout ${timeout}ms`
+        `Connection timed out with timeout ${timeout}ms waiting for the next event`
       );
       logger.error(error);
       if (onError) {
@@ -77,7 +81,7 @@ export async function fetchSSE<T>({
       signal: controller.signal,
 
       async onopen(response) {
-        setResetableTimeout();
+        setResetableTimeout(timeout);
 
         if (
           response.ok &&
@@ -97,7 +101,7 @@ export async function fetchSSE<T>({
       },
 
       onmessage(ev) {
-        setResetableTimeout();
+        setResetableTimeout(chunkTimeout);
         const event = JSON.parse(ev.data) as T;
         onEvent(event);
 
