@@ -452,10 +452,6 @@ describe("Scenario Analytics Cron Job", () => {
               ANALYTICS_KEYS.SCENARIO_RUN_FINISHED_COUNT_PER_DAY,
             ],
           },
-          createdAt: {
-            gte: testDateStart,
-            lt: testDateEnd,
-          },
         },
       });
 
