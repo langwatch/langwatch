@@ -1,5 +1,6 @@
 import { SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
 import type { AggregationsCalendarInterval } from "@elastic/elasticsearch/lib/api/types";
+import { ScenarioEventType } from "~/app/api/scenario-events/[[...route]]/enums";
 
 export interface ScenarioAnalyticsQueryOptions {
   projectId: string;
@@ -35,6 +36,8 @@ export function createScenarioAnalyticsQuery(
     },
   } = options;
 
+  const typeFilter = eventType === "*" ? [] : [{ term: { type: eventType } }];
+
   const baseQuery = {
     size: 0,
     query: {
@@ -49,7 +52,7 @@ export function createScenarioAnalyticsQuery(
               minimum_should_match: 1,
             },
           },
-          { term: { type: eventType } },
+          ...typeFilter,
           {
             range: {
               timestamp: {
@@ -106,7 +109,12 @@ export function createScenarioAnalyticsQueriesForAllEventTypes(
     timeZone: string;
   }
 ) {
-  const eventTypes = ["*", "message_snapshot", "run_started", "run_finished"];
+  const eventTypes = [
+    "*",
+    ScenarioEventType.MESSAGE_SNAPSHOT,
+    ScenarioEventType.RUN_STARTED,
+    ScenarioEventType.RUN_FINISHED,
+  ];
 
   return eventTypes.flatMap((eventType) =>
     createScenarioAnalyticsQuery({
