@@ -529,10 +529,18 @@ describe("Scenario Analytics Cron Job", () => {
       expect(res.statusCode).toBe(200);
 
       // Verify no analytics were created for events outside the date range
+      // Check all analytics types to ensure none were created
       const analytics = await prisma.analytics.findMany({
         where: {
           projectId: project1.id,
-          key: ANALYTICS_KEYS.SCENARIO_MESSAGE_SNAPSHOT_COUNT_PER_DAY,
+          key: {
+            in: [
+              ANALYTICS_KEYS.SCENARIO_EVENT_COUNT_PER_DAY,
+              ANALYTICS_KEYS.SCENARIO_MESSAGE_SNAPSHOT_COUNT_PER_DAY,
+              ANALYTICS_KEYS.SCENARIO_RUN_STARTED_COUNT_PER_DAY,
+              ANALYTICS_KEYS.SCENARIO_RUN_FINISHED_COUNT_PER_DAY,
+            ],
+          },
           createdAt: {
             gte: testDateStart,
             lt: testDateEnd,
