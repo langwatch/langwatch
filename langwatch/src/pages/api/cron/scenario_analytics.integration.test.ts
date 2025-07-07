@@ -89,23 +89,29 @@ describe("Scenario Analytics Cron Job", () => {
       },
     });
 
-    // Clean up test scenario events
-    const client = await esClient({ test: true });
-    await client.deleteByQuery({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: {
-        query: {
-          bool: {
-            should: [
-              { term: { "metadata.project_id": project1.id } },
-              { term: { "metadata.project_id": project2.id } },
-              { term: { project_id: project1.id } },
-              { term: { project_id: project2.id } },
-            ],
+    // Clean up test scenario events with error handling
+    try {
+      const client = await esClient({ test: true });
+      await client.deleteByQuery({
+        index: SCENARIO_EVENTS_INDEX.alias,
+        body: {
+          query: {
+            bool: {
+              should: [
+                { term: { "metadata.project_id": project1.id } },
+                { term: { "metadata.project_id": project2.id } },
+                { term: { project_id: project1.id } },
+                { term: { project_id: project2.id } },
+              ],
+            },
           },
         },
-      },
-    });
+        conflicts: "proceed", // Ignore version conflicts
+      });
+    } catch (error) {
+      // Log but don't fail the test cleanup
+      console.warn("Failed to clean up scenario events:", error);
+    }
   });
 
   beforeEach(async () => {
@@ -123,6 +129,29 @@ describe("Scenario Analytics Cron Job", () => {
         },
       },
     });
+
+    // Clear any existing scenario events for test projects
+    try {
+      const client = await esClient({ test: true });
+      await client.deleteByQuery({
+        index: SCENARIO_EVENTS_INDEX.alias,
+        body: {
+          query: {
+            bool: {
+              should: [
+                { term: { "metadata.project_id": project1.id } },
+                { term: { "metadata.project_id": project2.id } },
+                { term: { project_id: project1.id } },
+                { term: { project_id: project2.id } },
+              ],
+            },
+          },
+        },
+        conflicts: "proceed", // Ignore version conflicts
+      });
+    } catch (error) {
+      console.warn("Failed to clean up scenario events in beforeEach:", error);
+    }
   });
 
   describe("HTTP Handler", () => {
@@ -440,19 +469,24 @@ describe("Scenario Analytics Cron Job", () => {
       });
 
       // Clean up any existing scenario events for project1 from previous tests
-      await client.deleteByQuery({
-        index: SCENARIO_EVENTS_INDEX.alias,
-        body: {
-          query: {
-            bool: {
-              should: [
-                { term: { "metadata.project_id": project1.id } },
-                { term: { project_id: project1.id } },
-              ],
+      try {
+        await client.deleteByQuery({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                should: [
+                  { term: { "metadata.project_id": project1.id } },
+                  { term: { project_id: project1.id } },
+                ],
+              },
             },
           },
-        },
-      });
+          conflicts: "proceed", // Ignore version conflicts
+        });
+      } catch (error) {
+        console.warn("Failed to clean up existing scenario events:", error);
+      }
 
       // Create events for different dates
       const oldEvent = {
@@ -507,6 +541,26 @@ describe("Scenario Analytics Cron Job", () => {
       });
 
       expect(analytics.length).toBe(0);
+
+      // Clean up the test events we created
+      try {
+        await client.deleteByQuery({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                should: [
+                  { term: { scenario_id: "test-scenario-old" } },
+                  { term: { scenario_id: "test-scenario-future" } },
+                ],
+              },
+            },
+          },
+          conflicts: "proceed",
+        });
+      } catch (error) {
+        console.warn("Failed to clean up test events:", error);
+      }
     });
 
     it("should handle malformed Elasticsearch responses", async () => {
