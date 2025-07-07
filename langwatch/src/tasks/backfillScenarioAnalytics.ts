@@ -33,17 +33,17 @@ export default async function execute() {
       startDate.setHours(0, 0, 0, 0);
 
       // Create multi-search body for all event types with date histogram aggregation
-      const msearchBody = createScenarioAnalyticsQueriesForAllEventTypes(
-        project.id,
-        startDate.getTime(),
-        today.getTime(),
-        true, // includeDateHistogram
-        {
+      const msearchBody = createScenarioAnalyticsQueriesForAllEventTypes({
+        projectId: project.id,
+        startTime: startDate.getTime(),
+        endTime: today.getTime(),
+        includeDateHistogram: true,
+        dateHistogramOptions: {
           calendarInterval: "day" as AggregationsCalendarInterval,
           format: "yyyy-MM-dd",
           timeZone: "UTC",
-        }
-      );
+        },
+      });
 
       const msearchResult = await client.msearch({
         body: msearchBody,

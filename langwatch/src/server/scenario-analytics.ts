@@ -15,6 +15,18 @@ export interface ScenarioAnalyticsQueryOptions {
   };
 }
 
+export interface ScenarioAnalyticsQueryOptionsForAllEventTypes {
+  projectId: string;
+  startTime: number;
+  endTime: number;
+  includeDateHistogram?: boolean;
+  dateHistogramOptions?: {
+    calendarInterval: AggregationsCalendarInterval;
+    format: string;
+    timeZone: string;
+  };
+}
+
 /**
  * Creates Elasticsearch query for scenario analytics
  * @param options Query configuration options
@@ -91,32 +103,27 @@ export function createScenarioAnalyticsQuery(
 
 /**
  * Creates multiple scenario analytics queries for all event types
- * @param projectId Project ID
- * @param startTime Start timestamp
- * @param endTime End timestamp
- * @param includeDateHistogram Whether to include date histogram aggregation
- * @param dateHistogramOptions Date histogram configuration
+ * @param options Query configuration options (without eventType since it creates queries for all types)
  * @returns Array of query objects for msearch
  */
 export function createScenarioAnalyticsQueriesForAllEventTypes(
-  projectId: string,
-  startTime: number,
-  endTime: number,
-  includeDateHistogram = false,
-  dateHistogramOptions?: {
-    calendarInterval: AggregationsCalendarInterval;
-    format: string;
-    timeZone: string;
-  }
+  options: ScenarioAnalyticsQueryOptionsForAllEventTypes
 ) {
+  const {
+    projectId,
+    startTime,
+    endTime,
+    includeDateHistogram,
+    dateHistogramOptions,
+  } = options;
+
   const eventTypes = [
-    "*",
     ScenarioEventType.MESSAGE_SNAPSHOT,
     ScenarioEventType.RUN_STARTED,
     ScenarioEventType.RUN_FINISHED,
   ];
 
-  return eventTypes.flatMap((eventType) =>
+  const queries = eventTypes.flatMap((eventType) =>
     createScenarioAnalyticsQuery({
       projectId,
       eventType,
@@ -126,4 +133,6 @@ export function createScenarioAnalyticsQueriesForAllEventTypes(
       dateHistogramOptions,
     })
   );
+
+  return queries;
 }
