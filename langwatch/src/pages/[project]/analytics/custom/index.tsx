@@ -215,11 +215,11 @@ const chartOptions: Required<CustomGraphFormData>["graphType"][] = [
 ];
 
 const defaultValues: CustomGraphFormData = {
-  title: "Messages count",
+  title: "Traces count",
   graphType: chartOptions[1]!,
   series: [
     {
-      name: "Messages count",
+      name: "Traces count",
       colorSet: "orangeTones",
       metric: "metadata.trace_id",
       aggregation: "cardinality",

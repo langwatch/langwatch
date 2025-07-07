@@ -68,7 +68,7 @@ const mostDisucussedTopics = {
   graphType: "horizontal_bar",
   series: [
     {
-      name: "Messages count",
+      name: "Traces count",
       colorSet: "colors",
       metric: "metadata.trace_id",
       aggregation: "cardinality",

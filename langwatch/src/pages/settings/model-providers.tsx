@@ -68,7 +68,7 @@ export default function ModelsPage() {
       >
         <HStack width="full" marginTop={6}>
           <Heading size="lg" as="h1">
-            Model Providers
+            Model Connections
           </Heading>
 
           <Spacer />
@@ -394,7 +394,7 @@ function ModelProviderForm({
                   flexShrink={0}
                   whiteSpace="nowrap"
                 >
-                  Use custom settings
+                  Set your API keys
                 </Checkbox>
               </Field.Root>
             </HStack>

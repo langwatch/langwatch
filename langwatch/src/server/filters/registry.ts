@@ -478,8 +478,8 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
           result.unique_values?.buckets?.map((bucket: any) => ({
             field: bucket.key ? "true" : "false",
             label: bucket.key
-              ? "Messages with error"
-              : "Messages without error",
+              ? "Traces with error"
+              : "Traces without error",
             count: bucket.doc_count,
           })) ?? []
         );

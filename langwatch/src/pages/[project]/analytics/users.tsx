@@ -21,13 +21,13 @@ const messagesCount = {
   graphType: "summary",
   series: [
     {
-      name: "Messages count",
+      name: "Traces count",
       colorSet: "orangeTones",
       metric: "metadata.trace_id",
       aggregation: "cardinality",
     },
     {
-      name: "Average messages per user",
+      name: "Average traces per user",
       colorSet: "orangeTones",
       metric: "metadata.trace_id",
       aggregation: "cardinality",
@@ -105,7 +105,7 @@ const messageSentiment = {
   graphType: "stacked_bar",
   series: [
     {
-      name: "Average messages count per user",
+      name: "Average traces count per user",
       colorSet: "positiveNegativeNeutral",
       metric: "metadata.trace_id",
       aggregation: "cardinality",
@@ -126,7 +126,7 @@ const powerUsers = {
   graphType: "horizontal_bar",
   series: [
     {
-      name: "Messages count",
+      name: "Traces count",
       colorSet: "colors",
       metric: "metadata.trace_id",
       aggregation: "cardinality",
@@ -143,7 +143,7 @@ const maxMessagePerThread = {
   graphType: "scatter",
   series: [
     {
-      name: "Maximum messages count per thread",
+      name: "Maximum traces count per thread",
       colorSet: "blueTones",
       metric: "metadata.trace_id",
       aggregation: "cardinality",
@@ -209,7 +209,7 @@ export default function Users() {
           <GridItem colSpan={2} display="inline-grid">
             <Card.Root overflow="auto">
               <Card.Header>
-                <Heading size="sm">User Messages</Heading>
+                <Heading size="sm">User Traces</Heading>
               </Card.Header>
               <Card.Body>
                 <CustomGraph input={messagesCount as CustomGraphInput} />
@@ -273,7 +273,7 @@ export default function Users() {
               <Card.Header>
                 <HStack>
                   <BarChart2 color="orange" />
-                  <Heading size="sm">Max Messages Per Thread</Heading>
+                  <Heading size="sm">Max Traces Per Thread</Heading>
                 </HStack>
               </Card.Header>
               <Card.Body>

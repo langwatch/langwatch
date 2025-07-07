@@ -552,6 +552,14 @@ export const DashboardLayout = ({
                       <Menu.ItemGroup
                         title={`${session.user.name} (${session.user.email})`}
                       >
+                        <Menu.Item value="setup" asChild>
+                          <Link href={`/${project?.slug}/setup`}>
+                            API Key & Setup
+                          </Link>
+                        </Menu.Item>
+                        <Menu.Item value="settings" asChild>
+                          <Link href="/settings">Settings</Link>
+                        </Menu.Item>
                         <Menu.Item
                           value="logout"
                           onClick={() =>

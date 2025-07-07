@@ -85,7 +85,7 @@ export const analyticsMetrics = {
   metadata: {
     trace_id: {
       ...simpleFieldAnalytics("trace_id"),
-      label: "Messages",
+      label: "Traces",
       colorSet: "orangeTones",
       allowedAggregations: ["cardinality"],
       quickwitSupport: true,

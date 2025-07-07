@@ -300,7 +300,7 @@ export function TraceDetails(props: {
 
           <Tabs.List paddingLeft={6} width="full">
             {canViewMessages && (
-              <Tabs.Trigger value="messages">Messages</Tabs.Trigger>
+              <Tabs.Trigger value="messages">Thread</Tabs.Trigger>
             )}
             <Tabs.Trigger value="traceDetails">Trace Details</Tabs.Trigger>
             {anyGuardrails && (

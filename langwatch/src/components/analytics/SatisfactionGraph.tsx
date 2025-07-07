@@ -11,7 +11,7 @@ export const SatisfactionGraphs = () => {
     graphType: "donnut",
     series: [
       {
-        name: "Messages",
+        name: "Traces",
         metric: "metadata.trace_id",
         aggregation: "cardinality",
         colorSet: "positiveNegativeNeutral",
@@ -28,7 +28,7 @@ export const SatisfactionGraphs = () => {
     graphType: "stacked_bar",
     series: [
       {
-        name: "Messages",
+        name: "Traces",
         metric: "metadata.trace_id",
         aggregation: "cardinality",
         colorSet: "positiveNegativeNeutral",
