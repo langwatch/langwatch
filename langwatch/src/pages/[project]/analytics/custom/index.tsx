@@ -983,7 +983,10 @@ function SeriesField({
         .join(" ")
     );
 
-    if (!form.getFieldState(`series.${index}.name`)?.isTouched || !name) {
+    if (
+      (!customId && !form.getFieldState(`series.${index}.name`)?.isTouched) ||
+      !name
+    ) {
       form.resetField(`series.${index}.name`, { defaultValue: name_ });
     }
     // Skip automatic color set logic when editing an existing graph
