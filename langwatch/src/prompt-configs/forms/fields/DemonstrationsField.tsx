@@ -8,6 +8,7 @@ import { DemonstrationsModal } from "../../modals/DemonstrationsModal";
 import { DatasetPreview } from "~/components/datasets/DatasetPreview";
 import { Tooltip } from "~/components/ui/tooltip";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
+import { transposeColumnsFirstToRowsFirstWithId } from "../../../optimization_studio/utils/datasetUtils";
 
 /**
  * Field for managing demonstrations (few-shot examples) in prompt configurations
@@ -21,7 +22,10 @@ export function DemonstrationsField() {
   const { errors } = formState;
   const { open, onOpen, onClose } = useDisclosure();
   const demonstrations = watch("version.configData.demonstrations");
-  const total = demonstrations?.rows?.length;
+  const transposedRecords = transposeColumnsFirstToRowsFirstWithId(
+    demonstrations?.inline?.records ?? {}
+  );
+  const total = transposedRecords.length;
 
   return (
     <Controller
@@ -36,9 +40,9 @@ export function DemonstrationsField() {
           size="sm"
         >
           <DatasetPreview
-            rows={demonstrations?.rows ?? []}
-            columns={demonstrations?.columns ?? []}
-            minHeight={`${36 + 29 * (demonstrations?.rows?.length ?? 0)}px`}
+            rows={transposedRecords}
+            columns={demonstrations?.inline?.columnTypes ?? []}
+            minHeight={`${36 + 29 * (total ?? 0)}px`}
           />
           <DemonstrationsModal
             open={open}

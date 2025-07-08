@@ -70,10 +70,13 @@ export const usePromptConfigForm = ({
     const outputs = formData.version?.configData.outputs ?? [];
     const newColumns = inputsAndOutputsToDemostrationColumns(inputs, outputs);
     const currentColumns =
-      formData.version?.configData.demonstrations?.columns ?? [];
+      formData.version?.configData.demonstrations?.inline?.columnTypes ?? [];
 
     if (!isEqual(newColumns, currentColumns)) {
-      methods.setValue("version.configData.demonstrations.columns", newColumns);
+      methods.setValue(
+        "version.configData.demonstrations.inline.columnTypes",
+        newColumns
+      );
     }
   }, [formData]);
 

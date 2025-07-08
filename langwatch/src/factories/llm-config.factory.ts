@@ -11,6 +11,7 @@ import {
   type schemaValidators,
 } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import type { z } from "zod";
+import type { NodeDataset } from "../optimization_studio/types/dsl";
 
 /**
  * Factory for creating LlmPromptConfig objects for testing purposes.
@@ -50,9 +51,14 @@ export const llmPromptConfigVersionFactory = Factory.define<
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         demonstrations: {
-          columns: [],
-          rows: [],
-        },
+          inline: {
+            records: {
+              input: [],
+              output: [],
+            },
+            columnTypes: [],
+          },
+        } satisfies NodeDataset,
       };
 
   return {

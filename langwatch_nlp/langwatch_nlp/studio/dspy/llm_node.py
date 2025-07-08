@@ -3,7 +3,6 @@ import dspy
 import langwatch
 
 from langwatch_nlp.studio.dspy.predict_with_metadata import PredictWithMetadata
-from langwatch_nlp.studio.field_parser import with_autoparsing
 
 
 class LLMNode(dspy.Module):

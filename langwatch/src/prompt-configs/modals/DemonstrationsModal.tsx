@@ -2,6 +2,7 @@ import { Dialog } from "~/components/ui/dialog";
 import { Box, Button, Heading } from "@chakra-ui/react";
 import { DatasetTable } from "~/components/datasets/DatasetTable";
 import type { PromptConfigFormValues } from "../hooks/usePromptConfigForm";
+import { transposeColumnsFirstToRowsFirstWithId, transpostRowsFirstToColumnsFirstWithoutId } from "../../optimization_studio/utils/datasetUtils";
 
 type Demonstrations =
   PromptConfigFormValues["version"]["configData"]["demonstrations"];
@@ -17,6 +18,10 @@ export function DemonstrationsModal({
   demonstrations: Demonstrations;
   onChange: (demonstrations: Demonstrations) => void;
 }) {
+  const transposedRecords = transposeColumnsFirstToRowsFirstWithId(
+    demonstrations?.inline?.records ?? {}
+  );
+
   return (
     <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()}>
       <Dialog.Backdrop />
@@ -39,18 +44,15 @@ export function DemonstrationsModal({
             <DatasetTable
               inMemoryDataset={{
                 name: "Demonstrations",
-                datasetRecords: demonstrations?.rows ?? [],
-                columnTypes: demonstrations?.columns ?? [],
+                datasetRecords: transposedRecords,
+                columnTypes: demonstrations?.inline?.columnTypes ?? [],
               }}
-              onUpdateDataset={(dataset) =>
-                onChange({
-                  columns: dataset.columnTypes.map((column) => ({
-                    ...column,
-                    id: column.name,
-                  })),
-                  rows: dataset.datasetRecords,
-                })
-              }
+              onUpdateDataset={(dataset) => onChange({
+                inline: {
+                  columnTypes: dataset.columnTypes,
+                  records: transpostRowsFirstToColumnsFirstWithoutId(dataset.datasetRecords),
+                }
+              })}
               canEditDatasetRecord={false}
             />
             {/** This is a hacky way to get a button on here, but we're pressed for time */}

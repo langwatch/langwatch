@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 
-import type { DatasetColumns } from "../../server/datasets/types";
+import { datasetColumnTypeSchema, type DatasetColumns } from "../../server/datasets/types";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 import type { ChatMessage } from "../../server/tracer/types";
 
@@ -124,10 +124,7 @@ type PromptingTechniqueParameter = StronglyTypedFieldBase & {
 type DemonstrationsParameter = StronglyTypedFieldBase & {
   type: "dataset";
   identifier: "demonstrations";
-  value: {
-    columns: DatasetColumns;
-    rows: Record<string, string>[];
-  };
+  value: NodeDataset | undefined;
 };
 
 /**
@@ -176,14 +173,16 @@ export type Retriever = BaseComponent;
 
 export type PromptingTechnique = BaseComponent;
 
-export type NodeDataset = {
-  id?: string;
-  name?: string;
-  inline?: {
-    records: Record<string, string[]>;
-    columnTypes: DatasetColumns;
-  };
-};
+export const nodeDatasetSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().optional(),
+  inline: z.object({
+    records: z.record(z.array(z.string())),
+    columnTypes: z.array(z.object({ name: z.string(), type: datasetColumnTypeSchema })),
+  }).optional(),
+});
+
+export type NodeDataset = z.infer<typeof nodeDatasetSchema>;
 
 export type Entry = BaseComponent & {
   inputs?: never;
