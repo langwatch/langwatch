@@ -92,9 +92,7 @@ class TemplateAdapter(dspy.JSONAdapter):
 
         return messages
 
-    def _format_template_inputs(
-        self, template: str, inputs: dict[str, Any]
-    ) -> dict[str, Any]:
+    def _format_template_inputs(self, template: str, inputs: dict[str, Any]) -> str:
         """
         Format the template inputs filling the {{ input }} placeholders.
         """
@@ -129,4 +127,104 @@ class TemplateAdapter(dspy.JSONAdapter):
         return len(signature.output_fields) == 0 or (
             len(signature.output_fields) == 1
             and list(signature.output_fields.values())[0].annotation == str
+        )
+
+    def format_demos(
+        self, signature: Type[Signature], demos: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Format the few-shot examples.
+
+        This method formats the few-shot examples as multiturn messages.
+
+        Args:
+            signature: The DSPy signature for which to format the few-shot examples.
+            demos: A list of few-shot examples, each element is a dictionary with keys of the input and output fields of
+                the signature.
+
+        Returns:
+            A list of multiturn messages.
+        """
+        _messages = getattr(signature, "_messages", Field(default=[])).default
+        complete_demos = []
+        incomplete_demos = []
+
+        for demo in demos:
+            # Check if all fields are present and not None
+            is_complete = all(
+                k in demo and demo[k] is not None for k in signature.fields
+            )
+
+            # Check if demo has at least one input and one output field
+            has_input = any(k in demo for k in signature.input_fields)
+            has_output = any(k in demo for k in signature.output_fields)
+
+            if is_complete:
+                complete_demos.append(demo)
+            elif has_input and has_output:
+                # We only keep incomplete demos that have at least one input and one output field
+                incomplete_demos.append(demo)
+
+        messages = []
+
+        incomplete_demo_prefix = "This is an example of the task, though some input or output fields are not supplied."
+        for demo in incomplete_demos:
+            messages.extend(
+                [
+                    m
+                    | {
+                        "content": (f"{incomplete_demo_prefix}\n\n" if i == 0 else "")
+                        + self._format_template_inputs(m["content"], demo)
+                    }
+                    for i, m in enumerate(_messages)
+                ]
+            )
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": self.format_assistant_message_content(
+                        signature,
+                        demo,
+                        missing_field_message="Not supplied for this particular example. ",
+                    ),
+                }
+            )
+
+        for demo in complete_demos:
+            messages.extend(
+                [
+                    m | {"content": self._format_template_inputs(m["content"], demo)}
+                    for m in _messages
+                ]
+            )
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": self.format_assistant_message_content(
+                        signature,
+                        demo,
+                        missing_field_message="Not supplied for this conversation history message. ",
+                    ),
+                }
+            )
+
+        return messages
+
+    def format_assistant_message_content(
+        self,
+        signature: Type[Signature],
+        outputs: dict[str, Any],
+        missing_field_message=None,
+    ) -> str:
+        if self._use_text_only_completion(signature, outputs):
+            first_key = list(signature.output_fields.keys())[0]
+            if first_key in outputs:
+                output = outputs[first_key]
+                return (
+                    output
+                    if type(output) == str
+                    else json.dumps(output, cls=SerializableWithStringFallback)
+                )
+
+        return super().format_assistant_message_content(
+            signature, outputs, missing_field_message
         )
