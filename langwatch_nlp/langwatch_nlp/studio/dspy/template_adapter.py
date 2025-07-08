@@ -1,3 +1,4 @@
+from copy import deepcopy
 import json
 import re
 from typing import Any, Type, cast
@@ -9,6 +10,7 @@ from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import _get_structured_outputs_response_format
 from langwatch_nlp.studio.utils import SerializableWithStringFallback
 from pydantic import Field
+from dspy.signatures.signature import Signature
 
 
 class TemplateAdapter(dspy.JSONAdapter):
@@ -233,3 +235,47 @@ class TemplateAdapter(dspy.JSONAdapter):
         return super().format_assistant_message_content(
             signature, outputs, missing_field_message
         )
+
+
+# Patch for _messages field to be kept when using with_instructions or with_updated_fields to create a new signature
+def patch_signature_with_functions():
+    @classmethod
+    def patched_with_instructions(cls, instructions: str) -> Type["Signature"]:
+        """
+        Copied from dspy.signatures.signature.Signature.with_instructions
+        """
+        signature = Signature(cls.fields, instructions)  # type: ignore
+
+        # Patch to keep the _messages field
+        if hasattr(cls, "_messages"):
+            setattr(signature, "_messages", getattr(cls, "_messages"))
+
+        return signature  # type: ignore
+
+    @classmethod
+    def patched_with_updated_fields(
+        cls, name, type_=None, **kwargs
+    ) -> Type["Signature"]:
+        """
+        Copied from dspy.signatures.signature.Signature.with_updated_fields
+        """
+        fields_copy = deepcopy(cls.fields)
+        fields_copy[name].json_schema_extra = {
+            **fields_copy[name].json_schema_extra,
+            **kwargs,
+        }
+        if type_ is not None:
+            fields_copy[name].annotation = type_
+        signature = Signature(fields_copy, cls.instructions)  # type: ignore
+
+        # Patch to keep the _messages field
+        if hasattr(cls, "_messages"):
+            setattr(signature, "_messages", getattr(cls, "_messages"))
+
+        return signature  # type: ignore
+
+    Signature.with_instructions = patched_with_instructions  # type: ignore
+    Signature.with_updated_fields = patched_with_updated_fields  # type: ignore
+
+
+patch_signature_with_functions()
