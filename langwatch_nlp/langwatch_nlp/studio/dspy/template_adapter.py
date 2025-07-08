@@ -30,6 +30,9 @@ class TemplateAdapter(dspy.JSONAdapter):
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
     ) -> list[dict[str, Any]]:
+        if getattr(signature, "_messages", None) is None:
+            return super().__call__(lm, lm_kwargs, signature, demos, inputs)
+
         # If the signature has only one output field and it's a string, we can use the text only completion
         if self._use_text_only_completion(signature, inputs):
             return ChatAdapter.__call__(self, lm, lm_kwargs, signature, demos, inputs)  # type: ignore
@@ -51,6 +54,9 @@ class TemplateAdapter(dspy.JSONAdapter):
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
     ) -> list[dict[str, Any]]:
+        if getattr(signature, "_messages", None) is None:
+            return super().format(signature, demos, inputs)
+
         inputs_copy = dict(inputs)
 
         # If the signature and inputs have conversation history, we need to format the conversation history and
@@ -114,6 +120,9 @@ class TemplateAdapter(dspy.JSONAdapter):
         return template_fmt.format_map(SafeDict(str_inputs))  # type: ignore
 
     def parse(self, signature, completion):
+        if getattr(signature, "_messages", None) is None:
+            return super().parse(signature, completion)
+
         if len(signature.output_fields) == 0:
             return {}
 
@@ -132,18 +141,9 @@ class TemplateAdapter(dspy.JSONAdapter):
     def format_demos(
         self, signature: Type[Signature], demos: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
-        """Format the few-shot examples.
+        if getattr(signature, "_messages", None) is None:
+            return super().format_demos(signature, demos)
 
-        This method formats the few-shot examples as multiturn messages.
-
-        Args:
-            signature: The DSPy signature for which to format the few-shot examples.
-            demos: A list of few-shot examples, each element is a dictionary with keys of the input and output fields of
-                the signature.
-
-        Returns:
-            A list of multiturn messages.
-        """
         _messages = getattr(signature, "_messages", Field(default=[])).default
         complete_demos = []
         incomplete_demos = []
@@ -215,6 +215,11 @@ class TemplateAdapter(dspy.JSONAdapter):
         outputs: dict[str, Any],
         missing_field_message=None,
     ) -> str:
+        if getattr(signature, "_messages", None) is None:
+            return super().format_assistant_message_content(
+                signature, outputs, missing_field_message
+            )
+
         if self._use_text_only_completion(signature, outputs):
             first_key = list(signature.output_fields.keys())[0]
             if first_key in outputs:
