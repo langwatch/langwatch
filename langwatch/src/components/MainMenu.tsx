@@ -160,18 +160,6 @@ export const MainMenu = React.memo(function MainMenu() {
             />
           )}
 
-          {dependencies.FrillToggleButton && (
-            <Box
-              width="full"
-              display="flex"
-              alignContent="center"
-              alignItems="center"
-              justifyContent="center"
-            >
-              <dependencies.FrillToggleButton />
-            </Box>
-          )}
-
           <Spacer />
 
           {(window as any)?.$crisp && project && (

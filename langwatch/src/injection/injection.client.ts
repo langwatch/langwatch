@@ -6,7 +6,6 @@ export interface Dependencies {
   ExtraMenuItems?: React.FC;
   extraPagesRoutes?: Record<string, NextPage>;
   ExtraFooterComponents?: React.FC;
-  FrillToggleButton?: React.FC;
 }
 
 const dependencies: Dependencies = {};
