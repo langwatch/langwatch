@@ -25,6 +25,8 @@ declare module "next-auth" {
   interface Session extends DefaultSession {
     user: DefaultSession["user"] & {
       id: string;
+      isNewSignup?: boolean;
+      signupProvider?: string;
     };
   }
 }
@@ -79,6 +81,9 @@ export const authOptions = (
           ...session.user,
           id: user.id,
           email: user.email,
+          // Pass signup tracking info to client
+          isNewSignup: (user as any).isNewSignup,
+          signupProvider: (user as any).signupProvider,
         },
       };
     },
@@ -88,6 +93,15 @@ export const authOptions = (
       const existingUser = await prisma.user.findUnique({
         where: { email: user.email },
       });
+
+      // Track signup event for new OAuth users
+      if (!existingUser && account?.provider) {
+        // This is a new user signing up via OAuth
+        // We'll track this event on the client side after successful signin
+        // by setting a flag in the session that the client can check
+        user.isNewSignup = true;
+        user.signupProvider = account.provider;
+      }
 
       if (existingUser?.pendingSsoSetup && account?.provider) {
         // Wrap operations in a transaction
