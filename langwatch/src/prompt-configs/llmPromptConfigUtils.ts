@@ -12,6 +12,7 @@ import type {
   Component,
   LlmConfigParameter,
   LlmPromptConfigComponent,
+  NodeDataset,
   Signature,
 } from "../optimization_studio/types/dsl";
 
@@ -132,13 +133,12 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
           ? parametersMap.messages.value
           : [],
         demonstrations: {
-          columns: inputsAndOutputsToDemostrationColumns(inputs, outputs),
-          rows:
-            (
-              parametersMap.demonstrations?.value as {
-                rows: Record<string, string>[];
-              }
-            )?.rows ?? [],
+          inline: {
+            columnTypes: inputsAndOutputsToDemostrationColumns(inputs, outputs),
+            records:
+              (parametersMap.demonstrations?.value as NodeDataset)?.inline
+                ?.records ?? {},
+          },
         },
         prompting_technique: parametersMap.prompting_technique
           ?.value as PromptConfigFormValues["version"]["configData"]["prompting_technique"],
@@ -235,6 +235,7 @@ function inputOutputTypeToDatasetColumnType(
       return "json";
     default:
       type_ satisfies never;
+      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Unknown input/output type: ${type_}`);
   }
 }

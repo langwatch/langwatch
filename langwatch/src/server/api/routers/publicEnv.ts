@@ -25,7 +25,6 @@ export const publicEnvRouter = publicProcedure
       HAS_LANGWATCH_NLP_SERVICE:
         !!env.LANGWATCH_NLP_SERVICE || !!env.LANGWATCH_NLP_LAMBDA_CONFIG,
       HAS_LANGEVALS_ENDPOINT: !!env.LANGEVALS_ENDPOINT,
-      FRILL_KEY: env.FRILL_KEY,
     };
 
     return publicEnvVars;

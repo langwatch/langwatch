@@ -25,6 +25,7 @@ import re
 import dspy
 
 from langwatch_nlp.studio.utils import (
+    SerializableWithStringFallback,
     normalize_name_to_class_name,
     normalize_to_variable_name,
     snake_case_to_pascal_case,

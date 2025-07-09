@@ -2,10 +2,10 @@
 import type { LlmPromptConfigVersion } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { DATASET_COLUMN_TYPES } from "../../datasets/types";
 import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
 import { LlmConfigInputTypes, LlmConfigOutputTypes } from "../../../types";
 import { createLogger } from "../../../utils/logger";
+import { nodeDatasetSchema } from "../../../optimization_studio/types/dsl";
 
 const logger = createLogger(
   "langwatch:prompt-config:llm-config-version-schema"
@@ -42,28 +42,6 @@ export const outputsSchema = z.object({
 });
 
 /**
- * Schema for few-shot demonstrations
- */
-const demonstrationsSchema = z.object({
-  columns: z.array(
-    z.object({
-      id: z.string().min(1, "Column ID cannot be empty"),
-      name: z.string().min(1, "Column name cannot be empty"),
-      type: z.enum(DATASET_COLUMN_TYPES),
-    })
-  ),
-  rows: z
-    .array(
-      z
-        .object({
-          id: z.string().min(1, "Row ID cannot be empty"),
-        })
-        .and(z.record(z.any()))
-    )
-    .default([]),
-});
-
-/**
  * Schema v1.0 - Base configuration schema
  * Validates the configData JSON field in LlmPromptConfigVersion
  */
@@ -94,7 +72,7 @@ const configSchemaV1_0 = z.object({
     model: z.string().min(1, "Model identifier cannot be empty"),
     temperature: z.number().optional(),
     max_tokens: z.number().optional(),
-    demonstrations: demonstrationsSchema,
+    demonstrations: nodeDatasetSchema.optional(),
     prompting_technique: z
       .object({
         ref: z.string().optional(),

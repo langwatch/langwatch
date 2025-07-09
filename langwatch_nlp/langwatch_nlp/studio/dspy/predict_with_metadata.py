@@ -63,13 +63,8 @@ class ModuleWithMetadata:
 
 
 class PredictWithMetadata(dspy.Predict, ModuleWithMetadata):
-    _node_id: Optional[str] = None
-    lm: Optional[dspy.LM] = None
-
     def __init__(self, *args, **kwargs):
-        dspy.Predict.__init__(self, *args, **kwargs)
-        ModuleWithMetadata.__init__(self, self)
-        self.lm = dspy.settings.lm
+        super().__init__(*args, **kwargs)
 
     def forward(self, *args, **kwargs):
         self._module = super().forward

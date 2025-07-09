@@ -683,6 +683,7 @@ function CustomGraphForm({
               index={index}
               seriesFields={seriesFields}
               setExpandedSeries={setExpandedSeries}
+              customId={customId}
             />
           ))}
         </Accordion.Root>
@@ -789,12 +790,14 @@ function SeriesFieldItem({
   index,
   seriesFields,
   setExpandedSeries,
+  customId,
 }: {
   form: ReturnType<typeof useForm<CustomGraphFormData>>;
   field: FieldArrayWithId<CustomGraphFormData, "series", "id">;
   index: number;
   seriesFields: UseFieldArrayReturn<CustomGraphFormData, "series", "id">;
   setExpandedSeries: Dispatch<SetStateAction<string[]>>;
+  customId?: string;
 }) {
   const colorSet = form.watch(`series.${index}.colorSet`);
   const coneColors = rotatingColors[colorSet].map((color, i) => {
@@ -818,7 +821,7 @@ function SeriesFieldItem({
           : "colors"
       );
     }
-  }, [form, groupBy, index, seriesLength]);
+  }, [form, groupBy, index, seriesLength, customId]);
 
   return (
     <Accordion.Item
@@ -934,7 +937,7 @@ function SeriesFieldItem({
       </Accordion.ItemTrigger>
       <Accordion.ItemContent>
         <Box padding={3}>
-          <SeriesField form={form} index={index} />
+          <SeriesField form={form} index={index} customId={customId} />
         </Box>
       </Accordion.ItemContent>
     </Accordion.Item>
@@ -944,9 +947,11 @@ function SeriesFieldItem({
 function SeriesField({
   form,
   index,
+  customId,
 }: {
   form: ReturnType<typeof useForm<CustomGraphFormData>>;
   index: number;
+  customId?: string;
 }) {
   const name = form.watch(`series.${index}.name`);
   const metric = form.watch(`series.${index}.metric`);
@@ -978,10 +983,18 @@ function SeriesField({
         .join(" ")
     );
 
-    if (!form.getFieldState(`series.${index}.name`)?.isTouched || !name) {
+    if (
+      (!customId && !form.getFieldState(`series.${index}.name`)?.isTouched) ||
+      !name
+    ) {
       form.resetField(`series.${index}.name`, { defaultValue: name_ });
     }
-    if (!form.getFieldState(`series.${index}.colorSet`)?.isTouched && metric_) {
+    // Skip automatic color set logic when editing an existing graph
+    if (
+      !customId &&
+      !form.getFieldState(`series.${index}.colorSet`)?.isTouched &&
+      metric_
+    ) {
       form.setValue(`series.${index}.colorSet`, metric_.colorSet);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
