@@ -3,6 +3,7 @@ import { HStack } from "@chakra-ui/react";
 import { Tabs } from "@chakra-ui/react";
 
 import { useDrawer } from "../CurrentDrawer";
+import { LLMMetrics } from "../LLMMetrics";
 import { Drawer } from "../ui/drawer";
 
 export function PromptAnalyticsDrawer({
@@ -38,7 +39,7 @@ export function PromptAnalyticsDrawer({
             </Tabs.List>
 
             <Tabs.Content value="llm-metrics">
-              Coming soon {promptConfigId}
+              <LLMMetrics />
             </Tabs.Content>
             <Tabs.Content value="evaluations">
               Coming soon {promptConfigId}

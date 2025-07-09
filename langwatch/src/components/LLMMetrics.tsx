@@ -1,10 +1,12 @@
 import { Card, Grid, GridItem, Heading, Tabs, VStack } from "@chakra-ui/react";
+
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { usePublicEnv } from "../hooks/usePublicEnv";
 import { analyticsMetrics } from "../server/analytics/registry";
 import { TeamRoleGroup } from "../server/api/permission";
+
 import { CustomGraph, type CustomGraphInput } from "./analytics/CustomGraph";
 import { LLMSummary } from "./analytics/LLMSummary";
-import { usePublicEnv } from "../hooks/usePublicEnv";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
