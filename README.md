@@ -205,7 +205,7 @@ Please read our [Contribution Guidelines](https://github.com/langwatch/langwatch
 
 ## ✍️ License
 
-Please read our [LICENSE.md](http://LICENSE.md) file.
+Please read our [LICENSE.md](/LICENSE.md) file.
 
 ## 👮‍♀️ Security + Compliance
 
