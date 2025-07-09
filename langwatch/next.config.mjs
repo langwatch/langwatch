@@ -25,7 +25,7 @@ const cspHeader = `
     upgrade-insecure-requests;
     connect-src 'self' https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com;
     worker-src 'self' blob:;
-    frame-src 'self' https://*.posthog.com https://*.pendo.io https://www.youtube.com https://get.langwatch.ai;
+    frame-src 'self' https://*.posthog.com https://*.pendo.io https://www.youtube.com https://get.langwatch.ai https://www.googletagmanager.com;
 `;
 
 const existingNodeModules = new Set(
