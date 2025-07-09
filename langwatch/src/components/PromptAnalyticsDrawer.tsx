@@ -6,8 +6,8 @@ import { useDrawer } from "./CurrentDrawer";
 import { LLMMetrics } from "./LLMMetrics";
 import { Drawer } from "./ui/drawer";
 
-import { ReportsContent } from "~/pages/[project]/analytics/reports";
 import { EvaluationsContent } from "~/pages/[project]/analytics/evaluations";
+import { ReportsContent } from "~/pages/[project]/analytics/reports";
 
 export function PromptAnalyticsDrawer({
   promptConfigId,

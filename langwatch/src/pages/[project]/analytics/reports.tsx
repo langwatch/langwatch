@@ -10,8 +10,10 @@ import {
   VStack,
   Alert,
 } from "@chakra-ui/react";
-
+import { useRouter } from "next/router";
 import { BarChart2, MoreVertical, Plus, Edit, Trash2 } from "react-feather";
+
+import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { Link } from "../../../components/ui/link";
 
 import {
@@ -21,14 +23,10 @@ import {
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { useFilterToggle } from "~/components/filters/FilterToggle";
 import GraphsLayout from "~/components/GraphsLayout";
+import { Menu } from "~/components/ui/menu";
+import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-
-import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
-
-import { useRouter } from "next/router";
-import { toaster } from "~/components/ui/toaster";
-import { Menu } from "~/components/ui/menu";
 
 export function ReportsContent() {
   const { project } = useOrganizationTeamProject();
