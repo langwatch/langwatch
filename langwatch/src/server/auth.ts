@@ -82,8 +82,7 @@ export const authOptions = (
           id: user.id,
           email: user.email,
           // Pass signup tracking info to client
-          isNewSignup: (user as any).isNewSignup,
-          signupProvider: (user as any).signupProvider,
+          isNewSignup: user.isNewSignup,
         },
       };
     },
@@ -95,12 +94,11 @@ export const authOptions = (
       });
 
       // Track signup event for new OAuth users
-      if (!existingUser && account?.provider) {
+      if (!existingUser) {
         // This is a new user signing up via OAuth
         // We'll track this event on the client side after successful signin
         // by setting a flag in the session that the client can check
         user.isNewSignup = true;
-        user.signupProvider = account.provider;
       }
 
       if (existingUser?.pendingSsoSetup && account?.provider) {
