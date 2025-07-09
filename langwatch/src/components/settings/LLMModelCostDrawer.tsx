@@ -1,21 +1,15 @@
-import {
-  Button,
-  Field,
-  HStack,
-  Input,
-  Text,
-} from "@chakra-ui/react";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useDrawer } from "../CurrentDrawer";
-import { api } from "../../utils/api";
+import { Button, Field, HStack, Input, Text } from "@chakra-ui/react";
+
+import { usimport { api } from "../../utils/api";
 import { useForm } from "react-hook-form";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import type { MaybeStoredLLMModelCost } from "../../server/modelProviders/llmModelCost";
 import { Drawer } from "../../components/ui/drawer";
 import { InputGroup } from "../../components/ui/input-group";
 import { toaster } from "../../components/ui/toaster";
-
-export function LLMModelCostDrawer({
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useDrawer } from "../CurrentDrawer";
+ction LLMModelCostDrawer({
   id,
   cloneModel,
 }: {
@@ -31,7 +25,12 @@ export function LLMModelCostDrawer({
   );
 
   return (
-    <Drawer.Root open={true} placement="end" size={"xl"} onOpenChange={() => closeDrawer()}>
+    <Drawer.Root
+      open={true}
+      placement="end"
+      size={"xl"}
+      onOpenChange={() => closeDrawer()}
+    >
       <Drawer.Backdrop />
       <Drawer.Content>
         <Drawer.Header>
@@ -168,8 +167,16 @@ function LLMModelCostForm({
           invalid={!!errors.regex}
         >
           <InputGroup
-            startElement={<Text paddingX={2} fontFamily="monospace">/</Text>}
-            endElement={<Text paddingX={2} fontFamily="monospace">/</Text>}
+            startElement={
+              <Text paddingX={2} fontFamily="monospace">
+                /
+              </Text>
+            }
+            endElement={
+              <Text paddingX={2} fontFamily="monospace">
+                /
+              </Text>
+            }
           >
             <Input
               required
@@ -197,9 +204,7 @@ function LLMModelCostForm({
               })}
             />
           </InputGroup>
-          <Field.ErrorText>
-            {errors.inputCostPerToken?.message}
-          </Field.ErrorText>
+          <Field.ErrorText>{errors.inputCostPerToken?.message}</Field.ErrorText>
         </HorizontalFormControl>
         <HorizontalFormControl
           label="Output Cost Per Token"
