@@ -6,7 +6,7 @@ import { useDrawer } from "./CurrentDrawer";
 import { LLMMetrics } from "./LLMMetrics";
 import { Drawer } from "./ui/drawer";
 
-import { AnalyticsCustomGraphContent } from "~/pages/[project]/analytics/custom";
+import { ReportsContent } from "~/pages/[project]/analytics/reports";
 import { EvaluationsContent } from "~/pages/[project]/analytics/evaluations";
 
 export function PromptAnalyticsDrawer({
@@ -48,7 +48,7 @@ export function PromptAnalyticsDrawer({
               <EvaluationsContent />
             </Tabs.Content>
             <Tabs.Content value="custom-reports">
-              <AnalyticsCustomGraphContent />
+              <ReportsContent />
             </Tabs.Content>
           </Tabs.Root>
         </Drawer.Body>

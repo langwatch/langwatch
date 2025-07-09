@@ -1,35 +1,36 @@
-import { Link } from "../../../components/ui/link";
 import {
-  Box,
   Button,
   Card,
   Grid,
   GridItem,
   HStack,
-  Heading,
   Skeleton,
   Spacer,
   Text,
   VStack,
   Alert,
 } from "@chakra-ui/react";
+
 import { BarChart2, MoreVertical, Plus, Edit, Trash2 } from "react-feather";
+import { Link } from "../../../components/ui/link";
+
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
+import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { useFilterToggle } from "~/components/filters/FilterToggle";
+import GraphsLayout from "~/components/GraphsLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
-import GraphsLayout from "~/components/GraphsLayout";
-import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
+
 import { useRouter } from "next/router";
 import { toaster } from "~/components/ui/toaster";
 import { Menu } from "~/components/ui/menu";
 
-export default function Reports() {
+export function ReportsContent() {
   const { project } = useOrganizationTeamProject();
   const { showFilters } = useFilterToggle();
 
@@ -61,7 +62,7 @@ export default function Reports() {
   };
 
   return (
-    <GraphsLayout>
+    <>
       <AnalyticsHeader title="Custom Reports" />
       {graphs.data && graphs.data?.length === 0 && (
         <Alert.Root
@@ -154,6 +155,14 @@ export default function Reports() {
         </Grid>
         {showFilters ? <FilterSidebar /> : null}
       </HStack>
+    </>
+  );
+}
+
+export default function ReportsPage() {
+  return (
+    <GraphsLayout>
+      <ReportsContent />
     </GraphsLayout>
   );
 }
