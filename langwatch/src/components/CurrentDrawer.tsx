@@ -1,21 +1,64 @@
+/**
+ * CurrentDrawer.tsx
+ *
+ * This file provides the global drawer system for the app.
+ * It exposes:
+ *   - <CurrentDrawer />: Renders the currently open drawer (if any) based on the URL query.
+ *   - useDrawer(): Hook to open/close drawers programmatically.
+ *
+ * Drawers are registered in the `drawers` object below.
+ *
+ * # Example: Opening a Drawer
+ *
+ * import { useDrawer } from "./CurrentDrawer";
+ *
+ * const { openDrawer } = useDrawer();
+ *
+ * // To open the LLM Model Cost drawer:
+ * openDrawer("llmModelCost", { id: "model-123" });
+ *
+ * // To open the Trace Details drawer:
+ * openDrawer("traceDetails", { traceId: "abc123" });
+ *
+ * # Example: Closing a Drawer
+ *
+ * const { closeDrawer } = useDrawer();
+ * closeDrawer();
+ *
+ * # Example: Checking if a Drawer is Open
+ *
+ * const { drawerOpen } = useDrawer();
+ * if (drawerOpen("llmModelCost")) {
+ *   // do something
+ * }
+ *
+ * # Adding a New Drawer
+ * 1. Create your drawer component (e.g., MyDrawer).
+ * 2. Add it to the `drawers` object below with a unique key.
+ * 3. Use `openDrawer("myDrawer", { ...props })` to open it.
+ */
+
 import { useRouter } from "next/router";
 import qs from "qs";
 import { ErrorBoundary } from "react-error-boundary";
+
 import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
-import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
+import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { TriggerDrawer } from "./AddTriggerDrawer";
 import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
 import { UploadCSVModal } from "./datasets/UploadCSVModal";
+import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
-import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
 
 type DrawerProps = {
   open: string;
 } & Record<string, any>;
 
+// Register all available drawers here.
+// The key is used as the drawer name in openDrawer("key", ...).
 const drawers = {
   traceDetails: TraceDetailsDrawer,
   batchEvaluation: BatchEvaluationDrawer,
@@ -32,6 +75,10 @@ const drawers = {
 // workaround to pass complexProps to drawers
 let complexProps = {} as Record<string, (...args: any[]) => void>;
 
+/**
+ * Renders the currently open drawer, if any.
+ * Only one drawer can be open at a time.
+ */
 export function CurrentDrawer() {
   const router = useRouter();
 
@@ -51,6 +98,7 @@ export function CurrentDrawer() {
     <ErrorBoundary
       fallback={null}
       onError={() => {
+        // If a drawer errors, remove it from the URL to recover gracefully.
         void router.push(
           "?" +
             qs.stringify(
@@ -70,14 +118,27 @@ export function CurrentDrawer() {
   ) : null;
 }
 
+/**
+ * useDrawer hook
+ *
+ * Provides methods to open, close, and check the state of drawers.
+ *
+ * Usage:
+ *   const { openDrawer, closeDrawer, drawerOpen } = useDrawer();
+ */
 export function useDrawer() {
   const router = useRouter();
 
+  /**
+   * Opens a drawer by name, passing props to the drawer component.
+   * Example: openDrawer("llmModelCost", { id: "model-123" });
+   */
   const openDrawer = <T extends keyof typeof drawers>(
     drawer: T,
     props?: Parameters<(typeof drawers)[T]>[0],
     { replace }: { replace?: boolean } = {}
   ) => {
+    // Only pass complex props (functions/objects) via global variable
     complexProps = Object.fromEntries(
       Object.entries(props ?? {}).filter(
         ([_key, value]) =>
@@ -114,6 +175,9 @@ export function useDrawer() {
     );
   };
 
+  /**
+   * Closes any open drawer.
+   */
   const closeDrawer = () => {
     void router.push(
       "?" +
@@ -135,6 +199,10 @@ export function useDrawer() {
     );
   };
 
+  /**
+   * Returns true if the given drawer is currently open.
+   * Example: drawerOpen("llmModelCost")
+   */
   const drawerOpen = (drawer: keyof typeof drawers) => {
     return router.query["drawer.open"] === drawer;
   };
