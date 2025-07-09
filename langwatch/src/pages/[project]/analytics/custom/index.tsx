@@ -18,7 +18,6 @@ import {
   createListCollection,
   useDisclosure,
 } from "@chakra-ui/react";
-
 import {
   Select as MultiSelect,
   chakraComponents,
@@ -49,8 +48,9 @@ import {
   type Path,
   type UseFieldArrayReturn,
 } from "react-hook-form";
+import { LuChartArea } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
-import { RenderCode } from "~/components/code/RenderCode";
+
 import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
@@ -101,7 +101,7 @@ import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,
 } from "../../../../utils/stringCasing";
-import { LuChartArea } from "react-icons/lu";
+import { RenderCode } from "~/components/code/RenderCode";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -234,7 +234,7 @@ const defaultValues: CustomGraphFormData = {
   includePrevious: true,
 };
 
-export default function AnalyticsCustomGraph({
+export function AnalyticsCustomGraphContent({
   customId,
   graph,
   name,
@@ -299,7 +299,7 @@ export default function AnalyticsCustomGraph({
   ]);
 
   return (
-    <DashboardLayout>
+    <>
       <Container maxWidth="1600" padding={6}>
         <VStack width="full" align="start" gap={6}>
           <HStack width="full" align="top">
@@ -411,6 +411,14 @@ EOF`}
           </Dialog.Body>
         </Dialog.Content>
       </Dialog.Root>
+    </>
+  );
+}
+
+export default function AnalyticsCustomGraph() {
+  return (
+    <DashboardLayout>
+      <AnalyticsCustomGraphContent />
     </DashboardLayout>
   );
 }
