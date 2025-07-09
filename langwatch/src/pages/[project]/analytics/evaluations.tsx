@@ -8,18 +8,20 @@ import {
   Text,
   Alert,
 } from "@chakra-ui/react";
-import { Link } from "~/components/ui/link";
 import { BarChart2 } from "react-feather";
-import GraphsLayout from "~/components/GraphsLayout";
+
+import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
+import { getEvaluatorDefinitions } from "../../../server/evaluations/getEvaluator";
+
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
+import GraphsLayout from "~/components/GraphsLayout";
+import { Link } from "~/components/ui/link";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
-import { getEvaluatorDefinitions } from "../../../server/evaluations/getEvaluator";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -151,7 +153,7 @@ const creatChecks = (checks: any) => {
   });
 };
 
-export default function Evaluations() {
+export function EvaluationsContent() {
   const { project } = useOrganizationTeamProject();
   const checks = api.monitors.getAllForProject.useQuery(
     {
@@ -161,7 +163,7 @@ export default function Evaluations() {
   );
 
   return (
-    <GraphsLayout>
+    <>
       <AnalyticsHeader title="Evaluations" />
       {checks.data && checks.data?.length === 0 && (
         <Alert.Root
@@ -192,6 +194,14 @@ export default function Evaluations() {
           <FilterSidebar hideTopics={true} />
         </Box>
       </HStack>
+    </>
+  );
+}
+
+export default function Evaluations() {
+  return (
+    <GraphsLayout>
+      <EvaluationsContent />
     </GraphsLayout>
   );
 }
