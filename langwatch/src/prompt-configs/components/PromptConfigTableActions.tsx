@@ -54,8 +54,7 @@ export function PromptConfigActions({
         <Menu.Item
           value="analytics"
           onClick={() => {
-            // openDrawer("promptAnalytics", { promptConfigId: config.id });
-            openDrawer("llmModelCost", { id: config.id });
+            openDrawer("promptAnalytics", { promptConfigId: config.id });
           }}
         >
           <BarChart2 size={16} /> Analytics

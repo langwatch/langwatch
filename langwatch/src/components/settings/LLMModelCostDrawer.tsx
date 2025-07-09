@@ -1,6 +1,7 @@
 import { Button, Field, HStack, Input, Text } from "@chakra-ui/react";
 
-import { usimport { api } from "../../utils/api";
+import { useDrawer } from "../CurrentDrawer";
+import { api } from "../../utils/api";
 import { useForm } from "react-hook-form";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import type { MaybeStoredLLMModelCost } from "../../server/modelProviders/llmModelCost";
@@ -8,8 +9,8 @@ import { Drawer } from "../../components/ui/drawer";
 import { InputGroup } from "../../components/ui/input-group";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useDrawer } from "../CurrentDrawer";
-ction LLMModelCostDrawer({
+
+export function LLMModelCostDrawer({
   id,
   cloneModel,
 }: {

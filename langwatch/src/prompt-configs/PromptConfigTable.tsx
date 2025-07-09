@@ -3,9 +3,8 @@ import type { LlmPromptConfig } from "@prisma/client";
 import { type ReactNode } from "react";
 
 import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
-
 import { PromptConfigActions } from "./components/PromptConfigTableActions";
-import { useDrawer } from "~/components/CurrentDrawer";
+
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 export type PromptConfigColumn = {
@@ -61,7 +60,6 @@ export function PromptConfigTable({
   onRowClick,
 }: PromptConfigTableProps) {
   const { project } = useOrganizationTeamProject();
-  const { openDrawer } = useDrawer();
 
   if (isLoading || !project) {
     return <Text>Loading prompts...</Text>;
