@@ -1,5 +1,5 @@
 import { prisma } from "~/server/db";
-import { TRACE_INDEX } from "./elasticsearch";
+import { SCENARIO_EVENTS_INDEX, TRACE_INDEX } from "./elasticsearch";
 import { esClient } from "./elasticsearch";
 
 export async function collectUsageStats(instanceId: string) {
@@ -67,10 +67,12 @@ export async function collectUsageStats(instanceId: string) {
     }),
   ]);
 
-  const { totalTraces } = await getTraceCount(organizationId);
+  const { totalTraces } = await getTraceCount();
+  const { totalScenarioEvents } = await getScenariosCount();
 
   return {
     totalTraces,
+    totalScenarioEvents,
     annotations: annotationCount,
     annotationQueues: annotationQueueCount,
     annotationQueueItems: annotationQueueItemCount,
@@ -86,8 +88,8 @@ export async function collectUsageStats(instanceId: string) {
   };
 }
 
-const getTraceCount = async (organizationId: string) => {
-  const client = await esClient({ organizationId });
+const getTraceCount = async () => {
+  const client = await esClient();
 
   const result = await client.count({
     index: TRACE_INDEX.alias,
@@ -100,5 +102,22 @@ const getTraceCount = async (organizationId: string) => {
 
   return {
     totalTraces: result.count,
+  };
+};
+
+const getScenariosCount = async () => {
+  const client = await esClient();
+
+  const result = await client.count({
+    index: SCENARIO_EVENTS_INDEX.alias,
+    body: {
+      query: {
+        match_all: {}, // Get all documents without any filter
+      },
+    },
+  });
+
+  return {
+    totalScenarioEvents: result.count,
   };
 };

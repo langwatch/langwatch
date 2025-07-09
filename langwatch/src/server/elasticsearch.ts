@@ -43,13 +43,13 @@ const getOrgElasticsearchDetailsFromProject = async (projectId: string) => {
 };
 
 export const esClient = async (
-  args: { projectId: string } | { organizationId: string } | { test: true }
+  args?: { projectId: string } | { organizationId: string } | { test: true }
 ) => {
   let elasticsearchNodeUrl: string | null = null;
   let elasticsearchApiKey: string | null = null;
 
-  if ("test" in args) {
-    // For tests, directly use environment variables
+  if (!args || "test" in args) {
+    // For tests or no args, directly use environment variables
     elasticsearchNodeUrl = env.ELASTICSEARCH_NODE_URL ?? null;
     elasticsearchApiKey = env.ELASTICSEARCH_API_KEY ?? null;
   } else {
