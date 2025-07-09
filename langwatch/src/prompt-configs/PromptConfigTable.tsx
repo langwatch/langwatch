@@ -1,11 +1,13 @@
-import { Box, Button, HStack, IconButton, Table, Text } from "@chakra-ui/react";
-import { Edit, MoreVertical, Trash2 } from "react-feather";
+import { Box, Button, HStack, Table, Text } from "@chakra-ui/react";
 import type { LlmPromptConfig } from "@prisma/client";
-import { type ReactNode } from "react";
-import { Menu } from "~/components/ui/menu";
-import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { UnplugIcon } from "lucide-react";
+import { type ReactNode } from "react";
+import { Edit, MoreVertical, Trash2 } from "react-feather";
+
+import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
+
+import { Menu } from "~/components/ui/menu";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 export type PromptConfigColumn = {
   key: string;
