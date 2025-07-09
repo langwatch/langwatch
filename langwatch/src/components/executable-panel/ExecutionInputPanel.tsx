@@ -6,7 +6,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { Play } from "react-feather";
 import { useForm, type FieldError } from "react-hook-form";
 import { HorizontalFormControl } from "../HorizontalFormControl";
@@ -46,11 +46,7 @@ export const ExecutionInputPanel = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(fields)]);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<Record<string, string>>({
+  const form = useForm<Record<string, string>>({
     defaultValues: defaultValues as Record<string, string>,
     resolver: (values) => {
       const response: {
@@ -80,6 +76,15 @@ export const ExecutionInputPanel = ({
     },
   });
 
+  const formValues = form.watch();
+
+  useEffect(() => {
+    if (JSON.stringify(formValues) !== JSON.stringify(defaultValues)) {
+      form.reset(defaultValues as Record<string, string>);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultValues]);
+
   const onSubmit = useCallback(
     (data: Record<string, string>) => {
       onExecute(data);
@@ -88,7 +93,8 @@ export const ExecutionInputPanel = ({
   );
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    <form onSubmit={form.handleSubmit(onSubmit)}>
       <VStack align="start" gap={3} width="full">
         <Heading
           as="h3"
@@ -109,10 +115,10 @@ export const ExecutionInputPanel = ({
               key={input.identifier}
               label={input.identifier}
               helper={""}
-              invalid={!!errors[input.identifier]}
+              invalid={!!form.formState.errors[input.identifier]}
             >
               <Textarea
-                {...register(input.identifier)}
+                {...form.register(input.identifier)}
                 placeholder={
                   input.type === "image"
                     ? "image url"
@@ -122,7 +128,7 @@ export const ExecutionInputPanel = ({
                 }
               />
               <Field.ErrorText>
-                {errors[input.identifier]?.message}
+                {form.formState.errors[input.identifier]?.message}
               </Field.ErrorText>
             </HorizontalFormControl>
           );
@@ -131,7 +137,7 @@ export const ExecutionInputPanel = ({
           <Button
             type="submit"
             colorPalette="green"
-            loading={isSubmitting}
+            loading={form.formState.isSubmitting}
             loadingText={buttonText}
           >
             {buttonText} <Play size={16} />
