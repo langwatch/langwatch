@@ -267,9 +267,10 @@ class LangWatchTrace:
         self,
     ):
         ensure_setup()
-        import langwatch.dspy
+        # Making sure it doesn't get mixed up with langwatch.dspy from `import langwatch`
+        from langwatch.dspy.__init__ import DSPyTracer
 
-        langwatch.dspy.DSPyTracer(trace=self)
+        DSPyTracer(trace=self)
 
     def share(self) -> str:
         """Share this trace and get a shareable URL."""

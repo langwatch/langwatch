@@ -81,7 +81,7 @@ async def execute_optimization(
             do_not_trace=True,
         ) as (Module, _):
             module = Module(run_evaluations=True)
-            module.prevent_crashes()
+            module.prevent_crashes = True
 
             entry_node = cast(
                 EntryNode,

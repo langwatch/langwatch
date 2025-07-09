@@ -27,6 +27,7 @@ from langwatch_nlp.studio.utils import (
     ClientReadableValueError,
     SerializableWithPydanticAndPredictEncoder,
     disable_dsp_caching,
+    normalize_to_variable_name,
     optional_langwatch_trace,
     transpose_inline_dataset_to_object_list,
     get_dataset_entry_selection,
@@ -106,7 +107,7 @@ async def execute_flow(
 
             try:
                 input_keys = [input.identifier for input in module_inputs]
-                inputs_ = {k: v for k, v in entries[0].items() if k in input_keys}
+                inputs_ = {k: v for k, v in entries[0].items() if normalize_to_variable_name(k) in input_keys}
                 result = await dspy.asyncify(module.forward)(**inputs_)  # type: ignore
 
             except Exception as e:

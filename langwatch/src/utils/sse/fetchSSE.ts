@@ -41,7 +41,7 @@ export async function fetchSSE<T>({
   onEvent,
   shouldStopProcessing,
   timeout = 10_000,
-  chunkTimeout = 240_000,
+  chunkTimeout = 480_000,
   headers = {},
   onError,
 }: FetchSSEOptions<T>): Promise<void> {
