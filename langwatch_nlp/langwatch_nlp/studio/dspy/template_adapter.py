@@ -1,3 +1,4 @@
+from copy import deepcopy
 import json
 import re
 from typing import Any, Type, cast
@@ -9,6 +10,7 @@ from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.json_adapter import _get_structured_outputs_response_format
 from langwatch_nlp.studio.utils import SerializableWithStringFallback
 from pydantic import Field
+from dspy.signatures.signature import Signature
 
 
 class TemplateAdapter(dspy.JSONAdapter):
@@ -30,6 +32,9 @@ class TemplateAdapter(dspy.JSONAdapter):
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
     ) -> list[dict[str, Any]]:
+        if getattr(signature, "_messages", None) is None:
+            return super().__call__(lm, lm_kwargs, signature, demos, inputs)
+
         # If the signature has only one output field and it's a string, we can use the text only completion
         if self._use_text_only_completion(signature, inputs):
             return ChatAdapter.__call__(self, lm, lm_kwargs, signature, demos, inputs)  # type: ignore
@@ -51,6 +56,9 @@ class TemplateAdapter(dspy.JSONAdapter):
         demos: list[dict[str, Any]],
         inputs: dict[str, Any],
     ) -> list[dict[str, Any]]:
+        if getattr(signature, "_messages", None) is None:
+            return super().format(signature, demos, inputs)
+
         inputs_copy = dict(inputs)
 
         # If the signature and inputs have conversation history, we need to format the conversation history and
@@ -92,9 +100,7 @@ class TemplateAdapter(dspy.JSONAdapter):
 
         return messages
 
-    def _format_template_inputs(
-        self, template: str, inputs: dict[str, Any]
-    ) -> dict[str, Any]:
+    def _format_template_inputs(self, template: str, inputs: dict[str, Any]) -> str:
         """
         Format the template inputs filling the {{ input }} placeholders.
         """
@@ -116,6 +122,9 @@ class TemplateAdapter(dspy.JSONAdapter):
         return template_fmt.format_map(SafeDict(str_inputs))  # type: ignore
 
     def parse(self, signature, completion):
+        if getattr(signature, "_messages", None) is None:
+            return super().parse(signature, completion)
+
         if len(signature.output_fields) == 0:
             return {}
 
@@ -130,3 +139,143 @@ class TemplateAdapter(dspy.JSONAdapter):
             len(signature.output_fields) == 1
             and list(signature.output_fields.values())[0].annotation == str
         )
+
+    def format_demos(
+        self, signature: Type[Signature], demos: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        if getattr(signature, "_messages", None) is None:
+            return super().format_demos(signature, demos)
+
+        _messages = getattr(signature, "_messages", Field(default=[])).default
+        complete_demos = []
+        incomplete_demos = []
+
+        for demo in demos:
+            # Check if all fields are present and not None
+            is_complete = all(
+                k in demo and demo[k] is not None for k in signature.fields
+            )
+
+            # Check if demo has at least one input and one output field
+            has_input = any(k in demo for k in signature.input_fields)
+            has_output = any(k in demo for k in signature.output_fields)
+
+            if is_complete:
+                complete_demos.append(demo)
+            elif has_input and has_output:
+                # We only keep incomplete demos that have at least one input and one output field
+                incomplete_demos.append(demo)
+
+        messages = []
+
+        incomplete_demo_prefix = "This is an example of the task, though some input or output fields are not supplied."
+        for demo in incomplete_demos:
+            messages.extend(
+                [
+                    m
+                    | {
+                        "content": (f"{incomplete_demo_prefix}\n\n" if i == 0 else "")
+                        + self._format_template_inputs(m["content"], demo)
+                    }
+                    for i, m in enumerate(_messages)
+                ]
+            )
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": self.format_assistant_message_content(
+                        signature,
+                        demo,
+                        missing_field_message="Not supplied for this particular example. ",
+                    ),
+                }
+            )
+
+        for demo in complete_demos:
+            messages.extend(
+                [
+                    m | {"content": self._format_template_inputs(m["content"], demo)}
+                    for m in _messages
+                ]
+            )
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": self.format_assistant_message_content(
+                        signature,
+                        demo,
+                        missing_field_message="Not supplied for this conversation history message. ",
+                    ),
+                }
+            )
+
+        return messages
+
+    def format_assistant_message_content(
+        self,
+        signature: Type[Signature],
+        outputs: dict[str, Any],
+        missing_field_message=None,
+    ) -> str:
+        if getattr(signature, "_messages", None) is None:
+            return super().format_assistant_message_content(
+                signature, outputs, missing_field_message
+            )
+
+        if self._use_text_only_completion(signature, outputs):
+            first_key = list(signature.output_fields.keys())[0]
+            if first_key in outputs:
+                output = outputs[first_key]
+                return (
+                    output
+                    if type(output) == str
+                    else json.dumps(output, cls=SerializableWithStringFallback)
+                )
+
+        return super().format_assistant_message_content(
+            signature, outputs, missing_field_message
+        )
+
+
+# Patch for _messages field to be kept when using with_instructions or with_updated_fields to create a new signature
+def patch_signature_with_functions():
+    @classmethod
+    def patched_with_instructions(cls, instructions: str) -> Type["Signature"]:
+        """
+        Copied from dspy.signatures.signature.Signature.with_instructions
+        """
+        signature = Signature(cls.fields, instructions)  # type: ignore
+
+        # Patch to keep the _messages field
+        if hasattr(cls, "_messages"):
+            setattr(signature, "_messages", getattr(cls, "_messages"))
+
+        return signature  # type: ignore
+
+    @classmethod
+    def patched_with_updated_fields(
+        cls, name, type_=None, **kwargs
+    ) -> Type["Signature"]:
+        """
+        Copied from dspy.signatures.signature.Signature.with_updated_fields
+        """
+        fields_copy = deepcopy(cls.fields)
+        fields_copy[name].json_schema_extra = {
+            **fields_copy[name].json_schema_extra,
+            **kwargs,
+        }
+        if type_ is not None:
+            fields_copy[name].annotation = type_
+        signature = Signature(fields_copy, cls.instructions)  # type: ignore
+
+        # Patch to keep the _messages field
+        if hasattr(cls, "_messages"):
+            setattr(signature, "_messages", getattr(cls, "_messages"))
+
+        return signature  # type: ignore
+
+    Signature.with_instructions = patched_with_instructions  # type: ignore
+    Signature.with_updated_fields = patched_with_updated_fields  # type: ignore
+
+
+patch_signature_with_functions()
