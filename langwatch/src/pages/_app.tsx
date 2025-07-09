@@ -1,6 +1,5 @@
 import { type Session } from "next-auth";
 import { SessionProvider } from "next-auth/react";
-import { type AppType } from "next/app";
 
 import { api } from "~/utils/api";
 
@@ -11,6 +10,7 @@ import {
   defineRecipe,
   defineSlotRecipe,
 } from "@chakra-ui/react";
+import { type AppType } from "next/app";
 import "~/styles/globals.scss";
 import "~/styles/markdown.scss";
 
@@ -18,12 +18,12 @@ import { Inter } from "next/font/google";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import NProgress from "nprogress";
-import { useEffect, useState } from "react";
 import { colorSystem } from "../components/ui/color-mode";
 import { Toaster } from "../components/ui/toaster";
 import { dependencies } from "../injection/dependencies.client";
 
 import { PostHogProvider } from "posthog-js/react";
+import { useEffect, useState } from "react";
 import { usePostHog } from "../hooks/usePostHog";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -469,6 +469,7 @@ export const system = createSystem(defaultConfig, {
             full: { content: { maxWidth: "100%" } },
             eval: { content: { maxWidth: "1024px" } },
             xl: { content: { maxWidth: "4xl" } },
+            "2xl": { content: { maxWidth: "6xl" } },
           },
         },
         defaultVariants: {

@@ -1,15 +1,16 @@
-import { MessagesTable } from "~/components/messages/MessagesTable";
+import { useEffect, useState } from "react";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import WelcomeLayout from "../../components/welcome/WelcomeLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { MessagesList } from "../../components/messages/MessagesList";
 import { useTableView } from "../../components/messages/HeaderButtons";
 import { api } from "../../utils/api";
-import { useEffect, useState } from "react";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useFieldRedaction } from "../../hooks/useFieldRedaction";
 
-export default function MessagesOrIntegrationGuide() {
+import { MessagesTable } from "~/components/messages/MessagesTable";
+
+export function MessagesPageContent() {
   const { project } = useOrganizationTeamProject();
 
   const { isTableView } = useTableView();
@@ -43,24 +44,20 @@ export default function MessagesOrIntegrationGuide() {
   }, [project, traces.data, waitingForFirstMessage]);
 
   if (project && (!project.firstMessage || waitingForFirstMessage)) {
-    return (
-      <DashboardLayout>
-        <WelcomeLayout />
-      </DashboardLayout>
-    );
+    return <WelcomeLayout />;
   }
 
   if (isTableView) {
-    return (
-      <DashboardLayout>
-        <MessagesTable />
-      </DashboardLayout>
-    );
+    return <MessagesTable />;
   }
 
+  return <MessagesList />;
+}
+
+export default function MessagesPage() {
   return (
     <DashboardLayout>
-      <MessagesList />
+      <MessagesPageContent />
     </DashboardLayout>
   );
 }
