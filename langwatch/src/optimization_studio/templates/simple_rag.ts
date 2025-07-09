@@ -26,7 +26,7 @@ export const simpleRagTemplate: Workflow = {
         name: "Entry",
         outputs: [
           { identifier: "question", type: "str" },
-          { identifier: "gold_answer", type: "str" },
+          { identifier: "answer", type: "str" },
         ],
         entry_selection: "random",
         train_size: 0.8,
@@ -120,7 +120,7 @@ export const simpleRagTemplate: Workflow = {
                 "The Black Halo features a guest appearance by a Dutch symphonic metal band, that was founded by who?",
                 "The score for Frankie and Johnny was composed by a composer who has won what collection of four awards?",
               ],
-              gold_answer: [
+              answer: [
                 "no",
                 "National Hockey League",
                 "Steve Yzerman",
@@ -207,7 +207,7 @@ export const simpleRagTemplate: Workflow = {
             },
             columnTypes: [
               { name: "question", type: "string" },
-              { name: "gold_answer", type: "string" },
+              { name: "answer", type: "string" },
             ],
           },
         },
@@ -408,7 +408,7 @@ export const simpleRagTemplate: Workflow = {
     {
       id: "e4-5",
       source: "entry",
-      sourceHandle: "outputs.gold_answer",
+      sourceHandle: "outputs.answer",
       target: "exact_match",
       targetHandle: "inputs.expected_output",
       type: "default",
