@@ -1,7 +1,8 @@
 // src/components/analytics/PromptTracesDrawer.tsx
 import { HStack, Text, VStack, Card, Heading, Alert } from "@chakra-ui/react";
-import { useDrawer } from "../CurrentDrawer";
-import { Drawer } from "../ui/drawer";
+
+import { useDrawer } from "./CurrentDrawer";
+import { Drawer } from "./ui/drawer";
 
 export function PromptTracesDrawer({
   promptConfigId,

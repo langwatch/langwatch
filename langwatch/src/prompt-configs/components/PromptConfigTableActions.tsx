@@ -1,7 +1,7 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
 import type { LlmPromptConfig } from "@prisma/client";
 import { UnplugIcon } from "lucide-react";
-import { Edit, MoreVertical, Trash2, BarChart2 } from "react-feather";
+import { Edit, MoreVertical, Trash2, BarChart2, Activity } from "react-feather";
 
 import { GeneratePromptApiSnippetDialog } from "./GeneratePromptApiSnippetDialog";
 
@@ -58,6 +58,15 @@ export function PromptConfigActions({
           }}
         >
           <BarChart2 size={16} /> Analytics
+        </Menu.Item>
+
+        <Menu.Item
+          value="traces"
+          onClick={() => {
+            openDrawer("promptTraces", { promptConfigId: config.id });
+          }}
+        >
+          <Activity size={16} /> Traces
         </Menu.Item>
 
         <Menu.Item

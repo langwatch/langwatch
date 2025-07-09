@@ -50,7 +50,8 @@ import { TriggerDrawer } from "./AddTriggerDrawer";
 import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
 import { UploadCSVModal } from "./datasets/UploadCSVModal";
 import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
-import { PromptAnalyticsDrawer } from "./prompt-analytics/PromptAnalyticsDrawer";
+import { PromptAnalyticsDrawer } from "./PromptAnalyticsDrawer";
+import { PromptTracesDrawer } from "./PromptTracesDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
 
@@ -72,6 +73,7 @@ const drawers = {
   addOrEditDataset: AddOrEditDatasetDrawer,
   editTriggerFilter: EditTriggerFilterDrawer,
   promptAnalytics: PromptAnalyticsDrawer,
+  promptTraces: PromptTracesDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 // workaround to pass complexProps to drawers
