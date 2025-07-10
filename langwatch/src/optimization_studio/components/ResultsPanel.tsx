@@ -399,7 +399,7 @@ export function LoadedOptimizationResults({
   ) => {
     const appliedOptimizationsMap = Object.fromEntries(
       appliedOptimizations.map((optimization) => [
-        optimization.id,
+        optimization.id.replace(".predict", ""),
         optimization,
       ])
     );

@@ -26,7 +26,7 @@ export const simpleRagTemplate: Workflow = {
         name: "Entry",
         outputs: [
           { identifier: "question", type: "str" },
-          { identifier: "gold_answer", type: "str" },
+          { identifier: "answer", type: "str" },
         ],
         entry_selection: "random",
         train_size: 0.8,
@@ -120,7 +120,7 @@ export const simpleRagTemplate: Workflow = {
                 "The Black Halo features a guest appearance by a Dutch symphonic metal band, that was founded by who?",
                 "The score for Frankie and Johnny was composed by a composer who has won what collection of four awards?",
               ],
-              gold_answer: [
+              answer: [
                 "no",
                 "National Hockey League",
                 "Steve Yzerman",
@@ -207,7 +207,7 @@ export const simpleRagTemplate: Workflow = {
             },
             columnTypes: [
               { name: "question", type: "string" },
-              { name: "gold_answer", type: "string" },
+              { name: "answer", type: "string" },
             ],
           },
         },
@@ -337,19 +337,20 @@ export const simpleRagTemplate: Workflow = {
       },
     },
     {
-      id: "exact_match",
+      id: "llm_answer_match",
       type: "evaluator",
-      position: { x: 1200, y: 130 },
+      position: { x: 1200, y: 140 },
       data: {
-        name: "ExactMatch",
-        cls: "ExactMatchEvaluator",
+        name: "LLM Answer Match",
+        cls: "LangWatchEvaluator",
+        evaluator: "langevals/llm_answer_match",
         inputs: [
+          { identifier: "input", type: "str" },
           { identifier: "output", type: "str" },
           { identifier: "expected_output", type: "str" },
         ],
         outputs: [
           { identifier: "passed", type: "bool" },
-          { identifier: "score", type: "float" },
         ],
       } satisfies Evaluator,
     },
@@ -408,16 +409,24 @@ export const simpleRagTemplate: Workflow = {
     {
       id: "e4-5",
       source: "entry",
-      sourceHandle: "outputs.gold_answer",
-      target: "exact_match",
-      targetHandle: "inputs.expected_output",
+      sourceHandle: "outputs.question",
+      target: "llm_answer_match",
+      targetHandle: "inputs.input",
       type: "default",
     },
     {
       id: "e5-6",
+      source: "entry",
+      sourceHandle: "outputs.answer",
+      target: "llm_answer_match",
+      targetHandle: "inputs.expected_output",
+      type: "default",
+    },
+    {
+      id: "e6-7",
       source: "generate_answer",
       sourceHandle: "outputs.answer",
-      target: "exact_match",
+      target: "llm_answer_match",
       targetHandle: "inputs.output",
       type: "default",
     },

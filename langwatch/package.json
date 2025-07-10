@@ -66,6 +66,7 @@
     "@opensearch-project/opensearch": "^2.11.0",
     "@opentelemetry/exporter-trace-otlp-proto": "0.55.0",
     "@opentelemetry/otlp-transformer": "0.55.0",
+    "@opentelemetry/sdk-trace-web": "^2.0.1",
     "@prisma/client": "5.7.0",
     "@react-email/button": "^0.0.11",
     "@react-email/components": "^0.0.36",

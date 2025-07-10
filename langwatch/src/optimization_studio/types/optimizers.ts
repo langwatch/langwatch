@@ -11,16 +11,6 @@ export const optimizerParamsSchema = z.object({
 });
 
 export const OPTIMIZERS = {
-  MIPROv2ZeroShot: {
-    name: "Prompt Only (MIPRO v2)",
-    description:
-      "Generates several prompt alternatives to try and improve the LLM performance.",
-    minimum_train_set: 10,
-    params: {
-      llm: null as LLMConfig | null,
-      num_candidates: 7,
-    },
-  },
   MIPROv2: {
     name: "Prompt + Demonstrations (MIPRO v2)",
     description:
@@ -31,6 +21,16 @@ export const OPTIMIZERS = {
       num_candidates: 7,
       max_bootstrapped_demos: 4,
       max_labeled_demos: 16,
+    },
+  },
+  MIPROv2ZeroShot: {
+    name: "Prompt Only (MIPRO v2)",
+    description:
+      "Generates several prompt alternatives to try and improve the LLM performance.",
+    minimum_train_set: 10,
+    params: {
+      llm: null as LLMConfig | null,
+      num_candidates: 7,
     },
   },
   BootstrapFewShotWithRandomSearch: {

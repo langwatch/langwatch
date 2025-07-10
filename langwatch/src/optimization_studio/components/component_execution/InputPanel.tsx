@@ -1,6 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ExecutionInputPanel,
   type InputField,
@@ -35,15 +35,16 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
   const { startComponentExecution } = useComponentExecution();
 
   // Convert node inputs to the format expected by ExecutionInputPanel
-  const inputFields: InputField[] =
-    node.data.inputs?.map((input) => ({
+  const inputFields: InputField[] = useMemo(() => {
+    return node.data.inputs?.map((input) => ({
       identifier: input.identifier,
       type: input.type,
       optional: !missingFields.some(
         (field) => field.identifier === input.identifier
       ),
       value: inputs[input.identifier],
-    })) || [];
+    })) ?? [];
+  }, [node.data.inputs, missingFields, inputs]);
 
   // Handle execution when the user submits the form
   const onExecute = useCallback(
@@ -76,7 +77,7 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
               field.identifier,
               typeof field.value === "object"
                 ? JSON.stringify(field.value)
-                : field.value?.toString() || "",
+                : field.value?.toString() ?? "",
             ])
           );
           onExecute(formData);

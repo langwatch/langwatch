@@ -7,6 +7,7 @@ import { nanoid } from "nanoid";
 import { toaster } from "../../components/ui/toaster";
 import { useAlertOnComponent } from "./useAlertOnComponent";
 import { usePostEvent } from "./usePostEvent";
+import { generateOtelTraceId } from "../../utils/trace";
 
 export const useComponentExecution = () => {
   const { postEvent, socketStatus } = usePostEvent();
@@ -90,7 +91,7 @@ export const useComponentExecution = () => {
         return;
       }
 
-      const trace_id = `trace_${nanoid()}`;
+      const trace_id = generateOtelTraceId();
 
       setComponentExecutionState(node.id, {
         status: "waiting",

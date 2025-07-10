@@ -41,6 +41,7 @@ import type { AppRouter } from "../../server/api/root";
 import type {
   AppliedOptimization,
   AppliedOptimizationField,
+  DSPyPredictor,
   DSPyRunsSummary,
   DSPyStepSummary,
 } from "../../server/experiments/types";
@@ -1342,6 +1343,11 @@ export function DSPyExperimentSummary({
   onApply?: (appliedOptimizations: AppliedOptimization[]) => void;
   onViewLogs?: () => void;
 }) {
+  const { selectedPoint, setSelectedPoint } = useDSPyExperimentState({
+    project,
+    experiment,
+  });
+
   const { totalCost, bestScore, bestScoreStepSummary, bestScoreLabel } =
     useMemo(() => {
       const totalCost = run?.steps
@@ -1369,6 +1375,51 @@ export function DSPyExperimentSummary({
       enabled: !!bestScoreStepSummary && !!onApply,
     }
   );
+
+  const selectedPointStep = api.experiments.getExperimentDSPyStep.useQuery(
+    {
+      projectId: project.id,
+      experimentSlug: experiment.slug,
+      runId: selectedPoint?.runId ?? "",
+      index: selectedPoint?.index ?? "",
+    },
+    {
+      enabled: !!selectedPoint,
+    }
+  );
+
+  const onApplyOptimization = (predictors: DSPyPredictor[]) => {
+    const appliedOptimizations: AppliedOptimization[] = predictors.map(
+      (predictor) => {
+        const optimization: AppliedOptimization = {
+          id: predictor.name,
+          instructions:
+            predictor.predictor.extended_signature?.instructions ??
+            predictor.predictor.signature?.instructions,
+          fields: Object.entries(
+            predictor.predictor.signature?.fields ?? {}
+          ).map(([key, value]: [string, any]) => {
+            const field: AppliedOptimizationField = {
+              identifier: key,
+              field_type: value.field_type ?? "input",
+              prefix: value.prefix,
+              desc: value.desc,
+            };
+
+            return field;
+          }),
+          demonstrations: predictor.predictor.demos
+            ?.map((demo: any) => demo._store ?? demo)
+            .filter(Boolean),
+        };
+        return optimization;
+      }
+    );
+
+    if (onApply) {
+      onApply(appliedOptimizations);
+    }
+  };
 
   return (
     <HStack
@@ -1412,44 +1463,28 @@ export function DSPyExperimentSummary({
           View Logs
         </Button>
       )}
+      {selectedPoint && onApply && (
+        <Button
+          size="md"
+          variant="ghost"
+          onClick={() => {
+            if (!selectedPoint || !selectedPointStep.data) return;
+            onApplyOptimization(selectedPointStep.data.predictors);
+          }}
+        >
+          Apply Selected Step
+        </Button>
+      )}
       {bestScoreStep.data && onApply && (
         <Button
           size="md"
           colorPalette="green"
           onClick={() => {
             if (!bestScoreStep.data) return;
-            const appliedOptimizations: AppliedOptimization[] =
-              bestScoreStep.data.predictors.map((predictor) => {
-                const optimization: AppliedOptimization = {
-                  id: predictor.name,
-                  instructions:
-                    predictor.predictor.extended_signature?.instructions ??
-                    predictor.predictor.signature?.instructions,
-                  fields: Object.entries(
-                    predictor.predictor.signature?.fields ?? {}
-                  ).map(([key, value]: [string, any]) => {
-                    const field: AppliedOptimizationField = {
-                      identifier: key,
-                      field_type: value.field_type ?? "input",
-                      prefix: value.prefix,
-                      desc: value.desc,
-                    };
-
-                    return field;
-                  }),
-                  demonstrations: predictor.predictor.demos
-                    ?.map((demo: any) => demo._store ?? demo)
-                    .filter(Boolean),
-                };
-                return optimization;
-              });
-
-            if (onApply) {
-              onApply(appliedOptimizations);
-            }
+            onApplyOptimization(bestScoreStep.data.predictors);
           }}
         >
-          <LLMIcon /> Apply Optimization
+          <LLMIcon /> Apply Best Optimization
         </Button>
       )}
     </HStack>
