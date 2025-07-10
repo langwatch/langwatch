@@ -600,7 +600,7 @@ export function MessagesTable({
     },
     topic: {
       name: "Topic",
-      sortable: true,
+      sortable: false,
       render: (trace, index) => (
         <Table.Cell
           key={index}
@@ -624,7 +624,7 @@ export function MessagesTable({
     },
     subtopic: {
       name: "Subtopic",
-      sortable: true,
+      sortable: false,
       render: (trace, index) => (
         <Table.Cell
           key={index}
@@ -866,11 +866,11 @@ export function MessagesTable({
         annotators: annotators.map((p) => p.id),
       },
       {
-        onSuccess: async () => {
+        onSuccess: () => {
           // Invalidate count queries to update sidebar counts
-          await queryClient.annotation.getPendingItemsCount.invalidate();
-          await queryClient.annotation.getAssignedItemsCount.invalidate();
-          await queryClient.annotation.getQueueItemsCounts.invalidate();
+          void queryClient.annotation.getPendingItemsCount.invalidate();
+          void queryClient.annotation.getAssignedItemsCount.invalidate();
+          void queryClient.annotation.getQueueItemsCounts.invalidate();
 
           dialog.onClose();
           toaster.create({
