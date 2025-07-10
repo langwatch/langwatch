@@ -54,7 +54,7 @@ import {
   LuWandSparkles,
 } from "react-icons/lu";
 import { toaster } from "~/components/ui/toaster";
-import { trackEvent } from "~/utils/tracking";
+import { trackEventOnce } from "~/utils/tracking";
 
 type OrganizationFormData = {
   organizationName: string;
@@ -158,7 +158,7 @@ export default function OrganizationOnboarding() {
       },
       {
         onSuccess: (response) => {
-          trackEvent("signup", {
+          trackEventOnce("signup", {
             category: "onboarding",
             label: "organization_onboarding_completed",
           });
