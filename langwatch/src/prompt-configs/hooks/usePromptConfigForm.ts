@@ -71,14 +71,20 @@ export const usePromptConfigForm = ({
     const newColumns = inputsAndOutputsToDemostrationColumns(inputs, outputs);
     const currentColumns =
       formData.version?.configData.demonstrations?.inline?.columnTypes ?? [];
+    const currentRecords =
+      formData.version?.configData.demonstrations?.inline?.records ?? {};
 
     if (!isEqual(newColumns, currentColumns)) {
       methods.setValue(
         "version.configData.demonstrations.inline.columnTypes",
         newColumns
       );
+      methods.setValue(
+        "version.configData.demonstrations.inline.records",
+        currentRecords
+      );
     }
-  }, [formData]);
+  }, [formData, methods]);
 
   // Provides forward sync of parent component to form values
   useEffect(() => {

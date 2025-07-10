@@ -70,7 +70,7 @@ export function PromptTextArea({
 
   useEffect(() => {
     updateInvalidMentions();
-  }, [value, availableIds]);
+  }, [value, availableIds, updateInvalidMentions]);
 
   /**
    * The MentionsInput doesn't not handle resizing well,
@@ -84,8 +84,9 @@ export function PromptTextArea({
     const resizeHandler = () => {
       const textarea = textareaRef.current;
       const box = boxRef.current;
+      const maxHeight = document.documentElement.clientHeight * 0.33; // 33vh
       if (textarea && box) {
-        box.style.height = textarea.scrollHeight + "px";
+        box.style.height = Math.min(textarea.scrollHeight, maxHeight) + "px";
       }
     };
 
