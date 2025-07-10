@@ -39,6 +39,8 @@ print(response.text)
 `,
       target: "python_python3",
       title: "Get Prompts (Python httpx)",
+      path: "/api/prompts/{id}",
+      method: "GET",
     },
     {
       content: `
@@ -51,6 +53,8 @@ fetch('https://app.langwatch.ai/api/prompts/${promptId}', options)
 `,
       target: "node_native",
       title: "Get Prompts",
+      path: "/api/prompts/{id}",
+      method: "GET",
     },
     {
       content: `
@@ -84,6 +88,8 @@ if ($err) {
 `,
       target: "php_curl",
       title: "Get Prompts (PHP cURL)",
+      path: "/api/prompts/{id}",
+      method: "GET",
     },
     {
       content: `
@@ -112,6 +118,8 @@ func main() {
 `,
       target: "go_native",
       title: "Get Prompts (Go)",
+      path: "/api/prompts/{id}",
+      method: "GET",
     },
     {
       content: `
@@ -135,6 +143,8 @@ public class GetPrompt {
 `,
       target: "java_unirest",
       title: "Get Prompts (Java)",
+      path: "/api/prompts/{id}",
+      method: "GET",
     },
   ];
 }
