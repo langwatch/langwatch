@@ -1,5 +1,4 @@
-import traceback
-from typing import AsyncGenerator, Union
+from typing import AsyncGenerator
 
 
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
@@ -23,6 +22,9 @@ from langwatch_nlp.studio.types.events import (
     component_error_event,
 )
 import langwatch
+from opentelemetry.context import attach, detach
+from opentelemetry.propagate import extract
+import secrets
 
 
 async def execute_event(
@@ -30,6 +32,14 @@ async def execute_event(
     queue: "ServerEventQueue",
 ) -> AsyncGenerator[StudioServerEvent, None]:
     yield Debug(payload=DebugPayload(message="server starting execution"))
+
+    token = None
+    if hasattr(event.payload, "trace_id"):
+        span_id_hex = f"{secrets.randbits(64):016x}"
+        trace_id_hex = event.payload.trace_id  # type: ignore
+        traceparent = f"00-{trace_id_hex}-{span_id_hex}-01"
+        ctx = extract({"traceparent": traceparent})
+        token = attach(ctx)
 
     try:
         match event.type:
@@ -87,6 +97,9 @@ async def execute_event(
 
         traceback.print_exc()
         yield Error(payload=ErrorPayload(message=repr(e)))
+    finally:
+        if token:
+            detach(token)
 
     yield Done()
 

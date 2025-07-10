@@ -4,6 +4,7 @@ import type { StudioClientEvent } from "../types/events";
 import { useWorkflowStore } from "./useWorkflowStore";
 import { toaster } from "../../components/ui/toaster";
 import { usePostEvent } from "./usePostEvent";
+import { generateOtelTraceId } from "../../utils/trace";
 
 export const useWorkflowExecution = () => {
   const { postEvent, socketStatus } = usePostEvent();
@@ -74,7 +75,7 @@ export const useWorkflowExecution = () => {
         return;
       }
 
-      const trace_id = `trace_${nanoid()}`;
+      const trace_id = generateOtelTraceId();
 
       setWorkflowExecutionState({
         status: "waiting",
