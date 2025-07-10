@@ -158,7 +158,7 @@ export default function OrganizationOnboarding() {
       },
       {
         onSuccess: (response) => {
-          trackEventOnce("signup", {
+          trackEventOnce("organization_initialized", {
             category: "onboarding",
             label: "organization_onboarding_completed",
           });
