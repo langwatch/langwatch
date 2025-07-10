@@ -579,7 +579,7 @@ export function MessagesTable({
     },
     metadata: {
       name: "Metadata",
-      sortable: true,
+      sortable: false,
       render: (trace, index) => (
         <Table.Cell
           key={index}
