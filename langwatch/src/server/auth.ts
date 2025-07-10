@@ -26,7 +26,6 @@ declare module "next-auth" {
     user: DefaultSession["user"] & {
       id: string;
       isNewSignup?: boolean;
-      signupProvider?: string;
     };
   }
 }
@@ -75,14 +74,29 @@ export const authOptions = (
         };
       }
 
+      // Check if this is a new signup for OAuth users
+      let isNewSignup = false;
+      if (user && env.NEXTAUTH_PROVIDER !== "email") {
+        // Check if user was created in the last few minutes (indicating a new signup)
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        const recentUser = await prisma.user.findFirst({
+          where: {
+            id: user.id,
+            createdAt: {
+              gte: fiveMinutesAgo,
+            },
+          },
+        });
+        isNewSignup = !!recentUser;
+      }
+
       return {
         ...session,
         user: {
           ...session.user,
           id: user.id,
           email: user.email,
-          // Pass signup tracking info to client
-          isNewSignup: (user as any).isNewSignup,
+          isNewSignup,
         },
       };
     },
@@ -92,14 +106,6 @@ export const authOptions = (
       const existingUser = await prisma.user.findUnique({
         where: { email: user.email },
       });
-
-      // Track signup event for new OAuth users
-      if (!existingUser) {
-        // This is a new user signing up via OAuth
-        // We'll track this event on the client side after successful signin
-        // by setting a flag in the session that the client can check
-        (user as any).isNewSignup = true;
-      }
 
       if (existingUser?.pendingSsoSetup && account?.provider) {
         // Wrap operations in a transaction
