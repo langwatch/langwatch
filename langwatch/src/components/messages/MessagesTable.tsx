@@ -649,7 +649,7 @@ export function MessagesTable({
     },
     events: {
       name: "Events",
-      sortable: true,
+      sortable: false,
       render: (trace, index) => (
         <Table.Cell key={index}>{trace.events?.length}</Table.Cell>
       ),
