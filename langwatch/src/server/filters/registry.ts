@@ -1429,6 +1429,49 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
+  "metadata.prompt_id": {
+    name: "Prompt ID",
+    urlKey: "prompt_id",
+    query: (values) => ({
+      terms: { "metadata.prompt_id": values },
+    }),
+    listMatch: {
+      aggregation: (query) => ({
+        unique_values: {
+          filter: query
+            ? {
+                prefix: {
+                  "metadata.prompt_id": {
+                    value: query,
+                    case_insensitive: true,
+                  },
+                },
+              }
+            : {
+                match_all: {},
+              },
+          aggs: {
+            child: {
+              terms: {
+                field: "metadata.prompt_id",
+                size: 10_000,
+                order: { _key: "asc" },
+              },
+            },
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        return (
+          result.unique_values?.child?.buckets?.map((bucket: any) => ({
+            field: bucket.key,
+            label: bucket.key,
+            count: bucket.doc_count,
+          })) ?? []
+        );
+      },
+    },
+  },
 };
 
 const metadataKey = (key: string | undefined) => {
