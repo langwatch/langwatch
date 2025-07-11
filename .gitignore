@@ -14,3 +14,6 @@ langwatch_server/
 
 # vscode
 .vscode/
+
+# Misc
+.local
