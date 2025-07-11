@@ -2,11 +2,13 @@ import type {
   QueryDslBoolQuery,
   QueryDslQueryContainer,
 } from "@elastic/elasticsearch/lib/api/types";
+
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
 import { reservedTraceMetadataSchema } from "../tracer/types.generated";
+
 import type { FilterDefinition, FilterField } from "./types";
 
 export const availableFilters: { [K in FilterField]: FilterDefinition } = {
@@ -477,9 +479,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
         return (
           result.unique_values?.buckets?.map((bucket: any) => ({
             field: bucket.key ? "true" : "false",
-            label: bucket.key
-              ? "Traces with error"
-              : "Traces without error",
+            label: bucket.key ? "Traces with error" : "Traces without error",
             count: bucket.doc_count,
           })) ?? []
         );
