@@ -8,7 +8,12 @@ import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 export const graphsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
-      z.object({ projectId: z.string(), name: z.string(), graph: z.string() })
+      z.object({
+        projectId: z.string(),
+        name: z.string(),
+        graph: z.string(),
+        filterParams: z.any().optional(),
+      })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_MANAGE))
     .mutation(async ({ ctx, input }) => {
@@ -20,6 +25,7 @@ export const graphsRouter = createTRPCRouter({
           name: input.name,
           graph: graph,
           projectId: input.projectId,
+          filters: input.filterParams?.filters ?? {},
         },
       });
     }),
@@ -77,6 +83,7 @@ export const graphsRouter = createTRPCRouter({
         name: z.string(),
         graph: z.string(),
         graphId: z.string(),
+        filterParams: z.any().optional(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_MANAGE))
@@ -88,6 +95,7 @@ export const graphsRouter = createTRPCRouter({
         data: {
           name: input.name,
           graph: JSON.parse(input.graph),
+          filters: input.filterParams?.filters ?? {},
         },
       });
     }),

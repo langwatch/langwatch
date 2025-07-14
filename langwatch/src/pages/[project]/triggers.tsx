@@ -29,6 +29,7 @@ import { useDrawer } from "~/components/CurrentDrawer";
 import { HoverableBigText } from "~/components/HoverableBigText";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { SmallLabel } from "~/components/SmallLabel";
+import { FilterDisplay } from "~/components/triggers/FilterDisplay";
 import { ProjectSelector } from "../../components/DashboardLayout";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Drawer } from "../../components/ui/drawer";
@@ -235,50 +236,6 @@ export default function Members() {
     );
   };
 
-  const applyFilters = (filters: string) => {
-    const obj = JSON.parse(filters);
-    const result = [];
-
-    for (const [key, value] of Object.entries(obj)) {
-      if (Array.isArray(value)) {
-        if (!key.startsWith("eval")) {
-          result.push(
-            <FilterContainer key={key}>
-              <FilterLabel>{key}</FilterLabel>
-              <FilterValue>{value.join(", ")}</FilterValue>
-            </FilterContainer>
-          );
-        }
-      } else if (typeof value === "object" && value !== null) {
-        const nestedResult = [];
-        for (const [nestedKey, nestedValue] of Object.entries(value)) {
-          if (Array.isArray(nestedValue)) {
-            nestedResult.push(`${nestedKey}:${nestedValue.join("-")}`);
-          } else {
-            nestedResult.push(`${nestedKey}:${nestedValue}`);
-          }
-        }
-        if (!key.startsWith("eval")) {
-          result.push(
-            <FilterContainer key={key}>
-              <FilterLabel>{key}</FilterLabel>
-              <FilterValue>{nestedResult}</FilterValue>
-            </FilterContainer>
-          );
-        }
-      } else {
-        result.push(
-          <FilterContainer key={key} fontSize="xs">
-            <FilterLabel>{key}</FilterLabel>
-            <FilterValue>{String(value)}</FilterValue>
-          </FilterContainer>
-        );
-      }
-    }
-
-    return result;
-  };
-
   const applyChecks = (checks: Monitor[]) => {
     if (!checks || checks.length === 0) {
       return null;
@@ -372,9 +329,9 @@ export default function Members() {
                               )}
 
                               {trigger.filters &&
-                              typeof trigger.filters === "string"
-                                ? applyFilters(trigger.filters)
-                                : null}
+                              typeof trigger.filters === "string" ? (
+                                <FilterDisplay filters={trigger.filters} />
+                              ) : null}
                             </VStack>
                           </Table.Cell>
                           <Table.Cell whiteSpace="nowrap">

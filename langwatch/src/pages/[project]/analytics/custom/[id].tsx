@@ -23,6 +23,7 @@ export default function EditCustomAnalyticsPage() {
       customId={graphId}
       graph={graph as CustomGraphInput}
       name={name ?? ""}
+      filters={graphData.data?.filters}
     />
   ) : null;
 }
