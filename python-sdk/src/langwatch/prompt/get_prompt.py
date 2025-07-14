@@ -1,12 +1,24 @@
 from .prompt import Prompt
 from typing import Optional
 from opentelemetry import trace
-from langwatch.generated.langwatch_rest_api_client.api.default import get_api_prompts_by_id
-from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_400 import GetApiPromptsByIdResponse400
-from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_401 import GetApiPromptsByIdResponse401
-from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_404 import GetApiPromptsByIdResponse404
-from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_500 import GetApiPromptsByIdResponse500
-from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import GetApiPromptsByIdResponse200
+from langwatch.generated.langwatch_rest_api_client.api.default import (
+    get_api_prompts_by_id,
+)
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_400 import (
+    GetApiPromptsByIdResponse400,
+)
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_401 import (
+    GetApiPromptsByIdResponse401,
+)
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_404 import (
+    GetApiPromptsByIdResponse404,
+)
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_500 import (
+    GetApiPromptsByIdResponse500,
+)
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
+    GetApiPromptsByIdResponse200,
+)
 
 from langwatch.attributes import AttributeKey
 from langwatch.utils.initialization import ensure_setup
@@ -33,6 +45,9 @@ def get_prompt(prompt_id: str) -> Prompt:
     _setup()
 
     with tracer.start_as_current_span("get_prompt") as span:
+        print(f"Getting prompt {prompt_id}")
+        print(f"Span: {span}")
+
         span.set_attribute("inputs.prompt_id", prompt_id)
 
         try:
@@ -45,9 +60,29 @@ def get_prompt(prompt_id: str) -> Prompt:
 
             prompt = _handle_response(response, prompt_id)
             _set_prompt_attributes(span, prompt)
+            # Print all span attributes and any labels/tags for debugging/inspection.
+            # This helps developers see what tracing metadata is set at this point.
+            if hasattr(span, "attributes"):
+                print(f"Span attributes: {getattr(span, 'attributes')}")
+            else:
+                # Fallback: try to access via a method or known property
+                try:
+                    attrs = span.to_json().get("attributes", None)
+                    print(f"Span attributes (via to_json): {attrs}")
+                except Exception:
+                    print("Could not retrieve span attributes directly.")
+
+            # If the span has labels or tags, print them as well.
+            # OpenTelemetry uses 'attributes', but some tracing systems use 'labels' or 'tags'.
+            for label_name in ["labels", "tags"]:
+                if hasattr(span, label_name):
+                    print(f"Span {label_name}: {getattr(span, label_name)}")
+
+            print("SUCCESS")
             return prompt
 
         except Exception as ex:
+            print(f"Error getting prompt: {ex}")
             span.record_exception(ex)
             raise
 
@@ -70,21 +105,28 @@ async def async_get_prompt(prompt_id: str, version_id: Optional[str] = None) -> 
     _setup()
 
     with tracer.start_as_current_span("async_get_prompt") as span:
+        # Print information about the span for debugging/inspection purposes.
+        # This will help developers understand the current tracing context.
+        print(
+            f"[async_get_prompt] Span info: name={span.name}, context={span.get_span_context()}"
+        )
+
         span.set_attribute("inputs.prompt_id", prompt_id)
+
         if version_id:
             span.set_attribute("inputs.version_id", version_id)
 
         try:
             client = get_instance()
             response = await get_api_prompts_by_id.asyncio(
-                client=client.rest_api_client,
-                id=prompt_id
+                client=client.rest_api_client, id=prompt_id
             )
             prompt = _handle_response(response, prompt_id)
             _set_prompt_attributes(span, prompt)
             return prompt
 
         except Exception as ex:
+            print(ex)
             span.record_exception(ex)
             raise
 
@@ -119,9 +161,13 @@ def _handle_response(response, prompt_id: str) -> Prompt:
     elif isinstance(response, GetApiPromptsByIdResponse400):
         raise ValueError(f"Invalid request for prompt ID {prompt_id}: {response.error}")
     elif isinstance(response, GetApiPromptsByIdResponse401):
-        raise RuntimeError(f"Authentication error - please check your API key: {response.error}")
+        raise RuntimeError(
+            f"Authentication error - please check your API key: {response.error}"
+        )
     elif isinstance(response, GetApiPromptsByIdResponse500):
-        raise RuntimeError(f"Server error occurred while fetching prompt: {response.error}")
+        raise RuntimeError(
+            f"Server error occurred while fetching prompt: {response.error}"
+        )
     elif isinstance(response, GetApiPromptsByIdResponse200):
         return Prompt(response)
     else:
@@ -130,8 +176,10 @@ def _handle_response(response, prompt_id: str) -> Prompt:
 
 def _set_prompt_attributes(span, prompt: Prompt):
     """Set prompt attributes on span."""
-    span.set_attributes({
-        AttributeKey.LangWatchPromptId: prompt.id,
-        AttributeKey.LangWatchPromptVersionId: prompt.version_id,
-        AttributeKey.LangWatchPromptVersionNumber: prompt.version_number,
-    })
+    span.set_attributes(
+        {
+            AttributeKey.LangWatchPromptId: prompt.id,
+            AttributeKey.LangWatchPromptVersionId: prompt.version_id,
+            AttributeKey.LangWatchPromptVersionNumber: prompt.version_number,
+        }
+    )
