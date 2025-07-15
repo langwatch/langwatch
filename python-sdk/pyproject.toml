@@ -86,6 +86,7 @@ examples = [
     "opentelemetry-instrumentation-langchain>=0.40.4",
     "openinference-instrumentation-litellm>=0.1.19",
     "pandas>=2.2.3",
+    "unstructured[pdf]>=0.18.3",
 ]
 tests = [
     "pytest-asyncio>=0.21.2",
