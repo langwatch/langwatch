@@ -364,6 +364,7 @@ model CustomGraph {
     project   Project  @relation(fields: [projectId], references: [id])
     name      String
     graph     Json
+    filters   Json?
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now()) @updatedAt
 

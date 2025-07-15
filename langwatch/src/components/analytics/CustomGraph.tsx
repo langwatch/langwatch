@@ -56,6 +56,7 @@ import { Delayed } from "../Delayed";
 import { useColorRawValue } from "../../components/ui/color-mode";
 import { LuShield } from "react-icons/lu";
 import { usePeriodSelector } from "../PeriodSelector";
+import type { FilterField } from "~/server/filters/types";
 
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
@@ -66,7 +67,7 @@ export type CustomGraphInput = {
   startDate?: number;
   endDate?: number;
   graphId: string;
-  filters?: any;
+  filters?: Record<FilterField, string[] | Record<string, string[]>>;
   graphType:
     | "line"
     | "bar"
@@ -118,11 +119,13 @@ export function CustomGraph({
   titleProps,
   hideGroupLabel = false,
   size = "md",
+  filters,
 }: {
   input: CustomGraphInput;
   titleProps?: SystemStyleObject;
   hideGroupLabel?: boolean;
   size?: "sm" | "md";
+  filters?: Record<FilterField, string[] | Record<string, string[]>>;
 }) {
   const publicEnv = usePublicEnv();
 
@@ -142,6 +145,7 @@ export function CustomGraph({
       titleProps={titleProps}
       hideGroupLabel={hideGroupLabel}
       load={!!publicEnv.data}
+      filters={filters}
     />
   );
 }
@@ -153,6 +157,7 @@ const CustomGraph_ = React.memo(
     hideGroupLabel = false,
     load = true,
     size,
+    filters,
   }: {
     input: CustomGraphInput;
     titleProps?: {
@@ -163,6 +168,7 @@ const CustomGraph_ = React.memo(
     hideGroupLabel?: boolean;
     load?: boolean;
     size?: "sm" | "md";
+    filters?: Record<FilterField, string[] | Record<string, string[]>>;
   }) {
     const height_ = input.height ?? 300;
     const { filterParams, queryOpts } = useFilterParams();
@@ -190,6 +196,10 @@ const CustomGraph_ = React.memo(
     const timeseries = api.analytics.getTimeseries.useQuery(
       {
         ...filterParams,
+        filters: {
+          ...filterParams.filters,
+          ...filters,
+        },
         ...input,
         timeScale,
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,

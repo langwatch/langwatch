@@ -13,7 +13,14 @@ import {
   VStack,
   Alert,
 } from "@chakra-ui/react";
-import { BarChart2, MoreVertical, Plus, Edit, Trash2 } from "react-feather";
+import {
+  BarChart2,
+  MoreVertical,
+  Plus,
+  Edit,
+  Trash2,
+  Filter,
+} from "react-feather";
 import {
   CustomGraph,
   type CustomGraphInput,
@@ -21,6 +28,7 @@ import {
 import { useFilterToggle } from "~/components/filters/FilterToggle";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import type { FilterField } from "~/server/filters/types";
 
 import GraphsLayout from "~/components/GraphsLayout";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
@@ -28,6 +36,8 @@ import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { useRouter } from "next/router";
 import { toaster } from "~/components/ui/toaster";
 import { Menu } from "~/components/ui/menu";
+import { Tooltip } from "~/components/ui/tooltip";
+import { FilterDisplay } from "~/components/triggers/FilterDisplay";
 
 export default function Reports() {
   const { project } = useOrganizationTeamProject();
@@ -107,6 +117,34 @@ export default function Reports() {
                         {graph.name}
                       </Text>
                       <Spacer />
+                      {graph.filters && (
+                        <Tooltip
+                          content={
+                            <VStack
+                              align="start"
+                              backgroundColor="black"
+                              color="white"
+                              height="100%"
+                              textWrap="wrap"
+                            >
+                              <FilterDisplay
+                                filters={
+                                  graph.filters as Record<
+                                    FilterField,
+                                    string[] | Record<string, string[]>
+                                  >
+                                }
+                              />
+                            </VStack>
+                          }
+                          positioning={{ placement: "top" }}
+                          showArrow
+                        >
+                          <Box padding={1}>
+                            <Filter width={16} style={{ minWidth: 16 }} />
+                          </Box>
+                        </Tooltip>
+                      )}
                       <Menu.Root>
                         <Menu.Trigger asChild>
                           <Button
@@ -143,6 +181,14 @@ export default function Reports() {
                     <CustomGraph
                       key={graph.id}
                       input={graph.graph as CustomGraphInput}
+                      filters={
+                        graph.filters as
+                          | Record<
+                              FilterField,
+                              string[] | Record<string, string[]>
+                            >
+                          | undefined
+                      }
                     />
                   </Card.Body>
                 </Card.Root>

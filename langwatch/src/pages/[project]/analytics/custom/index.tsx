@@ -25,7 +25,13 @@ import {
   type SingleValue,
 } from "chakra-react-select";
 import { useRouter } from "next/router";
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  useEffect,
+  useState,
+  useRef,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import {
   AlignLeft,
   BarChart2,
@@ -238,14 +244,16 @@ export default function AnalyticsCustomGraph({
   customId,
   graph,
   name,
+  filters,
 }: {
   customId?: string;
   graph?: CustomGraphInput;
   name?: string;
+  filters?: Record<FilterField, string[] | Record<string, string[]>>;
 }) {
   const jsonModal = useDisclosure();
   const apiModal = useDisclosure();
-  const { filterParams } = useFilterParams();
+  const { filterParams, setFilters } = useFilterParams();
 
   let initialFormData: CustomGraphFormData | undefined;
   if (customId && graph) {
@@ -255,6 +263,15 @@ export default function AnalyticsCustomGraph({
   const form = useForm<CustomGraphFormData>({
     defaultValues: customId ? initialFormData : defaultValues,
   });
+
+  const hasSetFilters = useRef(false);
+
+  useEffect(() => {
+    if (customId && filters && !hasSetFilters.current) {
+      setFilters(filters);
+      hasSetFilters.current = true;
+    }
+  }, [customId, filters]);
 
   useEffect(() => {
     if (name) {
@@ -320,6 +337,7 @@ export default function AnalyticsCustomGraph({
                   form={form}
                   seriesFields={seriesFields}
                   customId={customId}
+                  filterParams={filterParams}
                 />
               </Card.Body>
             </Card.Root>
@@ -535,16 +553,19 @@ function CustomGraphForm({
   form,
   seriesFields,
   customId,
+  filterParams,
 }: {
   form: ReturnType<typeof useForm<CustomGraphFormData>>;
   seriesFields: UseFieldArrayReturn<CustomGraphFormData, "series", "id">;
   customId?: string;
+  filterParams: SharedFiltersInput;
 }) {
   const [expandedSeries, setExpandedSeries] = useState<string[]>(["0"]);
   const groupByField = form.control.register("groupBy");
   const graphType = form.watch("graphType");
   const groupBy = form.watch("groupBy");
   const title = form.watch("title");
+  const { showFilters, setShowFilters } = useFilterToggle();
 
   const joinedSeriesNames = form
     .watch()
@@ -584,6 +605,7 @@ function CustomGraphForm({
         projectId: project?.id ?? "",
         name: graphName ?? "",
         graph: JSON.stringify(graphJson),
+        filterParams: filterParams,
       },
       {
         onSuccess: () => {
@@ -603,6 +625,7 @@ function CustomGraphForm({
         name: graphName ?? "",
         graphId: customId ?? "",
         graph: JSON.stringify(graphJson),
+        filterParams: filterParams,
       },
       {
         onSuccess: () => {
@@ -754,6 +777,16 @@ function CustomGraphForm({
           />
         </Field.Root>
       )}
+      <HStack width="full" gap={2}>
+        <Button
+          variant="outline"
+          colorPalette="orange"
+          size="sm"
+          onClick={() => setShowFilters(!showFilters)}
+        >
+          {showFilters ? "Hide filters" : "Show filters"}
+        </Button>
+      </HStack>
       <HStack width="full" gap={2}>
         <Spacer />
         {customId ? (
