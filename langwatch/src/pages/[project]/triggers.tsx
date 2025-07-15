@@ -330,7 +330,10 @@ export default function Members() {
 
                               {trigger.filters &&
                               typeof trigger.filters === "string" ? (
-                                <FilterDisplay filters={trigger.filters} />
+                                <FilterDisplay
+                                  filters={trigger.filters}
+                                  hasBorder={true}
+                                />
                               ) : null}
                             </VStack>
                           </Table.Cell>

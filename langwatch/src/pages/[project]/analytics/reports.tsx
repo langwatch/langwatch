@@ -122,16 +122,27 @@ export default function Reports() {
                           content={
                             <VStack
                               align="start"
-                              backgroundColor="white"
-                              color="black"
+                              backgroundColor="black"
+                              color="white"
+                              height="100%"
+                              textWrap="wrap"
                             >
-                              <FilterDisplay filters={graph.filters as any} />
+                              <FilterDisplay
+                                filters={
+                                  graph.filters as Record<
+                                    FilterField,
+                                    string[] | Record<string, string[]>
+                                  >
+                                }
+                              />
                             </VStack>
                           }
                           positioning={{ placement: "top" }}
                           showArrow
                         >
-                          <Filter width={16} style={{ minWidth: 16 }} />
+                          <Box padding={1}>
+                            <Filter width={16} style={{ minWidth: 16 }} />
+                          </Box>
                         </Tooltip>
                       )}
                       <Menu.Root>

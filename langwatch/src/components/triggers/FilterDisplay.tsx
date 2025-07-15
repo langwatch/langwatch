@@ -4,25 +4,28 @@ import { HoverableBigText } from "../HoverableBigText";
 
 interface FilterDisplayProps {
   filters: string | Record<string, any>;
+  hasBorder?: boolean;
 }
 
 const FilterContainer = ({
   children,
   fontSize = "sm",
+  hasBorder = false,
 }: {
   children: React.ReactNode;
   fontSize?: string;
+  hasBorder?: boolean;
 }) => (
   <HStack
-    border="1px solid lightgray"
-    borderRadius="4px"
     fontSize={fontSize}
     width="100%"
     gap={2}
     paddingX={2}
     paddingY={1}
+    border={hasBorder ? "1px solid lightgray" : "none"}
+    borderRadius="md"
   >
-    <Box color="gray.500">
+    <Box color="gray.400">
       <Filter width={16} style={{ minWidth: 16 }} />
     </Box>
     {children}
@@ -42,7 +45,7 @@ const FilterLabel = ({ children }: { children: React.ReactNode }) => {
       padding={1}
       fontWeight="500"
       textTransform="capitalize"
-      color="gray.500"
+      color="gray.400"
     >
       {text.replace("_", " ")}
     </Box>
@@ -59,7 +62,10 @@ const FilterValue = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-export const FilterDisplay = ({ filters }: FilterDisplayProps) => {
+export const FilterDisplay = ({
+  filters,
+  hasBorder = false,
+}: FilterDisplayProps) => {
   const applyFilters = (filters: string | Record<string, any>) => {
     const obj = typeof filters === "string" ? JSON.parse(filters) : filters;
     const result = [];
@@ -68,7 +74,7 @@ export const FilterDisplay = ({ filters }: FilterDisplayProps) => {
       if (Array.isArray(value)) {
         if (!key.startsWith("eval")) {
           result.push(
-            <FilterContainer key={key}>
+            <FilterContainer key={key} hasBorder={hasBorder}>
               <FilterLabel>{key}</FilterLabel>
               <FilterValue>{value.join(", ")}</FilterValue>
             </FilterContainer>
@@ -85,7 +91,7 @@ export const FilterDisplay = ({ filters }: FilterDisplayProps) => {
         }
         if (!key.startsWith("eval")) {
           result.push(
-            <FilterContainer key={key}>
+            <FilterContainer key={key} hasBorder={hasBorder}>
               <FilterLabel>{key}</FilterLabel>
               <FilterValue>{nestedResult}</FilterValue>
             </FilterContainer>
@@ -93,7 +99,7 @@ export const FilterDisplay = ({ filters }: FilterDisplayProps) => {
         }
       } else {
         result.push(
-          <FilterContainer key={key} fontSize="xs">
+          <FilterContainer key={key} fontSize="xs" hasBorder={hasBorder}>
             <FilterLabel>{key}</FilterLabel>
             <FilterValue>{String(value)}</FilterValue>
           </FilterContainer>
