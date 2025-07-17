@@ -388,7 +388,7 @@ const processCollectorJob_ = async (
     collectorIndexDelayHistogram.observe(delay);
   }
 
-  await markProjectFirstMessage(project, trace.metadata);
+  void markProjectFirstMessage(project, trace.metadata);
 
   if (env.IS_QUICKWIT) {
     // Skip check and adjust for quickwit
