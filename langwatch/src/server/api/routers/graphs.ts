@@ -85,12 +85,10 @@ export const graphsRouter = createTRPCRouter({
         | undefined;
 
       if (graph.filters && typeof graph.filters === "object") {
-        const validFilters: Record<string, any> = {};
+        const validFilters: Record<string, unknown> = {};
 
         for (const [key, value] of Object.entries(graph.filters)) {
-          // Only include valid FilterField keys
           if (filterFieldsEnum.safeParse(key).success) {
-            // Basic validation of the value structure
             if (
               Array.isArray(value) ||
               (typeof value === "object" && value !== null)
@@ -100,12 +98,13 @@ export const graphsRouter = createTRPCRouter({
           }
         }
 
-        validatedFilters = validFilters as Record<
-          FilterField,
-          string[] | Record<string, string[]>
-        >;
-      } else {
-        validatedFilters = undefined;
+        validatedFilters =
+          Object.keys(validFilters).length > 0
+            ? (validFilters as Record<
+                FilterField,
+                string[] | Record<string, string[]>
+              >)
+            : undefined;
       }
 
       return {
