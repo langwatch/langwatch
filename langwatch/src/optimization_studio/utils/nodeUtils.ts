@@ -4,6 +4,8 @@ import { camelCaseToSnakeCase } from "../../utils/stringCasing";
 export const nameToId = (name: string) => {
   return camelCaseToSnakeCase(name)
     .replace(/[\(\)]/g, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Remove combining diacritical marks
     .replace(/[^a-zA-Z0-9_]/g, "_");
 };
 

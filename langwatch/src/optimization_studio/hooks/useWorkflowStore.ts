@@ -26,14 +26,11 @@ import React from "react";
 import { WizardContext } from "../../components/evaluations/wizard/hooks/useWizardContext";
 import { useEvaluationWizardStore } from "../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useShallow } from "zustand/react/shallow";
-import { findLowestAvailableName } from "../utils/nodeUtils";
+import { findLowestAvailableName, nameToId } from "../utils/nodeUtils";
 import { LlmConfigInputTypes } from "../../types";
 import { nanoid } from "nanoid";
 
-export type SocketStatus =
-  | "disconnected"
-  | "connecting-python"
-  | "connected";
+export type SocketStatus = "disconnected" | "connecting-python" | "connected";
 
 export type State = Workflow & {
   workflow_id?: string;
@@ -274,9 +271,9 @@ export const store = (
       ?.map((edge) => edge.targetHandle?.split(".")[1]);
 
     let inc = 2;
-    let newHandle = sourceHandle;
+    let newHandle = nameToId(sourceHandle);
     while (inputs?.includes(newHandle)) {
-      newHandle = `${sourceHandle}${inc}`;
+      newHandle = `${nameToId(sourceHandle)}${inc}`;
       inc++;
     }
 
