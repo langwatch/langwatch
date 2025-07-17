@@ -298,10 +298,18 @@ const processCollectorJob_ = async (
   const allSpans = existingSpans.concat(spans);
 
   // Remove duplicates based on span_id to avoid double-counting
-  const uniqueSpans = allSpans.filter(
-    (span, index, self) =>
-      index === self.findIndex((s) => s.span_id === span.span_id)
-  );
+  // Keep the latest span (from the end of the array) for each span_id
+  const uniqueSpans = allSpans.reduce((acc, span) => {
+    const existingIndex = acc.findIndex((s) => s.span_id === span.span_id);
+    if (existingIndex >= 0) {
+      // Replace existing span with the new one (latest wins)
+      acc[existingIndex] = span;
+    } else {
+      // Add new span
+      acc.push(span);
+    }
+    return acc;
+  }, [] as Span[]);
 
   // Log span costs for debugging
   uniqueSpans.forEach((span) => {

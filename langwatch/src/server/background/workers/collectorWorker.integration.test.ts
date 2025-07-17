@@ -22,12 +22,29 @@ describe("Collector Worker Integration Tests", () => {
   let projectId: string;
 
   beforeAll(async () => {
+    // Create a test organization
+    const organization = await prisma.organization.create({
+      data: {
+        name: "Test Organization for Collector Worker",
+        slug: `test-org-${nanoid()}`,
+      },
+    });
+
+    // Create a test team
+    const team = await prisma.team.create({
+      data: {
+        name: "Test Team for Collector Worker",
+        slug: `test-team-${nanoid()}`,
+        organizationId: organization.id,
+      },
+    });
+
     // Create a test project
     const project = await prisma.project.create({
       data: {
         name: "Test Project for Collector Worker",
         slug: `test-collector-${nanoid()}`,
-        teamId: "test-team-id",
+        teamId: team.id,
         apiKey: `test-api-key-${nanoid()}`,
         language: "typescript",
         framework: "other",
@@ -49,13 +66,28 @@ describe("Collector Worker Integration Tests", () => {
     });
 
     // Clean up test project
-    await prisma.project.delete({
+    const project = await prisma.project.findUnique({
       where: { id: projectId },
+      include: { team: { include: { organization: true } } },
     });
+
+    if (project) {
+      await prisma.project.delete({
+        where: { id: projectId },
+      });
+
+      await prisma.team.delete({
+        where: { id: project.team.id },
+      });
+
+      await prisma.organization.delete({
+        where: { id: project.team.organization.id },
+      });
+    }
   });
 
   describe("ignore_timestamps_on_write functionality", () => {
-    it.skip("should preserve existing timestamps when ignore_timestamps_on_write is true and trace exists", async () => {
+    it("should preserve existing timestamps when ignore_timestamps_on_write is true and trace exists", async () => {
       const traceId = `test-trace-preserve-${nanoid()}`;
       const spanId1 = `test-span-1-${nanoid()}`;
       const spanId2 = `test-span-2-${nanoid()}`;
