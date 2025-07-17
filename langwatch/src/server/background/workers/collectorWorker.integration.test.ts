@@ -16,45 +16,19 @@ import type {
 } from "../../tracer/types";
 import { processCollectorJob } from "./collectorWorker";
 import type { CollectorJob } from "../types";
-import { prisma } from "../../db";
+import { getTestProject } from "../../../utils/testUtils";
 
 describe("Collector Worker Integration Tests", () => {
   let projectId: string;
 
   beforeAll(async () => {
-    // Create a test organization
-    const organization = await prisma.organization.create({
-      data: {
-        name: "Test Organization for Collector Worker",
-        slug: `test-org-${nanoid()}`,
-      },
-    });
-
-    // Create a test team
-    const team = await prisma.team.create({
-      data: {
-        name: "Test Team for Collector Worker",
-        slug: `test-team-${nanoid()}`,
-        organizationId: organization.id,
-      },
-    });
-
-    // Create a test project
-    const project = await prisma.project.create({
-      data: {
-        name: "Test Project for Collector Worker",
-        slug: `test-collector-${nanoid()}`,
-        teamId: team.id,
-        apiKey: `test-api-key-${nanoid()}`,
-        language: "typescript",
-        framework: "other",
-      },
-    });
+    // Get a test project using the helper
+    const project = await getTestProject("collector-worker-integration-test");
     projectId = project.id;
   });
 
   afterAll(async () => {
-    // Clean up test documents
+    // Clean up test documents from Elasticsearch
     const client = await esClient({ test: true });
     await client.deleteByQuery({
       index: TRACE_INDEX.alias,
@@ -64,26 +38,6 @@ describe("Collector Worker Integration Tests", () => {
         },
       },
     });
-
-    // Clean up test project
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      include: { team: { include: { organization: true } } },
-    });
-
-    if (project) {
-      await prisma.project.delete({
-        where: { id: projectId },
-      });
-
-      await prisma.team.delete({
-        where: { id: project.team.id },
-      });
-
-      await prisma.organization.delete({
-        where: { id: project.team.organization.id },
-      });
-    }
   });
 
   describe("ignore_timestamps_on_write functionality", () => {
