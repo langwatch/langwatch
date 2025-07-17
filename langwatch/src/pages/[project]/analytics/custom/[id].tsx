@@ -25,7 +25,7 @@ export default function EditCustomAnalyticsPage() {
       graph={graph as CustomGraphInput}
       name={name ?? ""}
       filters={
-        graphData.data?.filters as Record<
+        (graphData.data?.filters ?? {}) as Record<
           FilterField,
           string[] | Record<string, string[]>
         >
