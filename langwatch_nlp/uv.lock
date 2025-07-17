@@ -1635,6 +1635,7 @@ examples = [
     { name = "pytest", specifier = ">=7.4.2,<8.0.0" },
     { name = "python-dotenv", specifier = "==1.0.1" },
     { name = "streamlit", specifier = ">=1.37.1,<2.0.0" },
+    { name = "unstructured", extras = ["pdf"], specifier = ">=0.18.3" },
     { name = "uvicorn", specifier = ">=0.25.0,<0.26.0" },
 ]
 tests = [{ name = "pytest-asyncio", specifier = ">=0.21.2" }]
