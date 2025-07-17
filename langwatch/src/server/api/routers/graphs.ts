@@ -4,6 +4,7 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 import { nanoid } from "nanoid";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { filterFieldsEnum, type FilterField } from "../../filters/types";
 
 export const graphsRouter = createTRPCRouter({
   create: protectedProcedure
@@ -74,7 +75,43 @@ export const graphsRouter = createTRPCRouter({
         where: { id, projectId: input.projectId },
       });
 
-      return graph;
+      if (!graph) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Graph not found" });
+      }
+
+      // Basic validation to ensure filters have the expected structure
+      let validatedFilters:
+        | Record<FilterField, string[] | Record<string, string[]>>
+        | undefined;
+
+      if (graph.filters && typeof graph.filters === "object") {
+        const validFilters: Record<string, any> = {};
+
+        for (const [key, value] of Object.entries(graph.filters)) {
+          // Only include valid FilterField keys
+          if (filterFieldsEnum.safeParse(key).success) {
+            // Basic validation of the value structure
+            if (
+              Array.isArray(value) ||
+              (typeof value === "object" && value !== null)
+            ) {
+              validFilters[key] = value;
+            }
+          }
+        }
+
+        validatedFilters = validFilters as Record<
+          FilterField,
+          string[] | Record<string, string[]>
+        >;
+      } else {
+        validatedFilters = undefined;
+      }
+
+      return {
+        ...graph,
+        filters: validatedFilters,
+      };
     }),
   updateById: protectedProcedure
     .input(
