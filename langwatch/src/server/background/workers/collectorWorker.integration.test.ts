@@ -18,7 +18,7 @@ import { processCollectorJob } from "./collectorWorker";
 import type { CollectorJob } from "../types";
 import { prisma } from "../../db";
 
-describe.skip("Collector Worker Integration Tests", () => {
+describe("Collector Worker Integration Tests", () => {
   let projectId: string;
 
   beforeAll(async () => {
@@ -304,6 +304,472 @@ describe.skip("Collector Worker Integration Tests", () => {
         expect(esSpan.timestamps.updated_at).toBeGreaterThanOrEqual(beforeTime);
         expect(esSpan.timestamps.updated_at).toBeLessThanOrEqual(afterTime);
       }
+    });
+  });
+
+  describe("cost calculation and aggregation", () => {
+    it("should correctly aggregate costs from multiple spans in a single job", async () => {
+      const traceId = `test-trace-cost-aggregation-${nanoid()}`;
+      const spanId1 = `test-span-cost-1-${nanoid()}`;
+      const spanId2 = `test-span-cost-2-${nanoid()}`;
+      const spanId3 = `test-span-cost-3-${nanoid()}`;
+
+      // Create a job with multiple spans, each with different costs
+      const job: CollectorJob = {
+        spans: [
+          {
+            span_id: spanId1,
+            trace_id: traceId,
+            type: "llm",
+            name: "First LLM Call",
+            timestamps: {
+              started_at: Date.now() - 10000,
+              finished_at: Date.now() - 9000,
+            },
+            input: { type: "text", value: "First prompt" },
+            output: { type: "text", value: "First response" },
+            metrics: {
+              cost: 0.0001,
+              prompt_tokens: 100,
+              completion_tokens: 50,
+            },
+          } as Span,
+          {
+            span_id: spanId2,
+            trace_id: traceId,
+            type: "llm",
+            name: "Second LLM Call",
+            timestamps: {
+              started_at: Date.now() - 8000,
+              finished_at: Date.now() - 7000,
+            },
+            input: { type: "text", value: "Second prompt" },
+            output: { type: "text", value: "Second response" },
+            metrics: {
+              cost: 0.0002,
+              prompt_tokens: 200,
+              completion_tokens: 100,
+            },
+          } as Span,
+          {
+            span_id: spanId3,
+            trace_id: traceId,
+            type: "span",
+            name: "Processing",
+            timestamps: {
+              started_at: Date.now() - 6000,
+              finished_at: Date.now() - 5000,
+            },
+            // No metrics - should not affect cost calculation
+          } as Span,
+        ],
+        evaluations: undefined,
+        traceId,
+        projectId,
+        expectedOutput: null,
+        reservedTraceMetadata: {
+          user_id: "test-user-cost",
+        },
+        customMetadata: {},
+        collectedAt: Date.now(),
+        paramsMD5: "test-md5-cost-1",
+      };
+
+      await processCollectorJob(undefined, job);
+
+      // Verify the trace was created with correct aggregated costs
+      const client = await esClient({ test: true });
+      const response = await client.get({
+        index: TRACE_INDEX.alias,
+        id: traceIndexId({ traceId, projectId }),
+      });
+
+      const trace = response._source as ElasticSearchTrace;
+
+      // Total cost should be sum of all span costs
+      expect(trace.metrics?.total_cost).toBe(0.0003); // 0.0001 + 0.0002
+      expect(trace.metrics?.prompt_tokens).toBe(300); // 100 + 200
+      expect(trace.metrics?.completion_tokens).toBe(150); // 50 + 100
+
+      // Verify all spans are present
+      expect(trace.spans).toHaveLength(3);
+      expect(
+        trace.spans?.find((s) => s.span_id === spanId1)?.metrics?.cost
+      ).toBe(0.0001);
+      expect(
+        trace.spans?.find((s) => s.span_id === spanId2)?.metrics?.cost
+      ).toBe(0.0002);
+      expect(
+        trace.spans?.find((s) => s.span_id === spanId3)?.metrics
+      ).toBeUndefined();
+    });
+
+    it("should correctly aggregate costs when adding new spans to existing trace", async () => {
+      const traceId = `test-trace-cost-incremental-${nanoid()}`;
+      const spanId1 = `test-span-incremental-1-${nanoid()}`;
+      const spanId2 = `test-span-incremental-2-${nanoid()}`;
+
+      // First job with one span
+      const firstJob: CollectorJob = {
+        spans: [
+          {
+            span_id: spanId1,
+            trace_id: traceId,
+            type: "llm",
+            name: "First LLM Call",
+            timestamps: {
+              started_at: Date.now() - 10000,
+              finished_at: Date.now() - 9000,
+            },
+            input: { type: "text", value: "First prompt" },
+            output: { type: "text", value: "First response" },
+            metrics: {
+              cost: 0.0001,
+              prompt_tokens: 100,
+              completion_tokens: 50,
+            },
+          } as Span,
+        ],
+        evaluations: undefined,
+        traceId,
+        projectId,
+        expectedOutput: null,
+        reservedTraceMetadata: {
+          user_id: "test-user-incremental",
+        },
+        customMetadata: {},
+        collectedAt: Date.now(),
+        paramsMD5: "test-md5-incremental-1",
+      };
+
+      await processCollectorJob(undefined, firstJob);
+
+      // Second job with another span, referencing existing trace
+      const secondJob: CollectorJob = {
+        spans: [
+          {
+            span_id: spanId2,
+            trace_id: traceId,
+            type: "llm",
+            name: "Second LLM Call",
+            timestamps: {
+              started_at: Date.now() - 8000,
+              finished_at: Date.now() - 7000,
+            },
+            input: { type: "text", value: "Second prompt" },
+            output: { type: "text", value: "Second response" },
+            metrics: {
+              cost: 0.0002,
+              prompt_tokens: 200,
+              completion_tokens: 100,
+            },
+          } as Span,
+        ],
+        evaluations: undefined,
+        traceId,
+        projectId,
+        expectedOutput: null,
+        reservedTraceMetadata: {
+          user_id: "test-user-incremental",
+        },
+        customMetadata: {},
+        collectedAt: Date.now(),
+        existingTrace: {
+          inserted_at: Date.now() - 5000,
+          indexing_md5s: ["test-md5-incremental-1"],
+          existing_metadata: {
+            user_id: "test-user-incremental",
+            all_keys: ["user_id"],
+          },
+        },
+        paramsMD5: "test-md5-incremental-2",
+      };
+
+      await processCollectorJob(undefined, secondJob);
+
+      // Verify the trace now has aggregated costs from both spans
+      const client = await esClient({ test: true });
+      const response = await client.get({
+        index: TRACE_INDEX.alias,
+        id: traceIndexId({ traceId, projectId }),
+      });
+
+      const trace = response._source as ElasticSearchTrace;
+
+      // Total cost should be sum of both span costs
+      expect(trace.metrics?.total_cost).toBe(0.0003); // 0.0001 + 0.0002
+      expect(trace.metrics?.prompt_tokens).toBe(300); // 100 + 200
+      expect(trace.metrics?.completion_tokens).toBe(150); // 50 + 100
+
+      // Verify both spans are present with their individual costs
+      expect(trace.spans).toHaveLength(2);
+      expect(
+        trace.spans?.find((s) => s.span_id === spanId1)?.metrics?.cost
+      ).toBe(0.0001);
+      expect(
+        trace.spans?.find((s) => s.span_id === spanId2)?.metrics?.cost
+      ).toBe(0.0002);
+    });
+
+    it("should handle spans with undefined or null costs correctly", async () => {
+      const traceId = `test-trace-cost-null-${nanoid()}`;
+      const spanId1 = `test-span-null-1-${nanoid()}`;
+      const spanId2 = `test-span-null-2-${nanoid()}`;
+
+      // Job with one span having cost and another without
+      const job: CollectorJob = {
+        spans: [
+          {
+            span_id: spanId1,
+            trace_id: traceId,
+            type: "llm",
+            name: "LLM Call with Cost",
+            timestamps: {
+              started_at: Date.now() - 10000,
+              finished_at: Date.now() - 9000,
+            },
+            input: { type: "text", value: "Prompt with cost" },
+            output: { type: "text", value: "Response with cost" },
+            metrics: {
+              cost: 0.0001,
+              prompt_tokens: 100,
+              completion_tokens: 50,
+            },
+          } as Span,
+          {
+            span_id: spanId2,
+            trace_id: traceId,
+            type: "llm",
+            name: "LLM Call without Cost",
+            timestamps: {
+              started_at: Date.now() - 8000,
+              finished_at: Date.now() - 7000,
+            },
+            input: { type: "text", value: "Prompt without cost" },
+            output: { type: "text", value: "Response without cost" },
+            metrics: {
+              cost: undefined, // Should be ignored in total cost
+              prompt_tokens: 200,
+              completion_tokens: 100,
+            },
+          } as Span,
+        ],
+        evaluations: undefined,
+        traceId,
+        projectId,
+        expectedOutput: null,
+        reservedTraceMetadata: {
+          user_id: "test-user-null",
+        },
+        customMetadata: {},
+        collectedAt: Date.now(),
+        paramsMD5: "test-md5-null",
+      };
+
+      await processCollectorJob(undefined, job);
+
+      // Verify the trace only includes the cost from the span that has it
+      const client = await esClient({ test: true });
+      const response = await client.get({
+        index: TRACE_INDEX.alias,
+        id: traceIndexId({ traceId, projectId }),
+      });
+
+      const trace = response._source as ElasticSearchTrace;
+
+      // Total cost should only include the span with defined cost
+      expect(trace.metrics?.total_cost).toBe(0.0001); // Only from first span
+      expect(trace.metrics?.prompt_tokens).toBe(300); // 100 + 200
+      expect(trace.metrics?.completion_tokens).toBe(150); // 50 + 100
+
+      // Verify both spans are present
+      expect(trace.spans).toHaveLength(2);
+      expect(
+        trace.spans?.find((s) => s.span_id === spanId1)?.metrics?.cost
+      ).toBe(0.0001);
+      expect(
+        trace.spans?.find((s) => s.span_id === spanId2)?.metrics?.cost
+      ).toBeUndefined();
+    });
+
+    it("should return null total_cost when no spans have costs", async () => {
+      const traceId = `test-trace-no-cost-${nanoid()}`;
+      const spanId1 = `test-span-no-cost-1-${nanoid()}`;
+      const spanId2 = `test-span-no-cost-2-${nanoid()}`;
+
+      // Job with spans that have no costs
+      const job: CollectorJob = {
+        spans: [
+          {
+            span_id: spanId1,
+            trace_id: traceId,
+            type: "span",
+            name: "Processing",
+            timestamps: {
+              started_at: Date.now() - 10000,
+              finished_at: Date.now() - 9000,
+            },
+            // No metrics
+          } as Span,
+          {
+            span_id: spanId2,
+            trace_id: traceId,
+            type: "llm",
+            name: "LLM Call without Cost",
+            timestamps: {
+              started_at: Date.now() - 8000,
+              finished_at: Date.now() - 7000,
+            },
+            input: { type: "text", value: "Prompt" },
+            output: { type: "text", value: "Response" },
+            metrics: {
+              cost: undefined,
+              prompt_tokens: 100,
+              completion_tokens: 50,
+            },
+          } as Span,
+        ],
+        evaluations: undefined,
+        traceId,
+        projectId,
+        expectedOutput: null,
+        reservedTraceMetadata: {
+          user_id: "test-user-no-cost",
+        },
+        customMetadata: {},
+        collectedAt: Date.now(),
+        paramsMD5: "test-md5-no-cost",
+      };
+
+      await processCollectorJob(undefined, job);
+
+      // Verify the trace has null total_cost
+      const client = await esClient({ test: true });
+      const response = await client.get({
+        index: TRACE_INDEX.alias,
+        id: traceIndexId({ traceId, projectId }),
+      });
+
+      const trace = response._source as ElasticSearchTrace;
+
+      // Total cost should be null when no spans have costs
+      expect(trace.metrics?.total_cost).toBeNull();
+      expect(trace.metrics?.prompt_tokens).toBe(100);
+      expect(trace.metrics?.completion_tokens).toBe(50);
+
+      // Verify both spans are present
+      expect(trace.spans).toHaveLength(2);
+      expect(
+        trace.spans?.find((s) => s.span_id === spanId1)?.metrics
+      ).toBeUndefined();
+      expect(
+        trace.spans?.find((s) => s.span_id === spanId2)?.metrics?.cost
+      ).toBeUndefined();
+    });
+
+    it("should deduplicate spans and calculate costs correctly", async () => {
+      const traceId = `test-trace-deduplication-${nanoid()}`;
+      const spanId = `test-span-deduplication-${nanoid()}`;
+
+      // First job with a span
+      const firstJob: CollectorJob = {
+        spans: [
+          {
+            span_id: spanId,
+            trace_id: traceId,
+            type: "llm",
+            name: "LLM Call",
+            timestamps: {
+              started_at: Date.now() - 10000,
+              finished_at: Date.now() - 9000,
+            },
+            input: { type: "text", value: "Original prompt" },
+            output: { type: "text", value: "Original response" },
+            metrics: {
+              cost: 0.0001,
+              prompt_tokens: 100,
+              completion_tokens: 50,
+            },
+          } as Span,
+        ],
+        evaluations: undefined,
+        traceId,
+        projectId,
+        expectedOutput: null,
+        reservedTraceMetadata: {
+          user_id: "test-user-dedup",
+        },
+        customMetadata: {},
+        collectedAt: Date.now(),
+        paramsMD5: "test-md5-dedup-1",
+      };
+
+      await processCollectorJob(undefined, firstJob);
+
+      // Second job with the same span (duplicate) but different cost
+      const secondJob: CollectorJob = {
+        spans: [
+          {
+            span_id: spanId, // Same span ID
+            trace_id: traceId,
+            type: "llm",
+            name: "Updated LLM Call",
+            timestamps: {
+              started_at: Date.now() - 10000,
+              finished_at: Date.now() - 9000,
+            },
+            input: { type: "text", value: "Updated prompt" },
+            output: { type: "text", value: "Updated response" },
+            metrics: {
+              cost: 0.0002, // Different cost
+              prompt_tokens: 200, // Different tokens
+              completion_tokens: 100,
+            },
+          } as Span,
+        ],
+        evaluations: undefined,
+        traceId,
+        projectId,
+        expectedOutput: null,
+        reservedTraceMetadata: {
+          user_id: "test-user-dedup",
+        },
+        customMetadata: {},
+        collectedAt: Date.now(),
+        existingTrace: {
+          inserted_at: Date.now() - 5000,
+          indexing_md5s: ["test-md5-dedup-1"],
+          existing_metadata: {
+            user_id: "test-user-dedup",
+            all_keys: ["user_id"],
+          },
+        },
+        paramsMD5: "test-md5-dedup-2",
+      };
+
+      await processCollectorJob(undefined, secondJob);
+
+      // Verify the trace has only one span (deduplicated) with the updated cost
+      const client = await esClient({ test: true });
+      const response = await client.get({
+        index: TRACE_INDEX.alias,
+        id: traceIndexId({ traceId, projectId }),
+      });
+
+      const trace = response._source as ElasticSearchTrace;
+
+      // Total cost should be from the updated span (not doubled)
+      expect(trace.metrics?.total_cost).toBe(0.0002); // Only the updated cost
+      expect(trace.metrics?.prompt_tokens).toBe(200); // Only the updated tokens
+      expect(trace.metrics?.completion_tokens).toBe(100);
+
+      // Verify only one span exists (deduplicated)
+      expect(trace.spans).toHaveLength(1);
+      const span = trace.spans?.[0];
+      expect(span?.span_id).toBe(spanId);
+      expect(span?.metrics?.cost).toBe(0.0002);
+      expect(span?.name).toBe("Updated LLM Call");
+      expect(span?.input?.value).toBe(JSON.stringify("Updated prompt"));
     });
   });
 });

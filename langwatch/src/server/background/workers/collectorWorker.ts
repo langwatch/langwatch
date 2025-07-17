@@ -8,7 +8,10 @@ import type {
 import { env } from "../../../env.mjs";
 import { createLogger } from "../../../utils/logger";
 import { safeTruncate } from "../../../utils/truncate";
-import { flattenObjectKeys, getProtectionsForProject } from "../../api/utils";
+import {
+  flattenObjectKeys,
+  getInternalProtectionsForProject,
+} from "../../api/utils";
 import { prisma } from "../../db";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import {
@@ -218,6 +221,7 @@ const processCollectorJob_ = async (
     existingTrace,
     paramsMD5,
   } = data;
+
   const project = await prisma.project.findUniqueOrThrow({
     where: { id: projectId },
   });
@@ -267,10 +271,11 @@ const processCollectorJob_ = async (
 
   const existingSpans: Span[] = [];
   const existingEvaluations: Evaluation[] = [];
+  const hasIgnoreTimestamps = false;
 
   if (existingTrace?.inserted_at) {
     // TODO: check for quickwit
-    const protections = await getProtectionsForProject(prisma, {
+    const protections = await getInternalProtectionsForProject(prisma, {
       projectId: project.id,
     });
     const existingTraceResponse = await getTraceById({
@@ -289,28 +294,42 @@ const processCollectorJob_ = async (
     }
   }
 
+  // Combine all spans for accurate metrics calculation
   const allSpans = existingSpans.concat(spans);
+
+  // Remove duplicates based on span_id to avoid double-counting
+  const uniqueSpans = allSpans.filter(
+    (span, index, self) =>
+      index === self.findIndex((s) => s.span_id === span.span_id)
+  );
+
+  // Log span costs for debugging
+  uniqueSpans.forEach((span) => {
+    if (span.metrics?.cost !== undefined && span.metrics?.cost !== null) {
+      logger.info(
+        {
+          spanId: span.span_id,
+          spanCost: span.metrics.cost,
+          spanType: span.type,
+          spanName: span.name,
+        },
+        "Span has cost"
+      );
+    }
+  });
+
   const [input, output] = await Promise.all([
-    { value: getFirstInputAsText(allSpans) },
-    { value: getLastOutputAsText(allSpans) },
+    { value: getFirstInputAsText(uniqueSpans) },
+    { value: getLastOutputAsText(uniqueSpans) },
   ]);
-  const error = getLastOutputError(spans);
+  const error = getLastOutputError(uniqueSpans);
 
   const evaluations = mapEvaluations(data)?.concat(existingEvaluations);
 
   const customExistingMetadata = existingTrace?.existing_metadata?.custom ?? {};
   const existingAllKeys = existingTrace?.existing_metadata?.all_keys ?? [];
-  if (existingTrace?.existing_metadata) {
-    delete existingTrace?.existing_metadata.custom;
-    delete existingTrace?.existing_metadata.all_keys;
-  }
 
-  // Check if any spans have ignore_timestamps_on_write flag
-  const hasIgnoreTimestamps = spans.some(
-    (span) => span.timestamps.ignore_timestamps_on_write
-  );
-
-  // Create the trace
+  // Create the trace with metrics calculated from ALL spans
   const trace: Omit<ElasticSearchTrace, "spans"> = {
     trace_id: traceId,
     project_id: project.id,
@@ -348,7 +367,7 @@ const processCollectorJob_ = async (
     ...(input?.value ? { input } : {}),
     ...(output?.value ? { output } : {}),
     ...(expectedOutput ? { expected_output: { value: expectedOutput } } : {}),
-    metrics: computeTraceMetrics(spans),
+    metrics: computeTraceMetrics(uniqueSpans), // Use uniqueSpans for accurate total_cost calculation
     error,
     indexing_md5s: [...(existingTrace?.indexing_md5s ?? []), paramsMD5]
       .reverse()
@@ -376,7 +395,7 @@ const processCollectorJob_ = async (
     collectorIndexDelayHistogram.observe(delay);
   }
 
-  void markProjectFirstMessage(project, trace.metadata);
+  await markProjectFirstMessage(project, trace.metadata);
 
   if (env.IS_QUICKWIT) {
     // Skip check and adjust for quickwit
@@ -612,10 +631,11 @@ export const processCollectorCheckAndAdjustJob = async (
   data: CollectorCheckAndAdjustJob
 ) => {
   logger.debug({ jobId: id }, "post-processing job");
-
   const { traceId, projectId } = data;
   const client = await esClient({ projectId });
-  const protections = await getProtectionsForProject(prisma, { projectId });
+  const protections = await getInternalProtectionsForProject(prisma, {
+    projectId,
+  });
   const existingTraceResponse = await searchTraces({
     connConfig: { projectId },
     search: {
@@ -733,7 +753,7 @@ export const startCollectorWorker = () => {
     return;
   }
 
-  prewarmTiktokenModels();
+  void prewarmTiktokenModels();
 
   const collectorWorker = new Worker<CollectorJob, void, string>(
     COLLECTOR_QUEUE,

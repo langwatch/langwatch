@@ -55,6 +55,18 @@ export async function getProtectionsForProject(
   );
 }
 
+// New function for internal operations that need full access
+export async function getInternalProtectionsForProject(
+  prisma: PrismaClient,
+  { projectId }: { projectId: string } & Record<string, unknown>
+): Promise<Protections> {
+  return {
+    canSeeCosts: true,
+    canSeeCapturedInput: true,
+    canSeeCapturedOutput: true,
+  };
+}
+
 export async function getUserProtectionsForProject(
   ctx: {
     prisma: PrismaClient;
