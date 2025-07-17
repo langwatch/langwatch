@@ -311,21 +311,6 @@ const processCollectorJob_ = async (
     return acc;
   }, [] as Span[]);
 
-  // Log span costs for debugging
-  uniqueSpans.forEach((span) => {
-    if (span.metrics?.cost !== undefined && span.metrics?.cost !== null) {
-      logger.info(
-        {
-          spanId: span.span_id,
-          spanCost: span.metrics.cost,
-          spanType: span.type,
-          spanName: span.name,
-        },
-        "Span has cost"
-      );
-    }
-  });
-
   const [input, output] = await Promise.all([
     { value: getFirstInputAsText(uniqueSpans) },
     { value: getLastOutputAsText(uniqueSpans) },
