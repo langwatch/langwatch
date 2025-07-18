@@ -70,7 +70,7 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
         if (!totalCost) {
           totalCost = 0;
         }
-        totalCost += span.metrics.cost;
+        totalCost = Number((totalCost + span.metrics.cost).toFixed(6));
       }
     }
   });
