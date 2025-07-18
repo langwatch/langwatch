@@ -88,11 +88,11 @@ describe("Trace metrics", () => {
 
       const metrics = computeTraceMetrics(spans);
 
-      expect(metrics.total_cost).toBeCloseTo(0.0003, 10); // 0.0001 + 0.0002
-      expect(metrics.prompt_tokens).toBe(300); // 100 + 200
-      expect(metrics.completion_tokens).toBe(150); // 50 + 100
-      expect(metrics.total_time_ms).toBe(1500); // 2500 - 1000
-      expect(metrics.first_token_ms).toBeNull(); // No first_token_at timestamps
+      expect(metrics!.total_cost).toBeCloseTo(0.0003, 10); // 0.0001 + 0.0002
+      expect(metrics!.prompt_tokens).toBe(300); // 100 + 200
+      expect(metrics!.completion_tokens).toBe(150); // 50 + 100
+      expect(metrics!.total_time_ms).toBe(1500); // 2500 - 1000
+      expect(metrics!.first_token_ms).toBeNull(); // No first_token_at timestamps
     });
 
     it("should handle spans with undefined or null costs", () => {
@@ -144,9 +144,9 @@ describe("Trace metrics", () => {
 
       const metrics = computeTraceMetrics(spans);
 
-      expect(metrics.total_cost).toBe(0.0001); // Only the first span's cost
-      expect(metrics.prompt_tokens).toBe(300); // 100 + 200
-      expect(metrics.completion_tokens).toBe(150); // 50 + 100
+      expect(metrics!.total_cost).toBe(0.0001); // Only the first span's cost
+      expect(metrics!.prompt_tokens).toBe(300); // 100 + 200
+      expect(metrics!.completion_tokens).toBe(150); // 50 + 100
     });
 
     it("should return null for total_cost when no spans have costs", () => {
@@ -181,20 +181,20 @@ describe("Trace metrics", () => {
 
       const metrics = computeTraceMetrics(spans);
 
-      expect(metrics.total_cost).toBeNull();
-      expect(metrics.prompt_tokens).toBe(100);
-      expect(metrics.completion_tokens).toBe(50);
+      expect(metrics!.total_cost).toBeNull();
+      expect(metrics!.prompt_tokens).toBe(100);
+      expect(metrics!.completion_tokens).toBe(50);
     });
 
     it("should handle empty spans array", () => {
       const metrics = computeTraceMetrics([]);
 
-      expect(metrics.total_cost).toBeNull();
-      expect(metrics.prompt_tokens).toBeNull();
-      expect(metrics.completion_tokens).toBeNull();
-      expect(metrics.total_time_ms).toBeNull();
-      expect(metrics.first_token_ms).toBeNull();
-      expect(metrics.tokens_estimated).toBe(false);
+      expect(metrics!.total_cost).toBeNull();
+      expect(metrics!.prompt_tokens).toBeNull();
+      expect(metrics!.completion_tokens).toBeNull();
+      expect(metrics!.total_time_ms).toBeNull();
+      expect(metrics!.first_token_ms).toBeNull();
+      expect(metrics!.tokens_estimated).toBe(false);
     });
 
     it("should calculate first_token_ms when first_token_at is available", () => {
@@ -217,8 +217,8 @@ describe("Trace metrics", () => {
 
       const metrics = computeTraceMetrics(spans);
 
-      expect(metrics.first_token_ms).toBe(200); // 1200 - 1000
-      expect(metrics.total_cost).toBe(0.0001);
+      expect(metrics!.first_token_ms).toBe(200); // 1200 - 1000
+      expect(metrics!.total_cost).toBe(0.0001);
     });
 
     it("should set tokens_estimated to true when any span has tokens_estimated", () => {
@@ -255,8 +255,8 @@ describe("Trace metrics", () => {
 
       const metrics = computeTraceMetrics(spans);
 
-      expect(metrics.tokens_estimated).toBe(true);
-      expect(metrics.total_cost).toBeCloseTo(0.0003, 10);
+      expect(metrics!.tokens_estimated).toBe(true);
+      expect(metrics!.total_cost).toBeCloseTo(0.0003, 10);
     });
   });
 
@@ -369,6 +369,7 @@ describe("Trace metrics", () => {
           output: {
             type: "guardrail_result",
             value: {
+              status: "processed",
               cost: {
                 amount: 0.0005,
                 currency: "USD",
@@ -421,6 +422,7 @@ describe("Trace metrics", () => {
           output: {
             type: "guardrail_result",
             value: {
+              status: "processed",
               cost: {
                 amount: 0.0005,
                 currency: "EUR",
