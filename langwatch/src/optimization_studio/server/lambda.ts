@@ -25,6 +25,8 @@ type LangWatchLambdaConfig = {
   role_arn: string;
   image_uri: string;
   cache_bucket: string;
+  subnet_ids: string[];
+  security_group_ids: string[];
 };
 
 const parseLambdaConfig = (): LangWatchLambdaConfig => {
@@ -38,7 +40,7 @@ const parseLambdaConfig = (): LangWatchLambdaConfig => {
   try {
     return JSON.parse(configStr) as LangWatchLambdaConfig;
   } catch (error) {
-    throw new Error("Failed to parse LANGWATCH_NLP_LAMBDA_CONFIG: " + error);
+    throw new Error("Failed to parse LANGWATCH_NLP_LAMBDA_CONFIG: " + String(error));
   }
 };
 
@@ -82,7 +84,7 @@ const checkLambdaExists = async (
 
 const createLogGroupWithRetention = async (
   functionName: string,
-  retentionInDays: number = 365
+  retentionInDays = 365
 ): Promise<void> => {
   const logsClient = createLogsClient();
   const logGroupName = `/aws/lambda/${functionName}`;
@@ -147,6 +149,10 @@ const createProjectLambda = async (
     Timeout: 900, // 15 minutes
     MemorySize: 1024,
     Architectures: ["arm64"],
+    VpcConfig: {
+      SubnetIds: config.subnet_ids,
+      SecurityGroupIds: config.security_group_ids,
+    },
     Environment: {
       Variables: {
         LANGWATCH_ENDPOINT: env.BASE_HOST,
@@ -180,8 +186,8 @@ const createProjectLambda = async (
 const pollLambdaUntilReady = async (
   lambda: LambdaClient,
   functionName: string,
-  maxAttempts: number = 60, // 5 minutes with 5-second intervals
-  intervalMs: number = 500
+  maxAttempts = 60, // 5 minutes with 5-second intervals
+  intervalMs = 500
 ): Promise<void> => {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const config = await checkLambdaExists(lambda, functionName);
