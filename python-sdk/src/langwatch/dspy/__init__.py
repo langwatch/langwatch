@@ -72,7 +72,16 @@ class SerializableAndPydanticEncoder(json.JSONEncoder):
         if isinstance(o, Completions):
             return {"__class__": classname} | o.__dict__
         if isinstance(o, BaseModel):
-            return o.model_dump(exclude_unset=True)
+            try:
+                return o.model_dump(exclude_unset=True)
+            except Exception as e:
+                if 'MockValSer' in str(e):
+                    return {
+                        key: getattr(o, key)
+                        for key in o.model_fields.keys()
+                        if hasattr(o, key) and getattr(o, key) is not None
+                    }
+                raise
         try:
             return super().default(o)
         except:
