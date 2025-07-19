@@ -26,10 +26,7 @@ import { decrypt, encrypt } from "~/utils/encryption";
 import { signUpDataSchema } from "./onboarding";
 import { dependencies } from "../../../injection/dependencies.server";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
-import {
-  usageStatsQueue,
-  scheduleUsageStatsForOrganization,
-} from "~/server/background/queues/usageStatsQueue";
+import { scheduleUsageStatsForOrganization } from "~/server/background/queues/usageStatsQueue";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
@@ -210,15 +207,33 @@ export const organizationRouter = createTRPCRouter({
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
       const demoProjectUserId = isDemo ? env.DEMO_PROJECT_USER_ID : "";
+      const demoProjectId = isDemo ? env.DEMO_PROJECT_ID : "";
 
       const organizations: FullyLoadedOrganization[] =
         await prisma.organization.findMany({
           where: {
-            members: {
-              some: {
-                OR: [{ userId: demoProjectUserId }, { userId: userId }],
+            OR: [
+              ...(isDemo
+                ? [
+                    {
+                      teams: {
+                        some: {
+                          projects: {
+                            some: { id: demoProjectId },
+                          },
+                        },
+                      },
+                    },
+                  ]
+                : []),
+              {
+                members: {
+                  some: {
+                    userId: userId,
+                  },
+                },
               },
-            },
+            ],
           },
           include: {
             members: true,
@@ -244,6 +259,9 @@ export const organizationRouter = createTRPCRouter({
           }
           if (project.s3Endpoint) {
             project.s3Endpoint = decrypt(project.s3Endpoint);
+          }
+          if (isDemo) {
+            project.apiKey = "";
           }
         }
       }
@@ -287,6 +305,27 @@ export const organizationRouter = createTRPCRouter({
             ? team.members.some((member) => member.userId === userId)
             : true;
         });
+
+        if (
+          isDemo &&
+          organization.teams.some((team) =>
+            team.projects.some((project) => project.id === demoProjectId)
+          )
+        ) {
+          organization.teams = organization.teams.flatMap((team) => {
+            if (team.projects.some((project) => project.id === demoProjectId)) {
+              team.projects = team.projects.filter(
+                (project) => project.id === demoProjectId
+              );
+              team.members = team.members.filter(
+                (member) => member.userId === demoProjectUserId
+              );
+              return [team];
+            } else {
+              return [];
+            }
+          });
+        }
       }
 
       return organizations;
