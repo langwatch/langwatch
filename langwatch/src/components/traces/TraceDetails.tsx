@@ -12,6 +12,8 @@ import { useRouter } from "next/router";
 import qs from "qs";
 import { useCallback, useEffect, useState } from "react";
 import { Maximize2, Minimize2 } from "react-feather";
+
+import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { TeamRoleGroup } from "../../server/api/permission";
@@ -25,9 +27,9 @@ import { ShareButton } from "./ShareButton";
 import { SpanTree } from "./SpanTree";
 import { TraceSummary } from "./Summary";
 
-import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
 import { Drawer } from "../ui/drawer";
+
 import { AddParticipants } from "./AddParticipants";
 import {
   Blocked,
@@ -132,6 +134,7 @@ export function TraceDetails(props: {
   }, [props.selectedTab]);
 
   const { trace } = useTraceDetailsState(props.traceId);
+  console.log("trace", JSON.stringify(trace, null, 2));
   const queueDrawerOpen = useDisclosure();
 
   const queueItem = api.annotation.createQueueItem.useMutation();

@@ -9,6 +9,7 @@ from openai import OpenAI
 client = OpenAI()
 
 import langwatch.prompt
+from langwatch.attributes import AttributeKey
 
 import chainlit as cl
 
@@ -47,6 +48,20 @@ async def main(message: cl.Message):
             input=message.content,
         )
 
+        # Get the current span and set attributes on it
+        current_span = langwatch.get_current_span()
+        current_span.set_attributes(
+            {
+                AttributeKey.LangWatchPromptId: prompt.id,
+                AttributeKey.LangWatchPromptVersionId: prompt.version_id,
+                AttributeKey.LangWatchPromptVersionNumber: prompt.version_number,
+            }
+        )
+
+        print(
+            f"[async_get_prompt] Example Span info: name={current_span.name}, context={current_span.get_span_context()}"
+        )
+
         completion = client.chat.completions.create(
             model=prompt.model.split("openai/")[1],
             messages=messages,
@@ -58,6 +73,8 @@ async def main(message: cl.Message):
                 await msg.stream_token(token)
 
         await msg.update()
+        print("EXAMPLE SUCCESS")
+
     except Exception as ex:
         print(f"Error: {ex}")
         raise
