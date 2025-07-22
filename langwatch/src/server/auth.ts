@@ -206,22 +206,54 @@ export const authOptions = (
       ? GitHubProvider({
           clientId: env.GITHUB_CLIENT_ID ?? "",
           clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
+          profile(profile) {
+            return {
+              id: profile.sub,
+              name: profile.name,
+              email: profile.email,
+              image: profile.image,
+            };
+          },
         })
       : env.NEXTAUTH_PROVIDER === "gitlab"
       ? GitlabProvider({
           clientId: env.GITLAB_CLIENT_ID ?? "",
           clientSecret: env.GITLAB_CLIENT_SECRET ?? "",
+          profile(profile) {
+            return {
+              id: profile.sub,
+              name: profile.name,
+              email: profile.email,
+              image: profile.image,
+            };
+          },
         })
       : env.NEXTAUTH_PROVIDER === "google"
       ? GoogleProvider({
           clientId: env.GOOGLE_CLIENT_ID ?? "",
           clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
+          profile(profile) {
+            return {
+              id: profile.sub,
+              name: profile.name,
+              email: profile.email,
+              image: profile.image,
+            };
+          },
         })
       : env.NEXTAUTH_PROVIDER === "okta"
       ? OktaProvider({
           clientId: env.OKTA_CLIENT_ID ?? "",
           clientSecret: env.OKTA_CLIENT_SECRET ?? "",
           issuer: env.OKTA_ISSUER ?? "",
+          profile(profile) {
+            return {
+              id: profile.sub,
+              name: profile.name,
+              email: profile.email,
+              image: profile.image,
+            };
+          },
         })
       : CredentialsProvider({
           name: "Credentials",
