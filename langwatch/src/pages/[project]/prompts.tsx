@@ -309,7 +309,11 @@ export default function PromptConfigsPage() {
                 <PromptConfigTable
                   configs={promptConfigs ?? []}
                   isLoading={isLoading}
-                  onRowClick={(config) => setSelectedPromptId(config.id)}
+                  onRowClick={(config) => {
+                    setSelectedPromptId(config.id);
+                    // Always expand the panel when a row is clicked
+                    setIsPaneExpanded(true);
+                  }}
                   columns={defaultColumns}
                 />
               </PageLayout.Content>
