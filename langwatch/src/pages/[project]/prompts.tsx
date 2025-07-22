@@ -1,6 +1,6 @@
 import { Flex, Spacer, VStack } from "@chakra-ui/react";
 import { type LlmPromptConfig } from "@prisma/client";
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Plus } from "react-feather";
 
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
@@ -17,35 +17,52 @@ import {
 } from "~/prompt-configs/PromptConfigTable";
 import { api } from "~/utils/api";
 
-export default function PromptConfigsPage() {
+/**
+ * Custom hook for managing prompt configuration data operations and state.
+ *
+ * This hook encapsulates all logic for fetching, creating, and deleting prompt configs
+ * for a given project, as well as managing the state for the delete confirmation dialog.
+ *
+ * Responsibilities:
+ * - Fetch all prompt configs for the provided project.
+ * - Handle creation of new prompt configs (with initial version).
+ * - Handle deletion of prompt configs (with confirmation dialog).
+ * - Expose state and handlers for dialog and CRUD operations.
+ *
+ * @param projectId The current project's ID, or undefined if not loaded.
+ * @returns {
+ *   promptConfigs: Array of prompt configs for the project,
+ *   isLoading: Whether configs are being loaded,
+ *   refetchPromptConfigs: Function to manually refetch configs,
+ *   isDeleteDialogOpen: Whether the delete dialog is open,
+ *   setIsDeleteDialogOpen: Setter for dialog open state,
+ *   createConfig: Handler to create a new config,
+ *   handleDeleteConfig: Handler to initiate delete dialog for a config,
+ *   confirmDeleteConfig: Handler to confirm and perform deletion
+ * }
+ */
+function usePromptConfigManagement(projectId: string | undefined) {
   const utils = api.useContext();
-  const { project } = useOrganizationTeamProject();
-  const { selectedPromptId, setSelectedPromptId, clearSelection } =
-    usePromptIdQueryParam();
-
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isPaneExpanded, setIsPaneExpanded] = useState(true); // Start open
   const [configToDelete, setConfigToDelete] = useState<LlmPromptConfig | null>(
     null
   );
-  const closePanel = () => {
-    clearSelection();
-  };
 
-  // Fetch prompt configs
+  // Fetch all prompt configs for the current project.
   const {
     data: promptConfigs,
     refetch: refetchPromptConfigs,
     isLoading,
   } = api.llmConfigs.getPromptConfigs.useQuery(
     {
-      projectId: project?.id ?? "",
+      projectId: projectId ?? "",
     },
     {
-      enabled: !!project?.id,
+      enabled: !!projectId,
       onError: (error) => {
+        // Show error toast if fetching fails
         toaster.create({
-          title: "Error loading prompt configs from here",
+          title: "Error loading prompt configs",
           description: error.message,
           type: "error",
         });
@@ -53,11 +70,14 @@ export default function PromptConfigsPage() {
     }
   );
 
+  // Mutation for creating a new prompt config with an initial version.
   const createConfigWithInitialVersionMutation =
     api.llmConfigs.createConfigWithInitialVersion.useMutation();
 
+  // Mutation for deleting a prompt config.
   const deleteConfigMutation = api.llmConfigs.deletePromptConfig.useMutation({
     onSuccess: () => {
+      // Invalidate prompt config cache and show success toast.
       void utils.llmConfigs.getPromptConfigs.invalidate();
       toaster.create({
         title: "Prompt config deleted",
@@ -68,6 +88,7 @@ export default function PromptConfigsPage() {
       });
     },
     onError: (error) => {
+      // Show error toast if deletion fails
       toaster.create({
         title: "Error deleting prompt config",
         description: error instanceof Error ? error.message : "Unknown error",
@@ -79,41 +100,38 @@ export default function PromptConfigsPage() {
     },
   });
 
-  const handleCreateButtonClick = async () => {
-    try {
-      if (!project?.id) {
-        toaster.create({
-          title: "Error",
-          description: "Project ID is required",
-          type: "error",
-        });
-        return;
-      }
-
-      // Create with defaults
+  /**
+   * Create a new prompt config for the given project.
+   * @param name Name for the new prompt config.
+   * @param projectId Project ID to associate the config with.
+   * @returns The created prompt config.
+   */
+  const createConfig = useCallback(
+    async (name: string, projectId: string) => {
       const result = await createConfigWithInitialVersionMutation.mutateAsync({
-        name: "New Prompt Config",
-        projectId: project.id,
+        name,
+        projectId,
       });
+      void refetchPromptConfigs();
+      return result;
+    },
+    [createConfigWithInitialVersionMutation, refetchPromptConfigs]
+  );
 
-      setSelectedPromptId(result.id);
-    } catch (error) {
-      toaster.create({
-        title: "Error creating prompt config",
-        description: error instanceof Error ? error.message : "Unknown error",
-        type: "error",
-      });
-    }
-
-    void refetchPromptConfigs();
-  };
-
-  const handleDeleteConfig = (config: LlmPromptConfig) => {
+  /**
+   * Open the delete confirmation dialog for a given config.
+   * @param config The config to delete.
+   */
+  const handleDeleteConfig = useCallback((config: LlmPromptConfig) => {
     setConfigToDelete(config);
     setIsDeleteDialogOpen(true);
-  };
+  }, []);
 
-  const confirmDeleteConfig = async () => {
+  /**
+   * Confirm and perform deletion of the selected config.
+   * Shows error toast if deletion fails.
+   */
+  const confirmDeleteConfig = useCallback(async () => {
     if (!configToDelete) return;
 
     try {
@@ -130,8 +148,97 @@ export default function PromptConfigsPage() {
         type: "error",
       });
     }
+  }, [configToDelete, deleteConfigMutation, refetchPromptConfigs]);
+
+  return {
+    promptConfigs,
+    isLoading,
+    refetchPromptConfigs,
+    isDeleteDialogOpen,
+    setIsDeleteDialogOpen,
+    createConfig,
+    handleDeleteConfig,
+    confirmDeleteConfig,
+  };
+}
+
+/**
+ * Page component for managing prompt configurations for a project.
+ *
+ * This page displays a table of all prompt configs for the current project,
+ * allows users to create, edit, and delete configs, and shows a side panel
+ * for editing the selected config. It also manages dialog state for confirming deletions.
+ *
+ * UI/UX Notes:
+ * - The prompt config panel is absolutely positioned to overlay the table.
+ * - The table area is scrollable, and the panel expands/collapses based on selection.
+ * - The delete dialog requires the user to type 'delete' to confirm.
+ */
+export default function PromptConfigsPage() {
+  // Get current project and prompt selection state from hooks.
+  const { project } = useOrganizationTeamProject();
+  const { selectedPromptId, setSelectedPromptId, clearSelection } =
+    usePromptIdQueryParam();
+
+  // State for whether the prompt config panel is expanded (visible).
+  const [isPaneExpanded, setIsPaneExpanded] = useState(true); // Start open
+
+  // Use custom hook to manage prompt config data and actions.
+  const {
+    promptConfigs,
+    isLoading,
+    isDeleteDialogOpen,
+    setIsDeleteDialogOpen,
+    createConfig,
+    handleDeleteConfig,
+    confirmDeleteConfig,
+  } = usePromptConfigManagement(project?.id);
+
+  // When a new prompt is selected, always expand the panel.
+  useEffect(() => {
+    if (selectedPromptId) {
+      setIsPaneExpanded(true);
+    }
+  }, [selectedPromptId]);
+
+  /**
+   * Deselects the current prompt config, closing the side panel.
+   */
+  const closePanel = () => {
+    clearSelection();
   };
 
+  /**
+   * Handler for creating a new prompt config.
+   * Shows error toast if project ID is missing or creation fails.
+   */
+  const handleCreateButtonClick = async () => {
+    try {
+      if (!project?.id) {
+        toaster.create({
+          title: "Error",
+          description: "Project ID is required",
+          type: "error",
+        });
+        return;
+      }
+
+      // Create a new prompt config with default name.
+      const result = await createConfig("New Prompt Config", project.id);
+      setSelectedPromptId(result.id);
+    } catch (error) {
+      toaster.create({
+        title: "Error creating prompt config",
+        description: error instanceof Error ? error.message : "Unknown error",
+        type: "error",
+      });
+    }
+  };
+
+  /**
+   * Memoized table columns for prompt config table.
+   * Handles edit and delete actions for each row.
+   */
   const defaultColumns = useMemo(() => {
     return createDefaultColumns({
       onDelete: (config) => {
@@ -143,7 +250,7 @@ export default function PromptConfigsPage() {
         return Promise.resolve();
       },
     });
-  }, [setSelectedPromptId]);
+  }, [setSelectedPromptId, handleDeleteConfig]);
 
   /**
    * NB: The styling and markup of this page is a bit hacky
@@ -166,7 +273,7 @@ export default function PromptConfigsPage() {
 
   return (
     <DashboardLayout position="relative">
-      {/* Main content outer wrapper */}
+      {/* Main content outer wrapper for the prompt config table and panel */}
       <div
         style={{
           position: "relative",
@@ -174,7 +281,7 @@ export default function PromptConfigsPage() {
           height: "100%",
         }}
       >
-        {/* Main content inner wrapper for the table -- allows for scrolling */}
+        {/* Scrollable table area */}
         <div
           style={{
             position: "absolute",
@@ -220,7 +327,7 @@ export default function PromptConfigsPage() {
           </Flex>
         </div>
 
-        {/* Prompt config panel with absolute position wrapper */}
+        {/* Prompt config panel, absolutely positioned to overlay the table */}
         <VStack
           height="100%"
           maxHeight="100vh"

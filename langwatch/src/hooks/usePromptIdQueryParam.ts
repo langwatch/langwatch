@@ -22,6 +22,7 @@ export const usePromptIdQueryParam = () => {
       if (promptId) {
         query.promptId = promptId;
       } else {
+        // Use delete or it will be left empty in the url
         delete query.promptId;
       }
       void router.push({ query }, undefined, { shallow: true });
