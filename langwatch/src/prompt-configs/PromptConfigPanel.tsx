@@ -107,7 +107,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
       setIsExpanded(false);
     } else {
       onClose();
-      setIsExpanded(true); // Reset to open state for next time
+      // setIsExpanded(true); // Reset to open state for next time
     }
   };
 
