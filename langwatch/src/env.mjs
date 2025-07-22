@@ -15,7 +15,7 @@ export const env = createEnv({
     DATABASE_URL: optionalIfBuildTime(z.string().url()),
     NODE_ENV: z.enum(["development", "test", "production"]),
     BASE_HOST: optionalIfBuildTime(z.string().min(1)),
-    NEXTAUTH_PROVIDER: z.enum(["auth0", "email", "azure-ad"]),
+    NEXTAUTH_PROVIDER: z.string().optional(),
     NEXTAUTH_SECRET: optionalIfBuildTime(z.string().min(1)),
     NEXTAUTH_URL: optionalIfBuildTime(
       z.preprocess(
@@ -63,6 +63,11 @@ export const env = createEnv({
     AZURE_CLIENT_ID: z.string().optional(),
     AZURE_CLIENT_SECRET: z.string().optional(),
     AZURE_TENANT_ID: z.string().optional(),
+
+    // Cognito
+    COGNITO_CLIENT_ID: z.string().optional(),
+    COGNITO_ISSUER: z.string().optional(),
+
     POSTHOG_KEY: z.string().optional(),
     POSTHOG_HOST: z.string().optional(),
     DISABLE_USAGE_STATS: z.boolean().optional(),
@@ -140,6 +145,8 @@ export const env = createEnv({
     AZURE_CLIENT_ID: process.env.AZURE_CLIENT_ID,
     AZURE_CLIENT_SECRET: process.env.AZURE_CLIENT_SECRET,
     AZURE_TENANT_ID: process.env.AZURE_TENANT_ID,
+    COGNITO_CLIENT_ID: process.env.COGNITO_CLIENT_ID,
+    COGNITO_ISSUER: process.env.COGNITO_ISSUER,
     POSTHOG_KEY: process.env.POSTHOG_KEY,
     POSTHOG_HOST: process.env.POSTHOG_HOST,
     DISABLE_USAGE_STATS:

@@ -6,6 +6,9 @@ import {
   type NextAuthOptions,
 } from "next-auth";
 import Auth0Provider, { type Auth0Profile } from "next-auth/providers/auth0";
+import CognitoProvider, {
+  type CognitoProfile,
+} from "next-auth/providers/cognito";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcrypt";
 
@@ -173,6 +176,24 @@ export const authOptions = (
               name: profile.displayName,
               email: profile.mail ?? profile.userPrincipalName,
               image: null, // Microsoft Graph doesn't return image by default
+            };
+          },
+        })
+      : env.NEXTAUTH_PROVIDER === "cognito"
+      ? CognitoProvider({
+          clientId: env.COGNITO_CLIENT_ID ?? "",
+          clientSecret: "",
+          issuer: env.COGNITO_ISSUER ?? "",
+          client: {
+            token_endpoint_auth_method: "none",
+          },
+
+          profile(profile: CognitoProfile) {
+            return {
+              id: profile.sub,
+              name: profile.name,
+              email: profile.email,
+              image: profile.picture,
             };
           },
         })
