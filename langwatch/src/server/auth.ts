@@ -19,6 +19,10 @@ import type { NextRequest } from "next/server";
 import { getNextAuthSessionToken } from "../utils/auth";
 import AzureADProvider from "next-auth/providers/azure-ad";
 import GitHubProvider from "next-auth/providers/github";
+import GitlabProvider from "next-auth/providers/gitlab";
+import GoogleProvider from "next-auth/providers/google";
+import OktaProvider from "next-auth/providers/okta";
+
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
  * object and keep type safety.
@@ -202,6 +206,22 @@ export const authOptions = (
       ? GitHubProvider({
           clientId: env.GITHUB_CLIENT_ID ?? "",
           clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
+        })
+      : env.NEXTAUTH_PROVIDER === "gitlab"
+      ? GitlabProvider({
+          clientId: env.GITLAB_CLIENT_ID ?? "",
+          clientSecret: env.GITLAB_CLIENT_SECRET ?? "",
+        })
+      : env.NEXTAUTH_PROVIDER === "google"
+      ? GoogleProvider({
+          clientId: env.GOOGLE_CLIENT_ID ?? "",
+          clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
+        })
+      : env.NEXTAUTH_PROVIDER === "okta"
+      ? OktaProvider({
+          clientId: env.OKTA_CLIENT_ID ?? "",
+          clientSecret: env.OKTA_CLIENT_SECRET ?? "",
+          issuer: env.OKTA_ISSUER ?? "",
         })
       : CredentialsProvider({
           name: "Credentials",
