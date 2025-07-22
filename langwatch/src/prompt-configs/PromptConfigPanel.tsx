@@ -7,26 +7,28 @@ import {
   forwardRef,
   type ForwardedRef,
 } from "react";
+import { useDebouncedCallback } from "use-debounce";
+
+import { PanelHeader } from "./components/ui/PanelHeader";
+import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
+import { useInvokePrompt } from "./hooks/useInvokePrompt";
+import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
+
 import {
   ExecutionInputPanel,
   type ExecuteData,
 } from "~/components/executable-panel/ExecutionInputPanel";
-import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
-import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
-import { PanelHeader } from "./components/ui/PanelHeader";
+import { ExecutionOutputPanel } from "~/components/executable-panel/ExecutionOutputPanel";
+import {
+  InputOutputExecutablePanel,
+  PANEL_ANIMATION_DURATION,
+} from "~/components/executable-panel/InputOutputExecutablePanel";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   llmConfigToPromptConfigFormValues,
   promptConfigFormValuesToOptimizationStudioNodeData,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-import {
-  InputOutputExecutablePanel,
-  PANEL_ANIMATION_DURATION,
-} from "~/components/executable-panel/InputOutputExecutablePanel";
-import { useInvokePrompt } from "./hooks/useInvokePrompt";
-import { ExecutionOutputPanel } from "~/components/executable-panel/ExecutionOutputPanel";
-import { useDebouncedCallback } from "use-debounce";
 
 /**
  * Panel for configuring and testing LLM prompts
@@ -55,10 +57,20 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
 
   // ---- API calls and data fetching ----
   const {
+    reset,
     mutate: invokeLLM,
     isLoading: isExecuting,
     data: promptExecutionResult,
-  } = useInvokePrompt();
+  } = useInvokePrompt({
+    mutationKey: ["prompt-config", configId],
+  });
+
+  useEffect(() => {
+    const shouldReset = !isOpen || !isExpanded || !configId;
+    if (shouldReset) {
+      reset();
+    }
+  }, [isOpen, isExpanded, configId, reset]);
 
   // Fetch the LLM configuration
   const { data: llmConfig, isLoading: isLoadingConfig } =
