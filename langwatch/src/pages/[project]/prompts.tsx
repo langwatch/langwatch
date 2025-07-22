@@ -5,28 +5,31 @@ import { Plus } from "react-feather";
 
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { CENTER_CONTENT_BOX_ID } from "~/components/executable-panel/InputOutputExecutablePanel";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { usePromptIdQueryParam } from "~/hooks/usePromptIdQueryParam";
 import { PromptConfigPanel } from "~/prompt-configs/PromptConfigPanel";
 import {
   createDefaultColumns,
   PromptConfigTable,
 } from "~/prompt-configs/PromptConfigTable";
 import { api } from "~/utils/api";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { CENTER_CONTENT_BOX_ID } from "~/components/executable-panel/InputOutputExecutablePanel";
 
 export default function PromptConfigsPage() {
   const utils = api.useContext();
   const { project } = useOrganizationTeamProject();
-  const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
+  const { selectedPromptId, setSelectedPromptId, clearSelection } =
+    usePromptIdQueryParam();
+
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isPaneExpanded, setIsPaneExpanded] = useState(true); // Start open
   const [configToDelete, setConfigToDelete] = useState<LlmPromptConfig | null>(
     null
   );
   const closePanel = () => {
-    setSelectedConfigId(null);
+    clearSelection();
   };
 
   // Fetch prompt configs
@@ -93,7 +96,7 @@ export default function PromptConfigsPage() {
         projectId: project.id,
       });
 
-      setSelectedConfigId(result.id);
+      setSelectedPromptId(result.id);
     } catch (error) {
       toaster.create({
         title: "Error creating prompt config",
@@ -136,11 +139,11 @@ export default function PromptConfigsPage() {
         return Promise.resolve();
       },
       onEdit: (config) => {
-        setSelectedConfigId(config.id);
+        setSelectedPromptId(config.id);
         return Promise.resolve();
       },
     });
-  }, []);
+  }, [setSelectedPromptId]);
 
   /**
    * NB: The styling and markup of this page is a bit hacky
@@ -199,7 +202,7 @@ export default function PromptConfigsPage() {
                 <PromptConfigTable
                   configs={promptConfigs ?? []}
                   isLoading={isLoading}
-                  onRowClick={(config) => setSelectedConfigId(config.id)}
+                  onRowClick={(config) => setSelectedPromptId(config.id)}
                   columns={defaultColumns}
                 />
               </PageLayout.Content>
@@ -224,7 +227,7 @@ export default function PromptConfigsPage() {
           position="absolute"
           top={0}
           width={
-            isPaneExpanded && selectedConfigId
+            isPaneExpanded && selectedPromptId
               ? "100%"
               : centerContentElementRef?.offsetWidth
           }
@@ -233,9 +236,9 @@ export default function PromptConfigsPage() {
         >
           <PromptConfigPanel
             ref={panelRef}
-            isOpen={!!selectedConfigId}
+            isOpen={!!selectedPromptId}
             onClose={closePanel}
-            configId={selectedConfigId ?? ""}
+            configId={selectedPromptId ?? ""}
             isPaneExpanded={isPaneExpanded}
             setIsPaneExpanded={setIsPaneExpanded}
           />
