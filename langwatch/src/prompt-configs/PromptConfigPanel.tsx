@@ -1,4 +1,4 @@
-import { Text, Spinner, VStack } from "@chakra-ui/react";
+import { Text, Spinner, VStack, HStack } from "@chakra-ui/react";
 import {
   type Dispatch,
   type SetStateAction,
@@ -23,6 +23,7 @@ import {
   InputOutputExecutablePanel,
   PANEL_ANIMATION_DURATION,
 } from "~/components/executable-panel/InputOutputExecutablePanel";
+import { MetadataTag } from "~/components/MetadataTag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   llmConfigToPromptConfigFormValues,
@@ -164,6 +165,16 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
             onClose={handleClose}
             onExpand={handleExpand}
           />
+          {llmConfig && (
+            <HStack width="full" gap={2} flexWrap="wrap">
+              <MetadataTag label="prompt_id" value={llmConfig.id} copyable />
+              <MetadataTag
+                label="version_id"
+                value={llmConfig.latestVersion.id ?? ""}
+                copyable
+              />
+            </HStack>
+          )}
           {isLoadingConfig ? (
             <Spinner size="md" />
           ) : (

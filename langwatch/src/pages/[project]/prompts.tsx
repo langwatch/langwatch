@@ -1,8 +1,8 @@
 import { Flex, Spacer, VStack } from "@chakra-ui/react";
-import { type LlmPromptConfig } from "@prisma/client";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Plus } from "react-feather";
 
+import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { CENTER_CONTENT_BOX_ID } from "~/components/executable-panel/InputOutputExecutablePanel";
@@ -44,9 +44,8 @@ import { api } from "~/utils/api";
 function usePromptConfigManagement(projectId: string | undefined) {
   const utils = api.useContext();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [configToDelete, setConfigToDelete] = useState<LlmPromptConfig | null>(
-    null
-  );
+  const [configToDelete, setConfigToDelete] =
+    useState<LlmConfigWithLatestVersion | null>(null);
 
   // Fetch all prompt configs for the current project.
   const {
@@ -122,10 +121,13 @@ function usePromptConfigManagement(projectId: string | undefined) {
    * Open the delete confirmation dialog for a given config.
    * @param config The config to delete.
    */
-  const handleDeleteConfig = useCallback((config: LlmPromptConfig) => {
-    setConfigToDelete(config);
-    setIsDeleteDialogOpen(true);
-  }, []);
+  const handleDeleteConfig = useCallback(
+    (config: LlmConfigWithLatestVersion) => {
+      setConfigToDelete(config);
+      setIsDeleteDialogOpen(true);
+    },
+    []
+  );
 
   /**
    * Confirm and perform deletion of the selected config.
