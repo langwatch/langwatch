@@ -67,6 +67,11 @@ export const env = createEnv({
     // Cognito
     COGNITO_CLIENT_ID: z.string().optional(),
     COGNITO_ISSUER: z.string().optional(),
+    COGNITO_CLIENT_SECRET: z.string().optional(),
+
+    // Github
+    GITHUB_CLIENT_ID: z.string().optional(),
+    GITHUB_CLIENT_SECRET: z.string().optional(),
 
     POSTHOG_KEY: z.string().optional(),
     POSTHOG_HOST: z.string().optional(),
@@ -147,12 +152,15 @@ export const env = createEnv({
     AZURE_TENANT_ID: process.env.AZURE_TENANT_ID,
     COGNITO_CLIENT_ID: process.env.COGNITO_CLIENT_ID,
     COGNITO_ISSUER: process.env.COGNITO_ISSUER,
+    COGNITO_CLIENT_SECRET: process.env.COGNITO_CLIENT_SECRET,
     POSTHOG_KEY: process.env.POSTHOG_KEY,
     POSTHOG_HOST: process.env.POSTHOG_HOST,
     DISABLE_USAGE_STATS:
       process.env.DISABLE_USAGE_STATS === "1" ||
       process.env.DISABLE_USAGE_STATS?.toLowerCase() === "true",
     LANGWATCH_NLP_LAMBDA_CONFIG: process.env.LANGWATCH_NLP_LAMBDA_CONFIG,
+    GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
+    GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

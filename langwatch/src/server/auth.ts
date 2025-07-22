@@ -18,6 +18,7 @@ import { dependencies } from "../injection/dependencies.server";
 import type { NextRequest } from "next/server";
 import { getNextAuthSessionToken } from "../utils/auth";
 import AzureADProvider from "next-auth/providers/azure-ad";
+import GitHubProvider from "next-auth/providers/github";
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
  * object and keep type safety.
@@ -182,7 +183,7 @@ export const authOptions = (
       : env.NEXTAUTH_PROVIDER === "cognito"
       ? CognitoProvider({
           clientId: env.COGNITO_CLIENT_ID ?? "",
-          clientSecret: "",
+          clientSecret: env.COGNITO_CLIENT_SECRET ?? "",
           issuer: env.COGNITO_ISSUER ?? "",
           client: {
             token_endpoint_auth_method: "none",
@@ -196,6 +197,11 @@ export const authOptions = (
               image: profile.picture,
             };
           },
+        })
+      : env.NEXTAUTH_PROVIDER === "github"
+      ? GitHubProvider({
+          clientId: env.GITHUB_CLIENT_ID ?? "",
+          clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
         })
       : CredentialsProvider({
           name: "Credentials",
