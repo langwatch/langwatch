@@ -1,9 +1,9 @@
 import { convertUint8ArrayToBase64 } from "@ai-sdk/provider-utils";
 import { type CoreMessage, type ImagePart } from "ai";
 import { z } from "zod";
-import { type ErrorCapture } from "./server/types/tracer";
-import { chatMessageSchema } from "./server/types/tracer.generated";
-import { type ChatMessage, type SpanInputOutput } from "./types";
+import { type ErrorCapture } from "../server/types/tracer";
+import { chatMessageSchema } from "../server/types/tracer.generated";
+import { type ChatMessage, type SpanInputOutput } from "../types";
 
 const convertImageToUrl = (
   image: ImagePart["image"],

@@ -41,7 +41,7 @@ import {
   autoconvertTypedValues,
   captureError,
   convertFromVercelAIMessages,
-} from "./utils";
+} from "./utils/misc";
 import { LangWatchExporter } from "./LangWatchExporter";
 
 export type {
