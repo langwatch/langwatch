@@ -1,7 +1,9 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, type MutationOptions } from "@tanstack/react-query";
 import type { Node } from "@xyflow/react";
-import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
+
 import { invokeLLM, type PromptExecutionResult } from "../utils/invokeLLM";
+
+import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("useInvokePrompt");
@@ -12,7 +14,9 @@ const logger = createLogger("useInvokePrompt");
  * This hook wraps the invokeLLM utility function in a mutation,
  * providing loading states, error handling, and cache management.
  */
-export function useInvokePrompt() {
+export function useInvokePrompt(
+  options?: Pick<MutationOptions, "mutationKey">
+) {
   return useMutation<
     PromptExecutionResult,
     Error,
@@ -21,6 +25,7 @@ export function useInvokePrompt() {
       data: Node<LlmPromptConfigComponent>["data"];
     }
   >({
+    ...options,
     mutationFn: async ({
       projectId,
       data,
