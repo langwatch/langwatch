@@ -178,6 +178,9 @@ export const env = createEnv({
     GITLAB_CLIENT_SECRET: process.env.GITLAB_CLIENT_SECRET,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    OKTA_CLIENT_ID: process.env.OKTA_CLIENT_ID,
+    OKTA_CLIENT_SECRET: process.env.OKTA_CLIENT_SECRET,
+    OKTA_ISSUER: process.env.OKTA_ISSUER,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
